@@ -1,0 +1,7 @@
+Django
+psycopg2
+django-environ
+djangorestframework
+gunicorn
+Pillow
+django-reversion
