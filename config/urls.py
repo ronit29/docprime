@@ -22,8 +22,10 @@ from ondoc import crm
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/crm/', include('ondoc.crm.urls')),
-    path('api/auth/', include('ondoc.authentication.urls')),
+    path('',include('ondoc.crm.urls')),
+
+    # path('api/crm/', include('ondoc.crm.urls')),
+    # path('api/auth/', include('ondoc.authentication.urls')),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
