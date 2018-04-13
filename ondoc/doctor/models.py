@@ -50,7 +50,7 @@ class Hospital(TimeStampedModel, CreatedByModel, QCModel):
     address = models.CharField(max_length=500)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
-    years_operational = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MaxValueValidator(1), MinValueValidator(200)])
+    years_operational = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MaxValueValidator(200), MinValueValidator(1)])
     registration_number = models.CharField(max_length=500, blank=True)
     building = models.CharField(max_length=100, blank=True)
     sublocality = models.CharField(max_length=100, blank=True)
@@ -116,7 +116,7 @@ class Qualification(TimeStampedModel, CreatedByModel, UniqueNameModel):
 
 
 class DoctorQualification(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="qualificationSpecialization", on_delete=models.CASCADE)
     qualification = models.ForeignKey(Qualification, on_delete=models.CASCADE)
     specialization = models.ForeignKey(Specialization, on_delete=models.CASCADE, blank=True, null=True)
 
@@ -131,7 +131,7 @@ class DoctorQualification(TimeStampedModel):
 
 
 class DoctorHospital(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="availability", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(1, "Monday"), (2, "Tuesday"), (3, "Wednesday"), (4, "Thursday"), (5, "Friday"), (6, "Saturday"), (7, "Sunday")])
 
@@ -156,7 +156,7 @@ class DoctorHospital(TimeStampedModel):
 
 
 class DoctorImage(TimeStampedModel, Image):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="profile_img", on_delete=models.CASCADE)
     name = models.ImageField(upload_to='doctor/images',height_field='height', width_field='width')
 
     class Meta:
@@ -229,7 +229,7 @@ class DoctorAssociation(TimeStampedModel):
 
 
 class DoctorExperience(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="pastExperience", on_delete=models.CASCADE)
     hospital = models.CharField(max_length=200)
     start_year = models.PositiveSmallIntegerField(default=None, blank=True, null=True,validators=[MinValueValidator(1950)])
     end_year = models.PositiveSmallIntegerField(default=None, blank=True, null=True,validators=[MinValueValidator(1950)])
