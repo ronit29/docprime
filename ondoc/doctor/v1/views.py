@@ -1,4 +1,4 @@
-from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital
+from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
                         DoctorApiReformData, DoctorHospitalSerializer
 from .services import ReformScheduleService
@@ -22,6 +22,9 @@ class GenericSearchView(APIView):
         
         medical_services = MedicalService.objects.filter(name__icontains=search_key)
         serialized_medical_serv = MedicalServiceSerializer(medical_services, many=True)
+
+        symptoms = Symptoms.objects.filter(name__icontains=search_key)
+        serialized_symptoms = SymptomsSerializer(symptoms, many=True)
         
         resp = {
             "message": "message",
@@ -33,6 +36,10 @@ class GenericSearchView(APIView):
             "type": "specialization",
             "name": "Specialization",
             "data": serialized_medical_serv.data
+        },{
+            "type": "symptoms",
+            "name": "Symptoms",
+            "data": serialized_symptoms
         }]}
         return Response(resp)
 

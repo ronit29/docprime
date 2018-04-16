@@ -5,7 +5,7 @@ import datetime
 from rest_framework import serializers
 from .services import RestructureDataService
 from ondoc.doctor.models import (
-        Doctor, Specialization, MedicalService, DoctorImage,
+        Doctor, Specialization, MedicalService, DoctorImage, Symptoms,
         DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience,
     ) 
 
@@ -87,3 +87,9 @@ class MedicalServiceSerializer(serializers.ModelSerializer):
         model = MedicalService
         fields = ('id', 'name', )
 
+
+class SymptomsSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Symptoms
+        fields = ('id', 'name', )

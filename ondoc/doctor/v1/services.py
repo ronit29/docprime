@@ -69,6 +69,7 @@ class RestructureDataService():
 
         return result
 
+
 class ReformScheduleService():
     """Restructure the data given by serializer, and get n days schedule"""
 

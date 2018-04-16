@@ -8,5 +8,4 @@ urlpatterns = [
     url(r'^(?P<version>(v1|v2))/', include(api_v1)),
 ]
 
-
 format_suffix_patterns(urlpatterns)
