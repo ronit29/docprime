@@ -115,6 +115,16 @@ class Qualification(TimeStampedModel, CreatedByModel, UniqueNameModel):
         db_table = "qualification"
 
 
+# class Symptoms(TimeStampedModel, CreatedByModel, UniqueNameModel):
+#     name = models.CharField(max_length=200)
+
+#     def __str__(self):
+#         return self.name
+
+#     class Meta:
+#         db_table = "symptoms"
+
+
 class DoctorQualification(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="qualificationSpecialization", on_delete=models.CASCADE)
     qualification = models.ForeignKey(Qualification, on_delete=models.CASCADE)

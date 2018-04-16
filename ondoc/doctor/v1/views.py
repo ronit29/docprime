@@ -1,5 +1,5 @@
 from ondoc.doctor.models import Doctor, Specialization, MedicalService
-from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer
+from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, DoctorApiReformData
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -43,6 +43,6 @@ class DoctorView(APIView):
 
     def get(self, request, version="v1", format=None):
         doctors = Doctor.objects.all()
-        serialized_doctors = DoctorSerializer(doctors, many=True)
+        serialized_doctors = DoctorApiReformData(doctors, many=True)
                 
         return Response(serialized_doctors.data)
