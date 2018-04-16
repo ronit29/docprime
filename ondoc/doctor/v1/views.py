@@ -1,5 +1,7 @@
-from ondoc.doctor.models import Doctor, Specialization, MedicalService
-from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, DoctorApiReformData
+from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital
+from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
+                        DoctorApiReformData, DoctorHospitalSerializer
+from .services import ReformScheduleService
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -35,9 +37,29 @@ class GenericSearchView(APIView):
         return Response(resp)
 
 
+class DoctorAvailability(APIView):
+    """
+    Explicitly extracts a doctor's schedule with more details.
+    """
+    # permission_classes = (IsAuthenticated,)
+
+    def get(self, request, version="v1", format=None):
+        doctor_id = request.GET.get("id", None)
+
+        try:
+            schedule = DoctorHospital.objects.filter(doctor_id = doctor_id)
+        except Doctor.DoesNotExist as e:
+            raise Exception('No doctor with specified id found')
+
+        serialized_schedule = DoctorHospitalSerializer(schedule, many=True)
+        schedule_obj = ReformScheduleService(schedule = serialized_schedule.data, days = 10)
+
+        return Response(schedule_obj.get_data())
+
+
 class DoctorView(APIView):
     """
-    List all snippets, or create a new snippet.
+    Lists all the doctors and their schedule.
     """
     # permission_classes = (IsAuthenticated,)
 
