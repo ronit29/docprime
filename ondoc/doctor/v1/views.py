@@ -1,6 +1,6 @@
 from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
-                        DoctorApiReformData, DoctorHospitalSerializer
+                        DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer
 from .services import ReformScheduleService
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -39,7 +39,7 @@ class GenericSearchView(APIView):
         },{
             "type": "symptoms",
             "name": "Symptoms",
-            "data": serialized_symptoms
+            "data": serialized_symptoms.data
         }]}
         return Response(resp)
 
@@ -54,7 +54,8 @@ class DoctorAvailability(APIView):
         doctor_id = request.GET.get("id", None)
 
         try:
-            schedule = DoctorHospital.objects.filter(doctor_id = doctor_id)
+            schedule = DoctorHospital.objects.filter(doctor_id = doctor_id).select_related('doctor',
+             'hospital')
         except Doctor.DoesNotExist as e:
             raise Exception('No doctor with specified id found')
 
@@ -71,7 +72,9 @@ class DoctorView(APIView):
     # permission_classes = (IsAuthenticated,)
 
     def get(self, request, version="v1", format=None):
-        doctors = Doctor.objects.all()
+        doctors = Doctor.objects.prefetch_related('qualificationSpecialization', 'profile_img',
+            'availability', 'pastExperience', 'availability__hospital', 'qualificationSpecialization__qualification'
+            , 'qualificationSpecialization__specialization').all()
         serialized_doctors = DoctorApiReformData(doctors, many=True)
                 
         return Response(serialized_doctors.data)

@@ -4,6 +4,8 @@ from collections import OrderedDict, defaultdict
 
 
 class RestructureDataService():
+    """.Restructures timings and availability given by serializer."""
+
     def reform_timings(self, days):
         sorted_results_by_days = defaultdict(list)
         result = []
@@ -77,13 +79,13 @@ class ReformScheduleService():
         self.schedule = schedule
         self.days = days
 
-    def create_schedule(self, schedule_by_day = {}):
+    def generate_schedule(self, schedule_by_day = {}):
         day = datetime.datetime.today().weekday()
         date = datetime.date.today()
         curr_hour = datetime.datetime.now().hour
         schedule_dates = []
 
-        # Now that we have schedule by days, we will get next n days schedule of doctor
+        # Now that we have schedule by days, we will generate next n dates schedule of doctor
         for _ in range(self.days):
             if day >= 7:
                 day = day%7
@@ -108,10 +110,11 @@ class ReformScheduleService():
         for sch in self.schedule:
             schedule_by_day[sch['day'] -1].append(sch)
 
-        schedule_dates = self.create_schedule(schedule_by_day = schedule_by_day)
+        schedule_dates = self.generate_schedule(schedule_by_day = schedule_by_day)
 
         restruct_obj = RestructureDataService()
         for single_date in schedule_dates:
             single_date['intervals'] = restruct_obj.reform_timings(single_date['intervals'])
 
         return schedule_dates
+
