@@ -9,8 +9,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 
 
-class CustomPagination(PageNumberPagination):
-    def get_paginated_response(self, data):
+class BasePagination(PageNumberPagination):
+    def get_paginated_response(self, data, keyword = "results"):
         return Response({
             'links': {
                 'next': self.get_next_link(),
@@ -18,8 +18,13 @@ class CustomPagination(PageNumberPagination):
             },
             'total_results': self.page.paginator.count,
             'total_pages': self.page.paginator.num_pages,
-            'results': data
+            keyword: data
         })
+
+
+class DoctorPagination(BasePagination):
+    def get_paginated_response(self, data):
+        return super().get_paginated_response(data, keyword = "doctors")
 
 
 class GenericSearchView(APIView):
@@ -86,7 +91,7 @@ class DoctorView(APIView):
     # permission_classes = (IsAuthenticated,)
 
     def get(self, request, version="v1", format=None):
-        paginator = CustomPagination()
+        paginator = DoctorPagination()
         doctors = Doctor.objects.prefetch_related('qualificationSpecialization', 'profile_img',
             'availability', 'pastExperience', 'availability__hospital', 'qualificationSpecialization__qualification'
             , 'qualificationSpecialization__specialization').all()
@@ -95,5 +100,4 @@ class DoctorView(APIView):
         serialized_doctors = DoctorApiReformData(page, many=True)
 
         return paginator.get_paginated_response(serialized_doctors.data)
-
 
