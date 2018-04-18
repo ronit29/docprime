@@ -6,6 +6,20 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+
+
+class CustomPagination(PageNumberPagination):
+    def get_paginated_response(self, data):
+        return Response({
+            'links': {
+                'next': self.get_next_link(),
+                'previous': self.get_previous_link()
+            },
+            'total_results': self.page.paginator.count,
+            'total_pages': self.page.paginator.num_pages,
+            'results': data
+        })
 
 
 class GenericSearchView(APIView):
@@ -72,9 +86,14 @@ class DoctorView(APIView):
     # permission_classes = (IsAuthenticated,)
 
     def get(self, request, version="v1", format=None):
+        paginator = CustomPagination()
         doctors = Doctor.objects.prefetch_related('qualificationSpecialization', 'profile_img',
             'availability', 'pastExperience', 'availability__hospital', 'qualificationSpecialization__qualification'
             , 'qualificationSpecialization__specialization').all()
-        serialized_doctors = DoctorApiReformData(doctors, many=True)
-                
-        return Response(serialized_doctors.data)
+        
+        page = paginator.paginate_queryset(doctors, request)
+        serialized_doctors = DoctorApiReformData(page, many=True)
+
+        return paginator.get_paginated_response(serialized_doctors.data)
+
+
