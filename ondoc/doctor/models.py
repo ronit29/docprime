@@ -4,7 +4,7 @@ from django.contrib.postgres.operations import CreateExtension
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
-from django.utils.safestring import mark_safe
+from django.contrib.postgres.fields import JSONField
 
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel
 
@@ -41,24 +41,27 @@ class MedicalService(TimeStampedModel,UniqueNameModel):
         return self.name
 
     class Meta:
-        db_table = "medical_services"
+        db_table = "medical_service"
 
 
 class Hospital(TimeStampedModel, CreatedByModel, QCModel):
 
-    name = models.CharField(max_length=200, blank=True)
-    address = models.CharField(max_length=500)
+    name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
-    years_operational = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MaxValueValidator(1), MinValueValidator(200)])
+    operational_since = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MinValueValidator(1800)])
+    parking = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Easy"), (2,"Difficult")])
     registration_number = models.CharField(max_length=500, blank=True)
     building = models.CharField(max_length=100, blank=True)
     sublocality = models.CharField(max_length=100, blank=True)
     locality = models.CharField(max_length=100, blank=True)
-    city = models.CharField(max_length=100, blank=True)
-    state = models.CharField(max_length=100, blank=True)
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=100)
+    country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     hospital_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Private"), (2,"Clinic"), (3,"Hospital")])
+    network_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Non Network Hospital"), (2,"Network Hospital")])
+    network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return self.name
@@ -67,20 +70,92 @@ class Hospital(TimeStampedModel, CreatedByModel, QCModel):
         db_table = "hospital"
 
 
+class HospitalAward(TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    year = models.PositiveSmallIntegerField(validators=[MinValueValidator(1900)])
+
+    def __str__(self):
+        return self.hospital.name + " (" + self.name + ")"
+
+    class Meta:
+        db_table = "hospital_award"
+
+
+class HospitalAccreditation(TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.hospital.name + " (" + self.name + ")"
+
+    class Meta:
+        db_table = "hospital_accreditation"
+
+class HospitalCertification(TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.hospital.name + " (" + self.name + ")"
+
+    class Meta:
+        db_table = "hospital_certification"
+
+class HospitalSpeciality(TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.hospital.name + " (" + self.name + ")"
+
+    class Meta:
+        db_table = "hospital_speciality"
+
+
+# class ClinicalSpeciality(TimeStampedModel):
+#     name = models.CharField(max_length=1000)
+
+#     def __str__(self):
+#         return self.name
+
+#     class Meta:
+#         db_table = "clinical_speciality"
+
+
+# class HospitalClinicalSpeciality(TimeStampedModel):
+#     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+#     speciality = models.ForeignKey(ClinicalSpeciality, on_delete=models.CASCADE)
+
+#     def __str__(self):
+#         return self.hospital.name + " (" + self.clinical_speciality.name + ")"
+
+#     class Meta:
+#         db_table = "hospital_clinical_speciality"
+#         unique_together = (("hospital", "speciality"))
+
+
+class College(TimeStampedModel):
+
+    name = models.CharField(max_length=200, blank=False)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "college"
+
+
 class Doctor(TimeStampedModel, CreatedByModel, QCModel):
 
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, choices=[("","Select"), ("m","Male"), ("f","Female"), ("o","Other")])
-    practice_duration = models.PositiveSmallIntegerField(default=None, blank=True, null=True,validators=[MaxValueValidator(100), MinValueValidator(1)])
+    practicing_since = models.PositiveSmallIntegerField(blank=True, null=True,validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
-    registration_details = models.CharField(max_length=200, blank=True)
+    license = models.CharField(max_length=200, blank=True)
     additional_details = models.CharField(max_length=2000, blank=True)
-    country_code = models.PositiveSmallIntegerField(default=91, blank=True, null=True)
-    phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
-    is_phone_number_verified = models.BooleanField(verbose_name= 'Phone Number Verified', default=False)
     email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name= 'Email Verified', default=False)
-
     hospitals = models.ManyToManyField(
         Hospital,
         through='DoctorHospital',
@@ -94,7 +169,7 @@ class Doctor(TimeStampedModel, CreatedByModel, QCModel):
         db_table = "doctor"
 
 
-class Specialization(TimeStampedModel, CreatedByModel, UniqueNameModel):
+class Specialization(TimeStampedModel, UniqueNameModel):
     name = models.CharField(max_length=200)
     human_readable_name = models.CharField(max_length=200, blank=True)
 
@@ -105,7 +180,7 @@ class Specialization(TimeStampedModel, CreatedByModel, UniqueNameModel):
         db_table = "specialization"
 
 
-class Qualification(TimeStampedModel, CreatedByModel, UniqueNameModel):
+class Qualification(TimeStampedModel, UniqueNameModel):
     name = models.CharField(max_length=200)
 
     def __str__(self):
@@ -119,6 +194,8 @@ class DoctorQualification(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
     qualification = models.ForeignKey(Qualification, on_delete=models.CASCADE)
     specialization = models.ForeignKey(Specialization, on_delete=models.CASCADE, blank=True, null=True)
+    college = models.ForeignKey(College, on_delete=models.CASCADE, blank=True, null=True);
+    passing_year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
 
     def __str__(self):
         if self.specialization_id:
@@ -127,7 +204,7 @@ class DoctorQualification(TimeStampedModel):
 
     class Meta:
         db_table = "doctor_qualification"
-        unique_together = (("doctor", "qualification", "specialization"))
+        unique_together = (("doctor", "qualification", "specialization", "college"))
 
 
 class DoctorHospital(TimeStampedModel):
@@ -210,6 +287,7 @@ class DoctorLanguage(TimeStampedModel):
 class DoctorAward(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
 
     def __str__(self):
         return self.doctor.name + " (" + self.name + ")"
@@ -245,3 +323,113 @@ class DoctorMedicalService(TimeStampedModel):
     class Meta:
         db_table = "doctor_medical_service"
         unique_together = (("doctor", "service"))
+
+class DoctorMobile(TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    country_code = models.PositiveSmallIntegerField(default=91, blank=True, null=True)
+    number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    is_phone_number_verified = models.BooleanField(verbose_name= 'Phone Number Verified?', default=False)
+
+    class Meta:
+        db_table = "doctor_mobile"
+        unique_together = (("doctor", "number"))
+
+
+class HospitalNetwork(TimeStampedModel, CreatedByModel, QCModel):
+    name = models.CharField(max_length=100)
+    operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
+    about = models.CharField(max_length=2000, blank=True)
+    network_size = models.PositiveSmallIntegerField(blank=True, null=True)
+    building = models.CharField(max_length=100, blank=True)
+    sublocality = models.CharField(max_length=100, blank=True)
+    locality = models.CharField(max_length=100, blank=True)
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=100)
+    country = models.CharField(max_length=100)
+    pin_code = models.PositiveIntegerField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name + " (" + self.city + ")"
+
+    class Meta:
+        db_table = "hospital_network"
+
+
+class HospitalNetworkCertification(TimeStampedModel):
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.network.name + " (" + self.name + ")"
+
+    class Meta:
+        db_table = "hospital_network_certification"
+
+
+class HospitalNetworkAward(TimeStampedModel):
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    year = models.PositiveSmallIntegerField(validators=[MinValueValidator(1900)])
+    def __str__(self):
+        return self.network.name + " (" + self.name + ")"
+
+    class Meta:
+        db_table = "hospital_network_award"
+
+
+class HospitalNetworkAccreditation(TimeStampedModel):
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.network.name + " (" + self.name + ")"
+
+    class Meta:
+        db_table = "hospital_network_accreditation"
+
+class HospitalNetworkManager(TimeStampedModel):
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    number = models.BigIntegerField()
+    email = models.EmailField(max_length=100, blank=True)
+    details = models.CharField(max_length=200, blank=True)
+    contact_type = models.PositiveSmallIntegerField(choices=[(1, "Other"), (2, "Single Point of Contact"), (3, "Manager")])
+
+    def __str__(self):
+        return self.network.name
+
+    class Meta:
+        db_table = "hospital_network_manager"
+
+
+class HospitalNetworkHelpline(TimeStampedModel):
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    number = models.BigIntegerField()
+    details = models.CharField(max_length=200, blank=True)
+
+    def __str__(self):
+        return self.network.name
+
+    class Meta:
+        db_table = "hospital_network_helpline"
+
+
+class HospitalNetworkEmail(TimeStampedModel):
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    email = models.EmailField(max_length=100)
+
+    def __str__(self):
+        return self.network.name
+
+    class Meta:
+        db_table = "hospital_network_email"
+
+# class HospitalNetworkMapping(TimeStampedModel):
+#     network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+#     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+
+#     def __str__(self):
+#         return self.network.name + " (" + self.hospital.name + ")"
+
+#     class Meta:
+#         db_table = "hospital_network_mapping"

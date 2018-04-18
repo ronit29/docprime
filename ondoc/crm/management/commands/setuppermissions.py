@@ -5,11 +5,15 @@ from django.db.models import Q
 
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorHospital,
-                                 DoctorQualification, Qualification,
-                                 Specialization, DoctorLanguage,
-                                 DoctorAward, DoctorAssociation,
-                                 DoctorExperience, DoctorMedicalService,
-                                 DoctorImage, DoctorDocument, Language, MedicalService)
+    DoctorQualification, Qualification, Specialization, DoctorLanguage,
+    DoctorAward, DoctorAssociation, DoctorExperience, DoctorMedicalService,
+    DoctorImage, DoctorDocument, Language, MedicalService, HospitalNetwork,
+    DoctorMobile, HospitalSpeciality, HospitalAward,
+    HospitalAccreditation, HospitalImage, HospitalDocument,
+    HospitalCertification, College, HospitalNetworkManager,
+    HospitalNetworkHelpline, HospitalNetworkEmail,
+    HospitalNetworkAccreditation, HospitalNetworkAward,
+    HospitalNetworkCertification)
 
 
 class Command(BaseCommand):
@@ -22,7 +26,7 @@ class Command(BaseCommand):
         group.permissions.clear()
 
 
-        content_types = ContentType.objects.get_for_models(Doctor, Hospital)
+        content_types = ContentType.objects.get_for_models(Doctor, Hospital, HospitalNetwork)
         for cl, ct in content_types.items():
 
             permissions = Permission.objects.filter(
@@ -33,16 +37,15 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
-
         content_types = ContentType.objects.get_for_models(DoctorHospital,
-                                                           DoctorQualification,
-                                                           DoctorLanguage,
-                                                           DoctorAward,
-                                                           DoctorAssociation,
-                                                           DoctorExperience,
-                                                           DoctorMedicalService,
-                                                           DoctorImage,
-                                                           DoctorDocument)
+            DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
+            DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
+            DoctorMobile, HospitalSpeciality,
+            HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
+            HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
+            HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
+            HospitalNetworkCertification)
+
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -57,16 +60,15 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['QC_GROUP_NAME'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Doctor, Hospital)
+        content_types = ContentType.objects.get_for_models(Doctor, Hospital, HospitalNetwork)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(Qualification,
-                                                           Specialization,
-                                                           Language,
-                                                           MedicalService)
+            Specialization, Language, MedicalService, College)
+
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -74,19 +76,24 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
+
         content_types = ContentType.objects.get_for_models(DoctorHospital,
-                                                           DoctorQualification,
-                                                           DoctorLanguage,
-                                                           DoctorAward,
-                                                           DoctorAssociation,
-                                                           DoctorExperience,
-                                                           DoctorMedicalService,
-                                                           DoctorImage,
-                                                           DoctorDocument)
+            DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
+            DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
+            DoctorMobile, HospitalSpeciality,
+            HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
+            HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
+            HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
+            HospitalNetworkCertification)
+
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
-                Q(codename='change_' + ct.model))
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
             group.permissions.add(*permissions)
+
 
         self.stdout.write('Successfully created groups and permissions')

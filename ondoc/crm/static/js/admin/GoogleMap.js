@@ -4,7 +4,7 @@ function GoogleMap() {
   this.requiredAccuracy = 50;
   this.init = function(){
     django.jQuery('#id_location_error').attr("readonly","readonly")
-    var locText = django.jQuery('#id_location').val().replace("POINT (","").replace(")","").split(" ");
+    var locText = django.jQuery('#id_location').val().replace("SRID=4326;POINT (","").replace(")","").split(" ");
     
         var center = {lat: 0, lng: 0};
         if(locText.length>1)
@@ -58,7 +58,7 @@ function GoogleMap() {
   this.renderMarker = function(position)
   {
       this.map.setCenter({lat: position.coords.latitude, lng: position.coords.longitude});
-      var point = "POINT ("+position.coords.longitude+" "+position.coords.latitude+")";
+      var point = "SRID=4326;POINT ("+position.coords.longitude+" "+position.coords.latitude+")";
       this.addMarker({lat: position.coords.latitude, lng: position.coords.longitude},position.coords.accuracy)
 
       if(position.coords.accuracy>this.requiredAccuracy)
