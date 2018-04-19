@@ -1,5 +1,5 @@
 from django.contrib.gis.db import models
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel
 from ondoc.doctor.models import Hospital
 
@@ -7,6 +7,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
     license = models.CharField(max_length=200, blank=True)
+    primary_email = models.EmailField(max_length=100, blank=True)
+    primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MinValueValidator(1800)])
     parking = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Easy"), (2,"Difficult")])
     always_open = models.BooleanField(verbose_name= 'Is lab open 24X7', default=False)
@@ -247,3 +249,16 @@ class RadiologyTest(TimeStampedModel):
 
     class Meta:
         db_table = "radiology_test"
+
+class LabOnboardingToken(TimeStampedModel):
+    GENERATED = 1
+    REJECTED = 2
+    CONSUMED = 3
+    STATUS_CHOICES = [(GENERATED, "Generated"), (REJECTED, "Rejected"), (CONSUMED, "Consumed")]
+    lab = models.ForeignKey(Lab, null=True, on_delete=models.SET_NULL)
+    token = models.CharField(max_length=100)
+    verified_token = models.CharField(max_length=100, null=True)
+    status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=GENERATED)
+
+    class Meta:
+        db_table = "lab_onboarding_token"
