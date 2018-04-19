@@ -81,7 +81,8 @@ THIRD_PARTY_APPS = (
 LOCAL_APPS = (
     'ondoc.crm',
     'ondoc.authentication',
-    'ondoc.doctor'
+    'ondoc.doctor',
+    'ondoc.diagnostic'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

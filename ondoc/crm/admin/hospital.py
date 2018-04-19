@@ -67,6 +67,19 @@ class HospitalSpecialityInline(admin.TabularInline):
 class HospitalForm(forms.ModelForm):
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
 
+    def clean_location(self):
+        data = self.cleaned_data['location']
+        # if data == '':
+        #    return None
+        return data
+
+    def clean_operational_since(self):
+        data = self.cleaned_data['operational_since']
+        if data == '':
+            return None
+        return data
+
+
     def validate_qc(self):
         qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
             'registration_number':'req','building':'req','locality':'req','city':'req','state':'req',
@@ -79,7 +92,6 @@ class HospitalForm(forms.ModelForm):
         if self.cleaned_data['network_type']==2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
 
-
     def clean(self):
         if not self.request.user.is_superuser:
             if self.instance.data_status == 3:
@@ -88,7 +100,7 @@ class HospitalForm(forms.ModelForm):
             if self.instance.data_status == 2 and not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
                 raise forms.ValidationError("Cannot update Hospital submitted for QC approval")
 
-            if self.instance.data_status == 1 and self.instance.created_by != self.request.user:
+            if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
                 raise forms.ValidationError("Cannot modify Hospital added by other users")
 
 

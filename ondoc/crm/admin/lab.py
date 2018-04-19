@@ -1,3 +1,14 @@
+from django.contrib.gis import forms
+from django.contrib.gis import admin
+from reversion.admin import VersionAdmin
+from django.db.models import Q
+from django.db import models
+
+from ondoc.doctor.models import Hospital
+from ondoc.diagnostic.models import (LabTiming, LabImage,
+    LabManager,LabAccreditation, LabAward, LabCertification,
+    LabNetwork)
+from .common import *
 
 class LabTimingInline(admin.TabularInline):
     model = LabTiming
@@ -53,6 +64,13 @@ class LabForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
 
+    def clean_operational_since(self):
+        data = self.cleaned_data['operational_since']
+        if data == '':
+            return None
+        return data
+
+
     def validate_qc(self):
         qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
             'license':'req','building':'req','locality':'req','city':'req','state':'req',
@@ -74,7 +92,7 @@ class LabForm(forms.ModelForm):
             if self.instance.data_status == 2 and not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
                 raise forms.ValidationError("Cannot update Lab submitted for QC approval")
 
-            if self.instance.data_status == 1 and self.instance.created_by != self.request.user:
+            if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
                 raise forms.ValidationError("Cannot modify Lab added by other users")
 
 
@@ -123,14 +141,14 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
         form = super(LabAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
         form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
-
+        form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
         return form
 
     list_display = ('name', 'updated_at', 'data_status', 'created_by')
     form = LabForm
     search_fields = ['name']
     inlines = [LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline]
+        LabManagerInline, LabTimingInline, LabImageInline]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'

@@ -1,3 +1,15 @@
+from django.contrib.gis import forms
+from django.contrib.gis import admin
+from reversion.admin import VersionAdmin
+from django.db.models import Q
+from django.db import models
+
+from ondoc.diagnostic.models import (LabNetworkCertification,
+    LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
+    LabNetworkHelpline, LabNetworkManager)
+from .common import *
+
+
 class LabNetworkCertificationInline(admin.TabularInline):
     model = LabNetworkCertification
     extra = 0
@@ -78,7 +90,7 @@ class LabNetworkForm(forms.ModelForm):
             if self.instance.data_status == 2 and not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
                 raise forms.ValidationError("Cannot update Lab Network  submitted for QC approval")
 
-            if self.instance.data_status == 1 and self.instance.created_by != self.request.user:
+            if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
                 raise forms.ValidationError("Cannot modify Lab Network added by other users")
 
             if '_submit_for_qc' in self.data:

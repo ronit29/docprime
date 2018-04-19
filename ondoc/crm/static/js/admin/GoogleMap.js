@@ -1,7 +1,7 @@
 function GoogleMap() {
 
   this.marker = null;
-  this.requiredAccuracy = 50;
+  this.requiredAccuracy = 500;
   this.init = function(){
     django.jQuery('#id_location_error').attr("readonly","readonly")
     var locText = django.jQuery('#id_location').val().replace("SRID=4326;POINT (","").replace(")","").split(" ");

@@ -89,7 +89,7 @@ class HospitalNetworkForm(forms.ModelForm):
             if self.instance.data_status == 2 and not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
                 raise forms.ValidationError("Cannot update Hospital Network  submitted for QC approval")
 
-            if self.instance.data_status == 1 and self.instance.created_by != self.request.user:
+            if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
                 raise forms.ValidationError("Cannot modify Hospital Network added by other users")
 
             if '_submit_for_qc' in self.data:

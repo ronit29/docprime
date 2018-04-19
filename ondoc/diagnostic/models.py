@@ -1,4 +1,7 @@
-from django.db import models
+from django.contrib.gis.db import models
+from django.core.validators import MinValueValidator
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel
+from ondoc.doctor.models import Hospital
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
     name = models.CharField(max_length=200)
@@ -7,7 +10,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MinValueValidator(1800)])
     parking = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Easy"), (2,"Difficult")])
     always_open = models.BooleanField(verbose_name= 'Is lab open 24X7', default=False)
-    hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL)
+    hospital = models.ForeignKey(Hospital, blank = True, null = True, on_delete=models.SET_NULL)
     network_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Non Network Lab"), (2,"Network Lab")])
     network = models.ForeignKey('LabNetwork', null=True, blank=True, on_delete=models.SET_NULL)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
@@ -19,6 +22,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     state = models.CharField(max_length=100)
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lab"
 
 
 class LabCertification(TimeStampedModel):
@@ -63,6 +72,12 @@ class LabManager(TimeStampedModel):
     details = models.CharField(max_length=200, blank=True)
     contact_type = models.PositiveSmallIntegerField(choices=[(1, "Other"), (2, "Single Point of Contact"), (3, "Manager"), (4, "Owner")])
 
+    def __str__(self):
+        return self.lab.name + " (" + self.name + ")"
+
+    class Meta:
+        db_table = "lab_manager"
+
 
 class LabImage(TimeStampedModel, Image):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
@@ -91,9 +106,6 @@ class LabTiming(TimeStampedModel):
 
     class Meta:
         db_table = "lab_timing"
-
-
-
 
 
 class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
@@ -157,7 +169,7 @@ class LabNetworkManager(TimeStampedModel):
     contact_type = models.PositiveSmallIntegerField(choices=[(1, "Other"), (2, "Single Point of Contact"), (3, "Manager")])
 
     def __str__(self):
-        return self.network.name
+        return self.name
 
     class Meta:
         db_table = "lab_network_manager"
@@ -169,7 +181,7 @@ class LabNetworkHelpline(TimeStampedModel):
     details = models.CharField(max_length=200, blank=True)
 
     def __str__(self):
-        return self.network.name
+        return self.number
 
     class Meta:
         db_table = "lab_network_helpline"
@@ -180,7 +192,7 @@ class LabNetworkEmail(TimeStampedModel):
     email = models.EmailField(max_length=100)
 
     def __str__(self):
-        return self.network.name
+        return self.email
 
     class Meta:
         db_table = "lab_network_email"
@@ -189,15 +201,25 @@ class LabNetworkEmail(TimeStampedModel):
 class PathologyTestType(TimeStampedModel):
     name = models.CharField(max_length=200)
 
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "pathology_test_type"
 
 class RadiologyTestType(TimeStampedModel):
     name = models.CharField(max_length=200)
 
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "radiology_test_type"
 
 class PathologyTest(TimeStampedModel):
     name = models.CharField(max_length=200)
-    test_type = models.ForeignKey(PathologyTestType, on_delete=models.SET_NULL)
-    test_sub_type = models.ForeignKey(PathologyTestType, on_delete=models.SET_NULL)
+    test_type = models.ForeignKey(PathologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_type')
+    test_sub_type = models.ForeignKey(PathologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_sub_type')
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
     why = models.CharField(max_length=1000, blank=True)
     pre_test_info = models.CharField(max_length=1000, blank=True)
@@ -206,13 +228,22 @@ class PathologyTest(TimeStampedModel):
     sample_amount = models.CharField(max_length=1000, blank=True)
     expected_tat = models.CharField(max_length=1000, blank=True)
 
+    def __str__(self):
+        return self.name
+
     class Meta:
         db_table = "pathalogy_test"
 
 class RadiologyTest(TimeStampedModel):
     name = models.CharField(max_length=200)
-    test_type = models.ForeignKey(RadiologyTestType, on_delete=models.SET_NULL)
-    test_sub_type = models.ForeignKey(RadiologyTestType, on_delete=models.SET_NULL)
+    test_type = models.ForeignKey(RadiologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_type')
+    test_sub_type = models.ForeignKey(RadiologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_sub_type')
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
     why = models.CharField(max_length=1000, blank=True)
     pre_test_info = models.CharField(max_length=1000, blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "radiology_test"

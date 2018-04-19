@@ -15,6 +15,14 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorHospital,
     HospitalNetworkAccreditation, HospitalNetworkAward,
     HospitalNetworkCertification)
 
+from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
+    LabManager,LabAccreditation, LabAward, LabCertification,
+    LabNetwork,LabNetworkCertification,
+    LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
+    LabNetworkHelpline, LabNetworkManager, PathologyTest,
+    RadiologyTest, PathologyTestType, RadiologyTestType)
+
+
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
@@ -56,6 +64,32 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
+        for cl, ct in content_types.items():
+
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(LabTiming, LabImage,
+        LabManager,LabAccreditation, LabAward, LabCertification,
+        LabNetwork,LabNetworkCertification, LabNetworkAward,
+        LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
+        LabNetworkManager)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+
         # setup permissions for qc team
         group, created = Group.objects.get_or_create(name=constants['QC_GROUP_NAME'])
         group.permissions.clear()
@@ -66,8 +100,27 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
+
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct), Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+
         content_types = ContentType.objects.get_for_models(Qualification,
             Specialization, Language, MedicalService, College)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+
+        content_types = ContentType.objects.get_for_models(PathologyTest,
+            RadiologyTest, PathologyTestType, RadiologyTestType)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -94,6 +147,22 @@ class Command(BaseCommand):
                 Q(codename='delete_' + ct.model))
 
             group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(LabTiming, LabImage,
+        LabManager,LabAccreditation, LabAward, LabCertification,
+        LabNetwork,LabNetworkCertification, LabNetworkAward,
+        LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
+        LabNetworkManager)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
 
 
         self.stdout.write('Successfully created groups and permissions')
