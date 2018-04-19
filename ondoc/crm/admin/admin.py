@@ -3,13 +3,13 @@
 from django.contrib.gis import admin
 
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital, HospitalNetwork)
-from ondoc.diagnostic.models import Lab, LabNetwork
+from ondoc.diagnostic.models import Lab, LabNetwork, PathologyTest, RadiologyTest, PathologyTestType, RadiologyTestType
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin,
     QualificationAdmin, LanguageAdmin, CollegeAdmin)
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
-from .lab import LabAdmin
+from .lab import LabAdmin, PathologyTestAdmin, RadiologyTestAdmin, RadiologyTestTypeAdmin, PathologyTestTypeAdmin
 from .lab_network import LabNetworkAdmin
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -37,4 +37,8 @@ admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
 admin.site.register(Lab, LabAdmin)
 admin.site.register(LabNetwork, LabNetworkAdmin)
-# admin.site.register(Image)
+
+admin.site.register(PathologyTest, PathologyTestAdmin)
+admin.site.register(RadiologyTest, RadiologyTestAdmin)
+admin.site.register(RadiologyTestType, RadiologyTestTypeAdmin)
+admin.site.register(PathologyTestType, PathologyTestTypeAdmin)

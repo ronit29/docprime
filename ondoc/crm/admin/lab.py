@@ -153,3 +153,16 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
     map_width = 200
     map_template = 'admin/gis/gmap.html'
     extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&callback=initGoogleMap']
+
+
+class PathologyTestAdmin(VersionAdmin):
+    search_fields = ['name']
+
+class RadiologyTestAdmin(VersionAdmin):
+    search_fields = ['name']
+
+class RadiologyTestTypeAdmin(VersionAdmin):
+    search_fields = ['name']
+
+class PathologyTestTypeAdmin(VersionAdmin):
+    search_fields = ['name']
