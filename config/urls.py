@@ -23,6 +23,7 @@ from ondoc import crm
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('',include('ondoc.crm.urls')),
+    path('onboard/',include('ondoc.onboard.urls')),
 
     # path('api/crm/', include('ondoc.crm.urls')),
     # path('api/auth/', include('ondoc.authentication.urls')),

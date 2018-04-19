@@ -75,14 +75,16 @@ DJANGO_APPS = (
 THIRD_PARTY_APPS = (
 
     'rest_framework',
-    'rest_framework.authtoken'
+    'rest_framework.authtoken',
+    'crispy_forms'
 )
 
 LOCAL_APPS = (
     'ondoc.crm',
     'ondoc.authentication',
     'ondoc.doctor',
-    'ondoc.diagnostic'
+    'ondoc.diagnostic',
+    'ondoc.onboard'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -202,3 +204,4 @@ MAP_WIDGETS = {
     ),
     "GOOGLE_MAP_API_KEY": "AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA"
 }
+CRISPY_TEMPLATE_PACK = 'bootstrap3'
