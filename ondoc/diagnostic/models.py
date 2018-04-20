@@ -3,6 +3,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel
 from ondoc.doctor.models import Hospital
 
+
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
@@ -33,7 +34,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
 
 
 class LabCertification(TimeStampedModel):
-    lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
+    lab = models.ForeignKey(Lab, related_name = 'lab_certificates', on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
 
     def __str__(self):

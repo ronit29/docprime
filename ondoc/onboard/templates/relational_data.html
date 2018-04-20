@@ -1,0 +1,19 @@
+<!-- Adding formsets for awards -->
+{{ formset.management_form }}
+{% for form in formset %}
+<div class="row form-row">
+    <div class="col-sm-2">
+        <label>{{form.name.label}}</label>
+    </div>
+    <div class="col-sm-4">
+        <div class="input-group">
+            {{form.name}}
+            {% if form.name.value and forloop.counter != last_form_counter %}
+                <span class="input-group-btn"><button class="btn btn-danger remove-form-row"><span class="glyphicon glyphicon-minus" aria-hidden="true"></span></button></span>
+            {% else %}
+                <span class="input-group-btn"><button class="btn btn-success add-form-row"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span></button></span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endfor %}
