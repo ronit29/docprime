@@ -2,5 +2,234 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-{% crispy form %}
+	<form class="form-horizontal" method="GET" action="">
+
+    <div class="panel panel-default">
+      <div class="panel-heading">BASIC DETAILS</div>
+      <div class="panel-body">
+            {% crispy lab_form %}
+      </div>
+    </div>
+
+    <div class="panel panel-default">
+      <div class="panel-heading">ADDRESS</div>
+      <div class="panel-body">
+            {% crispy lab_address_form %}
+      </div>
+    </div>
+
+
+    <div class="panel panel-default">
+      <div class="panel-heading">LAB CERTIFICATIONS</div>
+      <div class="panel-body">
+        {% include 'relational_data.html' with formset=certificates_formset %}
+      </div>
+    </div>
+
+
+    <div class="panel panel-default">
+      <div class="panel-heading">LAB AWARDS</div>
+      <div class="panel-body">
+
+
+        <!-- Adding formsets for awards -->
+        {{ award_formset.management_form }}
+        {% for form in award_formset %}
+        <div class="row form-row">
+            <div class="col-sm-4">
+                <label>{{ form.name.label }}</label>
+                {{ form.name }}
+            </div>
+
+            <div class="col-sm-4">
+                <label>{{ form.year.label }}</label>
+                {{ form.year }}
+            </div>
+
+
+            <div class="col-sm-4">
+                <div class="input-group">
+                    {% if form.name.value and forloop.counter != last_form_counter %}
+                        <span class="input-group-btn"><button class="btn btn-danger remove-form-row"><span class="glyphicon glyphicon-minus" aria-hidden="true"></span></button></span>
+                    {% else %}
+                        <span class="input-group-btn"><button class="btn btn-success add-form-row"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span></button></span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+      </div>
+    </div>
+
+
+    <div class="panel panel-default">
+      <div class="panel-heading">LAB ACCREDITATIONS</div>
+      <div class="panel-body">
+        <!-- Adding formsets for awards -->
+        {% include 'relational_data.html' with formset=accreditation_formset %}
+      </div>
+    </div>
+
+    <div class="panel panel-default">
+      <div class="panel-heading">LAB CONTACT DETAILS</div>
+      <div class="panel-body">
+
+
+        <!-- Adding formsets for awards -->
+        {{ lab_manager_formset.management_form }}
+        {% for form in lab_manager_formset %}
+        <div class="row form-row">
+            <div class="col-sm-4">
+                <label>{{ form.contact_type.label }}</label>
+                {{ form.contact_type }}
+            </div> 
+
+            <div class="col-sm-4">
+                <label>{{ form.name.label }}</label>
+                {{ form.name }}
+            </div>
+
+            <div class="col-sm-4">
+                <label>{{ form.number.label }}</label>
+                {{ form.number }}
+            </div>
+        </div>
+        <div class="row form-row">
+            <div class="col-sm-4">
+                <label>{{ form.email.label }}</label>
+                {{ form.email }}
+            </div>
+
+            <div class="col-sm-4">
+                <label>{{ form.details.label }}</label>
+                {{ form.details }}
+            </div>
+
+
+            <div class="col-sm-4">
+                <div class="input-group">
+                    {% if form.name.value and forloop.counter != last_form_counter %}
+                        <span class="input-group-btn"><button class="btn btn-danger remove-form-row"><span class="glyphicon glyphicon-minus" aria-hidden="true"></span></button></span>
+                    {% else %}
+                        <span class="input-group-btn"><button class="btn btn-success add-form-row"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span></button></span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+
+    <div class="panel panel-default">
+      <div class="panel-heading">LAB TIMINGS</div>
+      <div class="panel-body">
+        <!-- Adding formsets for awards -->
+
+
+        <!-- Adding formsets for awards -->
+        {{ lab_timing_formset.management_form }}
+        {% for form in lab_timing_formset %}
+        <div class="row form-row">
+            <div class="col-sm-3">
+                <label>{{ form.day.label }}</label>
+                {{ form.day }}
+            </div>
+
+            <div class="col-sm-3">
+                <label>{{ form.start.label }}</label>
+                {{ form.start }}
+            </div>
+
+            <div class="col-sm-3">
+                <label>{{ form.end.label }}</label>
+                {{ form.end }}
+            </div>
+
+            <div class="col-sm-3">
+                <div class="input-group">
+                    {% if form.name.value and forloop.counter != last_form_counter %}
+                        <span class="input-group-btn"><button class="btn btn-danger remove-form-row"><span class="glyphicon glyphicon-minus" aria-hidden="true"></span></button></span>
+                    {% else %}
+                        <span class="input-group-btn"><button class="btn btn-success add-form-row"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span></button></span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+
+
+      </div>
+    </div>
+
+
+	<input class="submit btn btn-primary pull-right" type="submit" value="Submit data">
+	</form>
 {% endblock %}
+
+
+
+{% block domready %}
+
+function updateElementIndex(el, prefix, ndx) {
+    var id_regex = new RegExp('(' + prefix + '-\\d+)');
+    var replacement = prefix + '-' + ndx;
+    if ($(el).attr("for")) $(el).attr("for", $(el).attr("for").replace(id_regex, replacement));
+    if (el.id) el.id = el.id.replace(id_regex, replacement);
+    if (el.name) el.name = el.name.replace(id_regex, replacement);
+}
+
+function cloneMore(selector, prefix) {
+    var newElement = $(selector).clone(true);
+    var total = $('#id_' + prefix + '-TOTAL_FORMS').val();
+
+    <!-- console.log(newElement); -->
+    newElement.find('input').each(function() {
+        var name = $(this).attr('name').replace('-' + (total-1) + '-', '-' + total + '-');
+
+        var id = 'id_' + name;
+        $(this).attr({'name': name, 'id': id}).val('').removeAttr('checked');
+    });
+
+    total++;
+    $('#id_' + prefix + '-TOTAL_FORMS').val(total);
+    $(selector).after(newElement);
+    var conditionRow = $('.form-row:not(:last)');
+    conditionRow.find('.btn.add-form-row')
+    .removeClass('btn-success').addClass('btn-danger')
+    .removeClass('add-form-row').addClass('remove-form-row')
+    .html('<span class="glyphicon glyphicon-minus" aria-hidden="true"></span>');
+    return false;
+}
+function deleteForm(prefix, btn) {
+    var total = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
+    <!-- alert(total); -->
+    if (total > 1){
+        btn.closest('.form-row').remove();
+        var forms = $('.form-row');
+        $('#id_' + prefix + '-TOTAL_FORMS').val(forms.length);
+        for (var i=0, formCount=forms.length; i<formCount; i++) {
+            $(forms.get(i)).find(':input').each(function() {
+                updateElementIndex(this, prefix, i);
+            });
+        }
+    }
+    return false;
+}
+
+$(document).on('click', '.add-form-row', function(e){
+    e.preventDefault();
+    cloneMore('.form-row:last', 'nested');
+    return false;
+});
+$(document).on('click', '.remove-form-row', function(e){
+    e.preventDefault();
+    deleteForm('nested', $(this));
+    return false;
+});
+
+
+{% endblock %}
+

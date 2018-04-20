@@ -1,38 +1,75 @@
 from django.shortcuts import render, redirect, HttpResponse
-from .forms import LabForm, OTPForm
-from ondoc.diagnostic.models import LabOnboardingToken, Lab
 from random import randint
+from django.views import View
+from django.shortcuts import render, redirect, HttpResponse
 from ondoc.sms import api
 
+# import models here
+from ondoc.diagnostic.models import LabOnboardingToken, Lab, LabAward
 
-def lab(request):
+# import forms here.
+from .forms import LabForm, OTPForm, LabCertificationForm, LabAwardForm, LabAddressForm
 
-    token = request.GET.get('token')
+# import formsets here.
+from .forms import LabAwardFormSet, LabCertificationFormSet, LabAccreditationFormSet, LabManagerFormSet, \
+                    LabTimingFormSet
 
-    existing = None
 
-    try:
-        existing = LabOnboardingToken.objects.filter(token=token).order_by('-created_at')[0]
-    except:
+
+class BaseOnboard(View):
+
+    def get(self, request):
+
+        token = request.GET.get('token')
+
+        if not token:
+            return HttpResponse('Invalid URL')
+
+        existing = None
+
+        try:
+            existing = LabOnboardingToken.objects.filter(token=token).order_by('-created_at')[0]
+        except:
+            pass
+
+        if not existing:
+            return HttpResponse('Invalid Token')
+
+        if not existing.lab:
+            return HttpResponse('No lab found for this token')
+
+        if existing.status != LabOnboardingToken.GENERATED:
+            return render(request,'access_denied.html')
+
+        auth = request.session.get(token, False)
+
+
+        if not auth:
+            return redirect("/onboard/otp?token="+token, permanent=False)
+
+
+        # Gather all forms
+        lab_form = LabForm(instance = existing.lab)
+        lab_address_form = LabAddressForm(instance = existing.lab)
+
+        # Gather all formsets
+        award_formset = LabAwardFormSet(instance = existing.lab, prefix="nested")
+        certificates_formset = LabCertificationFormSet(instance = existing.lab, prefix="nested")
+        accreditation_formset = LabAccreditationFormSet(instance = existing.lab, prefix="nested")
+        lab_manager_formset = LabManagerFormSet(instance = existing.lab, prefix="nested")
+        lab_timing_formset = LabTimingFormSet(instance = existing.lab, prefix="nested")
+
+        return render(request, 'lab.html', {'lab_form': lab_form,
+            'lab_address_form': lab_address_form,
+            'award_formset': award_formset,
+            'certificates_formset': certificates_formset,
+            'accreditation_formset': accreditation_formset,
+            'lab_manager_formset': lab_manager_formset,
+            'lab_timing_formset': lab_timing_formset})
+
+    def post(self, request):
         pass
 
-    if not existing:
-        return HttpResponse('Invalid Token')
-
-    if not existing.lab:
-        return HttpResponse('No lab found for this token')
-
-    if existing.status != LabOnboardingToken.GENERATED:
-        return render(request,'access_denied.html')
-
-    auth = request.session.get(token, False)
-
-
-    if not auth:
-        return redirect("/onboard/otp?token="+token, permanent=False)
-
-    form = LabForm(instance = existing.lab)
-    return render(request,'lab.html',{'form':form})
 
 
 def otp(request):
@@ -97,8 +134,8 @@ def generate(request):
     lab = Lab.objects.get(pk=lab_id)
 
     LabOnboardingToken.objects.filter(lab_id=lab_id, status=LabOnboardingToken.GENERATED).update(status=LabOnboardingToken.REJECTED)
-    
-    token = LabOnboardingToken(status=1,lab_id=lab_id, token=randint(1000000000, 9000000000),verified_token=randint(1000000000, 9000000000) )
+
+    token = LabOnboardingToken(status=1,lab_id=lab_id, token=randint(1000000000, 9000000000),verified_token=randint(1000000000, 9000000000))
     token.save()
     url = 'ondoc.com/onboard/lab?token='+str(token.token)+'&lab_id='+str(lab_id)
     return HttpResponse('generated_url is '+url)
