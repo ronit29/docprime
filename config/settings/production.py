@@ -38,3 +38,4 @@ X_FRAME_OPTIONS = 'DENY'
 
 
 INSTALLED_APPS += ('gunicorn',)
+SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'

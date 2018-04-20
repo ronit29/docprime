@@ -20,3 +20,6 @@ DEBUG_TOOLBAR_CONFIG = {
 }
 
 INTERNAL_IPS = ['127.0.0.1']
+
+SMS_BACKEND = 'ondoc.sms.backends.backend.ConsoleSmsBackend'
+# SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
