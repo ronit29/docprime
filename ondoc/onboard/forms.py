@@ -3,7 +3,6 @@ from crispy_forms.layout import Submit, Layout, Div, Fieldset
 from ondoc.diagnostic.models import Lab, LabCertification, LabAward, LabAccreditation, LabManager, LabTiming
 from django import forms
 from django.forms import inlineformset_factory
-
 # include all forms here
 
 class LabAwardForm(forms.ModelForm):
@@ -23,7 +22,7 @@ class LabTimingForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
- 
+
     class Meta:
         model = LabTiming
         exclude = ['lab',]
@@ -68,9 +67,14 @@ class LabForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.included = ('id', 'name', 'about', 'license', 'operational_since', 'parking', 'hospital', 'network_type', 'network', )
+        for field in self.fields:
+            if field not in self.included:
+                field.required = False
+
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
-        # self.helper.add_input(Submit('submit','Submit',css_class='btn-primary btn-block'))
         self.helper.layout = Layout(
             'name',
             'about',
@@ -94,12 +98,20 @@ class LabForm(forms.ModelForm):
 
     class Meta:
         model = Lab
-        exclude = []
+        fields = ('id', 'name', 'about', 'license', 'operational_since', 'parking', 'hospital', 'network_type', 'network', )
 
-class LabAddressForm(LabForm):
+class LabAddressForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.included = ('building', 'sublocality', 'locality', 'city', 'state', 'country', 'pin_code', )
+        for field in self.fields:
+            if field not in self.included:
+                field.required = False
+
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
         self.helper.layout = Layout(
             Div(
                 Div('building',css_class='col-md-offset-1 col-md-4',),
@@ -119,6 +131,10 @@ class LabAddressForm(LabForm):
             'pin_code',
         )
 
+    class Meta:
+        model = Lab
+        fields = ('building', 'sublocality', 'locality', 'city', 'state', 'country', 'pin_code' )
+
 
 class OTPForm(forms.Form):
 
@@ -134,9 +150,9 @@ class OTPForm(forms.Form):
 
 # include all formsets here
 
-LabAwardFormSet = inlineformset_factory(Lab, LabAward,extra = 1, can_delete=True, exclude=('lab', ))
-LabCertificationFormSet = inlineformset_factory(Lab, LabCertification,extra = 1, can_delete=True, exclude=('lab', ))
-LabAccreditationFormSet = inlineformset_factory(Lab, LabAccreditation,extra = 1, can_delete=True, exclude=('lab', ))
-LabManagerFormSet = inlineformset_factory(Lab, LabManager,extra = 1, can_delete=True, exclude=('lab', ))
+LabAwardFormSet = inlineformset_factory(Lab, LabAward, form = LabAwardForm,extra = 1, can_delete=True, exclude=('id', ))
+LabCertificationFormSet = inlineformset_factory(Lab, LabCertification, form = LabCertificationForm, extra = 1, can_delete=True, exclude=('lab', ))
+LabAccreditationFormSet = inlineformset_factory(Lab, LabAccreditation, form=LabAccreditationForm,extra = 1, can_delete=True, exclude=('lab', ))
+LabManagerFormSet = inlineformset_factory(Lab, LabManager, form = LabManagerForm, extra = 1, can_delete=True, exclude=('lab', ))
 LabTimingFormSet = inlineformset_factory(Lab, LabTiming, form = LabTimingForm,extra = 1, can_delete=True)
 

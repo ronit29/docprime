@@ -49,15 +49,15 @@ class BaseOnboard(View):
 
 
         # Gather all forms
-        lab_form = LabForm(instance = existing.lab)
-        lab_address_form = LabAddressForm(instance = existing.lab)
+        lab_form = LabForm(instance = existing.lab, prefix = "lab")
+        lab_address_form = LabAddressForm(instance = existing.lab, prefix = "labaddress")
 
         # Gather all formsets
-        award_formset = LabAwardFormSet(instance = existing.lab, prefix="nested")
-        certificates_formset = LabCertificationFormSet(instance = existing.lab, prefix="nested")
-        accreditation_formset = LabAccreditationFormSet(instance = existing.lab, prefix="nested")
-        lab_manager_formset = LabManagerFormSet(instance = existing.lab, prefix="nested")
-        lab_timing_formset = LabTimingFormSet(instance = existing.lab, prefix="nested")
+        award_formset = LabAwardFormSet(instance = existing.lab, prefix="labaward")
+        certificates_formset = LabCertificationFormSet(instance = existing.lab, prefix="labcertification")
+        accreditation_formset = LabAccreditationFormSet(instance = existing.lab, prefix="labaccreditation")
+        lab_manager_formset = LabManagerFormSet(instance = existing.lab, prefix="labmanager")
+        lab_timing_formset = LabTimingFormSet(instance = existing.lab, prefix="labtiming")
 
         return render(request, 'lab.html', {'lab_form': lab_form,
             'lab_address_form': lab_address_form,
@@ -68,7 +68,58 @@ class BaseOnboard(View):
             'lab_timing_formset': lab_timing_formset})
 
     def post(self, request):
-        pass
+        token = request.GET.get('token')
+        try:
+            instance = LabOnboardingToken.objects.filter(token = token)[0].lab
+        except:
+            return HttpResponse('invalid token')
+
+        lab_form = LabForm(request.POST, instance = instance, prefix = "lab")
+        lab_address_form = LabAddressForm(request.POST, instance = instance, prefix = "labaddress")
+
+
+        if all([lab_form.is_valid(), lab_address_form.is_valid()]):
+            lab_form.cleaned_data.update(lab_address_form.cleaned_data)
+            lab_obj = lab_form.save()
+        else:
+            return HttpResponse('invalid forms')
+
+        # Now we save the related forms
+        # save awards formset
+        award_formset = LabAwardFormSet(data=request.POST, prefix = "labaward", instance = lab_obj)
+        if award_formset.is_valid():
+            award_formset.save()
+
+        # save certificates formset
+        certificates_formset = LabCertificationFormSet(request.POST, prefix = "labcertification", instance = lab_obj)
+        if certificates_formset.is_valid():
+            certificates_formset.save()
+
+        # save accreditation formset
+        accreditation_formset = LabAccreditationFormSet(request.POST, prefix = "labaccreditation", instance = lab_obj)
+        if accreditation_formset.is_valid():
+            accreditation_formset.save()
+
+        # save lab_manager formset
+        lab_manager_formset = LabManagerFormSet(request.POST, prefix = "labmanager", instance = lab_obj)
+        if lab_manager_formset.is_valid():
+            lab_manager_formset.save()
+
+
+        # save lab_timing formset
+        lab_timing_formset = LabTimingFormSet(request.POST, prefix = "labtiming", instance = lab_obj)
+        if lab_timing_formset.is_valid():
+            lab_timing_formset.save()
+
+        return render(request, 'lab.html', {'lab_form': lab_form,
+            'lab_address_form': lab_address_form,
+            'award_formset': award_formset,
+            'certificates_formset': certificates_formset,
+            'accreditation_formset': accreditation_formset,
+            'lab_manager_formset': lab_manager_formset,
+            'lab_timing_formset': lab_timing_formset})
+
+
 
 
 
