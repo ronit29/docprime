@@ -120,9 +120,6 @@ class BaseOnboard(View):
             'lab_timing_formset': lab_timing_formset})
 
 
-
-
-
 def otp(request):
 
     token = request.GET.get('token')

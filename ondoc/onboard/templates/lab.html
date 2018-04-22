@@ -4,12 +4,12 @@
 {% block content %}
     <form class="form-horizontal" method="post">
         {% csrf_token %}
-
-
         <div class="panel panel-default">
           <div class="panel-heading">BASIC INFORMATION</div>
           <div class="panel-body">
-            {{ lab_form }}
+            <table class="table">
+                {{ lab_form.as_table }}                
+            </table>
             <!-- {% crispy lab_form %} -->
           </div>
         </div>
@@ -17,9 +17,10 @@
         <div class="panel panel-default">
           <div class="panel-heading">ADDRESS</div>
           <div class="panel-body">
-                {{ lab_address_form }}
-             <!-- {% crispy lab_address_form %} -->
-                
+                <table class="table">
+                {{ lab_address_form.as_table }}
+                </table>
+             <!-- {% crispy lab_address_form %} -->                
           </div>
         </div>
 
