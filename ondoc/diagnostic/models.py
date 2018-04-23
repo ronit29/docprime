@@ -251,6 +251,7 @@ class RadiologyTest(TimeStampedModel):
     class Meta:
         db_table = "radiology_test"
 
+
 class LabOnboardingToken(TimeStampedModel):
     GENERATED = 1
     REJECTED = 2

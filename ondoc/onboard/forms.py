@@ -1,9 +1,175 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit, Layout, Div, Fieldset
-from ondoc.diagnostic.models import Lab, LabCertification, LabAward, LabAccreditation, LabManager, LabTiming
+
+
+# import your models here
+from ondoc.diagnostic.models import (Lab, LabCertification, LabAward, LabAccreditation,
+                                    LabManager, LabTiming, )
+from ondoc.doctor.models import (Doctor, DoctorMobile, DoctorQualification, DoctorHospital,
+                                DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
+                                DoctorMedicalService, DoctorImage,)
+
+
+# import your django libraries here
 from django import forms
 from django.forms import inlineformset_factory
-# include all forms here
+
+
+# include all doctor onboarding forms here
+
+class DoctorForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+        self.helper.layout = Layout(
+            Div(
+                Div('name',css_class='col-md-6',),
+                Div('gender',css_class='col-md-6',),
+                css_class='row',
+            ),
+            Div(
+                Div('about',css_class='col-md-12',),
+                css_class='row',
+            ),
+            Div(
+                Div('license',css_class='col-md-6',),
+                Div('practicing_since',css_class='col-md-6',),
+                css_class='row',
+            ),
+            Div(
+                Div('email',css_class='col-md-6',),
+                Div('additional_details',css_class='col-md-6',),
+                css_class='row',
+            ),
+        )
+
+    class Meta:
+        model = Doctor
+        exclude = ('id',)
+
+
+class DoctorMobileForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+
+    class Meta:
+        model = DoctorMobile
+        fields = ('country_code', 'number', )
+
+
+class DoctorQualificationForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+
+    class Meta:
+        model = DoctorQualification
+        fields = ('qualification', 'specialization', )
+
+
+class DoctorHospitalForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+
+    class Meta:
+        model = DoctorHospital
+        fields = ('hospital', 'day', 'start', 'end', 'fees', )
+
+
+class DoctorLanguageForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+
+    class Meta:
+        model = DoctorLanguage
+        fields = ('language', )
+
+
+class DoctorAwardForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+
+    class Meta:
+        model = DoctorAward
+        fields = ('name', 'year', )
+
+
+class DoctorAssociationForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+
+    class Meta:
+        model = DoctorAssociation
+        fields = ('name', )
+
+
+class DoctorExperienceForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+
+    class Meta:
+        model = DoctorExperience
+        fields = ('hospital', 'start_year', 'end_year', )
+
+
+class DoctorMedicalServiceForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+
+    class Meta:
+        model = DoctorMedicalService
+        fields = ('service', )
+
+
+class DoctorImageForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+
+    class Meta:
+        model = DoctorImage
+        fields = ('name', )
+
+
+DoctorMobileFormSet = inlineformset_factory(Doctor, DoctorMobile, form = DoctorMobileForm,extra = 1, can_delete=True, exclude=('id', ))
+DoctorQualificationFormSet = inlineformset_factory(Doctor, DoctorQualification, form = DoctorQualificationForm,extra = 1, can_delete=True, exclude=('id', ))
+DoctorHospitalFormSet = inlineformset_factory(Doctor, DoctorHospital, form = DoctorHospitalForm,extra = 1, can_delete=True, exclude=('id', ))
+DoctorLanguageFormSet = inlineformset_factory(Doctor, DoctorLanguage, form = DoctorLanguageForm,extra = 1, can_delete=True, exclude=('id', ))
+DoctorAwardFormSet = inlineformset_factory(Doctor, DoctorAward, form = DoctorAwardForm,extra = 1, can_delete=True, exclude=('id', ))
+DoctorAssociationFormSet = inlineformset_factory(Doctor, DoctorAssociation, form = DoctorAssociationForm,extra = 1, can_delete=True, exclude=('id', ))
+DoctorExperienceFormSet = inlineformset_factory(Doctor, DoctorExperience, form = DoctorExperienceForm,extra = 1, can_delete=True, exclude=('id', ))
+DoctorServiceFormSet = inlineformset_factory(Doctor, DoctorMedicalService, form = DoctorMedicalServiceForm,extra = 1, can_delete=True, exclude=('id', ))
+DoctorImageFormSet = inlineformset_factory(Doctor, DoctorImage, form = DoctorImageForm,extra = 1, can_delete=True, exclude=('id', ))
+
+
+# import all lab onboarding forms here
 
 class LabAwardForm(forms.ModelForm):
 

@@ -424,6 +424,21 @@ class HospitalNetworkEmail(TimeStampedModel):
     class Meta:
         db_table = "hospital_network_email"
 
+
+class DoctorOnboardingToken(TimeStampedModel):
+    GENERATED = 1
+    REJECTED = 2
+    CONSUMED = 3
+    STATUS_CHOICES = [(GENERATED, "Generated"), (REJECTED, "Rejected"), (CONSUMED, "Consumed")]
+    doctor = models.ForeignKey(Doctor, null=True, on_delete=models.SET_NULL)
+    token = models.CharField(max_length=100)
+    verified_token = models.CharField(max_length=100, null=True)
+    status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=GENERATED)
+
+    class Meta:
+        db_table = "doctor_onboarding_token"
+
+
 # class HospitalNetworkMapping(TimeStampedModel):
 #     network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
 #     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
