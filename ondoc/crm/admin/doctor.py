@@ -7,7 +7,7 @@ from django.db.models import Q
 
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
-    DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile)
+    DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken, )
 
 from .common import *
 from ondoc.crm.constants import constants

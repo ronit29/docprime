@@ -1,19 +1,28 @@
-<!-- Adding formsets for awards -->
 {{ formset.management_form }}
-{% for form in formset %}
-<div class="row form-row">
-    <div class="col-sm-2">
-        <label>{{form.name.label}}</label>
-    </div>
-    <div class="col-sm-4">
-        <div class="input-group">
-            {{form.name}}
-            {% if form.name.value and forloop.counter != last_form_counter %}
-                <span class="input-group-btn"><button class="btn btn-danger remove-form-row"><span class="glyphicon glyphicon-minus" aria-hidden="true"></span></button></span>
-            {% else %}
-                <span class="input-group-btn"><button class="btn btn-success add-form-row"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span></button></span>
-            {% endif %}
-        </div>
-    </div>
-</div>
+{% for form in formset.forms %}
+
+{% if forloop.first %}
+    <thead>
+    <tr>
+        {% for field in form.visible_fields %}
+            <th>{{ field.label|capfirst }}</th>
+        {% endfor %}
+    </tr>
+    </thead>
+{% endif %}
+
+    <tr class="{{ form_class }}">
+        {% for field in form.visible_fields %}
+            <td>
+                {# Include the hidden fields in the form #}
+                {% if forloop.first %}
+                    {% for hidden in form.hidden_fields %}
+                        {{ hidden }}
+                    {% endfor %}
+                {% endif %}
+                {{ field.errors.as_ul }}
+                {{ field }}
+            </td>
+        {% endfor %}
+    </tr>
 {% endfor %}
