@@ -251,6 +251,39 @@ class RadiologyTest(TimeStampedModel):
     class Meta:
         db_table = "radiology_test"
 
+class LabService(TimeStampedModel):
+    lab = models.ForeignKey(Lab, null=True, on_delete=models.CASCADE)
+    service = models.PositiveSmallIntegerField(default=None, choices=[(1,"Pathology"), (2,"Radiology")])
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lab_service"
+
+class LabDoctorAvailability(TimeStampedModel):
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
+    is_male_available = models.BooleanField(verbose_name= 'Male')
+    is_female_available = models.BooleanField(verbose_name= 'Female')
+    slot = models.CharField(blank=False, max_length=2, choices=[("m","Morning"), ("e","Evening")])
+
+    def __str__(self):
+        return self.lab.name
+
+    class Meta:
+        db_table = "lab_doctor_availibility"
+
+class LabDocument(TimeStampedModel, Image):
+    lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
+    document_type = models.PositiveSmallIntegerField(choices=[("1","Pan card"), ("2","Address Proof"), ("3","GST Certificate"), ("4","Registration Certificate"),("5","Cancel Cheque Copy")])
+    name = models.ImageField(upload_to='lab/images', height_field='height', width_field='width')
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lab_document"
+
 class LabOnboardingToken(TimeStampedModel):
     GENERATED = 1
     REJECTED = 2

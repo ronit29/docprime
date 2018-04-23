@@ -20,7 +20,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabNetwork,LabNetworkCertification,
     LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
     LabNetworkHelpline, LabNetworkManager, PathologyTest,
-    RadiologyTest, PathologyTestType, RadiologyTestType)
+    RadiologyTest, PathologyTestType, RadiologyTestType, LabService)
 
 
 
@@ -120,7 +120,7 @@ class Command(BaseCommand):
 
 
         content_types = ContentType.objects.get_for_models(PathologyTest,
-            RadiologyTest, PathologyTestType, RadiologyTestType)
+            RadiologyTest, PathologyTestType, RadiologyTestType, LabService)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

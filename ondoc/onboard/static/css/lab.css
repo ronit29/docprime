@@ -1,0 +1,37 @@
+label
+{
+    text-align: left !important;
+    color: #00AAC5;
+}
+
+.panel-default>.panel-heading
+{
+    padding:14px 25px;
+    font-size: 18px;
+    background: #fff;
+}
+
+.form-control
+{
+    border: none;
+    outline:  none;
+    box-shadow: none;
+    background: #F4F4F4;
+
+}
+
+.panel-body
+{
+    padding:15px 25px;
+}
+
+.panel-footer
+{
+    font-size: 16px;
+}
+
+.glyphicon
+{
+    color: #00AAC5;
+    margin-right: 5px;
+}

@@ -3,7 +3,7 @@
 from django.contrib.gis import admin
 
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital, HospitalNetwork)
-from ondoc.diagnostic.models import Lab, LabNetwork, PathologyTest, RadiologyTest, PathologyTestType, RadiologyTestType
+from ondoc.diagnostic.models import Lab, LabNetwork, PathologyTest, RadiologyTest, PathologyTestType, RadiologyTestType, LabService
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin,
     QualificationAdmin, LanguageAdmin, CollegeAdmin)
 from .hospital import HospitalAdmin
@@ -42,3 +42,4 @@ admin.site.register(PathologyTest, PathologyTestAdmin)
 admin.site.register(RadiologyTest, RadiologyTestAdmin)
 admin.site.register(RadiologyTestType, RadiologyTestTypeAdmin)
 admin.site.register(PathologyTestType, PathologyTestTypeAdmin)
+admin.site.register(LabService)

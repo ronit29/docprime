@@ -2,17 +2,19 @@ from django.shortcuts import render, redirect, HttpResponse
 from random import randint
 from django.views import View
 from django.shortcuts import render, redirect, HttpResponse
+from django.forms import inlineformset_factory
+
 from ondoc.sms import api
 
 # import models here
-from ondoc.diagnostic.models import LabOnboardingToken, Lab, LabAward
+from ondoc.diagnostic.models import LabOnboardingToken, Lab, LabAward, LabCertification
 
 # import forms here.
 from .forms import LabForm, OTPForm, LabCertificationForm, LabAwardForm, LabAddressForm
 
 # import formsets here.
-from .forms import LabAwardFormSet, LabCertificationFormSet, LabAccreditationFormSet, LabManagerFormSet, \
-                    LabTimingFormSet
+from .forms import LabAwardFormSet, LabAccreditationFormSet, LabManagerFormSet, \
+                    LabTimingFormSet, LabCertificationFormSet, LabServiceFormSet
 
 
 
@@ -54,10 +56,13 @@ class BaseOnboard(View):
 
         # Gather all formsets
         award_formset = LabAwardFormSet(instance = existing.lab, prefix="nested")
+
         certificates_formset = LabCertificationFormSet(instance = existing.lab, prefix="nested")
+        
         accreditation_formset = LabAccreditationFormSet(instance = existing.lab, prefix="nested")
         lab_manager_formset = LabManagerFormSet(instance = existing.lab, prefix="nested")
         lab_timing_formset = LabTimingFormSet(instance = existing.lab, prefix="nested")
+        lab_service_formset = LabServiceFormSet(instance = existing.lab, prefix="nested")
 
         return render(request, 'lab.html', {'lab_form': lab_form,
             'lab_address_form': lab_address_form,
@@ -65,7 +70,9 @@ class BaseOnboard(View):
             'certificates_formset': certificates_formset,
             'accreditation_formset': accreditation_formset,
             'lab_manager_formset': lab_manager_formset,
-            'lab_timing_formset': lab_timing_formset})
+            'lab_timing_formset': lab_timing_formset,
+            'lab_service_formset': lab_service_formset,
+            'labAddressForm': LabAddressForm()})
 
     def post(self, request):
         pass
@@ -95,8 +102,6 @@ def otp(request):
 
     if existing.status != LabOnboardingToken.GENERATED:
         return render(request,'access_denied.html')
-
-
 
     if request.method == 'POST':
         action = request.POST.get('_resend_otp')
