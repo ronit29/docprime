@@ -8,7 +8,6 @@ from ondoc.doctor.models import DoctorOnboardingToken, Doctor
 
 # import forms here.
 
-
 #import other views
 from .doctoronboard_view import DoctorOnboard
 from .labonboard_view import LabOnboard

@@ -141,7 +141,7 @@ class LabAwardFormSetHelper(FormSetHelper):
         super().__init__(*args, **kwargs)
         self.layout = Layout(Div(CustomField('name', label_class='col-md-3', field_class='col-md-9', wrapper_class='col-md-6'),
                                     CustomField('year', label_class='col-md-2', field_class='col-md-6',wrapper_class='col-md-3'),
-                                    Field('DELETE', css_class='col-md-3'), css_class='row'))
+                                     css_class='row labaward'))
 
 class LabCertificationFormSetHelper(FormSetHelper):
     name = forms.CharField(label='Cerfication Name')
@@ -149,9 +149,10 @@ class LabCertificationFormSetHelper(FormSetHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.layout = Layout(
-                            Div(CustomField('name', label_class='col-md-3', field_class='col-md-9',wrapper_class='col-md-8'),
-                            Div(CustomField('DELETE', wrapper_class='col-md-12', label_class='delete-checkbox', field_class=''), css_class='col-md-4'),
-                            css_class='row'))
+                        Div(
+                            CustomField('name', label_class='col-md-3', field_class='col-md-9',wrapper_class='col-md-8'),
+                            # Div(CustomField('DELETE', wrapper_class='col-md-12', label_class='delete-checkbox', field_class=''), css_class='col-md-4'),
+                            css_class='row certificate'))
 
 
 class LabAccreditationFormSetHelper(FormSetHelper):
@@ -160,7 +161,9 @@ class LabAccreditationFormSetHelper(FormSetHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.layout = Layout(
-                             Div(CustomField('name', label_class='col-md-3', field_class='col-md-9',wrapper_class='col-md-8'), Div(CustomField('DELETE', wrapper_class='col-md-12', label_class='delete-checkbox', field_class=''), css_class='col-md-4'),css_class='row'))
+                            Div(CustomField('name', label_class='col-md-3', field_class='col-md-9',wrapper_class='col-md-8'), 
+                            Div(CustomField('DELETE', wrapper_class='col-md-12', label_class='delete-checkbox', field_class=''),
+                            css_class='col-md-4'),css_class='row accreditation'))
 
 
 
@@ -169,6 +172,7 @@ class LabManagerFormSetHelper(FormSetHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.layout = Layout(Div(
+                Div(
                 Div(CustomField('contact_type', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
                 Div(CustomField('name', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
                 Div(CustomField('number', label_class='col-md-4 col-md-offset-2', field_class='col-md-6'),css_class='col-md-4'),
@@ -176,7 +180,7 @@ class LabManagerFormSetHelper(FormSetHelper):
                 Div(
                 Div(CustomField('email', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
                 Div(CustomField('details', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
-                css_class='row'))
+                css_class='row'), css_class="labmanager"))
 
 
 class LabTimingFormSetHelper(FormSetHelper):
@@ -191,7 +195,7 @@ class LabTimingFormSetHelper(FormSetHelper):
                 Div(CustomField('start', label_class='col-md-4', label='Open Time', field_class='col-md-6'),css_class='col-md-4'),
                 Div(CustomField('end', label_class='col-md-4 ', label='Close Time',field_class='col-md-6'),css_class='col-md-4'),
                 Div(CustomField('DELETE'), css_class='col-md-1'),
-                css_class='row'))
+                css_class='row labtiming'))
 
 
 LabAwardFormSet = inlineformset_factory(Lab, LabAward, extra = 1, can_delete=True, exclude=('lab', ))

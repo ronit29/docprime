@@ -79,7 +79,7 @@
       <div class="panel-body">
         {% crispy lab_manager_formset labmanager_formset_helper %}
       </div>
-     <div class='panel-footer'>
+      <div class='panel-footer'>
         <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
         <span>Add Another Lab Contact</span>
       </div>
@@ -111,7 +111,35 @@
 
 {% block domready %}
 
+    $('.labaward').formset({
+        addText: 'Add Another Award',
+        deleteText: 'remove',
+        prefix: 'labaward'
+    });
 
+    $('.certificate').formset({
+        addText: 'Add Another Lab Certification',
+        deleteText: 'remove',
+        prefix: 'labcertification'
+    });
+
+    $('.accreditation').formset({
+        addText: 'Add Another Lab Accreditation',
+        deleteText: 'remove',
+        prefix: 'labaccreditation'
+    });
+
+    $('.labmanager').formset({
+        addText: 'Add Another Lab Contact',
+        deleteText: 'remove',
+        prefix: 'labmanager'
+    });
+
+    $('.labtiming').formset({
+        addText: 'Add Another Lab Timings',
+        deleteText: 'remove',
+        prefix: 'labtiming'
+    });
 
 {% endblock %}
 
