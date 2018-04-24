@@ -38,121 +38,13 @@ class CustomField(Field):
         return super(CustomField, self).render(form, form_style, context, template_pack, extra_context, **kwargs)
 
 
-class LabCertificationForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_tag = False;
-        # self.layout = Layout(CustomField('name', label_class='col-md-2', field_class='col-md-6'),DELETE())
-        self.helper.layout = Layout(
-                             Div(CustomField('name', label_class='col-md-3', field_class='col-md-9',wrapper_class='col-md-8'), Div(CustomField('DELETE', wrapper_class='col-md-12', label_class='delete-checkbox', field_class=''), css_class='col-md-4'),css_class='row'))
-        self.form_class = 'form-horizontal'
-
-
-    name = forms.CharField(label='Cerfication Name')
-
-    class Meta:
-        model = LabCertification
-        exclude = ['lab',]
-
-
-class LabAwardForm(forms.ModelForm):
-    year = forms.ChoiceField(choices=award_year_choices, required=False)
-    name = forms.CharField(label='Award Name')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_tag = False;
-
-        self.helper.layout = Layout(Div(CustomField('name', label_class='col-md-3', field_class='col-md-9', wrapper_class='col-md-6'),
-                                    CustomField('year', label_class='col-md-2', field_class='col-md-6',wrapper_class='col-md-3'),
-                                    Field('DELETE', css_class='col-md-3'), css_class='row'))
-        self.form_class = 'form-horizontal'
-
-
-    class Meta:
-        model = LabAward
-        exclude = ['lab',]
-
-class LabTimingForm(forms.ModelForm):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.fields['start'].label = 'Open Time'
-        self.fields['end'].label = 'Cloe Time'
-        self.helper = FormHelper()
-        self.helper.form_tag = False;
-        self.helper.form_class = 'form-horizontal'
-        self.helper.layout = Layout(Div(
-                Div(CustomField('day', label_class='col-md-4 hidden', field_class='col-md-12'),css_class='col-md-3'),
-                Div(CustomField('start', label_class='col-md-4', label='Open Time', field_class='col-md-6'),css_class='col-md-4'),
-                Div(CustomField('end', label_class='col-md-4 ', label='Close Time',field_class='col-md-6'),css_class='col-md-4'),
-                Div(CustomField('DELETE'), css_class='col-md-1'),
-                css_class='row'))
-
-    class Meta:
-        model = LabTiming
-        exclude = ['lab',]
-
-
-class LabManagerForm(forms.ModelForm):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_tag = False;
-        self.helper.layout = Layout(Div(
-                Div(CustomField('contact_type', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
-                Div(CustomField('name', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
-                Div(CustomField('number', label_class='col-md-4 col-md-offset-2', field_class='col-md-6'),css_class='col-md-4'),
-                css_class='row'),
-                Div(
-                Div(CustomField('email', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
-                Div(CustomField('details', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
-                css_class='row'))
-
-        self.helper.form_class = 'form-horizontal'
-
-    class Meta:
-        model = LabManager
-        exclude = ['lab',]
-
-
-# class LabCertificationFormSetHelper(FormHelper):
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         # self.layout = Layout(CustomField('name', label_class='col-md-2', field_class='col-md-6'),DELETE())
-#         self.layout = Layout(CustomField('name', label_class='col-md-2', field_class='col-md-6'))
-#         self.form_class = 'form-horizontal'
-
-
-class LabAccreditationForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_class = 'form-horizontal'
-        self.helper.form_tag = False;
-        # self.layout = Layout(CustomField('name', label_class='col-md-2', field_class='col-md-6'),DELETE())
-        self.helper.layout = Layout(
-                             Div(CustomField('name', label_class='col-md-3', field_class='col-md-9',wrapper_class='col-md-8'), Div(CustomField('DELETE', wrapper_class='col-md-12', label_class='delete-checkbox', field_class=''), css_class='col-md-4'),css_class='row'))
-        self.form_class = 'form-horizontal'
-
-    name = forms.CharField(label='Accreditation Name')
-
-    class Meta:
-        model = LabAccreditation
-        exclude = ['lab',]
-
-
 class LabForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
-        self.helper.form_tag = False;
-        # self.helper.form_class = 'form-horizontal'
+        self.helper.form_class = 'form-horizontal'
+        self.helper.form_tag = False
         # self.helper.add_input(Submit('submit','Submit',css_class='btn-primary btn-block'))
         self.helper.layout = Layout(
             CustomField('name', label_class='col-md-2', field_class='col-md-10'),
@@ -169,17 +61,18 @@ class LabForm(forms.ModelForm):
 
         )
 
-
     class Meta:
         model = Lab
-        exclude = []
+        fields = ('name', 'about', 'license', 'operational_since', 'parking', 'hospital', 'network_type', 'network', )
 
-class LabAddressForm(LabForm):
+
+class LabAddressForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
-        self.helper.form_tag = False;
+        self.helper.form_tag = False
         self.helper.layout = Layout(
             Div(
                 Div(CustomField('building', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-6'),
@@ -201,6 +94,11 @@ class LabAddressForm(LabForm):
                 css_class='row',
             )
         )
+
+    class Meta:
+        model = Lab
+        fields = ('building', 'sublocality', 'locality', 'city', 'state', 'country', 'pin_code', )
+
 
 class LabServiceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -228,13 +126,80 @@ class OTPForm(forms.Form):
 
 # include all formsets here
 
-LabAwardFormSet = inlineformset_factory(Lab, LabAward, form=LabAwardForm, extra = 1, can_delete=True, exclude=('lab', ))
-# LabCertificationFormSet = inlineformset_factory(Lab, LabCertification, form=LabCertificationForm,extra = 1, can_delete=True, exclude=('lab', ))
-LabAccreditationFormSet = inlineformset_factory(Lab, LabAccreditation,form=LabAccreditationForm, extra = 1, can_delete=True, exclude=('lab', ))
-LabManagerFormSet = inlineformset_factory(Lab, LabManager, form=LabManagerForm, extra = 1, can_delete=True, exclude=('lab', ))
-LabTimingFormSet = inlineformset_factory(Lab, LabTiming, form = LabTimingForm, extra = 1, can_delete=True)
-LabCertificationFormSet = inlineformset_factory(Lab, LabCertification, form=LabCertificationForm, extra = 2, can_delete=True, exclude=('lab', ))
-LabServiceFormSet = inlineformset_factory(Lab, LabService, form=LabServiceForm, extra = 2, exclude=('lab', ))
+
+class FormSetHelper(FormHelper):
+    def __init__(self, *args, **kwargs):
+        super(FormSetHelper, self).__init__(*args, **kwargs)
+        self.form_tag = False
+        self.form_class = 'form-horizontal'
+
+class LabAwardFormSetHelper(FormSetHelper):
+    year = forms.ChoiceField(choices=award_year_choices, required=False)
+    name = forms.CharField(label='Award Name')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.layout = Layout(Div(CustomField('name', label_class='col-md-3', field_class='col-md-9', wrapper_class='col-md-6'),
+                                    CustomField('year', label_class='col-md-2', field_class='col-md-6',wrapper_class='col-md-3'),
+                                    Field('DELETE', css_class='col-md-3'), css_class='row'))
+
+class LabCertificationFormSetHelper(FormSetHelper):
+    name = forms.CharField(label='Cerfication Name')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.layout = Layout(
+                            Div(CustomField('name', label_class='col-md-3', field_class='col-md-9',wrapper_class='col-md-8'),
+                            Div(CustomField('DELETE', wrapper_class='col-md-12', label_class='delete-checkbox', field_class=''), css_class='col-md-4'),
+                            css_class='row'))
+
+
+class LabAccreditationFormSetHelper(FormSetHelper):
+    name = forms.CharField(label='Accreditation Name')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.layout = Layout(
+                             Div(CustomField('name', label_class='col-md-3', field_class='col-md-9',wrapper_class='col-md-8'), Div(CustomField('DELETE', wrapper_class='col-md-12', label_class='delete-checkbox', field_class=''), css_class='col-md-4'),css_class='row'))
+
+
+
+class LabManagerFormSetHelper(FormSetHelper):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.layout = Layout(Div(
+                Div(CustomField('contact_type', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
+                Div(CustomField('name', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
+                Div(CustomField('number', label_class='col-md-4 col-md-offset-2', field_class='col-md-6'),css_class='col-md-4'),
+                css_class='row'),
+                Div(
+                Div(CustomField('email', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
+                Div(CustomField('details', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
+                css_class='row'))
+
+
+class LabTimingFormSetHelper(FormSetHelper):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # self.fields['start'].label = 'Open Time'
+        # self.fields['end'].label = 'Close Time'
+        self.layout = Layout(Div(
+                Div(CustomField('day', label_class='col-md-4 hidden', field_class='col-md-12'),css_class='col-md-3'),
+                Div(CustomField('start', label_class='col-md-4', label='Open Time', field_class='col-md-6'),css_class='col-md-4'),
+                Div(CustomField('end', label_class='col-md-4 ', label='Close Time',field_class='col-md-6'),css_class='col-md-4'),
+                Div(CustomField('DELETE'), css_class='col-md-1'),
+                css_class='row'))
+
+
+LabAwardFormSet = inlineformset_factory(Lab, LabAward, extra = 1, can_delete=True, exclude=('lab', ))
+LabCertificationFormSet = inlineformset_factory(Lab, LabCertification, extra = 1, can_delete=True, exclude=('lab',  ))
+LabAccreditationFormSet = inlineformset_factory(Lab, LabAccreditation, extra = 1, can_delete=True, exclude=('lab', ))
+LabManagerFormSet = inlineformset_factory(Lab, LabManager, extra = 1, can_delete=True, exclude=('lab',  ))
+LabTimingFormSet = inlineformset_factory(Lab, LabTiming, extra = 1, can_delete=True, exclude=('lab', ))
+LabServiceFormSet = inlineformset_factory(Lab, LabService, extra = 1, can_delete=True, exclude=('lab', ))
 
 
 

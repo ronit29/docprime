@@ -20,12 +20,8 @@
     <div class="panel panel-default">
       <div class="panel-heading">SERVICES</div>
       <div class="panel-body">
-         {{ lab_service_formset.management_form|crispy }}
-         {% for form in lab_service_formset %}
-         <div class="form-horizontal">
-              {% crispy form %}
-         </div>
-         {% endfor %}
+
+        {% crispy lab_service_formset formset_helper %}
 
       </div>
     </div>
@@ -41,13 +37,8 @@
     <div class="panel panel-default">
       <div class="panel-heading">LAB CERTIFICATIONS</div>
       <div class="panel-body">
-        {{ certificates_formset.management_form|crispy }}
-         {% for form in certificates_formset %}
-         <div class="form-horizontal">
-              {% crispy form %}
-         </div>
-         {% endfor %}
 
+        {% crispy certificates_formset certificate_formset_helper %}
 
       </div>
       <div class='panel-footer'>
@@ -60,12 +51,8 @@
     <div class="panel panel-default">
       <div class="panel-heading">LAB AWARDS</div>
       <div class="panel-body">
-        {{ award_formset.management_form|crispy }}
-         {% for form in award_formset %}
-         <div class="form-horizontal">
-              {% crispy form %}
-         </div>
-         {% endfor %}
+        {% crispy award_formset award_formset_helper %}
+
       </div>
       <div class='panel-footer'>
         <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
@@ -77,12 +64,8 @@
     <div class="panel panel-default">
       <div class="panel-heading">LAB ACCREDITATIONS</div>
       <div class="panel-body">
-        {{ accreditation_formset.management_form|crispy }}
-         {% for form in accreditation_formset %}
-         <div class="">
-              {% crispy form %}
-         </div>
-         {% endfor %}
+        {% crispy accreditation_formset accreditation_formset_helper %}
+
       </div>
       <div class='panel-footer'>
         <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
@@ -94,15 +77,7 @@
     <div class="panel panel-default">
       <div class="panel-heading">LAB CONTACT DETAILS</div>
       <div class="panel-body">
-
-
-        <!-- Adding formsets for awards -->
-        {{ lab_manager_formset.management_form }}
-        {% for form in lab_manager_formset %}        
-        <div class="">
-              {% crispy form %}
-        </div>
-        {% endfor %}
+        {% crispy lab_manager_formset labmanager_formset_helper %}
       </div>
      <div class='panel-footer'>
         <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
@@ -116,15 +91,7 @@
     <div class="panel panel-default">
       <div class="panel-heading">LAB Timings</div>
       <div class="panel-body">
-
-
-        <!-- Adding formsets for awards -->
-        {{ lab_timing_formset.management_form }}
-        {% for form in lab_timing_formset %}        
-        <div class="">
-              {% crispy form %}
-        </div>
-        {% endfor %}
+        {% crispy lab_timing_formset labtiming_formset_helper %}
       </div>
      <div class='panel-footer'>
         <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
