@@ -116,6 +116,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
 
 class OpdAppointmentSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = OpdAppointment
-        fields = ('fees', 'status', 'time_slot_start', 'tim_slot_end', )
+        fields = ('fees', 'status', 'time_slot_start', 'time_slot_end', )

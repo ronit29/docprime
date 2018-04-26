@@ -267,8 +267,8 @@ class OpdAppointment(TimeStampedModel):
     profile = models.PositiveSmallIntegerField()
     fees = models.PositiveSmallIntegerField()
     status = models.PositiveSmallIntegerField(default=CREATED)
-    time_slot_start = models.DateTimeField()
-    time_slot_end = models.DateTimeField()
+    time_slot_start = models.DateTimeField(auto_now=True)
+    time_slot_end = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "opd_appointment"

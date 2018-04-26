@@ -1,4 +1,4 @@
-from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms
+from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
                         DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer, OpdAppointmentSerializer
 from .services import ReformScheduleService
@@ -122,13 +122,23 @@ class DoctorProfile(APIView):
         return Response(serialized_doctor.data)
 
 
-class OpdAppointment(APIView):
+class DocotorAppointments(APIView):
+    """
+    Return Appointments for a doctor
+    """
 
     def get(self, request, version="v1", format=None):
+
         doctor_id = 2
+        response = {
+            "appointments" : []
+        }
 
-        appointments = OpdAppointmentSerializer.objects.filter(doctor=doctor_id)
-        serialized_appointments = OpdAppointmentSerializer(appointments[0])
+        appointments = OpdAppointment.objects.filter(doctor=doctor_id)
 
-        return Response(serialized_appointments.data)
+        for appointment in appointments :
+            appointmentData = OpdAppointmentSerializer(appointment).data
+            response['appointments'].append(appointmentData)
+
+        return Response(response)
 
