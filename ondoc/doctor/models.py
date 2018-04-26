@@ -207,7 +207,7 @@ class Language(TimeStampedModel, UniqueNameModel):
 
 
 class DoctorLanguage(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="languages", on_delete=models.CASCADE)
     language = models.ForeignKey(Language, on_delete=models.CASCADE)
 
     def __str__(self):
