@@ -1,5 +1,6 @@
 from django.urls import include, path
 from . import views
+from . import upload
 
 #from rest_framework.authtoken import views
 
@@ -10,5 +11,6 @@ urlpatterns = [
     # path('lab', views.lab, name='lab'),
     path('otp', views.otp, name='otp'),
     # path('doctor', views.lab, name='doctor'),
-    path('generate-url', views.generate, name='generate-url')
+    path('generate-url', views.generate, name='generate-url'),
+    path('upload', upload.BasicUploadView.as_view(), name='basic_upload'),
 ]

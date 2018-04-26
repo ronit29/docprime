@@ -3,18 +3,20 @@ from random import randint
 from django.views import View
 from django.shortcuts import render, redirect, HttpResponse
 from ondoc.sms import api
+from collections import OrderedDict
 
 # import models here
-from ondoc.diagnostic.models import LabOnboardingToken, Lab, LabAward
+from ondoc.diagnostic.models import LabOnboardingToken, Lab, LabAward, LabDoctorAvailability, LabService, LabImage, LabDocument
 from ondoc.doctor.models import DoctorOnboardingToken, Doctor
 
 
 # import forms here.
-from .forms import LabForm, OTPForm, LabCertificationForm, LabAwardForm, LabAddressForm
+from .forms import LabForm, OTPForm, LabCertificationForm, LabAwardForm, LabAddressForm, LabOpenForm
 
 # import formsets here.
 from .forms import LabAwardFormSet, LabAccreditationFormSet, LabManagerFormSet, \
-                    LabTimingFormSet, LabCertificationFormSet, LabServiceFormSet, DoctorHospitalFormSet, \
+                    LabTimingFormSet, LabCertificationFormSet, LabServiceFormSet, LabDoctorAvailabilityFormSet, \
+                    LabDoctorFormSet, DoctorHospitalFormSet, \
                     DoctorLanguageFormSet, DoctorAwardFormSet, DoctorAssociationFormSet, DoctorExperienceFormSet
 
 
@@ -47,6 +49,7 @@ class DoctorOnboard(View):
         if not auth:
             return redirect("/onboard/otp?token="+token, permanent=False)
 
+
         # Gather all forms
         doctor_form = DoctorForm(instance = existing.doctor, prefix = "doctor")
 
@@ -60,7 +63,6 @@ class DoctorOnboard(View):
         experience_formset = DoctorExperienceFormSet(instance = existing.doctor, prefix = 'doctorexperience')
         medicalservice_formset = DoctorServiceFormSet(instance = existing.doctor, prefix = 'doctormedicalservice')
         image_formset = DoctorImageFormSet(instance = existing.doctor, prefix = 'doctorimage')
-
         return render(request, 'doctor.html', {'doctor_form': doctor_form,
             'mobile_formset': mobile_formset,
             'qualification_formset': qualification_formset,
@@ -163,38 +165,83 @@ class LabOnboard(View):
             return HttpResponse('No lab found for this token')
 
         if existing.status != LabOnboardingToken.GENERATED:
-            return render(request,'access_denied.html')
+            return render(request, 'access_denied.html')
 
         auth = request.session.get(token, False)
-
 
         if not auth:
             return redirect("/onboard/otp?token="+token, permanent=False)
 
+        address_components = ['building','sublocality','locality','city','state','country']
+        address_values = []
+        for x in address_components:
+            if getattr(existing.lab, x):
+                address_values.append(getattr(existing.lab, x))
 
+        address = ", ".join(address_values)
+
+
+        lab_service_dict = {}
+        for service in LabService.objects.filter(lab=existing.lab):
+            lab_service_dict[service.service] = service
+
+
+        # We need to pregenerate the doctor availability entries to show on the form
+        for slot, name in LabDoctorAvailability.SLOT_CHOICES:
+            if not LabDoctorAvailability.objects.filter(slot=slot, lab=existing.lab).exists():
+                lb = LabDoctorAvailability()
+                lb.slot = slot
+                lb.lab = existing.lab
+                lb.save()
+
+        lab_images = LabImage.objects.filter(lab=existing.lab)
+
+        lab_doc_dict = OrderedDict()
+        for id, value in LabDocument.CHOICES:
+            results = LabDocument.objects.filter(lab=existing.lab, document_type=id)
+            if len(results)>0:
+                lab_doc_dict[id] = (id, value, results)
+            else:
+                lab_doc_dict[id] = (id, value, None)
+
+        lab_documents = LabDocument.objects.filter(lab=existing.lab)
         # Gather all forms
         lab_form = LabForm(instance = existing.lab)
         lab_address_form = LabAddressForm(instance = existing.lab)
-
+        lab_open_form = LabOpenForm(instance = existing.lab)
         # Gather all formsets
         award_formset = LabAwardFormSet(instance = existing.lab, prefix="labaward")
 
         certificates_formset = LabCertificationFormSet(instance = existing.lab, prefix="labcertificates")
-        
+
         accreditation_formset = LabAccreditationFormSet(instance = existing.lab, prefix="labaccreditation")
         lab_manager_formset = LabManagerFormSet(instance = existing.lab, prefix="labmanager")
         lab_timing_formset = LabTimingFormSet(instance = existing.lab, prefix="labtiming")
         lab_service_formset = LabServiceFormSet(instance = existing.lab, prefix="labservice")
+        lab_doctor_availability_formset = LabDoctorAvailabilityFormSet(instance = existing.lab, prefix="labdoctoravailability")
+        lab_doctor_formset = LabDoctorFormSet(instance = existing.lab, prefix="labdoctor")
+
 
         return render(request, 'lab.html', {'lab_form': lab_form,
             'lab_address_form': lab_address_form,
+            'lab_open_form' : lab_open_form,
             'award_formset': award_formset,
             'certificates_formset': certificates_formset,
             'accreditation_formset': accreditation_formset,
             'lab_manager_formset': lab_manager_formset,
             'lab_timing_formset': lab_timing_formset,
             'lab_service_formset': lab_service_formset,
-            'labAddressForm': LabAddressForm()})
+            'labAddressForm': LabAddressForm(),
+            'LabDoctorAvailability':LabDoctorAvailability,
+            'LabService':LabService,
+            'lab_service_dict': lab_service_dict,
+            'lab_doctor_availability_formset' : lab_doctor_availability_formset,
+            'lab_doctor_formset' : lab_doctor_formset,
+            'address' : address,
+            'lab_images' : lab_images,
+            'lab_doc_dict' : lab_doc_dict,
+            'LabDocument' : LabDocument,
+            })
 
     def post(self, request):
         token = request.GET.get('token')
@@ -290,6 +337,7 @@ def otp(request):
             otp = request.POST.get('otp')
             if otp == stored_otp:
                 request.session[token] = True
+                request.session["token_value"] = token
                 return redirect("/onboard/lab?token=1438749146", permanent=False)
             else:
                 request.session['otp_mismatch'] = True

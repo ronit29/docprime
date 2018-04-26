@@ -252,8 +252,9 @@ class RadiologyTest(TimeStampedModel):
         db_table = "radiology_test"
 
 class LabService(TimeStampedModel):
+    SERVICE_CHOICES = [(1,"Pathology"), (2,"Radiology")]
     lab = models.ForeignKey(Lab, null=True, on_delete=models.CASCADE)
-    service = models.PositiveSmallIntegerField(default=None, choices=[(1,"Pathology"), (2,"Radiology")])
+    service = models.PositiveSmallIntegerField(default=None, choices=SERVICE_CHOICES)
 
     def __str__(self):
         return self.name
@@ -262,20 +263,38 @@ class LabService(TimeStampedModel):
         db_table = "lab_service"
 
 class LabDoctorAvailability(TimeStampedModel):
+    SLOT_CHOICES = [("m","Morning"), ("e","Evening")]
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
-    is_male_available = models.BooleanField(verbose_name= 'Male')
-    is_female_available = models.BooleanField(verbose_name= 'Female')
-    slot = models.CharField(blank=False, max_length=2, choices=[("m","Morning"), ("e","Evening")])
+    is_male_available = models.BooleanField(verbose_name= 'Male', default=False)
+    is_female_available = models.BooleanField(verbose_name= 'Female', default=False)
+    slot = models.CharField(blank=False, max_length=2, choices=SLOT_CHOICES)
 
     def __str__(self):
         return self.lab.name
 
     class Meta:
-        db_table = "lab_doctor_availibility"
+        db_table = "lab_doctor_availability"
+
+class LabDoctor(TimeStampedModel):
+    registration_number = models.CharField(max_length=100, blank=False)
+    lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.registration_number
+
+    class Meta:
+        db_table = "lab_doctor"
+
 
 class LabDocument(TimeStampedModel, Image):
+    PAN = 1
+    ADDRESS = 2
+    GST = 3
+    REGISTRATION = 4
+    CHEQUE = 5
+    CHOICES = [(PAN,"PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"Registration Certificate"),(CHEQUE,"Cancel Cheque Copy")]
     lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
-    document_type = models.PositiveSmallIntegerField(choices=[("1","Pan card"), ("2","Address Proof"), ("3","GST Certificate"), ("4","Registration Certificate"),("5","Cancel Cheque Copy")])
+    document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.ImageField(upload_to='lab/images', height_field='height', width_field='width')
 
     def __str__(self):

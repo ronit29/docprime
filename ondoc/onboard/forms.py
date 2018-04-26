@@ -1,11 +1,11 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit, Layout, Div, Fieldset, Field
-from ondoc.diagnostic.models import Lab, LabCertification, LabAward, LabAccreditation, LabManager, LabTiming, LabService
+from ondoc.diagnostic.models import Lab, LabCertification, LabAward, LabAccreditation, LabManager, LabTiming, LabService, LabDoctorAvailability, LabDoctor, LabImage, LabDocument
 from ondoc.doctor.models import (Doctor, DoctorMobile, DoctorQualification, DoctorHospital,
                                 DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
-                                DoctorMedicalService, DoctorImage,)
+                                DoctorMedicalService, DoctorImage)
 
-from ondoc.crm.admin.common import award_year_choices
+from ondoc.crm.admin.common import award_year_choices, hospital_operational_since_choices
 from django import forms
 from django.forms import inlineformset_factory
 from crispy_forms.utils import TEMPLATE_PACK
@@ -45,7 +45,7 @@ class LabCertificationForm(forms.ModelForm):
         self.helper.form_tag = False;
         # self.layout = Layout(CustomField('name', label_class='col-md-2', field_class='col-md-6'),DELETE())
         self.helper.layout = Layout(
-                             Div(CustomField('name', label_class='col-md-3', field_class='col-md-9',wrapper_class='col-md-8'), Div(CustomField('DELETE', wrapper_class='col-md-12', label_class='delete-checkbox', field_class=''), css_class='col-md-4'),css_class='row'))
+                             Div(CustomField('name', label_class='col-md-3', field_class='col-md-9',wrapper_class='col-md-8'), Div(CustomField('DELETE', wrapper_class='col-md-12', label_class='delete-checkbox', field_class=''), css_class='col-md-3 col-md-offset-1'),css_class='row'))
         self.form_class = 'form-horizontal'
 
 
@@ -67,7 +67,7 @@ class LabAwardForm(forms.ModelForm):
 
         self.helper.layout = Layout(Div(CustomField('name', label_class='col-md-3', field_class='col-md-9', wrapper_class='col-md-6'),
                                     CustomField('year', label_class='col-md-2', field_class='col-md-6',wrapper_class='col-md-3'),
-                                    Field('DELETE', css_class='col-md-3'), css_class='row'))
+                                    Div(CustomField('DELETE'),css_class='col-md-3'), css_class='row'))
         self.form_class = 'form-horizontal'
 
 
@@ -81,15 +81,15 @@ class LabTimingForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         self.fields['start'].label = 'Open Time'
-        self.fields['end'].label = 'Cloe Time'
+        self.fields['end'].label = 'Close Time'
         self.helper = FormHelper()
-        self.helper.form_tag = False;
+        self.helper.form_tag = False
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = Layout(Div(
-                Div(CustomField('day', label_class='col-md-4 hidden', field_class='col-md-12'),css_class='col-md-3'),
-                Div(CustomField('start', label_class='col-md-4', label='Open Time', field_class='col-md-6'),css_class='col-md-4'),
-                Div(CustomField('end', label_class='col-md-4 ', label='Close Time',field_class='col-md-6'),css_class='col-md-4'),
-                Div(CustomField('DELETE'), css_class='col-md-1'),
+                Div(CustomField('day', label_class='col-md-4 hidden', field_class='col-md-12'),css_class='col-md-2'),
+                Div(CustomField('start', label_class='col-md-4 col-md-offset-1', label='Open Time', field_class='col-md-7'),css_class='col-md-4'),
+                Div(CustomField('end', label_class='col-md-4 col-md-offset-1', label='Close Time',field_class='col-md-7'),css_class='col-md-4'),
+                Div(CustomField('DELETE'), css_class='col-md-1 col-md-offset-1'),
                 css_class='row'))
 
     class Meta:
@@ -104,15 +104,16 @@ class LabManagerForm(forms.ModelForm):
         self.helper = FormHelper()
         self.helper.form_tag = False;
         self.helper.layout = Layout(Div(
-                Div(CustomField('contact_type', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
-                Div(CustomField('name', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
-                Div(CustomField('number', label_class='col-md-4 col-md-offset-2', field_class='col-md-6'),css_class='col-md-4'),
+                Div(CustomField('contact_type', label_class='col-md-4', field_class='col-md-8'),css_class='col-md-4'),
+                Div(CustomField('name', label_class='col-md-2 col-md-offset-2', field_class='col-md-8'),css_class='col-md-4'),
+                Div(CustomField('number', label_class='col-md-3 col-md-offset-2', field_class='col-md-6'),css_class='col-md-3'),
+                Div(CustomField('DELETE'), css_class='col-md-1'),
+
                 css_class='row'),
                 Div(
-                Div(CustomField('email', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
-                Div(CustomField('details', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-4'),
+                Div(CustomField('email', label_class='col-md-4', field_class='col-md-8'),css_class='col-md-4'),
+                Div(CustomField('details', label_class='col-md-2 col-md-offset-2', field_class='col-md-8'),css_class='col-md-4'),
                 css_class='row'))
-
         self.helper.form_class = 'form-horizontal'
 
     class Meta:
@@ -147,27 +148,39 @@ class LabAccreditationForm(forms.ModelForm):
 
 
 class LabForm(forms.ModelForm):
+    about = forms.CharField(widget=forms.Textarea)
+    license = forms.CharField(required=True)
+    operational_since = forms.ChoiceField(required=True, choices=hospital_operational_since_choices)
 
+    # license = forms.CharField(disabled=True)
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        #instance = getattr(self, 'instance', None)
+        #if instance and instance.pk:
+        self.fields['license'].widget.attrs['disabled'] = True
+        self.fields['hospital'].widget.attrs['disabled'] = True
+        self.fields['network'].widget.attrs['disabled'] = True
+
         self.helper = FormHelper()
         self.helper.form_tag = False;
         # self.helper.form_class = 'form-horizontal'
         # self.helper.add_input(Submit('submit','Submit',css_class='btn-primary btn-block'))
         self.helper.layout = Layout(
-            CustomField('name', label_class='col-md-2', field_class='col-md-10'),
-            CustomField('about', label_class='col-md-2', field_class='col-md-10'),
+            CustomField('name', label_class='col-md-1', field_class='col-md-5'),
+            CustomField('about', label_class='col-md-1', field_class='col-md-10'),
             
             Div(
-                Div(CustomField('license', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-6'),
-                Div(CustomField('operational_since', label_class='col-md-4 col-md-offset-2', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('license', label_class='col-md-2', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('operational_since', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-6'),
                 css_class='row'),
             Div(
-                Div(CustomField('parking', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-6'),
-                Div(CustomField('hospital', label_class='col-md-4 col-md-offset-2', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('parking', label_class='col-md-2', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('hospital', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-6'),
                 css_class='row'),
-
-        )
+            Div(                
+                Div(CustomField('network', label_class='col-md-2', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('network_type', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-6'),
+                css_class='row'))
 
 
     class Meta:
@@ -176,42 +189,112 @@ class LabForm(forms.ModelForm):
 
 class LabAddressForm(LabForm):
 
+    location = forms.CharField(disabled=True)
+    pin_code = forms.CharField()
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper.form_class = 'form-horizontal'
         self.helper.form_tag = False;
         self.helper.layout = Layout(
             Div(
-                Div(CustomField('building', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-6'),
-                Div(CustomField('sublocality', label_class='col-md-4 col-md-offset-2', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('building', label_class='col-md-3', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('sublocality', label_class='col-md-3 col-md-offset-3', field_class='col-md-6'),css_class='col-md-6'),
                 css_class='row'
             ),
             Div(
-                Div(CustomField('locality', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-6'),
-                Div(CustomField('city', label_class='col-md-4 col-md-offset-2', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('locality', label_class='col-md-3', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('city', label_class='col-md-3 col-md-offset-3', field_class='col-md-6'),css_class='col-md-6'),
                 css_class='row',
             ),
             Div(
-                Div(CustomField('state', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-6'),
-                Div(CustomField('country', label_class='col-md-4 col-md-offset-2', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('state', label_class='col-md-3', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('country', label_class='col-md-3 col-md-offset-3', field_class='col-md-6'),css_class='col-md-6'),
                 css_class='row',
             ),
             Div(
-                Div(CustomField('pin_code', label_class='col-md-4', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('pin_code', label_class='col-md-3', field_class='col-md-6'),css_class='col-md-6'),
+                Div(CustomField('location', label_class='col-md-3 col-md-offset-3', field_class='col-md-6'),css_class='col-md-6 hidden'),
                 css_class='row',
             )
         )
 
+class LabOpenForm(LabForm):
+      def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper.form_class = 'form-horizontal'
+        self.helper.form_tag = False;
+        self.helper.layout = Layout(CustomField('always_open'))
+
 class LabServiceForm(forms.ModelForm):
+
+    #service = forms.CharField( disabled=True)
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
-        self.helper.form_tag = False;
+        self.helper.form_tag = False
+        self.helper.layout = Layout(CustomField('is_available', label_class='hidden', field_class='col-md-6'),
+                                    CustomField('service', label_class='col-md-4', field_class='col-md-6'))
 
     class Meta:
-        model =LabService
+        model = LabService
         exclude = ['lab',]
-        widgets = {'service': forms.CheckboxSelectMultiple}
+        # widgets = {'service': forms.CheckboxSelectMultiple}                
+
+class LabDoctorAvailabilityForm(forms.ModelForm):
+
+    #service = forms.CharField( disabled=True)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['slot'].widget.attrs['disabled'] = True
+        self.fields['is_male_available'].label =''
+        self.fields['is_female_available'].label =''
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.layout = Layout(
+                            Div(
+                            Div(CustomField('slot', label_class='hidden'),css_class='col-md-6 col-sm-6 col-xs-6'), 
+                            Div(Div(CustomField('is_male_available', wrapper_class='col-md-6'), css_class='col-md-6 col-sm-6 col-xs-6'),
+                            Div(CustomField('is_female_available',  wrapper_class='col-md-6'), css_class='col-md-6 col-sm-6 col-xs-6'), css_class='col-sm-6 col-xs-6 col-md-5 col-md-offset-1')
+                            ,css_class='clearfix'))
+
+
+    class Meta:
+        model = LabDoctorAvailability
+        exclude = ['lab',]
+
+
+class LabDoctorForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.fields['registration_number'].label =''
+
+    class Meta:
+        model = LabDoctor
+        exclude = ['lab',]
+
+class LabImageForm(forms.ModelForm):
+    class Meta:
+        model = LabImage
+        exclude = ['lab',]
+
+
+class LabDocumentForm(forms.ModelForm):
+    class Meta:
+        model = LabDocument
+        exclude = ['lab',]
+
+# class LabDoctorAvailabilityForm(forms.ModelForm):
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         self.helper = FormHelper()
+#         self.helper.form_tag = False;
+
+#     class Meta:
+#         model = LabDoctorAvailability
+#         exclude = ['lab',]
+        # widgets = {'service': forms.CheckboxSelectMultiple}
 
 
 class OTPForm(forms.Form):
@@ -225,17 +308,16 @@ class OTPForm(forms.Form):
         self.helper.add_input(Submit(name='_resend_otp', value='Resend OTP', css_class='btn-primary btn-block'))
 
 
-
 # include all formsets here
-
+LabDoctorAvailabilityFormSet = inlineformset_factory(Lab, LabDoctorAvailability, form=LabDoctorAvailabilityForm, extra = 0, can_delete=True, exclude=('lab', ))
 LabAwardFormSet = inlineformset_factory(Lab, LabAward, form=LabAwardForm, extra = 1, can_delete=True, exclude=('lab', ))
 # LabCertificationFormSet = inlineformset_factory(Lab, LabCertification, form=LabCertificationForm,extra = 1, can_delete=True, exclude=('lab', ))
 LabAccreditationFormSet = inlineformset_factory(Lab, LabAccreditation,form=LabAccreditationForm, extra = 1, can_delete=True, exclude=('lab', ))
 LabManagerFormSet = inlineformset_factory(Lab, LabManager, form=LabManagerForm, extra = 1, can_delete=True, exclude=('lab', ))
 LabTimingFormSet = inlineformset_factory(Lab, LabTiming, form = LabTimingForm, extra = 1, can_delete=True)
 LabCertificationFormSet = inlineformset_factory(Lab, LabCertification, form=LabCertificationForm, extra = 2, can_delete=True, exclude=('lab', ))
-LabServiceFormSet = inlineformset_factory(Lab, LabService, form=LabServiceForm, extra = 2, exclude=('lab', ))
-
+LabServiceFormSet = inlineformset_factory(Lab, LabService, form=LabServiceForm, extra=0, exclude=('lab', ))
+LabDoctorFormSet = inlineformset_factory(Lab, LabDoctor, form=LabDoctorForm, extra=1,can_delete=False, exclude=('lab', ))
 
 
 # include all doctor onboarding forms here
@@ -390,4 +472,3 @@ DoctorAssociationFormSet = inlineformset_factory(Doctor, DoctorAssociation, form
 DoctorExperienceFormSet = inlineformset_factory(Doctor, DoctorExperience, form = DoctorExperienceForm,extra = 1, can_delete=True, exclude=('id', ))
 DoctorServiceFormSet = inlineformset_factory(Doctor, DoctorMedicalService, form = DoctorMedicalServiceForm,extra = 1, can_delete=True, exclude=('id', ))
 DoctorImageFormSet = inlineformset_factory(Doctor, DoctorImage, form = DoctorImageForm,extra = 1, can_delete=True, exclude=('id', ))
-
