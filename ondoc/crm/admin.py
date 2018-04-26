@@ -2,7 +2,7 @@ from django.contrib.gis import admin
 from django.contrib.gis import forms
 from django.contrib.gis.db import models
 from ondoc.doctor.models import Doctor, Qualification, Specialization, DoctorQualification, Hospital, DoctorHospital, DoctorLanguage, Language, DoctorAward, DoctorAssociation, DoctorExperience, DoctorMedicalService, MedicalService, DoctorImage, DoctorDocument, HospitalImage, HospitalDocument, OpdAppointment
-from ondoc.authentication.models import StaffProfile
+from ondoc.authentication.models import StaffProfile, UserProfile
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 from reversion.admin import VersionAdmin
@@ -371,6 +371,7 @@ admin.site.register(Qualification)
 # admin.site.register(Specialization)
 admin.site.register(Hospital, HospitalAdmin)
 admin.site.register(User, CustomUserAdmin)
+admin.site.register(UserProfile)
 admin.site.register(Language)
 admin.site.register(OpdAppointment)
 admin.site.register(MedicalService, MedicalServiceAdmin)

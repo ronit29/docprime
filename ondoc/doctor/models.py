@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.utils.safestring import mark_safe
 
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile
 
 
 class Migration(migrations.Migration):
@@ -262,9 +262,10 @@ class OpdAppointment(TimeStampedModel):
     ACCEPTED = 2
     RESCHEDULED = 3
     REJECTED = 4
+    
     doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    profile = models.PositiveSmallIntegerField()
+    profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
     fees = models.PositiveSmallIntegerField()
     status = models.PositiveSmallIntegerField(default=CREATED)
     time_slot_start = models.DateTimeField(auto_now=True)

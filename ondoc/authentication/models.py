@@ -1,12 +1,12 @@
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
-
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 class Image(models.Model):
-    name = models.ImageField(height_field='height', width_field='width')
-    width = models.PositiveSmallIntegerField(editable=False)
-    height = models.PositiveSmallIntegerField(editable=False)
+    # name = models.ImageField(height_field='height', width_field='width')
+    width = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
+    height = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
 
     class Meta:
         abstract = True
@@ -106,3 +106,25 @@ class CreatedByModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class UserProfile(TimeStampedModel, Image):
+    
+    user = models.ForeignKey(User, related_name="profiles", on_delete=models.CASCADE)
+    name = models.CharField(max_length=100, blank=False, default=None)
+    email = models.CharField(max_length=20, blank=False, default=None)
+    gender = models.CharField(max_length=2, default=None, blank=True, choices=[("","Select"), ("m","Male"), ("f","Female"), ("o","Other")])
+    mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    is_otp_verified = models.BooleanField(default=False)
+    is_default_user = models.BooleanField(default=False)
+    dob = models.DateField(blank=True, null=True)
+    
+    profile_image = models.ImageField(upload_to='users/images' ,height_field='height', width_field='width',blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "user_profile"
+
+
