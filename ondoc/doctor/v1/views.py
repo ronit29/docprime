@@ -1,6 +1,6 @@
 from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
-                        DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer
+                        DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer, OpdAppointmentSerializer
 from .services import ReformScheduleService
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -120,4 +120,15 @@ class DoctorProfile(APIView):
         serialized_doctor = DoctorProfileSerializer(doctor_profile[0])
 
         return Response(serialized_doctor.data)
+
+
+class OpdAppointment(APIView):
+
+    def get(self, request, version="v1", format=None):
+        doctor_id = 2
+
+        appointments = OpdAppointmentSerializer.objects.filter(doctor=doctor_id)
+        serialized_appointments = OpdAppointmentSerializer(appointments[0])
+
+        return Response(serialized_appointments.data)
 
