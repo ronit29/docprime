@@ -158,6 +158,7 @@ class LabForm(forms.ModelForm):
         #instance = getattr(self, 'instance', None)
         #if instance and instance.pk:
         self.fields['license'].widget.attrs['disabled'] = True
+        self.fields['license'].required = False
         self.fields['hospital'].widget.attrs['disabled'] = True
         self.fields['network'].widget.attrs['disabled'] = True
 
@@ -185,14 +186,15 @@ class LabForm(forms.ModelForm):
 
     class Meta:
         model = Lab
-        exclude = []
+        fields = ('name', 'about', 'license', 'operational_since', 'parking', 'hospital', 'network_type', 'network', )
 
-class LabAddressForm(LabForm):
+class LabAddressForm(forms.ModelForm):
 
     location = forms.CharField(disabled=True)
     pin_code = forms.CharField()
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.form_tag = False;
         self.helper.layout = Layout(
@@ -218,12 +220,21 @@ class LabAddressForm(LabForm):
             )
         )
 
-class LabOpenForm(LabForm):
-      def __init__(self, *args, **kwargs):
+    class Meta:
+        model = Lab
+        fields = ('building', 'sublocality', 'locality', 'city', 'state', 'country', 'pin_code','location' )
+
+class LabOpenForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.form_tag = False;
         self.helper.layout = Layout(CustomField('always_open'))
+    class Meta:
+        model = Lab
+        fields = ('always_open',)
+
 
 class LabServiceForm(forms.ModelForm):
 
@@ -472,3 +483,4 @@ DoctorAssociationFormSet = inlineformset_factory(Doctor, DoctorAssociation, form
 DoctorExperienceFormSet = inlineformset_factory(Doctor, DoctorExperience, form = DoctorExperienceForm,extra = 1, can_delete=True, exclude=('id', ))
 DoctorServiceFormSet = inlineformset_factory(Doctor, DoctorMedicalService, form = DoctorMedicalServiceForm,extra = 1, can_delete=True, exclude=('id', ))
 DoctorImageFormSet = inlineformset_factory(Doctor, DoctorImage, form = DoctorImageForm,extra = 1, can_delete=True, exclude=('id', ))
+

@@ -333,13 +333,18 @@
 
 <div style='font-size: 16px;margin-bottom:30px;'>I hereby agree to the terms and conditions governing the  empanelment with the company.</div>
 
-<button class='btn pull-right' style='background-color:#00acc1;min-width: 180px;height: 40px;color: white;'>Submit</button>
-<button class='btn pull-right' style='margin-right:20px;background-color:#979797;min-width: 180px;height: 40px;color: white;'>Save Draft</button>
+<button class='btn pull-right submit-form' style='background-color:#00acc1;min-width: 180px;height: 40px;color: white;'>Submit</button>
+<button class='btn pull-right save-draft' style='margin-right:20px;background-color:#979797;min-width: 180px;height: 40px;color: white;'>Save Draft</button>
 
 <div style='padding-top:100px'></div>
 {% endblock %}
 
 {% block domready %}
+
+$('.submit-form').on('click',function(e){
+    
+    $('form').submit()
+})
 
 $('.trigger-upload').on('click',function(e){
     $(this).closest('.upload-container').find('.dropzone').trigger('click')
