@@ -255,3 +255,20 @@ class DoctorMedicalService(TimeStampedModel):
     class Meta:
         db_table = "doctor_medical_service"
         unique_together = (("doctor", "service"))
+
+
+class OpdAppointment(TimeStampedModel):
+    CREATED = 1
+    ACCEPTED = 2
+    RESCHEDULED = 3
+    REJECTED = 4
+    doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    profile = models.PositiveSmallIntegerField()
+    fees = models.PositiveSmallIntegerField()
+    status = models.PositiveSmallIntegerField(default=CREATED)
+    time_slot = models.DateTimeField()
+
+    class Meta:
+        db_table = "opd_appointment"
+
