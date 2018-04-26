@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 
+from django.db.models import Prefetch
 
 class BasePagination(PageNumberPagination):
     def get_paginated_response(self, data, keyword = "results"):
@@ -110,8 +111,13 @@ class DoctorProfile(APIView):
     def get(self, request, version="v1", format=None):
         
         doctor_id = 2
-        doctor_profile = Doctor.objects.get(id=doctor_id)
-        serialized_doctor = DoctorProfileSerializer(doctor_profile)
+
+        try:
+            doctor_profile = Doctor.objects.filter(id=doctor_id).prefetch_related(Prefetch('availability', queryset=DoctorHospital.objects.distinct('hospital_id').order_by('hospital_id','fees')))
+        except Doctor.DoesNotExist as e:
+            raise Exception('No doctor with specified id found')
+
+        serialized_doctor = DoctorProfileSerializer(doctor_profile[0])
 
         return Response(serialized_doctor.data)
 
