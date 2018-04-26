@@ -135,10 +135,9 @@ class DocotorAppointments(APIView):
         }
 
         appointments = OpdAppointment.objects.filter(doctor=doctor_id)
+        appointmentsData = OpdAppointmentSerializer(appointments, many=True).data
 
-        for appointment in appointments :
-            appointmentData = OpdAppointmentSerializer(appointment).data
-            response['appointments'].append(appointmentData)
+        response['appointments'] = appointmentsData
 
         return Response(response)
 
