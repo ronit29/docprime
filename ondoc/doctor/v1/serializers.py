@@ -93,3 +93,16 @@ class SymptomsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Symptoms
         fields = ('id', 'name', )
+
+
+class DoctorProfileSerializer(serializers.ModelSerializer):
+    
+    profile_img = DoctorImageSerializer(read_only=True, many = True)
+    qualificationSpecialization = DoctorQualificationSerializer(read_only=True, many = True)
+    availability = DoctorHospitalSerializer(read_only=True, many = True)
+    pastExperience = DoctorExperienceSerializer(read_only=True, many = True)
+
+    class Meta:
+        model = Doctor
+        fields = ('id', 'name', 'practice_duration', 'profile_img', 'qualificationSpecialization',
+                 'email', 'availability', 'pastExperience' )

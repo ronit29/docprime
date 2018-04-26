@@ -1,6 +1,6 @@
 from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
-                        DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer
+                        DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer
 from .services import ReformScheduleService
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -100,4 +100,18 @@ class DoctorView(APIView):
         serialized_doctors = DoctorApiReformData(page, many=True)
 
         return paginator.get_paginated_response(serialized_doctors.data)
+
+
+class DoctorProfile(APIView):
+    """
+    Return Detailed doctor profile
+    """
+
+    def get(self, request, version="v1", format=None):
+        
+        doctor_id = 2
+        doctor_profile = Doctor.objects.get(id=doctor_id)
+        serialized_doctor = DoctorProfileSerializer(doctor_profile)
+
+        return Response(serialized_doctor.data)
 
