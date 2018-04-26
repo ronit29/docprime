@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, HttpResponse
+from django.http import JsonResponse
 from random import randint
 from ondoc.sms import api
 
@@ -56,10 +57,10 @@ def otp(request):
             if otp == stored_otp:
                 request.session[token] = True
                 request.session["token_value"] = token
-                return redirect("/onboard/lab?token=1438749146", permanent=False)
+                return redirect("/onboard/lab?token=" + token, permanent=False)
             else:
                 request.session['otp_mismatch'] = True
-                return redirect("/onboard/otp?token=1438749146", permanent=False)
+                return redirect("/onboard/otp?token="+token, permanent=False)
     else:
         otp_resent = request.session.get('otp_resent', False)
         otp_mismatch = request.session.get('otp_mismatch', False)
@@ -71,7 +72,10 @@ def otp(request):
 
 
 def generate(request):
-    lab_id = request.GET.get('lab_id')
+    if not request.is_ajax():
+        return HttpResponse('invalid request') 
+
+    lab_id = request.POST.get('lab_id')
     lab = Lab.objects.get(pk=lab_id)
 
     LabOnboardingToken.objects.filter(lab_id=lab_id, status=LabOnboardingToken.GENERATED).update(status=LabOnboardingToken.REJECTED)
@@ -79,4 +83,4 @@ def generate(request):
     token = LabOnboardingToken(status=1,lab_id=lab_id, token=randint(1000000000, 9000000000),verified_token=randint(1000000000, 9000000000))
     token.save()
     url = 'ondoc.com/onboard/lab?token='+str(token.token)+'&lab_id='+str(lab_id)
-    return HttpResponse('generated_url is '+url)
+    return JsonResponse({'url': url})

@@ -1,0 +1,106 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+
+<h3>
+{{ lab.name }}
+</h3>
+<hr>
+
+<table id="result_list">
+	<thead>
+		<th>
+			<div class="text">
+				license
+			</div>
+		</th>
+		<th>
+			<div class="text">
+				about
+			</div>
+		</th>
+		<th>
+			<div class="text">
+				Last token
+			</div>
+		</th>
+		<th>
+			<div class="text">
+				Last token status
+			</div>
+		</th>
+		<th>
+			<div class="text">
+				Last URL
+			</div>
+		</th>
+	</thead>
+	<tbody>
+		<tr class="row1">
+			<td>
+				{{ lab.license }}
+			</td>
+			<td>
+				{{ lab.about }}
+			</td>
+			<td>
+				{{ last_token.token }}
+			</td>
+			<td id="last_token_status">
+				{{ last_token.status }}
+			</td>
+			<td>
+				{{ last_url }}
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+
+<button class="generate">GENERATE NEW LINK</button>
+<p id="new_url">
+	
+</p>
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+<script type="text/javascript" src="//cdn.jsdelivr.net/jquery.cookie/1.4.1/jquery.cookie.min.js">
+</script>
+
+<script type="text/javascript">
+
+    var csrftoken = $.cookie('csrftoken');
+    function csrfSafeMethod(method) {
+      // these HTTP methods do not require CSRF protection
+      return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+    }
+    $.ajaxSetup({
+      beforeSend: function(xhr, settings) {
+      if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+        xhr.setRequestHeader("X-CSRFToken", csrftoken);
+      }
+      }
+    });
+
+	$(document).ready(function(){
+		$('.generate').click(function(){
+		    $.ajax(
+		    {
+		        "type":"POST",
+		        "dataType": "json",
+		        "url": "{% url 'onboard:generate-url' %}",
+		        "data":{
+		            "lab_id": {{ lab.id }}
+		        },
+		        success: function( data ) 
+		        {
+		        	// alert(data.url);
+		        	$("#last_token_status").html("2");
+		        	$("#new_url").html(data.url);
+		        }
+		    }); 	
+	});
+});
+</script>
+
+{% endblock %}

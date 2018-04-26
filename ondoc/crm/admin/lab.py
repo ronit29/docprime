@@ -1,3 +1,7 @@
+from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
+from django.conf.urls import url
+from django.urls import include, path, reverse
+from django.utils.safestring import mark_safe
 from django.contrib.gis import forms
 from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
@@ -7,8 +11,9 @@ from django.db import models
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification,
-    LabNetwork)
+    LabNetwork, Lab, LabOnboardingToken)
 from .common import *
+
 
 class LabTimingInline(admin.TabularInline):
     model = LabTiming
@@ -115,6 +120,37 @@ class LabForm(forms.ModelForm):
 
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
     change_form_template = 'custom_change_form.html'
+    list_display = ('name', 'updated_at', 'data_status', 'created_by', 'get_onboard_link',)
+
+    def get_urls(self):
+        urls = super().get_urls()
+        my_urls = [
+            url('onboardlab_admin/(?P<userid>\d+)/', self.admin_site.admin_view(self.onboardlab_admin), name="onboardlab_admin"),
+        ]
+        return my_urls + urls
+
+    def onboardlab_admin(self, request, userid):
+        try:
+            lab_obj = Lab.objects.get(id = userid)
+        except Exception as e:
+            return HttpResponse('invalid lab')
+
+        try:
+            last_token = LabOnboardingToken.objects.filter(lab = lab_obj).order_by('-id').first()
+        except Exception as e:
+            last_token = None
+
+        last_url = None
+        if last_token:
+            last_url = 'ondoc.com/onboard/lab?token='+str(last_token.token)+'&lab_id='+str(userid)
+
+        return render(request, 'onboardlab.html', {'lab': lab_obj, 'last_token': last_token, 'last_url': last_url})
+
+    def get_onboard_link(self, obj = None):
+        if obj.data_status == 1:
+            return mark_safe("<a href='/admin/diagnostic/lab/onboardlab_admin/%s'>generate onboarding url</a>" % obj.id)
+        return ""
+    get_onboard_link.allow_tags = True
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
@@ -144,7 +180,6 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
         form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
         return form
 
-    list_display = ('name', 'updated_at', 'data_status', 'created_by')
     form = LabForm
     search_fields = ['name']
     inlines = [LabCertificationInline, LabAwardInline, LabAccreditationInline,
