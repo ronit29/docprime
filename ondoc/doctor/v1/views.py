@@ -141,3 +141,26 @@ class DocotorAppointments(APIView):
 
         return Response(response)
 
+    def put(self, request, version="v1", format=None):
+
+        # TODO : Authenticate this request so only the assigned doctor or the patient
+        #        is able to change the status of the appointment id.
+
+        appointment_id = request.data['appointment_id']
+        status = request.data['status']
+        
+        try:
+            selected_appointment = OpdAppointment.objects.get(id=appointment_id)
+            selected_appointment.status = status
+            selected_appointment.save()
+            
+        except OpdAppointment.DoesNotExist:
+            return Response('No Appointment found with the ID provided',status=404)
+        except Exception as e:
+            return Response(str(e),status=500)
+
+        return Response({
+            "message" : "Appointment modified"
+        })
+
+
