@@ -271,6 +271,9 @@ class OpdAppointment(TimeStampedModel):
     time_slot_start = models.DateTimeField(auto_now=True)
     time_slot_end = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return self.profile.name + " (" + self.doctor.name + ")"
+
     class Meta:
         db_table = "opd_appointment"
 

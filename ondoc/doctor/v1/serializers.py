@@ -116,7 +116,13 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
 
 class OpdAppointmentSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.ReadOnlyField(source='doctor.name')
+    hospital_name = serializers.ReadOnlyField(source='hospital.name')
+    patient_name = serializers.ReadOnlyField(source='profile.name')
+    patient_dob = serializers.ReadOnlyField(source='profile.dob')
+    patient_gender = serializers.ReadOnlyField(source='profile.gender')
+    patient_image = serializers.ReadOnlyField(source='profile.profile_image.url')
 
     class Meta:
         model = OpdAppointment
-        fields = ('fees', 'status', 'time_slot_start', 'time_slot_end', )
+        fields = ('fees', 'status', 'time_slot_start', 'time_slot_end', 'doctor_name', 'hospital_name','patient_name','patient_dob','patient_gender','patient_image')
