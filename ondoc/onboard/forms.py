@@ -196,7 +196,8 @@ class LabAddressForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
-        self.helper.form_tag = False;
+        self.helper.form_tag = False
+        self.fields['location'].required = False
         self.helper.layout = Layout(
             Div(
                 Div(CustomField('building', label_class='col-md-3', field_class='col-md-6'),css_class='col-md-6'),
