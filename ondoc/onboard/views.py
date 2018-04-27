@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, HttpResponse
 from django.http import JsonResponse
 from random import randint
 from ondoc.sms import api
-
+from ondoc.sendemail import api as email_api
 # import models here
 from ondoc.diagnostic.models import LabOnboardingToken, Lab, LabAward
 from ondoc.doctor.models import DoctorOnboardingToken, Doctor
@@ -102,5 +102,6 @@ def generate(request):
     token = LabOnboardingToken(status=1,email=lab.primary_email,mobile=lab.primary_mobile,lab_id=lab_id, token=randint(1000000000, 9000000000),verified_token=randint(1000000000, 9000000000))
     token.save()
     url = host + '/onboard/lab?token='+str(token.token)
-    print("The generated onboarding url is: " + url)
+    email_api.send_email('arunchaudhary@policybazaar.com', 'support@panaceatechno.com', 'Test email', 'Test subject')
+    #print("The generated onboarding url is: " + url)
     return JsonResponse({'message': 'ok'})

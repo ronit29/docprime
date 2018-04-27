@@ -24,3 +24,14 @@ INTERNAL_IPS = ['127.0.0.1']
 
 SMS_BACKEND = 'ondoc.sms.backends.backend.ConsoleSmsBackend'
 # SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
+
+#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'localhost'
+# EMAIL_PORT = 1025
+
+EMAIL_HOST = 'smtp.falconide.com'
+EMAIL_PORT = 25
+# EMAIL_HOST_USER = 'policybazaarcom1'
+# EMAIL_HOST_PASSWORD = 'Sm@pbzc3'
+# EMAIL_USE_TLS = False
