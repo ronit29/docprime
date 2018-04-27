@@ -91,7 +91,7 @@ def otp(request):
 
 def generate(request):
     if not request.is_ajax():
-        return HttpResponse('invalid request') 
+        return HttpResponse('invalid request')
 
     host = request.get_host()
     lab_id = request.POST.get('lab_id')
@@ -99,9 +99,9 @@ def generate(request):
 
     LabOnboardingToken.objects.filter(lab_id=lab_id, status=LabOnboardingToken.GENERATED).update(status=LabOnboardingToken.REJECTED)
 
-    token = LabOnboardingToken(status=1,email=lab.primary_email,mobile=lab.primary_mobile,lab_id=lab_id, token=randint(1000000000, 9000000000),verified_token=randint(1000000000, 9000000000))
+    token = LabOnboardingToken(status=1,email=lab.primary_email,mobile=lab.primary_mobile,lab_id=lab_id, token=randint(1000000000, 9000000000))
     token.save()
     url = host + '/onboard/lab?token='+str(token.token)
     email_api.send_email('arunchaudhary@policybazaar.com', 'support@panaceatechno.com', 'Test email', 'Test subject')
-    #print("The generated onboarding url is: " + url)
+    # qprint("The generated onboarding url is: " + url)
     return JsonResponse({'message': 'ok'})
