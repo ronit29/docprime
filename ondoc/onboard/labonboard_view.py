@@ -20,7 +20,8 @@ class LabOnboard(View):
         token = request.GET.get('token')
 
         if not token:
-            return HttpResponse('Invalid URL')
+            return render(request,'access_denied.html')
+
 
         existing = None
 
@@ -30,10 +31,14 @@ class LabOnboard(View):
             pass
 
         if not existing:
-            return HttpResponse('Invalid Token')
+            return render(request,'access_denied.html')
+
 
         if not existing.lab:
-            return HttpResponse('No lab found for this token')
+            return render(request,'access_denied.html')
+
+        if existing.status == LabOnboardingToken.CONSUMED:
+            return render(request, 'success.html')
 
         if existing.status != LabOnboardingToken.GENERATED:
             return render(request, 'access_denied.html')
@@ -205,6 +210,15 @@ class LabOnboard(View):
                 LabService.objects.filter(service=id, lab=instance).delete()
 
         request.session['message'] = 'Successfully Saved Draft'
+
+        action = request.POST.get('_action',None)
+
+        if action=='_submit':
+            instance.onboarding_status = Lab.ONBOARDED
+            instance.save()
+            LabOnboardingToken.objects.filter(token = token).update(status=LabOnboardingToken.CONSUMED)
+
+
         return redirect("/onboard/lab?token="+token, permanent=False)
 
 

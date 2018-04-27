@@ -5,9 +5,14 @@ from ondoc.doctor.models import Hospital
 
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
+    NOT_ONBOARDED = 1
+    REQUEST_SENT = 2
+    ONBOARDED = 3
+
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
     license = models.CharField(max_length=200, blank=True)
+    onboarding_status = models.PositiveSmallIntegerField(default=NOT_ONBOARDED, choices=[(NOT_ONBOARDED,"Not Onboarded"), (REQUEST_SENT,"Onboarding Request Sent"), (ONBOARDED,"Onboarded")])
     primary_email = models.EmailField(max_length=100, blank=True)
     primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MinValueValidator(1800)])
@@ -310,6 +315,8 @@ class LabOnboardingToken(TimeStampedModel):
     STATUS_CHOICES = [(GENERATED, "Generated"), (REJECTED, "Rejected"), (CONSUMED, "Consumed")]
     lab = models.ForeignKey(Lab, null=True, on_delete=models.SET_NULL)
     token = models.CharField(max_length=100)
+    email = models.EmailField(max_length=100, blank=True)
+    mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     verified_token = models.CharField(max_length=100, null=True)
     status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=GENERATED)
 
