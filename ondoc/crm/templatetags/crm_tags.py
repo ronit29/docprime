@@ -67,3 +67,7 @@ def custom_test(context):
     if context.get('original') is not None:
         ctx['original'] = context['original']
     return ctx
+
+@register.filter
+def get_item(dictionary, key):
+    return dictionary.get(key)

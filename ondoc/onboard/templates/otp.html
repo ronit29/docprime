@@ -3,12 +3,14 @@
 {% load staticfiles %}
 
 {% block content %}
-    <link rel="stylesheet" href="{% static 'css/onboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/onboard.css' %}">
 
-<div style='padding-top:50px;'>
-<h1 style='text-align: center;margin-bottom: 100px;'>Diagnostic Lab Onboarding</h1>
+<div style='padding-top:120px;'>
+<h1 style='text-align: center;margin-bottom: 20px;font-size: 40px;color: #00acc1
+'>Welcome To Panacea Tech</h1>
+
 <div class='row'>
-<div class='col-lg-4 col-md-4 col-sm-12 col-xs-12 col-md-offset-4 col-lg-offset-4'>
+<div style='box-shadow: 0px 3px 6px 0 rgba(0,0,0,.18); padding: 50px; border-radius: 20px;' class='col-lg-6 col-md-6 col-sm-12 col-xs-12 col-md-offset-3 col-lg-offset-3'>
 {% if otp_resent %}
 <div style='text-align: center;padding: 0 0 20px 0;color: #4cae4c;'>New OTP has been sent to you</div>
 {% elif otp_mismatch %}
@@ -18,5 +20,8 @@
 {% crispy form %}
 </div>
 </div>
+</div>
+<div style='background: #00acc1;font-size: 14px;padding:5px 0;color:#fff;position: absolute;bottom: 0;left: 0;right: 0;text-align: center;'>
+    (c) Panacea Tech All Rights Reserved @2018
 </div>
 {% endblock %}

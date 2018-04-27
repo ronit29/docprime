@@ -76,6 +76,7 @@ label
     background: #fff;
     border: none;
     color: #757575;
+    padding: 10px 25px;
 }
 
 .glyphicon
@@ -93,4 +94,9 @@ label
 .dropzone .dz-preview .dz-image
 {
     border-radius: 0;
+}
+
+.error .terms-error
+{
+    display: block !important;
 }

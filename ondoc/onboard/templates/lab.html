@@ -1,6 +1,7 @@
 {%extends 'base.html'%}
 {% load crispy_forms_tags %}
 {% load staticfiles %}
+{% load crm_tags %}
 
 {% block header %}
 <div class='' style='background: #00acc1;height: 50px;color:#fff;font-size: 18px;padding:13px 0;'>
@@ -19,7 +20,20 @@
     <link rel="stylesheet" href="{% static 'css/dropzone.css' %}">
     <link rel="stylesheet" href="{% static 'css/lab.css' %}">
 
-<div style='padding:40px 0 20px 0'>
+{% if error_message %}
+    <div class="alert alert-danger" style="margin-top: 20px;">
+      <strong>{{ error_message }}</strong>
+    </div>
+{% endif %}
+
+{% if message %}
+    <div class="alert alert-success" style="margin-top: 20px;">
+      <strong>{{ message }}</strong>
+    </div>
+{% endif %}
+
+
+<div style='padding:40px 0 0 0'>
 	<form class="form-horizontal" method="POST" action="">
 
     <div class="panel panel-default">
@@ -46,10 +60,9 @@
         <div {% if forloop.last %} class='col-md-3 col-md-offset-3 col-sm-6 col-xs-6' {% else %} class='col-md-6 col-sm-6 col-xs-6' {% endif %}>
             <div class="form-group"> 
                 <div class="controls "> 
-                    <div id="div_id_labservice-0-service" class="checkbox"> 
-                        <label for="id_labservice-0-service" style="color: black;font-size: 14px;"> 
-                        <input type="checkbox" name="labservice-0-service" class="checkboxinput" field-class="col-md-6" id="id_labservice-0-service" label-class="hidden">
-                        <input type='text' class="hidden" value = "{{id}}">
+                    <div class="checkbox"> 
+                        <label for="id_labservice_{{forloop.counter}}" style="color: black;font-size: 14px;"> 
+                        <input {% if lab_service_dict|get_item:id %} checked="checked" {% endif %} type="checkbox" name="labservice_{{forloop.counter}}" class="checkboxinput" field-class="col-md-6" id="id_labservice_{{forloop.counter}}" label-class="hidden">
                         {{name}}
                         </label> 
                     </div> 
@@ -60,7 +73,6 @@
         </div>
         <div>
         <p style='font-size: 12px;color:#00AAC5;margin:30px 0;'>Doctors For Radiology</p>
-         {{ lab_doctor_availability_formset.management_form|crispy }}
         <div class='clearfix' style='font-size: 14px;'>
             <div class='col-md-6 col-sm-6 col-xs-6'></div>
             <div class='col-md-5 col-md-offset-1 col-sm-6 col-xs-6'>
@@ -69,16 +81,17 @@
             </div>
         </div>
 
-
+         {{ lab_doctor_availability_formset.management_form|crispy }}
          {% for form in lab_doctor_availability_formset %}
          <div class="form-horizontal">
+              {{ form.id }}
               {% crispy form %}
          </div>
          {% endfor %}
 
        </div>
         </div>
-        <div class='col-md-6 col-md-offset-1'>
+        <div class='col-md-6 col-md-offset-1 dummy-panel'>
             <div class='col-md-6'>
                 <p style='font-size: 12px;margin-top: 9;color:#00AAC5;'>Doctor's MCI Registration Number</p>
             </div>
@@ -86,15 +99,27 @@
             
              {{ lab_doctor_formset.management_form|crispy }}
              {% for form in lab_doctor_formset %}
+             <div class='dummy-panel-body'>
              <div class="form-horizontal">
+                  {{ form.id }}
                   {% crispy form %}
+             </div>
              </div>
              {% endfor %}
              <div style='font-size: 16px;'>
+             <div class='add-new-form' data-key='labdoctor' style='display: inline-block;'>
                 <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-                <span>Add Another</span>
-            </div>
+             <span>Add Another</span>
              </div>
+
+             <div class="empty_form" style="display:none">
+                <div class="form-horizontal">                
+                    {% crispy lab_doctor_formset.empty_form %}
+                </div>            
+             </div>
+
+            </div>
+            </div>
 
         </div>
 
@@ -134,15 +159,23 @@
         {{ certificates_formset.management_form|crispy }}
          {% for form in certificates_formset %}
          <div class="form-horizontal">
+              {{ form.id }}
               {% crispy form %}
          </div>
          {% endfor %}
-
-
       </div>
       <div class='panel-footer'>
-        <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-        <span>Add Another Lab Certification</span>
+        <div class='add-new-form' data-key='labcertification' style='display: inline-block;'>
+            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span>Add Another Lab Certification</span>
+        </div>
+
+        <div class="empty_form" style="display:none">
+            <div class="form-horizontal">                
+                {% crispy certificates_formset.empty_form %}
+            </div>            
+        </div>
+
       </div>
     </div>
 
@@ -155,13 +188,24 @@
         {{ award_formset.management_form|crispy }}
          {% for form in award_formset %}
          <div class="form-horizontal">
+              {{ form.id }}
               {% crispy form %}
          </div>
          {% endfor %}
       </div>
       <div class='panel-footer'>
-        <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-        <span>Add Another Award</span>
+
+        <div class='add-new-form' data-key='labaward' style='display: inline-block;'>
+            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span>Add Another Award</span>
+        </div>
+
+        <div class="empty_form" style="display:none">
+            <div class="form-horizontal">
+                {% crispy award_formset.empty_form %}
+            </div>
+        </div>
+
       </div>
     </div>
 
@@ -174,13 +218,22 @@
         {{ accreditation_formset.management_form|crispy }}
          {% for form in accreditation_formset %}
          <div class="">
+              {{ form.id }}
               {% crispy form %}
          </div>
          {% endfor %}
       </div>
+
       <div class='panel-footer'>
-        <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-        <span>Add Another Lab Accreditation</span>
+        <div class='add-new-form' data-key='labaccreditation' style='display: inline-block;'>
+            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span>Add Another Lab Accreditation</span>
+        </div>
+        <div class="empty_form" style="display:none">
+            <div class="form-horizontal">
+                {% crispy accreditation_formset.empty_form %}
+            </div>
+        </div>        
       </div>
 
     </div>
@@ -189,21 +242,29 @@
       <div class="panel-heading">
         <img class='heading-icon' src ="{% static 'images/7.png' %}">
         <span>LAB CONTACT DETAILS</span></div>
-      <div class="panel-body" style='padding-right: 20px;'>
 
-
+     <div class="panel-body" style='padding-right: 20px;'>
         <!-- Adding formsets for awards -->
         {{ lab_manager_formset.management_form }}
         {% for form in lab_manager_formset %}        
         <div class="" style='margin-bottom: 30px;'>
+              {{ form.id }}
               {% crispy form %}
         </div>
         {% endfor %}
-      </div>
+     </div>
+
      <div class='panel-footer'>
-        <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-        <span>Add Another Lab Contact</span>
-      </div>
+       <div class='add-new-form' data-key='labmanager' style='display: inline-block;'>
+            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span>Add Another Lab Contact</span>
+        </div>
+        <div class="empty_form" style="display:none">
+            <div class="form-horizontal">
+                {% crispy lab_manager_formset.empty_form %}
+            </div>
+        </div>        
+     </div>
 
     </div>
 
@@ -222,14 +283,22 @@
         {{ lab_timing_formset.management_form }}
         {% for form in lab_timing_formset %}        
         <div style='margin-left: 40px'>
+              {{ form.id }}
               {% crispy form %}
         </div>
         {% endfor %}
       </div>
      <div class='panel-footer'>
-        <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-        <span>Add Another Lab Timings</span>
-      </div>
+       <div class='add-new-form' data-key='labtiming' style='display: inline-block;'>
+            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span>Add Another Lab Timings</span>
+        </div>
+        <div class="empty_form" style="display:none">
+            <div class="form-horizontal">
+                {% crispy lab_timing_formset.empty_form %}
+            </div>
+        </div>        
+    </div>
 
     </div>
 
@@ -331,7 +400,12 @@
 
 </div>
 
-<div style='font-size: 16px;margin-bottom:30px;'>I hereby agree to the terms and conditions governing the  empanelment with the company.</div>
+
+<div class="form-group terms-div">
+  <label style='font-size: 16px;color:black;' class='checkbox-inline' for="terms-checkbox"><input id='terms-checkbox' class='terms' type='checkbox'>I hereby agree to the terms and conditions governing the  empanelment with the company.</label>
+  <div class='terms-error' style='padding:0 20px;color:#a94442;display: none;'>Cannot submit without agreeing to Terms</div>
+</div>  
+
 
 <button class='btn pull-right submit-form' style='background-color:#00acc1;min-width: 180px;height: 40px;color: white;'>Submit</button>
 <button class='btn pull-right save-draft' style='margin-right:20px;background-color:#979797;min-width: 180px;height: 40px;color: white;'>Save Draft</button>
@@ -341,10 +415,55 @@
 
 {% block domready %}
 
+
+var errNode = $('.has-error:first')
+
+if(errNode.length>0)
+{
+    $('html, body').animate({
+        scrollTop: errNode.offset().top
+    }, 1000);
+}
+
+
+$(document).on("keypress", ":input:not(textarea)", function(event) {
+    return event.keyCode != 13;
+});
+
+$('.add-new-form').click(function() {
+    var data = $(this).data();
+    var form_idx = $('#id_'+data.key+'-TOTAL_FORMS').val();
+    $(this).closest('.panel,.dummy-panel').find('.panel-body,.dummy-panel-body').append($(this).next('.empty_form').html().replace(/__prefix__/g, form_idx));
+    $('#id_'+data.key+'-TOTAL_FORMS').val(parseInt(form_idx) + 1);
+});
+
+
 $('.submit-form').on('click',function(e){
-    
+    e.preventDefault();
+    if($('.terms:checked').length==0)
+    {
+        $('.terms-div').addClass('error');
+        return
+    }
+
+    $(':disabled').removeAttr('disabled')
+    var input = $("<input name='_action'>").attr("type", "hidden").val("_submit");
+    $('form').append($(input));
+
+    $('form').submit();
+});
+
+$('.save-draft').on('click',function(e){
+    e.preventDefault();
+
+    $(':disabled').removeAttr('disabled')        
+    var input = $("<input name='_action'>").attr("type", "hidden").val("_savedraft");
+    $('form').append($(input));
+
     $('form').submit()
 })
+
+
 
 $('.trigger-upload').on('click',function(e){
     $(this).closest('.upload-container').find('.dropzone').trigger('click')

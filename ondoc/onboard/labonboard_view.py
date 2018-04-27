@@ -75,7 +75,7 @@ class LabOnboard(View):
             else:
                 lab_doc_dict[id] = (id, value, None)
 
-        lab_documents = LabDocument.objects.filter(lab=existing.lab)
+        # lab_documents = LabDocument.objects.filter(lab=existing.lab)
         # Gather all forms
         lab_form = LabForm(instance = existing.lab, prefix='lab')
         lab_address_form = LabAddressForm(instance = existing.lab,prefix='labaddress')
@@ -83,7 +83,7 @@ class LabOnboard(View):
         # Gather all formsets
         award_formset = LabAwardFormSet(instance = existing.lab, prefix="labaward")
 
-        certificates_formset = LabCertificationFormSet(instance = existing.lab, prefix="labcertificates")
+        certificates_formset = LabCertificationFormSet(instance = existing.lab, prefix="labcertification")
 
         accreditation_formset = LabAccreditationFormSet(instance = existing.lab, prefix="labaccreditation")
         lab_manager_formset = LabManagerFormSet(instance = existing.lab, prefix="labmanager")
@@ -92,6 +92,8 @@ class LabOnboard(View):
         lab_doctor_availability_formset = LabDoctorAvailabilityFormSet(instance = existing.lab, prefix="labdoctoravailability")
         lab_doctor_formset = LabDoctorFormSet(instance = existing.lab, prefix="labdoctor")
 
+        message = request.session.get('message','')
+        request.session['message'] = ''
 
         return render(request, 'lab.html', {'lab_form': lab_form,
             'lab_address_form': lab_address_form,
@@ -112,6 +114,7 @@ class LabOnboard(View):
             'lab_images' : lab_images,
             'lab_doc_dict' : lab_doc_dict,
             'LabDocument' : LabDocument,
+            'message' : message
             })
 
     def post(self, request):
@@ -124,51 +127,92 @@ class LabOnboard(View):
         lab_form = LabForm(request.POST, instance = instance, prefix = "lab")
         lab_address_form = LabAddressForm(request.POST, instance = instance, prefix = "labaddress")
         lab_open_form = LabOpenForm(request.POST, instance = instance, prefix = "labopen")
-
-        if all([lab_form.is_valid(), lab_address_form.is_valid(), lab_open_form.is_valid()]):
-            lab_form.cleaned_data.update(lab_address_form.cleaned_data)
-            lab_form.cleaned_data.update(lab_open_form.cleaned_data)
-            lab_obj = lab_form.save()
-        else:
-            return HttpResponse('invalid forms')
-
-        # Now we save the related forms
-        # save awards formset
-        award_formset = LabAwardFormSet(request.POST, prefix = "labaward", instance = instance)
-        if award_formset.is_valid():
-            award_formset.save()
-        else:
-            print(award_formset.errors)
-
-
-        # save accreditation formset
-        accreditation_formset = LabAccreditationFormSet(request.POST, prefix = "labaccreditation", instance = instance)
-        if accreditation_formset.is_valid():
-            accreditation_formset.save()
-        else:
-            print(accreditation_formset.errors)
-
-
-        # save certificates formset
+        lab_doctor_availability_formset = LabDoctorAvailabilityFormSet(request.POST, prefix = "labdoctoravailability", instance = instance)
+        lab_doctor_formset = LabDoctorAvailabilityFormSet(request.POST, prefix = "labdoctor", instance = instance)
         certificates_formset = LabCertificationFormSet(request.POST, prefix = "labcertification", instance = instance)
-        if certificates_formset.is_valid():
-            certificates_formset.save()
-
-        # save lab_manager formset
+        award_formset = LabAwardFormSet(request.POST, prefix = "labaward", instance = instance)
+        accreditation_formset = LabAccreditationFormSet(request.POST, prefix = "labaccreditation", instance = instance)
         lab_manager_formset = LabManagerFormSet(request.POST, prefix = "labmanager", instance = instance)
-        if lab_manager_formset.is_valid():
-            lab_manager_formset.save()
-
-
-        # save lab_timing formset
         lab_timing_formset = LabTimingFormSet(request.POST, prefix = "labtiming", instance = instance)
-        if lab_timing_formset.is_valid():
-            lab_timing_formset.save()
 
-        return render(request, 'lab.html', {'lab_form': lab_form,
-            'lab_address_form': lab_address_form,
-            'award_formset': award_formset,
-            'certificates_formset': certificates_formset,
-            'accreditation_formset': accreditation_formset,
-            'lab_manager_formset': lab_manager_formset,
-            'lab_timing_formset': lab_timing_formset})
+        if not all([lab_form.is_valid(), lab_address_form.is_valid(), lab_open_form.is_valid(),lab_doctor_availability_formset.is_valid(),
+            lab_doctor_formset.is_valid(), certificates_formset.is_valid(), award_formset.is_valid(),
+            accreditation_formset.is_valid(), lab_manager_formset.is_valid(), lab_timing_formset.is_valid()
+             ]):
+
+            lab_images = LabImage.objects.filter(lab=instance)
+            lab_doc_dict = OrderedDict()
+            for id, value in LabDocument.CHOICES:
+                results = LabDocument.objects.filter(lab=instance, document_type=id)
+                if len(results)>0:
+                    lab_doc_dict[id] = (id, value, results)
+                else:
+                    lab_doc_dict[id] = (id, value, None)
+
+            address_components = ['building','sublocality','locality','city','state','country']
+            address_values = []
+            for x in address_components:
+                if getattr(instance, x):
+                    address_values.append(getattr(instance, x))
+
+            address = ", ".join(address_values)
+
+            lab_service_dict = {}
+            for service in LabService.objects.filter(lab=instance):
+                lab_service_dict[service.service] = service
+
+            return render(request, 'lab.html', {'lab_form': lab_form,
+                'lab_address_form': lab_address_form,
+                'award_formset': award_formset,
+                'certificates_formset': certificates_formset,
+                'accreditation_formset': accreditation_formset,
+                'lab_manager_formset': lab_manager_formset,
+                'lab_timing_formset': lab_timing_formset,
+                'lab_open_form' : lab_open_form,
+                'lab_doctor_formset' : lab_doctor_formset,
+                'lab_images' : lab_images,
+                'lab_doc_dict' : lab_doc_dict,
+                'address' : address,
+                'lab_service_dict' : lab_service_dict,
+                'LabService' : LabService,
+                'lab_doctor_availability_formset' : lab_doctor_availability_formset,
+                'error_message' : 'Please fill all required fields'})
+
+
+
+        lab_form.cleaned_data.update(lab_address_form.cleaned_data)
+        lab_form.cleaned_data.update(lab_open_form.cleaned_data)
+        lab_obj = lab_form.save()
+
+        lab_doctor_availability_formset.save()
+        lab_doctor_formset.save()
+        certificates_formset.save()
+        award_formset.save()
+        accreditation_formset.save()
+        lab_manager_formset.save()
+        lab_timing_formset.save()
+
+
+        for id, name in LabService.SERVICE_CHOICES:
+            val = request.POST.get('labservice_'+str(id))
+            if val:
+                if not LabService.objects.filter(service=id, lab=instance).exists():
+                    ls = LabService()
+                    ls.lab = instance
+                    ls.service = id
+                    ls.save()
+            else:
+                LabService.objects.filter(service=id, lab=instance).delete()
+
+        request.session['message'] = 'Successfully Saved Draft'
+        return redirect("/onboard/lab?token="+token, permanent=False)
+
+
+        # return render(request, 'lab.html', {'lab_form': lab_form,
+        #     'lab_address_form': lab_address_form,
+        #     'award_formset': award_formset,
+        #     'certificates_formset': certificates_formset,
+        #     'accreditation_formset': accreditation_formset,
+        #     'lab_manager_formset': lab_manager_formset,
+        #     'lab_timing_formset': lab_timing_formset,
+        #      'lab_open_form' : lab_open_form})

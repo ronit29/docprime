@@ -3,6 +3,7 @@ from .base import env
 
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='!!!SET DJANGO_SECRET_KEY!!!')
+CRISPY_FAIL_SILENTLY = not DEBUG
 
 ALLOWED_HOSTS = ['*']
 GOOGLE_MAPS_API_KEY = 'AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA'

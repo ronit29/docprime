@@ -19,7 +19,9 @@ def otp(request):
     token = request.GET.get('token')
 
     if not token:
-        return HttpResponse('Invalid URL. Token is required')
+        #return HttpResponse('Invalid URL. Token is required')
+        return render(request,'access_denied.html')
+
 
     existing = None
 
@@ -29,20 +31,25 @@ def otp(request):
         pass
 
     if not existing:
-        return HttpResponse('Invalid Token')
+        return render(request,'access_denied.html')
 
     if not existing.lab:
-        return HttpResponse('No lab found for this token')
+        return render(request,'access_denied.html')
 
 
     if existing.status != LabOnboardingToken.GENERATED:
         return render(request,'access_denied.html')
 
+    auth = request.session.get(token, False)
+    if auth:
+        return redirect("/onboard/lab?token="+token, permanent=False)
+
+
     if request.method == 'POST':
         action = request.POST.get('_resend_otp')
         if action:
             otp = randint(200000, 900000)
-            message = 'OTP is '+str(otp)
+            message = 'You have initiated onboarding process for '+existing.lab.name+'. OTP is '+str(otp)
             api.send_sms(message, '91'+str(existing.lab.primary_mobile))
 
             # print(otp)
@@ -65,8 +72,19 @@ def otp(request):
         otp_mismatch = request.session.get('otp_mismatch', False)
         request.session['otp_resent'] = False
         request.session['otp_mismatch'] = False
+        existingOTP = request.session.get('otp',None)
 
         form = OTPForm()
+        if existingOTP:
+            form.fields['otp'].label = '6 Digit verification code has been send to your mobile number 9560511234'
+        else:
+            otp = randint(200000, 900000)
+            message = 'You have initiated onboarding process for '+existing.lab.name+'. OTP is '+str(otp)
+            api.send_sms(message, '91'+str(existing.lab.primary_mobile))
+            request.session['otp'] = otp
+
+
+
         return render(request,'otp.html',{'form':form, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})
 
 

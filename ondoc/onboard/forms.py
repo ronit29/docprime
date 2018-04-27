@@ -257,6 +257,8 @@ class LabDoctorAvailabilityForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['slot'].widget.attrs['disabled'] = True
+        # self.fields['slot'].required = True
+
         self.fields['is_male_available'].label =''
         self.fields['is_female_available'].label =''
         self.helper = FormHelper()
@@ -315,20 +317,20 @@ class OTPForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-vertical'
-        self.helper.add_input(Submit(name='submit',value='Submit',css_class='btn-primary btn-block'))
-        self.helper.add_input(Submit(name='_resend_otp', value='Resend OTP', css_class='btn-primary btn-block'))
+        self.helper.add_input(Submit(name='verify',value='Verify',css_class='btn col-md-5'))
+        self.helper.add_input(Submit(name='_resend_otp', value='Resend OTP', css_class='btn col-md-5 col-md-offset-2'))
 
 
 # include all formsets here
 LabDoctorAvailabilityFormSet = inlineformset_factory(Lab, LabDoctorAvailability, form=LabDoctorAvailabilityForm, extra = 0, can_delete=True, exclude=('lab', ))
-LabAwardFormSet = inlineformset_factory(Lab, LabAward, form=LabAwardForm, extra = 1, can_delete=True, exclude=('lab', ))
+LabAwardFormSet = inlineformset_factory(Lab, LabAward, form=LabAwardForm, extra = 0, can_delete=True, exclude=('lab', ))
 # LabCertificationFormSet = inlineformset_factory(Lab, LabCertification, form=LabCertificationForm,extra = 1, can_delete=True, exclude=('lab', ))
-LabAccreditationFormSet = inlineformset_factory(Lab, LabAccreditation,form=LabAccreditationForm, extra = 1, can_delete=True, exclude=('lab', ))
-LabManagerFormSet = inlineformset_factory(Lab, LabManager, form=LabManagerForm, extra = 1, can_delete=True, exclude=('lab', ))
-LabTimingFormSet = inlineformset_factory(Lab, LabTiming, form = LabTimingForm, extra = 1, can_delete=True)
-LabCertificationFormSet = inlineformset_factory(Lab, LabCertification, form=LabCertificationForm, extra = 2, can_delete=True, exclude=('lab', ))
+LabAccreditationFormSet = inlineformset_factory(Lab, LabAccreditation,form=LabAccreditationForm, extra = 0, can_delete=True, exclude=('lab', ))
+LabManagerFormSet = inlineformset_factory(Lab, LabManager, form=LabManagerForm, extra = 0, can_delete=True, exclude=('lab', ))
+LabTimingFormSet = inlineformset_factory(Lab, LabTiming, form = LabTimingForm, extra = 0, can_delete=True)
+LabCertificationFormSet = inlineformset_factory(Lab, LabCertification, form=LabCertificationForm, extra = 0, can_delete=True, exclude=('lab', ))
 LabServiceFormSet = inlineformset_factory(Lab, LabService, form=LabServiceForm, extra=0, exclude=('lab', ))
-LabDoctorFormSet = inlineformset_factory(Lab, LabDoctor, form=LabDoctorForm, extra=1,can_delete=False, exclude=('lab', ))
+LabDoctorFormSet = inlineformset_factory(Lab, LabDoctor, form=LabDoctorForm, extra=1 ,can_delete=False, exclude=('lab', ))
 
 
 # include all doctor onboarding forms here
@@ -483,4 +485,3 @@ DoctorAssociationFormSet = inlineformset_factory(Doctor, DoctorAssociation, form
 DoctorExperienceFormSet = inlineformset_factory(Doctor, DoctorExperience, form = DoctorExperienceForm,extra = 1, can_delete=True, exclude=('id', ))
 DoctorServiceFormSet = inlineformset_factory(Doctor, DoctorMedicalService, form = DoctorMedicalServiceForm,extra = 1, can_delete=True, exclude=('id', ))
 DoctorImageFormSet = inlineformset_factory(Doctor, DoctorImage, form = DoctorImageForm,extra = 1, can_delete=True, exclude=('id', ))
-
