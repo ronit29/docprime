@@ -140,9 +140,6 @@ class LabOnboard(View):
         lab_manager_formset = LabManagerFormSet(request.POST, prefix = "labmanager", instance = instance)
         lab_timing_formset = LabTimingFormSet(request.POST, prefix = "labtiming", instance = instance)
 
-
-        # print(lab_address_form.errors)
-
         if not all([lab_form.is_valid(), lab_address_form.is_valid(), lab_open_form.is_valid(),lab_doctor_availability_formset.is_valid(),
             lab_doctor_formset.is_valid(), certificates_formset.is_valid(), award_formset.is_valid(),
             accreditation_formset.is_valid(), lab_manager_formset.is_valid(), lab_timing_formset.is_valid()
