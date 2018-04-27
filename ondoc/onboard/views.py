@@ -77,7 +77,7 @@ def otp(request):
 
         form = OTPForm()
         if existingOTP:
-            form.fields['otp'].label = '6 Digit verification code has been send to your mobile number 9560511234'
+            form.fields['otp'].label = '6 Digit verification code has been send to your mobile number '+str(existing.lab.primary_mobile)
         else:
             otp = randint(200000, 900000)
             message = 'You have initiated onboarding process for '+existing.lab.name+'. OTP is '+str(otp)
