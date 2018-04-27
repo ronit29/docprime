@@ -102,4 +102,5 @@ def generate(request):
     token = LabOnboardingToken(status=1,lab_id=lab_id, token=randint(1000000000, 9000000000),verified_token=randint(1000000000, 9000000000))
     token.save()
     url = host + '/onboard/lab?token='+str(token.token)
-    return JsonResponse({'url': url})
+    print("The generated onboarding url is: " + url)
+    return JsonResponse({'message': 'ok'})

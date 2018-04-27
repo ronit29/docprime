@@ -2,7 +2,7 @@
 {% block content %}
 
 <h3>
-{{ lab.name }}
+Send onboarding request to {{ lab.name }}
 </h3>
 <hr>
 
@@ -15,48 +15,23 @@
 		</th>
 		<th>
 			<div class="text">
-				about
+				Last Sent date
 			</div>
-		</th>
-		<th>
-			<div class="text">
-				Last token
-			</div>
-		</th>
-		<th>
-			<div class="text">
-				Last token status
-			</div>
-		</th>
-		<th>
-			<div class="text">
-				Last URL
-			</div>
-		</th>
-	</thead>
+		</th>	</thead>
 	<tbody>
 		<tr class="row1">
 			<td>
 				{{ lab.license }}
 			</td>
 			<td>
-				{{ lab.about }}
-			</td>
-			<td>
-				{{ last_token.token }}
-			</td>
-			<td id="last_token_status">
-				{{ last_token.status }}
-			</td>
-			<td>
-				{{ last_url }}
+				{{ last_token.created_at }}
 			</td>
 		</tr>
 	</tbody>
 </table>
 
 
-<button class="generate">GENERATE NEW LINK</button>
+<button class="generate">send email and sms</button>
 <p id="new_url">
 	
 </p>
@@ -94,9 +69,12 @@
 		        },
 		        success: function( data ) 
 		        {
-		        	// alert(data.url);
-		        	$("#last_token_status").html("2");
-		        	$("#new_url").html(data.url);
+		        	// console.log(data.url);
+		        	$("#new_url").html("successfully sent the email and sms.");
+		        },
+		        error: function(data)
+		        {
+		        	$("#new_url").html("something went wrong! Please try again.");
 		        }
 		    }); 	
 	});
