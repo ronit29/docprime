@@ -142,10 +142,12 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
             last_token = None
 
         last_url = None
+        created_at = ""
         if last_token:
-            last_url = host+'/onboard/lab?token='+str(last_token.token)+'&lab_id='+str(userid)
+            last_url = host+'/onboard/lab?token='+str(last_token.token)
+            created_at = last_token.created_at
 
-        return render(request, 'onboardlab.html', {'lab': lab_obj, 'last_token': last_token, 'last_url': last_url})
+        return render(request, 'onboardlab.html', {'lab': lab_obj, 'last_created': created_at})
 
     def get_onboard_link(self, obj = None):
         if obj.data_status == 1:
