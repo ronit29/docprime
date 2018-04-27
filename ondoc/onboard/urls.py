@@ -5,6 +5,7 @@ from . import upload
 
 #from rest_framework.authtoken import views
 
+app_name="onboard"
 urlpatterns = [
     # path('auth/', views.obtain_auth_token),
     path('lab', views.LabOnboard.as_view(), name='lab'),
