@@ -75,6 +75,7 @@ def generate(request):
     if not request.is_ajax():
         return HttpResponse('invalid request') 
 
+    host = request.get_host()
     lab_id = request.POST.get('lab_id')
     lab = Lab.objects.get(pk=lab_id)
 
@@ -82,5 +83,5 @@ def generate(request):
 
     token = LabOnboardingToken(status=1,lab_id=lab_id, token=randint(1000000000, 9000000000),verified_token=randint(1000000000, 9000000000))
     token.save()
-    url = 'ondoc.com/onboard/lab?token='+str(token.token)+'&lab_id='+str(lab_id)
+    url = host + '/onboard/lab?token='+str(token.token)+'&lab_id='+str(lab_id)
     return JsonResponse({'url': url})

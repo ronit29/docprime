@@ -130,6 +130,7 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
         return my_urls + urls
 
     def onboardlab_admin(self, request, userid):
+        host = request.get_host()
         try:
             lab_obj = Lab.objects.get(id = userid)
         except Exception as e:
@@ -142,7 +143,7 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
 
         last_url = None
         if last_token:
-            last_url = 'ondoc.com/onboard/lab?token='+str(last_token.token)+'&lab_id='+str(userid)
+            last_url = host+'/onboard/lab?token='+str(last_token.token)+'&lab_id='+str(userid)
 
         return render(request, 'onboardlab.html', {'lab': lab_obj, 'last_token': last_token, 'last_url': last_url})
 
