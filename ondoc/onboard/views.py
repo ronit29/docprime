@@ -75,18 +75,24 @@ def otp(request):
         request.session['otp_mismatch'] = False
         existingOTP = request.session.get('otp',None)
 
-        form = OTPForm()
+        label = 'Verify your Registered Mobile Number '+str(existing.lab.primary_mobile)
+        page = 'otp_request'
+
         if existingOTP:
-            form.fields['otp'].label = '6 Digit verification code has been send to your mobile number '+str(existing.lab.primary_mobile)
-        else:
-            otp = randint(200000, 900000)
-            message = 'You have initiated onboarding process for '+existing.lab.name+'. OTP is '+str(otp)
-            api.send_sms(message, '91'+str(existing.lab.primary_mobile))
-            request.session['otp'] = otp
+            page = 'otp_verify'
+            label = '6 Digit verification code has been send to your mobile number '+str(existing.lab.primary_mobile)
+
+        
+            # form.fields['otp'].widget = HiddenInput()
+
+            # otp = randint(200000, 900000)
+            # message = 'You have initiated onboarding process for '+existing.lab.name+'. OTP is '+str(otp)
+            #api.send_sms(message, '91'+str(existing.lab.primary_mobile))
+            #request.session['otp'] = otp
 
 
 
-        return render(request,'otp.html',{'form':form, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})
+    return render(request,'otp.html',{'label':label, 'page':page, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})
 
 
 def generate(request):
@@ -102,6 +108,9 @@ def generate(request):
     token = LabOnboardingToken(status=1,email=lab.primary_email,mobile=lab.primary_mobile,lab_id=lab_id, token=randint(1000000000, 9000000000))
     token.save()
     url = host + '/onboard/lab?token='+str(token.token)
-    email_api.send_email('arunchaudhary@policybazaar.com', 'support@panaceatechno.com', 'Test email', 'Test subject')
+    email_api.send_email(lab.primary_email, 'Onboarding link for '+lab.name, 'Your onboarding url is '+url)
     # qprint("The generated onboarding url is: " + url)
     return JsonResponse({'message': 'ok'})
+
+def terms(request):
+    return render(request,'terms.html')

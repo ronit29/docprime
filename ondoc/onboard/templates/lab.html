@@ -308,6 +308,9 @@
       <div class="panel panel-default">
       <div class="panel-heading">AGREED RATE LIST</div>
       <div class="panel-body">
+        {% if lab.agreed_rate_list %}
+        <a style="color: #00AAC5;text-decoration: none;" href='{{ lab.agreed_rate_list.url }}' download>View agreed rates</a>
+        {% endif %}
       </div>  
       </div>
       
@@ -320,8 +323,12 @@
       <div class='upload-container' data-media='image' data-type='' data-url='/onboard/upload' data-max='5'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
 
         {% for img in lab_images %}
-            <div class="existing-image" style="vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
+            <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
             <img width="120" height="120" src='{{img.name.url}}'>
+                <div style='text-align: center;'>
+                 <a data-image-id='{{img.id}}' data-media-type='image' class="remove-image" href="javascript:undefined;">X</a>
+                 
+                </div> 
 
             </div>            
         {% endfor %}
@@ -343,7 +350,7 @@
 
     <div class="panel panel-default">
       <div class="panel-heading">DOCUMENTS</div>
-      <div class="panel-body">
+      <div class="panel-body lab-documents">
         {% for id,data in lab_doc_dict.items %}
 
         {% with results=data.2 %}
@@ -355,12 +362,18 @@
         {% endif %}
 
         {% if results %}
-        <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}</div>
+        <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}
+        <span class='image-required-message'> (Required)</span>
+        </div>
             {% for instance in results %}
 
-            <div class="existing-image" style="vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
+            <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
 
                 <img width="120" height="120" src='{{instance.name.url}}'>
+                <div style='text-align: center;'>
+                    <a data-image-id='{{instance.id}}' data-media-type='document' class="remove-image" href="javascript:undefined;">X</a>
+              
+                </div> 
 
             </div>
             {% endfor %}
@@ -372,11 +385,19 @@
             <div style="padding-top: 10px;">Upload image</div>
         </div>
         {% endif %}    
+        <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
+        </div>
+        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload hidden'>
+            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+            <div style="padding-top: 10px;">Upload image</div>
+        </div>
 
         {% else %}
 
         <div>
-        <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}</div>
+        <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}
+        <span class='image-required-message'> (Required)</span>
+        </div>
 
         <div class="image-upload dropzone dz-clickable" style='border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;'>
         </div>
@@ -414,7 +435,6 @@
 
 {% block domready %}
 
-
 var errNode = $('.has-error:first')
 
 if(errNode.length>0)
@@ -424,6 +444,28 @@ if(errNode.length>0)
     }, 1000);
 }
 
+
+function removeImage(image_id, media_type)
+{
+    console.log('image deleted');
+    $.ajax({
+        url: '/onboard/upload?image_id='+image_id+'&media_type='+media_type,
+        type: 'DELETE',
+        success: function(result) { }
+    });
+
+}
+
+$('.remove-image').on('click',function(){
+   var r = confirm("This file would be permanently deleted. Are you sure.");
+   if(r==true)
+   {
+       var data = $(this).data();
+       removeImage(data.imageId,data.mediaType);
+       $(this).closest('.upload-container').find('.trigger-upload').removeClass('hidden');
+       $(this).closest('.existing-image').remove();
+   }
+});
 
 $(document).on("keypress", ":input:not(textarea)", function(event) {
     return event.keyCode != 13;
@@ -444,6 +486,22 @@ $('.submit-form').on('click',function(e){
         $('.terms-div').addClass('error');
         return
     }
+
+    var errors = false;
+    $('.lab-documents .upload-container').each(function(){
+        var length = $(this).find('.existing-image').length+$(this).find('.dz-image-preview').length
+
+        if(length==0)
+        {
+            $(this).addClass('image-error');
+            errors = true;
+        }
+        else
+            $(this).removeClass('image-error');
+
+    })
+    if(errors)
+        return;
 
     $(':disabled').removeAttr('disabled')
     var input = $("<input name='_action'>").attr("type", "hidden").val("_submit");
@@ -474,20 +532,31 @@ $('.image-upload').each(function(x){
     var data = $(this).closest('.upload-container').data()
     $(this).dropzone({
 
-    init: function() 
+    init: function()
     {
-        this.on("success", function(file) { 
+        this.on("success", function(file, response) {
 
-           var existing  =  $(this.element).closest('.upload-container').find('.existing-image').length
+           file.previewElement.image_id = response.image_id;
+           file.previewElement.media_type = response.media_type;
+           var existing  =  $(this.element).closest('.upload-container').find('.existing-image').length;
 
-           if((this.files.length+existing) >= this.options.maxFiles) 
+           if((this.files.length+existing) >= this.options.maxFiles)
            {
-                $(this.element).closest('.upload-container').find('.trigger-upload').addClass('hidden')
-            }
+                $(this.element).closest('.upload-container').find('.trigger-upload').addClass('hidden');
+                $(this.element).closest('.upload-container').removeClass('image-error')
+           }
         });
 
         this.on("error", function(file) {
              this.removeFile(file);
+        });
+
+        this.on("removedfile", function(file) { 
+            var image_id = file.previewElement.image_id;
+            var media_type = file.previewElement.media_type;
+            removeImage(image_id, media_type);
+            $(this.previewsContainer).closest('.upload-container').find('.trigger-upload').removeClass('hidden')
+            
         });
 
     },
@@ -497,10 +566,19 @@ $('.image-upload').each(function(x){
     maxFiles:data.max,
     uploadMultiple:false,
     maxFilesize:data.max,
+    //removedfile : onImageDelete,
+    //addRemoveLinks : true,
+    //dictRemoveFile : 'Remove Image',
+    dictRemoveFileConfirmation : 'This file would be permanently deleted. Are you sure.',
+    previewTemplate : '<div class="dz-preview dz-file-preview"><div class="dz-image"><img data-dz-thumbnail></div><div class="dz-details"><div class="dz-filename"><span data-dz-name></span></div><div class="dz-size" data-dz-size></div></div><div class="dz-progress"><span class="dz-upload" data-dz-uploadprogress></span></div><div class="dz-success-mark"><span>✔</span></div><div class="dz-error-mark"><span>✘</span></div><div class="dz-error-message"><span data-dz-errormessage></span></div><a class="dz-remove" href="javascript:undefined;" data-dz-remove="">X</a></div>',
+
+
     params: {'csrfmiddlewaretoken': $.cookie('csrftoken'),'document_type':data.type, 'media':data.media}
 })
 
 });
+
+
 
 {% endblock %}
 

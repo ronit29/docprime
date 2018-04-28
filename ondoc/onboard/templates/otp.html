@@ -12,12 +12,43 @@
 <div class='row'>
 <div style='box-shadow: 0px 3px 6px 0 rgba(0,0,0,.18); padding: 50px; border-radius: 20px;' class='col-lg-6 col-md-6 col-sm-12 col-xs-12 col-md-offset-3 col-lg-offset-3'>
 {% if otp_resent %}
-<div style='text-align: center;padding: 0 0 20px 0;color: #4cae4c;'>New OTP has been sent to you</div>
+<div style='text-align: center;padding: 0 0 20px 0;color: #4cae4c;'></div>
 {% elif otp_mismatch %}
 <div style='text-align: center;padding: 0 0 20px 0;color: #ac2925;'>OTP Mismatch. Please try again</div>
 {% endif %}
 
-{% crispy form %}
+
+<form class="form-vertical" method="post">
+    {% csrf_token %}
+
+    <div id="div_id_otp" class="form-group"> 
+        <label for="id_otp" class="control-label ">
+                {{ label }}
+        </label> 
+    {% ifequal page 'otp_verify' %}
+    <div class="controls "> 
+        <input type="text" name="otp" placeholder="Enter OTP" class="textinput textInput form-control" id="id_otp">
+    </div> 
+    {% endifequal %}
+
+    </div>
+    <div class="form-group">
+        <div class="controls ">
+           {% ifequal page 'otp_verify' %}
+            <input type="submit" name="verify" value="Verify" class="btn btn-primary btn col-md-5" id="submit-id-verify"> 
+
+            <input type="submit" name="_resend_otp" value="Resend OTP" class="btn btn-primary btn col-md-5 col-md-offset-2" id="submit-id-_resend_otp"> 
+
+           {% else %}
+            <input type="submit" name="_resend_otp" value="Send OTP" class="btn btn-primary btn col-md-6 col-md-offset-3" id="submit-id-_resend_otp"> 
+
+
+
+            {% endifequal %} 
+        </div> 
+    </div> 
+    </form>
+
 </div>
 </div>
 </div>

@@ -4,7 +4,7 @@ function GoogleMap() {
 
   this.init = function(){
    
-    var locText = $('#id_location').val().replace("SRID=4326;POINT (","").replace(")","").split(" ");
+    var locText = $('#id_labaddress-location').val().replace("SRID=4326;POINT (","").replace(")","").split(" ");
     
         var center = {lat: 28.460462, lng: 77.074852};
         if(locText.length>1)

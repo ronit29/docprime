@@ -15,4 +15,5 @@ urlpatterns = [
     # path('doctor', views.lab, name='doctor'),
     path('generate-url', views.generate, name='generate-url'),
     path('upload', upload.BasicUploadView.as_view(), name='basic_upload'),
+    path('terms', views.terms, name='terms'),
 ]

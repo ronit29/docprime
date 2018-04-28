@@ -68,6 +68,8 @@ class LabCertificationInline(admin.TabularInline):
 class LabForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
+    onboarding_status = forms.CharField(disabled=True)
+
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
@@ -121,6 +123,7 @@ class LabForm(forms.ModelForm):
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
     change_form_template = 'custom_change_form.html'
     list_display = ('name', 'updated_at', 'data_status', 'created_by', 'get_onboard_link',)
+    # readonly_fields = ("onboarding_status",)
 
     def get_urls(self):
         urls = super().get_urls()
@@ -190,8 +193,8 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
-    extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&callback=initGoogleMap']
-
+    # extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&callback=initGoogleMap']
+    # extra_js = ['https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&libraries=places&callback=initMap']
 
 class PathologyTestAdmin(VersionAdmin):
     search_fields = ['name']

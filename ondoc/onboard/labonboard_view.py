@@ -119,7 +119,8 @@ class LabOnboard(View):
             'lab_images' : lab_images,
             'lab_doc_dict' : lab_doc_dict,
             'LabDocument' : LabDocument,
-            'message' : message
+            'message' : message,
+            'lab' : existing.lab,
             })
 
     def post(self, request):
@@ -133,7 +134,7 @@ class LabOnboard(View):
         lab_address_form = LabAddressForm(request.POST, instance = instance, prefix = "labaddress")
         lab_open_form = LabOpenForm(request.POST, instance = instance, prefix = "labopen")
         lab_doctor_availability_formset = LabDoctorAvailabilityFormSet(request.POST, prefix = "labdoctoravailability", instance = instance)
-        lab_doctor_formset = LabDoctorAvailabilityFormSet(request.POST, prefix = "labdoctor", instance = instance)
+        lab_doctor_formset = LabDoctorFormSet(request.POST, prefix = "labdoctor", instance = instance)
         certificates_formset = LabCertificationFormSet(request.POST, prefix = "labcertification", instance = instance)
         award_formset = LabAwardFormSet(request.POST, prefix = "labaward", instance = instance)
         accreditation_formset = LabAccreditationFormSet(request.POST, prefix = "labaccreditation", instance = instance)
@@ -181,7 +182,8 @@ class LabOnboard(View):
                 'lab_service_dict' : lab_service_dict,
                 'LabService' : LabService,
                 'lab_doctor_availability_formset' : lab_doctor_availability_formset,
-                'error_message' : 'Please fill all required fields'})
+                'error_message' : 'Please fill all required fields',
+                'lab':instance,})
 
 
 

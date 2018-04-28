@@ -25,13 +25,13 @@ class BasicUploadView(View):
             pass
 
         media = request.POST.get('media')
-        type = request.POST.get('document_type')
+        doc_type = request.POST.get('document_type')
 
         form = None
         if media == 'image':
             form = LabImageForm(self.request.POST, self.request.FILES)
         elif media == 'document':
-            if int(type) in [i[0] for i in LabDocument.CHOICES]:
+            if int(doc_type) in [i[0] for i in LabDocument.CHOICES]:
                 form = LabDocumentForm(self.request.POST, self.request.FILES)
             else:
                 return HttpResponse(status=400)
@@ -43,7 +43,31 @@ class BasicUploadView(View):
             instance = form.save(commit=False)
             instance.lab = existing.lab
             instance.save()
-            data = {'is_valid': True, 'url': instance.name.url}
+            data = {'media_type':media, 'is_valid': True, 'url': instance.name.url, 'image_id':instance.id}
             return JsonResponse(data)
         else:
             return HttpResponse(status=400)
+
+    def delete(self, request):
+        token_value = request.session.get('token_value')
+        image_type = request.GET.get('media_type')
+        image_id = request.GET.get('image_id')
+        if not token_value or not image_id or not image_type:
+            return HttpResponse(status=400)
+
+        existing = None
+        try:
+            existing = LabOnboardingToken.objects.filter(token=token_value).order_by('-created_at')[0]
+        except:
+            pass
+
+        if not existing or not existing.lab:
+            return HttpResponse(status=400)
+
+        if image_type=='image':
+            LabImage.objects.filter(lab=existing.lab, id=image_id).delete()
+        elif image_type=='document':
+            LabDocument.objects.filter(lab=existing.lab, id=image_id).delete()
+
+        return JsonResponse({})
+
