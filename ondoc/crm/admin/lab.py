@@ -11,7 +11,8 @@ from django.db import models
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification,
-    LabNetwork, Lab, LabOnboardingToken)
+    LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
+    LabDoctor, LabDocument)
 from .common import *
 
 
@@ -58,6 +59,36 @@ class LabAwardInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+class LabServiceInline(admin.TabularInline):
+    model = LabService
+    #form = LabAwardForm
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+class LabDoctorInline(admin.TabularInline):
+    model = LabDoctor
+    #form = LabAwardForm
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+class LabDocumentInline(admin.TabularInline):
+    model = LabDocument
+    #form = LabAwardForm
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+class LabDoctorAvailabilityInline(admin.TabularInline):
+    model = LabDoctorAvailability
+    #form = LabAwardForm
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
+
 class LabCertificationInline(admin.TabularInline):
     model = LabCertification
     extra = 0
@@ -68,8 +99,7 @@ class LabCertificationInline(admin.TabularInline):
 class LabForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
-    onboarding_status = forms.CharField(disabled=True)
-
+    onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Lab.ONBOARDING_STATUS)
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
@@ -122,8 +152,9 @@ class LabForm(forms.ModelForm):
 
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
     change_form_template = 'custom_change_form.html'
-    list_display = ('name', 'updated_at', 'data_status', 'created_by', 'get_onboard_link',)
-    # readonly_fields = ("onboarding_status",)
+    list_display = ('name', 'updated_at','onboarding_status','data_status', 'created_by', 'get_onboard_link',)
+    # readonly_fields=('onboarding_status', )
+
 
     def get_urls(self):
         urls = super().get_urls()
@@ -188,8 +219,8 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
 
     form = LabForm
     search_fields = ['name']
-    inlines = [LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline]
+    inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
+        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
