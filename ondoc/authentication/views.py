@@ -1,6 +1,7 @@
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
+from rest_framework.authtoken.models import Token
 from ondoc.authentication.models import OtpVerifications, User, UserProfile
 from ondoc.authentication.serializers import UserAuthSerializer
 from random import randint
@@ -69,12 +70,18 @@ def verify_otp(request):
 
     try:
         otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, isExpired=False)
+        user_data = User.objects.get(phone_number=phone_number, user_type=3)
+        token = Token.objects.get_or_create(user=user_data)
+        
         response = {
-            "message" : "Sucessfuly. Logged In"
+            "message" : "Sucessfuly. Logged In",
+            "token" : str(token[0])
         }
         return Response(response,status=200)
     except OtpVerifications.DoesNotExist:
-        return Response('No OTP found',status=404)    
+        return Response('No OTP found',status=404)
+    except User.DoesNotExist:
+        return Response('User Not found',status=404) 
     except Exception as e:
         return Response(str(e),status=500)
 
