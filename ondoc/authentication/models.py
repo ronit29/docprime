@@ -107,7 +107,6 @@ class CreatedByModel(models.Model):
     class Meta:
         abstract = True
 
-
 class UserProfile(TimeStampedModel, Image):
     
     user = models.ForeignKey(User, related_name="profiles", on_delete=models.CASCADE)
@@ -127,4 +126,14 @@ class UserProfile(TimeStampedModel, Image):
     class Meta:
         db_table = "user_profile"
 
+class OtpVerifications(TimeStampedModel):
+    phone_number = models.CharField(max_length=10)
+    code = models.CharField(max_length=10)
+    country_code = models.CharField(max_length=10)
+    isExpired = models.BooleanField(default=False)
 
+    def __str__(self):
+        return self.phone_number
+
+    class Meta:
+        db_table = "otp_verification"

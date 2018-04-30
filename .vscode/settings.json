@@ -1,4 +1,5 @@
 {
     "python.linting.pylintEnabled": false,
-    "python.pythonPath": "python3"
+    "python.pythonPath": "python3",
+    "python.formatting.provider": "autopep8"
 }
