@@ -1,7 +1,10 @@
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.authtoken.models import Token
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+
 from ondoc.authentication.models import OtpVerifications, User, UserProfile
 from ondoc.authentication.serializers import UserAuthSerializer, UserProfileSerializer
 from random import randint
@@ -13,6 +16,8 @@ def register_user(request, format='json'):
         phone_number = request.data['phone_number']
         otp = request.data['otp']
         otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, isExpired=False)
+        otpEntry.isExpired = True
+        otpEntry.save()
     except OtpVerifications.DoesNotExist:
         return Response('No OTP found',status=404)
 
@@ -67,8 +72,6 @@ def generate_otp(request):
     except UserProfile.DoesNotExist:
         response['message'] = 'UserProfile Not found'
         return Response(response, status=200)
-    except Exception as e:
-        return Response(str(e),status=500)
 
 
 @api_view(['POST', ])
@@ -82,6 +85,8 @@ def verify_otp(request):
 
     try:
         otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, isExpired=False)
+        otpEntry.isExpired = True
+        otpEntry.save()
         user_data = User.objects.get(phone_number=phone_number, user_type=3)
         token = Token.objects.get_or_create(user=user_data)
 
@@ -93,8 +98,12 @@ def verify_otp(request):
     except OtpVerifications.DoesNotExist:
         return Response('No OTP found',status=404)
     except User.DoesNotExist:
-        return Response('User Not found',status=404) 
-    except Exception as e:
-        return Response(str(e),status=500)
+        return Response('User Not found',status=404)
 
-    
+
+@api_view(['GET', ])
+@authentication_classes((TokenAuthentication, ))
+@permission_classes((IsAuthenticated,))
+def logout(request, format='json'):
+    request.user.auth_token.delete()
+    return Response(status=status.HTTP_200_OK)
