@@ -68,7 +68,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(verbose_name= 'Staff Status', default=False, help_text= 'Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField(auto_now_add=True)
 
-
     class Meta:
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
         db_table = "auth_user"
@@ -113,7 +112,7 @@ class UserProfile(TimeStampedModel, Image):
     name = models.CharField(max_length=100, blank=False, default=None)
     email = models.CharField(max_length=20, blank=False, default=None)
     gender = models.CharField(max_length=2, default=None, blank=True, choices=[("","Select"), ("m","Male"), ("f","Female"), ("o","Other")])
-    mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     is_otp_verified = models.BooleanField(default=False)
     is_default_user = models.BooleanField(default=False)
     dob = models.DateField(blank=True, null=True)

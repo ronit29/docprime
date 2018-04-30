@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework.authtoken.models import Token
 from ondoc.authentication.models import OtpVerifications, User, UserProfile
-from ondoc.authentication.serializers import UserAuthSerializer
+from ondoc.authentication.serializers import UserAuthSerializer, UserProfileSerializer
 from random import randint
 from .service import sendOTP
 
@@ -18,15 +18,27 @@ def register_user(request, format='json'):
 
     userData = request.data
     userData['is_phone_number_verified'] = True
-    serializer = UserAuthSerializer(data=userData, context={'user_type': 3})
+    userData['is_default_user'] = True
+    userData['is_otp_verified'] = True
     
-    if serializer.is_valid(raise_exception=True):
-        user = serializer.save()
+    userSerializer = UserAuthSerializer(data=userData, context={'user_type': 3})
+    if userSerializer.is_valid(raise_exception=True):
+        user = userSerializer.save()
         if user:
-            json = serializer.data
-            return Response(json, status=status.HTTP_201_CREATED)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # creating user profile now
+            userProfileSerializer = UserProfileSerializer(data=userData,context={ 'user': user, 'email': '' })
+            if userProfileSerializer.is_valid(raise_exception=True):
+                userProfile = userProfileSerializer.save()
+                token = Token.objects.get_or_create(user=user)
+                response = {
+                    "message" : "Sucessfuly Create user and Logged In",
+                    "token" : str(token[0])
+                }
+                return Response(response,status=200)
+            else :
+                return Response(userProfileSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    else :
+        return Response(userSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST', ])
@@ -72,7 +84,7 @@ def verify_otp(request):
         otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, isExpired=False)
         user_data = User.objects.get(phone_number=phone_number, user_type=3)
         token = Token.objects.get_or_create(user=user_data)
-        
+
         response = {
             "message" : "Sucessfuly. Logged In",
             "token" : str(token[0])

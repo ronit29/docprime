@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+from ondoc.authentication.models import OtpVerifications, User, UserProfile
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
@@ -11,8 +12,7 @@ class UserAuthSerializer(serializers.ModelSerializer):
 
 
     def create(self, validated_data):
-        user = User(phone_number=validated_data['phone_number'], user_type=self.context['user_type'], email=validated_data['email'], is_phone_number_verified=validated_data['is_phone_number_verified'])
-
+        user = User(phone_number=validated_data['phone_number'], user_type=self.context['user_type'], is_phone_number_verified=validated_data['is_phone_number_verified'])
         # user.set_password(validated_data['password'])
         user.save()
         return user
@@ -25,8 +25,22 @@ class UserAuthSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("User with this phone number already exists")
         return data
 
-
-
     class Meta:
         model = get_user_model()
-        fields = ('id', 'phone_number', 'password', 'email', 'is_phone_number_verified')
+        fields = ('id', 'phone_number', 'password', 'is_phone_number_verified')
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+
+    def create(self, validated_data):
+        userProfile = UserProfile(name=validated_data['name'], gender=validated_data['gender'], is_default_user=validated_data['is_default_user'],is_otp_verified=validated_data['is_otp_verified'], phone_number=validated_data['phone_number'], user=self.context['user'], email=self.context['email'])
+
+        userProfile.save()
+        return userProfile
+
+    def validate(self, data):
+        return data
+
+    class Meta:
+        model = UserProfile
+        fields = ('id', 'name', 'phone_number', 'gender', 'is_default_user', 'is_otp_verified')
