@@ -1,12 +1,16 @@
 from django.shortcuts import render, redirect, HttpResponse
 from django.views import View
 from .forms import  DoctorHospitalFormSet, DoctorLanguageFormSet, DoctorAwardFormSet, \
-                     DoctorAssociationFormSet, DoctorExperienceFormSet
+                     DoctorAssociationFormSet, DoctorExperienceFormSet, DoctorForm, \
+                     DoctorMobileFormSet, DoctorQualificationFormSet, DoctorServiceFormSet, \
+                     DoctorImageFormSet
 
 
 # import models here
 from ondoc.doctor.models import DoctorOnboardingToken, Doctor
-
+from random import randint
+from ondoc.sms import api
+from ondoc.sendemail import api as email_api
 
 class DoctorOnboard(View):
 
@@ -127,3 +131,73 @@ class DoctorOnboard(View):
             'medicalservice_formset': medicalservice_formset,
             'image_formset': image_formset,
         })
+
+
+def otp(request):
+
+    token = request.GET.get('token')
+
+    if not token:
+        #return HttpResponse('Invalid URL. Token is required')
+        return render(request,'access_denied.html')
+
+
+    existing = None
+
+    try:
+        existing = DoctorOnboardingToken.objects.filter(token=token).order_by('-created_at')[0]
+    except:
+        pass
+
+    if not existing:
+        return render(request,'access_denied.html')
+
+    if not existing.doctor:
+        return render(request,'access_denied.html')
+
+
+    if existing.status != DoctorOnboardingToken.GENERATED:
+        return render(request,'access_denied.html')
+
+    auth = request.session.get(token, False)
+    if auth:
+        return redirect("/onboard/doctor?token="+token, permanent=False)
+
+
+    if request.method == 'POST':
+        action = request.POST.get('_resend_otp')
+        if action:
+            otp = randint(200000, 900000)
+            message = 'You have initiated onboarding process for '+existing.doctor.name+'. OTP is '+str(otp)
+            api.send_sms(message, '91'+str(existing.doctor.primary_mobile))
+
+            # print(otp)
+            request.session['otp'] = otp
+            request.session['otp_resent'] = True
+            # request.session['otp_verified'] = True
+            return redirect("/onboard/doctor/otp?token="+token, permanent=False)
+        else:
+            stored_otp = str(request.session.get('otp',''))
+            otp = request.POST.get('otp')
+            if otp == stored_otp:
+                request.session[token] = True
+                request.session["token_value"] = token
+                return redirect("/onboard/doctor?token=" + token, permanent=False)
+            else:
+                request.session['otp_mismatch'] = True
+                return redirect("/onboard/doctor/otp?token="+token, permanent=False)
+    else:
+        otp_resent = request.session.get('otp_resent', False)
+        otp_mismatch = request.session.get('otp_mismatch', False)
+        request.session['otp_resent'] = False
+        request.session['otp_mismatch'] = False
+        existingOTP = request.session.get('otp',None)
+
+        label = 'Verify your Registered Mobile Number '+str(existing.doctor.primary_mobile)
+        page = 'otp_request'
+
+        if existingOTP:
+            page = 'otp_verify'
+            label = '6 Digit verification code has been send to your mobile number '+str(existing.doctor.primary_mobile)
+
+    return render(request,'otp.html',{'label':label, 'page':page, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})

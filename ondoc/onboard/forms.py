@@ -5,7 +5,7 @@ from ondoc.doctor.models import (Doctor, DoctorMobile, DoctorQualification, Doct
                                 DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                 DoctorMedicalService, DoctorImage)
 
-from ondoc.crm.admin.common import award_year_choices, hospital_operational_since_choices
+from ondoc.crm.admin.common import award_year_choices, hospital_operational_since_choices, practicing_since_choices, college_passing_year_choices
 from django import forms
 from django.forms import inlineformset_factory
 from crispy_forms.utils import TEMPLATE_PACK
@@ -337,31 +337,36 @@ LabDoctorFormSet = inlineformset_factory(Lab, LabDoctor, form=LabDoctorForm, ext
 # include all doctor onboarding forms here
 
 class DoctorForm(forms.ModelForm):
+    about = forms.CharField(widget=forms.Textarea)
+    practicing_since = forms.ChoiceField(choices=practicing_since_choices, required=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['gender'].required = True
+        self.fields['license'].required = True
+        self.fields['email'].required = True
+
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = Layout(
             Div(
-                Div('name',css_class='col-md-6',),
-                Div('gender',css_class='col-md-6',),
-                css_class='row',
+                Div(CustomField('name', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-6'),
+                Div(CustomField('gender', field_class='col-md-6',label_class='col-md-4'), css_class='col-md-6'),
+                css_class = 'row'
             ),
             Div(
-                Div('about',css_class='col-md-12',),
-                css_class='row',
+                CustomField('about',label_class='col-md-1', field_class='col-md-10')
             ),
             Div(
-                Div('license',css_class='col-md-6',),
-                Div('practicing_since',css_class='col-md-6',),
-                css_class='row',
+                Div(CustomField('license', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-6'),
+                Div(CustomField('practicing_since', field_class='col-md-6',label_class='col-md-4'), css_class='col-md-6'),
+                css_class = 'row'
             ),
             Div(
-                Div('email',css_class='col-md-6',),
-                Div('additional_details',css_class='col-md-6',),
-                css_class='row',
-            ),
+                Div(CustomField('email', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-6'),
+                # Div(CustomField('additional_details', field_class='col-md-6',label_class='col-md-4'), css_class='col-md-6'),
+                css_class = 'row'
+            )
         )
 
     class Meta:
@@ -373,24 +378,42 @@ class DoctorMobileForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.fields['is_primary'].label = ''
         self.helper.form_class = 'form-horizontal'
+        self.helper.layout = Layout(
+            Div(
+                Div(CustomField('is_primary', field_class='col-md-12',label_class='hidden'), css_class='col-md-1'),
+                Div(CustomField('number', field_class='col-md-6',label_class='hidden'), css_class='col-md-6'), 
+                Div(CustomField('DELETE'), css_class='col-md-1'), css_class='clearfix'
+            ))
 
     class Meta:
         model = DoctorMobile
-        fields = ('country_code', 'number', )
+        fields = ('is_primary', 'number', )
 
 
 class DoctorQualificationForm(forms.ModelForm):
-
+    passing_year = forms.ChoiceField(choices=college_passing_year_choices, required=True)
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
-
+        self.helper.form_tag = False
+        self.helper.layout = Layout(Div(
+                Div(CustomField('qualification', field_class='col-md-7',label_class='col-md-3'), css_class='col-md-5'),
+                Div(CustomField('specialization', field_class='col-md-7',label_class='col-md-4'), css_class='col-md-5'),
+                css_class = 'row'),
+                Div(
+                Div(CustomField('college', field_class='col-md-7',label_class='col-md-3'), css_class='col-md-5'),
+                Div(CustomField('passing_year', field_class='col-md-7',label_class='col-md-4'), css_class='col-md-5'),
+                Div(CustomField('DELETE'), css_class='col-md-1 col-md-offset-1'),
+                css_class = 'row'))
     class Meta:
         model = DoctorQualification
-        fields = ('qualification', 'specialization', )
+        fields = ('qualification', 'specialization','college','passing_year')
 
 
 class DoctorHospitalForm(forms.ModelForm):
@@ -398,7 +421,19 @@ class DoctorHospitalForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
+        self.fields['start'].label = 'Open Time'
+        self.fields['end'].label = 'Close Time'
         self.helper.form_class = 'form-horizontal'
+        self.helper.form_tag = False
+        self.helper.layout = Layout(Div(
+                Div(CustomField('hospital', field_class='col-md-7',label_class='col-md-3'), css_class='col-md-6'),
+                Div(CustomField('day', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-6'),
+                css_class = 'row'),
+                Div(
+                Div(CustomField('start', field_class='col-md-6',label_class='col-md-6'), css_class='col-md-3'),
+                Div(CustomField('end', field_class='col-md-6',label_class='col-md-6'), css_class='col-md-3 col-md-offset-1'),
+                Div(CustomField('fees', field_class='col-md-6',label_class='col-md-6'), css_class='col-md-3 col-md-offset-1'),
+                css_class = 'row'))
 
     class Meta:
         model = DoctorHospital
@@ -411,6 +446,11 @@ class DoctorLanguageForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
+        self.helper.form_tag = False
+        self.helper.layout = Layout(Div(
+                Div(CustomField('language', field_class='col-md-7',label_class='col-md-3'), css_class='col-md-9'),
+                Div(CustomField('DELETE', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-3'),
+                css_class = 'row'),)
 
     class Meta:
         model = DoctorLanguage
@@ -423,10 +463,16 @@ class DoctorAwardForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
+        self.helper.form_tag = False
+        self.helper.layout = Layout(Div(
+                Div(CustomField('name', field_class='col-md-7',label_class='col-md-3'), css_class='col-md-6'),
+                Div(CustomField('year', field_class='col-md-7',label_class='col-md-3'), css_class='col-md-4'),
+                Div(CustomField('DELETE', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-2'),
+                css_class = 'row'),)
 
     class Meta:
         model = DoctorAward
-        fields = ('name', 'year', )
+        fields = ('name', 'year',)
 
 
 class DoctorAssociationForm(forms.ModelForm):

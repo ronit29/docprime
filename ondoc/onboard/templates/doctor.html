@@ -1,15 +1,44 @@
 {%extends 'base.html'%}
 {% load crispy_forms_tags %}
+{% load staticfiles %}
+{% block header %}
+<div class='' style='background: #00acc1;height: 50px;color:#fff;font-size: 18px;padding:13px 0;'>
+    <div class="container">
+    <div class='row'>    
+    <div class='col-md-3 col-xs-6 col-sm-6'>Panacea Techno</div>
+    <div class='col-md-6 col-xs-6 col-sm-6' style='text-align: center;'>WELCOME {{ doctor_form.name.value|default_if_none:"" }}</div>
+    </div>    
+    </div>                
+</div>    
+{% endblock %}
 
 {% block content %}
+    <link rel="stylesheet" href="{% static 'css/basic.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dropzone.css' %}">
+    <link rel="stylesheet" href="{% static 'css/lab.css' %}">
+
+{% if error_message %}
+    <div class="alert alert-danger" style="margin-top: 20px;">
+      <strong>{{ error_message }}</strong>
+    </div>
+{% endif %}
+
+{% if message %}
+    <div class="alert alert-success" style="margin-top: 20px;">
+      <strong>{{ message }}</strong>
+    </div>
+{% endif %}
+<div style='padding:40px 0 0 0'>
+
     <form class="form-horizontal" method="post">
         {% csrf_token %}
         <div class="panel panel-default">
-          <div class="panel-heading">BASIC INFORMATION</div>
+        <div class="panel-heading">        
+        <img class='heading-icon' src ="{% static 'images/1.png' %}" >
+        <span>BASIC DETAILS</span>
+        </div>
           <div class="panel-body">
-            <table class="table">
-                {% crispy doctor_form %}                
-            </table>
+                {% crispy doctor_form %}
           </div>
         </div>
 
@@ -17,57 +46,150 @@
         <div class="panel panel-default">
             <div class="panel-heading">CONTACT NUMBERS</div>
             <div class="panel-body">
+            <div style='font-size:12px;color:#00acc1;margin-bottom: 10px;'>Primary Number</div>    
+             {{ mobile_formset.management_form|crispy }}
+             {% for form in mobile_formset %}
+             <div class="form-horizontal">
+                  {{ form.id }}
+                  {% crispy form %}
+             </div>           
+             {% endfor %}
+            </div>
+            <div class='panel-footer'>
+            <div class='add-new-form' data-key='doctormobile' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                <span>Add Another Number</span>
+            </div>
 
-            <table class="table">
-                <!-- Adding formsets for awards -->
-                {% include 'relational_data.html' with formset=mobile_formset form_class='mobile' %}
-            </table>
-          </div>
+            <div class="empty_form" style="display:none">
+                <div class="form-horizontal">                
+                    {% crispy mobile_formset.empty_form %}
+                </div>            
+            </div>
+
+            </div>
         </div>
 
         <div class="panel panel-default">
-            <div class="panel-heading">QUALIFICATION</div>
+            <div class="panel-heading">
+            <img class='heading-icon' src ="{% static 'images/11.png' %}" >    
+            <span>QUALIFICATION</span>
+            </div>
             <div class="panel-body">
+             {{ mobile_formset.management_form|crispy }}
+             {% for form in qualification_formset %}
+             <div class="form-horizontal">
+                  {{ form.id }}
+                  {% crispy form %}
+             </div>  
+             {% endfor %}
+            </div>
+            <div class='panel-footer'>
+            <div class='add-new-form' data-key='doctorqualification' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                <span>Add Another Qualification</span>
+            </div>
 
-            <table class="table">
-                <!-- Adding formsets for awards -->
-                {% include 'relational_data.html' with formset=qualification_formset form_class='qualification' %}
-            </table>
-          </div>
+            <div class="empty_form" style="display:none">
+                <div class="form-horizontal">                
+                    {% crispy qualification_formset.empty_form %}
+                </div>            
+            </div>
+
+            </div>
+
         </div>
 
 
-        <div class="panel panel-default">
-            <div class="panel-heading">ASSOCIATED CLINIC/HOSPITAL</div>
-            <div class="panel-body">
 
-            <table class="table">
-                <!-- Adding formsets for awards -->
-                {% include 'relational_data.html' with formset=hospital_formset form_class='hospital' %}
-            </table>
+        <div class="panel panel-default">
+            <div class="panel-heading">
+            <img class='heading-icon' src ="{% static 'images/12.png' %}">
+            <span>ASSOCIATED CLINIC/HOSPITAL</span>
+            </div>
+            <div class="panel-body">
+             {{ hospital_formset.management_form|crispy }}
+             {% for form in hospital_formset %}
+             <div class="form-horizontal">
+                  {{ form.id }}
+                  {% crispy form %}
+             </div>  
+             {% endfor %}
           </div>
+
+            <div class='panel-footer'>
+            <div class='add-new-form' data-key='doctorhospital' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                <span>Add Another Clinic/Hospital</span>
+            </div>
+
+            <div class="empty_form" style="display:none">
+                <div class="form-horizontal">                
+                    {% crispy hospital_formset.empty_form %}
+                </div>            
+            </div>
+
+            </div>
+
+
         </div>
 
         <div class="panel panel-default">
-            <div class="panel-heading">LANGUAGE</div>
+            <div class="panel-heading">
+              <img class='heading-icon' src ="{% static 'images/13.png' %}">
+              <span>LANGUAGE</span>
+            </div>
             <div class="panel-body">
+               {{ language_formset.management_form|crispy }}
+               {% for form in language_formset %}
+                <div class="form-horizontal col-md-6">
+                      {{ form.id }}
+                      {% crispy form %}
+                </div>  
+                {% endfor %}
+             </div>   
+            <div class='panel-footer'>
+            <div class='add-new-form' data-key='doctorlanguage' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                <span>Add Another Language</span>
+            </div>
 
-            <table class="table">
-                <!-- Adding formsets for awards -->
-                {% include 'relational_data.html' with formset=language_formset form_class='language' %}
-            </table>
-          </div>
+            <div class="empty_form" style="display:none">
+                <div class="form-horizontal col-md-6">                
+                    {% crispy language_formset.empty_form %}
+                </div>            
+            </div>
+
+            </div>        
         </div>
 
         <div class="panel panel-default">
-            <div class="panel-heading">AWARDS</div>
-            <div class="panel-body">
+            <div class="panel-heading">
+                <img class='heading-icon' src ="{% static 'images/14.png' %}">
+                <span>AWARDS</span>
+            </div>
+            <div class="panel-body">            
+               {{ award_formset.management_form|crispy }}
+               {% for form in award_formset %}
+                <div class="form-horizontal col-md-6">
+                      {{ form.id }}
+                      {% crispy form %}
+                </div>  
+                {% endfor %}
+            </div>
+            <div class='panel-footer'>
+                <div class='add-new-form' data-key='doctoraward' style='display: inline-block;'>
+                    <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                    <span>Add Another Award</span>
+                </div>
 
-            <table class="table">
-                <!-- Adding formsets for awards -->
-                {% include 'relational_data.html' with formset=award_formset form_class='award' %}
-            </table>
-          </div>
+                <div class="empty_form" style="display:none">
+                    <div class="form-horizontal col-md-6">                
+                        {% crispy award_formset.empty_form %}
+                    </div>            
+                </div>
+            </div>
+
         </div>
 
         <div class="panel panel-default">
@@ -76,7 +198,7 @@
 
             <table class="table">
                 <!-- Adding formsets for awards -->
-                {% include 'relational_data.html' with formset=association_formset form_class='association' %}
+                {% crispy association_formset %}
             </table>
           </div>
         </div>
@@ -85,10 +207,8 @@
             <div class="panel-heading">EXPERIENCE</div>
             <div class="panel-body">
 
-            <table class="table">
-                <!-- Adding formsets for awards -->
-                {% include 'relational_data.html' with formset=experience_formset form_class='experience' %}
-            </table>
+                {% crispy experience_formset %}
+
           </div>
         </div>
 
@@ -96,10 +216,8 @@
             <div class="panel-heading">SUBSCRIBED SERVICES</div>
             <div class="panel-body">
 
-            <table class="table">
-                <!-- Adding formsets for awards -->
-                {% include 'relational_data.html' with formset=medicalservice_formset form_class='services' %}
-            </table>
+                {% crispy medicalservice_formset %}
+
           </div>
         </div>
 
@@ -107,74 +225,28 @@
             <div class="panel-heading">IMAGES</div>
             <div class="panel-body">
 
-            <table class="table">
-                <!-- Adding formsets for awards -->
-                {% include 'relational_data.html' with formset=image_formset form_class='image' %}
-            </table>
+                {% crispy image_formset %}
+
           </div>
         </div>
 
         <input class="submit btn btn-primary" type="submit" value="submit">
     </form>
+</div>
 {% endblock %}
 
 
 
 {% block domready %}
 
-$('.mobile').formset({
-    addText: '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span> add new contact',
-    deleteText: 'remove',
-    prefix: 'doctormobile'
+
+$('.add-new-form').click(function() {
+    var data = $(this).data();
+    var form_idx = $('#id_'+data.key+'-TOTAL_FORMS').val();
+    $(this).closest('.panel,.dummy-panel').find('.panel-body,.dummy-panel-body').append($(this).next('.empty_form').html().replace(/__prefix__/g, form_idx));
+    $('#id_'+data.key+'-TOTAL_FORMS').val(parseInt(form_idx) + 1);
 });
 
-$('.qualification').formset({
-    addText: '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span> add new qualification',
-    deleteText: 'remove',
-    prefix: 'doctorqualification'
-});
-
-$('.hospital').formset({
-    addText: '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span> add new hospital',
-    deleteText: 'remove',
-    prefix: 'doctorhospital'
-});
-
-$('.language').formset({
-    addText: '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span> add new language',
-    deleteText: 'remove',
-    prefix: 'doctorlanguage'
-});
-
-$('.award').formset({
-    addText: '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span> add new award',
-    deleteText: 'remove',
-    prefix: 'doctorlanguage'
-});
-
-$('.association').formset({
-    addText: '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span> add new association/membership',
-    deleteText: 'remove',
-    prefix: 'doctorassociation'
-});
-
-$('.experience').formset({
-    addText: '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span> add new experience',
-    deleteText: 'remove',
-    prefix: 'doctorexperience'
-});
-
-$('.services').formset({
-    addText: '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span> add new service',
-    deleteText: 'remove',
-    prefix: 'doctormedicalservice'
-});
-
-$('.image').formset({
-    addText: '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span> add new image',
-    deleteText: 'remove',
-    prefix: 'doctorimage'
-});
 
 {% endblock %}
 

@@ -30,7 +30,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     state = models.CharField(max_length=100)
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
-    agreed_rate_list = models.FileField(upload_to='lab/docs', null=True)
+    agreed_rate_list = models.FileField(upload_to='lab/docs', null=True, blank=True)
 
 
     def __str__(self):

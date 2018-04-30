@@ -328,6 +328,7 @@ class DoctorMobile(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
     country_code = models.PositiveSmallIntegerField(default=91, blank=True, null=True)
     number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    is_primary = models.BooleanField(verbose_name= 'Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name= 'Phone Number Verified?', default=False)
 
     class Meta:

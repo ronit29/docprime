@@ -212,4 +212,4 @@
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&libraries=places&callback=initMap" async defer></script>   
 
 </div>
-<textarea style='' id="{{ id }}" class="vWKTField required" cols="150" rows="10" name="{{ name }}">{% if wkt %}SRID=4326;{{wkt}}{% else %}{{wkt}}{% endif %}</textarea>
+<textarea style='display: none;' id="{{ id }}" class="vWKTField required" cols="150" rows="10" name="{{ name }}">{% if wkt %}SRID=4326;{{wkt}}{% else %}{{wkt}}{% endif %}</textarea>
