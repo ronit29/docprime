@@ -12,7 +12,7 @@ from random import randint
 from .service import sendOTP, verifyOTP
 
 @api_view(['POST', ])
-@verifyOTP
+# @verifyOTP
 def register_user(request, format='json'):
 
     userData = request.data
@@ -21,12 +21,12 @@ def register_user(request, format='json'):
     userData['is_otp_verified'] = True
     
     userSerializer = UserAuthSerializer(data=userData, context={'user_type': 3})
-    if userSerializer.is_valid(raise_exception=True):
+    if userSerializer.is_valid():
         user = userSerializer.save()
         if user:
             # creating user profile now
             userProfileSerializer = UserProfileSerializer(data=userData,context={ 'user': user, 'email': '' })
-            if userProfileSerializer.is_valid(raise_exception=True):
+            if userProfileSerializer.is_valid():
                 userProfile = userProfileSerializer.save()
                 token = Token.objects.get_or_create(user=user)
                 response = {
@@ -38,8 +38,9 @@ def register_user(request, format='json'):
                 # TODO : deleting user for mocking rollback, fix later - make these transactional
                 user.delete()
                 return Response(userProfileSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    else :
-        return Response(userSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    return Response(userSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
 
 
 @api_view(['POST', ])
