@@ -35,6 +35,8 @@ def register_user(request, format='json'):
                 }
                 return Response(response,status=200)
             else :
+                # TODO : deleting user for mocking rollback, fix later - make these transactional
+                user.delete()
                 return Response(userProfileSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
     else :
         return Response(userSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
