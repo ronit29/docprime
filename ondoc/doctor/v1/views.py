@@ -1,7 +1,7 @@
 from rest_framework import status
 from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment, Hospital, UserProfile
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
-                        DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer, OpdAppointmentSerializer
+                        DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer, OpdAppointmentSerializer, HospitalSerializer
 from .services import ReformScheduleService
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -11,6 +11,7 @@ from rest_framework.pagination import PageNumberPagination
 
 from django.db.models import Prefetch
 from datetime import datetime
+
 
 class BasePagination(PageNumberPagination):
     def get_paginated_response(self, data, keyword = "results"):
@@ -182,4 +183,14 @@ class DocotorAppointments(APIView):
             return Response(opd_appointment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class DoctorHospitalAvailability(APIView):
+
+    def get(self, request, version="v1", format=None):
+
+        doctor_id = request.GET.get("doctor_id", 2)
+        hospital_id = request.GET.get("hospital_id", 1)
+    
+        schedule = DoctorHospital.objects.filter(doctor_id=doctor_id, hospital_id=hospital_id)
+        serialized_schedule = DoctorHospitalSerializer(schedule, many=True)
+        return Response(serialized_schedule.data)
 

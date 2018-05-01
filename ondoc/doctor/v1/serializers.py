@@ -6,7 +6,7 @@ from rest_framework import serializers
 from .services import RestructureDataService
 from ondoc.doctor.models import (
         Doctor, Specialization, MedicalService, DoctorImage, Symptoms,
-        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile
+        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile, Hospital
     ) 
 
 
@@ -15,6 +15,7 @@ class DoctorExperienceSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorExperience
         fields = ('doctor', 'hospital', 'start_year', 'end_year', )
+
 
 class DoctorLanguageSerializer(serializers.ModelSerializer):
 
@@ -141,3 +142,16 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = OpdAppointment
         fields = ('id', 'time_slot_start', 'fees', 'time_slot_end', 'status', 'doctor_name', 'hospital_name', 'patient_name', 'patient_dob', 'patient_gender', 'patient_image')
+
+
+class HospitalSerializer(serializers.ModelSerializer):
+
+    def create(self, validated_data):
+        return Hospital.objects.create(**validated_data)
+
+    def validate(self, data):        
+        return data
+
+    class Meta:
+        model = Hospital
+        fields = ('id', 'name', 'address', 'location', 'years_operational', 'building', 'pin_code', 'state', 'city', 'locality', 'hospital_type')
