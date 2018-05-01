@@ -1,4 +1,5 @@
-from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment
+from rest_framework import status
+from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment, Hospital, UserProfile
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
                         DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer, OpdAppointmentSerializer
 from .services import ReformScheduleService
@@ -9,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 
 from django.db.models import Prefetch
+from datetime import datetime
 
 class BasePagination(PageNumberPagination):
     def get_paginated_response(self, data, keyword = "results"):
@@ -162,5 +164,43 @@ class DocotorAppointments(APIView):
         return Response({
             "message" : "Appointment modified"
         })
+
+    def post(self, request, version="v1", format='json'):
+
+        # TODO : Authenticate this request so only the assigned doctor or the patient
+        #        is able to change the status of the appointment id.
+
+        # doctor = Doctor.objects.get(id=request.data['doctor_id'])
+        # hospital = Hospital.objects.get(id=request.data['hospital_id'])
+        # profile = UserProfile.objects.get(id=request.data['profile_id'])
+        # appointment_start_date_time = datetime.utcfromtimestamp(request.data['time_slot_start'] / 1000)
+        # appointment_end_date_time = datetime.utcfromtimestamp(request.data['time_slot_end'] / 1000)
+
+        # request_data={
+        #     'fees' : request.data['fees'],
+        #     'doctor': doctor,
+        #     'hospital': hospital,
+        #     'profile':profile,
+        #     'appointment_start_date_time':appointment_start_date_time,
+        #     'appointment_end_date_time':appointment_end_date_time
+        #
+        # }
+        opd_appointment_serializer = OpdAppointmentSerializer(data=request.data)
+        if opd_appointment_serializer.is_valid(raise_exception=True):
+            opd_appointment = opd_appointment_serializer.save()
+            response = {
+                "message": "Sucessfuly Create user and Logged In",
+                "token":opd_appointment
+            }
+            return Response(response, status=200)
+        else:
+            return Response(opd_appointment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        #
+        #
+        # return Response({
+        #     "message": "Appointment created",
+        #     "appointment_id" : opd_appointment.id
+        # })
 
 

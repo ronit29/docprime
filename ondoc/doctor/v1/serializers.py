@@ -6,7 +6,7 @@ from rest_framework import serializers
 from .services import RestructureDataService
 from ondoc.doctor.models import (
         Doctor, Specialization, MedicalService, DoctorImage, Symptoms,
-        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience,DoctorLanguage,OpdAppointment
+        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile
     ) 
 
 
@@ -122,6 +122,28 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     patient_dob = serializers.ReadOnlyField(source='profile.dob')
     patient_gender = serializers.ReadOnlyField(source='profile.gender')
     patient_image = serializers.ReadOnlyField(source='profile.profile_image.url')
+
+    def create(self, validated_data):
+        doctor = Doctor.objects.get(id=validated_data.data['doctor_id'])
+        hospital = Hospital.objects.get(id=validated_data.data['hospital_id'])
+        profile = UserProfile.objects.get(id=validated_data.data['profile_id'])
+        appointment_start_date_time = datetime.utcfromtimestamp(validated_data.data['time_slot_start'] / 1000)
+        appointment_end_date_time = datetime.utcfromtimestamp(validated_data.data['time_slot_end'] / 1000)
+        opd_appointment = OpdAppointment(doctor=doctor, hospital=hospital, profile=profile,
+                                         time_slot_start=appointment_start_date_time,
+                                         time_slot_end=appointment_end_date_time,
+                                         fees=validated_data.data['fees'],
+                                         status=OpdAppointment.CREATED)
+
+        opd_appointment.save()
+        return opd_appointment
+
+    def update(self, validated_data):
+
+        return validated_data
+
+    def validate(self, data):
+        return data
 
     class Meta:
         model = OpdAppointment
