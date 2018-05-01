@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from ondoc.authentication.models import OtpVerifications, User, UserProfile
 from ondoc.authentication.serializers import UserAuthSerializer, UserProfileSerializer
 from random import randint
-from .service import sendOTP
+from .service import sendOTP, getTimeDifferenceInMinutes
 
 @api_view(['POST', ])
 def register_user(request, format='json'):
@@ -16,8 +16,12 @@ def register_user(request, format='json'):
         phone_number = request.data['phone_number']
         otp = request.data['otp']
         otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, isExpired=False)
+        otp_time = getTimeDifferenceInMinutes(otpEntry.created_at)
         otpEntry.isExpired = True
         otpEntry.save()
+        if otp_time > 15 :
+            return Response('OTP Expired',status=404)
+            
     except OtpVerifications.DoesNotExist:
         return Response('No OTP found',status=404)
 
@@ -85,8 +89,12 @@ def verify_otp(request):
 
     try:
         otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, isExpired=False)
+        otp_time = getTimeDifferenceInMinutes(otpEntry.created_at)
         otpEntry.isExpired = True
         otpEntry.save()
+        if otp_time > 15 :
+            return Response('OTP Expired',status=404)
+        
         user_data = User.objects.get(phone_number=phone_number, user_type=3)
         token = Token.objects.get_or_create(user=user_data)
 
