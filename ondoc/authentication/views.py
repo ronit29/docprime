@@ -6,6 +6,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 
 from ondoc.authentication.models import OtpVerifications, User, UserProfile
+from ondoc.doctor.models import Doctor
 from ondoc.authentication.serializers import UserAuthSerializer, UserProfileSerializer
 from random import randint
 from .service import sendOTP, verifyOTP
@@ -91,8 +92,8 @@ def login_doctor(request):
 
     phone_number = request.data['phone_number']
     try:
-        
-        user_data = User.objects.get(phone_number=phone_number, user_type=3)
+        doctor_data = Doctor.objects.get(phone_number=phone_number)
+        user_data = User.objects.get(phone_number=phone_number, user_type=2)
         token = Token.objects.get_or_create(user=user_data)
 
         response = {
@@ -100,8 +101,27 @@ def login_doctor(request):
             "token" : str(token[0])
         }
         return Response(response,status=200)
+    except Doctor.DoesNotExist:
+        return Response('Docotr not registered',status=404)
     except User.DoesNotExist:
-        return Response('User Not found',status=404)
+        # is user not exists, create one and then login
+        userData = request.data
+        userData['is_phone_number_verified'] = True
+        userSerializer = UserAuthSerializer(data=userData, context={'user_type': 2})
+        if userSerializer.is_valid(raise_exception=True):
+            user = userSerializer.save()
+            if user:
+                # also link this user with doctor
+                doctor_data.user = user
+                doctor_data.save()
+                token = Token.objects.get_or_create(user=user)
+                response = {
+                    "message" : "Sucessfuly. Logged In",
+                    "token" : str(token[0])
+                }
+                return Response(response,status=200)
+        
+        return Response('Cannot register User',status=404)
 
 
 @api_view(['GET', ])
