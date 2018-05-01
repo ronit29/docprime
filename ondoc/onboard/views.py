@@ -109,8 +109,32 @@ def generate(request):
     token.save()
     url = host + '/onboard/lab?token='+str(token.token)
     email_api.send_email(lab.primary_email, 'Onboarding link for '+lab.name, 'Your onboarding url is '+url)
+    lab.onboarding_status = lab.REQUEST_SENT
+    lab.save()
+
     # qprint("The generated onboarding url is: " + url)
     return JsonResponse({'message': 'ok'})
+
+def generate_doctor(request):
+    if not request.is_ajax():
+        return HttpResponse('invalid request')
+
+    host = request.get_host()
+    doctor_id = request.POST.get('doctor_id')
+    doctor = Doctor.objects.get(pk=doctor_id)
+
+    DoctorOnboardingToken.objects.filter(doctor_id=doctor_id, status=DoctorOnboardingToken.GENERATED).update(status=DoctorOnboardingToken.REJECTED)
+
+    token = DoctorOnboardingToken(status=1,email=doctor.email,mobile=doctor.primary_mobile,doctor_id=doctor_id, token=randint(1000000000, 9000000000))
+    token.save()
+    url = host + '/onboard/doctor?token='+str(token.token)
+    email_api.send_email(doctor.email, 'Onboarding link for '+doctor.name, 'Your onboarding url is '+url)
+    doctor.onboarding_status = doctor.REQUEST_SENT
+    doctor.save()
+
+    # qprint("The generated onboarding url is: " + url)
+    return JsonResponse({'message': 'ok'})
+
 
 def terms(request):
     return render(request,'terms.html')

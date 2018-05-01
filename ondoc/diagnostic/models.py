@@ -1,5 +1,5 @@
 from django.contrib.gis.db import models
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel
 from ondoc.doctor.models import Hospital
 
@@ -26,11 +26,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     building = models.CharField(max_length=100, blank=True)
     sublocality = models.CharField(max_length=100, blank=True)
     locality = models.CharField(max_length=100, blank=True)
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
-    country = models.CharField(max_length=100)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
-    agreed_rate_list = models.FileField(upload_to='lab/docs', null=True, blank=True)
+    agreed_rate_list = models.FileField(upload_to='lab/docs', null=True, blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
 
 
     def __str__(self):
@@ -41,7 +41,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
 
 
 class LabCertification(TimeStampedModel):
-    lab = models.ForeignKey(Lab, related_name = 'lab_certificates', on_delete=models.CASCADE)
+    lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
 
     def __str__(self):
@@ -259,7 +259,9 @@ class RadiologyTest(TimeStampedModel):
         db_table = "radiology_test"
 
 class LabService(TimeStampedModel):
-    SERVICE_CHOICES = [(1,"Pathology"), (2,"Radiology")]
+    PATHOLOGY = 1
+    RADIOLOGY = 2
+    SERVICE_CHOICES = [(PATHOLOGY, "Pathology"), (RADIOLOGY, "Radiology")]
     lab = models.ForeignKey(Lab, null=True, on_delete=models.CASCADE)
     service = models.PositiveSmallIntegerField(default=None, choices=SERVICE_CHOICES)
 
@@ -299,7 +301,8 @@ class LabDocument(TimeStampedModel, Image):
     GST = 3
     REGISTRATION = 4
     CHEQUE = 5
-    CHOICES = [(PAN,"PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"Registration Certificate"),(CHEQUE,"Cancel Cheque Copy")]
+    LOGO = 6
+    CHOICES = [(PAN,"PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"Registration Certificate"),(CHEQUE,"Cancel Cheque Copy"),(LOGO,"LOGO")]
     lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.ImageField(upload_to='lab/images', height_field='height', width_field='width')

@@ -3,7 +3,7 @@ from crispy_forms.layout import Submit, Layout, Div, Fieldset, Field
 from ondoc.diagnostic.models import Lab, LabCertification, LabAward, LabAccreditation, LabManager, LabTiming, LabService, LabDoctorAvailability, LabDoctor, LabImage, LabDocument
 from ondoc.doctor.models import (Doctor, DoctorMobile, DoctorQualification, DoctorHospital,
                                 DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
-                                DoctorMedicalService, DoctorImage)
+                                DoctorMedicalService, DoctorImage, DoctorDocument)
 
 from ondoc.crm.admin.common import award_year_choices, hospital_operational_since_choices, practicing_since_choices, college_passing_year_choices
 from django import forms
@@ -283,7 +283,7 @@ class LabDoctorForm(forms.ModelForm):
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.fields['registration_number'].label =''
-
+        
     class Meta:
         model = LabDoctor
         exclude = ['lab',]
@@ -345,9 +345,12 @@ class DoctorForm(forms.ModelForm):
         self.fields['gender'].required = True
         self.fields['license'].required = True
         self.fields['email'].required = True
-
+        self.fields['license'].label ='MCI Number'
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
+        self.helper.form_tag = False
+        # self.fields['hospitals'].required = False
+        # self.fields['onboarding_status'].required = False
         self.helper.layout = Layout(
             Div(
                 Div(CustomField('name', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-6'),
@@ -371,7 +374,7 @@ class DoctorForm(forms.ModelForm):
 
     class Meta:
         model = Doctor
-        exclude = ('id',)
+        fields = ('name', 'about', 'gender', 'practicing_since', 'license', 'email')
 
 
 class DoctorMobileForm(forms.ModelForm):
@@ -385,9 +388,9 @@ class DoctorMobileForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = Layout(
             Div(
-                Div(CustomField('is_primary', field_class='col-md-12',label_class='hidden'), css_class='col-md-1'),
-                Div(CustomField('number', field_class='col-md-6',label_class='hidden'), css_class='col-md-6'), 
-                Div(CustomField('DELETE'), css_class='col-md-1'), css_class='clearfix'
+                Div(CustomField('is_primary', field_class='col-md-12',label_class='hidden'), css_class='col-md-1 col-xs-2 number-check'),
+                Div(CustomField('number', field_class='col-md-8',label_class='hidden'), css_class='col-md-6 col-xs-8'), 
+                Div(CustomField('DELETE'), css_class='col-md-1 col-xs-2'), css_class='clearfix'
             ))
 
     class Meta:
@@ -459,11 +462,13 @@ class DoctorLanguageForm(forms.ModelForm):
 
 class DoctorAwardForm(forms.ModelForm):
 
+    year = forms.ChoiceField(choices=award_year_choices, required=True)
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.form_tag = False
+        self.fields['name'].label = 'Award Name'
         self.helper.layout = Layout(Div(
                 Div(CustomField('name', field_class='col-md-7',label_class='col-md-3'), css_class='col-md-6'),
                 Div(CustomField('year', field_class='col-md-7',label_class='col-md-3'), css_class='col-md-4'),
@@ -481,6 +486,12 @@ class DoctorAssociationForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
+        self.helper.form_tag = False
+        self.helper.layout = Layout(Div(
+                Div(CustomField('name', field_class='col-md-11',label_class='col-md-3 hidden'), css_class='col-md-6 col-xs-10'),
+                Div(CustomField('DELETE', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-2 col-xs-2'),
+                css_class = 'row'),)
+
 
     class Meta:
         model = DoctorAssociation
@@ -489,10 +500,21 @@ class DoctorAssociationForm(forms.ModelForm):
 
 class DoctorExperienceForm(forms.ModelForm):
 
+    start_year = forms.ChoiceField(choices=practicing_since_choices, required=True)
+    end_year = forms.ChoiceField(choices=practicing_since_choices, required=True)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
+        self.helper.form_tag = False
         self.helper.form_class = 'form-horizontal'
+        self.helper.layout = Layout(Div(
+                Div(CustomField('hospital', field_class='col-md-8',label_class='col-md-3'), css_class='col-md-4'),
+                Div(CustomField('start_year', field_class='col-md-7',label_class='col-md-5'), css_class='col-md-3'),
+                Div(CustomField('end_year', field_class='col-md-7',label_class='col-md-5'), css_class='col-md-3'),
+                Div(CustomField('DELETE', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-2'),
+                css_class = 'row'),)
+
 
     class Meta:
         model = DoctorExperience
@@ -504,31 +526,31 @@ class DoctorMedicalServiceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
+        self.helper.form_tag = False
         self.helper.form_class = 'form-horizontal'
 
     class Meta:
         model = DoctorMedicalService
         fields = ('service', )
 
-
 class DoctorImageForm(forms.ModelForm):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_class = 'form-horizontal'
-
     class Meta:
         model = DoctorImage
-        fields = ('name', )
+        exclude = ['doctor',]
 
 
-DoctorMobileFormSet = inlineformset_factory(Doctor, DoctorMobile, form = DoctorMobileForm,extra = 1, can_delete=True, exclude=('id', ))
-DoctorQualificationFormSet = inlineformset_factory(Doctor, DoctorQualification, form = DoctorQualificationForm,extra = 1, can_delete=True, exclude=('id', ))
-DoctorHospitalFormSet = inlineformset_factory(Doctor, DoctorHospital, form = DoctorHospitalForm,extra = 1, can_delete=True, exclude=('id', ))
-DoctorLanguageFormSet = inlineformset_factory(Doctor, DoctorLanguage, form = DoctorLanguageForm,extra = 1, can_delete=True, exclude=('id', ))
-DoctorAwardFormSet = inlineformset_factory(Doctor, DoctorAward, form = DoctorAwardForm,extra = 1, can_delete=True, exclude=('id', ))
-DoctorAssociationFormSet = inlineformset_factory(Doctor, DoctorAssociation, form = DoctorAssociationForm,extra = 1, can_delete=True, exclude=('id', ))
-DoctorExperienceFormSet = inlineformset_factory(Doctor, DoctorExperience, form = DoctorExperienceForm,extra = 1, can_delete=True, exclude=('id', ))
-DoctorServiceFormSet = inlineformset_factory(Doctor, DoctorMedicalService, form = DoctorMedicalServiceForm,extra = 1, can_delete=True, exclude=('id', ))
-DoctorImageFormSet = inlineformset_factory(Doctor, DoctorImage, form = DoctorImageForm,extra = 1, can_delete=True, exclude=('id', ))
+class DoctorDocumentForm(forms.ModelForm):
+    class Meta:
+        model = DoctorDocument
+        exclude = ['doctor',]
+
+
+DoctorMobileFormSet = inlineformset_factory(Doctor, DoctorMobile, form = DoctorMobileForm,extra = 0, can_delete=True, exclude=('doctor', ))
+DoctorQualificationFormSet = inlineformset_factory(Doctor, DoctorQualification, form = DoctorQualificationForm,extra = 0, can_delete=True, exclude=('doctor', ))
+DoctorHospitalFormSet = inlineformset_factory(Doctor, DoctorHospital, form = DoctorHospitalForm,extra = 0, can_delete=True, exclude=('doctor', ))
+DoctorLanguageFormSet = inlineformset_factory(Doctor, DoctorLanguage, form = DoctorLanguageForm,extra = 0, can_delete=True, exclude=('doctor', ))
+DoctorAwardFormSet = inlineformset_factory(Doctor, DoctorAward, form = DoctorAwardForm,extra = 0, can_delete=True, exclude=('doctor', ))
+DoctorAssociationFormSet = inlineformset_factory(Doctor, DoctorAssociation, form = DoctorAssociationForm,extra = 0, can_delete=True, exclude=('doctor', ))
+DoctorExperienceFormSet = inlineformset_factory(Doctor, DoctorExperience, form = DoctorExperienceForm,extra = 0, can_delete=True, exclude=('doctor', ))
+DoctorServiceFormSet = inlineformset_factory(Doctor, DoctorMedicalService, form = DoctorMedicalServiceForm,extra = 0, can_delete=True, exclude=('doctor', ))
+# DoctorImageFormSet = inlineformset_factory(Doctor, DoctorImage, form = DoctorImageForm,extra = 0, can_delete=True, exclude=('doctor', ))

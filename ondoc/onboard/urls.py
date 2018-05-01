@@ -15,6 +15,8 @@ urlpatterns = [
     path('otp', views.otp, name='otp'),
     # path('doctor', views.lab, name='doctor'),
     path('generate-url', views.generate, name='generate-url'),
+    path('generate-doctor-url', views.generate_doctor, name='generate-doctor-url'),
     path('upload', upload.BasicUploadView.as_view(), name='basic_upload'),
+    path('doctor-upload', upload.DoctorUploadView.as_view(), name='doctor_upload'),
     path('terms', views.terms, name='terms'),
 ]

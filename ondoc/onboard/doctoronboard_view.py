@@ -1,13 +1,14 @@
 from django.shortcuts import render, redirect, HttpResponse
 from django.views import View
+from collections import OrderedDict
+
 from .forms import  DoctorHospitalFormSet, DoctorLanguageFormSet, DoctorAwardFormSet, \
                      DoctorAssociationFormSet, DoctorExperienceFormSet, DoctorForm, \
-                     DoctorMobileFormSet, DoctorQualificationFormSet, DoctorServiceFormSet, \
-                     DoctorImageFormSet
+                     DoctorMobileFormSet, DoctorQualificationFormSet, DoctorServiceFormSet
 
 
 # import models here
-from ondoc.doctor.models import DoctorOnboardingToken, Doctor
+from ondoc.doctor.models import DoctorOnboardingToken, Doctor, DoctorImage, DoctorDocument
 from random import randint
 from ondoc.sms import api
 from ondoc.sendemail import api as email_api
@@ -18,7 +19,8 @@ class DoctorOnboard(View):
         token = request.GET.get('token')
 
         if not token:
-            return HttpResponse('Invalid URL')
+            return render(request,'access_denied.html')
+
 
         existing = None
 
@@ -28,10 +30,13 @@ class DoctorOnboard(View):
             pass
 
         if not existing:
-            return HttpResponse('Invalid Token')
+            return render(request,'access_denied.html')
 
         if not existing.doctor:
-            return HttpResponse('No doctor found for this token')
+            return render(request,'access_denied.html')
+
+        if existing.status == DoctorOnboardingToken.CONSUMED:
+            return render(request, 'dsuccess.html')
 
         if existing.status != DoctorOnboardingToken.GENERATED:
             return render(request,'access_denied.html')
@@ -39,7 +44,17 @@ class DoctorOnboard(View):
         auth = request.session.get(token, False)
 
         if not auth:
-            return redirect("/onboard/otp?token="+token, permanent=False)
+            return redirect("/onboard/doctor/otp?token="+token, permanent=False)
+        doc_images = DoctorImage.objects.filter(doctor=existing.doctor)
+
+        doc_dict = OrderedDict()
+        for id, value in DoctorDocument.CHOICES:
+            results = DoctorDocument.objects.filter(doctor=existing.doctor, document_type=id)
+            if len(results)>0:
+                doc_dict[id] = (id, value, results)
+            else:
+                doc_dict[id] = (id, value, None)
+
 
         # Gather all forms
         doctor_form = DoctorForm(instance = existing.doctor, prefix = "doctor")
@@ -53,7 +68,7 @@ class DoctorOnboard(View):
         association_formset = DoctorAssociationFormSet(instance = existing.doctor, prefix = 'doctorassociation')
         experience_formset = DoctorExperienceFormSet(instance = existing.doctor, prefix = 'doctorexperience')
         medicalservice_formset = DoctorServiceFormSet(instance = existing.doctor, prefix = 'doctormedicalservice')
-        image_formset = DoctorImageFormSet(instance = existing.doctor, prefix = 'doctorimage')
+        # image_formset = DoctorImageFormSet(instance = existing.doctor, prefix = 'doctorimage')
 
         return render(request, 'doctor.html', {'doctor_form': doctor_form,
             'mobile_formset': mobile_formset,
@@ -64,8 +79,10 @@ class DoctorOnboard(View):
             'association_formset': association_formset,
             'experience_formset': experience_formset,
             'medicalservice_formset': medicalservice_formset,
-            'image_formset': image_formset,
-        })
+            
+            'doc_images' : doc_images,
+            'doc_dict' : doc_dict,
+            'DoctorDocument' : DoctorDocument})
 
     def post(self, request):
         token = request.GET.get('token')
@@ -74,63 +91,71 @@ class DoctorOnboard(View):
         except:
             return HttpResponse('invalid token')
 
+        doctor_obj = instance
+
         doctor_form = DoctorForm(request.POST, instance = instance, prefix = "doctor")
 
-        if doctor_form.is_valid():
-            doctor_obj = doctor_form.save()
-        else:
-            return HttpResponse('invalid forms')
-
-        # Now we save the related forms
-        # save awards formset
         mobile_formset = DoctorMobileFormSet(data=request.POST, instance = doctor_obj, prefix = "doctormobile")
-        if mobile_formset.is_valid():
-            mobile_formset.save()
-
         qualification_formset = DoctorQualificationFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorqualification')
-        if qualification_formset.is_valid():
-            qualification_formset.save()
 
         hospital_formset = DoctorHospitalFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorhospital')
-        if hospital_formset.is_valid():
-            hospital_formset.save()
-
         language_formset = DoctorLanguageFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorlanguage')
-        if language_formset.is_valid():
-            language_formset.save()
-
         award_formset = DoctorAwardFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctoraward')
-        if award_formset.is_valid():
-            award_formset.save()
-
         association_formset = DoctorAssociationFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorassociation')
-        if association_formset.is_valid():
-            association_formset.save()
-
         experience_formset = DoctorExperienceFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorexperience')
-        if experience_formset.is_valid():
-            experience_formset.save()
+        #medicalservice_formset = DoctorServiceFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctormedicalservice')
 
-        medicalservice_formset = DoctorServiceFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctormedicalservice')
-        if medicalservice_formset.is_valid():
-            medicalservice_formset.save()
+        if not all([doctor_form.is_valid(), mobile_formset.is_valid(), qualification_formset.is_valid(),
+            hospital_formset.is_valid(), language_formset.is_valid(), award_formset.is_valid(),
+            association_formset.is_valid(), experience_formset.is_valid()]):
 
-        image_formset = DoctorImageFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorimage')
-        if image_formset.is_valid():
-            image_formset.save()
+            doc_images = DoctorImage.objects.filter(doctor=doctor_obj)
+
+            doc_dict = OrderedDict()
+            for id, value in DoctorDocument.CHOICES:
+                results = DoctorDocument.objects.filter(doctor=doctor_obj, document_type=id)
+                if len(results)>0:
+                    doc_dict[id] = (id, value, results)
+                else:
+                    doc_dict[id] = (id, value, None)
+
+            return render(request, 'doctor.html', {'doctor_form': doctor_form,
+                'mobile_formset': mobile_formset,
+                'qualification_formset': qualification_formset,
+                'hospital_formset': hospital_formset,
+                'language_formset': language_formset,
+                'award_formset': award_formset,
+                'association_formset': association_formset,
+                'experience_formset': experience_formset,
+                # 'medicalservice_formset': medicalservice_formset,
+                'error_message' : 'Please fill all required fields',
+                'doc_images' : doc_images,
+                'doc_dict' :doc_dict,
+                'DoctorDocument' : DoctorDocument
+            })
 
 
-        return render(request, 'doctor.html', {'doctor_form': doctor_form,
-            'mobile_formset': mobile_formset,
-            'qualification_formset': qualification_formset,
-            'hospital_formset': hospital_formset,
-            'language_formset': language_formset,
-            'award_formset': award_formset,
-            'association_formset': association_formset,
-            'experience_formset': experience_formset,
-            'medicalservice_formset': medicalservice_formset,
-            'image_formset': image_formset,
-        })
+        doc_obj = doctor_form.save()
+
+        mobile_formset.save()
+        qualification_formset.save()
+        hospital_formset.save()
+        language_formset.save()
+        award_formset.save()
+        association_formset.save()
+        experience_formset.save()
+
+        request.session['message'] = 'Successfully Saved Draft'
+
+        action = request.POST.get('_action',None)
+
+        if action=='_submit':
+            instance.onboarding_status = Doctor.ONBOARDED
+            instance.save()
+            DoctorOnboardingToken.objects.filter(token = token).update(status=DoctorOnboardingToken.CONSUMED)
+
+
+        return redirect("/onboard/doctor?token="+token, permanent=False)
 
 
 def otp(request):

@@ -4,7 +4,6 @@ from django.contrib.postgres.operations import CreateExtension
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
-from django.contrib.postgres.fields import JSONField
 
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel
 
@@ -147,12 +146,18 @@ class College(TimeStampedModel):
 
 
 class Doctor(TimeStampedModel, CreatedByModel, QCModel):
+    NOT_ONBOARDED = 1
+    REQUEST_SENT = 2
+    ONBOARDED = 3
+    ONBOARDING_STATUS = [(NOT_ONBOARDED, "Not Onboarded"), (REQUEST_SENT, "Onboarding Request Sent"), (ONBOARDED, "Onboarded")]
 
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, choices=[("","Select"), ("m","Male"), ("f","Female"), ("o","Other")])
     practicing_since = models.PositiveSmallIntegerField(blank=True, null=True,validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
+    primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     license = models.CharField(max_length=200, blank=True)
+    onboarding_status = models.PositiveSmallIntegerField(default=NOT_ONBOARDED, choices=ONBOARDING_STATUS)
     additional_details = models.CharField(max_length=2000, blank=True)
     email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name= 'Email Verified', default=False)
@@ -240,7 +245,16 @@ class DoctorImage(TimeStampedModel, Image):
         db_table = "doctor_image"
 
 class DoctorDocument(TimeStampedModel, Image):
+    PAN = 1
+    ADDRESS = 2
+    GST = 3
+    REGISTRATION = 4
+    CHEQUE = 5
+    AADHAR = 7
+    CHOICES = [(PAN,"PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"MCI Registration Number"),(CHEQUE,"Cancel Cheque Copy"),(AADHAR,"Aadhar Card")]
+
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.ImageField(upload_to='doctor/documents',height_field='height', width_field='width')
 
     class Meta:
@@ -334,6 +348,16 @@ class DoctorMobile(TimeStampedModel):
     class Meta:
         db_table = "doctor_mobile"
         unique_together = (("doctor", "number"))
+
+class DoctorEmail(TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    email = models.EmailField(max_length=100, blank=True)
+    is_primary = models.BooleanField(verbose_name= 'Primary Email?', default=False)
+    is_email_verified = models.BooleanField(verbose_name= 'Phone Number Verified?', default=False)
+
+    class Meta:
+        db_table = "doctor_email"
+        unique_together = (("doctor", "email"))
 
 
 class HospitalNetwork(TimeStampedModel, CreatedByModel, QCModel):
@@ -433,6 +457,8 @@ class DoctorOnboardingToken(TimeStampedModel):
     STATUS_CHOICES = [(GENERATED, "Generated"), (REJECTED, "Rejected"), (CONSUMED, "Consumed")]
     doctor = models.ForeignKey(Doctor, null=True, on_delete=models.SET_NULL)
     token = models.CharField(max_length=100)
+    email = models.EmailField(max_length=100, blank=True)
+    mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     verified_token = models.CharField(max_length=100, null=True)
     status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=GENERATED)
 

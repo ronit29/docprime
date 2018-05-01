@@ -2,7 +2,7 @@
 {% block content %}
 
 <h3>
-Send onboarding request to <strong>{{ lab.name }}</strong>
+Send onboarding request to <strong>{{ doctor.name }}</strong>
 </h3>
 <hr>
 
@@ -17,7 +17,7 @@ Send onboarding request to <strong>{{ lab.name }}</strong>
 {% else %}
 <button class="generate" style='margin: 20px 0;'>Send onboarding Email</button>
 <p id="new_url">
-	
+    
 </p>
 {% endif %}
 
@@ -41,27 +41,28 @@ Send onboarding request to <strong>{{ lab.name }}</strong>
       }
     });
 
-	$(document).ready(function(){
-		$('.generate').click(function(){
-		    $.ajax(
-		    {
-		        "type":"POST",
-		        "dataType": "json",
-		        "url": "{% url 'onboard:generate-url' %}",
-		        "data":{
-		            "lab_id": {{ lab.id }}
-		        },
-		        success: function( data ) 
-		        {
-		        	// console.log(data.url);
-		        	$("#new_url").html("successfully sent the Onboarding Link via email");
-		        },
-		        error: function(data)
-		        {
-		        	$("#new_url").html("something went wrong! Please try again.");
-		        }
-		    }); 	
-	});
+    $(document).ready(function(){
+        $('.generate').click(function(){
+            $.ajax(
+            {
+                "type":"POST",
+                "dataType": "json",
+                "url": "{% url 'onboard:generate-doctor-url' %}",
+                "data":{
+                    "doctor_id": {{ doctor.id }}
+                },
+                success: function( data ) 
+                {
+                    // console.log(data.url);
+                    $("#new_url").html("Successfully sent the Onboarding Link via email");
+                    $('.generate').css('display','none');
+                },
+                error: function(data)
+                {
+                    $("#new_url").html("Something went wrong! Please try again.");
+                }
+            });     
+    });
 });
 </script>
 

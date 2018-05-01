@@ -98,6 +98,9 @@ class LabCertificationInline(admin.TabularInline):
 
 class LabForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
+    primary_mobile = forms.CharField(required=True)
+    primary_email = forms.EmailField(required=True)
+    city = forms.CharField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
     onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Lab.ONBOARDING_STATUS)
 
@@ -170,21 +173,52 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
         except Exception as e:
             return HttpResponse('invalid lab')
 
+        count = 0
         try:
-            last_token = LabOnboardingToken.objects.filter(lab = lab_obj).order_by('-id').first()
+            count = LabOnboardingToken.objects.filter(lab = lab_obj).count()
         except Exception as e:
-            last_token = None
+            pass
+            # last_token = None
 
-        last_url = None
-        created_at = ""
-        if last_token:
-            last_url = host+'/onboard/lab?token='+str(last_token.token)
-            created_at = last_token.created_at
+        #last_url = None
+        #created_at = ""
+        # if last_token:
+        #     last_url = host+'/onboard/lab?token='+str(last_token.token)
+        #     created_at = last_token.created_at
 
-        return render(request, 'onboardlab.html', {'lab': lab_obj, 'last_created': created_at})
+        # check for errors
+        errors = []
+        required = ['name','about','license','primary_email','primary_mobile','operational_since', 'parking', 'network_type', 'location','building','city','state','country','pin_code','agreed_rate_list']
+        for req in required:
+            if not getattr(lab_obj, req):
+                errors.append(req+' is required')
+
+        if not lab_obj.locality or lab_obj.sublocality:
+            errors.append('locality or sublocality is required')
+
+        length_required = ['labservice', 'labdoctoravailability', 'labmanager', 'labtiming', 'labaccreditation']
+        if lab_obj.labservice_set.filter(service = LabService.RADIOLOGY).exists():
+            length_required.append('labdoctor')
+        for req in length_required:
+            if not len(getattr(lab_obj, req+'_set').all()):
+                errors.append(req + ' is required')
+
+        #if not lab_obj.lab_services_set:
+            # errors.append('lab services are required')
+
+        # if not lab_obj.license:
+        #     errors.append('License is required')
+        # if not lab_obj.primary_email:
+        #     errors.append('Primary Email is required')
+        # if not lab_obj.primary_mobile:
+        #     errors.append('Primary Mobile is required')
+        # if not lab_obj.agreed_rate_list:
+        #     errors.append('Agreed rate list in required')
+
+        return render(request, 'onboardlab.html', {'lab': lab_obj, 'count': count, 'errors': errors})
 
     def get_onboard_link(self, obj = None):
-        if obj.data_status == 1:
+        if obj.data_status == Lab.IN_PROGRESS and obj.onboarding_status in (Lab.NOT_ONBOARDED, Lab.REQUEST_SENT):
             return mark_safe("<a href='/admin/diagnostic/lab/onboardlab_admin/%s'>generate onboarding url</a>" % obj.id)
         return ""
     get_onboard_link.allow_tags = True

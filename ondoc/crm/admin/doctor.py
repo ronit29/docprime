@@ -4,10 +4,14 @@ from django.core.exceptions import FieldDoesNotExist
 import datetime
 from django.forms.models import BaseFormSet
 from django.db.models import Q
+from django.utils.safestring import mark_safe
+from django.conf.urls import url
+from django.shortcuts import render
 
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
-    DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken, )
+    DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
+    DoctorEmail )
 
 from .common import *
 from ondoc.crm.constants import constants
@@ -102,6 +106,7 @@ class DoctorDocumentInline(admin.TabularInline):
 
 class DoctorMobileForm(forms.ModelForm):
     number = forms.CharField(required=True)
+    is_primary = forms.BooleanField(required=False)
     #def is_valid(self):
     #    pass
     # def clean(self):
@@ -116,13 +121,30 @@ class DoctorMobileInline(admin.TabularInline):
     show_change_link = False
     fields = ['number']
 
+class DoctorEmailForm(forms.ModelForm):
+    pass
+    #def is_valid(self):
+    #    pass
+    # def clean(self):
+    #    pass
+
+class DoctorEmailInline(admin.TabularInline):
+    model = DoctorEmail
+    form = DoctorEmailForm
+
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    fields = ['email']
 
 
 class DoctorForm(forms.ModelForm):
     additional_details = forms.CharField(widget=forms.Textarea, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
+    primary_mobile = forms.CharField(required=True)
+    email = forms.EmailField(required=True)
     practicing_since = forms.ChoiceField(required=False, choices=practicing_since_choices)
-
+    onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Doctor.ONBOARDING_STATUS)
     def validate_qc(self):
         qc_required = {'name':'req','gender':'req','practicing_since':'req',
         'about':'req','license':'req','email':'req','doctormobile':'count',
@@ -163,7 +185,6 @@ class DoctorForm(forms.ModelForm):
                 if self.instance.data_status == 3:
                     raise forms.ValidationError("Cannot reject QC approved data")
 
-
         return super(DoctorForm, self).clean()
 
 
@@ -171,12 +192,13 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
 
     change_form_template = 'custom_change_form.html'
 
-    list_display = ('name', 'updated_at','data_status', 'created_by')
+    list_display = ('name', 'updated_at','data_status', 'created_by','get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = ('data_status',)
     form = DoctorForm
     inlines = [
         DoctorMobileInline,
+        DoctorEmailInline,
         DoctorQualificationInline,
         DoctorHospitalInline,
         DoctorLanguageInline,
@@ -189,6 +211,53 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
     ]
     exclude = ['created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
     search_fields = ['name']
+
+    def get_urls(self):
+        urls = super().get_urls()
+        my_urls = [
+            url('onboard_admin/(?P<userid>\d+)/', self.admin_site.admin_view(self.onboarddoctor_admin), name="onboarddoctor_admin"),
+        ]
+        return my_urls + urls
+
+    def onboarddoctor_admin(self, request, userid):
+        host = request.get_host()
+        try:
+            doctor = Doctor.objects.get(id = userid)
+        except Exception as e:
+            return HttpResponse('invalid doctor')
+
+        count = 0
+        try:
+            count = DoctorOnboardingToken.objects.filter(doctor = doctor).count()
+        except Exception as e:
+            pass
+            # last_token = None
+
+        #last_url = None
+        #created_at = ""
+        # if last_token:
+        #     last_url = host+'/onboard/lab?token='+str(last_token.token)
+        #     created_at = last_token.created_at
+
+        # check for errors
+        errors = []
+        required = ['name','about','gender','license','practicing_since','primary_mobile','email']
+        for req in required:
+            if not getattr(doctor, req):
+                errors.append(req+' is required')
+
+        length_required = ['doctormobile','doctorqualification','doctorhospital',
+            'doctorlanguage','doctorexperience','doctormedicalservice','doctorimage']
+        for req in length_required:
+            if not len(getattr(doctor, req+'_set').all()):
+                errors.append(req + ' is required')
+
+        return render(request, 'onboarddoctor.html', {'doctor': doctor, 'count': count, 'errors': errors})
+
+    def get_onboard_link(self, obj = None):
+        if obj.data_status == Doctor.IN_PROGRESS and obj.onboarding_status in (Doctor.NOT_ONBOARDED, Doctor.REQUEST_SENT):
+            return mark_safe("<a href='/admin/doctor/doctor/onboard_admin/%s'>generate onboarding url</a>" % obj.id)
+        return ""
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(DoctorAdmin, self).get_form(request, obj=obj, **kwargs)
@@ -238,6 +307,10 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
             return True
 
         return obj.created_by == request.user
+
+    class Media:
+        js = ('js/admin/ondoc.js',)
+
 
 class SpecializationAdmin(VersionAdmin):
     search_fields = ['name']
