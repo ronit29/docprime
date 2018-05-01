@@ -32,6 +32,18 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     address = serializers.ReadOnlyField(source='hospital.address')
     hospital_id = serializers.ReadOnlyField(source='hospital.pk')
 
+    def create(self, validated_data):
+        return DoctorHospital.objects.create(**validated_data)
+
+    def validate(self, data):
+        doctor = Doctor.objects.get(id=self.context['doctor_id'])
+        hospital = Hospital.objects.get(id=self.context['hospital_id'])
+
+        data['doctor'] = doctor
+        data['hospital'] = hospital
+        
+        return data
+
     class Meta:
         model = DoctorHospital
         fields = ('doctor', 'hospital', 'address', 'hospital_id', 'day', 'start', 'end', 'fees', )

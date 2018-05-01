@@ -125,7 +125,7 @@ class DoctorProfile(APIView):
         return Response(serialized_doctor.data)
 
 
-class DocotorAppointments(APIView):
+class DoctorAppointments(APIView):
     """
     Return Appointments for a doctor
     """
@@ -193,4 +193,17 @@ class DoctorHospitalAvailability(APIView):
         schedule = DoctorHospital.objects.filter(doctor_id=doctor_id, hospital_id=hospital_id)
         serialized_schedule = DoctorHospitalSerializer(schedule, many=True)
         return Response(serialized_schedule.data)
+
+    def post(self, request, version="v1", format='json'):
+
+        request_data = request.data
+        doctor_hospital_serializer = DoctorHospitalSerializer(data=request_data,context=request_data)
+        if doctor_hospital_serializer.is_valid(raise_exception=True):
+
+            doctor_hospital_serializer.save()
+            return Response("Sucessfuly Created", status=200)
+            
+        else:
+            return Response(doctor_hospital_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 

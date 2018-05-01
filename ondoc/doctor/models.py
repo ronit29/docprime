@@ -164,6 +164,7 @@ class DoctorHospital(TimeStampedModel):
 
     class Meta:
         db_table = "doctor_hospital"
+        unique_together = (("start", "end", "day", "hospital", "doctor"))
 
 
 class DoctorImage(TimeStampedModel, Image):
