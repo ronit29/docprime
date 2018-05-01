@@ -162,6 +162,9 @@ class DoctorHospital(TimeStampedModel):
 
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
 
+    def __str__(self):
+        return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
+
     class Meta:
         db_table = "doctor_hospital"
         unique_together = (("start", "end", "day", "hospital", "doctor"))
