@@ -1,7 +1,30 @@
+from rest_framework.response import Response
+from ondoc.authentication.models import OtpVerifications, User, UserProfile
 import requests
 import json
 from django.utils import timezone
 import time
+
+def verifyOTP(f):
+    def wrapper(*args, **kwargs):
+        request = args[0]
+        try:
+            phone_number = request.data['phone_number']
+            otp = request.data['otp']
+            otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, isExpired=False)
+            otp_time = getTimeDifferenceInMinutes(otpEntry.created_at)
+            otpEntry.isExpired = True
+            otpEntry.save()
+            if otp_time > 15 :
+                return Response('OTP Expired',status=404)
+
+            return f(*args, **kwargs)
+
+        except OtpVerifications.DoesNotExist:
+            return Response('OTP Not found',status=404)
+
+    return wrapper
+
 
 def getTimeDifferenceInMinutes(end):
     d1_ts = time.mktime(timezone.now().timetuple())

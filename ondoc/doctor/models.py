@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.utils.safestring import mark_safe
 
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
 
 
 class Migration(migrations.Migration):
@@ -80,6 +80,7 @@ class Doctor(TimeStampedModel, CreatedByModel, QCModel):
     is_phone_number_verified = models.BooleanField(verbose_name= 'Phone Number Verified', default=False)
     email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name= 'Email Verified', default=False)
+    user = models.ForeignKey(User, related_name="doctor_profile", on_delete=models.CASCADE, default=None, blank=True, null=True)
 
     hospitals = models.ManyToManyField(
         Hospital,

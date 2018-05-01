@@ -8,22 +8,11 @@ from rest_framework.permissions import IsAuthenticated
 from ondoc.authentication.models import OtpVerifications, User, UserProfile
 from ondoc.authentication.serializers import UserAuthSerializer, UserProfileSerializer
 from random import randint
-from .service import sendOTP, getTimeDifferenceInMinutes
+from .service import sendOTP, verifyOTP
 
 @api_view(['POST', ])
+@verifyOTP
 def register_user(request, format='json'):
-    try:
-        phone_number = request.data['phone_number']
-        otp = request.data['otp']
-        otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, isExpired=False)
-        otp_time = getTimeDifferenceInMinutes(otpEntry.created_at)
-        otpEntry.isExpired = True
-        otpEntry.save()
-        if otp_time > 15 :
-            return Response('OTP Expired',status=404)
-            
-    except OtpVerifications.DoesNotExist:
-        return Response('No OTP found',status=404)
 
     userData = request.data
     userData['is_phone_number_verified'] = True
@@ -79,21 +68,29 @@ def generate_otp(request):
 
 
 @api_view(['POST', ])
-def verify_otp(request):
-    """
-    Takes OTP and user details, verifies those and will then create session and creates a user if required. and return sessionId
-    """
-    
+@verifyOTP
+def login_user(request):
     phone_number = request.data['phone_number']
-    otp = request.data['otp']
 
+    try:        
+        user_data = User.objects.get(phone_number=phone_number, user_type=3)
+        token = Token.objects.get_or_create(user=user_data)
+
+        response = {
+            "message" : "Sucessfuly. Logged In",
+            "token" : str(token[0])
+        }
+        return Response(response,status=200)
+    except User.DoesNotExist:
+        return Response('User Not found',status=404)
+
+
+@api_view(['POST', ])
+@verifyOTP
+def login_doctor(request):
+
+    phone_number = request.data['phone_number']
     try:
-        otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, isExpired=False)
-        otp_time = getTimeDifferenceInMinutes(otpEntry.created_at)
-        otpEntry.isExpired = True
-        otpEntry.save()
-        if otp_time > 15 :
-            return Response('OTP Expired',status=404)
         
         user_data = User.objects.get(phone_number=phone_number, user_type=3)
         token = Token.objects.get_or_create(user=user_data)
@@ -103,8 +100,6 @@ def verify_otp(request):
             "token" : str(token[0])
         }
         return Response(response,status=200)
-    except OtpVerifications.DoesNotExist:
-        return Response('No OTP found',status=404)
     except User.DoesNotExist:
         return Response('User Not found',status=404)
 
