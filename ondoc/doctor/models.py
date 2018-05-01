@@ -269,8 +269,8 @@ class OpdAppointment(TimeStampedModel):
     profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
     fees = models.PositiveSmallIntegerField()
     status = models.PositiveSmallIntegerField(default=CREATED)
-    time_slot_start = models.DateTimeField(auto_now=True)
-    time_slot_end = models.DateTimeField(auto_now=True)
+    time_slot_start = models.DateTimeField(blank=True, null=True)
+    time_slot_end = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"

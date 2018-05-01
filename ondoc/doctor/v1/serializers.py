@@ -116,6 +116,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
 
 class OpdAppointmentSerializer(serializers.ModelSerializer):
+
     doctor_name = serializers.ReadOnlyField(source='doctor.name')
     hospital_name = serializers.ReadOnlyField(source='hospital.name')
     patient_name = serializers.ReadOnlyField(source='profile.name')
@@ -124,27 +125,19 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     patient_image = serializers.ReadOnlyField(source='profile.profile_image.url')
 
     def create(self, validated_data):
-        doctor = Doctor.objects.get(id=validated_data.data['doctor_id'])
-        hospital = Hospital.objects.get(id=validated_data.data['hospital_id'])
-        profile = UserProfile.objects.get(id=validated_data.data['profile_id'])
-        appointment_start_date_time = datetime.utcfromtimestamp(validated_data.data['time_slot_start'] / 1000)
-        appointment_end_date_time = datetime.utcfromtimestamp(validated_data.data['time_slot_end'] / 1000)
-        opd_appointment = OpdAppointment(doctor=doctor, hospital=hospital, profile=profile,
-                                         time_slot_start=appointment_start_date_time,
-                                         time_slot_end=appointment_end_date_time,
-                                         fees=validated_data.data['fees'],
-                                         status=OpdAppointment.CREATED)
-
-        opd_appointment.save()
-        return opd_appointment
-
-    def update(self, validated_data):
-
-        return validated_data
+        return OpdAppointment.objects.create(**validated_data)
 
     def validate(self, data):
+        doctor = Doctor.objects.get(id=self.context['doctor_id'])
+        hospital = Hospital.objects.get(id=self.context['hospital_id'])
+        profile = UserProfile.objects.get(id=self.context['profile_id'])
+
+        data['doctor'] = doctor
+        data['hospital'] = hospital
+        data['profile'] = profile
+        
         return data
 
     class Meta:
         model = OpdAppointment
-        fields = ('fees', 'status', 'time_slot_start', 'time_slot_end', 'doctor_name', 'hospital_name','patient_name','patient_dob','patient_gender','patient_image')
+        fields = ('id', 'time_slot_start', 'fees', 'time_slot_end', 'status', 'doctor_name', 'hospital_name', 'patient_name', 'patient_dob', 'patient_gender', 'patient_image')

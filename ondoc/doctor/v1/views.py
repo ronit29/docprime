@@ -169,38 +169,17 @@ class DocotorAppointments(APIView):
 
         # TODO : Authenticate this request so only the assigned doctor or the patient
         #        is able to change the status of the appointment id.
+        request_data = request.data
+        
+        request_data['time_slot_start'] = datetime.utcfromtimestamp(request_data['time_slot_start'] / 1000)
+        request_data['time_slot_end'] = datetime.utcfromtimestamp(request_data['time_slot_end'] / 1000)
 
-        # doctor = Doctor.objects.get(id=request.data['doctor_id'])
-        # hospital = Hospital.objects.get(id=request.data['hospital_id'])
-        # profile = UserProfile.objects.get(id=request.data['profile_id'])
-        # appointment_start_date_time = datetime.utcfromtimestamp(request.data['time_slot_start'] / 1000)
-        # appointment_end_date_time = datetime.utcfromtimestamp(request.data['time_slot_end'] / 1000)
-
-        # request_data={
-        #     'fees' : request.data['fees'],
-        #     'doctor': doctor,
-        #     'hospital': hospital,
-        #     'profile':profile,
-        #     'appointment_start_date_time':appointment_start_date_time,
-        #     'appointment_end_date_time':appointment_end_date_time
-        #
-        # }
-        opd_appointment_serializer = OpdAppointmentSerializer(data=request.data)
+        opd_appointment_serializer = OpdAppointmentSerializer(data=request_data,context=request_data)
         if opd_appointment_serializer.is_valid(raise_exception=True):
             opd_appointment = opd_appointment_serializer.save()
-            response = {
-                "message": "Sucessfuly Create user and Logged In",
-                "token":opd_appointment
-            }
-            return Response(response, status=200)
+            return Response("Sucessfuly Created", status=200)
         else:
             return Response(opd_appointment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        #
-        #
-        # return Response({
-        #     "message": "Appointment created",
-        #     "appointment_id" : opd_appointment.id
-        # })
 
 
