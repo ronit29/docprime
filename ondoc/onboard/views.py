@@ -108,7 +108,16 @@ def generate(request):
     token = LabOnboardingToken(status=1,email=lab.primary_email,mobile=lab.primary_mobile,lab_id=lab_id, token=randint(1000000000, 9000000000))
     token.save()
     url = host + '/onboard/lab?token='+str(token.token)
-    email_api.send_email(lab.primary_email, 'Onboarding link for '+lab.name, 'Your onboarding url is '+url)
+
+    message =  ('Dear Sir/Mam,'
+                'Please find below the enrolment URL Link:-'
+                'We request you to kindly complete the form by filling an empanelment form to start working together for patient requirements like consultations and investigations.'
+                'Our agreed rate list along with terms and condition are available on the link for your kind perusal.'
+                'For any queries you can connect with our representative over the phone which is already associated with you.'
+                )
+
+
+    email_api.send_email(lab.primary_email, 'Onboarding link for '+lab.name, message)
     lab.onboarding_status = lab.REQUEST_SENT
     lab.save()
 

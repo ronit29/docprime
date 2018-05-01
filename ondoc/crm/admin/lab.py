@@ -193,7 +193,7 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
             if not getattr(lab_obj, req):
                 errors.append(req+' is required')
 
-        if not lab_obj.locality or lab_obj.sublocality:
+        if not lab_obj.locality and not lab_obj.sublocality:
             errors.append('locality or sublocality is required')
 
         length_required = ['labservice', 'labdoctoravailability', 'labmanager', 'labtiming', 'labaccreditation']
