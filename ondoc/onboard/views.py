@@ -90,8 +90,6 @@ def otp(request):
             #api.send_sms(message, '91'+str(existing.lab.primary_mobile))
             #request.session['otp'] = otp
 
-
-
     return render(request,'otp.html',{'label':label, 'page':page, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})
 
 
@@ -109,11 +107,11 @@ def generate(request):
     token.save()
     url = host + '/onboard/lab?token='+str(token.token)
 
-    message =  ('Dear Sir/Mam,'
-                'Please find below the enrolment URL Link:-'
-                'We request you to kindly complete the form by filling an empanelment form to start working together for patient requirements like consultations and investigations.'
-                'Our agreed rate list along with terms and condition are available on the link for your kind perusal.'
-                'For any queries you can connect with our representative over the phone which is already associated with you.'
+    message =  ('Dear Sir/Mam,\n\n'
+                'Please find below the enrolment URL Link:-\n\n'+url+
+                '\n\nWe request you to kindly complete the form by filling an empanelment form to start working together for patient requirements like consultations and investigations.'
+                '\n\nOur agreed rate list along with terms and condition are available on the link for your kind perusal.'
+                '\n\nFor any queries you can connect with our representative over the phone which is already associated with you.'
                 )
 
 
@@ -137,7 +135,15 @@ def generate_doctor(request):
     token = DoctorOnboardingToken(status=1,email=doctor.email,mobile=doctor.primary_mobile,doctor_id=doctor_id, token=randint(1000000000, 9000000000))
     token.save()
     url = host + '/onboard/doctor?token='+str(token.token)
-    email_api.send_email(doctor.email, 'Onboarding link for '+doctor.name, 'Your onboarding url is '+url)
+
+    message =  ('Dear Sir/Mam,\n\n'
+                'Please find below the enrolment URL Link:-\n\n'+url+
+                '\n\nWe request you to kindly complete the form by filling an empanelment form to start working together for patient requirements like consultations and investigations.'
+                '\n\nOur agreed rate list along with terms and condition are available on the link for your kind perusal.'
+                '\n\nFor any queries you can connect with our representative over the phone which is already associated with you.'
+                )
+
+    email_api.send_email(doctor.email, 'Onboarding link for '+doctor.name, message)
     doctor.onboarding_status = doctor.REQUEST_SENT
     doctor.save()
 

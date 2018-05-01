@@ -258,6 +258,10 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
+
+    class Media:
+        js = ('js/admin/ondoc.js',)
+
     # extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&callback=initGoogleMap']
     # extra_js = ['https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&libraries=places&callback=initMap']
 

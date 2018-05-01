@@ -55,6 +55,8 @@ Send onboarding request to <strong>{{ lab.name }}</strong>
 		        {
 		        	// console.log(data.url);
 		        	$("#new_url").html("successfully sent the Onboarding Link via email");
+                    $('.generate').css('display','none');
+
 		        },
 		        error: function(data)
 		        {
