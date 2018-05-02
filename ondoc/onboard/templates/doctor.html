@@ -1,0 +1,567 @@
+{%extends 'base.html'%}
+{% load crispy_forms_tags %}
+{% load staticfiles %}
+{% block header %}
+<div class='' style='background: #00acc1;height: 50px;color:#fff;font-size: 18px;padding:13px 0;'>
+    <div class="container">
+    <div class='row'>    
+    <div class='col-md-3 col-xs-6 col-sm-6'>Panacea Techno</div>
+    <div class='col-md-6 col-xs-6 col-sm-6' style='text-align: center;'>WELCOME {{ doctor_form.name.value|default_if_none:"" }}</div>
+    </div>    
+    </div>                
+</div>    
+{% endblock %}
+
+{% block content %}
+    <link rel="stylesheet" href="{% static 'css/basic.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dropzone.css' %}">
+    <link rel="stylesheet" href="{% static 'css/lab.css' %}">
+
+{% if error_message %}
+    <div class="alert alert-danger" style="margin-top: 20px;">
+      <strong>{{ error_message }}</strong>
+    </div>
+{% endif %}
+
+{% if message %}
+    <div class="alert alert-success" style="margin-top: 20px;">
+      <strong>{{ message }}</strong>
+    </div>
+{% endif %}
+<div style='padding:40px 0 0 0'>
+
+    <form class="form-horizontal" method="POST" action="">
+
+        <div class="panel panel-default">
+        <div class="panel-heading">        
+        <img class='heading-icon' src ="{% static 'images/1.png' %}" >
+        <span>BASIC DETAILS</span>
+        </div>
+          <div class="panel-body">
+                {% crispy doctor_form %}
+          </div>
+        </div>
+
+
+        <div class="panel panel-default">
+            <div class="panel-heading">CONTACT NUMBERS</div>
+            <div class="panel-body cnums">
+            <div style='font-size:12px;color:#00acc1;margin-bottom: 10px;'>Primary Number</div>    
+             {{ mobile_formset.management_form|crispy }}
+             {% for form in mobile_formset %}
+             <div class="form-horizontal">
+                  {{ form.id }}
+                  {% crispy form %}
+             </div>           
+             {% endfor %}
+            </div>
+            <div class='panel-footer'>
+            <div class='add-new-form' data-key='doctormobile' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                <span>Add Another Number</span>
+            </div>
+
+            <div class="empty_form" style="display:none">
+                <div class="form-horizontal">                
+                    {% crispy mobile_formset.empty_form %}
+                </div>            
+            </div>
+            <div style='color:#00acc1;font-size: 12px;margin-top: 10px;'>Primary number will be used as a unique  identifier in our systems and will be used for all related services on our platform.</div>
+            </div>
+        </div>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">EMAILS</div>
+            <div class="panel-body cnums">
+            <div style='font-size:12px;color:#00acc1;margin-bottom: 10px;'>Primary Email</div>    
+             {{ email_formset.management_form|crispy }}
+             {% for form in email_formset %}
+             <div class="form-horizontal">
+                  {{ form.id }}
+                  {% crispy form %}
+             </div>           
+             {% endfor %}
+            </div>
+            <div class='panel-footer'>
+            <div class='add-new-form' data-key='doctoremail' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                <span>Add Another Email</span>
+            </div>
+
+            <div class="empty_form" style="display:none">
+                <div class="form-horizontal">                
+                    {% crispy email_formset.empty_form %}
+                </div>            
+            </div>
+            <div style='color:#00acc1;font-size: 12px;margin-top: 10px;'>Primary email will be used as a unique  identifier in our systems and will be used for all related services on our platform.</div>
+            </div>
+        </div>
+
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+            <img class='heading-icon' src ="{% static 'images/11.png' %}" >    
+            <span>QUALIFICATION</span>
+            </div>
+            <div class="panel-body">
+             {{ qualification_formset.management_form|crispy }}
+             {% for form in qualification_formset %}
+             <div class="form-horizontal">
+                  {{ form.id }}
+                  {% crispy form %}
+             </div>  
+             {% endfor %}
+            </div>
+            <div class='panel-footer'>
+            <div class='add-new-form' data-key='doctorqualification' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                <span>Add Another Qualification</span>
+            </div>
+
+            <div class="empty_form" style="display:none">
+                <div class="form-horizontal">                
+                    {% crispy qualification_formset.empty_form %}
+                </div>            
+            </div>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+            <img class='heading-icon' src ="{% static 'images/12.png' %}">
+            <span>ASSOCIATED CLINIC/HOSPITAL</span>
+            </div>
+            <div class="panel-body">
+             {{ hospital_formset.management_form|crispy }}
+             {% for form in hospital_formset %}
+             <div class="form-horizontal" style='margin-bottom: 30px;'>
+                  {{ form.id }}
+                  {% crispy form %}
+             </div>  
+             {% endfor %}
+          </div>
+
+            <div class='panel-footer'>
+            <div class='add-new-form' data-key='doctorhospital' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                <span>Add Another Clinic/Hospital</span>
+            </div>
+
+            <div class="empty_form" style="display:none">
+                <div class="form-horizontal" style='margin-bottom: 30px;'>                
+                    {% crispy hospital_formset.empty_form %}
+                </div>            
+            </div>
+
+            </div>
+
+
+        </div>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+              <img class='heading-icon' src ="{% static 'images/13.png' %}">
+              <span>LANGUAGE</span>
+            </div>
+            <div class="panel-body">
+               {{ language_formset.management_form|crispy }}
+               {% for form in language_formset %}
+                <div class="form-horizontal col-md-6">
+                      {{ form.id }}
+                      {% crispy form %}
+                </div>  
+                {% endfor %}
+             </div>   
+            <div class='panel-footer'>
+            <div class='add-new-form' data-key='doctorlanguage' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                <span>Add Another Language</span>
+            </div>
+
+            <div class="empty_form" style="display:none">
+                <div class="form-horizontal col-md-6">                
+                    {% crispy language_formset.empty_form %}
+                </div>            
+            </div>
+
+            </div>        
+        </div>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <img class='heading-icon' src ="{% static 'images/14.png' %}">
+                <span>AWARDS</span>
+            </div>
+            <div class="panel-body">            
+               {{ award_formset.management_form|crispy }}
+               {% for form in award_formset %}
+                <div class="form-horizontal">
+                      {{ form.id }}
+                      {% crispy form %}
+                </div>  
+                {% endfor %}
+            </div>
+            <div class='panel-footer'>
+                <div class='add-new-form' data-key='doctoraward' style='display: inline-block;'>
+                    <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                    <span>Add Another Award</span>
+                </div>
+
+                <div class="empty_form" style="display:none">
+                    <div class="form-horizontal">                
+                        {% crispy award_formset.empty_form %}
+                    </div>            
+                </div>
+            </div>
+
+        </div>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">ASSOCIATION/MEMBERSHIP</div>
+            <div class="panel-body">
+
+               {{ association_formset.management_form|crispy }}
+               {% for form in association_formset %}
+                <div class="form-horizontal">
+                      {{ form.id }}
+                      {% crispy form %}
+                </div>  
+                {% endfor %}
+            </div>
+            <div class='panel-footer'>
+                <div class='add-new-form' data-key='doctorassociation' style='display: inline-block;'>
+                    <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                    <span>Add Another Doctor Association</span>
+                </div>
+
+                <div class="empty_form" style="display:none">
+                    <div class="form-horizontal">                
+                        {% crispy association_formset.empty_form %}
+                    </div>            
+                </div>
+            </div>
+
+        </div>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">EXPERIENCE</div>
+            <div class="panel-body">
+
+               {{ experience_formset.management_form|crispy }}
+               {% for form in experience_formset %}
+                <div class="form-horizontal">
+                      {{ form.id }}
+                      {% crispy form %}
+                </div>  
+                {% endfor %}
+
+            </div>
+            <div class='panel-footer'>
+                <div class='add-new-form' data-key='doctorexperience' style='display: inline-block;'>
+                    <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                    <span>Add Another Doctor Experience</span>
+                </div>
+
+                <div class="empty_form" style="display:none">
+                    <div class="form-horizontal">                
+                        {% crispy experience_formset.empty_form %}
+                    </div>            
+                </div>
+            </div>
+        </div>       
+</form>
+
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <img class='heading-icon' src ="{% static 'images/10.png' %}">
+        <span>IMAGES</span></div>
+      <div class="panel-body">
+      <div class='upload-container' data-media='image' data-type='' data-url='/onboard/doctor-upload' data-max='5'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+
+        {% for img in doc_images %}
+            <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
+            <img width="120" height="120" src='{{img.name.url}}'>
+                <div style='text-align: center;'>
+                 <a data-image-id='{{img.id}}' data-media-type='image' class="remove-image" href="javascript:undefined;">X</a>
+                 
+                </div> 
+
+            </div>            
+        {% endfor %}
+
+        {% if doc_images.count < 10 %}
+        <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
+        </div>
+        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload'>
+            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+            <div style="padding-top: 10px;">Upload image</div>
+        </div>
+        {% endif %}
+        </div>
+
+
+      </div>    
+
+    </div>
+
+
+
+
+    <div class="panel panel-default">
+      <div class="panel-heading">DOCUMENTS</div>
+      <div class="panel-body lab-documents">
+        {% for id,data in doc_dict.items %}
+
+        {% with results=data.2 %}
+
+        {% if id == DoctorDocument.ADDRESS %}
+            <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='3'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+        {% elif id == DoctorDocument.GST %}        
+           <div class='upload-container not-required' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+
+        {% else %}
+            <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+        {% endif %}
+
+        {% if results %}
+        <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}
+        <span class='image-required-message'> (Required)</span>
+        </div>
+            {% for instance in results %}
+
+            <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
+
+                <img width="120" height="120" src='{{instance.name.url}}'>
+                <div style='text-align: center;'>
+                    <a data-image-id='{{instance.id}}' data-media-type='document' class="remove-image" href="javascript:undefined;">X</a>
+              
+                </div> 
+
+            </div>
+            {% endfor %}
+        {% if results.count < 1 or results.count < 3 and id == DoctorDocument.ADDRESS %}    
+        <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
+        </div>
+        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload'>
+            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+            <div style="padding-top: 10px;">Upload image</div>
+        </div>
+        {% endif %}    
+        <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
+        </div>
+        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload hidden'>
+            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+            <div style="padding-top: 10px;">Upload image</div>
+        </div>
+
+        {% else %}
+
+        <div>
+        <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}
+        <span class='image-required-message'> (Required)</span>
+        </div>
+
+        <div class="image-upload dropzone dz-clickable" style='border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;'>
+        </div>
+        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload'>
+            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+            <div style="padding-top: 10px;">Upload image</div>
+        </div>
+
+        </div>
+        {% endif %}
+        </div>
+        {% endwith %}        
+
+        {% endfor %}
+
+
+      </div>    
+
+    </div>
+
+</div>
+</div>
+
+<div class='container'>
+<div class="form-group terms-div">
+  <label style='font-size: 16px;color:black;' class='checkbox-inline' for="terms-checkbox"><input id='terms-checkbox' class='terms' type='checkbox'>I hereby agree to the <a target='_blank' href='/onboard/terms'>terms and conditions</a> governing the  empanelment with the company.</label>
+  <div class='terms-error' style='padding:0 20px;color:#a94442;display: none;'>Cannot submit without agreeing to Terms</div>
+</div>  
+
+
+<button class='btn pull-right submit-form' style='background-color:#00acc1;min-width: 180px;height: 40px;color: white;'>Submit</button>
+<button class='btn pull-right save-draft' style='margin-right:20px;background-color:#979797;min-width: 180px;height: 40px;color: white;'>Save Draft</button>
+
+<div style='padding-top:100px'></div>
+</div>   
+ </div>
+
+
+
+
+
+
+{% endblock %}
+
+
+
+{% block domready %}
+
+
+$('body').on('click','.number-check input', function() {
+    $(this).closest('.panel-body').find('.number-check input').not(this).prop('checked',false)    
+});
+
+
+var errNode = $('.has-error:first')
+
+if(errNode.length>0)
+{
+    $('html, body').animate({
+        scrollTop: errNode.offset().top
+    }, 1000);
+}
+
+
+function removeImage(image_id, media_type)
+{
+    console.log('image deleted');
+    $.ajax({
+        url: '/onboard/doctor-upload?image_id='+image_id+'&media_type='+media_type,
+        type: 'DELETE',
+        success: function(result) { }
+    });
+
+}
+
+$('.remove-image').on('click',function(){
+   var r = confirm("This file would be permanently deleted. Are you sure.");
+   if(r==true)
+   {
+       var data = $(this).data();
+       removeImage(data.imageId,data.mediaType);
+       $(this).closest('.upload-container').find('.trigger-upload').removeClass('hidden');
+       $(this).closest('.existing-image').remove();
+   }
+});
+
+$(document).on("keypress", ":input:not(textarea)", function(event) {
+    return event.keyCode != 13;
+});
+
+$('.add-new-form').click(function() {
+    var data = $(this).data();
+    var form_idx = $('#id_'+data.key+'-TOTAL_FORMS').val();
+    $(this).closest('.panel,.dummy-panel').find('.panel-body,.dummy-panel-body').append($(this).next('.empty_form').html().replace(/__prefix__/g, form_idx));
+    $('#id_'+data.key+'-TOTAL_FORMS').val(parseInt(form_idx) + 1);
+});
+
+
+$('.submit-form').on('click',function(e){
+    e.preventDefault();
+    if($('.terms:checked').length==0)
+    {
+        $('.terms-div').addClass('error');
+        return
+    }
+
+    var errors = false;
+    $('.lab-documents .upload-container').not('.not-required').each(function(){
+        var length = $(this).find('.existing-image').length+$(this).find('.dz-image-preview').length
+
+        if(length==0)
+        {
+            $(this).addClass('image-error');
+            errors = true;
+        }
+        else
+            $(this).removeClass('image-error');
+
+    })
+    if(errors)
+        return;
+
+    $(':disabled').removeAttr('disabled')
+    var input = $("<input name='_action'>").attr("type", "hidden").val("_submit");
+    $('form').append($(input));
+
+    $('form').submit();
+});
+
+$('.save-draft').on('click',function(e){
+    e.preventDefault();
+
+    $(':disabled').removeAttr('disabled')        
+    var input = $("<input name='_action'>").attr("type", "hidden").val("_savedraft");
+    $('form').append($(input));
+
+    $('form').submit()
+})
+
+
+
+$('.trigger-upload').on('click',function(e){
+    $(this).closest('.upload-container').find('.dropzone').trigger('click')
+
+})
+
+$('.image-upload').each(function(x){
+
+    var data = $(this).closest('.upload-container').data()
+    $(this).dropzone({
+
+    init: function()
+    {
+        this.on("success", function(file, response) {
+
+           file.previewElement.image_id = response.image_id;
+           file.previewElement.media_type = response.media_type;
+           var existing  =  $(this.element).closest('.upload-container').find('.existing-image').length;
+
+           if((this.files.length+existing) >= this.options.maxFiles)
+           {
+                $(this.element).closest('.upload-container').find('.trigger-upload').addClass('hidden');
+                $(this.element).closest('.upload-container').removeClass('image-error')
+           }
+        });
+
+        this.on("error", function(file) {
+             this.removeFile(file);
+        });
+
+        this.on("removedfile", function(file) { 
+            var image_id = file.previewElement.image_id;
+            var media_type = file.previewElement.media_type;
+            removeImage(image_id, media_type);
+            $(this.previewsContainer).closest('.upload-container').find('.trigger-upload').removeClass('hidden')
+            
+        });
+
+    },
+    paramName: 'name',
+    url: data.url,
+    dictDefaultMessage : '',
+    maxFiles:data.max,
+    uploadMultiple:false,
+    maxFilesize:data.max,
+    //removedfile : onImageDelete,
+    //addRemoveLinks : true,
+    //dictRemoveFile : 'Remove Image',
+    dictRemoveFileConfirmation : 'This file would be permanently deleted. Are you sure.',
+    previewTemplate : '<div class="dz-preview dz-file-preview"><div class="dz-image"><img data-dz-thumbnail></div><div class="dz-details"><div class="dz-filename"><span data-dz-name></span></div><div class="dz-size" data-dz-size></div></div><div class="dz-progress"><span class="dz-upload" data-dz-uploadprogress></span></div><div class="dz-success-mark"><span>✔</span></div><div class="dz-error-mark"><span>✘</span></div><div class="dz-error-message"><span data-dz-errormessage></span></div><a class="dz-remove" href="javascript:undefined;" data-dz-remove="">X</a></div>',
+
+
+    params: {'csrfmiddlewaretoken': $.cookie('csrftoken'),'document_type':data.type, 'media':data.media}
+})
+
+});
+
+
+
+{% endblock %}
+

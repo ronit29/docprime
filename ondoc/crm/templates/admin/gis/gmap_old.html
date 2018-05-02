@@ -1,0 +1,36 @@
+<div style="width:100%;">
+
+<div style="background: black;color: #fff;">
+<div style="height:30px;background: gainsboro">
+
+	<button id="get-loc" type="button" style="height: 100%;width:150px;">Get My Location</button>
+</div>
+<div id="loc-message" style="padding: 10px;font-size: 20px;text-align: center;">
+	
+</div>
+</div>
+
+<div id="gmap" style="width:100%;height:300px;">Hello</div>
+</div>
+
+    <div class="pac-card" id="pac-card">
+      <div>
+        <div id="title">
+          Autocomplete search
+        </div>
+      </div>
+      <div id="pac-container">
+        <input id="pac-input" type="text"
+            placeholder="Enter a location">
+      </div>
+    </div>
+    <div id="map"></div>
+    <div id="infowindow-content">
+      <img src="" width="16" height="16" id="place-icon">
+      <span id="place-name"  class="title"></span><br>
+      <span id="place-address"></span>
+    </div>
+
+
+
+<textarea style='' id="{{ id }}" class="vWKTField required" cols="150" rows="10" name="{{ name }}">{% if wkt %}SRID=4326;{{wkt}}{% else %}{{wkt}}{% endif %}</textarea>

@@ -12,7 +12,11 @@ class Image(models.Model):
         abstract = True
 
 class QCModel(models.Model):
-    data_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=[(1,"In Progress"), (2,"Submitted For QC Check"), (3,"QC approved")])
+    IN_PROGRESS = 1
+    SUBMITTED_FOR_QC = 2
+    QC_APPROVED = 3
+    DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"),(SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved")]
+    data_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=DATA_STATUS_CHOICES)
 
     class Meta:
         abstract = True

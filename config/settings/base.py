@@ -62,7 +62,6 @@ DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 # Application definition
 
 DJANGO_APPS = (
-    #'grappelli',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -76,13 +75,16 @@ DJANGO_APPS = (
 THIRD_PARTY_APPS = (
 
     'rest_framework',
-    'rest_framework.authtoken'
+    'rest_framework.authtoken',
+    'crispy_forms'
 )
 
 LOCAL_APPS = (
     'ondoc.crm',
     'ondoc.authentication',
-    'ondoc.doctor'
+    'ondoc.doctor',
+    'ondoc.diagnostic',
+    'ondoc.onboard'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -202,3 +204,10 @@ MAP_WIDGETS = {
     ),
     "GOOGLE_MAP_API_KEY": "AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA"
 }
+CRISPY_TEMPLATE_PACK = 'bootstrap3'
+SMS_AUTH_KEY = env('SMS_AUTH_KEY')
+EMAIL_HOST = 'smtpbp.falconide.com'
+EMAIL_PORT = 25
+EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
+#EMAIL_USE_TLS = True

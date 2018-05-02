@@ -1,0 +1,9 @@
+{% extends "admin/change_form.html" %}
+
+{% load crm_tags %}
+
+{% block submit_buttons_bottom %}
+{{ block.super }}
+
+{% show_actions original %}
+{% endblock %}

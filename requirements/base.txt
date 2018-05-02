@@ -5,3 +5,5 @@ djangorestframework
 gunicorn
 Pillow
 django-reversion
+django-crispy-forms
+requests

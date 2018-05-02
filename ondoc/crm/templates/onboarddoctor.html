@@ -1,0 +1,69 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+
+<h3>
+Send onboarding request to <strong>{{ doctor.name }}</strong>
+</h3>
+<hr>
+
+
+<div>{{ count }} onboarding requests already sent</div>
+
+{% if errors %}
+{% for err in errors %}
+
+<h4 style='color:#d9534f;'>{{ err }}</h4>
+{% endfor %}
+{% else %}
+<button class="generate" style='margin: 20px 0;'>Send onboarding Email</button>
+<p id="new_url">
+    
+</p>
+{% endif %}
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+<script type="text/javascript" src="//cdn.jsdelivr.net/jquery.cookie/1.4.1/jquery.cookie.min.js">
+</script>
+
+<script type="text/javascript">
+
+    var csrftoken = $.cookie('csrftoken');
+    function csrfSafeMethod(method) {
+      // these HTTP methods do not require CSRF protection
+      return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+    }
+    $.ajaxSetup({
+      beforeSend: function(xhr, settings) {
+      if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+        xhr.setRequestHeader("X-CSRFToken", csrftoken);
+      }
+      }
+    });
+
+    $(document).ready(function(){
+        $('.generate').click(function(){
+            $.ajax(
+            {
+                "type":"POST",
+                "dataType": "json",
+                "url": "{% url 'onboard:generate-doctor-url' %}",
+                "data":{
+                    "doctor_id": {{ doctor.id }}
+                },
+                success: function( data ) 
+                {
+                    // console.log(data.url);
+                    $("#new_url").html("Successfully sent the Onboarding Link via email");
+                    $('.generate').css('display','none');
+                },
+                error: function(data)
+                {
+                    $("#new_url").html("Something went wrong! Please try again.");
+                }
+            });     
+    });
+});
+</script>
+
+{% endblock %}

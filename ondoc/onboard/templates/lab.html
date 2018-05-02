@@ -1,0 +1,589 @@
+{%extends 'base.html'%}
+{% load crispy_forms_tags %}
+{% load staticfiles %}
+{% load crm_tags %}
+
+{% block header %}
+<div class='' style='background: #00acc1;height: 50px;color:#fff;font-size: 18px;padding:13px 0;'>
+    <div class="container">
+    <div class='row'>    
+    <div class='col-md-3 col-xs-6 col-sm-6'>Panacea Techno</div>
+    <div class='col-md-6 col-xs-6 col-sm-6' style='text-align: center;'>WELCOME {{ lab_form.name.value|default_if_none:"" }}</div>
+    </div>    
+    </div>                
+</div>    
+{% endblock %}
+
+{% block content %}
+
+    <link rel="stylesheet" href="{% static 'css/basic.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dropzone.css' %}">
+    <link rel="stylesheet" href="{% static 'css/lab.css' %}">
+
+{% if error_message %}
+    <div class="alert alert-danger" style="margin-top: 20px;">
+      <strong>{{ error_message }}</strong>
+    </div>
+{% endif %}
+
+{% if message %}
+    <div class="alert alert-success" style="margin-top: 20px;">
+      <strong>{{ message }}</strong>
+    </div>
+{% endif %}
+
+
+<div style='padding:40px 0 0 0'>
+	<form class="form-horizontal" method="POST" action="">
+
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <img class='heading-icon' src ="{% static 'images/1.png' %}" >
+        <span>BASIC DETAILS</span></div>
+      <div class="panel-body">
+            {% crispy lab_form %}           
+
+      </div>
+    </div>
+
+    <div class="panel panel-default">
+      <div class="panel-heading">SERVICES</div>
+      <div class="panel-body">
+
+        <div class='row'>
+        <div class='col-md-5'>    
+        <div class='clearfix'>   
+         {% for id, name in LabService.SERVICE_CHOICES %}
+
+
+ 
+        <div {% if forloop.last %} class='col-md-3 col-md-offset-3 col-sm-6 col-xs-6' {% else %} class='col-md-6 col-sm-6 col-xs-6' {% endif %}>
+            <div class="form-group"> 
+                <div class="controls "> 
+                    <div class="checkbox"> 
+                        <label for="id_labservice_{{forloop.counter}}" style="color: black;font-size: 14px;"> 
+                        <input {% if lab_service_dict|get_item:id %} checked="checked" {% endif %} type="checkbox" name="labservice_{{forloop.counter}}" class="checkboxinput" field-class="col-md-6" id="id_labservice_{{forloop.counter}}" label-class="hidden">
+                        {{name}}
+                        </label> 
+                    </div> 
+                </div> 
+            </div>
+        </div>  
+         {% endfor%}
+        </div>
+        <div>
+        <p style='font-size: 12px;color:#00AAC5;margin:30px 0;'>Doctors For Radiology</p>
+        <div class='clearfix' style='font-size: 14px;'>
+            <div class='col-md-6 col-sm-6 col-xs-6'></div>
+            <div class='col-md-5 col-md-offset-1 col-sm-6 col-xs-6'>
+                <div class='col-md-6 col-sm-6 col-xs-6'>Male</div>
+                <div class='col-md-6 col-sm-6 col-xs-6'>Female</div>
+            </div>
+        </div>
+
+         {{ lab_doctor_availability_formset.management_form|crispy }}
+         {% for form in lab_doctor_availability_formset %}
+         <div class="form-horizontal">
+              {{ form.id }}
+              {% crispy form %}
+         </div>
+         {% endfor %}
+
+       </div>
+        </div>
+        <div class='col-md-6 col-md-offset-1 dummy-panel'>
+            <div class='col-md-6'>
+                <p style='font-size: 12px;margin-top: 9;color:#00AAC5;'>Doctor's MCI Registration Number</p>
+            </div>
+            <div class='col-md-6'>
+            
+             {{ lab_doctor_formset.management_form|crispy }}
+             {% for form in lab_doctor_formset %}
+             <div class='dummy-panel-body'>
+             <div class="form-horizontal">
+                  {{ form.id }}
+                  {% crispy form %}
+             </div>
+             </div>
+             {% endfor %}
+             <div style='font-size: 16px;'>
+             <div class='add-new-form' data-key='labdoctor' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+             <span>Add Another</span>
+             </div>
+
+             <div class="empty_form" style="display:none">
+                <div class="form-horizontal">                
+                    {% crispy lab_doctor_formset.empty_form %}
+                </div>            
+             </div>
+
+            </div>
+            </div>
+
+        </div>
+
+        </div>
+
+
+
+
+      </div>
+    </div>
+
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <img class='heading-icon' src ="{% static 'images/3.png' %}" >
+        <span>ADDRESS</span>
+      </div>
+      
+
+      <div class="panel-body">
+      <div class="row">
+      <div class='col-md-6 address'>{{address}}</div>
+      <div class='col-md-6' >
+          <div id="gmap" style="width:100%;height:160px;"></div>
+      </div>
+      </div>
+      <div style='padding:40px 0;'></div>
+            {% crispy lab_address_form %}
+      </div>
+    </div>
+
+
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <img class='heading-icon' src ="{% static 'images/4.png' %}">
+        <span>LAB CERTIFICATIONS</span></div>
+      <div class="panel-body">
+        {{ certificates_formset.management_form|crispy }}
+         {% for form in certificates_formset %}
+         <div class="form-horizontal">
+              {{ form.id }}
+              {% crispy form %}
+         </div>
+         {% endfor %}
+      </div>
+      <div class='panel-footer'>
+        <div class='add-new-form' data-key='labcertification' style='display: inline-block;'>
+            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span>Add Another Lab Certification</span>
+        </div>
+
+        <div class="empty_form" style="display:none">
+            <div class="form-horizontal">                
+                {% crispy certificates_formset.empty_form %}
+            </div>            
+        </div>
+
+      </div>
+    </div>
+
+
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <img class='heading-icon' src ="{% static 'images/5.png' %}">
+        <span>LAB AWARDS</span></div>
+      <div class="panel-body">
+        {{ award_formset.management_form|crispy }}
+         {% for form in award_formset %}
+         <div class="form-horizontal">
+              {{ form.id }}
+              {% crispy form %}
+         </div>
+         {% endfor %}
+      </div>
+      <div class='panel-footer'>
+
+        <div class='add-new-form' data-key='labaward' style='display: inline-block;'>
+            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span>Add Another Award</span>
+        </div>
+
+        <div class="empty_form" style="display:none">
+            <div class="form-horizontal">
+                {% crispy award_formset.empty_form %}
+            </div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <img class='heading-icon' src ="{% static 'images/6.png' %}">
+        <span>LAB ACCREDITATIONS</span></div>
+      <div class="panel-body">
+        {{ accreditation_formset.management_form|crispy }}
+         {% for form in accreditation_formset %}
+         <div class="">
+              {{ form.id }}
+              {% crispy form %}
+         </div>
+         {% endfor %}
+      </div>
+
+      <div class='panel-footer'>
+        <div class='add-new-form' data-key='labaccreditation' style='display: inline-block;'>
+            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span>Add Another Lab Accreditation</span>
+        </div>
+        <div class="empty_form" style="display:none">
+            <div class="form-horizontal">
+                {% crispy accreditation_formset.empty_form %}
+            </div>
+        </div>        
+      </div>
+
+    </div>
+
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <img class='heading-icon' src ="{% static 'images/7.png' %}">
+        <span>LAB CONTACT DETAILS</span></div>
+
+     <div class="panel-body" style='padding-right: 20px;'>
+        <!-- Adding formsets for awards -->
+        {{ lab_manager_formset.management_form }}
+        {% for form in lab_manager_formset %}        
+        <div class="" style='margin-bottom: 30px;'>
+              {{ form.id }}
+              {% crispy form %}
+        </div>
+        {% endfor %}
+     </div>
+
+     <div class='panel-footer'>
+       <div class='add-new-form' data-key='labmanager' style='display: inline-block;'>
+            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span>Add Another Lab Contact</span>
+        </div>
+        <div class="empty_form" style="display:none">
+            <div class="form-horizontal">
+                {% crispy lab_manager_formset.empty_form %}
+            </div>
+        </div>        
+     </div>
+
+    </div>
+
+
+
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <img class='heading-icon' src ="{% static 'images/8.png' %}">
+        <span>LAB Timings</span></div>
+      <div class="panel-body">
+
+        <div class='col-md-12'>
+        {% crispy lab_open_form %}
+        </div>
+        <!-- Adding formsets for awards -->
+        {{ lab_timing_formset.management_form }}
+        {% for form in lab_timing_formset %}        
+        <div style='margin-left: 40px'>
+              {{ form.id }}
+              {% crispy form %}
+        </div>
+        {% endfor %}
+      </div>
+     <div class='panel-footer'>
+       <div class='add-new-form' data-key='labtiming' style='display: inline-block;'>
+            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+            <span>Add Another Lab Timings</span>
+        </div>
+        <div class="empty_form" style="display:none">
+            <div class="form-horizontal">
+                {% crispy lab_timing_formset.empty_form %}
+            </div>
+        </div>        
+    </div>
+
+    </div>
+
+	</form>
+
+
+      <div class="panel panel-default">
+      <div class="panel-heading">AGREED RATE LIST</div>
+      <div class="panel-body">
+        {% if lab.agreed_rate_list %}
+        <a style="color: #00AAC5;text-decoration: none;" href='{{ lab.agreed_rate_list.url }}' download>View agreed rates</a>
+        {% endif %}
+      </div>  
+      </div>
+      
+
+      <div class="panel panel-default">
+      <div class="panel-heading">
+        <img class='heading-icon' src ="{% static 'images/10.png' %}">
+        <span>LAB IMAGE</span></div>
+      <div class="panel-body">
+      <div class='upload-container' data-media='image' data-type='' data-url='/onboard/upload' data-max='5'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+
+        {% for img in lab_images %}
+            <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
+            <img width="120" height="120" src='{{img.name.url}}'>
+                <div style='text-align: center;'>
+                 <a data-image-id='{{img.id}}' data-media-type='image' class="remove-image" href="javascript:undefined;">X</a>
+                 
+                </div> 
+
+            </div>            
+        {% endfor %}
+
+        {% if lab_images.count < 5 %}
+        <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
+        </div>
+        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload'>
+            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+            <div style="padding-top: 10px;">Upload image</div>
+        </div>
+        {% endif %}
+        </div>
+
+
+      </div>    
+
+    </div>
+
+    <div class="panel panel-default">
+      <div class="panel-heading">DOCUMENTS</div>
+      <div class="panel-body lab-documents">
+        {% for id,data in lab_doc_dict.items %}
+
+        {% with results=data.2 %}
+
+        {% if id == LabDocument.ADDRESS %}
+            <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/upload' data-max='3'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+        {% elif id == LabDocument.GST %}        
+           <div class='upload-container not-required' data-media='document' data-type='{{id}}' data-url='/onboard/upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+
+        {% else %}
+            <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+        {% endif %}
+
+        {% if results %}
+        <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}
+        <span class='image-required-message'> (Required)</span>
+        </div>
+            {% for instance in results %}
+
+            <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
+
+                <img width="120" height="120" src='{{instance.name.url}}'>
+                <div style='text-align: center;'>
+                    <a data-image-id='{{instance.id}}' data-media-type='document' class="remove-image" href="javascript:undefined;">X</a>
+              
+                </div> 
+
+            </div>
+            {% endfor %}
+        {% if results.count < 1 or results.count < 3 and id == LabDocument.ADDRESS %}    
+        <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
+        </div>
+        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload'>
+            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+            <div style="padding-top: 10px;">Upload image</div>
+        </div>
+        {% endif %}    
+        <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
+        </div>
+        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload hidden'>
+            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+            <div style="padding-top: 10px;">Upload image</div>
+        </div>
+
+        {% else %}
+
+        <div>
+        <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}
+        <span class='image-required-message'> (Required)</span>
+        </div>
+
+        <div class="image-upload dropzone dz-clickable" style='border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;'>
+        </div>
+        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload'>
+            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+            <div style="padding-top: 10px;">Upload image</div>
+        </div>
+
+        </div>
+        {% endif %}
+        </div>
+        {% endwith %}        
+
+        {% endfor %}
+
+
+      </div>    
+
+
+<div class="form-group terms-div">
+  <label style='font-size: 16px;color:black;' class='checkbox-inline' for="terms-checkbox"><input id='terms-checkbox' class='terms' type='checkbox'>I hereby agree to the <a target='_blank' href='/onboard/terms'>terms and conditions</a> governing the  empanelment with the company.</label>
+  <div class='terms-error' style='padding:0 20px;color:#a94442;display: none;'>Cannot submit without agreeing to Terms</div>
+</div>  
+
+
+<button class='btn pull-right submit-form' style='background-color:#00acc1;min-width: 180px;height: 40px;color: white;'>Submit</button>
+<button class='btn pull-right save-draft' style='margin-right:20px;background-color:#979797;min-width: 180px;height: 40px;color: white;'>Save Draft</button>
+
+<div style='padding-top:100px'></div>
+    </div>
+
+
+</div>
+
+
+{% endblock %}
+
+{% block domready %}
+
+var errNode = $('.has-error:first')
+
+if(errNode.length>0)
+{
+    $('html, body').animate({
+        scrollTop: errNode.offset().top
+    }, 1000);
+}
+
+
+function removeImage(image_id, media_type)
+{
+    console.log('image deleted');
+    $.ajax({
+        url: '/onboard/upload?image_id='+image_id+'&media_type='+media_type,
+        type: 'DELETE',
+        success: function(result) { }
+    });
+
+}
+
+$('.remove-image').on('click',function(){
+   var r = confirm("This file would be permanently deleted. Are you sure.");
+   if(r==true)
+   {
+       var data = $(this).data();
+       removeImage(data.imageId,data.mediaType);
+       $(this).closest('.upload-container').find('.trigger-upload').removeClass('hidden');
+       $(this).closest('.existing-image').remove();
+   }
+});
+
+$(document).on("keypress", ":input:not(textarea)", function(event) {
+    return event.keyCode != 13;
+});
+
+$('.add-new-form').click(function() {
+    var data = $(this).data();
+    var form_idx = $('#id_'+data.key+'-TOTAL_FORMS').val();
+    $(this).closest('.panel,.dummy-panel').find('.panel-body,.dummy-panel-body').append($(this).next('.empty_form').html().replace(/__prefix__/g, form_idx));
+    $('#id_'+data.key+'-TOTAL_FORMS').val(parseInt(form_idx) + 1);
+});
+
+
+$('.submit-form').on('click',function(e){
+    e.preventDefault();
+    if($('.terms:checked').length==0)
+    {
+        $('.terms-div').addClass('error');
+        return
+    }
+
+    var errors = false;
+    $('.lab-documents .upload-container').not('.not-required').each(function(){
+        var length = $(this).find('.existing-image').length+$(this).find('.dz-image-preview').length
+
+        if(length==0)
+        {
+            $(this).addClass('image-error');
+            errors = true;
+        }
+        else
+            $(this).removeClass('image-error');
+
+    })
+    if(errors)
+        return;
+
+    $(':disabled').removeAttr('disabled')
+    var input = $("<input name='_action'>").attr("type", "hidden").val("_submit");
+    $('form').append($(input));
+
+    $('form').submit();
+});
+
+$('.save-draft').on('click',function(e){
+    e.preventDefault();
+
+    $(':disabled').removeAttr('disabled')        
+    var input = $("<input name='_action'>").attr("type", "hidden").val("_savedraft");
+    $('form').append($(input));
+
+    $('form').submit()
+})
+
+
+
+$('.trigger-upload').on('click',function(e){
+    $(this).closest('.upload-container').find('.dropzone').trigger('click')
+
+})
+
+$('.image-upload').each(function(x){
+
+    var data = $(this).closest('.upload-container').data()
+    $(this).dropzone({
+
+    init: function()
+    {
+        this.on("success", function(file, response) {
+
+           file.previewElement.image_id = response.image_id;
+           file.previewElement.media_type = response.media_type;
+           var existing  =  $(this.element).closest('.upload-container').find('.existing-image').length;
+
+           if((this.files.length+existing) >= this.options.maxFiles)
+           {
+                $(this.element).closest('.upload-container').find('.trigger-upload').addClass('hidden');
+                $(this.element).closest('.upload-container').removeClass('image-error')
+           }
+        });
+
+        this.on("error", function(file) {
+             this.removeFile(file);
+        });
+
+        this.on("removedfile", function(file) { 
+            var image_id = file.previewElement.image_id;
+            var media_type = file.previewElement.media_type;
+            removeImage(image_id, media_type);
+            $(this.previewsContainer).closest('.upload-container').find('.trigger-upload').removeClass('hidden')
+            
+        });
+
+    },
+    paramName: 'name',
+    url: data.url,
+    dictDefaultMessage : '',
+    maxFiles:data.max,
+    uploadMultiple:false,
+    maxFilesize:data.max,
+    //removedfile : onImageDelete,
+    //addRemoveLinks : true,
+    //dictRemoveFile : 'Remove Image',
+    dictRemoveFileConfirmation : 'This file would be permanently deleted. Are you sure.',
+    previewTemplate : '<div class="dz-preview dz-file-preview"><div class="dz-image"><img data-dz-thumbnail></div><div class="dz-details"><div class="dz-filename"><span data-dz-name></span></div><div class="dz-size" data-dz-size></div></div><div class="dz-progress"><span class="dz-upload" data-dz-uploadprogress></span></div><div class="dz-success-mark"><span>✔</span></div><div class="dz-error-mark"><span>✘</span></div><div class="dz-error-message"><span data-dz-errormessage></span></div><a class="dz-remove" href="javascript:undefined;" data-dz-remove="">X</a></div>',
+
+
+    params: {'csrfmiddlewaretoken': $.cookie('csrftoken'),'document_type':data.type, 'media':data.media}
+})
+
+});
+
+
+
+{% endblock %}
+
