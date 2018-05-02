@@ -12,7 +12,7 @@ from random import randint
 from .service import sendOTP, verifyOTP
 
 @api_view(['POST', ])
-# @verifyOTP
+@verifyOTP
 def register_user(request, format='json'):
 
     userData = request.data
@@ -89,7 +89,7 @@ def login_user(request):
 
 
 @api_view(['POST', ])
-# @verifyOTP
+@verifyOTP
 def login_doctor(request):
 
     phone_number = request.data['phone_number']
