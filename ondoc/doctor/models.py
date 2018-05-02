@@ -4,8 +4,9 @@ from django.contrib.postgres.operations import CreateExtension
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
+from django.utils.safestring import mark_safe
 
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
 
 
 class Migration(migrations.Migration):
@@ -161,6 +162,7 @@ class Doctor(TimeStampedModel, CreatedByModel, QCModel):
     additional_details = models.CharField(max_length=2000, blank=True)
     # email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name= 'Email Verified', default=False)
+    user = models.ForeignKey(User, related_name="doctor_profile", on_delete=models.CASCADE, default=None, blank=True, null=True)
     hospitals = models.ManyToManyField(
         Hospital,
         through='DoctorHospital',
@@ -195,8 +197,18 @@ class Qualification(TimeStampedModel, UniqueNameModel):
         db_table = "qualification"
 
 
+class Symptoms(TimeStampedModel, CreatedByModel, UniqueNameModel):
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "symptoms"
+
+
 class DoctorQualification(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="qualificationSpecialization", on_delete=models.CASCADE)
     qualification = models.ForeignKey(Qualification, on_delete=models.CASCADE)
     specialization = models.ForeignKey(Specialization, on_delete=models.CASCADE, blank=True, null=True)
     college = models.ForeignKey(College, on_delete=models.CASCADE, blank=True, null=True);
@@ -213,7 +225,7 @@ class DoctorQualification(TimeStampedModel):
 
 
 class DoctorHospital(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="availability", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
 
@@ -233,12 +245,16 @@ class DoctorHospital(TimeStampedModel):
 
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
 
+    def __str__(self):
+        return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
+
     class Meta:
         db_table = "doctor_hospital"
+        unique_together = (("start", "end", "day", "hospital", "doctor"))
 
 
 class DoctorImage(TimeStampedModel, Image):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="profile_img", on_delete=models.CASCADE)
     name = models.ImageField(upload_to='doctor/images',height_field='height', width_field='width')
 
     class Meta:
@@ -288,7 +304,7 @@ class Language(TimeStampedModel, UniqueNameModel):
 
 
 class DoctorLanguage(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="languages", on_delete=models.CASCADE)
     language = models.ForeignKey(Language, on_delete=models.CASCADE)
 
     def __str__(self):
@@ -321,7 +337,7 @@ class DoctorAssociation(TimeStampedModel):
 
 
 class DoctorExperience(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="pastExperience", on_delete=models.CASCADE)
     hospital = models.CharField(max_length=200)
     start_year = models.PositiveSmallIntegerField(default=None, blank=True, null=True,validators=[MinValueValidator(1950)])
     end_year = models.PositiveSmallIntegerField(default=None, blank=True, null=True,validators=[MinValueValidator(1950)])
@@ -475,3 +491,25 @@ class DoctorOnboardingToken(TimeStampedModel):
 
 #     class Meta:
 #         db_table = "hospital_network_mapping"
+
+
+class OpdAppointment(TimeStampedModel):
+    CREATED = 1
+    ACCEPTED = 2
+    RESCHEDULED = 3
+    REJECTED = 4
+    
+    doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
+    fees = models.PositiveSmallIntegerField()
+    status = models.PositiveSmallIntegerField(default=CREATED)
+    time_slot_start = models.DateTimeField(blank=True, null=True)
+    time_slot_end = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return self.profile.name + " (" + self.doctor.name + ")"
+
+    class Meta:
+        db_table = "opd_appointment"
+

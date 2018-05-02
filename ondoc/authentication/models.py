@@ -1,12 +1,12 @@
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
-
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 class Image(models.Model):
-    name = models.ImageField(height_field='height', width_field='width')
-    width = models.PositiveSmallIntegerField(editable=False)
-    height = models.PositiveSmallIntegerField(editable=False)
+    # name = models.ImageField(height_field='height', width_field='width')
+    width = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
+    height = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
 
     class Meta:
         abstract = True
@@ -72,6 +72,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(verbose_name= 'Staff Status', default=False, help_text= 'Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return self.phone_number
 
     class Meta:
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
@@ -110,3 +112,34 @@ class CreatedByModel(models.Model):
 
     class Meta:
         abstract = True
+
+class UserProfile(TimeStampedModel, Image):
+    
+    user = models.ForeignKey(User, related_name="profiles", on_delete=models.CASCADE)
+    name = models.CharField(max_length=100, blank=False, default=None)
+    email = models.CharField(max_length=20, blank=False, default=None)
+    gender = models.CharField(max_length=2, default=None, blank=True, choices=[("","Select"), ("m","Male"), ("f","Female"), ("o","Other")])
+    phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    is_otp_verified = models.BooleanField(default=False)
+    is_default_user = models.BooleanField(default=False)
+    dob = models.DateField(blank=True, null=True)
+    
+    profile_image = models.ImageField(upload_to='users/images' ,height_field='height', width_field='width',blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "user_profile"
+
+class OtpVerifications(TimeStampedModel):
+    phone_number = models.CharField(max_length=10)
+    code = models.CharField(max_length=10)
+    country_code = models.CharField(max_length=10)
+    isExpired = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.phone_number
+
+    class Meta:
+        db_table = "otp_verification"

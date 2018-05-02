@@ -24,7 +24,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('',include('ondoc.crm.urls', namespace='crm')),
     path('onboard/',include('ondoc.onboard.urls', namespace='onboard')),
-
+    path('doctors/', include('ondoc.doctor.urls')),
+    path('auth/', include('ondoc.authentication.urls'))
     # path('api/crm/', include('ondoc.crm.urls')),
     # path('api/auth/', include('ondoc.authentication.urls')),
 

@@ -7,3 +7,4 @@ Pillow
 django-reversion
 django-crispy-forms
 requests
+django-cors-headers
