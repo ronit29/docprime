@@ -215,7 +215,7 @@ class DoctorQualification(TimeStampedModel):
 class DoctorHospital(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(1, "Monday"), (2, "Tuesday"), (3, "Wednesday"), (4, "Thursday"), (5, "Friday"), (6, "Saturday"), (7, "Sunday")])
+    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
 
     start = models.PositiveSmallIntegerField(
         blank=False, null=False, choices=[(6, "6 AM"), (7, "7 AM"),

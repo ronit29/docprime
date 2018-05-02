@@ -100,7 +100,7 @@ class LabImage(TimeStampedModel, Image):
 class LabTiming(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
 
-    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(1, "Monday"), (2, "Tuesday"), (3, "Wednesday"), (4, "Thursday"), (5, "Friday"), (6, "Saturday"), (7, "Sunday")])
+    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
     start = models.PositiveSmallIntegerField(
         blank=False, null=False, choices=[(6, "6 AM"), (7, "7 AM"),
         (8, "8 AM"), (9, "9 AM"), (10, "10 AM"), (11, "11 AM"),
