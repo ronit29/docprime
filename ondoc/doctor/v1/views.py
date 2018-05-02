@@ -1,4 +1,5 @@
 from rest_framework import status
+from django.db.models import Q
 from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment, Hospital, UserProfile
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
                         DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer, OpdAppointmentSerializer, HospitalSerializer
@@ -172,10 +173,27 @@ class DoctorAppointments(APIView):
         # TODO : Authenticate this request so only the assigned doctor or the patient
         #        is able to change the status of the appointment id.
         request_data = request.data
-        
+
+        request_data['doctor'] = Doctor.objects.get(id=request.data['doctor_id'])
+        request_data['hospital'] = Hospital.objects.get(id=request.data['hospital_id'])
+        request_data['profile'] = UserProfile.objects.get(id=request.data['profile_id'])
         request_data['time_slot_start'] = datetime.utcfromtimestamp(request_data['time_slot_start'] / 1000)
         request_data['time_slot_end'] = datetime.utcfromtimestamp(request_data['time_slot_end'] / 1000)
+        time_slot_start = request_data['time_slot_start']
+        time_slot_end = request_data['time_slot_end']
+        day = time_slot_start.weekday() + 1
+        start_hour = time_slot_start.hour
+        end_hour = time_slot_end.hour
 
+        doctorHospitals = DoctorHospital.objects.filter(Q(doctor=request_data['doctor']) &
+                                                        Q(hospital=request_data['hospital'])
+                                                        & Q(day= day)& Q(start__lte=start_hour)&Q(end__gte=end_hour))
+
+        serialized_schedule = DoctorHospitalSerializer(doctorHospitals, many=True)
+        if not serialized_schedule.data[0]:
+            return Response("Doctor Hospital not found", status=status.HTTP_404_NOT_FOUND)
+        fees = serialized_schedule.data[0]['fees']
+        request_data['fees']=fees
         opd_appointment_serializer = OpdAppointmentSerializer(data=request_data,context=request_data)
         if opd_appointment_serializer.is_valid(raise_exception=True):
             opd_appointment = opd_appointment_serializer.save()
@@ -206,6 +224,7 @@ class DoctorHospitalAvailability(APIView):
         hospital = Hospital.objects.get(id=request_data['hospital_id'])
 
         doctor_hospital_serializer = DoctorHospitalSerializer(data=request_data,context={'doctor':doctor, 'hospital':hospital})
+
         if doctor_hospital_serializer.is_valid(raise_exception=True):
 
             doctor_hospital_serializer.save()
