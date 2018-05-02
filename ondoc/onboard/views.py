@@ -131,8 +131,8 @@ def generate_doctor(request):
     doctor = Doctor.objects.get(pk=doctor_id)
 
     DoctorOnboardingToken.objects.filter(doctor_id=doctor_id, status=DoctorOnboardingToken.GENERATED).update(status=DoctorOnboardingToken.REJECTED)
-    p_email = doctor.doctoremail_set.filter(is_primary=True)[0]
-    p_mobile = doctor.doctormobile_set.filter(is_primary=True)[0]
+    p_email = doctor.emails.filter(is_primary=True)[0]
+    p_mobile = doctor.mobiles.filter(is_primary=True)[0]
     token = DoctorOnboardingToken(status=1,email=p_email.email,mobile=p_mobile.number,doctor_id=doctor_id, token=randint(1000000000, 9000000000))
     token.save()
     url = host + '/onboard/doctor?token='+str(token.token)

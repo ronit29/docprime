@@ -208,7 +208,7 @@ class Symptoms(TimeStampedModel, CreatedByModel, UniqueNameModel):
 
 
 class DoctorQualification(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, related_name="qualificationSpecialization", on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="qualifications", on_delete=models.CASCADE)
     qualification = models.ForeignKey(Qualification, on_delete=models.CASCADE)
     specialization = models.ForeignKey(Specialization, on_delete=models.CASCADE, blank=True, null=True)
     college = models.ForeignKey(College, on_delete=models.CASCADE, blank=True, null=True);
@@ -254,7 +254,7 @@ class DoctorHospital(TimeStampedModel):
 
 
 class DoctorImage(TimeStampedModel, Image):
-    doctor = models.ForeignKey(Doctor, related_name="profile_img", on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
     name = models.ImageField(upload_to='doctor/images',height_field='height', width_field='width')
 
     class Meta:
@@ -337,7 +337,7 @@ class DoctorAssociation(TimeStampedModel):
 
 
 class DoctorExperience(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, related_name="pastExperience", on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="experiences", on_delete=models.CASCADE)
     hospital = models.CharField(max_length=200)
     start_year = models.PositiveSmallIntegerField(default=None, blank=True, null=True,validators=[MinValueValidator(1950)])
     end_year = models.PositiveSmallIntegerField(default=None, blank=True, null=True,validators=[MinValueValidator(1950)])
@@ -355,7 +355,7 @@ class DoctorMedicalService(TimeStampedModel):
         unique_together = (("doctor", "service"))
 
 class DoctorMobile(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="mobiles", on_delete=models.CASCADE)
     country_code = models.PositiveSmallIntegerField(default=91, blank=True, null=True)
     number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     is_primary = models.BooleanField(verbose_name= 'Primary Number?', default=False)
@@ -366,7 +366,7 @@ class DoctorMobile(TimeStampedModel):
         unique_together = (("doctor", "number"))
 
 class DoctorEmail(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="emails", on_delete=models.CASCADE)
     email = models.EmailField(max_length=100, blank=True)
     is_primary = models.BooleanField(verbose_name= 'Primary Email?', default=False)
     is_email_verified = models.BooleanField(verbose_name= 'Phone Number Verified?', default=False)
@@ -497,8 +497,7 @@ class OpdAppointment(TimeStampedModel):
     CREATED = 1
     ACCEPTED = 2
     RESCHEDULED = 3
-    REJECTED = 4
-    
+    REJECTED = 4    
     doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)

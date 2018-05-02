@@ -21,7 +21,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
     LabNetworkHelpline, LabNetworkManager, PathologyTest,
     RadiologyTest, PathologyTestType, RadiologyTestType, LabService,
-    LabDoctorAvailability,LabDoctor)
+    LabDoctorAvailability,LabDoctor,LabDocument)
 
 
 
@@ -79,7 +79,7 @@ class Command(BaseCommand):
         LabManager,LabAccreditation, LabAward, LabCertification,
         LabNetwork,LabNetworkCertification, LabNetworkAward,
         LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
-        LabNetworkManager,LabService, LabDoctorAvailability, LabDoctor)
+        LabNetworkManager,LabService, LabDoctorAvailability, LabDoctor, LabDocument)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -153,7 +153,7 @@ class Command(BaseCommand):
         LabManager,LabAccreditation, LabAward, LabCertification,
         LabNetwork,LabNetworkCertification, LabNetworkAward,
         LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
-        LabNetworkManager,LabService,LabDoctorAvailability,LabDoctor)
+        LabNetworkManager,LabService,LabDoctorAvailability,LabDoctor, LabDocument)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

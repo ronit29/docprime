@@ -277,10 +277,12 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
             if not getattr(doctor, req):
                 errors.append(req+' is required')
 
-        length_required = ['doctormobile','doctoremail','doctorqualification','doctorhospital',
-            'doctorlanguage','doctorexperience','doctorimage']
+        
+        length_required = ['mobiles','emails','qualifications','hospitals',
+             'languages','experiences','images']
+
         for req in length_required:
-            if not len(getattr(doctor, req+'_set').all()):
+            if not len(getattr(doctor, req).all()):
                 errors.append(req + ' is required')
 
         return render(request, 'onboarddoctor.html', {'doctor': doctor, 'count': count, 'errors': errors})

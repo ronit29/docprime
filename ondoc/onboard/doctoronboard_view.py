@@ -207,7 +207,7 @@ def otp(request):
         if action:
             otp = randint(200000, 900000)
             message = 'You have initiated onboarding process for '+existing.doctor.name+'. OTP is '+str(otp)
-            api.send_sms(message, '91'+str(existing.doctor.doctormobile_set.filter(is_primary=True)[0].number))
+            api.send_sms(message, '91'+str(existing.doctor.mobiles.filter(is_primary=True)[0].number))
 
             # print(otp)
             request.session['otp'] = otp
@@ -231,11 +231,11 @@ def otp(request):
         request.session['otp_mismatch'] = False
         existingOTP = request.session.get('otp',None)
 
-        label = 'Verify your Registered Mobile Number '+str(existing.doctor.doctormobile_set.filter(is_primary=True)[0].number)
+        label = 'Verify your Registered Mobile Number '+str(existing.doctor.mobiles.filter(is_primary=True)[0].number)
         page = 'otp_request'
 
         if existingOTP:
             page = 'otp_verify'
-            label = '6 Digit verification code has been send to your mobile number '+str(existing.doctor.doctormobile_set.filter(is_primary=True)[0].number)
+            label = '6 Digit verification code has been send to your mobile number '+str(existing.doctor.mobiles.filter(is_primary=True)[0].number)
 
     return render(request,'otp.html',{'label':label, 'page':page, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})
