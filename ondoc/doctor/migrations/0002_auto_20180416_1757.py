@@ -47,9 +47,10 @@ class Migration(migrations.Migration):
             name='doctor',
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='qualificationSpecialization', to='doctor.Doctor'),
         ),
-        migrations.AlterField(
-            model_name='hospital',
-            name='years_operational',
-            field=models.PositiveSmallIntegerField(blank=True, null=True, validators=[django.core.validators.MaxValueValidator(200), django.core.validators.MinValueValidator(1)]),
-        ),
+        
+        # migrations.AlterField(
+        #     model_name='hospital',
+        #     name='years_operational',
+        #     field=models.PositiveSmallIntegerField(blank=True, null=True, validators=[django.core.validators.MaxValueValidator(200), django.core.validators.MinValueValidator(1)]),
+        # ),
     ]
