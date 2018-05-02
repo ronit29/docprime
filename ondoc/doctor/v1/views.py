@@ -233,4 +233,20 @@ class DoctorHospitalAvailability(APIView):
         else:
             return Response(doctor_hospital_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def put(self, request, version="v1", format='json'):
+
+        request_data = request.data
+
+        availability = DoctorHospital.objects.get(id=request_data['id'])
+
+        availability.start = request_data.get('start', availability.start)
+        availability.end = request_data.get('end', availability.end)
+        availability.day = request_data.get('day', availability.day)
+        availability.fees = request_data.get('fees', availability.fees)
+
+        availability.save()
+
+        return Response("Sucessfuly Modified", status=200)
+            
+
 
