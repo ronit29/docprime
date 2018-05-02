@@ -4,7 +4,8 @@ from collections import OrderedDict
 
 from .forms import  DoctorHospitalFormSet, DoctorLanguageFormSet, DoctorAwardFormSet, \
                      DoctorAssociationFormSet, DoctorExperienceFormSet, DoctorForm, \
-                     DoctorMobileFormSet, DoctorQualificationFormSet, DoctorServiceFormSet
+                     DoctorMobileFormSet, DoctorQualificationFormSet, DoctorServiceFormSet, \
+                     DoctorEmailFormSet, BaseDoctorMobileFormSet, BaseDoctorEmailFormSet
 
 
 # import models here
@@ -55,11 +56,17 @@ class DoctorOnboard(View):
             else:
                 doc_dict[id] = (id, value, None)
 
+        message = request.session.get('message','')
+        request.session['message'] = ''
+
 
         # Gather all forms
         doctor_form = DoctorForm(instance = existing.doctor, prefix = "doctor")
 
         # GAther the formsets
+        #email_formset = DoctorEmailFormSet(instance = existing.doctor, formset = BaseDoctorEmailFormSet, prefix = 'doctoremail')
+        email_formset = DoctorEmailFormSet(instance = existing.doctor, prefix = 'doctoremail')
+        #mobile_formset = DoctorMobileFormSet(instance = existing.doctor, formset = BaseDoctorMobileFormSet, prefix = 'doctormobile')
         mobile_formset = DoctorMobileFormSet(instance = existing.doctor, prefix = 'doctormobile')
         qualification_formset = DoctorQualificationFormSet(instance = existing.doctor, prefix = 'doctorqualification')
         hospital_formset = DoctorHospitalFormSet(instance = existing.doctor, prefix = 'doctorhospital')
@@ -70,7 +77,9 @@ class DoctorOnboard(View):
         medicalservice_formset = DoctorServiceFormSet(instance = existing.doctor, prefix = 'doctormedicalservice')
         # image_formset = DoctorImageFormSet(instance = existing.doctor, prefix = 'doctorimage')
 
+
         return render(request, 'doctor.html', {'doctor_form': doctor_form,
+            'email_formset': email_formset,
             'mobile_formset': mobile_formset,
             'qualification_formset': qualification_formset,
             'hospital_formset': hospital_formset,
@@ -78,11 +87,11 @@ class DoctorOnboard(View):
             'award_formset': award_formset,
             'association_formset': association_formset,
             'experience_formset': experience_formset,
-            'medicalservice_formset': medicalservice_formset,
-            
+            'medicalservice_formset': medicalservice_formset,            
             'doc_images' : doc_images,
             'doc_dict' : doc_dict,
-            'DoctorDocument' : DoctorDocument})
+            'DoctorDocument' : DoctorDocument,
+            'message' : message})
 
     def post(self, request):
         token = request.GET.get('token')
@@ -96,6 +105,8 @@ class DoctorOnboard(View):
         doctor_form = DoctorForm(request.POST, instance = instance, prefix = "doctor")
 
         mobile_formset = DoctorMobileFormSet(data=request.POST, instance = doctor_obj, prefix = "doctormobile")
+        email_formset = DoctorEmailFormSet(data=request.POST, instance = doctor_obj, prefix = "doctoremail")
+
         qualification_formset = DoctorQualificationFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorqualification')
 
         hospital_formset = DoctorHospitalFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorhospital')
@@ -105,7 +116,7 @@ class DoctorOnboard(View):
         experience_formset = DoctorExperienceFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorexperience')
         #medicalservice_formset = DoctorServiceFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctormedicalservice')
 
-        if not all([doctor_form.is_valid(), mobile_formset.is_valid(), qualification_formset.is_valid(),
+        if not all([doctor_form.is_valid(), mobile_formset.is_valid(), email_formset.is_valid(), qualification_formset.is_valid(),
             hospital_formset.is_valid(), language_formset.is_valid(), award_formset.is_valid(),
             association_formset.is_valid(), experience_formset.is_valid()]):
 
@@ -121,6 +132,7 @@ class DoctorOnboard(View):
 
             return render(request, 'doctor.html', {'doctor_form': doctor_form,
                 'mobile_formset': mobile_formset,
+                'email_formset': email_formset,
                 'qualification_formset': qualification_formset,
                 'hospital_formset': hospital_formset,
                 'language_formset': language_formset,
@@ -138,6 +150,7 @@ class DoctorOnboard(View):
         doc_obj = doctor_form.save()
 
         mobile_formset.save()
+        email_formset.save()
         qualification_formset.save()
         hospital_formset.save()
         language_formset.save()
@@ -194,7 +207,7 @@ def otp(request):
         if action:
             otp = randint(200000, 900000)
             message = 'You have initiated onboarding process for '+existing.doctor.name+'. OTP is '+str(otp)
-            api.send_sms(message, '91'+str(existing.doctor.primary_mobile))
+            api.send_sms(message, '91'+str(existing.doctor.doctormobile_set.filter(is_primary=True)[0].number))
 
             # print(otp)
             request.session['otp'] = otp
@@ -218,11 +231,11 @@ def otp(request):
         request.session['otp_mismatch'] = False
         existingOTP = request.session.get('otp',None)
 
-        label = 'Verify your Registered Mobile Number '+str(existing.doctor.primary_mobile)
+        label = 'Verify your Registered Mobile Number '+str(existing.doctor.doctormobile_set.filter(is_primary=True)[0].number)
         page = 'otp_request'
 
         if existingOTP:
             page = 'otp_verify'
-            label = '6 Digit verification code has been send to your mobile number '+str(existing.doctor.primary_mobile)
+            label = '6 Digit verification code has been send to your mobile number '+str(existing.doctor.doctormobile_set.filter(is_primary=True)[0].number)
 
     return render(request,'otp.html',{'label':label, 'page':page, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})

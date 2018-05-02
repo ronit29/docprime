@@ -131,8 +131,9 @@ def generate_doctor(request):
     doctor = Doctor.objects.get(pk=doctor_id)
 
     DoctorOnboardingToken.objects.filter(doctor_id=doctor_id, status=DoctorOnboardingToken.GENERATED).update(status=DoctorOnboardingToken.REJECTED)
-
-    token = DoctorOnboardingToken(status=1,email=doctor.email,mobile=doctor.primary_mobile,doctor_id=doctor_id, token=randint(1000000000, 9000000000))
+    p_email = doctor.doctoremail_set.filter(is_primary=True)[0]
+    p_mobile = doctor.doctormobile_set.filter(is_primary=True)[0]
+    token = DoctorOnboardingToken(status=1,email=p_email.email,mobile=p_mobile.number,doctor_id=doctor_id, token=randint(1000000000, 9000000000))
     token.save()
     url = host + '/onboard/doctor?token='+str(token.token)
 
@@ -143,7 +144,7 @@ def generate_doctor(request):
                 '\n\nFor any queries you can connect with our representative over the phone which is already associated with you.'
                 )
 
-    email_api.send_email(doctor.email, 'Onboarding link for '+doctor.name, message)
+    email_api.send_email(p_email.email, 'Onboarding link for '+doctor.name, message)
     doctor.onboarding_status = doctor.REQUEST_SENT
     doctor.save()
 

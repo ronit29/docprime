@@ -1,5 +1,14 @@
-/*django.jQuery('body').on('click','.dynamic-doctormobile_set field-is_primary input[type="checkbox"]',function(){
+var $ = django.jQuery;
 
-    console.log('clicked');
+$( document ).ready(function(){
 
-});*/
+$('body').on('change','#doctormobile_set-group .field-is_primary input', function() {
+    $(this).closest('#doctormobile_set-group').find('.field-is_primary input').not(this).prop('checked',false) 
+ });
+
+$('body').on('change','#doctoremail_set-group .field-is_primary input', function() {
+    $(this).closest('#doctoremail_set-group').find('.field-is_primary input').not(this).prop('checked',false) 
+ });
+
+
+});

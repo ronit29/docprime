@@ -71,6 +71,34 @@
         </div>
 
         <div class="panel panel-default">
+            <div class="panel-heading">EMAILS</div>
+            <div class="panel-body cnums">
+            <div style='font-size:12px;color:#00acc1;margin-bottom: 10px;'>Primary Email</div>    
+             {{ email_formset.management_form|crispy }}
+             {% for form in email_formset %}
+             <div class="form-horizontal">
+                  {{ form.id }}
+                  {% crispy form %}
+             </div>           
+             {% endfor %}
+            </div>
+            <div class='panel-footer'>
+            <div class='add-new-form' data-key='doctoremail' style='display: inline-block;'>
+                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                <span>Add Another Email</span>
+            </div>
+
+            <div class="empty_form" style="display:none">
+                <div class="form-horizontal">                
+                    {% crispy email_formset.empty_form %}
+                </div>            
+            </div>
+            <div style='color:#00acc1;font-size: 12px;margin-top: 10px;'>Primary email will be used as a unique  identifier in our systems and will be used for all related services on our platform.</div>
+            </div>
+        </div>
+
+
+        <div class="panel panel-default">
             <div class="panel-heading">
             <img class='heading-icon' src ="{% static 'images/11.png' %}" >    
             <span>QUALIFICATION</span>
@@ -386,9 +414,7 @@
 
 
 $('body').on('click','.number-check input', function() {
-    $(this).closest('.panel-body').find('.number-check input').not(this).prop('checked',false)
-
-    
+    $(this).closest('.panel-body').find('.number-check input').not(this).prop('checked',false)    
 });
 
 

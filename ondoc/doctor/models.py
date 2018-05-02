@@ -155,11 +155,11 @@ class Doctor(TimeStampedModel, CreatedByModel, QCModel):
     gender = models.CharField(max_length=2, default=None, blank=True, choices=[("","Select"), ("m","Male"), ("f","Female"), ("o","Other")])
     practicing_since = models.PositiveSmallIntegerField(blank=True, null=True,validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
-    primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    # primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     license = models.CharField(max_length=200, blank=True)
     onboarding_status = models.PositiveSmallIntegerField(default=NOT_ONBOARDED, choices=ONBOARDING_STATUS)
     additional_details = models.CharField(max_length=2000, blank=True)
-    email = models.EmailField(max_length=100, blank=True)
+    # email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name= 'Email Verified', default=False)
     hospitals = models.ManyToManyField(
         Hospital,

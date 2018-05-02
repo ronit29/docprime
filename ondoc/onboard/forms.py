@@ -3,7 +3,7 @@ from crispy_forms.layout import Submit, Layout, Div, Fieldset, Field
 from ondoc.diagnostic.models import Lab, LabCertification, LabAward, LabAccreditation, LabManager, LabTiming, LabService, LabDoctorAvailability, LabDoctor, LabImage, LabDocument
 from ondoc.doctor.models import (Doctor, DoctorMobile, DoctorQualification, DoctorHospital,
                                 DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
-                                DoctorMedicalService, DoctorImage, DoctorDocument)
+                                DoctorMedicalService, DoctorImage, DoctorDocument, DoctorEmail)
 
 from ondoc.crm.admin.common import award_year_choices, hospital_operational_since_choices, practicing_since_choices, college_passing_year_choices
 from django import forms
@@ -344,7 +344,7 @@ class DoctorForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['gender'].required = True
         self.fields['license'].required = True
-        self.fields['email'].required = True
+        # self.fields['email'].required = True
         self.fields['license'].label ='MCI Number'
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
@@ -365,16 +365,12 @@ class DoctorForm(forms.ModelForm):
                 Div(CustomField('practicing_since', field_class='col-md-6',label_class='col-md-4'), css_class='col-md-6'),
                 css_class = 'row'
             ),
-            Div(
-                Div(CustomField('email', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-6'),
-                # Div(CustomField('additional_details', field_class='col-md-6',label_class='col-md-4'), css_class='col-md-6'),
-                css_class = 'row'
-            )
+            
         )
 
     class Meta:
         model = Doctor
-        fields = ('name', 'about', 'gender', 'practicing_since', 'license', 'email')
+        fields = ('name', 'about', 'gender', 'practicing_since', 'license')
 
 
 class DoctorMobileForm(forms.ModelForm):
@@ -396,6 +392,26 @@ class DoctorMobileForm(forms.ModelForm):
     class Meta:
         model = DoctorMobile
         fields = ('is_primary', 'number', )
+
+class DoctorEmailForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.fields['is_primary'].label = ''
+        self.helper.form_class = 'form-horizontal'
+        self.helper.layout = Layout(
+            Div(
+                Div(CustomField('is_primary', field_class='col-md-12',label_class='hidden'), css_class='col-md-1 col-xs-2 number-check'),
+                Div(CustomField('email', field_class='col-md-8',label_class='hidden'), css_class='col-md-6 col-xs-8'), 
+                Div(CustomField('DELETE'), css_class='col-md-1 col-xs-2'), css_class='clearfix'
+            ))
+
+    class Meta:
+        model = DoctorEmail
+        fields = ('is_primary', 'email', )
 
 
 class DoctorQualificationForm(forms.ModelForm):
@@ -544,8 +560,52 @@ class DoctorDocumentForm(forms.ModelForm):
         model = DoctorDocument
         exclude = ['doctor',]
 
+class BaseDoctorMobileFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        primary = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('is_primary'):
+                primary += 1
 
-DoctorMobileFormSet = inlineformset_factory(Doctor, DoctorMobile, form = DoctorMobileForm,extra = 0, can_delete=True, exclude=('doctor', ))
+        if count>0:
+            if primary==0:
+                self.forms[0].add_error('number', 'One primary number is required')
+                #self.add_error('is_primary', "One primary number is required")
+                #raise forms.ValidationError("One primary number is required")
+            if primary>=2:
+                self.forms[0].add_error('number', "Only one mobile number can be primary")
+                # self.add_error('is_primary', "Only one mobile number can be primary")
+                #raise forms.ValidationError("Only one mobile number can be primary")
+
+
+class BaseDoctorEmailFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        primary = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('is_primary'):
+                primary += 1
+
+        if count>0:
+            if primary==0:
+                self.forms[0].add_error('email', 'One email is required')
+                #self.add_error('is_primary', "One primary number is required")
+                #raise forms.ValidationError("One primary number is required")
+            if primary>=2:
+                self.forms[0].add_error('email', "Only one email can be primary")
+                # self.add_error('is_primary', "Only one mobile number can be primary")
+                #raise forms.ValidationError("Only one mobile number can be primary")
+
+
+
+
+DoctorEmailFormSet = inlineformset_factory(Doctor, DoctorEmail,formset=BaseDoctorEmailFormSet, form = DoctorEmailForm,extra = 0, min_num=1, can_delete=True, exclude=('doctor', ))
+DoctorMobileFormSet = inlineformset_factory(Doctor, DoctorMobile,formset = BaseDoctorMobileFormSet, form = DoctorMobileForm,extra = 0,min_num=1, can_delete=True, exclude=('doctor', ))
 DoctorQualificationFormSet = inlineformset_factory(Doctor, DoctorQualification, form = DoctorQualificationForm,extra = 0, can_delete=True, exclude=('doctor', ))
 DoctorHospitalFormSet = inlineformset_factory(Doctor, DoctorHospital, form = DoctorHospitalForm,extra = 0, can_delete=True, exclude=('doctor', ))
 DoctorLanguageFormSet = inlineformset_factory(Doctor, DoctorLanguage, form = DoctorLanguageForm,extra = 0, can_delete=True, exclude=('doctor', ))

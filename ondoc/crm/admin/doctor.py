@@ -72,8 +72,8 @@ class DoctorAssociationInline(admin.TabularInline):
     show_change_link = False
 
 class DoctorExperienceForm(forms.ModelForm):
-    start_year = forms.IntegerField(min_value=1950,max_value=datetime.datetime.now().year)
-    end_year = forms.IntegerField(min_value=1950,max_value=datetime.datetime.now().year)
+    start_year = forms.ChoiceField(required=False, choices=practicing_since_choices)
+    end_year = forms.ChoiceField(required=False, choices=practicing_since_choices)
 
 class DoctorExperienceInline(admin.TabularInline):
     model = DoctorExperience
@@ -112,37 +112,68 @@ class DoctorMobileForm(forms.ModelForm):
     # def clean(self):
     #    pass
 
+class DoctorMobileFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        primary = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('is_primary'):
+                primary += 1
+                
+        if count>0:
+            if primary==0: 
+               raise forms.ValidationError("One primary number is required")
+            if primary>=2:
+               raise forms.ValidationError("Only one mobile number can be primary")
+
+
 class DoctorMobileInline(admin.TabularInline):
     model = DoctorMobile
     form = DoctorMobileForm
-
+    formset = DoctorMobileFormSet
     extra = 0
     can_delete = True
     show_change_link = False
-    fields = ['number']
+    fields = ['number','is_primary']
+
 
 class DoctorEmailForm(forms.ModelForm):
-    pass
-    #def is_valid(self):
-    #    pass
-    # def clean(self):
-    #    pass
+    email = forms.CharField(required=True)
+    is_primary = forms.BooleanField(required=False)
+
+class DoctorEmailFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        primary = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('is_primary'):
+                primary += 1
+
+        if count>0:
+            if primary==0: 
+               raise forms.ValidationError("One primary email is required")
+            if primary>=2:
+               raise forms.ValidationError("Only one email can be primary")
 
 class DoctorEmailInline(admin.TabularInline):
     model = DoctorEmail
     form = DoctorEmailForm
-
+    formset = DoctorEmailFormSet
     extra = 0
     can_delete = True
     show_change_link = False
-    fields = ['email']
+    fields = ['email','is_primary']
 
 
 class DoctorForm(forms.ModelForm):
     additional_details = forms.CharField(widget=forms.Textarea, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
-    primary_mobile = forms.CharField(required=True)
-    email = forms.EmailField(required=True)
+    # primary_mobile = forms.CharField(required=True)
+    # email = forms.EmailField(required=True)
     practicing_since = forms.ChoiceField(required=False, choices=practicing_since_choices)
     onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Doctor.ONBOARDING_STATUS)
     def validate_qc(self):
@@ -241,13 +272,13 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
 
         # check for errors
         errors = []
-        required = ['name','about','gender','license','practicing_since','primary_mobile','email']
+        required = ['name','about','gender','license','practicing_since']
         for req in required:
             if not getattr(doctor, req):
                 errors.append(req+' is required')
 
-        length_required = ['doctormobile','doctorqualification','doctorhospital',
-            'doctorlanguage','doctorexperience','doctormedicalservice','doctorimage']
+        length_required = ['doctormobile','doctoremail','doctorqualification','doctorhospital',
+            'doctorlanguage','doctorexperience','doctorimage']
         for req in length_required:
             if not len(getattr(doctor, req+'_set').all()):
                 errors.append(req + ' is required')
