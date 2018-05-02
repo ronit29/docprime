@@ -7,6 +7,7 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.pagination import PageNumberPagination
 
 from django.db.models import Prefetch
@@ -185,6 +186,9 @@ class DoctorAppointments(APIView):
 
 class DoctorHospitalAvailability(APIView):
 
+    # authentication_classes = (TokenAuthentication, )
+    # permission_classes = (IsAuthenticated,)
+
     def get(self, request, version="v1", format=None):
 
         doctor_id = request.GET.get("doctor_id", 2)
@@ -197,7 +201,11 @@ class DoctorHospitalAvailability(APIView):
     def post(self, request, version="v1", format='json'):
 
         request_data = request.data
-        doctor_hospital_serializer = DoctorHospitalSerializer(data=request_data,context=request_data)
+
+        doctor = Doctor.objects.get(id=request_data['doctor_id'])
+        hospital = Hospital.objects.get(id=request_data['hospital_id'])
+
+        doctor_hospital_serializer = DoctorHospitalSerializer(data=request_data,context={'doctor':doctor, 'hospital':hospital})
         if doctor_hospital_serializer.is_valid(raise_exception=True):
 
             doctor_hospital_serializer.save()

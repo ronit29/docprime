@@ -36,11 +36,9 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return DoctorHospital.objects.create(**validated_data)
 
     def validate(self, data):
-        doctor = Doctor.objects.get(id=self.context['doctor_id'])
-        hospital = Hospital.objects.get(id=self.context['hospital_id'])
-
-        data['doctor'] = doctor
-        data['hospital'] = hospital
+        
+        data['doctor'] = self.context['doctor']
+        data['hospital'] = self.context['hospital']
         
         return data
 
