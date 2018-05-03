@@ -150,7 +150,7 @@ class SymptomsSerializer(serializers.ModelSerializer):
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
     
-    profile_img = DoctorImageSerializer(read_only=True, many = True)
+    images = DoctorImageSerializer(read_only=True, many = True)
     qualifications = DoctorQualificationSerializer(read_only=True, many = True)
     languages = DoctorLanguageSerializer(read_only=True, many = True)
     availability = DoctorHospitalSerializer(read_only=True, many = True)
@@ -161,9 +161,18 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     associations = DoctorAssociationSerializer(read_only=True, many = True)
     awards = DoctorAwardSerializer(read_only=True, many = True)
 
+    def to_representation(self, doctor):
+        parent_rep = super().to_representation(doctor)        
+        try:
+            parent_rep['images'] = parent_rep['images'][0]
+        except KeyError as e:
+            return parent_rep
+            
+        return parent_rep
+
     class Meta:
         model = Doctor
-        fields = ( 'id', 'name', 'gender', 'about', 'license', 'additional_details', 'emails', 'practicing_since', 'profile_img', 'languages', 'qualifications', 'availability', 'mobiles', 'medical_services', 'experiences', 'associations', 'awards', 'appointments')
+        fields = ( 'id', 'name', 'gender', 'about', 'license', 'additional_details', 'emails', 'practicing_since', 'images', 'languages', 'qualifications', 'availability', 'mobiles', 'medical_services', 'experiences', 'associations', 'awards', 'appointments')
 
 
 class OpdAppointmentSerializer(serializers.ModelSerializer):
