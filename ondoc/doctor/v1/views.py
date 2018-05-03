@@ -171,30 +171,40 @@ class DoctorAppointments(APIView):
     def post(self, request, version="v1", format='json'):
 
         # TODO : Authenticate this request so only the assigned doctor or the patient
-        #        is able to change the status of the appointment id.
-        request_data = request.data
+        #        is able to change the status of the appointment id
+        try:
+            request_data = request.data
+            request_data['doctor'] = Doctor.objects.get(id=request.data['doctor_id'])
+            request_data['hospital'] = Hospital.objects.get(id=request.data['hospital_id'])
+            request_data['profile'] = UserProfile.objects.get(id=request.data['profile_id'])
+            request_data['time_slot_start'] = datetime.utcfromtimestamp(request_data['time_slot_start'] / 1000)
+            request_data['time_slot_end'] = datetime.utcfromtimestamp(request_data['time_slot_end'] / 1000)
+            time_slot_start = request_data['time_slot_start']
+            time_slot_end = request_data['time_slot_end']
+            day = time_slot_start.weekday()
+            start_hour = time_slot_start.hour
+            end_hour = time_slot_end.hour
 
-        request_data['doctor'] = Doctor.objects.get(id=request.data['doctor_id'])
-        request_data['hospital'] = Hospital.objects.get(id=request.data['hospital_id'])
-        request_data['profile'] = UserProfile.objects.get(id=request.data['profile_id'])
-        request_data['time_slot_start'] = datetime.utcfromtimestamp(request_data['time_slot_start'] / 1000)
-        request_data['time_slot_end'] = datetime.utcfromtimestamp(request_data['time_slot_end'] / 1000)
-        time_slot_start = request_data['time_slot_start']
-        time_slot_end = request_data['time_slot_end']
-        day = time_slot_start.weekday() + 1
-        start_hour = time_slot_start.hour
-        end_hour = time_slot_end.hour
+            doctorHospitals = DoctorHospital.objects.filter(Q(doctor=request_data['doctor']) &
+                                                            Q(hospital=request_data['hospital'])
+                                                            & Q(day= day)& Q(start__lte=start_hour)&Q(end__gte=end_hour))
 
-        doctorHospitals = DoctorHospital.objects.filter(Q(doctor=request_data['doctor']) &
-                                                        Q(hospital=request_data['hospital'])
-                                                        & Q(day= day)& Q(start__lte=start_hour)&Q(end__gte=end_hour))
+            serialized_schedule = DoctorHospitalSerializer(doctorHospitals, many=True)
+            if not serialized_schedule.data[0]:
+                return Response("Doctor Hospital not found", status=status.HTTP_404_NOT_FOUND)
+            fees = serialized_schedule.data[0]['fees']
+            request_data['fees']=fees
+            opd_appointment_serializer = OpdAppointmentSerializer(data=request_data,context=request_data)
 
-        serialized_schedule = DoctorHospitalSerializer(doctorHospitals, many=True)
-        if not serialized_schedule.data[0]:
-            return Response("Doctor Hospital not found", status=status.HTTP_404_NOT_FOUND)
-        fees = serialized_schedule.data[0]['fees']
-        request_data['fees']=fees
-        opd_appointment_serializer = OpdAppointmentSerializer(data=request_data,context=request_data)
+        except Doctor.DoesNotExist:
+            return Response('No Doctor found with the ID provided',status=404)
+        except Hospital.DoesNotExist:
+            return Response('No Hospital found with the ID provided', status=404)
+        except UserProfile.DoesNotExist:
+            return Response('No UserProfile found with the ID provided', status=404)
+        except DoctorHospital.DoesNotExist:
+            return Response('No DoctorHospital found with the ID provided', status=404)
+
         if opd_appointment_serializer.is_valid(raise_exception=True):
             opd_appointment = opd_appointment_serializer.save()
             return Response("Sucessfuly Created", status=200)
