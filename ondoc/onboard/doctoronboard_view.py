@@ -116,6 +116,26 @@ class DoctorOnboard(View):
         experience_formset = DoctorExperienceFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorexperience')
         #medicalservice_formset = DoctorServiceFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctormedicalservice')
 
+        validate_req = [mobile_formset, email_formset, qualification_formset, hospital_formset, language_formset, experience_formset]
+        min_num = 0
+        validate_min = False
+
+        if request.POST.get('_action',None) == '_submit':
+            min_num = 1
+            validate_min = True
+            if 'awards_not_applicable' not in request.POST:
+                validate_req.append(award_formset)
+            if 'assoc_not_applicable' not in request.POST:
+                validate_req.append(association_formset)
+
+                # validate_req.append(association_formset)
+
+
+
+        for x in validate_req:
+            x.min_num = min_num
+            x.validate_min = validate_min
+
         if not all([doctor_form.is_valid(), mobile_formset.is_valid(), email_formset.is_valid(), qualification_formset.is_valid(),
             hospital_formset.is_valid(), language_formset.is_valid(), award_formset.is_valid(),
             association_formset.is_valid(), experience_formset.is_valid()]):

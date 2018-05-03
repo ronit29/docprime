@@ -46,6 +46,10 @@
         <div class="panel panel-default">
             <div class="panel-heading">CONTACT NUMBERS</div>
             <div class="panel-body cnums">
+             {% for x in mobile_formset.non_form_errors %}   
+             <div class='formset-error'>Atleast one Mobile Number is required</div>
+             {% endfor %}
+   
             <div style='font-size:12px;color:#00acc1;margin-bottom: 10px;'>Primary Number</div>    
              {{ mobile_formset.management_form|crispy }}
              {% for form in mobile_formset %}
@@ -56,16 +60,7 @@
              {% endfor %}
             </div>
             <div class='panel-footer'>
-            <div class='add-new-form' data-key='doctormobile' style='display: inline-block;'>
-                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-                <span>Add Another Number</span>
-            </div>
 
-            <div class="empty_form" style="display:none">
-                <div class="form-horizontal">                
-                    {% crispy mobile_formset.empty_form %}
-                </div>            
-            </div>
             <div style='color:#00acc1;font-size: 12px;margin-top: 10px;'>Primary number will be used as a unique  identifier in our systems and will be used for all related services on our platform.</div>
             </div>
         </div>
@@ -73,6 +68,10 @@
         <div class="panel panel-default">
             <div class="panel-heading">EMAILS</div>
             <div class="panel-body cnums">
+             {% for x in email_formset.non_form_errors %}   
+             <div class='formset-error'>Atleast one Email is required</div>
+             {% endfor %}
+
             <div style='font-size:12px;color:#00acc1;margin-bottom: 10px;'>Primary Email</div>    
              {{ email_formset.management_form|crispy }}
              {% for form in email_formset %}
@@ -83,17 +82,7 @@
              {% endfor %}
             </div>
             <div class='panel-footer'>
-            <div class='add-new-form' data-key='doctoremail' style='display: inline-block;'>
-                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-                <span>Add Another Email</span>
-            </div>
 
-            <div class="empty_form" style="display:none">
-                <div class="form-horizontal">                
-                    {% crispy email_formset.empty_form %}
-                </div>            
-            </div>
-            <div style='color:#00acc1;font-size: 12px;margin-top: 10px;'>Primary email will be used as a unique  identifier in our systems and will be used for all related services on our platform.</div>
             </div>
         </div>
 
@@ -104,6 +93,9 @@
             <span>QUALIFICATION</span>
             </div>
             <div class="panel-body">
+             {% for x in qualification_formset.non_form_errors %}   
+             <div class='formset-error'>Atleast one Qualification entry is required</div>
+             {% endfor %}
              {{ qualification_formset.management_form|crispy }}
              {% for form in qualification_formset %}
              <div class="form-horizontal">
@@ -136,6 +128,10 @@
             <span>ASSOCIATED CLINIC/HOSPITAL</span>
             </div>
             <div class="panel-body">
+             {% for x in hospital_formset.non_form_errors %}   
+             <div class='formset-error'>Atleast one Hospital Entry is required</div>
+             {% endfor %}
+
              {{ hospital_formset.management_form|crispy }}
              {% for form in hospital_formset %}
              <div class="form-horizontal" style='margin-bottom: 30px;'>
@@ -146,17 +142,6 @@
           </div>
 
             <div class='panel-footer'>
-            <div class='add-new-form' data-key='doctorhospital' style='display: inline-block;'>
-                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-                <span>Add Another Clinic/Hospital</span>
-            </div>
-
-            <div class="empty_form" style="display:none">
-                <div class="form-horizontal" style='margin-bottom: 30px;'>                
-                    {% crispy hospital_formset.empty_form %}
-                </div>            
-            </div>
-
             </div>
 
 
@@ -168,6 +153,10 @@
               <span>LANGUAGE</span>
             </div>
             <div class="panel-body">
+                 {% for x in language_formset.non_form_errors %}   
+                 <div class='formset-error'>Atleast one Language entry is required</div>
+                 {% endfor %}
+
                {{ language_formset.management_form|crispy }}
                {% for form in language_formset %}
                 <div class="form-horizontal col-md-6">
@@ -196,8 +185,16 @@
                 <img class='heading-icon' src ="{% static 'images/14.png' %}">
                 <span>AWARDS</span>
             </div>
-            <div class="panel-body">            
+            <div class="panel-body">
+               {% if award_formset.non_form_errors %}
+                 <div style='margin-bottom:5px;' class='formset-error'>Awards are required</div>
+               {% endif %}
+
                {{ award_formset.management_form|crispy }}
+               <div class="checkbox" style="margin:-10px 0 10px 0;">
+                  <label style="color:#000;"><input name="awards_not_applicable" type="checkbox" value="">Check if Not Applicable</label>
+               </div>
+
                {% for form in award_formset %}
                 <div class="form-horizontal">
                       {{ form.id }}
@@ -224,7 +221,15 @@
             <div class="panel-heading">ASSOCIATION/MEMBERSHIP</div>
             <div class="panel-body">
 
+               {% if association_formset.non_form_errors %}
+                 <div style='margin-bottom:5px;' class='formset-error'>ASSOCIATION/MEMBERSHIP is required</div>
+               {% endif %}
+
                {{ association_formset.management_form|crispy }}
+               <div class="checkbox" style="margin:-10px 0 10px 0;">
+                  <label style="color:#000;"><input name="assoc_not_applicable" type="checkbox" value="">Check if Not Applicable</label>
+               </div>
+
                {% for form in association_formset %}
                 <div class="form-horizontal">
                       {{ form.id }}
@@ -250,6 +255,9 @@
         <div class="panel panel-default">
             <div class="panel-heading">EXPERIENCE</div>
             <div class="panel-body">
+             {% for x in experience_formset.non_form_errors %}   
+             <div class='formset-error'>Atleast one Experience entry is required</div>
+             {% endfor %}
 
                {{ experience_formset.management_form|crispy }}
                {% for form in experience_formset %}
@@ -280,8 +288,11 @@
         <img class='heading-icon' src ="{% static 'images/10.png' %}">
         <span>IMAGES</span></div>
       <div class="panel-body">
-      <div class='upload-container' data-media='image' data-type='' data-url='/onboard/doctor-upload' data-max='5'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
 
+      <div class='upload-container' data-media='image' data-type='' data-url='/onboard/doctor-upload' data-max='5'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+        <div>
+        <span class='image-required-message'> (Required)</span>
+        </div>
         {% for img in doc_images %}
             <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
             <img width="120" height="120" src='{{img.name.url}}'>
@@ -418,7 +429,7 @@ $('body').on('click','.number-check input', function() {
 });
 
 
-var errNode = $('.has-error:first')
+var errNode = $('.has-error,.formset-error:first')
 
 if(errNode.length>0)
 {
@@ -471,7 +482,7 @@ $('.submit-form').on('click',function(e){
     }
 
     var errors = false;
-    $('.lab-documents .upload-container').not('.not-required').each(function(){
+    $('.upload-container').not('.not-required').each(function(){
         var length = $(this).find('.existing-image').length+$(this).find('.dz-image-preview').length
 
         if(length==0)
@@ -484,7 +495,12 @@ $('.submit-form').on('click',function(e){
 
     })
     if(errors)
+    {
+        $('html, body').animate({
+        scrollTop: $('.image-error:first').offset().top
+        }, 500);
         return;
+    }
 
     $(':disabled').removeAttr('disabled')
     var input = $("<input name='_action'>").attr("type", "hidden").val("_submit");
@@ -502,7 +518,6 @@ $('.save-draft').on('click',function(e){
 
     $('form').submit()
 })
-
 
 
 $('.trigger-upload').on('click',function(e){
