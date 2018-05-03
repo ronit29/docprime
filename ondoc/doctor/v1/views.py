@@ -1,6 +1,6 @@
 from rest_framework import status
 from django.db.models import Q
-from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment, Hospital, UserProfile
+from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment, Hospital, UserProfile, OpdAppointment
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
                         DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer, OpdAppointmentSerializer, HospitalSerializer
 from .services import ReformScheduleService
@@ -113,18 +113,26 @@ class DoctorProfile(APIView):
     Return Detailed doctor profile
     """
 
+    authentication_classes = (TokenAuthentication, )
+    permission_classes = (IsAuthenticated,)
+
     def get(self, request, version="v1", format=None):
-        
-        doctor_id = 2
 
         try:
-            doctor_profile = Doctor.objects.filter(id=doctor_id).prefetch_related(Prefetch('availability', queryset=DoctorHospital.objects.distinct('hospital_id').order_by('hospital_id','fees')))
+            doctor_profile = Doctor.objects.filter(user=request.user).prefetch_related(Prefetch('availability', queryset=DoctorHospital.objects.distinct('hospital_id').order_by('hospital_id','fees')))
+
+            # count all upcoming/accepted appointments
+            doctor_appointments = OpdAppointment.objects.filter(doctor=doctor_profile[0],status=2).count()
+            
         except Doctor.DoesNotExist as e:
-            raise Exception('No doctor with specified id found')
+            raise Exception('No doctor linked with the logged in User')
 
         serialized_doctor = DoctorProfileSerializer(doctor_profile[0])
-
-        return Response(serialized_doctor.data)
+        
+        return Response({
+            "profile" : serialized_doctor.data,
+            "doctor_appointments" : doctor_appointments
+        })
 
 
 class DoctorAppointments(APIView):

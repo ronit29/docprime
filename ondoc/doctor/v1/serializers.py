@@ -8,7 +8,7 @@ from datetime import datetime
 
 from ondoc.doctor.models import (
         Doctor, Specialization, MedicalService, DoctorImage, Symptoms,
-        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile, Hospital
+        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile, Hospital, DoctorEmail, DoctorMobile, DoctorMedicalService, DoctorAssociation, DoctorAward
     ) 
 
 
@@ -16,7 +16,35 @@ class DoctorExperienceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorExperience
-        fields = ('doctor', 'hospital', 'start_year', 'end_year', )
+        fields = ('hospital', 'start_year', 'end_year', )
+
+
+class DoctorEmailSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DoctorEmail
+        fields = ('email', 'is_primary')
+
+
+class DoctorAssociationSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DoctorAssociation
+        fields = ('name', 'id')
+
+
+class DoctorMobileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DoctorMobile
+        fields = ('number', 'is_primary')
+
+
+class DoctorAwardSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DoctorAward
+        fields = ('name', 'year')
 
 
 class DoctorLanguageSerializer(serializers.ModelSerializer):
@@ -52,10 +80,11 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 class DoctorQualificationSerializer(serializers.ModelSerializer):
     qualification = serializers.ReadOnlyField(source='qualification.name')
     specialization = serializers.ReadOnlyField(source='specialization.name')
+    college = serializers.ReadOnlyField(source='college.name')
 
     class Meta:
         model = DoctorQualification
-        fields = ('qualification', 'specialization', )
+        fields = ('passing_year' , 'qualification', 'specialization', 'college')
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
@@ -104,9 +133,12 @@ class SpecializationSerializer(serializers.ModelSerializer):
 
 class MedicalServiceSerializer(serializers.ModelSerializer):
 
+    name = serializers.ReadOnlyField(source='service.name')
+    description = serializers.ReadOnlyField(source='service.name')
+
     class Meta:
-        model = MedicalService
-        fields = ('id', 'name', )
+        model = DoctorMedicalService
+        fields = ('id', 'name', 'description')
 
 
 class SymptomsSerializer(serializers.ModelSerializer):
@@ -119,13 +151,19 @@ class SymptomsSerializer(serializers.ModelSerializer):
 class DoctorProfileSerializer(serializers.ModelSerializer):
     
     profile_img = DoctorImageSerializer(read_only=True, many = True)
-    qualificationSpecialization = DoctorQualificationSerializer(read_only=True, many = True)
+    qualifications = DoctorQualificationSerializer(read_only=True, many = True)
     languages = DoctorLanguageSerializer(read_only=True, many = True)
     availability = DoctorHospitalSerializer(read_only=True, many = True)
+    emails = DoctorEmailSerializer(read_only=True, many = True)
+    mobiles = DoctorMobileSerializer(read_only=True, many = True)
+    medical_services = MedicalServiceSerializer(read_only=True, many = True)
+    experiences = DoctorExperienceSerializer(read_only=True, many = True)
+    associations = DoctorAssociationSerializer(read_only=True, many = True)
+    awards = DoctorAwardSerializer(read_only=True, many = True)
 
     class Meta:
         model = Doctor
-        fields = ( 'id', 'name', 'gender', 'phone_number', 'email', 'practice_duration', 'profile_img', 'languages', 'qualificationSpecialization', 'availability')
+        fields = ( 'id', 'name', 'gender', 'about', 'license', 'additional_details', 'emails', 'practicing_since', 'profile_img', 'languages', 'qualifications', 'availability', 'mobiles', 'medical_services', 'experiences', 'associations', 'awards', 'appointments')
 
 
 class OpdAppointmentSerializer(serializers.ModelSerializer):
@@ -155,6 +193,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = OpdAppointment
         fields = ('id', 'time_slot_start', 'fees', 'time_slot_end', 'status', 'doctor_name', 'hospital_name', 'patient_name', 'patient_dob', 'patient_gender', 'patient_image')
+
 
 class HospitalSerializer(serializers.ModelSerializer):
 

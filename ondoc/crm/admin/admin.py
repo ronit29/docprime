@@ -2,7 +2,7 @@
 
 from django.contrib.gis import admin
 
-from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital, HospitalNetwork, DoctorOnboardingToken)
+from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital, HospitalNetwork, DoctorOnboardingToken, OpdAppointment)
 from ondoc.diagnostic.models import Lab, LabNetwork, PathologyTest, RadiologyTest, PathologyTestType, RadiologyTestType, LabService
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin, CollegeAdmin)
 from .hospital import HospitalAdmin
@@ -22,6 +22,7 @@ admin.site.site_url = None
 admin.site.index_title = 'CRM Administration'
 
 admin.site.register(OtpVerifications)
+admin.site.register(OpdAppointment)
 
 admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(DoctorOnboardingToken)
