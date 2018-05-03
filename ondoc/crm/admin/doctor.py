@@ -178,13 +178,13 @@ class DoctorForm(forms.ModelForm):
     onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Doctor.ONBOARDING_STATUS)
     def validate_qc(self):
         qc_required = {'name':'req','gender':'req','practicing_since':'req',
-        'about':'req','license':'req','email':'req','doctormobile':'count',
-        'doctorqualification':'count','doctorhospital':'count','doctorlanguage':'count',
-        'doctorimage':'count'}
+        'about':'req','license':'req','mobiles':'count','emails':'count',
+        'qualifications':'count','availability':'count','languages':'count',
+        'images':'count'}
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+            if value=='count' and int(self.data[key+'-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
     def clean_practicing_since(self):
