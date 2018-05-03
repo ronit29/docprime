@@ -3,9 +3,10 @@ from . import views
 
 urlpatterns = [
     #path('auth/', views.obtain_auth_token),
-    path('otp/generate',views.generate_otp),
-    path('otp/user',views.login_user),
-    path('otp/doctor',views.login_doctor),
-    path('register',views.register_user),
+    path('doctor/otp/generate',views.generate_otp_doctor),
+    path('doctor/login',views.login_doctor),
+    path('user/otp/generate',views.generate_otp_user),
+    path('user/login',views.login_user),
+    path('user/register',views.register_user),
     path('logout',views.logout)
 ]

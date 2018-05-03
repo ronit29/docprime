@@ -16,12 +16,12 @@ def verifyOTP(f):
             otpEntry.isExpired = True
             otpEntry.save()
             if otp_time > 15 :
-                return Response('OTP Expired',status=404)
+                return Response('OTP Expired/Invalid',status=404)
 
             return f(*args, **kwargs)
 
         except OtpVerifications.DoesNotExist:
-            return Response('OTP Not found',status=404)
+            return Response('OTP Expired/Invalid',status=404)
 
     return wrapper
 
