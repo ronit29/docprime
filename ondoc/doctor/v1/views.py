@@ -128,7 +128,7 @@ class DoctorProfile(APIView):
             raise Exception('No doctor linked with the logged in User')
 
         serialized_doctor = DoctorProfileSerializer(doctor_profile[0])
-        
+
         return Response({
             "profile" : serialized_doctor.data,
             "doctor_appointments" : doctor_appointments
