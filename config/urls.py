@@ -17,19 +17,29 @@ from django.urls import include, path
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
+from django.conf import settings
 
 from ondoc import crm
+
+# DEBUG = env.bool('DJANGO_DEBUG', default=True)
+
+additional_urls = [
+    path('doctors/', include('ondoc.doctor.urls')),
+    path('auth/', include('ondoc.authentication.urls'))
+    ]
+
+if not settings.DEBUG:
+    additional_urls = []
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('',include('ondoc.crm.urls', namespace='crm')),
     path('onboard/',include('ondoc.onboard.urls', namespace='onboard')),
-    path('doctors/', include('ondoc.doctor.urls')),
-    path('auth/', include('ondoc.authentication.urls'))
+    # path('doctors/', include('ondoc.doctor.urls')),
+    # path('auth/', include('ondoc.authentication.urls'))
     # path('api/crm/', include('ondoc.crm.urls')),
     # path('api/auth/', include('ondoc.authentication.urls')),
-
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+] + additional_urls + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:
     import debug_toolbar
