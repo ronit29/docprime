@@ -8,7 +8,7 @@ from datetime import datetime
 
 from ondoc.doctor.models import (
         Doctor, Specialization, MedicalService, DoctorImage, Symptoms,
-        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile, Hospital
+        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile, Hospital, DoctorLeave
     ) 
 
 
@@ -167,3 +167,24 @@ class HospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'address', 'location', 'operational_since', 'building', 'pin_code', 'state', 'city', 'locality', 'hospital_type')
+
+
+class DoctorLeaveSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.ReadOnlyField(source='doctor.name')
+
+    def create(self, validated_data):
+        return DoctorLeave.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        instance.status = validated_data.get('status', instance.status)
+        instance.save()
+        return instance
+
+    def validate(self, data):
+        data['doctor'] = self.context['doctor']
+        return data
+
+    class Meta:
+        model = DoctorLeave
+        fields = ('id', 'start_time', 'end_time', 'start_date', 'end_date', 'doctor_name')
+

@@ -512,3 +512,17 @@ class OpdAppointment(TimeStampedModel):
     class Meta:
         db_table = "opd_appointment"
 
+
+class DoctorLeave (TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, related_name="leaves", on_delete=models.CASCADE)
+    start_time = models.TimeField(blank=True, null=True)
+    end_time = models.TimeField(blank=True, null=True)
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return self.doctor.name + "(" + str(self.start_time) + "," + str(self.end_date) + str(self.start_date)
+
+    class Meta:
+        db_table = "doctor_leave"
+

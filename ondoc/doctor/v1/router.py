@@ -1,6 +1,6 @@
 # base/router.py
 from django.conf.urls import url
-from .views import DoctorView, GenericSearchView, DoctorAvailability, DoctorProfile, DoctorAppointments, DoctorHospitalAvailability
+from .views import DoctorView, GenericSearchView, DoctorAvailability, DoctorProfile, DoctorAppointments, DoctorHospitalAvailability, DoctorBlockCalendar
 from rest_framework import routers, serializers, viewsets
 
 
@@ -15,7 +15,8 @@ urlpatterns = [
     url(r'^availability', DoctorAvailability.as_view()),
     url(r'^profile', DoctorProfile.as_view()),
     url(r'^appointment', DoctorAppointments.as_view()),
-    url(r'^hospital', DoctorHospitalAvailability.as_view())
+    url(r'^hospital', DoctorHospitalAvailability.as_view()),
+    url(r'^leave', DoctorBlockCalendar.as_view())
 ]
 
 api_urlpatterns = urlpatterns + router.urls

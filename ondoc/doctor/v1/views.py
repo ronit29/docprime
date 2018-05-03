@@ -1,8 +1,8 @@
 from rest_framework import status
 from django.db.models import Q
-from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment, Hospital, UserProfile
+from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment, Hospital, UserProfile, DoctorLeave
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
-                        DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer, OpdAppointmentSerializer, HospitalSerializer
+                        DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer, OpdAppointmentSerializer, HospitalSerializer, DoctorLeaveSerializer
 from .services import ReformScheduleService
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -207,7 +207,7 @@ class DoctorAppointments(APIView):
 
         if opd_appointment_serializer.is_valid(raise_exception=True):
             opd_appointment = opd_appointment_serializer.save()
-            return Response("Sucessfuly Created", status=200)
+            return Response("Successfully Created", status=200)
         else:
             return Response(opd_appointment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -238,7 +238,7 @@ class DoctorHospitalAvailability(APIView):
         if doctor_hospital_serializer.is_valid(raise_exception=True):
 
             doctor_hospital_serializer.save()
-            return Response("Sucessfuly Created", status=200)
+            return Response("Successfully Created", status=200)
             
         else:
             return Response(doctor_hospital_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -256,7 +256,46 @@ class DoctorHospitalAvailability(APIView):
 
         availability.save()
 
-        return Response("Sucessfuly Modified", status=200)
-            
+        return Response("Successfully Modified", status=200)
+
+
+class DoctorBlockCalendar(APIView):
+    """
+    Return Leaves for a doctor
+    """
+
+    def get(self, request, version="v1", format=None):
+        if request.GET.get("doctor_id") is not None:
+            doctor_id = request.GET.get("doctor_id")
+            leaves = DoctorLeave.objects.filter(doctor_id=doctor_id)
+            serialized_leaves = DoctorLeaveSerializer(leaves, many=True)
+            return Response(serialized_leaves.data)
+        elif request.GET.get("leave_id") is not None:
+            leave_id = request.GET.get("leave_id")
+            leave = DoctorLeave.objects.get(id=leave_id)
+            serialized_leave = DoctorLeaveSerializer(leave, many=False)
+            return Response(serialized_leave.data)
+
+    def post(self, request, version="v1", format='json'):
+        request_data = request.data
+        doctor = Doctor.objects.get(id=request_data['doctor_id'])
+        doctor_leave_serializer = DoctorLeaveSerializer(data=request_data, context={'doctor': doctor})
+        if doctor_leave_serializer.is_valid(raise_exception=True):
+            doctor_leave_serializer.save()
+            return Response("Successfully Created", status=200)
+        else:
+            return Response(doctor_leave_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, version="v1", format='json'):
+
+        request_data = request.data
+        leave = DoctorLeave.objects.get(id=request_data['id'])
+        leave.start_date = request_data.get('start_date', leave.start_date)
+        leave.end_date = request_data.get('end_date', leave.end_date)
+        leave.start_time = request_data.get('start_time', leave.start_time)
+        leave.end_time = request_data.get('end_time', leave.end_time)
+        leave.save()
+
+        return Response("Successfully Modified", status=200)
 
 
