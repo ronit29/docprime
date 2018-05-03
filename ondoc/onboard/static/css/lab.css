@@ -128,3 +128,8 @@ label
     font-weight: bold;
 
 }
+
+.formset-error
+{
+    color:#a94442;
+}

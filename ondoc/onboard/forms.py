@@ -384,9 +384,9 @@ class DoctorMobileForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = Layout(
             Div(
-                Div(CustomField('is_primary', field_class='col-md-12',label_class='hidden'), css_class='col-md-1 col-xs-2 number-check'),
-                Div(CustomField('number', field_class='col-md-8',label_class='hidden'), css_class='col-md-6 col-xs-8'), 
-                Div(CustomField('DELETE'), css_class='col-md-1 col-xs-2'), css_class='clearfix'
+                Div(CustomField('is_primary',disabled=True, field_class='col-md-12',label_class='hidden'), css_class='col-md-1 col-xs-2 number-check'),
+                Div(CustomField('number', disabled=True, field_class='col-md-8',label_class='hidden'), css_class='col-md-6 col-xs-8'), 
+                 css_class='clearfix'
             ))
 
     class Meta:
@@ -404,9 +404,9 @@ class DoctorEmailForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = Layout(
             Div(
-                Div(CustomField('is_primary', field_class='col-md-12',label_class='hidden'), css_class='col-md-1 col-xs-2 number-check'),
-                Div(CustomField('email', field_class='col-md-8',label_class='hidden'), css_class='col-md-6 col-xs-8'), 
-                Div(CustomField('DELETE'), css_class='col-md-1 col-xs-2'), css_class='clearfix'
+                Div(CustomField('is_primary',disabled=True, field_class='col-md-12',label_class='hidden'), css_class='col-md-1 col-xs-2 number-check'),
+                Div(CustomField('email',disabled=True, field_class='col-md-8',label_class='hidden'), css_class='col-md-6 col-xs-8'), 
+                css_class='clearfix'
             ))
 
     class Meta:
@@ -439,6 +439,9 @@ class DoctorHospitalForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for key in self.fields.keys():
+            self.fields[key].disabled = True
+
         self.helper = FormHelper()
         self.fields['start'].label = 'Open Time'
         self.fields['end'].label = 'Close Time'
@@ -560,9 +563,24 @@ class DoctorDocumentForm(forms.ModelForm):
         model = DoctorDocument
         exclude = ['doctor',]
 
-class BaseDoctorMobileFormSet(forms.BaseInlineFormSet):
+
+class RequiredFormset(forms.BaseInlineFormSet):
+
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
+
+
+    class Meta:
+        abstract=True
+
+class BaseDoctorMobileFormSet(RequiredFormset):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
         primary = 0
         count = 0
         for value in self.cleaned_data:
@@ -581,7 +599,7 @@ class BaseDoctorMobileFormSet(forms.BaseInlineFormSet):
                 #raise forms.ValidationError("Only one mobile number can be primary")
 
 
-class BaseDoctorEmailFormSet(forms.BaseInlineFormSet):
+class BaseDoctorEmailFormSet(RequiredFormset):
     def clean(self):
         super().clean()
         primary = 0
@@ -604,8 +622,8 @@ class BaseDoctorEmailFormSet(forms.BaseInlineFormSet):
 
 
 
-DoctorEmailFormSet = inlineformset_factory(Doctor, DoctorEmail,formset=BaseDoctorEmailFormSet, form = DoctorEmailForm,extra = 0, min_num=1, can_delete=True, exclude=('doctor', ))
-DoctorMobileFormSet = inlineformset_factory(Doctor, DoctorMobile,formset = BaseDoctorMobileFormSet, form = DoctorMobileForm,extra = 0,min_num=1, can_delete=True, exclude=('doctor', ))
+DoctorEmailFormSet = inlineformset_factory(Doctor, DoctorEmail,formset=BaseDoctorEmailFormSet, form = DoctorEmailForm,extra = 0, can_delete=False, exclude=('doctor', ))
+DoctorMobileFormSet = inlineformset_factory(Doctor, DoctorMobile,formset = BaseDoctorMobileFormSet, form = DoctorMobileForm,extra = 0, can_delete=False, exclude=('doctor', ))
 DoctorQualificationFormSet = inlineformset_factory(Doctor, DoctorQualification, form = DoctorQualificationForm,extra = 0, can_delete=True, exclude=('doctor', ))
 DoctorHospitalFormSet = inlineformset_factory(Doctor, DoctorHospital, form = DoctorHospitalForm,extra = 0, can_delete=True, exclude=('doctor', ))
 DoctorLanguageFormSet = inlineformset_factory(Doctor, DoctorLanguage, form = DoctorLanguageForm,extra = 0, can_delete=True, exclude=('doctor', ))
