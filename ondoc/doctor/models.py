@@ -315,7 +315,7 @@ class DoctorLanguage(TimeStampedModel):
         unique_together = (("doctor", "language"))
 
 class DoctorAward(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="awards", on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
     year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
 
@@ -326,7 +326,7 @@ class DoctorAward(TimeStampedModel):
         db_table = "doctor_awards"
 
 class DoctorAssociation(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="associations", on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
 
     def __str__(self):
@@ -347,7 +347,7 @@ class DoctorExperience(TimeStampedModel):
 
 
 class DoctorMedicalService(TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="medical_services", on_delete=models.CASCADE)
     service = models.ForeignKey(MedicalService, on_delete=models.CASCADE)
 
     class Meta:
