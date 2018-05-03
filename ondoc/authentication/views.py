@@ -6,7 +6,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 
 from ondoc.authentication.models import OtpVerifications, User, UserProfile
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, DoctorMobile
 from ondoc.authentication.serializers import UserAuthSerializer, UserProfileSerializer
 from random import randint
 from .service import sendOTP, verifyOTP
@@ -23,7 +23,7 @@ def register_user(request, format='json'):
     userSerializer = UserAuthSerializer(data=userData, context={'user_type': 3})
     if userSerializer.is_valid():
         user = userSerializer.save()
-        if user:
+        try:
             # creating user profile now
             userProfileSerializer = UserProfileSerializer(data=userData,context={ 'user': user, 'email': '' })
             if userProfileSerializer.is_valid():
@@ -34,14 +34,13 @@ def register_user(request, format='json'):
                     "token" : str(token[0])
                 }
                 return Response(response,status=200)
-            else :
-                # TODO : deleting user for mocking rollback, fix later - make these transactional
-                user.delete()
-                return Response(userProfileSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except:
+            # TODO : deleting user for mocking rollback, fix later - make these transactional
+            user.delete()
+            return Response("Error Creating User Profile", status=status.HTTP_400_BAD_REQUEST)
     
     return Response(userSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-
 
 @api_view(['POST', ])
 def generate_otp(request):
@@ -95,7 +94,9 @@ def login_doctor(request):
 
     phone_number = request.data['phone_number']
     try:
-        doctor_data = Doctor.objects.get(phone_number=phone_number)
+
+        doctor_mobile = DoctorMobile.objects.get()
+        doctor_data = doctor_mobile.doctor
         user_data = User.objects.get(phone_number=phone_number, user_type=2)
         token = Token.objects.get_or_create(user=user_data)
 
@@ -104,7 +105,7 @@ def login_doctor(request):
             "token" : str(token[0])
         }
         return Response(response,status=200)
-    except Doctor.DoesNotExist:
+    except DoctorMobile.DoesNotExist:
         return Response('Docotr not registered',status=404)
     except User.DoesNotExist:
         # is user not exists, create one and then login
