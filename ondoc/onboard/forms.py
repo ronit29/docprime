@@ -89,7 +89,6 @@ class LabTimingForm(forms.ModelForm):
                 Div(CustomField('day', label_class='col-md-4 hidden', field_class='col-md-12'),css_class='col-md-2'),
                 Div(CustomField('start', label_class='col-md-4 col-md-offset-1', label='Open Time', field_class='col-md-7'),css_class='col-md-4'),
                 Div(CustomField('end', label_class='col-md-4 col-md-offset-1', label='Close Time',field_class='col-md-7'),css_class='col-md-4'),
-                Div(CustomField('DELETE'), css_class='col-md-1 col-md-offset-1'),
                 css_class='row'))
 
     class Meta:
@@ -101,14 +100,15 @@ class LabManagerForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for key in self.fields.keys():
+            self.fields[key].disabled = True
+
         self.helper = FormHelper()
         self.helper.form_tag = False;
         self.helper.layout = Layout(Div(
                 Div(CustomField('contact_type', label_class='col-md-4', field_class='col-md-8'),css_class='col-md-4'),
                 Div(CustomField('name', label_class='col-md-2 col-md-offset-2', field_class='col-md-8'),css_class='col-md-4'),
                 Div(CustomField('number', label_class='col-md-3 col-md-offset-2', field_class='col-md-6'),css_class='col-md-3'),
-                Div(CustomField('DELETE'), css_class='col-md-1'),
-
                 css_class='row'),
                 Div(
                 Div(CustomField('email', label_class='col-md-4', field_class='col-md-8'),css_class='col-md-4'),

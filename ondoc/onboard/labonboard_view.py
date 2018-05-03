@@ -141,6 +141,27 @@ class LabOnboard(View):
         lab_manager_formset = LabManagerFormSet(request.POST, prefix = "labmanager", instance = instance)
         lab_timing_formset = LabTimingFormSet(request.POST, prefix = "labtiming", instance = instance)
 
+
+        validate_req = [lab_manager_formset]
+        min_num = 0
+        validate_min = False
+
+        if request.POST.get('_action',None) == '_submit':
+            min_num = 1
+            validate_min = True
+            if 'labopen-always_open' not in request.POST:
+                validate_req.append(lab_timing_formset)
+
+        for x in validate_req:
+            x.min_num = min_num
+            x.validate_min = validate_min
+
+        #service_missing = False
+        #if 'lab_service_1' not in request.POST and 'lab_service_2' not in request.POST
+        #    service_missing = True
+
+
+
         if not all([lab_form.is_valid(), lab_address_form.is_valid(), lab_open_form.is_valid(),lab_doctor_availability_formset.is_valid(),
             lab_doctor_formset.is_valid(), certificates_formset.is_valid(), award_formset.is_valid(),
             accreditation_formset.is_valid(), lab_manager_formset.is_valid(), lab_timing_formset.is_valid()

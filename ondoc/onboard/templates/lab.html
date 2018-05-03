@@ -49,7 +49,7 @@
     <div class="panel panel-default">
       <div class="panel-heading">SERVICES</div>
       <div class="panel-body">
-
+        <div class='lab-service-error hidden' style='color:#a94442'>Select atleast one service</div>
         <div class='row'>
         <div class='col-md-5'>    
         <div class='clearfix'>   
@@ -62,7 +62,7 @@
                 <div class="controls "> 
                     <div class="checkbox"> 
                         <label for="id_labservice_{{forloop.counter}}" style="color: black;font-size: 14px;"> 
-                        <input {% if lab_service_dict|get_item:id %} checked="checked" {% endif %} type="checkbox" name="labservice_{{forloop.counter}}" class="checkboxinput" field-class="col-md-6" id="id_labservice_{{forloop.counter}}" label-class="hidden">
+                        <input {% if lab_service_dict|get_item:id %} checked="checked" {% endif %} type="checkbox" name="labservice_{{forloop.counter}}" class="checkboxinput lab-service-input" field-class="col-md-6" id="id_labservice_{{forloop.counter}}" label-class="hidden">
                         {{name}}
                         </label> 
                     </div> 
@@ -244,7 +244,10 @@
         <span>LAB CONTACT DETAILS</span></div>
 
      <div class="panel-body" style='padding-right: 20px;'>
-        <!-- Adding formsets for awards -->
+        {% if lab_manager_formset.non_form_errors %}
+            <div style='margin-bottom:5px;' class='formset-error'>LAB Contacts are required</div>
+        {% endif %}
+
         {{ lab_manager_formset.management_form }}
         {% for form in lab_manager_formset %}        
         <div class="" style='margin-bottom: 30px;'>
@@ -255,15 +258,6 @@
      </div>
 
      <div class='panel-footer'>
-       <div class='add-new-form' data-key='labmanager' style='display: inline-block;'>
-            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-            <span>Add Another Lab Contact</span>
-        </div>
-        <div class="empty_form" style="display:none">
-            <div class="form-horizontal">
-                {% crispy lab_manager_formset.empty_form %}
-            </div>
-        </div>        
      </div>
 
     </div>
@@ -273,8 +267,12 @@
     <div class="panel panel-default">
       <div class="panel-heading">
         <img class='heading-icon' src ="{% static 'images/8.png' %}">
-        <span>LAB Timings</span></div>
+        <span>LAB Timings</span>
+      </div>
       <div class="panel-body">
+        {% if lab_timing_formset.non_form_errors %}
+            <div style='margin-bottom:5px;' class='formset-error'>LAB Timings are required</div>
+        {% endif %}
 
         <div class='col-md-12'>
         {% crispy lab_open_form %}
@@ -288,7 +286,7 @@
         </div>
         {% endfor %}
       </div>
-     <div class='panel-footer'>
+    <div class='panel-footer'>
        <div class='add-new-form' data-key='labtiming' style='display: inline-block;'>
             <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
             <span>Add Another Lab Timings</span>
@@ -321,6 +319,9 @@
         <span>LAB IMAGE</span></div>
       <div class="panel-body">
       <div class='upload-container' data-media='image' data-type='' data-url='/onboard/upload' data-max='5'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+        <div>
+        <span class='image-required-message'> (Required)</span>
+        </div>
 
         {% for img in lab_images %}
             <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
@@ -387,14 +388,14 @@
             <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
             <div style="padding-top: 10px;">Upload image</div>
         </div>
-        {% endif %}    
+        {% else %}    
         <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
         </div>
         <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload hidden'>
             <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
             <div style="padding-top: 10px;">Upload image</div>
         </div>
-
+        {% endif %}    
         {% else %}
 
         <div>
@@ -416,7 +417,7 @@
 
         {% endfor %}
 
-
+      </div>  
       </div>    
 
 
@@ -493,7 +494,7 @@ $('.submit-form').on('click',function(e){
     }
 
     var errors = false;
-    $('.lab-documents .upload-container').not('.not-required').each(function(){
+    $('.upload-container').not('.not-required').each(function(){
         var length = $(this).find('.existing-image').length+$(this).find('.dz-image-preview').length
 
         if(length==0)
@@ -505,8 +506,26 @@ $('.submit-form').on('click',function(e){
             $(this).removeClass('image-error');
 
     })
+
     if(errors)
+    {
+        $('html, body').animate({
+        scrollTop: $('.image-error:first').offset().top
+        }, 500);
         return;
+    }
+
+    if($('.lab-service-input:checked').length==0)
+    {
+        $('.lab-service-error').removeClass('hidden')
+        $('html, body').animate({
+        scrollTop: $('.lab-service-error').offset().top
+        }, 500);
+
+        return;
+    }
+
+
 
     $(':disabled').removeAttr('disabled')
     var input = $("<input name='_action'>").attr("type", "hidden").val("_submit");
