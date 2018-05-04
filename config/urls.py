@@ -25,7 +25,8 @@ from ondoc import crm
 
 additional_urls = [
     path('doctors/', include('ondoc.doctor.urls')),
-    path('auth/', include('ondoc.authentication.urls'))
+    path('auth/', include('ondoc.authentication.urls')),
+    path('diagnostic/', include('ondoc.diagnostic.urls'))
     ]
 
 if not settings.DEBUG:
