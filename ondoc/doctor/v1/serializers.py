@@ -8,8 +8,8 @@ from datetime import datetime
 
 from ondoc.doctor.models import (
         Doctor, Specialization, MedicalService, DoctorImage, Symptoms,
-        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile, Hospital, DoctorEmail, DoctorMobile, DoctorMedicalService, DoctorAssociation, DoctorAward
-    ) 
+        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile, Hospital, DoctorEmail, DoctorMobile, DoctorMedicalService, DoctorAssociation, DoctorAward, DoctorLeave
+    )
 
 
 class DoctorExperienceSerializer(serializers.ModelSerializer):
@@ -162,12 +162,12 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     awards = DoctorAwardSerializer(read_only=True, many = True)
 
     def to_representation(self, doctor):
-        parent_rep = super().to_representation(doctor)        
+        parent_rep = super().to_representation(doctor)
         try:
             parent_rep['images'] = parent_rep['images'][0]
         except KeyError as e:
             return parent_rep
-            
+
         return parent_rep
 
     class Meta:
@@ -203,7 +203,6 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'time_slot_start', 'fees', 'time_slot_end', 'status', 'doctor_name', 'hospital_name', 'patient_name', 'patient_dob', 'patient_gender', 'patient_image')
 
-
 class HospitalSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
@@ -215,3 +214,24 @@ class HospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'address', 'location', 'operational_since', 'building', 'pin_code', 'state', 'city', 'locality', 'hospital_type')
+
+
+class DoctorLeaveSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.ReadOnlyField(source='doctor.name')
+
+    def create(self, validated_data):
+        return DoctorLeave.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        instance.status = validated_data.get('status', instance.status)
+        instance.save()
+        return instance
+
+    def validate(self, data):
+        data['doctor'] = self.context['doctor']
+        return data
+
+    class Meta:
+        model = DoctorLeave
+        fields = ('id', 'start_time', 'end_time', 'start_date', 'end_date', 'doctor_name')
+
