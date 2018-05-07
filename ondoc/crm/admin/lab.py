@@ -305,14 +305,8 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
     # extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&callback=initGoogleMap']
     # extra_js = ['https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&libraries=places&callback=initMap']
 
-class PathologyTestAdmin(VersionAdmin):
+class LabTestAdmin(VersionAdmin):
     search_fields = ['name']
 
-class RadiologyTestAdmin(VersionAdmin):
-    search_fields = ['name']
-
-class RadiologyTestTypeAdmin(VersionAdmin):
-    search_fields = ['name']
-
-class PathologyTestTypeAdmin(VersionAdmin):
+class LabTestTypeAdmin(VersionAdmin):
     search_fields = ['name']

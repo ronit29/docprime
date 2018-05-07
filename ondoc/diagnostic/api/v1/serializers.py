@@ -1,14 +1,14 @@
 from rest_framework import serializers
-from ondoc.diagnostic.models import PathologyTest
+from ondoc.diagnostic.models import LabTest
 
-class PathologyTestListSerializer(serializers.ModelSerializer):
+class LabTestListSerializer(serializers.ModelSerializer):
     class Meta:
-        model = PathologyTest
+        model = LabTest
         fields = ('id','name')
 
 
-class PathologyTestSerializer(serializers.ModelSerializer):
+class LabTestSerializer(serializers.ModelSerializer):
     class Meta:
-        model = PathologyTest
+        model = LabTest
         fields = ('id','name','pre_test_info','why')
         # fields = ('id', 'account_name', 'users', 'created')

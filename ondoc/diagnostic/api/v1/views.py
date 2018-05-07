@@ -1,13 +1,13 @@
-from .serializers import PathologyTestSerializer, PathologyTestListSerializer
+from .serializers import LabTestSerializer, LabTestListSerializer
 from rest_framework import viewsets
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 
-from ondoc.diagnostic.models import PathologyTest
+from ondoc.diagnostic.models import LabTest
 
 class PathologyTestList(viewsets.ReadOnlyModelViewSet):
-    queryset = PathologyTest.objects.all()
-    serializer_class= PathologyTestSerializer
+    queryset = LabTest.objects.all()
+    serializer_class= LabTestSerializer
     lookup_field = 'id'
 
     # def list(self, request):

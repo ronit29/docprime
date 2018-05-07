@@ -210,33 +210,35 @@ class LabNetworkEmail(TimeStampedModel):
         db_table = "lab_network_email"
 
 
-class PathologyTestType(TimeStampedModel):
+class LabTestType(TimeStampedModel):
     name = models.CharField(max_length=200)
 
     def __str__(self):
         return self.name
 
     class Meta:
-        db_table = "pathology_test_type"
+        db_table = "lab_test_type"
 
-class RadiologyTestType(TimeStampedModel):
+
+# class RadiologyTestType(TimeStampedModel):
+#     name = models.CharField(max_length=200)
+
+#     def __str__(self):
+#         return self.name
+
+#     class Meta:
+#         db_table = "radiology_test_type"
+
+class LabTest(TimeStampedModel):
     name = models.CharField(max_length=200)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        db_table = "radiology_test_type"
-
-class PathologyTest(TimeStampedModel):
-    name = models.CharField(max_length=200)
-    test_type = models.ForeignKey(PathologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_type')
-    test_sub_type = models.ForeignKey(PathologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_sub_type')
+    test_type = models.ForeignKey(LabTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_type')
+    test_sub_type = models.ForeignKey(LabTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_sub_type')
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
     why = models.CharField(max_length=1000, blank=True)
     pre_test_info = models.CharField(max_length=1000, blank=True)
     sample_handling_instructions = models.CharField(max_length=1000, blank=True)
     sample_collection_instructions = models.CharField(max_length=1000, blank=True)
+    preferred_time = models.CharField(max_length=1000, blank=True)
     sample_amount = models.CharField(max_length=1000, blank=True)
     expected_tat = models.CharField(max_length=1000, blank=True)
 
@@ -244,21 +246,58 @@ class PathologyTest(TimeStampedModel):
         return self.name
 
     class Meta:
-        db_table = "pathalogy_test"
+        db_table = "lab_test"
 
-class RadiologyTest(TimeStampedModel):
+class AvailableLabTest(TimeStampedModel):
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests')
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='availablelabs')
+    mrp = models.PositiveSmallIntegerField()
+    agreed_price = models.PositiveSmallIntegerField()
+    deal_price = models.PositiveSmallIntegerField()
+
+    def __str__(self):
+        return self.name+', '+self.lab.name
+
+    class Meta:
+        db_table = "available_lab_test"
+
+
+class CommonTest(TimeStampedModel):
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
+
+
+class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)
-    test_type = models.ForeignKey(RadiologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_type')
-    test_sub_type = models.ForeignKey(RadiologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_sub_type')
-    is_package = models.BooleanField(verbose_name= 'Is this test package type?')
-    why = models.CharField(max_length=1000, blank=True)
-    pre_test_info = models.CharField(max_length=1000, blank=True)
 
     def __str__(self):
         return self.name
 
     class Meta:
-        db_table = "radiology_test"
+        db_table = "common_diagnostic_condition"
+
+
+class PromotedLab(TimeStampedModel):
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.lab.name
+
+    class Meta:
+        db_table = "promoted_lab"
+
+# class RadiologyTest(TimeStampedModel):
+#     name = models.CharField(max_length=200)
+#     test_type = models.ForeignKey(RadiologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_type')
+#     test_sub_type = models.ForeignKey(RadiologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_sub_type')
+#     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
+#     why = models.CharField(max_length=1000, blank=True)
+#     pre_test_info = models.CharField(max_length=1000, blank=True)
+
+#     def __str__(self):
+#         return self.name
+
+#     class Meta:
+#         db_table = "radiology_test"
 
 class LabService(TimeStampedModel):
     PATHOLOGY = 1
