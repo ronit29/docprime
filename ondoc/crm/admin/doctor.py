@@ -34,9 +34,18 @@ class DoctorQualificationInline(admin.TabularInline):
     show_change_link = False
     # autocomplete_fields = ['specialization']
 
+class DoctorHospitalForm(forms.ModelForm):
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start")
+        end = cleaned_data.get("end")
+        if start>=end:
+            raise forms.ValidationError("Availability start time should be less than end time")
+
 
 class DoctorHospitalInline(admin.TabularInline):
     model = DoctorHospital
+    form = DoctorHospitalForm
     extra = 0
     can_delete = True
     show_change_link = False
@@ -89,15 +98,53 @@ class DoctorMedicalServiceInline(admin.TabularInline):
     show_change_link = False
     # autocomplete_fields = ['service']
 
+class DoctorImageForm(forms.ModelForm):
+    name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
 class DoctorImageInline(admin.TabularInline):
     model = DoctorImage
+    form = DoctorImageForm
     template = 'imageinline.html'
     extra = 0
     can_delete = True
     show_change_link = False
 
+class DoctorDocumentForm(forms.ModelForm):
+    name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+
+
+class DoctorDocumentFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        choices = dict(DoctorDocument.CHOICES)
+        count = {}
+        for key, value in DoctorDocument.CHOICES:
+            count[key] = 0
+
+        for value in self.cleaned_data:
+            if not value['DELETE']:
+                count[value['document_type']] += 1
+
+        for key, value in count.items():
+            if not key==DoctorDocument.ADDRESS and value>1:
+                raise forms.ValidationError("Only one "+choices[key]+" is allowed")
+
+        if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+            for key, value in count.items():
+                if value<1:
+                    raise forms.ValidationError(choices[key]+" is required")
+
 class DoctorDocumentInline(admin.TabularInline):
+    formset = DoctorDocumentFormSet
+    form = DoctorDocumentForm
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj=obj, **kwargs)
+        formset.request = request
+        return formset
+
     model = DoctorDocument
     extra = 0
     can_delete = True
@@ -115,6 +162,9 @@ class DoctorMobileForm(forms.ModelForm):
 class DoctorMobileFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
+
         primary = 0
         count = 0
         for value in self.cleaned_data:
@@ -146,6 +196,8 @@ class DoctorEmailForm(forms.ModelForm):
 class DoctorEmailFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
         primary = 0
         count = 0
         for value in self.cleaned_data:
@@ -180,7 +232,7 @@ class DoctorForm(forms.ModelForm):
         qc_required = {'name':'req','gender':'req','practicing_since':'req',
         'about':'req','license':'req','mobiles':'count','emails':'count',
         'qualifications':'count','availability':'count','languages':'count',
-        'images':'count'}
+        'images':'count','documents':'count'}
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
@@ -240,7 +292,7 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
         DoctorImageInline,
         DoctorDocumentInline
     ]
-    exclude = ['created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
+    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
     search_fields = ['name']
 
     def get_urls(self):

@@ -75,6 +75,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.phone_number
 
+    def save(self, *args, **kwargs):
+        if self.email:    
+            self.email = self.email.lower()
+        return super().save(*args, **kwargs)
+
+
     class Meta:
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
         db_table = "auth_user"

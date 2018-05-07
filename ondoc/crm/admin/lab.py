@@ -22,9 +22,12 @@ class LabTimingInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+class LabImageForm(forms.ModelForm):
+    name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
 class LabImageInline(admin.TabularInline):
-    model = LabImage   
+    model = LabImage
+    form = LabImageForm
     extra = 0
     can_delete = True
     show_change_link = False
@@ -73,9 +76,45 @@ class LabDoctorInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+class LabDocumentForm(forms.ModelForm):
+    name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+
+
+class LabDocumentFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        choices = dict(LabDocument.CHOICES)
+        count = {}
+        for key, value in LabDocument.CHOICES:
+            count[key] = 0
+
+        for value in self.cleaned_data:
+            if not value['DELETE']:
+                count[value['document_type']] += 1
+
+        for key, value in count.items():
+            if not key==LabDocument.ADDRESS and value>1:
+                raise forms.ValidationError("Only one "+choices[key]+" is allowed")
+
+        if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+            for key, value in count.items():
+                if value<1:
+                    raise forms.ValidationError(choices[key]+" is required")
+
+
+
 class LabDocumentInline(admin.TabularInline):
     model = LabDocument
-    #form = LabAwardForm
+    formset = LabDocumentFormSet
+    form = LabDocumentForm
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj=obj, **kwargs)
+        formset.request = request
+        return formset
+
     extra = 0
     can_delete = True
     show_change_link = False
@@ -102,7 +141,8 @@ class LabForm(forms.ModelForm):
     primary_email = forms.EmailField(required=True)
     city = forms.CharField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
-    onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Lab.ONBOARDING_STATUS)
+    onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
+    agreed_rate_list = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'application/pdf'}))
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
