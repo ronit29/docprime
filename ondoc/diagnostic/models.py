@@ -191,7 +191,7 @@ class LabNetworkHelpline(TimeStampedModel):
     details = models.CharField(max_length=200, blank=True)
 
     def __str__(self):
-        return self.number
+        return str(self.number)
 
     class Meta:
         db_table = "lab_network_helpline"

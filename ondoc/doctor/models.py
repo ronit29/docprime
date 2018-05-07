@@ -269,7 +269,7 @@ class DoctorDocument(TimeStampedModel, Image):
     AADHAR = 7
     CHOICES = [(PAN,"PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"MCI Registration Number"),(CHEQUE,"Cancel Cheque Copy"),(AADHAR,"Aadhar Card")]
 
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.ImageField(upload_to='doctor/documents',height_field='height', width_field='width')
 

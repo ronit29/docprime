@@ -23,9 +23,14 @@ class CustomUserChangeForm(UserChangeForm):
             super(CustomUserChangeForm, self).__init__(*args, **kwargs)
 
     def clean_email(self):
-        if self.initial["email"] is None:
+        # if self.initial["email"] is None:
+        #     return ''
+        # return self.initial["email"]
+
+        email = self.cleaned_data['email']
+        if email is None:
             return ''
-        return self.initial["email"]
+        return email
 
 
 class CustomUserAdmin(UserAdmin,VersionAdmin):
@@ -65,4 +70,3 @@ class CustomUserAdmin(UserAdmin,VersionAdmin):
         return qs
     def get_changeform_initial_data(self, request):
         return {'user_type': 1}
-
