@@ -12,6 +12,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
     license = models.CharField(max_length=200, blank=True)
+    is_insurance_enabled = models.BooleanField(verbose_name= 'Enabled for Insurance Customer',default=False)
+    is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
     onboarding_status = models.PositiveSmallIntegerField(default=NOT_ONBOARDED, choices=ONBOARDING_STATUS)
     primary_email = models.EmailField(max_length=100, blank=True)
     primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
@@ -30,7 +32,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     state = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
-    agreed_rate_list = models.FileField(upload_to='lab/docs', null=True, blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
+    agreed_rate_list = models.FileField(upload_to='lab/docs',max_length=200, null=True, blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
 
 
     def __str__(self):

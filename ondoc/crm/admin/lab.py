@@ -22,12 +22,12 @@ class LabTimingInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
-class LabImageForm(forms.ModelForm):
-    name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+# class LabImageForm(forms.ModelForm):
+#     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
 class LabImageInline(admin.TabularInline):
     model = LabImage
-    form = LabImageForm
+    # form = LabImageForm
     extra = 0
     can_delete = True
     show_change_link = False
@@ -76,8 +76,8 @@ class LabDoctorInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
-class LabDocumentForm(forms.ModelForm):
-    name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+# class LabDocumentForm(forms.ModelForm):
+#     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
 
 class LabDocumentFormSet(forms.BaseInlineFormSet):
@@ -109,7 +109,7 @@ class LabDocumentFormSet(forms.BaseInlineFormSet):
 class LabDocumentInline(admin.TabularInline):
     model = LabDocument
     formset = LabDocumentFormSet
-    form = LabDocumentForm
+    # form = LabDocumentForm
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj=obj, **kwargs)
         formset.request = request
@@ -142,7 +142,7 @@ class LabForm(forms.ModelForm):
     city = forms.CharField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
     onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
-    agreed_rate_list = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'application/pdf'}))
+    # agreed_rate_list = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'application/pdf'}))
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']

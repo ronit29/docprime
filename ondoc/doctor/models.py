@@ -163,6 +163,8 @@ class Doctor(TimeStampedModel, CreatedByModel, QCModel):
     # email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name= 'Email Verified', default=False)
     user = models.ForeignKey(User, related_name="doctor_profile", on_delete=models.CASCADE, default=None, blank=True, null=True)
+    is_insurance_enabled = models.BooleanField(verbose_name= 'Enabled for Insurance Customer',default=False)
+    is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
     hospitals = models.ManyToManyField(
         Hospital,
         through='DoctorHospital',
