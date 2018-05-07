@@ -45,7 +45,7 @@ def register_user(request, format='json'):
 @api_view(['POST', ])
 def generate_otp_user(request):
     phone_number = request.data['phone_number']
-    random_otp = randint(1000,9999)
+    random_otp = randint(100000,999999)
     response = {
         "message" : "OTP Generated Sucessfuly."
     }
@@ -70,7 +70,7 @@ def generate_otp_user(request):
 @api_view(['POST', ])
 def generate_otp_doctor(request):
     phone_number = request.data['phone_number']
-    random_otp = randint(1000,9999)
+    random_otp = randint(100000,999999)
     response = {
         "message" : "OTP Generated Sucessfuly."
     }
