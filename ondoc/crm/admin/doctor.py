@@ -1,3 +1,4 @@
+from django.contrib.gis.db import models
 from django.contrib.gis import forms
 from reversion.admin import VersionAdmin
 from django.core.exceptions import FieldDoesNotExist
@@ -98,20 +99,22 @@ class DoctorMedicalServiceInline(admin.TabularInline):
     show_change_link = False
     # autocomplete_fields = ['service']
 
-class DoctorImageForm(forms.ModelForm):
-    name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+# class DoctorImageForm(forms.ModelForm):
+#     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
 class DoctorImageInline(admin.TabularInline):
     model = DoctorImage
-    form = DoctorImageForm
+    #form = DoctorImageForm
     template = 'imageinline.html'
     extra = 0
     can_delete = True
     show_change_link = False
 
-class DoctorDocumentForm(forms.ModelForm):
-    name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
-
+# class DoctorDocumentForm(forms.ModelForm):
+#     pass
+    # name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+    # class Meta:
+    #     Model = DoctorDocument
 
 class DoctorDocumentFormSet(forms.BaseInlineFormSet):
     def clean(self):
@@ -139,7 +142,7 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
 
 class DoctorDocumentInline(admin.TabularInline):
     formset = DoctorDocumentFormSet
-    form = DoctorDocumentForm
+
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj=obj, **kwargs)
         formset.request = request
