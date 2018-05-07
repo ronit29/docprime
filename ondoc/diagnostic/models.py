@@ -220,6 +220,16 @@ class LabTestType(TimeStampedModel):
         db_table = "lab_test_type"
 
 
+class LabTestSubType(TimeStampedModel):
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lab_test_sub_type"
+
+
 # class RadiologyTestType(TimeStampedModel):
 #     name = models.CharField(max_length=200)
 
@@ -232,7 +242,7 @@ class LabTestType(TimeStampedModel):
 class LabTest(TimeStampedModel):
     name = models.CharField(max_length=200)
     test_type = models.ForeignKey(LabTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_type')
-    test_sub_type = models.ForeignKey(LabTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_sub_type')
+    test_sub_type = models.ForeignKey(LabTestSubType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_sub_type')
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
     why = models.CharField(max_length=1000, blank=True)
     pre_test_info = models.CharField(max_length=1000, blank=True)
