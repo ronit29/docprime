@@ -128,7 +128,7 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
             count[key] = 0
 
         for value in self.cleaned_data:
-            if not value['DELETE']:
+            if value and not value['DELETE']:
                 count[value['document_type']] += 1
 
         for key, value in count.items():

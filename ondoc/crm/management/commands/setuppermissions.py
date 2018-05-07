@@ -77,7 +77,7 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(LabTiming, LabImage,
         LabManager,LabAccreditation, LabAward, LabCertification,
-        LabNetwork,LabNetworkCertification, LabNetworkAward,
+        LabNetworkCertification, LabNetworkAward,
         LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
         LabNetworkManager,LabService, LabDoctorAvailability, LabDoctor, LabDocument)
 
@@ -151,7 +151,7 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(LabTiming, LabImage,
         LabManager,LabAccreditation, LabAward, LabCertification,
-        LabNetwork,LabNetworkCertification, LabNetworkAward,
+        LabNetworkCertification, LabNetworkAward,
         LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
         LabNetworkManager,LabService,LabDoctorAvailability,LabDoctor, LabDocument)
 
