@@ -503,6 +503,8 @@ class OpdAppointment(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
+    user  = models.ForeignKey(User, related_name="appointments", on_delete=models.CASCADE)
+    booked_by = models.ForeignKey(User, related_name="booked_appointements", on_delete=models.CASCADE)
     fees = models.PositiveSmallIntegerField()
     status = models.PositiveSmallIntegerField(default=CREATED)
     time_slot_start = models.DateTimeField(blank=True, null=True)
