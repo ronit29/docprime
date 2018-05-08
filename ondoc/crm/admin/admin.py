@@ -12,7 +12,7 @@ from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin
 from .lab_network import LabNetworkAdmin
 from django.contrib.auth import get_user_model
 User = get_user_model()
-from ondoc.authentication.models import OtpVerifications
+from ondoc.authentication.models import OtpVerifications, UserProfile
 
 
 # Admin Site config
@@ -23,6 +23,7 @@ admin.site.index_title = 'CRM Administration'
 
 admin.site.register(OtpVerifications)
 admin.site.register(OpdAppointment)
+admin.site.register(UserProfile)
 
 admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(DoctorOnboardingToken)
