@@ -197,7 +197,9 @@ REST_FRAMEWORK = {
 'DEFAULT_AUTHENTICATION_CLASSES': (
 #'rest_framework.authentication.TokenAuthentication',
 'ondoc.authentication.auth.CustomAuthentication',
-)
+),
+'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler'
+
 }
 
 MAP_WIDGETS = {

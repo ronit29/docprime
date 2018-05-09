@@ -56,7 +56,10 @@ class CustomUserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    USER_TYPE_CHOICES = ((1, 'staff'), (2, 'doctor'), (3, 'user'))
+    STAFF = 1
+    DOCTOR = 2
+    CONSUMER = 3
+    USER_TYPE_CHOICES = ((STAFF, 'staff'), (DOCTOR, 'doctor'), (CONSUMER, 'user'))
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['phone_number']
 
@@ -120,11 +123,14 @@ class CreatedByModel(models.Model):
         abstract = True
 
 class UserProfile(TimeStampedModel, Image):
-    
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE,"Male"), (FEMALE,"Female"), (OTHER,"Other")]
     user = models.ForeignKey(User, related_name="profiles", on_delete=models.CASCADE)
     name = models.CharField(max_length=100, blank=False, default=None)
     email = models.CharField(max_length=20, blank=False, default=None)
-    gender = models.CharField(max_length=2, default=None, blank=True, choices=[("","Select"), ("m","Male"), ("f","Female"), ("o","Other")])
+    gender = models.CharField(max_length=2, default=None, blank=True, choices=GENDER_CHOICES)
     phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     is_otp_verified = models.BooleanField(default=False)
     is_default_user = models.BooleanField(default=False)
