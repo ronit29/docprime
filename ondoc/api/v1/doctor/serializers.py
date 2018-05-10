@@ -77,7 +77,7 @@ class UpdateStatusSerializer(serializers.Serializer):
                 raise serializers.ValidationError("time_slot_start is required.")
             if not (data.get('time_slot_end')):
                 raise serializers.ValidationError("time_slot_end is required.")
-            if DoctorHospital.objects.filter(doctor=opd_appointment.doctor, hospital=opd_appointment.hospital).filter(
+            if not DoctorHospital.objects.filter(doctor=opd_appointment.doctor, hospital=opd_appointment.hospital).filter(
                     day=data.get('time_slot_start').weekday(), start__lte=data.get("time_slot_start").hour,
                     end__gte=data.get("time_slot_end").hour).exists():
                 raise serializers.ValidationError("Doctor is not available.")
