@@ -1,9 +1,9 @@
 from django.urls import path
-from .views import OTP, User
+from .views import LoginOTP, User
 
 urlpatterns = [
-    path('otp/generate', OTP.as_view({'post': 'generate'}), name='otp-generate'),
-    path('otp/verify', OTP.as_view({'post': 'verify'}), name='otp-verify'),
+    path('login/otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
+    #path('otp/verify', OTP.as_view({'post': 'verify'}), name='otp-verify'),
     path('user/login', User.as_view({'post': 'login'}), name='user-login'),
     path('user/register', User.as_view({'post': 'register'}), name='user-register'),
 

@@ -2,10 +2,14 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.generics import GenericAPIView
 from .serializers import OTPSerializer, OTPVerificationSerializer, UserSerializer
 from rest_framework.response import Response
+from django.db import transaction
 
 from ondoc.sms.api import send_otp
-from ondoc.authentication.models import User
-class OTP(GenericViewSet):
+
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+class LoginOTP(GenericViewSet):
 
     def generate(self, request, format=None):
 
@@ -32,7 +36,11 @@ class OTP(GenericViewSet):
 
 class User(GenericViewSet):
     def login(self, request, format=None):
-        pass
+        serializer = OTPVerificationSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            pass
+
+    @transaction.atomic
     def register(self, request, format=None):
 
         data = {'phone_number':request.data.get('phone_number'),'otp':request.data.get('otp')}
@@ -46,5 +54,4 @@ class User(GenericViewSet):
 
         serializer = UserSerializer(data=data)
         if serializer.is_valid(raise_exception=True):
-            pass
-        pass    
+            serializer.save()

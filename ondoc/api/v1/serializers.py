@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from ondoc.authentication.models import OtpVerifications, User, UserProfile
+import datetime
+from dateutil.relativedelta import relativedelta
 
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -33,7 +35,24 @@ class UserSerializer(serializers.ModelSerializer):
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
 
     def validate(self, attrs):
-        pass
+        if User.objects.filter(phone_number=attrs['phone_number'],user_type=User.CONSUMER).exists():
+            raise serializers.ValidationError('User already exists')
+        return attrs
+
+    def create(self, validated_data):
+        profile_data = validated_data.pop('profile')
+        validated_data.pop('otp')
+        validated_data['user_type'] = User.CONSUMER
+        validated_data['is_phone_number_verified'] = True
+        # need to convert age to date of birth
+        age = profile_data.pop('age')
+        dob = datetime.datetime.now() - relativedelta(years=age)
+        profile_data['dob'] = dob
+
+        user = User.objects.create(**validated_data)
+        profile = UserProfile.objects.create(user=user, **profile_data)
+
+        return user
 
     class Meta:
         model = User
