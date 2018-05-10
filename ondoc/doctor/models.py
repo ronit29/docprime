@@ -4,7 +4,7 @@ from django.contrib.postgres.operations import CreateExtension
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
-from django.utils.safestring import mark_safe
+from django.conf import settings
 
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
 
@@ -146,7 +146,7 @@ class College(TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(TimeStampedModel, CreatedByModel, QCModel):
+class Doctor(TimeStampedModel, QCModel):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
@@ -162,7 +162,9 @@ class Doctor(TimeStampedModel, CreatedByModel, QCModel):
     additional_details = models.CharField(max_length=2000, blank=True)
     # email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name= 'Email Verified', default=False)
-    user = models.ForeignKey(User, related_name="doctor_profile", on_delete=models.CASCADE, default=None, blank=True, null=True)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name="doctor", on_delete=models.CASCADE, default=None, blank=True, null=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="created_doctors", null=True, editable=False, on_delete=models.SET_NULL)
+
     is_insurance_enabled = models.BooleanField(verbose_name= 'Enabled for Insurance Customer',default=False)
     is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
     hospitals = models.ManyToManyField(
@@ -529,4 +531,3 @@ class DoctorLeave (TimeStampedModel):
 
     class Meta:
         db_table = "doctor_leave"
-

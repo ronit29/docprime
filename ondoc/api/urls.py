@@ -1,11 +1,11 @@
 from django.conf.urls import url, include
 from django.urls import path
 
-from .v1.router import urlpatterns as v1
-
-from rest_framework.urlpatterns import format_suffix_patterns
+from .v1.doctor.router import urlpatterns as doctor_url
+from .v1.auth.router import urlpatterns as auth_url
 
 
 urlpatterns = [
-    path('v1/', include(v1))
+    path('v1/doctor/',include(doctor_url)),
+    path('v1/user/',include(auth_url))
 ]
