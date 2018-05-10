@@ -1,18 +1,26 @@
-from datetime import datetime
+from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import BaseFilterBackend
 from rest_framework.views import APIView
 from rest_framework import viewsets
 from rest_framework import mixins
 from .serializers import OTPSerializer
 from rest_framework.response import Response
 from rest_framework import status
-from ondoc.doctor.models import OpdAppointment, Doctor, Hospital, UserProfile, User, DoctorHospital
-from .serializers import OpdAppointmentSerializer, SetAppointmentSerializer
+from ondoc.doctor.models import OpdAppointment, DoctorHospital
+from .serializers import OpdAppointmentSerializer, SetAppointmentSerializer, UpdateStatusSerializer
 from rest_framework.decorators import action
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 
 
 from ondoc.sms.api import send_otp
+
+
+class DoctorFilterBackend(BaseFilterBackend):
+
+    def filter_queryset(self, request, queryset, view):
+        return queryset.filter(doctor__user=request.user)
 
 
 class OndocViewSet(mixins.CreateModelMixin,
@@ -39,9 +47,11 @@ class OTP(APIView):
 
 class DoctorAppointmentsViewSet(OndocViewSet):
     authentication_classes = (TokenAuthentication, )
+    filter_backends = (DjangoFilterBackend, DoctorFilterBackend)
     permission_classes = (IsAuthenticated,)
     queryset = OpdAppointment.objects.all()
     serializer_class = OpdAppointmentSerializer
+    filter_fields = ('hospital',)
 
     @action(methods=['post'], detail=False)
     def set_appointment(self, request):
@@ -75,3 +85,17 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         appointment_serializer.save()
         return Response(data=appointment_serializer.data)
 
+    @action(methods=['post'], detail=True)
+    def update_status(self, request, pk):
+        opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
+        serializer = UpdateStatusSerializer(data=request.data,
+                                            context={'request': request, 'opd_appointment': opd_appointment})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        opd_appointment.status = data.get('status')
+        if data.get('status') == OpdAppointment.RESCHEDULED and request.user.user_type == 3:
+            opd_appointment.time_slot_start = data.get("time_slot_start")
+            opd_appointment.time_slot_end = data.get("time_slot_end")
+        opd_appointment.save()
+        opd_appointment_serializer = OpdAppointmentSerializer(opd_appointment)
+        return Response(opd_appointment_serializer.data)
