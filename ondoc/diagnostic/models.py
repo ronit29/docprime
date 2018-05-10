@@ -1,6 +1,6 @@
 from django.contrib.gis.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile
 from ondoc.doctor.models import Hospital
 
 
@@ -155,6 +155,7 @@ class LabNetworkAward(TimeStampedModel):
     network = models.ForeignKey(LabNetwork, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
     year = models.PositiveSmallIntegerField(validators=[MinValueValidator(1900)])
+
     def __str__(self):
         return self.network.name + " (" + self.name + ")"
 
@@ -171,6 +172,7 @@ class LabNetworkAccreditation(TimeStampedModel):
 
     class Meta:
         db_table = "lab_network_accreditation"
+
 
 class LabNetworkManager(TimeStampedModel):
     network = models.ForeignKey(LabNetwork, on_delete=models.CASCADE)
@@ -258,6 +260,7 @@ class LabTest(TimeStampedModel):
     class Meta:
         db_table = "lab_test"
 
+
 class AvailableLabTest(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests')
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='availablelabs')
@@ -266,10 +269,30 @@ class AvailableLabTest(TimeStampedModel):
     deal_price = models.PositiveSmallIntegerField()
 
     def __str__(self):
-        return self.name+', '+self.lab.name
+        return self.test.name+', '+self.lab.name
 
     class Meta:
         db_table = "available_lab_test"
+
+
+class LabAppointment(TimeStampedModel):
+    CREATED = 1
+    ACCEPTED = 2
+    RESCHEDULED = 3
+    REJECTED = 4
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
+    lab_test = models.ManyToManyField(AvailableLabTest)
+    profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)
+    status = models.PositiveSmallIntegerField(default=CREATED)
+    price = models.PositiveSmallIntegerField()
+    time_slot_start = models.DateTimeField(blank=True, null=True)
+    time_slot_end = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return self.profile.name+', '+self.lab.name
+
+    class Meta:
+        db_table = "lab_appointment"
 
 
 class CommonTest(TimeStampedModel):
@@ -309,6 +332,7 @@ class PromotedLab(TimeStampedModel):
 #     class Meta:
 #         db_table = "radiology_test"
 
+
 class LabService(TimeStampedModel):
     PATHOLOGY = 1
     RADIOLOGY = 2
@@ -322,6 +346,7 @@ class LabService(TimeStampedModel):
     class Meta:
         db_table = "lab_service"
 
+
 class LabDoctorAvailability(TimeStampedModel):
     SLOT_CHOICES = [("m","Morning"), ("e","Evening")]
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
@@ -334,6 +359,7 @@ class LabDoctorAvailability(TimeStampedModel):
 
     class Meta:
         db_table = "lab_doctor_availability"
+
 
 class LabDoctor(TimeStampedModel):
     registration_number = models.CharField(max_length=100, blank=False)
@@ -363,6 +389,7 @@ class LabDocument(TimeStampedModel, Image):
 
     class Meta:
         db_table = "lab_document"
+
 
 class LabOnboardingToken(TimeStampedModel):
     GENERATED = 1

@@ -197,7 +197,8 @@ REST_FRAMEWORK = {
 'DEFAULT_AUTHENTICATION_CLASSES': (
 #'rest_framework.authentication.TokenAuthentication',
 'ondoc.authentication.auth.CustomAuthentication',
-)
+),
+'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',)
 }
 
 MAP_WIDGETS = {

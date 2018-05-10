@@ -3,16 +3,17 @@
 from django.contrib.gis import admin
 
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital, HospitalNetwork, DoctorOnboardingToken, OpdAppointment)
-from ondoc.diagnostic.models import Lab, LabNetwork, LabTest, LabTestType, LabService
+from ondoc.diagnostic.models import Lab, LabNetwork, LabTest, LabTestType, LabService, LabTestSubType, AvailableLabTest, \
+    LabAppointment, LabTiming
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin, CollegeAdmin)
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
-from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin
+from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, LabSubTestTypeAdmin, AvailableLabTestAdmin
 from .lab_network import LabNetworkAdmin
 from django.contrib.auth import get_user_model
 User = get_user_model()
-from ondoc.authentication.models import OtpVerifications
+from ondoc.authentication.models import OtpVerifications, UserProfile
 
 
 # Admin Site config
@@ -41,3 +42,9 @@ admin.site.register(LabNetwork, LabNetworkAdmin)
 
 admin.site.register(LabTest, LabTestAdmin)
 admin.site.register(LabTestType, LabTestTypeAdmin)
+admin.site.register(LabTestSubType, LabSubTestTypeAdmin)
+admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
+
+admin.site.register(UserProfile)
+admin.site.register(LabAppointment)
+admin.site.register(LabTiming)
