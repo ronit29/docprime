@@ -16,7 +16,7 @@ User = get_user_model()
 
 from ondoc.doctor.models import OpdAppointment, DoctorHospital
 from .serializers import OpdAppointmentSerializer, SetAppointmentSerializer, UpdateStatusSerializer, AppointmentFilterSerializer, CreateAppointmentSerializer
-
+from ondoc.api.pagination import paginate_queryset
 
 
 # class DoctorFilterBackend(BaseFilterBackend):
@@ -108,16 +108,20 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if hospital_id:
             queryset = queryset.filter(hospital_id=hospital_id)
-        if range=='previous':
-            queryset = queryset.filter(time_slot_start__lte=timezone.now())
-        elif range=='upcoming':
-            queryset.filter(status__in=[OpdAppointment.CREATED, OpdAppointment.RESCHEDULED],
-                time_slot_start__gt=timezone.now())
-        elif range=='pending':
-            queryset.filter(time_slot_start__gt=timezone.now(), status = OpdAppointment.CREATED)   
-        serial = OpdAppointmentSerializer(queryset, many=True)
-        return Response(serial.data)
 
+        if range=='previous':
+            queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
+        elif range=='upcoming':
+            queryset = queryset.filter(status__in=[OpdAppointment.CREATED, OpdAppointment.RESCHEDULED],
+                time_slot_start__gt=timezone.now()).order_by('time_slot_start')
+        elif range=='pending':
+            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status = OpdAppointment.CREATED).order_by('time_slot_start')
+        else:
+            queryset = queryset.order_by('-time_slot_start')
+
+        queryset = paginate_queryset(queryset, request)    
+        serializer = OpdAppointmentSerializer(queryset, many=True)
+        return Response(serializer.data)
 
     @transaction.atomic
     def create(self, request):
