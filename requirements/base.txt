@@ -9,3 +9,4 @@ django-crispy-forms
 requests
 django-cors-headers
 django-filter==1.1.0
+python-dateutil==2.7.3
