@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.db.models import Q
-from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital)
+from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital, DoctorAssociation,
+                                 DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage, DoctorLanguage
+                                 , DoctorMedicalService, DoctorMobile, DoctorQualification)
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -132,3 +134,148 @@ class UpdateStatusSerializer(serializers.Serializer):
                             end__gte=data.get("time_slot_end").hour).exists()):
                 raise serializers.ValidationError("Doctor is not available.")
         return data
+
+
+class DoctorImageSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DoctorImage
+        fields = ('name', )
+
+
+class DoctorQualificationSerializer(serializers.ModelSerializer):
+    qualification = serializers.ReadOnlyField(source='qualification.name')
+    specialization = serializers.ReadOnlyField(source='specialization.name')
+    college = serializers.ReadOnlyField(source='college.name')
+
+    class Meta:
+        model = DoctorQualification
+        fields = ('passing_year', 'qualification', 'specialization', 'college')
+
+
+class DoctorLanguageSerializer(serializers.ModelSerializer):
+
+    language = serializers.ReadOnlyField(source='language.name')
+
+    class Meta:
+        model = DoctorLanguage
+        fields = ('language', )
+
+
+class DoctorHospitalSerializer(serializers.ModelSerializer):
+    doctor = serializers.ReadOnlyField(source='doctor.name')
+    hospital = serializers.ReadOnlyField(source='hospital.name')
+    address = serializers.ReadOnlyField(source='hospital.address')
+    hospital_id = serializers.ReadOnlyField(source='hospital.pk')
+
+    def create(self, validated_data):
+        return DoctorHospital.objects.create(**validated_data)
+
+    def validate(self, data):
+        data['doctor'] = self.context['doctor']
+        data['hospital'] = self.context['hospital']
+
+        return data
+
+    class Meta:
+        model = DoctorHospital
+        fields = ('doctor', 'hospital', 'address', 'hospital_id', 'day', 'start', 'end', 'fees',)
+
+
+class DoctorEmailSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DoctorEmail
+        fields = ('email', 'is_primary')
+
+
+class DoctorAssociationSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DoctorAssociation
+        fields = ('name', 'id')
+
+
+class DoctorMobileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DoctorMobile
+        fields = ('number', 'is_primary')
+
+
+class DoctorExperienceSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DoctorExperience
+        fields = ('hospital', 'start_year', 'end_year', )
+
+
+class DoctorAwardSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DoctorAward
+        fields = ('name', 'year')
+
+
+class MedicalServiceSerializer(serializers.ModelSerializer):
+
+    name = serializers.ReadOnlyField(source='service.name')
+    description = serializers.ReadOnlyField(source='service.name')
+
+    class Meta:
+        model = DoctorMedicalService
+        fields = ('id', 'name', 'description')
+
+
+class DoctorProfileSerializer(serializers.ModelSerializer):
+    images = DoctorImageSerializer(read_only=True, many=True)
+    qualifications = DoctorQualificationSerializer(read_only=True, many=True)
+    languages = DoctorLanguageSerializer(read_only=True, many=True)
+    availability = DoctorHospitalSerializer(read_only=True, many=True)
+    emails = DoctorEmailSerializer(read_only=True, many=True)
+    mobiles = DoctorMobileSerializer(read_only=True, many=True)
+    medical_services = MedicalServiceSerializer(read_only=True, many=True)
+    experiences = DoctorExperienceSerializer(read_only=True, many=True)
+    associations = DoctorAssociationSerializer(read_only=True, many=True)
+    awards = DoctorAwardSerializer(read_only=True, many=True)
+
+    # def to_representation(self, doctor):
+    #     parent_rep = super().to_representation(doctor)
+    #     try:
+    #         parent_rep['images'] = parent_rep['images'][0]
+    #     except KeyError as e:
+    #         return parent_rep
+    #
+    #     return parent_rep
+
+    class Meta:
+        model = Doctor
+        fields = (
+        'id', 'name', 'gender', 'about', 'license', 'additional_details', 'emails', 'practicing_since', 'images',
+        'languages', 'qualifications', 'availability', 'mobiles', 'medical_services', 'experiences', 'associations',
+        'awards', 'appointments')
+
+
+class HospitalModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Hospital
+        fields = '__all__'
+
+
+class DoctorHospitalModelSerializer(serializers.ModelSerializer):
+    hospital = HospitalModelSerializer()
+
+    class Meta:
+        model = DoctorHospital
+        fields = '__all__'
+
+
+class DoctorHospitalListSerializer(serializers.Serializer):
+    min_fees = serializers.IntegerField()
+    hospital = serializers.SerializerMethodField()
+
+    def get_hospital(self, obj):
+        queryset = Hospital.objects.get(pk=obj['hospital'])
+        serializer = HospitalModelSerializer(queryset)
+        return serializer.data
+

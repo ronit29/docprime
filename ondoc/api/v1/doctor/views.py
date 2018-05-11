@@ -14,16 +14,19 @@ from django.db import transaction
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-from ondoc.doctor.models import OpdAppointment, DoctorHospital
-from .serializers import OpdAppointmentSerializer, SetAppointmentSerializer, UpdateStatusSerializer, AppointmentFilterSerializer, CreateAppointmentSerializer
+from ondoc.doctor.models import OpdAppointment, DoctorHospital, Doctor
+from .serializers import OpdAppointmentSerializer, SetAppointmentSerializer, UpdateStatusSerializer, \
+    AppointmentFilterSerializer, CreateAppointmentSerializer, DoctorHospitalModelSerializer, \
+    DoctorHospitalListSerializer, DoctorProfileSerializer, DoctorHospitalSerializer
 from ondoc.api.pagination import paginate_queryset
+
+from django.db.models import Min
 
 
 # class DoctorFilterBackend(BaseFilterBackend):
 
 #     def filter_queryset(self, request, queryset, view):
 #         return queryset.filter(doctor__user=request.user)
-
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -40,6 +43,7 @@ class OndocViewSet(mixins.CreateModelMixin,
                    mixins.ListModelMixin,
                    viewsets.GenericViewSet):
     pass
+
 
 class DoctorAppointmentsViewSet(OndocViewSet):
     authentication_classes = (TokenAuthentication, )
@@ -180,3 +184,33 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             opd_appointment.time_slot_end = validated_data.get("time_slot_end")
         opd_appointment.save()
         return opd_appointment
+
+
+class DoctorProfileView(mixins.RetrieveModelMixin,
+                        viewsets.GenericViewSet):
+    serializer_class = DoctorProfileSerializer
+    queryset = Doctor.objects.all()
+
+
+class DoctorHospitalView(mixins.ListModelMixin,
+                         mixins.RetrieveModelMixin,
+                         viewsets.GenericViewSet):
+
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    queryset = DoctorHospital.objects.all()
+    serializer_class = DoctorHospitalSerializer
+
+    def list(self, request):
+        user = request.user
+        queryset = (DoctorHospital.objects.filter(doctor__user=user).
+                    values('hospital').annotate(min_fees=Min('fees')))
+        serializer = DoctorHospitalListSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def retrieve(self, request, pk):
+        user = request.user
+        queryset = DoctorHospital.objects.filter(doctor__user=user, hospital=pk)
+        serializer = DoctorHospitalModelSerializer(queryset, many=True)
+        return Response(serializer.data)
