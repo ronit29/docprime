@@ -72,20 +72,20 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 #         serial = OpdAppointmentSerializer(queryset, many=True)
 #         return Response(serial.data)
 
-#     @action(methods=['post'], detail=True)
-#     def update_status(self, request, pk):
-#         opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
-#         serializer = UpdateStatusSerializer(data=request.data,
-#                                             context={'request': request, 'opd_appointment': opd_appointment})
-#         serializer.is_valid(raise_exception=True)
-#         data = serializer.validated_data
-#         opd_appointment.status = data.get('status')
-#         if data.get('status') == OpdAppointment.RESCHEDULED and request.user.user_type == 3:
-#             opd_appointment.time_slot_start = data.get("time_slot_start")
-#             opd_appointment.time_slot_end = data.get("time_slot_end")
-#         opd_appointment.save()
-#         opd_appointment_serializer = OpdAppointmentSerializer(opd_appointment)
-#         return Response(opd_appointment_serializer.data)
+    # @action(methods=['post'], detail=True)
+    # def update_status(self, request, pk):
+    #     opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
+    #     serializer = UpdateStatusSerializer(data=request.data,
+    #                                         context={'request': request, 'opd_appointment': opd_appointment})
+    #     serializer.is_valid(raise_exception=True)
+    #     data = serializer.validated_data
+    #     opd_appointment.status = data.get('status')
+    #     if data.get('status') == OpdAppointment.RESCHEDULED and request.user.user_type == 3:
+    #         opd_appointment.time_slot_start = data.get("time_slot_start")
+    #         opd_appointment.time_slot_end = data.get("time_slot_end")
+    #     opd_appointment.save()
+    #     opd_appointment_serializer = OpdAppointmentSerializer(opd_appointment)
+    #     return Response(opd_appointment_serializer.data)
 
     def get_queryset(self):
 
@@ -105,23 +105,21 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         range = serializer.validated_data.get('range')
         hospital_id = serializer.validated_data.get('hospital_id')
 
-
         if hospital_id:
             queryset = queryset.filter(hospital_id=hospital_id)
-        if range=='previous':
+        if range == 'previous':
             queryset = queryset.filter(time_slot_start__lte=timezone.now())
-        elif range=='upcoming':
-            queryset.filter(status__in=[OpdAppointment.CREATED, OpdAppointment.RESCHEDULED],
-                time_slot_start__gt=timezone.now())
-        elif range=='pending':
-            queryset.filter(time_slot_start__gt=timezone.now(), status = OpdAppointment.CREATED)   
+        elif range == 'upcoming':
+            queryset = queryset.filter(status__in=[OpdAppointment.CREATED, OpdAppointment.RESCHEDULED],
+                                       time_slot_start__gt=timezone.now())
+        elif range == 'pending':
+            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status=OpdAppointment.CREATED)
         serial = OpdAppointmentSerializer(queryset, many=True)
         return Response(serial.data)
 
 
     @transaction.atomic
     def create(self, request):
-
         serializer = CreateAppointmentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -149,3 +147,33 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         resp["status"] = 1
         resp["data"] = appointment_serializer.data
         return Response(data=resp)
+
+    def update(self, request, pk=None):
+        opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
+        serializer = UpdateStatusSerializer(data=request.data,
+                                            context={'request': request, 'opd_appointment': opd_appointment})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        if request.user.user_type == User.DOCTOR:
+            updated_opd_appointment = self.doctor_update(opd_appointment, validated_data)
+        elif request.user.user_type == User.CONSUMER:
+            updated_opd_appointment = self.consumer_update(opd_appointment, validated_data)
+        opd_appointment_serializer = OpdAppointmentSerializer(updated_opd_appointment)
+        response = {
+            "status": 1,
+            "data": opd_appointment_serializer.data
+        }
+        return Response(response)
+
+    def doctor_update(self, opd_appointment, validated_data):
+        opd_appointment.status = validated_data.get('status')
+        opd_appointment.save()
+        return opd_appointment
+
+    def consumer_update(self, opd_appointment, validated_data):
+        opd_appointment.status = validated_data.get('status')
+        if validated_data.get('status') == OpdAppointment.RESCHEDULED:
+            opd_appointment.time_slot_start = validated_data.get("time_slot_start")
+            opd_appointment.time_slot_end = validated_data.get("time_slot_end")
+        opd_appointment.save()
+        return opd_appointment

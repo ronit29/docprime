@@ -72,7 +72,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
             raise serializers.ValidationError('Cannot book appointment with same doctor again')
 
         if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile = data.get('profile')).count()>=MAX_APPOINTMENTS_ALLOWED:
-            raise serializers.ValidationError('Max'+MAX_APPOINTMENTS_ALLOWED+' active appointments are allowed')
+            raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
 
         return data
 
@@ -111,17 +111,17 @@ class UpdateStatusSerializer(serializers.Serializer):
         request = self.context.get("request")
         opd_appointment = self.context.get("opd_appointment")
         current_datetime = timezone.now()
-        if request.user.user_type == 2 and not (data.get('status') in self.DOCTOR_ALLOWED_CHOICES):
+        if request.user.user_type == User.DOCTOR and not (data.get('status') in self.DOCTOR_ALLOWED_CHOICES):
             raise serializers.ValidationError("Not a valid status for the user.")
-        if request.user.user_type == 3 and (not data.get('status') in self.PATIENT_ALLOWED_CHOICES):
+        if request.user.user_type == User.CONSUMER and (not data.get('status') in self.PATIENT_ALLOWED_CHOICES):
             raise serializers.ValidationError("Not a valid status for the user.")
-        if request.user.user_type == 2 and data.get('status') == OpdAppointment.ACCEPTED and (
+        if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.ACCEPTED and (
                 current_datetime > opd_appointment.time_slot_start):
             raise serializers.ValidationError("Can not accept appointment after time slot has passed.")
-        if request.user.user_type == 2 and data.get('status') == OpdAppointment.RESCHEDULED and (
+        if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.RESCHEDULED and (
                 current_datetime > opd_appointment.time_slot_start):
             raise serializers.ValidationError("Can not reschedule appointment after time slot has passed.")
-        if request.user.user_type == 3 and data.get('status') == OpdAppointment.RESCHEDULED:
+        if request.user.user_type == User.CONSUMER and data.get('status') == OpdAppointment.RESCHEDULED:
             if not (data.get('time_slot_start')):
                 raise serializers.ValidationError("time_slot_start is required.")
             if not (data.get('time_slot_end')):
