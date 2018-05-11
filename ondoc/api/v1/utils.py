@@ -35,6 +35,11 @@ def custom_exception_handler(exc, context):
     if response is not None:
         try:
             data = formatted_errors(exc.get_full_details())
+            nfe = data.get('non_field_errors')
+            if nfe:
+                del data['non_field_errors']
+                data['request_errors'] = nfe
+
             response.data = data
         except Exception:
             pass
