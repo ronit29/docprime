@@ -30,8 +30,14 @@ class LoginOTP(GenericViewSet):
         phone_number = data['phone_number']
         send_otp("otp sent {}", phone_number)
 
-        if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
-            response['exists']=1
+        req_type = request.query_params.get('type')
+
+        if req_type == 'doctor':
+            if DoctorMobile.objects.filter(number=phone_number, is_primary=True).exists():
+                response['exists']=1
+        else:
+            if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
+                response['exists']=1
 
         return Response(response)
 

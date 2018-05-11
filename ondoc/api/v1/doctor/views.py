@@ -98,7 +98,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     def list(self, request):
         queryset = self.get_queryset()
-        print(request.query_params)
         serializer = AppointmentFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
