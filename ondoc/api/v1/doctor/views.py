@@ -11,6 +11,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db import transaction
+from django.http import Http404
+
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
@@ -186,10 +188,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return opd_appointment
 
 
-class DoctorProfileView(mixins.RetrieveModelMixin,
-                        viewsets.GenericViewSet):
-    serializer_class = DoctorProfileSerializer
-    queryset = Doctor.objects.all()
+class DoctorProfileView(viewsets.GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
+    permission_classes = (IsAuthenticated,)
+
+    def retrieve(self, request):
+        doctor  = get_object_or_404(Doctor, pk=request.user.doctor.id)
+        serializer = DoctorProfileSerializer(doctor, many=False)
+
+        return Response(serializer.data)
 
 
 class DoctorHospitalView(mixins.ListModelMixin,
@@ -202,15 +209,25 @@ class DoctorHospitalView(mixins.ListModelMixin,
     queryset = DoctorHospital.objects.all()
     serializer_class = DoctorHospitalSerializer
 
+    def get_queryset(self):
+        user = self.request.user
+        if user.user_type == User.DOCTOR:
+            return DoctorHospital.objects.filter(doctor=user.doctor)
+
+
     def list(self, request):
         user = request.user
-        queryset = (DoctorHospital.objects.filter(doctor__user=user).
-                    values('hospital').annotate(min_fees=Min('fees')))
+        queryset = self.get_queryset().values('hospital').annotate(min_fees=Min('fees'))
+
         serializer = DoctorHospitalListSerializer(queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk):
         user = request.user
-        queryset = DoctorHospital.objects.filter(doctor__user=user, hospital=pk)
+
+        queryset = self.get_queryset().filter(hospital=pk)
+        if len(queryset) == 0:
+            raise Http404("No Hospital matches the given query.")
+
         serializer = DoctorHospitalModelSerializer(queryset, many=True)
         return Response(serializer.data)

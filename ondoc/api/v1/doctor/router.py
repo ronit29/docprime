@@ -7,10 +7,10 @@ urlpatterns = [
     path('appointment/<int:pk>', DoctorAppointmentsViewSet.as_view({'get': 'retrieve'}), name='get-appointment-detail'),
     path('appointment/<int:pk>/update', DoctorAppointmentsViewSet.as_view({'post': 'update'}),
          name='update-appointment-detail'),
-    path('doctorprofile/<int:pk>/',
+    path('profile',
          DoctorProfileView.as_view({'get': 'retrieve'}), name='doctor-profile'),
-    path('doctorclinic/',
+    path('clinic',
          DoctorHospitalView.as_view({'get': 'list'}), name='doctor-hospital'),
-    path('doctorclinic/<int:pk>/',
+    path('clinic/<int:pk>/',
          DoctorHospitalView.as_view({'get': 'retrieve'}), name='doctor-detail-hospital'),
 ]

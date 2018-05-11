@@ -229,23 +229,20 @@ class DoctorQualification(TimeStampedModel):
 
 
 class DoctorHospital(TimeStampedModel):
+    DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
+
+    TIME_SLOT_CHOICES = [(6, "6 AM"), (7, "7 AM"),
+        (8, "8 AM"), (9, "9 AM"), (10, "10 AM"), (11, "11 AM"),
+        (12, "12 PM"), (13, "1 PM"), (14, "2 PM"), (15, "3 PM"),
+        (16, "4 PM"), (17, "5 PM"), (18, "6 PM"), (19, "7 PM"),
+        (20, "8 PM"), (21, "9 PM"), (22, "10 PM"), (23, "11 PM")]
     doctor = models.ForeignKey(Doctor, related_name="availability", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
+    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
 
-    start = models.PositiveSmallIntegerField(
-        blank=False, null=False, choices=[(6, "6 AM"), (7, "7 AM"),
-        (8, "8 AM"), (9, "9 AM"), (10, "10 AM"), (11, "11 AM"),
-        (12, "12 PM"), (13, "1 PM"), (14, "2 PM"), (15, "3 PM"),
-        (16, "4 PM"), (17, "5 PM"), (18, "6 PM"), (19, "7 PM"),
-        (20, "8 PM"), (21, "9 PM"), (22, "10 PM"), (23, "11 PM")])
+    start = models.PositiveSmallIntegerField(blank=False, null=False, choices=TIME_SLOT_CHOICES)
 
-    end = models.PositiveSmallIntegerField(
-        blank=False, null=False, choices=[(6, "6 AM"), (7, "7 AM"),
-        (8, "8 AM"), (9, "9 AM"), (10, "10 AM"), (11, "11 AM"),
-        (12, "12 PM"), (13, "1 PM"), (14, "2 PM"), (15, "3 PM"),
-        (16, "4 PM"), (17, "5 PM"), (18, "6 PM"), (19, "7 PM"),
-        (20, "8 PM"), (21, "9 PM"), (22, "10 PM"), (23, "11 PM")])
+    end = models.PositiveSmallIntegerField(blank=False, null=False, choices=TIME_SLOT_CHOICES)
 
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
 

@@ -167,6 +167,12 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     hospital = serializers.ReadOnlyField(source='hospital.name')
     address = serializers.ReadOnlyField(source='hospital.address')
     hospital_id = serializers.ReadOnlyField(source='hospital.pk')
+    day = serializers.SerializerMethodField()
+
+    def get_day(self, attrs):
+        day  = attrs.day
+        return dict(DoctorHospital.DAY_CHOICES).get(day)
+
 
     def create(self, validated_data):
         return DoctorHospital.objects.create(**validated_data)
@@ -251,23 +257,52 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
         fields = (
-        'id', 'name', 'gender', 'about', 'license', 'additional_details', 'emails', 'practicing_since', 'images',
+        'id', 'name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
         'languages', 'qualifications', 'availability', 'mobiles', 'medical_services', 'experiences', 'associations',
         'awards', 'appointments')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
+    lat = serializers.SerializerMethodField()
+    lng = serializers.SerializerMethodField()
+    def get_lat(self, obj):
+        loc = obj.location
+        if loc:
+            return loc.y
+        return None
+
+    def get_lng(self, obj):   
+        loc = obj.location
+        if loc:
+            return loc.x
+        return None
+
     class Meta:
         model = Hospital
-        fields = '__all__'
-
+        fields = ('id', 'name', 'operational_since', 'lat', 'lng', 'registration_number','building', 'sublocality', 'locality', 'city')
 
 class DoctorHospitalModelSerializer(serializers.ModelSerializer):
     hospital = HospitalModelSerializer()
+    day = serializers.SerializerMethodField()
+    start = serializers.SerializerMethodField()
+    end = serializers.SerializerMethodField()
+    
+    def get_day(self, obj):
+        day = obj.day
+        return dict(DoctorHospital.DAY_CHOICES).get(day)
+
+    def get_start(self, obj):
+        start = obj.start
+        return dict(DoctorHospital.TIME_SLOT_CHOICES).get(start)
+
+    def get_end(self, obj):
+        end = obj.end
+        return dict(DoctorHospital.TIME_SLOT_CHOICES).get(end)
 
     class Meta:
         model = DoctorHospital
         fields = '__all__'
+        fields = ('id','day','start','end','fees','hospital')
 
 
 class DoctorHospitalListSerializer(serializers.Serializer):
@@ -278,4 +313,3 @@ class DoctorHospitalListSerializer(serializers.Serializer):
         queryset = Hospital.objects.get(pk=obj['hospital'])
         serializer = HospitalModelSerializer(queryset)
         return serializer.data
-
