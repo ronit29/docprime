@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital, DoctorAssociation,
-                                 DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage, DoctorLanguage
-                                 , DoctorMedicalService, DoctorMobile, DoctorQualification)
+                                 DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
+                                 DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave)
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -279,3 +279,25 @@ class DoctorHospitalListSerializer(serializers.Serializer):
         serializer = HospitalModelSerializer(queryset)
         return serializer.data
 
+
+class DoctorBlockCalenderSerialzer(serializers.Serializer):
+    INTERVAL_CHOICES = tuple([value for value in DoctorLeave.INTERVAL_MAPPING.values()])
+    interval = serializers.ChoiceField(choices=INTERVAL_CHOICES)
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if DoctorLeave.objects.filter(doctor=request.user.doctor.id, deleted_at__isnull=True).exists():
+            raise serializers.ValidationError("Doctor can apply on one leave at a time")
+        return attrs
+
+
+class DoctorLeaveSerializer(serializers.ModelSerializer):
+    interval = serializers.CharField(read_only=True)
+    start_time = serializers.TimeField(write_only=True)
+    end_time = serializers.TimeField(write_only=True)
+
+    class Meta:
+        model = DoctorLeave
+        exclude = ('created_at', 'updated_at', 'deleted_at')

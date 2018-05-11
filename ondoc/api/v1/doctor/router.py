@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospitalView
+from .views import DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospitalView, DoctorBlockCalendarViewSet
 
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
@@ -13,4 +13,8 @@ urlpatterns = [
          DoctorHospitalView.as_view({'get': 'list'}), name='doctor-hospital'),
     path('doctorclinic/<int:pk>/',
          DoctorHospitalView.as_view({'get': 'retrieve'}), name='doctor-detail-hospital'),
-]
+    path('block-calender', DoctorBlockCalendarViewSet.as_view({'get': 'list'}), name='get-block-calender'),
+    path('block-calender/create', DoctorBlockCalendarViewSet.as_view({'post': 'create'}), name='block-calender-create'),
+    path('block-calender/<int:pk>/delete', DoctorBlockCalendarViewSet.as_view({'post': 'destroy'}),
+         name='block-calender-delete'),
+ ]

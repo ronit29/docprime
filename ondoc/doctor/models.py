@@ -520,15 +520,25 @@ class OpdAppointment(TimeStampedModel):
         db_table = "opd_appointment"
 
 
-class DoctorLeave (TimeStampedModel):
+class DoctorLeave(TimeStampedModel):
+    INTERVAL_MAPPING = {
+        ("12:00:00", "01:59:59"): 'morning',
+        ("02:00:00", "05:59:59"): 'evening',
+        ("12:00:00", "05:59:59"): 'all',
+    }
     doctor = models.ForeignKey(Doctor, related_name="leaves", on_delete=models.CASCADE)
     start_time = models.TimeField(blank=True, null=True)
     end_time = models.TimeField(blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)
     end_date = models.DateField(blank=True, null=True)
+    deleted_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return self.doctor.name + "(" + str(self.start_time) + "," + str(self.end_date) + str(self.start_date)
 
     class Meta:
         db_table = "doctor_leave"
+
+    @property
+    def interval(self):
+        return self.INTERVAL_MAPPING.get((str(self.start_time), str(self.end_time)))
