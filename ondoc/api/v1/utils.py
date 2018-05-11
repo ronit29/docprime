@@ -33,7 +33,10 @@ def custom_exception_handler(exc, context):
 
     # Now add the HTTP status code to the response.
     if response is not None:
-        data = formatted_errors(exc.get_full_details())
-        response.data = data
+        try:
+            data = formatted_errors(exc.get_full_details())
+            response.data = data
+        except Exception:
+            pass
 
     return response

@@ -2,14 +2,18 @@ from rest_framework import serializers
 from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital)
 from django.utils import timezone
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 
 class OTPSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField()
 
 class AppointmentFilterSerializer(serializers.Serializer):
-    CHOICES = ['all', 'previous', 'upcoming']
-    range = serializers.ChoiceField(choices=CHOICES)
+    CHOICES = ['all', 'previous', 'upcoming', 'pending']
+
+    range = serializers.ChoiceField(choices=CHOICES, required=False)
+    hospital_id = serializers.IntegerField(required=False)
 
 class OpdAppointmentSerializer(serializers.ModelSerializer):
 
@@ -29,6 +33,48 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             return obj.profile.profile_image
         else:
             return None
+
+
+class CreateAppointmentSerializer(serializers.Serializer):
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
+    time_slot_start = serializers.DateTimeField()
+    time_slot_end = serializers.DateTimeField()
+
+    def validate(self, data):
+        ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.CREATED, OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]
+        MAX_APPOINTMENTS_ALLOWED = 3
+        MAX_FUTURE_DAY = 7
+        request = self.context.get("request")
+        time_slot_start = data.get("time_slot_start")
+        time_slot_end = data.get("time_slot_end")
+
+        if not request.user.user_type == User.CONSUMER:
+            raise serializers.ValidationError("Not allowed to create appointment")
+
+        if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
+            raise serializers.ValidationError("Invalid profile id")
+
+        if time_slot_start<timezone.now():
+            raise serializers.ValidationError("Cannot book in past")
+
+        delta = time_slot_start - timezone.now()
+        if delta.days > MAX_FUTURE_DAY:
+            raise serializers.ValidationError("Cannot book appointment more than "+str(MAX_FUTURE_DAY)+" days ahead")
+
+
+        if not DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
+            day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).exists():
+            raise serializers.ValidationError("Invalid slot")
+
+        if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor = data.get('doctor')).exists():
+            raise serializers.ValidationError('Cannot book appointment with same doctor again')
+
+        if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile = data.get('profile')).count()>=MAX_APPOINTMENTS_ALLOWED:
+            raise serializers.ValidationError('Max'+MAX_APPOINTMENTS_ALLOWED+' active appointments are allowed')
+
+        return data
 
 
 class SetAppointmentSerializer(serializers.Serializer):

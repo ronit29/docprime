@@ -502,6 +502,7 @@ class OpdAppointment(TimeStampedModel):
     ACCEPTED = 2
     RESCHEDULED = 3
     REJECTED = 4    
+    CANCELED = 5
     doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
