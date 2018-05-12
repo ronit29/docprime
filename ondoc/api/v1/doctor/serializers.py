@@ -1,8 +1,10 @@
 from rest_framework import serializers
 from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital, DoctorAssociation,
-                                 DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage, DoctorLanguage
-                                 , DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave)
+                                 DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
+                                 DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
+                                 Prescription, PrescriptionFile)
+
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -335,3 +337,22 @@ class DoctorLeaveSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorLeave
         exclude = ('created_at', 'updated_at', 'deleted_at')
+
+
+class PrescriptionFileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = PrescriptionFile
+        fields = "__all__"
+
+
+class PrescriptionSerializer(serializers.Serializer):
+    appointment = serializers.PrimaryKeyRelatedField(queryset=OpdAppointment.objects.all())
+    prescription_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
+    file = serializers.FileField()
+
+    def validate_appointment(self, value):
+        request = self.context.get('request')
+        if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
+            raise serializers.ValidationError("Appointment is not correct.")
+        return value
