@@ -257,6 +257,7 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
         serializer = DoctorLeaveSerializer(queryset, many=True)
         return Response(serializer.data)
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         serializer = DoctorBlockCalenderSerialzer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -270,6 +271,7 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
         }
         doctor_leave_serializer = DoctorLeaveSerializer(data=doctor_leave_data)
         doctor_leave_serializer.is_valid(raise_exception=True)
+        self.get_queryset().update(deleted_at = timezone.now())
         doctor_leave_serializer.save()
         return Response(doctor_leave_serializer.data)
 

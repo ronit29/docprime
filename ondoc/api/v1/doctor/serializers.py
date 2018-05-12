@@ -320,11 +320,11 @@ class DoctorBlockCalenderSerialzer(serializers.Serializer):
     start_date = serializers.DateField()
     end_date = serializers.DateField()
 
-    def validate(self, attrs):
-        request = self.context.get("request")
-        if DoctorLeave.objects.filter(doctor=request.user.doctor.id, deleted_at__isnull=True).exists():
-            raise serializers.ValidationError("Doctor can apply on one leave at a time")
-        return attrs
+    # def validate(self, attrs):
+    #     request = self.context.get("request")
+    #     if DoctorLeave.objects.filter(doctor=request.user.doctor.id, deleted_at__isnull=True).exists():
+    #         raise serializers.ValidationError("Doctor can apply on one leave at a time")
+    #     return attrs
 
 
 class DoctorLeaveSerializer(serializers.ModelSerializer):
