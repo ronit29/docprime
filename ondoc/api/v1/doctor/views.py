@@ -16,10 +16,11 @@ from django.http import Http404
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-from ondoc.doctor.models import OpdAppointment, DoctorHospital, Doctor
-from .serializers import OpdAppointmentSerializer, SetAppointmentSerializer, UpdateStatusSerializer, \
-    AppointmentFilterSerializer, CreateAppointmentSerializer, DoctorHospitalModelSerializer, \
-    DoctorHospitalListSerializer, DoctorProfileSerializer, DoctorHospitalSerializer
+from ondoc.doctor.models import OpdAppointment, DoctorHospital, Doctor, DoctorLeave
+from .serializers import (OpdAppointmentSerializer, UpdateStatusSerializer,
+                          AppointmentFilterSerializer, CreateAppointmentSerializer, DoctorHospitalModelSerializer,
+                          DoctorHospitalListSerializer, DoctorProfileSerializer, DoctorHospitalSerializer,
+                          DoctorBlockCalenderSerialzer, DoctorLeaveSerializer)
 from ondoc.api.pagination import paginate_queryset
 
 from django.db.models import Min
@@ -35,6 +36,15 @@ class CreateAppointmentPermission(permissions.BasePermission):
 
     def has_permission(self, request, view):
         if request.user.user_type==User.CONSUMER:
+            return True
+        return False
+
+
+class DoctorPermission(permissions.BasePermission):
+    message = 'Doctor is allowed to perform action only.'
+
+    def has_permission(self, request, view):
+        if request.user.user_type == User.DOCTOR:
             return True
         return False
 
@@ -116,9 +126,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if range=='previous':
             queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
         elif range=='upcoming':
-            queryset = queryset.filter(status__in=[OpdAppointment.CREATED, OpdAppointment.RESCHEDULED],
+            queryset = queryset.filter(
+                status__in=[OpdAppointment.CREATED, OpdAppointment.RESCHEDULED, OpdAppointment.ACCEPTED],
                 time_slot_start__gt=timezone.now()).order_by('time_slot_start')
-        elif range=='pending':
+        elif range =='pending':
             queryset = queryset.filter(time_slot_start__gt=timezone.now(), status = OpdAppointment.CREATED).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
@@ -231,3 +242,42 @@ class DoctorHospitalView(mixins.ListModelMixin,
 
         serializer = DoctorHospitalModelSerializer(queryset, many=True)
         return Response(serializer.data)
+
+class DoctorBlockCalendarViewSet(OndocViewSet):
+    authentication_classes = (TokenAuthentication, )
+    permission_classes = (IsAuthenticated, DoctorPermission, )
+    INTERVAL_MAPPING = {DoctorLeave.INTERVAL_MAPPING.get(key): key for key in DoctorLeave.INTERVAL_MAPPING.keys()}
+
+    def get_queryset(self):
+        user = self.request.user
+        return DoctorLeave.objects.filter(doctor=user.doctor.id, deleted_at__isnull=True)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = DoctorLeaveSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        serializer = DoctorBlockCalenderSerialzer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        doctor_leave_data = {
+            "doctor": request.user.doctor.id,
+            "start_time": self.INTERVAL_MAPPING[validated_data.get("interval")][0],
+            "end_time": self.INTERVAL_MAPPING[validated_data.get("interval")][1],
+            "start_date": validated_data.get("start_date"),
+            "end_date": validated_data.get("end_date")
+        }
+        doctor_leave_serializer = DoctorLeaveSerializer(data=doctor_leave_data)
+        doctor_leave_serializer.is_valid(raise_exception=True)
+        doctor_leave_serializer.save()
+        return Response(doctor_leave_serializer.data)
+
+    def destroy(self, request, pk=None):
+        current_time = timezone.now()
+        doctor_leave = DoctorLeave.objects.get(pk=pk)
+        doctor_leave.deleted_at = current_time
+        doctor_leave.save()
+        return Response({
+            "status": 1
+        })

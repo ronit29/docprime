@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital, DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage, DoctorLanguage
-                                 , DoctorMedicalService, DoctorMobile, DoctorQualification)
+                                 , DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave)
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -286,7 +286,7 @@ class DoctorHospitalModelSerializer(serializers.ModelSerializer):
     day = serializers.SerializerMethodField()
     start = serializers.SerializerMethodField()
     end = serializers.SerializerMethodField()
-    
+
     def get_day(self, obj):
         day = obj.day
         return dict(DoctorHospital.DAY_CHOICES).get(day)
@@ -301,7 +301,6 @@ class DoctorHospitalModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorHospital
-        fields = '__all__'
         fields = ('id','day','start','end','fees','hospital')
 
 
@@ -313,3 +312,26 @@ class DoctorHospitalListSerializer(serializers.Serializer):
         queryset = Hospital.objects.get(pk=obj['hospital'])
         serializer = HospitalModelSerializer(queryset)
         return serializer.data
+
+
+class DoctorBlockCalenderSerialzer(serializers.Serializer):
+    INTERVAL_CHOICES = tuple([value for value in DoctorLeave.INTERVAL_MAPPING.values()])
+    interval = serializers.ChoiceField(choices=INTERVAL_CHOICES)
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if DoctorLeave.objects.filter(doctor=request.user.doctor.id, deleted_at__isnull=True).exists():
+            raise serializers.ValidationError("Doctor can apply on one leave at a time")
+        return attrs
+
+
+class DoctorLeaveSerializer(serializers.ModelSerializer):
+    interval = serializers.CharField(read_only=True)
+    start_time = serializers.TimeField(write_only=True)
+    end_time = serializers.TimeField(write_only=True)
+
+    class Meta:
+        model = DoctorLeave
+        exclude = ('created_at', 'updated_at', 'deleted_at')
