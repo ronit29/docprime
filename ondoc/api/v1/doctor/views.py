@@ -186,7 +186,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return Response(response)
 
     def doctor_update(self, opd_appointment, validated_data):
+        status = validated_data.get('status')
+        patient_status = validated_data.get('patient_status')
+
+        #if 
         opd_appointment.status = validated_data.get('status')
+
         opd_appointment.save()
         return opd_appointment
 

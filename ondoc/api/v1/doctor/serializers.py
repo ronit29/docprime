@@ -106,6 +106,7 @@ class UpdateStatusSerializer(serializers.Serializer):
                       (OpdAppointment.RESCHEDULED, "Rescheduled"),
                       (OpdAppointment.REJECTED, "Rejected"))
     status = serializers.ChoiceField(choices=STATUS_CHOICES)
+    patient_status = serializers.ChoiceField(choices=OpdAppointment.PATIENT_STATUS_CHOICES, required=False)
     time_slot_start = serializers.DateTimeField(required=False)
     time_slot_end = serializers.DateTimeField(required=False)
 
@@ -113,26 +114,27 @@ class UpdateStatusSerializer(serializers.Serializer):
         request = self.context.get("request")
         opd_appointment = self.context.get("opd_appointment")
         current_datetime = timezone.now()
-        if request.user.user_type == User.DOCTOR and not (data.get('status') in self.DOCTOR_ALLOWED_CHOICES):
-            raise serializers.ValidationError("Not a valid status for the user.")
-        if request.user.user_type == User.CONSUMER and (not data.get('status') in self.PATIENT_ALLOWED_CHOICES):
-            raise serializers.ValidationError("Not a valid status for the user.")
-        if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.ACCEPTED and (
-                current_datetime > opd_appointment.time_slot_start):
-            raise serializers.ValidationError("Can not accept appointment after time slot has passed.")
-        if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.RESCHEDULED and (
-                current_datetime > opd_appointment.time_slot_start):
-            raise serializers.ValidationError("Can not reschedule appointment after time slot has passed.")
-        if request.user.user_type == User.CONSUMER and data.get('status') == OpdAppointment.RESCHEDULED:
-            if not (data.get('time_slot_start')):
-                raise serializers.ValidationError("time_slot_start is required.")
-            if not (data.get('time_slot_end')):
-                raise serializers.ValidationError("time_slot_end is required.")
-            if (not DoctorHospital
-                    .objects.filter(doctor=opd_appointment.doctor, hospital=opd_appointment.hospital)
-                    .filter(day=data.get('time_slot_start').weekday(), start__lte=data.get("time_slot_start").hour,
-                            end__gte=data.get("time_slot_end").hour).exists()):
-                raise serializers.ValidationError("Doctor is not available.")
+        # if request.user.user_type == User.DOCTOR and not (data.get('status') in self.DOCTOR_ALLOWED_CHOICES):
+        #     raise serializers.ValidationError("Not a valid status for the user.")
+        # if request.user.user_type == User.CONSUMER and (not data.get('status') in self.PATIENT_ALLOWED_CHOICES):
+        #     raise serializers.ValidationError("Not a valid status for the user.")
+        # if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.ACCEPTED and (
+        #         current_datetime > opd_appointment.time_slot_start):
+        #     raise serializers.ValidationError("Can not accept appointment after time slot has passed.")
+        # if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.RESCHEDULED and (
+        #         current_datetime > opd_appointment.time_slot_start):
+        #     raise serializers.ValidationError("Can not reschedule appointment after time slot has passed.")
+        # if request.user.user_type == User.CONSUMER and data.get('status') == OpdAppointment.RESCHEDULED:
+        #     if not (data.get('time_slot_start')):
+        #         raise serializers.ValidationError("time_slot_start is required.")
+        #     if not (data.get('time_slot_end')):
+        #         raise serializers.ValidationError("time_slot_end is required.")
+        #     if (not DoctorHospital
+        #             .objects.filter(doctor=opd_appointment.doctor, hospital=opd_appointment.hospital)
+        #             .filter(day=data.get('time_slot_start').weekday(), start__lte=data.get("time_slot_start").hour,
+        #                     end__gte=data.get("time_slot_end").hour).exists()):
+        #         raise serializers.ValidationError("Doctor is not available.")
+
         return data
 
 
