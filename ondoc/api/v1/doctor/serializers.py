@@ -261,7 +261,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         fields = (
         'id', 'name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
         'languages', 'qualifications', 'availability', 'mobiles', 'medical_services', 'experiences', 'associations',
-        'awards', 'appointments')
+        'awards', 'appointments', 'hospitals')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
@@ -283,8 +283,9 @@ class HospitalModelSerializer(serializers.ModelSerializer):
         model = Hospital
         fields = ('id', 'name', 'operational_since', 'lat', 'lng', 'registration_number','building', 'sublocality', 'locality', 'city')
 
-class DoctorHospitalModelSerializer(serializers.ModelSerializer):
-    hospital = HospitalModelSerializer()
+
+class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
+    # hospital = HospitalModelSerializer()
     day = serializers.SerializerMethodField()
     start = serializers.SerializerMethodField()
     end = serializers.SerializerMethodField()
@@ -303,7 +304,8 @@ class DoctorHospitalModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorHospital
-        fields = ('id','day','start','end','fees','hospital')
+        # fields = ('id', 'day', 'start', 'end', 'fees', 'hospital')
+        fields = ('day', 'start', 'end', 'fees')
 
 
 class DoctorHospitalListSerializer(serializers.Serializer):

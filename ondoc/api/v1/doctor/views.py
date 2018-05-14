@@ -12,19 +12,24 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
+from django.db.models import Q
+from django.db.models import Expression
+
+import datetime
 
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
 from ondoc.doctor.models import OpdAppointment, DoctorHospital, Doctor, DoctorLeave, Prescription, PrescriptionFile
 from .serializers import (OpdAppointmentSerializer, UpdateStatusSerializer,
-                          AppointmentFilterSerializer, CreateAppointmentSerializer, DoctorHospitalModelSerializer,
+                          AppointmentFilterSerializer, CreateAppointmentSerializer,
                           DoctorHospitalListSerializer, DoctorProfileSerializer, DoctorHospitalSerializer,
                           DoctorBlockCalenderSerialzer, DoctorLeaveSerializer, PrescriptionFileSerializer,
-                          PrescriptionSerializer)
+                          PrescriptionSerializer, DoctorHospitalScheduleSerializer, HospitalModelSerializer)
 from ondoc.api.pagination import paginate_queryset
 
-from django.db.models import Min
+from django.db.models import Min, Max
+from django.contrib.postgres.aggregates import ArrayAgg
 
 
 # class DoctorFilterBackend(BaseFilterBackend):
@@ -205,10 +210,21 @@ class DoctorProfileView(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request):
-        doctor  = get_object_or_404(Doctor, pk=request.user.doctor.id)
+        doctor = get_object_or_404(Doctor, pk=request.user.doctor.id)
         serializer = DoctorProfileSerializer(doctor, many=False)
 
-        return Response(serializer.data)
+        now = datetime.datetime.now()
+        appointment_count = OpdAppointment.objects.filter(Q(doctor=request.user.doctor.id),
+                                                          ~Q(status=OpdAppointment.REJECTED)
+                                                          & ~Q(status=OpdAppointment.CANCELED),
+                                                          Q(time_slot_start__gte=now)).count()
+        hospital_queryset = doctor.hospitals.distinct()
+        hospital_serializer = HospitalModelSerializer(hospital_queryset, many=True)
+
+        temp_data = serializer.data
+        temp_data["count"] = appointment_count
+        temp_data['hospitals'] = hospital_serializer.data
+        return Response(temp_data)
 
 
 class DoctorHospitalView(mixins.ListModelMixin,
@@ -226,7 +242,6 @@ class DoctorHospitalView(mixins.ListModelMixin,
         if user.user_type == User.DOCTOR:
             return DoctorHospital.objects.filter(doctor=user.doctor)
 
-
     def list(self, request):
         user = request.user
         queryset = self.get_queryset().values('hospital').annotate(min_fees=Min('fees'))
@@ -241,8 +256,16 @@ class DoctorHospitalView(mixins.ListModelMixin,
         if len(queryset) == 0:
             raise Http404("No Hospital matches the given query.")
 
-        serializer = DoctorHospitalModelSerializer(queryset, many=True)
-        return Response(serializer.data)
+        schedule_serializer = DoctorHospitalScheduleSerializer(queryset, many=True)
+        hospital_queryset = queryset.first().hospital
+        hospital_serializer = HospitalModelSerializer(hospital_queryset)
+
+        temp_data = dict()
+        temp_data['hospital'] = hospital_serializer.data
+        temp_data['schedule'] = schedule_serializer.data
+
+        return Response(temp_data)
+
 
 class DoctorBlockCalendarViewSet(OndocViewSet):
     authentication_classes = (TokenAuthentication, )
