@@ -151,7 +151,7 @@ class NotificationEndpointViewSet(GenericViewSet):
         return Response(data={"status": 1, "message": "deleted"})
 
 
-class NotificationViewset(GenericViewSet):
+class NotificationViewSet(GenericViewSet):
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
