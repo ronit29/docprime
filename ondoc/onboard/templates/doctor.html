@@ -493,7 +493,7 @@ $('.submit-form').on('click',function(e){
 
     var errors = false;
     $('.upload-container').not('.not-required').each(function(){
-        var length = $(this).find('.existing-image').length+$(this).find('.dz-image-preview').length
+        var length = $(this).find('.existing-image').length+$(this).find('.dz-image-preview,.dz-file-preview').length
 
         if(length==0)
         {
