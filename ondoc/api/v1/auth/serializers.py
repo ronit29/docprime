@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ondoc.authentication.models import OtpVerifications, User, UserProfile
+from ondoc.authentication.models import OtpVerifications, User, UserProfile, Notification, NotificationEndpoint
 from ondoc.doctor.models import DoctorMobile
 import datetime
 from dateutil.relativedelta import relativedelta
@@ -83,3 +83,33 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('phone_number', 'profile', 'otp')
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = '__all__'
+
+
+class NotificationEndpointSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = NotificationEndpoint
+        fields = '__all__'
+
+
+class NotificationEndpointSaveSerializer(serializers.Serializer):
+    device_id = serializers.CharField(required=False)
+    token = serializers.CharField()
+
+
+class NotificationEndpointDeleteSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if not NotificationEndpoint.objects.filter(token=attrs.get('token')).exists():
+            raise serializers.ValidationError("Token does not exists.")
+        if not NotificationEndpoint.objects.filter(user=request.user, token=attrs.get('token')).exists():
+            raise serializers.ValidationError("Token does not  match.")
+        return attrs

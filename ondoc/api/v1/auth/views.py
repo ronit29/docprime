@@ -1,6 +1,10 @@
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.generics import GenericAPIView
-from .serializers import OTPSerializer, OTPVerificationSerializer, UserSerializer, DoctorLoginSerializer
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+
+from .serializers import (OTPSerializer, OTPVerificationSerializer, UserSerializer, DoctorLoginSerializer,
+                          NotificationEndpointSaveSerializer, NotificationEndpointSerializer,
+                          NotificationEndpointDeleteSerializer, NotificationSerializer)
 from rest_framework.response import Response
 from django.db import transaction
 from rest_framework.authtoken.models import Token
@@ -8,8 +12,10 @@ from rest_framework.authtoken.models import Token
 from ondoc.sms.api import send_otp
 
 from ondoc.doctor.models import DoctorMobile
-from ondoc.authentication.models import OtpVerifications
+from ondoc.authentication.models import OtpVerifications, NotificationEndpoint, Notification
 from django.contrib.auth import get_user_model
+from ondoc.api.pagination import paginate_queryset
+
 User = get_user_model()
 
 
@@ -116,3 +122,41 @@ class UserViewset(GenericViewSet):
             "token" : str(token[0])
         }
         return Response(response)
+
+
+class NotificationEndpointViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
+    permission_classes = (IsAuthenticated,)
+
+    def save(self, request):
+        serializer = NotificationEndpointSaveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        notification_endpoint_data = {
+            "user": request.user.id,
+            "device_id": validated_data.get("device_id"),
+            "token": validated_data.get("token")
+        }
+        notification_endpoint_serializer = NotificationEndpointSerializer(data=notification_endpoint_data)
+        notification_endpoint_serializer.is_valid(raise_exception=True)
+        notification_endpoint_serializer.save()
+        return Response(notification_endpoint_serializer.data)
+
+    def delete(self, request):
+        serializer = NotificationEndpointDeleteSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        notification_endpoint = NotificationEndpoint.objects.filter(token=validated_data.get('token')).first()
+        notification_endpoint.delete()
+        return Response(data={"status": 1, "message": "deleted"})
+
+
+class NotificationViewset(GenericViewSet):
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request):
+        queryset = paginate_queryset(queryset=Notification.objects.filter(user=request.user),
+                                     request=request)
+        serializer = NotificationSerializer(queryset, many=True)
+        return Response(serializer.data)
