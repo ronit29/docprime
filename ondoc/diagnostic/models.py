@@ -346,7 +346,7 @@ class LabDoctor(TimeStampedModel):
         db_table = "lab_doctor"
 
 
-class LabDocument(TimeStampedModel, Image):
+class LabDocument(TimeStampedModel):
     PAN = 1
     ADDRESS = 2
     GST = 3
@@ -356,7 +356,15 @@ class LabDocument(TimeStampedModel, Image):
     CHOICES = [(PAN,"PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"Registration Certificate"),(CHEQUE,"Cancel Cheque Copy"),(LOGO,"LOGO")]
     lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
-    name = models.ImageField(upload_to='lab/images', height_field='height', width_field='width')
+    name = models.FileField(upload_to='lab/images', validators=[FileExtensionValidator(allowed_extensions=['pdf','jpg','jpeg','png'])])
+
+    def extension(self):
+        name, extension = os.path.splitext(self.name.name)
+        return extension
+
+    def is_pdf(self):
+        return self.name.name.endswith('.pdf')
+
 
     # def __str__(self):
         # return self.name

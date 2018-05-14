@@ -1,7 +1,7 @@
 from django.contrib.gis.db import models
 from django.db import migrations
 from django.contrib.postgres.operations import CreateExtension
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.utils.safestring import mark_safe
@@ -262,7 +262,7 @@ class DoctorImage(TimeStampedModel, Image):
     class Meta:
         db_table = "doctor_image"
 
-class DoctorDocument(TimeStampedModel, Image):
+class DoctorDocument(TimeStampedModel):
     PAN = 1
     ADDRESS = 2
     GST = 3
@@ -273,7 +273,14 @@ class DoctorDocument(TimeStampedModel, Image):
 
     doctor = models.ForeignKey(Doctor, related_name="documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
-    name = models.ImageField(upload_to='doctor/documents',height_field='height', width_field='width')
+    name = models.FileField(upload_to='doctor/documents', validators=[FileExtensionValidator(allowed_extensions=['pdf','jpg','jpeg','png'])])
+
+    def extension(self):
+        name, extension = os.path.splitext(self.name.name)
+        return extension
+
+    def is_pdf(self):
+        return self.name.name.endswith('.pdf')
 
     class Meta:
         db_table = "doctor_document"

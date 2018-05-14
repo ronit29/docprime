@@ -91,9 +91,20 @@ label
     margin: 10px 10px 0 0;
 }
 
+.dropzone .dz-preview.dz-file-preview
+{
+    margin: 10px 10px 0 0;
+}
+
+
 .dropzone .dz-preview .dz-image
 {
     border-radius: 0;
+}
+
+.dropzone .dz-preview.dz-file-preview .dz-image
+{
+    border-radius: 0;   
 }
 
 .error .terms-error
