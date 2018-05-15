@@ -1,6 +1,9 @@
-from .serializers import LabListSerializer, LabTestListSerializer, LabCustomSerializer, AvailableLabTestSerializer, \
-    LabAppointmentModelSerializer, LabAppointmentCreateSerializer, LabAppointmentUpdateSerializer
-from ondoc.diagnostic.models import LabTest, AvailableLabTest, Lab, LabAppointment
+from .serializers import ( LabModelSerializer, LabTestListSerializer, LabCustomSerializer, AvailableLabTestSerializer,
+                           LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
+                           LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
+                           PromotedLabsSerializer, CommonConditionsSerializer)
+from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, PromotedLab,
+                                     CommonDiagnosticCondition, CommonTest)
 from ondoc.authentication.models import UserProfile
 
 from rest_framework import viewsets, mixins
@@ -17,6 +20,24 @@ from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
 from django.db.models import Count, Sum, Max
+from django.http import Http404
+
+
+class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
+
+    def list(self, request, *args, **kwargs):
+        test_queryset = CommonTest.objects.all()
+        conditions_queryset = CommonDiagnosticCondition.objects.all()
+        lab_queryset = PromotedLab.objects.all()
+        test_serializer = CommonTestSerializer(test_queryset, many=True)
+        lab_serializer = PromotedLabsSerializer(lab_queryset, many=True)
+        condition_serializer = CommonConditionsSerializer(conditions_queryset, many=True)
+        temp_data = dict()
+        temp_data['common_tests'] = test_serializer.data
+        temp_data['preferred_labs'] = lab_serializer.data
+        temp_data['common_conditions'] = condition_serializer.data
+
+        return Response(temp_data)
 
 
 class LabTestList(viewsets.ReadOnlyModelViewSet):
@@ -27,12 +48,27 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
     # filter_fields = ('name',)
     search_fields = ('name',)
 
+    def list(self, request, *args, **kwargs):
+        name = request.query_params.get('name')
+        test_queryset = LabTest.objects.all()
+        lab_queryset = Lab.objects.all()
+        temp_data = dict()
+        if name:
+            test_queryset = test_queryset.filter(name__icontains=name)
+            lab_queryset = lab_queryset.filter(name__icontains=name)
+            test_serializer = LabTestListSerializer(test_queryset, many=True)
+            lab_serializer = LabListSerializer(lab_queryset, many=True)
+            temp_data['tests'] = test_serializer.data
+            temp_data['labs'] = lab_serializer.data
+
+        return Response(temp_data)
+
 
 class LabList(viewsets.ReadOnlyModelViewSet):
     # queryset = self.form_queryset()
     authentication_classes = (TokenAuthentication,)
     queryset = AvailableLabTest.objects.all()
-    serializer_class = LabListSerializer
+    serializer_class = LabModelSerializer
     lookup_field = 'id'
     # filter_backends = (DjangoFilterBackend, )
     # filter_fields = ('name', 'deal_price', )
@@ -46,30 +82,49 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def retrieve(self, request, lab_id):
         queryset = AvailableLabTest.objects.filter(lab=lab_id)
-        # obj = get_object_or_404(queryset)
-        serializer = AvailableLabTestSerializer(queryset, many=True)
-        return Response(serializer.data)
+
+        if len(queryset) == 0:
+            raise Http404("No labs available")
+
+        test_serializer = AvailableLabTestSerializer(queryset, many=True)
+        lab_serializer = LabModelSerializer(queryset.first().lab)
+        temp_data = dict()
+        temp_data['lab'] = lab_serializer.data
+        temp_data['tests'] = test_serializer.data
+        return Response(temp_data)
+        # return Response(serializer.data)
 
     def get_lab_list(self, parameters):
         # allowed_ordering = ['price','distance',]
-        ids = list(map(int, parameters.get("ids").split(",")))
         distance = 13514700
-
         default_long = -96.876369
         default_lat = 29.905320
         long = parameters.get('long', default_long)
         lat = parameters.get('lat', default_lat)
-        point_string = 'POINT('+str(long)+' '+str(lat)+')'
+        id_str = parameters.get('ids')
+        price = parameters.get('price')
+        ids = list()
+        queryset = AvailableLabTest.objects
 
-        pnt = GEOSGeometry(point_string, srid=4326)
+        if id_str:
+            ids = list(map(int, parameters.get("ids").split(",")))
+            queryset = queryset.filter(test__in=ids)
+
+        if lat is not None and long is not None:
+            point_string = 'POINT('+str(long)+' '+str(lat)+')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+            queryset = queryset.filter(lab__location__distance_lte=(pnt, distance))
+
+        if price:
+            queryset = queryset.filter(mrp__lte=price)
 
         queryset = (
-            AvailableLabTest.objects.filter(lab__location__distance_lte=(pnt, distance)).filter(test__in=ids).values(
-                'lab').annotate(price=Sum('mrp'),
-                                count=Count('id'), distance=Max(
-                    Distance('lab__location', pnt)), name=Max('lab__name')).filter(count__gte=len(ids)))
+            queryset.values('lab').annotate(price=Sum('mrp'), count=Count('id'),
+                                            distance=Max(Distance('lab__location', pnt)),
+                                            name=Max('lab__name')).filter(count__gte=len(ids)))
 
         queryset = self.apply_custom_filters(queryset, parameters)
+        return queryset
 
         list_of_labs = list()
         lab_price_map = dict()
@@ -81,11 +136,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @staticmethod
     def apply_custom_filters(queryset, parameters):
-        price = parameters.get('price')
         order_by = parameters.get("order_by")
-        if price:
-            queryset = queryset.filter(price__lte=price)
-
         if order_by is not None:
             if order_by == "price":
                 queryset = queryset.order_by("price")

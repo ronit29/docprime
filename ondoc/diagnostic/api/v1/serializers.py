@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from ondoc.diagnostic.models import LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming
+from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
+                                     CommonTest, CommonDiagnosticCondition)
 from ondoc.authentication.models import UserProfile
 from django.db.models import Count, Sum
 from django.db.models import Q
@@ -13,14 +14,26 @@ utc = pytz.UTC
 class LabTestListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
-        fields = ('id','name')
+        fields = ('id', 'name')
+
+
+class LabListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Lab
+        fields = ('id', 'name')
 
 
 class LabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
-        fields = ('id','name','pre_test_info','why')
+        fields = ('id', 'name', 'pre_test_info', 'why')
         # fields = ('id', 'account_name', 'users', 'created')
+
+
+class LabModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Lab
+        fields = '__all__'
 
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
@@ -28,18 +41,40 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test', 'mrp')
-
-
-class LabListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Lab
-        fields = '__all__'
+        # fields = '__all__'
+        exclude = ('lab', 'agreed_price', 'deal_price')
 
 
 class LabCustomSerializer(serializers.Serializer):
-    lab = LabListSerializer()
+    lab = serializers.SerializerMethodField()
     price = serializers.IntegerField()
+
+    def get_lab(self, obj):
+        queryset = Lab.objects.get(pk=obj['lab'])
+        serializer = LabModelSerializer(queryset)
+        return serializer.data
+
+
+class CommonTestSerializer(serializers.ModelSerializer):
+    test = LabTestSerializer()
+
+    class Meta:
+        model = CommonTest
+        fields = '__all__'
+
+
+class CommonConditionsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CommonDiagnosticCondition
+        fields = '__all__'
+
+
+class PromotedLabsSerializer(serializers.ModelSerializer):
+    lab = LabModelSerializer()
+
+    class Meta:
+        model = PromotedLab
+        fields = '__all__'
 
 
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
