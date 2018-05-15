@@ -1,8 +1,10 @@
 from rest_framework import serializers
 from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital, DoctorAssociation,
-                                 DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage, DoctorLanguage
-                                 , DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave)
+                                 DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
+                                 DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
+                                 Prescription, PrescriptionFile)
+
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -261,7 +263,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         fields = (
         'id', 'name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
         'languages', 'qualifications', 'availability', 'mobiles', 'medical_services', 'experiences', 'associations',
-        'awards', 'appointments')
+        'awards', 'appointments', 'hospitals')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
@@ -283,8 +285,9 @@ class HospitalModelSerializer(serializers.ModelSerializer):
         model = Hospital
         fields = ('id', 'name', 'operational_since', 'lat', 'lng', 'registration_number','building', 'sublocality', 'locality', 'city')
 
-class DoctorHospitalModelSerializer(serializers.ModelSerializer):
-    hospital = HospitalModelSerializer()
+
+class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
+    # hospital = HospitalModelSerializer()
     day = serializers.SerializerMethodField()
     start = serializers.SerializerMethodField()
     end = serializers.SerializerMethodField()
@@ -303,7 +306,8 @@ class DoctorHospitalModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorHospital
-        fields = ('id','day','start','end','fees','hospital')
+        # fields = ('id', 'day', 'start', 'end', 'fees', 'hospital')
+        fields = ('day', 'start', 'end', 'fees')
 
 
 class DoctorHospitalListSerializer(serializers.Serializer):
@@ -337,3 +341,22 @@ class DoctorLeaveSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorLeave
         exclude = ('created_at', 'updated_at', 'deleted_at')
+
+
+class PrescriptionFileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = PrescriptionFile
+        fields = "__all__"
+
+
+class PrescriptionSerializer(serializers.Serializer):
+    appointment = serializers.PrimaryKeyRelatedField(queryset=OpdAppointment.objects.all())
+    prescription_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
+    file = serializers.FileField()
+
+    def validate_appointment(self, value):
+        request = self.context.get('request')
+        if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
+            raise serializers.ValidationError("Appointment is not correct.")
+        return value

@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.contrib.postgres.fields import JSONField
+
 
 class Image(models.Model):
     # name = models.ImageField(height_field='height', width_field='width')
@@ -155,3 +157,32 @@ class OtpVerifications(TimeStampedModel):
 
     class Meta:
         db_table = "otp_verification"
+
+
+class NotificationEndpoint(TimeStampedModel):
+    user = models.ForeignKey(User, related_name='notification_endpoints', on_delete=models.CASCADE)
+    device_id = models.TextField(blank=True, null=True)
+    token = models.TextField(unique=True)
+
+    class Meta:
+        db_table = 'notification_endpoint'
+
+    def __str__(self):
+        return "{}-{}".format(self.user.phone_number, self.token)
+
+
+class Notification(TimeStampedModel):
+    ACCEPTED = 1
+    REJECTED = 2
+    TYPE_CHOICES = ((ACCEPTED, 'Accepted'), (REJECTED, 'Rejected'), )
+    user = models.ForeignKey(User, related_name='notifications', on_delete=models.CASCADE)
+    content = JSONField()
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES)
+    viewed_at = models.DateTimeField(blank=True, null=True)
+    read_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'notification'
+
+    def __str__(self):
+        return "{}-{}".format(self.user.phone_number, self.id)

@@ -543,3 +543,25 @@ class DoctorLeave(TimeStampedModel):
     @property
     def interval(self):
         return self.INTERVAL_MAPPING.get((str(self.start_time), str(self.end_time)))
+
+
+class Prescription (TimeStampedModel):
+    appointment = models.ForeignKey(OpdAppointment,  on_delete=models.CASCADE)
+    prescription_details = models.TextField(max_length=300, blank=True, null=True)
+
+    def __str__(self):
+        return "{}-{}".format(self.id, self.appointment.id)
+
+    class Meta:
+        db_table = "prescription"
+
+
+class PrescriptionFile(TimeStampedModel):
+    prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE)
+    file = models.FileField(upload_to='prescriptions', blank=False, null=False)
+
+    def __str__(self):
+        return "{}-{}".format(self.id, self.prescription.id)
+
+    class Meta:
+        db_table = "prescription_file"
