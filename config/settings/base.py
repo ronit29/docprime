@@ -77,7 +77,8 @@ THIRD_PARTY_APPS = (
     'rest_framework',
     'rest_framework.authtoken',
     'crispy_forms',
-    'corsheaders'
+    'corsheaders',
+    'import_export',
 )
 
 LOCAL_APPS = (
@@ -85,7 +86,8 @@ LOCAL_APPS = (
     'ondoc.authentication',
     'ondoc.doctor',
     'ondoc.diagnostic',
-    'ondoc.onboard'
+    'ondoc.onboard',
+    'ondoc.lead',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

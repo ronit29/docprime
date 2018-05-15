@@ -4,6 +4,8 @@ from django.contrib.gis import admin
 
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital, HospitalNetwork, DoctorOnboardingToken, OpdAppointment)
 from ondoc.diagnostic.models import Lab, LabNetwork, PathologyTest, RadiologyTest, PathologyTestType, RadiologyTestType, LabService
+from ondoc.lead.models import HospitalLead
+from .lead import HospitalLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin, CollegeAdmin)
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -44,3 +46,5 @@ admin.site.register(PathologyTest, PathologyTestAdmin)
 admin.site.register(RadiologyTest, RadiologyTestAdmin)
 admin.site.register(RadiologyTestType, RadiologyTestTypeAdmin)
 admin.site.register(PathologyTestType, PathologyTestTypeAdmin)
+
+admin.site.register(HospitalLead, HospitalLeadAdmin)
