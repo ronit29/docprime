@@ -273,7 +273,7 @@ class DoctorDocument(TimeStampedModel):
 
     doctor = models.ForeignKey(Doctor, related_name="documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
-    name = models.FileField(upload_to='doctor/documents', validators=[FileExtensionValidator(allowed_extensions=['pdf','jpg','jpeg','png'])])
+    name = models.FileField(upload_to='doctor/documents', validators=[FileExtensionValidator(allowed_extensions=['pdf','jfif','jpg','jpeg','png'])])
 
     def extension(self):
         name, extension = os.path.splitext(self.name.name)

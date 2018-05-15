@@ -356,7 +356,7 @@ class LabDocument(TimeStampedModel):
     CHOICES = [(PAN,"PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"Registration Certificate"),(CHEQUE,"Cancel Cheque Copy"),(LOGO,"LOGO")]
     lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
-    name = models.FileField(upload_to='lab/images', validators=[FileExtensionValidator(allowed_extensions=['pdf','jpg','jpeg','png'])])
+    name = models.FileField(upload_to='lab/images', validators=[FileExtensionValidator(allowed_extensions=['pdf','jfif','jpg','jpeg','png'])])
 
     def extension(self):
         name, extension = os.path.splitext(self.name.name)
