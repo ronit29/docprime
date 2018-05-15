@@ -13,6 +13,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
     DoctorEmail )
+from .filters import RelatedDropdownFilter
 
 from .common import *
 from ondoc.crm.constants import constants
@@ -280,7 +281,7 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
 
     list_display = ('name', 'updated_at','data_status', 'created_by','get_onboard_link')
     date_hierarchy = 'created_at'
-    list_filter = ('data_status',)
+    list_filter = (("user", RelatedDropdownFilter), )
     form = DoctorForm
     inlines = [
         DoctorMobileInline,
