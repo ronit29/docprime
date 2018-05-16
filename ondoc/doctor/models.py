@@ -5,7 +5,8 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.conf import settings
-
+from datetime import datetime, timedelta
+from django.utils import timezone
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
 
 
@@ -496,13 +497,19 @@ class DoctorOnboardingToken(TimeStampedModel):
 
 class OpdAppointment(TimeStampedModel):
     CREATED = 1
-    ACCEPTED = 2
-    RESCHEDULED = 3
-    REJECTED = 4
-    CANCELED = 5
-    PATIENT_SHOW = 1
-    PATIENT_DIDNT_SHOW = 2
-    PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
+    BOOKED = 2
+    RESCHEDULED_DOCTOR = 3
+    RESCHEDULED_PATIENT = 4
+    ACCEPTED = 5
+
+    #RESCHEDULED_BY_USER = 4
+    #REJECTED = 4
+    CANCELED = 6
+    COMPLETED = 7
+
+    # PATIENT_SHOW = 1
+    # PATIENT_DIDNT_SHOW = 2
+    # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
     doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
@@ -510,12 +517,33 @@ class OpdAppointment(TimeStampedModel):
     booked_by = models.ForeignKey(User, related_name="booked_appointements", on_delete=models.CASCADE)
     fees = models.PositiveSmallIntegerField()
     status = models.PositiveSmallIntegerField(default=CREATED)
-    patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    #patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
+
+    def allowed_action(self, user_type):
+
+        allowed = []
+        current_datetime = timezone.now()
+
+        if user_type == User.DOCTOR and self.time_slot_start<current_datetime:
+            if self.status == self.BOOKED:
+                allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
+            elif self.status == self.ACCEPTED:
+                allowed = [self.RESCHEDULED_DOCTOR]
+            elif self.status == self.RESCHEDULED_DOCTOR:
+                allowed = [self.ACCEPTED]
+
+        elif user_type == User.CONSUMER and current_datetime<self.time_slot_start+timedelta(hours=6):
+            if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
+                allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
+
+        return allowed
+
 
     class Meta:
         db_table = "opd_appointment"

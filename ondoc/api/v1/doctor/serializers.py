@@ -102,20 +102,48 @@ class SetAppointmentSerializer(serializers.Serializer):
 
 
 class UpdateStatusSerializer(serializers.Serializer):
-    DOCTOR_ALLOWED_CHOICES = [OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]
-    PATIENT_ALLOWED_CHOICES = [OpdAppointment.REJECTED, OpdAppointment.RESCHEDULED]
-    STATUS_CHOICES = ((OpdAppointment.ACCEPTED, "Accepted"),
-                      (OpdAppointment.RESCHEDULED, "Rescheduled"),
-                      (OpdAppointment.REJECTED, "Rejected"))
-    status = serializers.ChoiceField(choices=STATUS_CHOICES)
-    patient_status = serializers.ChoiceField(choices=OpdAppointment.PATIENT_STATUS_CHOICES, required=False)
+    # DOCTOR_ALLOWED_CHOICES = [OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]
+    # PATIENT_ALLOWED_CHOICES = [OpdAppointment.CANCELED, OpdAppointment.RESCHEDULED]
+    # STATUS_CHOICES = ((OpdAppointment.ACCEPTED, "Accepted"),
+    #                   (OpdAppointment.RESCHEDULED, "Rescheduled"),
+    #                   (OpdAppointment.REJECTED, "Rejected"))
+    # status = serializers.ChoiceField(choices=STATUS_CHOICES)
+    #patient_status = serializers.ChoiceField(choices=OpdAppointment.PATIENT_STATUS_CHOICES, required=False)
+    status = serializers.IntegerField()
     time_slot_start = serializers.DateTimeField(required=False)
     time_slot_end = serializers.DateTimeField(required=False)
 
-    def validate(self, data):
-        request = self.context.get("request")
-        opd_appointment = self.context.get("opd_appointment")
-        current_datetime = timezone.now()
+    # def validate(self, data):
+    #     request = self.context.get("request")
+    #     user_type = request.user.user_type
+    #     opd_appointment = self.context.get("opd_appointment")
+    #     current_datetime = timezone.now()
+    #     # Validate Doctor Choices
+    #     status = data.get('status')
+        
+
+        # if user_type == User.DOCTOR:
+        #     if opd_appointment.time_slot_start<current_datetime && opd_appointment.status == OpdAppointment.CREATED:
+        #        allowed = [OpdAppointment.ACCEPTED,OpdAppointment.RESCHEDULED_BY_DOCTOR]
+
+        #     elif opd_appointment.time_slot_start<current_datetime && opd_appointment.status == OpdAppointment.RESCHEDULED:
+        #        allowed = [OpdAppointment.ACCEPTED]
+
+        #     elif opd_appointment.time_slot_start<current_datetime && opd_appointment.status == OpdAppointment.ACCEPTED:
+        #        allowed = [OpdAppointment.RESCHEDULED]
+
+        # if user_type == User.CONSUMER:
+        #     if opd_appointment.status in 
+        #        allowed = [OpdAppointment.RESCHEDULED, OpdAppointment.CANCELED]
+
+        #     if opd_appointment
+        #     if opd_appointment.time_slot_start<current_datetime && opd_appointment.status [OpdAppointment.CREATED, OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]:
+        #         allowed = [OpdAppointment.ACCEPTED,OpdAppointment.RESCHEDULED]
+
+
+        #     if status in (OpdAppointment.CREATED  )
+
+
         # if request.user.user_type == User.DOCTOR and not (data.get('status') in self.DOCTOR_ALLOWED_CHOICES):
         #     raise serializers.ValidationError("Not a valid status for the user.")
         # if request.user.user_type == User.CONSUMER and (not data.get('status') in self.PATIENT_ALLOWED_CHOICES):
@@ -137,7 +165,7 @@ class UpdateStatusSerializer(serializers.Serializer):
         #                     end__gte=data.get("time_slot_end").hour).exists()):
         #         raise serializers.ValidationError("Doctor is not available.")
 
-        return data
+        # return data
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
