@@ -68,3 +68,5 @@ class HospitalLeadAdmin(ImportMixin, VersionAdmin):
     address.short_description = 'Address'
     timings.short_description = "Timings"
     services.short_description = "Services"
+    name.short_description = "Name"
+    about.short_description = "About"
