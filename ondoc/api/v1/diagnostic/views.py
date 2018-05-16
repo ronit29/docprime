@@ -1,8 +1,8 @@
-from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSerializer, AvailableLabTestSerializer,
-                          LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
-                          LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
-                          PromotedLabsSerializer, CommonConditionsSerializer, LabTimingModelSerializer)
-from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
+from .serializers import ( LabModelSerializer, LabTestListSerializer, LabCustomSerializer, AvailableLabTestSerializer,
+                           LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
+                           LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
+                           PromotedLabsSerializer, CommonConditionsSerializer)
+from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
 from ondoc.authentication.models import UserProfile
 
@@ -182,15 +182,4 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
         return Response(serializer.data)
 
-
-class LabTimingListView(mixins.ListModelMixin,
-                        viewsets.GenericViewSet):
-
-    def list(self, request, *args, **kwargs):
-        params = request.query_params
-
-        flag = True if int(params.get('pickup', 0)) else False
-        queryset = LabTiming.objects.filter(lab=params.get('lab'), pickup_flag=flag)
-        serializer = LabTimingModelSerializer(queryset, many=True)
-        return Response(serializer.data)
 

@@ -24,6 +24,7 @@ admin.site.index_title = 'CRM Administration'
 
 admin.site.register(OtpVerifications)
 admin.site.register(OpdAppointment)
+admin.site.register(UserProfile)
 
 admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(DoctorOnboardingToken)
@@ -45,6 +46,5 @@ admin.site.register(LabTestType, LabTestTypeAdmin)
 admin.site.register(LabTestSubType, LabSubTestTypeAdmin)
 admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
 
-admin.site.register(UserProfile)
 admin.site.register(LabAppointment)
 admin.site.register(LabTiming)

@@ -93,7 +93,7 @@ class LabManager(TimeStampedModel):
 
 class LabImage(TimeStampedModel, Image):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
-    name = models.ImageField(upload_to='lab/images',height_field='height', width_field='width')
+    name = models.ImageField(upload_to='lab/images', height_field='height', width_field='width')
 
     class Meta:
         db_table = "lab_image"
@@ -102,6 +102,7 @@ class LabImage(TimeStampedModel, Image):
 class LabTiming(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
 
+    pickup_flag = models.BooleanField(default=False)
     day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
     start = models.PositiveSmallIntegerField(
         blank=False, null=False, choices=[(6, "6 AM"), (7, "7 AM"),
@@ -280,6 +281,7 @@ class LabAppointment(TimeStampedModel):
     ACCEPTED = 2
     RESCHEDULED = 3
     REJECTED = 4
+    CANCELED = 5
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
     lab_test = models.ManyToManyField(AvailableLabTest)
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)

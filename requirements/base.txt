@@ -1,10 +1,12 @@
 Django
 psycopg2
 django-environ
-djangorestframework
+djangorestframework==3.8.2
 gunicorn
 Pillow
 django-reversion
 django-crispy-forms
 requests
 django-cors-headers
+django-filter==1.1.0
+python-dateutil==2.7.3
