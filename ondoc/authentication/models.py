@@ -186,3 +186,19 @@ class Notification(TimeStampedModel):
 
     def __str__(self):
         return "{}-{}".format(self.user.phone_number, self.id)
+
+
+class Address(TimeStampedModel):
+    HOME_ADDRESS = 1
+    WORK_ADDRESS = 2
+    OTHER = 3
+    TYPE_CHOICES = (
+        (HOME_ADDRESS, 'Home Address'),
+        (WORK_ADDRESS, 'Work Address'),
+        (OTHER, 'Other'),
+    )
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
+    place_id = models.CharField(max_length=100)
+    address = models.TextField()

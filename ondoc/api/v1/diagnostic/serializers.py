@@ -1,14 +1,15 @@
 from rest_framework import serializers
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition)
-from ondoc.authentication.models import UserProfile
+from ondoc.authentication.models import UserProfile, Address
 from django.db.models import Count, Sum
 from django.db.models import Q
-
+from django.contrib.auth import get_user_model
 import datetime
 import pytz
 
 utc = pytz.UTC
+User = get_user_model()
 
 
 class LabTestListSerializer(serializers.ModelSerializer):
@@ -218,3 +219,16 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                                                        end__gte=end_hour)
         if not lab_timing_queryset:
             raise serializers.ValidationError("No time slot available")
+
+
+class AddressSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Address
+        fields = "__all__"
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
+            serializers.ValidationError("Profile is not correct.")
+        return attrs

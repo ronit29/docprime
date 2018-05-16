@@ -1,10 +1,10 @@
 from .serializers import ( LabModelSerializer, LabTestListSerializer, LabCustomSerializer, AvailableLabTestSerializer,
                            LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
                            LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
-                           PromotedLabsSerializer, CommonConditionsSerializer)
+                           PromotedLabsSerializer, CommonConditionsSerializer, AddressSerializer)
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
-from ondoc.authentication.models import UserProfile
+from ondoc.authentication.models import UserProfile, Address
 
 from rest_framework import viewsets, mixins
 from rest_framework.response import Response
@@ -181,5 +181,34 @@ class LabAppointmentView(mixins.CreateModelMixin,
         lab_appointment_queryset = serializer.save()
         serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
         return Response(serializer.data)
+
+
+class AddressViewsSet(viewsets.ModelViewSet):
+    serializer_class = AddressSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    pagination_class = None
+
+    def get_queryset(self):
+        request = self.request
+        return Address.objects.filter(user=request.user)
+
+    def create(self, request, *args, **kwargs):
+        data = dict(request.data)
+        data["user"] = request.user.id
+        serializer = AddressSerializer(data=data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def destroy(self, request, pk=None):
+        address = Address.objects.filter(pk=pk).first()
+        address.delete()
+        return Response({
+            "status": 1
+        })
+
+
+
 
 
