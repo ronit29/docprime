@@ -14,7 +14,7 @@ utc = pytz.UTC
 class LabTestListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
-        fields = ('id', 'name')
+        fields = ('id', 'name', 'is_package')
 
 
 class LabListSerializer(serializers.ModelSerializer):
@@ -31,9 +31,20 @@ class LabTestSerializer(serializers.ModelSerializer):
 
 
 class LabModelSerializer(serializers.ModelSerializer):
+
+    lat = serializers.SerializerMethodField()
+    long = serializers.SerializerMethodField()
+
+    def get_lat(self, obj):
+        return obj.location.y
+
+    def get_long(self, obj):
+        return obj.location.x
+
     class Meta:
         model = Lab
-        fields = '__all__'
+        # fields = '__all__'
+        exclude = ('created_at', 'updated_at', 'location', 'location_error', )
 
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
@@ -56,25 +67,29 @@ class LabCustomSerializer(serializers.Serializer):
 
 
 class CommonTestSerializer(serializers.ModelSerializer):
-    test = LabTestSerializer()
+    id = serializers.ReadOnlyField(source='test.id')
+    name = serializers.ReadOnlyField(source='test.name')
 
     class Meta:
         model = CommonTest
-        fields = '__all__'
+        fields = ('id', 'name', )
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = CommonDiagnosticCondition
-        fields = '__all__'
+        fields = ('id', 'name', )
 
 
 class PromotedLabsSerializer(serializers.ModelSerializer):
-    lab = LabModelSerializer()
+    # lab = LabModelSerializer()
+    id = serializers.ReadOnlyField(source='lab.id')
+    name = serializers.ReadOnlyField(source='lab.name')
 
     class Meta:
         model = PromotedLab
-        fields = '__all__'
+        fields = ('id', 'name', )
 
 
 class LabAppointmentModelSerializer(serializers.ModelSerializer):

@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
 
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters import filters
@@ -97,8 +98,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def get_lab_list(self, parameters):
         # allowed_ordering = ['price','distance',]
         distance = 13514700
-        default_long = -96.876369
-        default_lat = 29.905320
+        default_long = 77.0266
+        default_lat = 28.4595
         long = parameters.get('long', default_long)
         lat = parameters.get('lat', default_lat)
         id_str = parameters.get('ids')
@@ -126,14 +127,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         queryset = self.apply_custom_filters(queryset, parameters)
         return queryset
 
-        list_of_labs = list()
-        lab_price_map = dict()
-        for q in queryset:
-            list_of_labs.append(int(q.get("lab")))
-            lab_price_map[int(q.get("lab"))] = int(q.get("price"))
-
-        return self.get_labs(list_of_labs, lab_price_map)
-
     @staticmethod
     def apply_custom_filters(queryset, parameters):
         order_by = parameters.get("order_by")
@@ -146,14 +139,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.order_by("name")
         return queryset
 
-    @staticmethod
-    def get_labs(list_of_labs, lab_price_map):
-        lab_queryset = Lab.objects.filter(id__in=list_of_labs)
-        for q in lab_queryset:
-            index = list_of_labs.index(q.id)
-            list_of_labs[index] = {"lab": q, "price": lab_price_map[q.id]}
-        return list_of_labs
-
 
 class LabAppointmentView(mixins.CreateModelMixin,
                          mixins.ListModelMixin,
@@ -162,11 +147,14 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     queryset = LabAppointment.objects.all()
     serializer_class = LabAppointmentModelSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
 
     def list(self, request, *args, **kwargs):
-        queryset = LabAppointment.objects.filter(profile=request.user)
+        user = request.user
+        queryset = LabAppointment.objects.filter(profile__user=2)
         serializer = LabAppointmentModelSerializer(queryset, many=True)
         return Response(serializer.data)
 
