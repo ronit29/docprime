@@ -2,6 +2,7 @@ import json
 from import_export import resources
 from import_export.admin import ImportMixin, base_formats
 from ondoc.lead.models import HospitalLead
+from ondoc.doctor.models import MedicalService
 from reversion.admin import VersionAdmin
 from django.utils.html import format_html_join
 from django.utils.safestring import mark_safe
@@ -22,6 +23,9 @@ class HospitalLeadAdmin(ImportMixin, VersionAdmin):
     resource_class = HospitalLeadResource
 
     def has_delete_permission(self, request, obj=None):
+        return False
+    
+    def has_add_permission(self, request):
         return False
 
     def timings(self, instance):
@@ -45,7 +49,9 @@ class HospitalLeadAdmin(ImportMixin, VersionAdmin):
         return format_html_join(
             mark_safe('<br/>'),
             '{}',
-            ((line,) for line in data.get("Services").values()),
+            ((service_name if MedicalService.objects.filter(
+                name=service_name).exists() else "{} - Does not exists.".format(service_name),) for service_name in
+             data.get("Services").values()),
         )
 
     def name(self, instance):
