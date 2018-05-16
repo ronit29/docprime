@@ -1,6 +1,6 @@
 import json
 from import_export import resources
-from import_export.admin import ImportExportModelAdmin
+from import_export.admin import ImportMixin, base_formats
 from ondoc.lead.models import HospitalLead
 from reversion.admin import VersionAdmin
 from django.utils.html import format_html_join
@@ -13,18 +13,25 @@ class HospitalLeadResource(resources.ModelResource):
         model = HospitalLead
 
 
-class HospitalLeadAdmin(ImportExportModelAdmin, VersionAdmin):
+class HospitalLeadAdmin(ImportMixin, VersionAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = []
-    list_display = ('source_id', 'city', 'lab', 'name', )
-    readonly_fields = ('source_id', 'city', 'lab', "timings", "address", "services", 'name',
-                       'about', )
-    exclude = ('json', )
+    list_display = ('city', 'lab', 'name', )
+    readonly_fields = ('name', 'lab', "timings", "services", 'city',  "address", 'about', )
+    exclude = ('json', 'source_id', )
     resource_class = HospitalLeadResource
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
     def timings(self, instance):
         data = json.loads(instance.json)
         if data:
-            return data.get("WeeklyOpenTime")
+            return format_html_join(
+                mark_safe('<br/>'),
+                '{} : {}',
+                ((key, data.get("WeeklyOpenTime").get(key)) for key in data.get("WeeklyOpenTime").keys()),
+            )
 
     def address(self, instance):
         data = json.loads(instance.json)
@@ -33,8 +40,8 @@ class HospitalLeadAdmin(ImportExportModelAdmin, VersionAdmin):
 
     def services(self, instance):
         data = json.loads(instance.json)
-        # if data:
-        #     return ", ".join([value for value in data.get("Services").values()])
+        if not data:
+            return
         return format_html_join(
             mark_safe('<br/>'),
             '{}',
