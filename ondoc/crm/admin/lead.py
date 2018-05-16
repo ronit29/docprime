@@ -9,7 +9,6 @@ from django.utils.safestring import mark_safe
 
 
 class HospitalLeadResource(resources.ModelResource):
-
     class Meta:
         model = HospitalLead
 
@@ -17,14 +16,14 @@ class HospitalLeadResource(resources.ModelResource):
 class HospitalLeadAdmin(ImportMixin, VersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = []
-    list_display = ('city', 'lab', 'name', )
-    readonly_fields = ('name', 'lab', "timings", "services", 'city',  "address", 'about', )
-    exclude = ('json', 'source_id', )
+    list_display = ('city', 'lab', 'name',)
+    readonly_fields = ('name', 'lab', "timings", "services", 'city', "address", 'about',)
+    exclude = ('json', 'source_id',)
     resource_class = HospitalLeadResource
 
     def has_delete_permission(self, request, obj=None):
         return False
-    
+
     def has_add_permission(self, request):
         return False
 
@@ -63,7 +62,6 @@ class HospitalLeadAdmin(ImportMixin, VersionAdmin):
         data = json.loads(instance.json)
         if data:
             return data.get("About")
-
 
     address.short_description = 'Address'
     timings.short_description = "Timings"
