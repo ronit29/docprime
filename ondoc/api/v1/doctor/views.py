@@ -180,10 +180,19 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        allowed = opd_appointment.allowed_action(request.user.user_type)
+        appt_status = validated_data['status']
+        if appt_status not in allowed:
+            resp = {}
+            resp['allowed'] = allowed
+            return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+
+
         if request.user.user_type == User.DOCTOR:
             updated_opd_appointment = self.doctor_update(opd_appointment, validated_data)
         elif request.user.user_type == User.CONSUMER:
             updated_opd_appointment = self.consumer_update(opd_appointment, validated_data)
+
         opd_appointment_serializer = OpdAppointmentSerializer(updated_opd_appointment)
         response = {
             "status": 1,
@@ -192,13 +201,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return Response(response)
 
     def doctor_update(self, opd_appointment, validated_data):
+        status = validated_data.get('status')
         opd_appointment.status = validated_data.get('status')
+
         opd_appointment.save()
         return opd_appointment
 
     def consumer_update(self, opd_appointment, validated_data):
         opd_appointment.status = validated_data.get('status')
-        if validated_data.get('status') == OpdAppointment.RESCHEDULED:
+        if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
             opd_appointment.time_slot_start = validated_data.get("time_slot_start")
             opd_appointment.time_slot_end = validated_data.get("time_slot_end")
         opd_appointment.save()
