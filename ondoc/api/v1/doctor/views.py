@@ -20,7 +20,9 @@ import datetime
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-from ondoc.doctor.models import OpdAppointment, DoctorHospital, Doctor, DoctorLeave, Prescription, PrescriptionFile
+from ondoc.doctor.models import (OpdAppointment, DoctorHospital, Doctor, DoctorLeave, Prescription, PrescriptionFile,
+                                 MedicalCondition, Specialization)
+
 from .serializers import (OpdAppointmentSerializer, UpdateStatusSerializer,
                           AppointmentFilterSerializer, CreateAppointmentSerializer,
                           DoctorHospitalListSerializer, DoctorProfileSerializer, DoctorHospitalSerializer,
@@ -350,3 +352,13 @@ class PrescriptionFileViewset(OndocViewSet):
         prescription_file_serializer.is_valid(raise_exception=True)
         prescription_file_serializer.save()
         return Response(prescription_file_serializer.data)
+
+
+class SearchedItemsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+
+    def list(self, request, *args, **kwargs):
+        medical_conditions = MedicalCondition.objects.all().values("id", "name")
+        specializations = Specialization.objects.all().values("id", "name")
+        return Response({"conditions": medical_conditions, "specializations": specializations})

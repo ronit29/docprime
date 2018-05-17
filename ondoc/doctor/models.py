@@ -593,3 +593,13 @@ class PrescriptionFile(TimeStampedModel):
 
     class Meta:
         db_table = "prescription_file"
+
+
+class MedicalCondition(TimeStampedModel):
+    name = models.CharField(max_length=100, verbose_name="Name")
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = "medical_condition"
