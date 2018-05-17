@@ -1,8 +1,9 @@
-from .serializers import ( LabModelSerializer, LabTestListSerializer, LabCustomSerializer, AvailableLabTestSerializer,
-                           LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
-                           LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
-                           PromotedLabsSerializer, CommonConditionsSerializer, AddressSerializer)
-from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, PromotedLab,
+from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSerializer, AvailableLabTestSerializer,
+                          LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
+                          LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
+                          PromotedLabsSerializer, CommonConditionsSerializer, LabTimingModelSerializer,
+                          AddressSerializer)
+from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
 from ondoc.authentication.models import UserProfile, Address
 
@@ -22,6 +23,7 @@ from django.shortcuts import get_object_or_404
 
 from django.db.models import Count, Sum, Max
 from django.http import Http404
+from rest_framework import status
 
 
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -88,10 +90,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             raise Http404("No labs available")
 
         test_serializer = AvailableLabTestSerializer(queryset, many=True)
-        lab_serializer = LabModelSerializer(queryset.first().lab)
+        lab_queryset = queryset.first().lab
+        timing_queryset = lab_queryset.labtiming_set.all()
+        timing_serializer = LabTimingModelSerializer(timing_queryset, many=True)
+        lab_serializer = LabModelSerializer(lab_queryset)
         temp_data = dict()
         temp_data['lab'] = lab_serializer.data
         temp_data['tests'] = test_serializer.data
+        temp_data['lab_timing'] = timing_serializer.data
         return Response(temp_data)
         # return Response(serializer.data)
 
@@ -154,7 +160,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     def list(self, request, *args, **kwargs):
         user = request.user
-        queryset = LabAppointment.objects.filter(profile__user=2)
+        queryset = LabAppointment.objects.filter(profile__user=user)
         serializer = LabAppointmentModelSerializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -173,10 +179,18 @@ class LabAppointmentView(mixins.CreateModelMixin,
         return Response(serializer.data)
 
     def update(self, request, pk):
-        lab_appointment_obj = LabAppointment.objects.get(pk=pk)
-        serializer = LabAppointmentUpdateSerializer(lab_appointment_obj, data=request.data,
+        data = request.data
+        lab_appointment_obj = get_object_or_404(LabAppointment, pk=pk)
+        # lab_appointment_obj = LabAppointment.objects.get(pk=pk)
+        serializer = LabAppointmentUpdateSerializer(lab_appointment_obj, data=data,
                                                     context={'lab_id': lab_appointment_obj.lab})
         serializer.is_valid(raise_exception=True)
+        # allowed = lab_appointment_obj.allowed_action(request.user.user_type)
+        allowed = lab_appointment_obj.allowed_action(3)
+        if data.get('status') not in allowed:
+            resp = dict()
+            resp['allowed'] = allowed
+            return Response(resp, status=status.HTTP_400_BAD_REQUEST)
 
         lab_appointment_queryset = serializer.save()
         serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
@@ -209,6 +223,25 @@ class AddressViewsSet(viewsets.ModelViewSet):
         })
 
 
+class LabTimingListView(mixins.ListModelMixin,
+                        viewsets.GenericViewSet):
+
+    def list(self, request, *args, **kwargs):
+        params = request.query_params
+
+        flag = True if int(params.get('pickup', 0)) else False
+        queryset = LabTiming.objects.filter(lab=params.get('lab'), pickup_flag=flag)
+        serializer = LabTimingModelSerializer(queryset, many=True)
+        return Response(serializer.data)
 
 
+class AvailableTestViewSet(mixins.ListModelMixin,
+                           viewsets.GenericViewSet):
+
+    def retrive(self, request, lab_id):
+        params = request.query_params
+
+        queryset = AvailableLabTest.objects.filter(lab=lab_id)
+        serializer = AvailableLabTestSerializer(queryset, many=True)
+        return Response(serializer.data)
 

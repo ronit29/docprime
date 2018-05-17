@@ -50,11 +50,12 @@ class LabModelSerializer(serializers.ModelSerializer):
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
+    test_id = serializers.ReadOnlyField(source='test.id')
 
     class Meta:
         model = AvailableLabTest
-        # fields = '__all__'
-        exclude = ('lab', 'agreed_price', 'deal_price')
+        fields = ('test_id', 'mrp', 'test', )
+        # exclude = ('lab', 'agreed_price', 'deal_price')
 
 
 class LabCustomSerializer(serializers.Serializer):
@@ -100,8 +101,9 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
 
 class LabAppointmentUpdateSerializer(serializers.Serializer):
-    appointment_status = [LabAppointment.CREATED, LabAppointment.ACCEPTED, LabAppointment.RESCHEDULED,
-                          LabAppointment.REJECTED]
+    appointment_status = [LabAppointment.CREATED, LabAppointment.ACCEPTED, LabAppointment.RESCHEDULED_LAB,
+                          LabAppointment.CANCELED, LabAppointment.RESCHEDULED_PATIENT, LabAppointment.COMPLETED,
+                          LabAppointment.BOOKED]
     status = serializers.ChoiceField(choices=appointment_status)
     start_time = serializers.DateTimeField(required=False)
     end_time = serializers.DateTimeField(required=False)
@@ -117,11 +119,11 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
         pass
 
     def update(self, instance, data):
-        if data['status'] == LabAppointment.RESCHEDULED:
+        if data['status'] == LabAppointment.RESCHEDULED_PATIENT:
             self.reschedule_validation(instance, data)
             instance.time_slot_start = data.get("start_time", instance.time_slot_start)
             instance.time_slot_end = data.get("end_time", instance.time_slot_end)
-        elif data['status'] == LabAppointment.REJECTED:
+        elif data['status'] == LabAppointment.CANCELED:
             self.cancel_validation(instance, data)
         else:
             raise serializers.ValidationError("Invalid Status")
@@ -136,7 +138,9 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Cannot Reschedule")
 
     def cancel_validation(self, instance, data):
-        pass
+        now = datetime.datetime.now().replace(tzinfo=utc)
+        if instance.time_slot_start < now:
+            raise serializers.ValidationError("Cannot Cancel")
 
 
 class LabAppointmentCreateSerializer(serializers.Serializer):
@@ -234,3 +238,10 @@ class AddressSerializer(serializers.ModelSerializer):
         if not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
+
+
+class LabTimingModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = LabTiming
+        fields = ('id', 'day', 'start', 'end')
