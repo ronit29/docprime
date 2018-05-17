@@ -16,8 +16,18 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
 from .common import *
 
 
+class LabTimingForm(forms.ModelForm):
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start")
+        end = cleaned_data.get("end")
+        if start and end and start>=end:
+            raise forms.ValidationError("Start time should be less than end time")
+
+
 class LabTimingInline(admin.TabularInline):
     model = LabTiming
+    form = LabTimingForm
     extra = 0
     can_delete = True
     show_change_link = False

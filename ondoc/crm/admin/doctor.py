@@ -40,7 +40,7 @@ class DoctorHospitalForm(forms.ModelForm):
         cleaned_data = super().clean()
         start = cleaned_data.get("start")
         end = cleaned_data.get("end")
-        if start>=end:
+        if start and end and start>=end:
             raise forms.ValidationError("Availability start time should be less than end time")
 
 
