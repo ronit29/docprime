@@ -48,6 +48,9 @@ USE_L10N = True
 
 USE_TZ = True
 
+FILE_UPLOAD_PERMISSIONS = 0o664
+# FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
+
 # Database
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
 
