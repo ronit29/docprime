@@ -8,3 +8,4 @@ django-reversion
 django-crispy-forms
 requests
 django-cors-headers
+raven==6.8.0
