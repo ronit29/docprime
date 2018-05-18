@@ -177,11 +177,14 @@ class Doctor(TimeStampedModel, QCModel):
     def __str__(self):
         return self.name
 
-    def experience(self):
+    def experience_years(self):
         if not self.practicing_since:
             return None
         current_year = timezone.now().year
         return int(current_year - self.practicing_since)
+
+    def ex_hospitals(self):
+        return self.experiences.all().values("hospital")
 
     def hospital_count(self):
         return self.availability.all().count()

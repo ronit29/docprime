@@ -416,10 +416,11 @@ class DoctorSearchResultSerializer(serializers.ModelSerializer):
     qualifications = DoctorQualificationSerializer(read_only=True, many=True)
     hospital = DoctorHospitalSearchSerializer(read_only=True)
     timings = serializers.ListField(read_only=True, min_length=0)
-    experience = serializers.IntegerField(read_only=True, allow_null=True)
+    experience_years = serializers.IntegerField(read_only=True, allow_null=True)
+    ex_hospitals = serializers.ListField(min_length=0)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
 
     class Meta:
         model = Doctor
-        fields = ('id', 'qualifications', 'hospital', 'experience', 'hospital_count',
-                  'name', 'gender', 'timings', )
+        fields = ('id', 'qualifications', 'hospital', 'experience_years', 'hospital_count',
+                  'name', 'gender', 'timings', 'ex_hospitals', )
