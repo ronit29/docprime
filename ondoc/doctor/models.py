@@ -177,6 +177,28 @@ class Doctor(TimeStampedModel, QCModel):
     def __str__(self):
         return self.name
 
+    def experience(self):
+        if not self.practicing_since:
+            return None
+        current_year = timezone.now().year
+        return int(current_year - self.practicing_since)
+
+    def hospital_count(self):
+        return self.availability.all().count()
+
+    def hospital(self):
+        return self.availability.all().first()
+
+    def timings(self):
+        availability = self.availability.all().first()
+        if not availability:
+            return []
+        days_mapping = dict(DoctorHospital.DAY_CHOICES)
+        return [{"day": days_mapping.get(availability.get('day')),
+                 "start": availability.get("start"),
+                 "end": availability.get("end")} for availability in
+                self.availability.filter(id=availability.id).values("day", "start", "end")]
+
     class Meta:
         db_table = "doctor"
 
@@ -249,6 +271,9 @@ class DoctorHospital(TimeStampedModel):
 
     def __str__(self):
         return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
+
+    def discounted_fees(self):
+        return self.fees
 
     class Meta:
         db_table = "doctor_hospital"

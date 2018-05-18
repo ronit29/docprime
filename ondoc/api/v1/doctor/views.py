@@ -21,16 +21,18 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 from ondoc.doctor.models import (OpdAppointment, DoctorHospital, Doctor, DoctorLeave, Prescription, PrescriptionFile,
-                                 MedicalCondition, Specialization)
+                                 MedicalCondition, Specialization, DoctorQualification)
 
-from .serializers import (OpdAppointmentSerializer, UpdateStatusSerializer,
-                          AppointmentFilterSerializer, CreateAppointmentSerializer,
+from .serializers import (OpdAppointmentSerializer, UpdateStatusSerializer,DoctorListSerializer,
+                          AppointmentFilterSerializer, CreateAppointmentSerializer, DoctorSearchResultSerializer,
                           DoctorHospitalListSerializer, DoctorProfileSerializer, DoctorHospitalSerializer,
                           DoctorBlockCalenderSerialzer, DoctorLeaveSerializer, PrescriptionFileSerializer,
                           PrescriptionSerializer, DoctorHospitalScheduleSerializer, HospitalModelSerializer)
 from ondoc.api.pagination import paginate_queryset
 
 from django.db.models import Min, Max
+from django.contrib.gis.geos import Point
+from django.contrib.gis.db.models.functions import Distance
 from django.contrib.postgres.aggregates import ArrayAgg
 
 
@@ -142,7 +144,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         else:
             queryset = queryset.order_by('-time_slot_start')
 
-        queryset = paginate_queryset(queryset, request)    
+        queryset = paginate_queryset(queryset, request)
         serializer = OpdAppointmentSerializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -362,3 +364,28 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         medical_conditions = MedicalCondition.objects.all().values("id", "name")
         specializations = Specialization.objects.all().values("id", "name")
         return Response({"conditions": medical_conditions, "specializations": specializations})
+
+
+class DoctorListViewSet(viewsets.GenericViewSet):
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+
+    def list(self, request, *args, **kwargs):
+        MAX_DISTANCE = 10000
+        serializer = DoctorListSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        point = Point(validated_data.get("longitude"),
+                      validated_data.get("latitude"), srid=4326)
+        specialization_ids = validated_data.get("specialization_ids").strip(",").split(",") if validated_data.get(
+            "specialization_ids") else []
+
+        doctor_ids = [doctor_hospital.doctor.id for doctor_hospital in
+                      DoctorHospital.objects.filter(hospital__location__distance_lte=(point, MAX_DISTANCE)
+                                                    )]
+        if specialization_ids:
+            doctor_ids = [doctor_qualification.doctor.id for doctor_qualification in DoctorQualification.objects.filter(
+                doctor__id__in=doctor_ids).filter(specialization__in=specialization_ids)]
+        queryset = Doctor.objects.filter(id__in=doctor_ids)
+        search_result_serializer = DoctorSearchResultSerializer(queryset, many=True)
+        return Response(search_result_serializer.data)

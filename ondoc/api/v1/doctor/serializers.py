@@ -3,7 +3,7 @@ from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital, DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
-                                 Prescription, PrescriptionFile)
+                                 Prescription, PrescriptionFile, Specialization)
 
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -197,7 +197,7 @@ class DoctorLanguageSerializer(serializers.ModelSerializer):
 class DoctorHospitalSerializer(serializers.ModelSerializer):
     doctor = serializers.ReadOnlyField(source='doctor.name')
     hospital = serializers.ReadOnlyField(source='hospital.name')
-    address = serializers.ReadOnlyField(source='hospital.address')
+    address = serializers.ReadOnlyField(source='hospital.locality')
     hospital_id = serializers.ReadOnlyField(source='hospital.pk')
     day = serializers.SerializerMethodField()
 
@@ -388,3 +388,38 @@ class PrescriptionSerializer(serializers.Serializer):
         if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
             raise serializers.ValidationError("Appointment is not correct.")
         return value
+
+
+class DoctorListSerializer(serializers.Serializer):
+    specialization_ids = serializers.CharField(required=False)
+    longitude = serializers.FloatField(default=77.071848)
+    latitude = serializers.FloatField(default=28.450367)
+
+    def validate_specialization_id(self, value):
+        if not Specialization.objects.filter(id__in=value.strip()).count() == len(value.strip()):
+            raise serializers.ValidationError("Invalid specialization Id.")
+        return value
+
+
+class DoctorHospitalSearchSerializer(DoctorHospitalSerializer):
+    discounted_fees = serializers.IntegerField(read_only=True, allow_null=True)
+    hospital_id = None
+    doctor = None
+    day = None
+
+    class Meta:
+        model = DoctorHospital
+        exclude = ("id", "created_at", "updated_at", "day", "start", "end", "doctor")
+
+
+class DoctorSearchResultSerializer(serializers.ModelSerializer):
+    qualifications = DoctorQualificationSerializer(read_only=True, many=True)
+    hospital = DoctorHospitalSearchSerializer(read_only=True)
+    timings = serializers.ListField(read_only=True, min_length=0)
+    experience = serializers.IntegerField(read_only=True, allow_null=True)
+    hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = Doctor
+        fields = ('id', 'qualifications', 'hospital', 'experience', 'hospital_count',
+                  'name', 'gender', 'timings', )
