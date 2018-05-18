@@ -24,6 +24,8 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count, Sum, Max
 from django.http import Http404
 from rest_framework import status
+from collections import OrderedDict
+from django.utils import timezone
 
 
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -90,9 +92,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             raise Http404("No labs available")
 
         test_serializer = AvailableLabTestSerializer(queryset, many=True)
-        lab_queryset = queryset.first().lab
-        timing_queryset = lab_queryset.labtiming_set.all()
-        timing_serializer = LabTimingModelSerializer(timing_queryset, many=True)
+        lab_queryset = queryset[0].lab
+        day_now = timezone.now().weekday()
+        timing_queryset = lab_queryset.labtiming_set.filter(day=day_now)
+        timing = dict()
+        timing[day_now] = dict()
+        timing_serializer = LabTimingModelSerializer(timing_queryset, many=True, context={'timing': timing})
         lab_serializer = LabModelSerializer(lab_queryset)
         temp_data = dict()
         temp_data['lab'] = lab_serializer.data
@@ -102,28 +107,38 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # return Response(serializer.data)
 
     def get_lab_list(self, parameters):
-        # allowed_ordering = ['price','distance',]
-        distance = 13514700
-        default_long = 77.0266
-        default_lat = 28.4595
+        # distance in meters
+        DEFAULT_DISTANCE = 10000
+
+        default_long = 77.071848
+        default_lat = 28.450367
+        min_distance = parameters.get('min_distance')
+        max_distance = parameters.get('max_distance', DEFAULT_DISTANCE)
         long = parameters.get('long', default_long)
         lat = parameters.get('lat', default_lat)
         id_str = parameters.get('ids')
-        price = parameters.get('price')
+        min_price = parameters.get('min_price')
+        max_price = parameters.get('max_price')
         ids = list()
         queryset = AvailableLabTest.objects
 
         if id_str:
-            ids = list(map(int, parameters.get("ids").split(",")))
+            id_str = id_str.strip(',')
+            ids = list(map(int, id_str.split(",")))
             queryset = queryset.filter(test__in=ids)
 
         if lat is not None and long is not None:
             point_string = 'POINT('+str(long)+' '+str(lat)+')'
             pnt = GEOSGeometry(point_string, srid=4326)
-            queryset = queryset.filter(lab__location__distance_lte=(pnt, distance))
+            queryset = queryset.filter(lab__location__distance_lte=(pnt, max_distance))
+            if min_distance:
+                queryset = queryset.filter(lab__location__distance_gte=(pnt, min_distance))
 
-        if price:
-            queryset = queryset.filter(mrp__lte=price)
+        if min_price:
+            queryset = queryset.filter(mrp__gte=min_price)
+
+        if max_price:
+            queryset = queryset.filter(mrp__lte=max_price)
 
         queryset = (
             queryset.values('lab').annotate(price=Sum('mrp'), count=Count('id'),
@@ -231,8 +246,27 @@ class LabTimingListView(mixins.ListModelMixin,
 
         flag = True if int(params.get('pickup', 0)) else False
         queryset = LabTiming.objects.filter(lab=params.get('lab'), pickup_flag=flag)
-        serializer = LabTimingModelSerializer(queryset, many=True)
-        return Response(serializer.data)
+        if not queryset:
+            return Response([])
+        resp_dict = dict()
+
+        for i in range(7):
+            resp_dict[i] = dict()
+        serializer = LabTimingModelSerializer(queryset, many=True, context={'timing': resp_dict})
+
+        temp_data = serializer.data
+
+        for i in range(7):
+            if resp_dict[i].get('timing'):
+                temp_list = list()
+                temp_list = [[k, v] for k, v in resp_dict[i]['timing'][0].items()]
+                resp_dict[i]['timing'][0] = temp_list
+                temp_list = [[k, v] for k, v in resp_dict[i]['timing'][1].items()]
+                resp_dict[i]['timing'][1] = temp_list
+                temp_list = [[k, v] for k, v in resp_dict[i]['timing'][2].items()]
+                resp_dict[i]['timing'][2] = temp_list
+
+        return Response(resp_dict)
 
 
 class AvailableTestViewSet(mixins.ListModelMixin,

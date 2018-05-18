@@ -36,7 +36,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     agreed_rate_list = models.FileField(upload_to='lab/docs',max_length=200, null=True, blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
 
-
     def __str__(self):
         return self.name
 
@@ -94,7 +93,7 @@ class LabManager(TimeStampedModel):
 
 
 class LabImage(TimeStampedModel, Image):
-    lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='lab_image')
     name = models.ImageField(upload_to='lab/images', height_field='height', width_field='width')
 
     class Meta:
@@ -319,6 +318,7 @@ class CommonTest(TimeStampedModel):
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)
+    test = models.ManyToManyField(LabTest)
 
     def __str__(self):
         return self.name
@@ -397,7 +397,7 @@ class LabDocument(TimeStampedModel, Image):
     REGISTRATION = 4
     CHEQUE = 5
     LOGO = 6
-    CHOICES = [(PAN,"PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"Registration Certificate"),(CHEQUE,"Cancel Cheque Copy"),(LOGO,"LOGO")]
+    CHOICES = [(PAN, "PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"Registration Certificate"),(CHEQUE,"Cancel Cheque Copy"),(LOGO,"LOGO")]
     lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.ImageField(upload_to='lab/images', height_field='height', width_field='width')
