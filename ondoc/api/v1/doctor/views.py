@@ -20,17 +20,22 @@ import datetime
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-from ondoc.doctor.models import OpdAppointment, DoctorHospital, Doctor, DoctorLeave, Prescription, PrescriptionFile
-from .serializers import (OpdAppointmentSerializer, UpdateStatusSerializer,
-                          AppointmentFilterSerializer, CreateAppointmentSerializer,
+from ondoc.doctor.models import (OpdAppointment, DoctorHospital, Doctor, DoctorLeave, Prescription, PrescriptionFile,
+                                 MedicalCondition, Specialization, DoctorQualification)
+
+from .serializers import (OpdAppointmentSerializer, UpdateStatusSerializer,DoctorListSerializer,
+                          AppointmentFilterSerializer, CreateAppointmentSerializer, DoctorSearchResultSerializer,
                           DoctorHospitalListSerializer, DoctorProfileSerializer, DoctorHospitalSerializer,
                           DoctorBlockCalenderSerialzer, DoctorLeaveSerializer, PrescriptionFileSerializer,
-                          PrescriptionSerializer, DoctorHospitalScheduleSerializer, HospitalModelSerializer)
+                          PrescriptionSerializer, DoctorHospitalScheduleSerializer, HospitalModelSerializer,
+                          DoctorProfileUserViewSerializer)
 from ondoc.api.pagination import paginate_queryset
 
 from django.db.models import Min, Max
+from django.contrib.gis.geos import Point
+from django.contrib.gis.db.models.functions import Distance
 from django.contrib.postgres.aggregates import ArrayAgg
-
+from django.db.models import Prefetch
 
 # class DoctorFilterBackend(BaseFilterBackend):
 
@@ -140,7 +145,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         else:
             queryset = queryset.order_by('-time_slot_start')
 
-        queryset = paginate_queryset(queryset, request)    
+        queryset = paginate_queryset(queryset, request)
         serializer = OpdAppointmentSerializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -180,10 +185,19 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        allowed = opd_appointment.allowed_action(request.user.user_type)
+        appt_status = validated_data['status']
+        if appt_status not in allowed:
+            resp = {}
+            resp['allowed'] = allowed
+            return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+
+
         if request.user.user_type == User.DOCTOR:
             updated_opd_appointment = self.doctor_update(opd_appointment, validated_data)
         elif request.user.user_type == User.CONSUMER:
             updated_opd_appointment = self.consumer_update(opd_appointment, validated_data)
+
         opd_appointment_serializer = OpdAppointmentSerializer(updated_opd_appointment)
         response = {
             "status": 1,
@@ -192,13 +206,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return Response(response)
 
     def doctor_update(self, opd_appointment, validated_data):
+        status = validated_data.get('status')
         opd_appointment.status = validated_data.get('status')
+
         opd_appointment.save()
         return opd_appointment
 
     def consumer_update(self, opd_appointment, validated_data):
         opd_appointment.status = validated_data.get('status')
-        if validated_data.get('status') == OpdAppointment.RESCHEDULED:
+        if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
             opd_appointment.time_slot_start = validated_data.get("time_slot_start")
             opd_appointment.time_slot_end = validated_data.get("time_slot_end")
         opd_appointment.save()
@@ -225,6 +241,15 @@ class DoctorProfileView(viewsets.GenericViewSet):
         temp_data["count"] = appointment_count
         temp_data['hospitals'] = hospital_serializer.data
         return Response(temp_data)
+
+
+class DoctorProfileUserViewSet(viewsets.GenericViewSet):
+
+    def retrieve(self, request, pk):
+        doctor = Doctor.objects.prefetch_related('languages__language').filter(pk=pk).first()
+        serializer = DoctorProfileUserViewSerializer(doctor, many=False)
+        serializer = DoctorProfileSerializer(doctor)
+        return Response(serializer.data)
 
 
 class DoctorHospitalView(mixins.ListModelMixin,
@@ -339,3 +364,42 @@ class PrescriptionFileViewset(OndocViewSet):
         prescription_file_serializer.is_valid(raise_exception=True)
         prescription_file_serializer.save()
         return Response(prescription_file_serializer.data)
+
+
+class SearchedItemsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+
+    def list(self, request, *args, **kwargs):
+        medical_conditions = MedicalCondition.objects.all().values("id", "name")
+        specializations = Specialization.objects.all().values("id", "name")
+        return Response({"conditions": medical_conditions, "specializations": specializations})
+
+
+class DoctorListViewSet(viewsets.GenericViewSet):
+    # authentication_classes = (TokenAuthentication,)
+    # permission_classes = (IsAuthenticated, DoctorPermission,)
+    queryset = Doctor.objects.all()
+
+    def list(self, request, *args, **kwargs):
+        MAX_DISTANCE = 10000
+        serializer = DoctorListSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        point = Point(validated_data.get("longitude"),
+                      validated_data.get("latitude"), srid=4326)
+        specialization_ids = validated_data.get("specialization_ids").strip(",").split(",") if validated_data.get(
+            "specialization_ids") else []
+
+        doctor_ids = set([doctor_hospital.doctor.id for doctor_hospital in
+                      DoctorHospital.objects.filter(hospital__location__distance_lte=(point, MAX_DISTANCE)
+                                                    ).select_related('doctor')])
+        if specialization_ids:
+            doctor_ids = set([doctor_qualification.doctor.id for doctor_qualification in DoctorQualification.objects.filter(
+                doctor__id__in=doctor_ids).filter(specialization__in=specialization_ids).select_related("doctor")])
+        queryset = Doctor.objects.prefetch_related("qualifications", "qualifications__specialization",
+                                                   "qualifications__qualification", "availability__doctor",
+                                                   "availability__hospital", "experiences__doctor",
+                                                   ).filter(id__in=doctor_ids)
+        search_result_serializer = DoctorSearchResultSerializer(queryset, many=True)
+        return Response(search_result_serializer.data)

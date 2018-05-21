@@ -3,7 +3,7 @@ from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital, DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
-                                 Prescription, PrescriptionFile)
+                                 Prescription, PrescriptionFile, Specialization)
 
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -102,40 +102,70 @@ class SetAppointmentSerializer(serializers.Serializer):
 
 
 class UpdateStatusSerializer(serializers.Serializer):
-    DOCTOR_ALLOWED_CHOICES = [OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]
-    PATIENT_ALLOWED_CHOICES = [OpdAppointment.REJECTED, OpdAppointment.RESCHEDULED]
-    STATUS_CHOICES = ((OpdAppointment.ACCEPTED, "Accepted"),
-                      (OpdAppointment.RESCHEDULED, "Rescheduled"),
-                      (OpdAppointment.REJECTED, "Rejected"))
-    status = serializers.ChoiceField(choices=STATUS_CHOICES)
+    # DOCTOR_ALLOWED_CHOICES = [OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]
+    # PATIENT_ALLOWED_CHOICES = [OpdAppointment.CANCELED, OpdAppointment.RESCHEDULED]
+    # STATUS_CHOICES = ((OpdAppointment.ACCEPTED, "Accepted"),
+    #                   (OpdAppointment.RESCHEDULED, "Rescheduled"),
+    #                   (OpdAppointment.REJECTED, "Rejected"))
+    # status = serializers.ChoiceField(choices=STATUS_CHOICES)
+    #patient_status = serializers.ChoiceField(choices=OpdAppointment.PATIENT_STATUS_CHOICES, required=False)
+    status = serializers.IntegerField()
     time_slot_start = serializers.DateTimeField(required=False)
     time_slot_end = serializers.DateTimeField(required=False)
 
-    def validate(self, data):
-        request = self.context.get("request")
-        opd_appointment = self.context.get("opd_appointment")
-        current_datetime = timezone.now()
-        if request.user.user_type == User.DOCTOR and not (data.get('status') in self.DOCTOR_ALLOWED_CHOICES):
-            raise serializers.ValidationError("Not a valid status for the user.")
-        if request.user.user_type == User.CONSUMER and (not data.get('status') in self.PATIENT_ALLOWED_CHOICES):
-            raise serializers.ValidationError("Not a valid status for the user.")
-        if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.ACCEPTED and (
-                current_datetime > opd_appointment.time_slot_start):
-            raise serializers.ValidationError("Can not accept appointment after time slot has passed.")
-        if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.RESCHEDULED and (
-                current_datetime > opd_appointment.time_slot_start):
-            raise serializers.ValidationError("Can not reschedule appointment after time slot has passed.")
-        if request.user.user_type == User.CONSUMER and data.get('status') == OpdAppointment.RESCHEDULED:
-            if not (data.get('time_slot_start')):
-                raise serializers.ValidationError("time_slot_start is required.")
-            if not (data.get('time_slot_end')):
-                raise serializers.ValidationError("time_slot_end is required.")
-            if (not DoctorHospital
-                    .objects.filter(doctor=opd_appointment.doctor, hospital=opd_appointment.hospital)
-                    .filter(day=data.get('time_slot_start').weekday(), start__lte=data.get("time_slot_start").hour,
-                            end__gte=data.get("time_slot_end").hour).exists()):
-                raise serializers.ValidationError("Doctor is not available.")
-        return data
+    # def validate(self, data):
+    #     request = self.context.get("request")
+    #     user_type = request.user.user_type
+    #     opd_appointment = self.context.get("opd_appointment")
+    #     current_datetime = timezone.now()
+    #     # Validate Doctor Choices
+    #     status = data.get('status')
+        
+
+        # if user_type == User.DOCTOR:
+        #     if opd_appointment.time_slot_start<current_datetime && opd_appointment.status == OpdAppointment.CREATED:
+        #        allowed = [OpdAppointment.ACCEPTED,OpdAppointment.RESCHEDULED_BY_DOCTOR]
+
+        #     elif opd_appointment.time_slot_start<current_datetime && opd_appointment.status == OpdAppointment.RESCHEDULED:
+        #        allowed = [OpdAppointment.ACCEPTED]
+
+        #     elif opd_appointment.time_slot_start<current_datetime && opd_appointment.status == OpdAppointment.ACCEPTED:
+        #        allowed = [OpdAppointment.RESCHEDULED]
+
+        # if user_type == User.CONSUMER:
+        #     if opd_appointment.status in 
+        #        allowed = [OpdAppointment.RESCHEDULED, OpdAppointment.CANCELED]
+
+        #     if opd_appointment
+        #     if opd_appointment.time_slot_start<current_datetime && opd_appointment.status [OpdAppointment.CREATED, OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]:
+        #         allowed = [OpdAppointment.ACCEPTED,OpdAppointment.RESCHEDULED]
+
+
+        #     if status in (OpdAppointment.CREATED  )
+
+
+        # if request.user.user_type == User.DOCTOR and not (data.get('status') in self.DOCTOR_ALLOWED_CHOICES):
+        #     raise serializers.ValidationError("Not a valid status for the user.")
+        # if request.user.user_type == User.CONSUMER and (not data.get('status') in self.PATIENT_ALLOWED_CHOICES):
+        #     raise serializers.ValidationError("Not a valid status for the user.")
+        # if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.ACCEPTED and (
+        #         current_datetime > opd_appointment.time_slot_start):
+        #     raise serializers.ValidationError("Can not accept appointment after time slot has passed.")
+        # if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.RESCHEDULED and (
+        #         current_datetime > opd_appointment.time_slot_start):
+        #     raise serializers.ValidationError("Can not reschedule appointment after time slot has passed.")
+        # if request.user.user_type == User.CONSUMER and data.get('status') == OpdAppointment.RESCHEDULED:
+        #     if not (data.get('time_slot_start')):
+        #         raise serializers.ValidationError("time_slot_start is required.")
+        #     if not (data.get('time_slot_end')):
+        #         raise serializers.ValidationError("time_slot_end is required.")
+        #     if (not DoctorHospital
+        #             .objects.filter(doctor=opd_appointment.doctor, hospital=opd_appointment.hospital)
+        #             .filter(day=data.get('time_slot_start').weekday(), start__lte=data.get("time_slot_start").hour,
+        #                     end__gte=data.get("time_slot_end").hour).exists()):
+        #         raise serializers.ValidationError("Doctor is not available.")
+
+        # return data
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
@@ -166,10 +196,10 @@ class DoctorLanguageSerializer(serializers.ModelSerializer):
 
 class DoctorHospitalSerializer(serializers.ModelSerializer):
     doctor = serializers.ReadOnlyField(source='doctor.name')
-    hospital = serializers.ReadOnlyField(source='hospital.name')
-    address = serializers.ReadOnlyField(source='hospital.address')
+    hospital_name = serializers.ReadOnlyField(source='hospital.name')
+    address = serializers.ReadOnlyField(source='hospital.locality')
     hospital_id = serializers.ReadOnlyField(source='hospital.pk')
-    day = serializers.SerializerMethodField()
+    # day = serializers.SerializerMethodField()
 
     def get_day(self, attrs):
         day  = attrs.day
@@ -187,7 +217,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorHospital
-        fields = ('doctor', 'hospital', 'address', 'hospital_id', 'day', 'start', 'end', 'fees',)
+        fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'fees',)
 
 
 class DoctorEmailSerializer(serializers.ModelSerializer):
@@ -358,3 +388,49 @@ class PrescriptionSerializer(serializers.Serializer):
         if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
             raise serializers.ValidationError("Appointment is not correct.")
         return value
+
+
+class DoctorListSerializer(serializers.Serializer):
+    specialization_ids = serializers.CharField(required=False)
+    longitude = serializers.FloatField(default=77.071848)
+    latitude = serializers.FloatField(default=28.450367)
+
+    def validate_specialization_id(self, value):
+        if not Specialization.objects.filter(id__in=value.strip()).count() == len(value.strip()):
+            raise serializers.ValidationError("Invalid specialization Id.")
+        return value
+
+
+class DoctorHospitalSearchSerializer(DoctorHospitalSerializer):
+    discounted_fees = serializers.IntegerField(read_only=True, allow_null=True)
+    hospital_id = None
+    doctor = None
+    day = None
+
+    class Meta:
+        model = DoctorHospital
+        exclude = ("id", "created_at", "updated_at", "day", "start", "end", "doctor")
+
+
+class DoctorSearchResultSerializer(serializers.ModelSerializer):
+    qualifications = DoctorQualificationSerializer(read_only=True, many=True)
+    hospital = DoctorHospitalSearchSerializer(read_only=True, many=True)
+    timings = serializers.ListField(read_only=True, min_length=0)
+    experience_years = serializers.IntegerField(read_only=True, allow_null=True)
+    experiences = DoctorExperienceSerializer(read_only=True, many=True)
+    hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = Doctor
+        fields = ('id', 'qualifications', 'hospital', 'experience_years', 'experiences',
+                  'timings', 'hospital_count', 'name', 'gender', )
+
+
+class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
+    emails = None
+    experience_years = serializers.IntegerField(allow_null=True)
+
+    class Meta:
+        model = Doctor
+        exclude = ('created_at', 'updated_at', 'hospitals', 'onboarding_status', 'is_email_verified',
+                   'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
