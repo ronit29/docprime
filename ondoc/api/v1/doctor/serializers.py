@@ -434,3 +434,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         model = Doctor
         exclude = ('created_at', 'updated_at', 'hospitals', 'onboarding_status', 'is_email_verified',
                    'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
+
+
+class DoctorAvailabilityTimingSerializer(serializers.Serializer):
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())

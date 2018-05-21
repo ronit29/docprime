@@ -1,46 +1,24 @@
+from ondoc.doctor import models
+from . import serializers
+from ondoc.api.v1.diagnostic.serializers import TimeSlotSerializer
+from ondoc.api.pagination import paginate_queryset
+from django.db.models import Min
+from django.contrib.gis.geos import Point
 from django.shortcuts import get_object_or_404
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import BaseFilterBackend
-from rest_framework.views import APIView
 from rest_framework import viewsets
 from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from rest_framework.decorators import action
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
 from django.db.models import Q
-from django.db.models import Expression
-
 import datetime
-
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-from ondoc.doctor.models import (OpdAppointment, DoctorHospital, Doctor, DoctorLeave, Prescription, PrescriptionFile,
-                                 MedicalCondition, Specialization, DoctorQualification)
-
-from .serializers import (OpdAppointmentSerializer, UpdateStatusSerializer,DoctorListSerializer,
-                          AppointmentFilterSerializer, CreateAppointmentSerializer, DoctorSearchResultSerializer,
-                          DoctorHospitalListSerializer, DoctorProfileSerializer, DoctorHospitalSerializer,
-                          DoctorBlockCalenderSerialzer, DoctorLeaveSerializer, PrescriptionFileSerializer,
-                          PrescriptionSerializer, DoctorHospitalScheduleSerializer, HospitalModelSerializer,
-                          DoctorProfileUserViewSerializer)
-from ondoc.api.pagination import paginate_queryset
-
-from django.db.models import Min, Max
-from django.contrib.gis.geos import Point
-from django.contrib.gis.db.models.functions import Distance
-from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import Prefetch
-
-# class DoctorFilterBackend(BaseFilterBackend):
-
-#     def filter_queryset(self, request, queryset, view):
-#         return queryset.filter(doctor__user=request.user)
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -73,7 +51,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 #     filter_backends = (DjangoFilterBackend)
     permission_classes = (IsAuthenticated,)
 #     #queryset = OpdAppointment.objects.all()
-    serializer_class = OpdAppointmentSerializer
+    serializer_class = serializers.OpdAppointmentSerializer
 #     filter_fields = ('hospital','profile','')
 
 #     # def list (self, request):
@@ -118,14 +96,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         user = self.request.user
         if user.user_type == User.DOCTOR:
-            return OpdAppointment.objects.filter(doctor=user.doctor)
+            return models.OpdAppointment.objects.filter(doctor=user.doctor)
         elif user.user_type == User.CONSUMER:
-            return OpdAppointment.objects.filter(user=user)
+            return models.OpdAppointment.objects.filter(user=user)
 
 
     def list(self, request):
         queryset = self.get_queryset()
-        serializer = AppointmentFilterSerializer(data=request.query_params)
+        serializer = models.AppointmentFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         range = serializer.validated_data.get('range')
@@ -138,10 +116,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
         elif range=='upcoming':
             queryset = queryset.filter(
-                status__in=[OpdAppointment.CREATED, OpdAppointment.RESCHEDULED, OpdAppointment.ACCEPTED],
+                status__in=[models.OpdAppointment.CREATED, models.OpdAppointment.RESCHEDULED, models.OpdAppointment.ACCEPTED],
                 time_slot_start__gt=timezone.now()).order_by('time_slot_start')
         elif range =='pending':
-            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status = OpdAppointment.CREATED).order_by('time_slot_start')
+            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status = models.OpdAppointment.CREATED).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
 
@@ -151,12 +129,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     @transaction.atomic
     def create(self, request):
-        serializer = CreateAppointmentSerializer(data=request.data, context={'request': request})
+        serializer = models.CreateAppointmentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         time_slot_start = data.get("time_slot_start")
 
-        doctor_hospital = DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
+        doctor_hospital = models.DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
             day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).first()
         fees = doctor_hospital.fees
 
@@ -180,8 +158,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return Response(data=resp)
 
     def update(self, request, pk=None):
-        opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
-        serializer = UpdateStatusSerializer(data=request.data,
+        opd_appointment = get_object_or_404(models.OpdAppointment, pk=pk)
+        serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -214,7 +192,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     def consumer_update(self, opd_appointment, validated_data):
         opd_appointment.status = validated_data.get('status')
-        if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
+        if validated_data.get('status') == models.OpdAppointment.RESCHEDULED_PATIENT:
             opd_appointment.time_slot_start = validated_data.get("time_slot_start")
             opd_appointment.time_slot_end = validated_data.get("time_slot_end")
         opd_appointment.save()
@@ -226,16 +204,16 @@ class DoctorProfileView(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request):
-        doctor = get_object_or_404(Doctor, pk=request.user.doctor.id)
-        serializer = DoctorProfileSerializer(doctor, many=False)
+        doctor = get_object_or_404(models.Doctor, pk=request.user.doctor.id)
+        serializer = serializers.DoctorProfileSerializer(doctor, many=False)
 
         now = datetime.datetime.now()
-        appointment_count = OpdAppointment.objects.filter(Q(doctor=request.user.doctor.id),
-                                                          ~Q(status=OpdAppointment.REJECTED)
-                                                          & ~Q(status=OpdAppointment.CANCELED),
-                                                          Q(time_slot_start__gte=now)).count()
+        appointment_count = models.OpdAppointment.objects.filter(Q(doctor=request.user.doctor.id),
+                                                                 ~Q(status=models.OpdAppointment.REJECTED)
+                                                                 & ~Q(status=models.OpdAppointment.CANCELED),
+                                                                 Q(time_slot_start__gte=now)).count()
         hospital_queryset = doctor.hospitals.distinct()
-        hospital_serializer = HospitalModelSerializer(hospital_queryset, many=True)
+        hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True)
 
         temp_data = serializer.data
         temp_data["count"] = appointment_count
@@ -246,9 +224,9 @@ class DoctorProfileView(viewsets.GenericViewSet):
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def retrieve(self, request, pk):
-        doctor = Doctor.objects.prefetch_related('languages__language').filter(pk=pk).first()
-        serializer = DoctorProfileUserViewSerializer(doctor, many=False)
-        serializer = DoctorProfileSerializer(doctor)
+        doctor = models.Doctor.objects.prefetch_related('languages__language').filter(pk=pk).first()
+        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False)
+        serializer = serializers.DoctorProfileSerializer(doctor)
         return Response(serializer.data)
 
 
@@ -259,19 +237,19 @@ class DoctorHospitalView(mixins.ListModelMixin,
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    queryset = DoctorHospital.objects.all()
-    serializer_class = DoctorHospitalSerializer
+    queryset = models.DoctorHospital.objects.all()
+    serializer_class = serializers.DoctorHospitalSerializer
 
     def get_queryset(self):
         user = self.request.user
         if user.user_type == User.DOCTOR:
-            return DoctorHospital.objects.filter(doctor=user.doctor)
+            return models.DoctorHospital.objects.filter(doctor=user.doctor)
 
     def list(self, request):
         user = request.user
         queryset = self.get_queryset().values('hospital').annotate(min_fees=Min('fees'))
 
-        serializer = DoctorHospitalListSerializer(queryset, many=True)
+        serializer = serializers.DoctorHospitalListSerializer(queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk):
@@ -281,9 +259,9 @@ class DoctorHospitalView(mixins.ListModelMixin,
         if len(queryset) == 0:
             raise Http404("No Hospital matches the given query.")
 
-        schedule_serializer = DoctorHospitalScheduleSerializer(queryset, many=True)
+        schedule_serializer = serializers.DoctorHospitalScheduleSerializer(queryset, many=True)
         hospital_queryset = queryset.first().hospital
-        hospital_serializer = HospitalModelSerializer(hospital_queryset)
+        hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset)
 
         temp_data = dict()
         temp_data['hospital'] = hospital_serializer.data
@@ -293,22 +271,23 @@ class DoctorHospitalView(mixins.ListModelMixin,
 
 
 class DoctorBlockCalendarViewSet(OndocViewSet):
-    authentication_classes = (TokenAuthentication, )
-    permission_classes = (IsAuthenticated, DoctorPermission, )
-    INTERVAL_MAPPING = {DoctorLeave.INTERVAL_MAPPING.get(key): key for key in DoctorLeave.INTERVAL_MAPPING.keys()}
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+    INTERVAL_MAPPING = {models.DoctorLeave.INTERVAL_MAPPING.get(key): key for key in
+                        models.DoctorLeave.INTERVAL_MAPPING.keys()}
 
     def get_queryset(self):
         user = self.request.user
-        return DoctorLeave.objects.filter(doctor=user.doctor.id, deleted_at__isnull=True)
+        return models.DoctorLeave.objects.filter(doctor=user.doctor.id, deleted_at__isnull=True)
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        serializer = DoctorLeaveSerializer(queryset, many=True)
+        serializer = serializers.DoctorLeaveSerializer(queryset, many=True)
         return Response(serializer.data)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        serializer = DoctorBlockCalenderSerialzer(data=request.data, context={"request": request})
+        serializer = models.DoctorBlockCalenderSerialzer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         doctor_leave_data = {
@@ -318,15 +297,15 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
             "start_date": validated_data.get("start_date"),
             "end_date": validated_data.get("end_date")
         }
-        doctor_leave_serializer = DoctorLeaveSerializer(data=doctor_leave_data)
+        doctor_leave_serializer = serializers.DoctorLeaveSerializer(data=doctor_leave_data)
         doctor_leave_serializer.is_valid(raise_exception=True)
-        self.get_queryset().update(deleted_at = timezone.now())
+        self.get_queryset().update(deleted_at=timezone.now())
         doctor_leave_serializer.save()
         return Response(doctor_leave_serializer.data)
 
     def destroy(self, request, pk=None):
         current_time = timezone.now()
-        doctor_leave = DoctorLeave.objects.get(pk=pk)
+        doctor_leave = models.DoctorLeave.objects.get(pk=pk)
         doctor_leave.deleted_at = current_time
         doctor_leave.save()
         return Response({
@@ -340,27 +319,27 @@ class PrescriptionFileViewset(OndocViewSet):
 
     def get_queryset(self):
         request = self.request
-        return PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
+        return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        serializer = PrescriptionFileSerializer(queryset, many=True)
+        serializer = serializers.PrescriptionFileSerializer(queryset, many=True)
         return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
-        serializer = PrescriptionSerializer(data=request.data, context={"request": request})
+        serializer = serializers.PrescriptionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        if Prescription.objects.filter(appointment=validated_data.get('appointment')).exists():
-            prescription = Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
+        if models.Prescription.objects.filter(appointment=validated_data.get('appointment')).exists():
+            prescription = models.Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
         else:
-            prescription = Prescription.objects.create(appointment=validated_data.get('appointment'),
+            prescription = models.Prescription.objects.create(appointment=validated_data.get('appointment'),
                                                        prescription_details=validated_data.get('prescription_details'))
         prescription_file_data = {
             "prescription": prescription.id,
             "file": validated_data.get('file')
         }
-        prescription_file_serializer = PrescriptionFileSerializer(data=prescription_file_data)
+        prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data)
         prescription_file_serializer.is_valid(raise_exception=True)
         prescription_file_serializer.save()
         return Response(prescription_file_serializer.data)
@@ -371,19 +350,19 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated, DoctorPermission,)
 
     def list(self, request, *args, **kwargs):
-        medical_conditions = MedicalCondition.objects.all().values("id", "name")
-        specializations = Specialization.objects.all().values("id", "name")
+        medical_conditions = models.MedicalCondition.objects.all().values("id", "name")
+        specializations = models.Specialization.objects.all().values("id", "name")
         return Response({"conditions": medical_conditions, "specializations": specializations})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
-    # authentication_classes = (TokenAuthentication,)
-    # permission_classes = (IsAuthenticated, DoctorPermission,)
-    queryset = Doctor.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated, DoctorPermission,)
+    queryset = models.Doctor.objects.all()
 
     def list(self, request, *args, **kwargs):
         MAX_DISTANCE = 10000
-        serializer = DoctorListSerializer(data=request.query_params)
+        serializer = serializers.DoctorListSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         point = Point(validated_data.get("longitude"),
@@ -392,14 +371,40 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             "specialization_ids") else []
 
         doctor_ids = set([doctor_hospital.doctor.id for doctor_hospital in
-                      DoctorHospital.objects.filter(hospital__location__distance_lte=(point, MAX_DISTANCE)
-                                                    ).select_related('doctor')])
+                          models.DoctorHospital.objects.filter(hospital__location__distance_lte=(point, MAX_DISTANCE)
+                                                               ).select_related('doctor')])
         if specialization_ids:
-            doctor_ids = set([doctor_qualification.doctor.id for doctor_qualification in DoctorQualification.objects.filter(
-                doctor__id__in=doctor_ids).filter(specialization__in=specialization_ids).select_related("doctor")])
-        queryset = Doctor.objects.prefetch_related("qualifications", "qualifications__specialization",
+            doctor_ids = set(
+                [doctor_qualification.doctor.id for doctor_qualification in models.DoctorQualification.objects.filter(
+                    doctor__id__in=doctor_ids).filter(specialization__in=specialization_ids).select_related("doctor")])
+        queryset = models.Doctor.objects.prefetch_related("qualifications", "qualifications__specialization",
                                                    "qualifications__qualification", "availability__doctor",
                                                    "availability__hospital", "experiences__doctor",
                                                    ).filter(id__in=doctor_ids)
-        search_result_serializer = DoctorSearchResultSerializer(queryset, many=True)
+        search_result_serializer = serializers.DoctorSearchResultSerializer(queryset, many=True)
         return Response(search_result_serializer.data)
+
+
+class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
+
+    def list(self, request, *args, **kwargs):
+        serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        queryset = models.DoctorHospital.objects.filter(doctor=validated_data.get('doctor_id'),
+                                                        hospital=validated_data.get('hospital_id'))
+        timeslots = dict()
+        for i in range(0, 7):
+            timeslots[i] = dict()
+        timeslot_serializer = TimeSlotSerializer(queryset, context={'timing': timeslots}, many=True)
+        data = timeslot_serializer.data
+        for i in range(7):
+            if timeslots[i].get('timing'):
+                temp_list = list()
+                temp_list = [[k, v] for k, v in timeslots[i]['timing'][0].items()]
+                timeslots[i]['timing'][0] = temp_list
+                temp_list = [[k, v] for k, v in timeslots[i]['timing'][1].items()]
+                timeslots[i]['timing'][1] = temp_list
+                temp_list = [[k, v] for k, v in timeslots[i]['timing'][2].items()]
+                timeslots[i]['timing'][2] = temp_list
+        return Response(timeslots)
