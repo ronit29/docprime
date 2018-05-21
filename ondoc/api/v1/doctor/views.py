@@ -124,7 +124,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.order_by('-time_slot_start')
 
         queryset = paginate_queryset(queryset, request)
-        serializer = OpdAppointmentSerializer(queryset, many=True)
+        serializer = serializers.OpdAppointmentSerializer(queryset, many=True)
         return Response(serializer.data)
 
     @transaction.atomic
@@ -149,7 +149,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             #"time_slot_end": time_slot_end,
         }
 
-        appointment_serializer = OpdAppointmentSerializer(data=data)
+        appointment_serializer = serializers.OpdAppointmentSerializer(data=data)
         appointment_serializer.is_valid(raise_exception=True)
         appointment_serializer.save()
         resp = {}
@@ -176,7 +176,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         elif request.user.user_type == User.CONSUMER:
             updated_opd_appointment = self.consumer_update(opd_appointment, validated_data)
 
-        opd_appointment_serializer = OpdAppointmentSerializer(updated_opd_appointment)
+        opd_appointment_serializer = serializers.OpdAppointmentSerializer(updated_opd_appointment)
         response = {
             "status": 1,
             "data": opd_appointment_serializer.data
@@ -334,7 +334,8 @@ class PrescriptionFileViewset(OndocViewSet):
             prescription = models.Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
         else:
             prescription = models.Prescription.objects.create(appointment=validated_data.get('appointment'),
-                                                       prescription_details=validated_data.get('prescription_details'))
+                                                              prescription_details=validated_data.get(
+                                                                  'prescription_details'))
         prescription_file_data = {
             "prescription": prescription.id,
             "file": validated_data.get('file')
@@ -356,8 +357,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated, DoctorPermission,)
+    # authentication_classes = (TokenAuthentication,)
+    # permission_classes = (IsAuthenticated, DoctorPermission,)
     queryset = models.Doctor.objects.all()
 
     def list(self, request, *args, **kwargs):
@@ -378,9 +379,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 [doctor_qualification.doctor.id for doctor_qualification in models.DoctorQualification.objects.filter(
                     doctor__id__in=doctor_ids).filter(specialization__in=specialization_ids).select_related("doctor")])
         queryset = models.Doctor.objects.prefetch_related("qualifications", "qualifications__specialization",
-                                                   "qualifications__qualification", "availability__doctor",
-                                                   "availability__hospital", "experiences__doctor",
-                                                   ).filter(id__in=doctor_ids)
+                                                          "qualifications__qualification", "availability__doctor",
+                                                          "availability__hospital", "experiences__doctor",
+                                                          ).filter(id__in=doctor_ids)
+        queryset = paginate_queryset(queryset, request)
         search_result_serializer = serializers.DoctorSearchResultSerializer(queryset, many=True)
         return Response(search_result_serializer.data)
 
