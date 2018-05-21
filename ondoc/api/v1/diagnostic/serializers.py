@@ -40,8 +40,8 @@ class LabImageModelSerializer(serializers.ModelSerializer):
 
 class LabModelSerializer(serializers.ModelSerializer):
 
-    lat = serializers.IntegerField(source='location.y')
-    long = serializers.IntegerField(source='location.x')
+    lat = serializers.FloatField(source='location.y')
+    long = serializers.FloatField(source='location.x')
     address = serializers.SerializerMethodField()
     lab_image = LabImageModelSerializer(many=True)
 
@@ -261,7 +261,7 @@ class AddressSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class LabTimingModelSerializer(serializers.ModelSerializer):
+class TimeSlotSerializer(serializers.Serializer):
     MORNING = 0
     AFTERNOON = 1
     EVENING = 2
@@ -317,7 +317,3 @@ class LabTimingModelSerializer(serializers.ModelSerializer):
             return self.AFTERNOON, pm
         else:
             return self.EVENING, pm
-
-    class Meta:
-        model = LabTiming
-        fields = ('id', 'day', 'timing', )

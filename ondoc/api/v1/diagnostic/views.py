@@ -1,7 +1,7 @@
 from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSerializer, AvailableLabTestSerializer,
                           LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
                           LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
-                          PromotedLabsSerializer, CommonConditionsSerializer, LabTimingModelSerializer,
+                          PromotedLabsSerializer, CommonConditionsSerializer, TimeSlotSerializer,
                           AddressSerializer)
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
@@ -95,16 +95,39 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_queryset = queryset[0].lab
         day_now = timezone.now().weekday()
         timing_queryset = lab_queryset.labtiming_set.filter(day=day_now)
-        timing = dict()
-        timing[day_now] = dict()
-        timing_serializer = LabTimingModelSerializer(timing_queryset, many=True, context={'timing': timing})
         lab_serializer = LabModelSerializer(lab_queryset)
         temp_data = dict()
         temp_data['lab'] = lab_serializer.data
         temp_data['tests'] = test_serializer.data
-        temp_data['lab_timing'] = timing_serializer.data
+        temp_data['lab_timing'] = ''
+        temp_data['lab_timing'] = self.get_lab_timing(timing_queryset)
+
         return Response(temp_data)
         # return Response(serializer.data)
+
+    def get_lab_timing(self, queryset):
+        temp_str = ''
+        for qdata in queryset:
+            start = self.convert_time(qdata.start)
+            end = self.convert_time(qdata.end)
+            if not temp_str:
+                temp_str += start + " - " + end
+            else:
+                temp_str += " | " + start + " - " + end
+        return temp_str
+
+    @staticmethod
+    def convert_time(time):
+        hour = int(time)
+        min = int((time - hour) * 60)
+        am_pm = ''
+        if time < 12:
+            am_pm = 'AM'
+        else:
+            am_pm = 'PM'
+            hour -= 12
+
+        return str(hour) + ":" + str(min) + " " + am_pm
 
     def get_lab_list(self, parameters):
         # distance in meters
@@ -252,7 +275,8 @@ class LabTimingListView(mixins.ListModelMixin,
 
         for i in range(7):
             resp_dict[i] = dict()
-        serializer = LabTimingModelSerializer(queryset, many=True, context={'timing': resp_dict})
+
+        serializer = TimeSlotSerializer(queryset, many=True, context={'timing': resp_dict})
 
         temp_data = serializer.data
 
