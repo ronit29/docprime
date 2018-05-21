@@ -183,14 +183,15 @@ class Doctor(TimeStampedModel, QCModel):
         current_year = timezone.now().year
         return int(current_year - self.practicing_since)
 
-    def ex_hospitals(self):
-        return self.experiences.all().values("hospital")
+    def experiences(self):
+        return self.experiences.all()
 
     def hospital_count(self):
         return self.availability.all().count()
 
     def hospital(self):
-        return self.availability.all().first()
+        # return None
+        return self.availability.all()
 
     def timings(self):
         availability = self.availability.all().first()
@@ -248,6 +249,7 @@ class DoctorQualification(TimeStampedModel):
         if self.specialization_id:
             return self.qualification.name + " (" + self.specialization.name + ")"
         return self.qualification.name
+
 
     class Meta:
         db_table = "doctor_qualification"
