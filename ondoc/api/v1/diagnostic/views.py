@@ -170,10 +170,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if max_price:
             queryset = queryset.filter(mrp__lte=max_price)
 
-        queryset = (
-            queryset.values('lab').annotate(price=Sum('mrp'), count=Count('id'),
-                                            distance=Max(Distance('lab__location', pnt)),
-                                            name=Max('lab__name')).filter(count__gte=len(ids)))
+        if ids:
+            queryset = (
+                queryset.values('lab').annotate(price=Sum('mrp'), count=Count('id'),
+                                                distance=Max(Distance('lab__location', pnt)),
+                                                name=Max('lab__name')).filter(count__gte=len(ids)))
+        else:
+            queryset = (
+                queryset.values('lab').annotate(count=Count('id'),
+                                                distance=Max(Distance('lab__location', pnt)),
+                                                name=Max('lab__name')).filter(count__gte=len(ids)))
 
         queryset = self.apply_custom_filters(queryset, parameters)
         return queryset

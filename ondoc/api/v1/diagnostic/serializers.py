@@ -80,7 +80,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 class LabCustomSerializer(serializers.Serializer):
     # lab = serializers.SerializerMethodField()
     lab = LabModelSerializer()
-    price = serializers.IntegerField()
+    price = serializers.IntegerField(default=None)
     distance = serializers.IntegerField(source='distance.m')
     pickup_available = serializers.IntegerField(default=0)
 
