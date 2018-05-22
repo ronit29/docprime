@@ -190,7 +190,7 @@ class Doctor(TimeStampedModel, QCModel):
         return self.availability.all().count()
 
     def hospital(self):
-        return self.availability.all().order_by("fees")
+        return self.availability.all()
 
     class Meta:
         db_table = "doctor"
