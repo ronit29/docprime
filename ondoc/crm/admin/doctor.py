@@ -12,10 +12,15 @@ from django.shortcuts import render
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
-    DoctorEmail )
+    DoctorEmail, College)
 
 from .common import *
+from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
+
+class AutoComplete:
+    def autocomplete_view(self, request):
+        return CustomAutoComplete.as_view(model_admin=self)(request)
 
 class DoctorQualificationForm(forms.ModelForm):
     passing_year = forms.ChoiceField(choices=college_passing_year_choices, required=False)
@@ -33,7 +38,7 @@ class DoctorQualificationInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-    # autocomplete_fields = ['specialization']
+    autocomplete_fields = ['college']
 
 class DoctorHospitalForm(forms.ModelForm):
     def clean(self):
@@ -400,13 +405,12 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
         js = ('js/admin/ondoc.js',)
 
 
-class SpecializationAdmin(VersionAdmin):
+class SpecializationAdmin(AutoComplete, VersionAdmin):
     search_fields = ['name']
 
 
-class QualificationAdmin(VersionAdmin):
+class QualificationAdmin(AutoComplete, VersionAdmin):
     search_fields = ['name']
-
 
 class MedicalServiceAdmin(VersionAdmin):
     search_fields = ['name']
@@ -414,6 +418,5 @@ class MedicalServiceAdmin(VersionAdmin):
 class LanguageAdmin(VersionAdmin):
     search_fields = ['name']
 
-
-class CollegeAdmin(VersionAdmin):
+class CollegeAdmin(AutoComplete, VersionAdmin):
     search_fields = ['name']
