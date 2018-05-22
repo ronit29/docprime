@@ -226,10 +226,44 @@ class DoctorProfileView(viewsets.GenericViewSet):
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def retrieve(self, request, pk):
-        doctor = models.Doctor.objects.prefetch_related('languages__language').filter(pk=pk).first()
+        doctor = (models.Doctor.objects
+                  .prefetch_related('languages__language',
+                                    'availability__hospital',
+                                    'qualifications__qualification',
+                                    'qualifications__specialization',
+                                    )
+                  .filter(pk=pk).first())
+        if not doctor:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False)
-        serializer = serializers.DoctorProfileSerializer(doctor)
-        return Response(serializer.data)
+        response_data = serializer.data
+        timings = []
+        hospitals = sorted(response_data.get('availability'), key=itemgetter("fees"))
+        for ndx, value in enumerate(hospitals):
+            if ndx == 0:
+                timings.append({
+                    'start': value.get("start"),
+                    "end": value.get("end"),
+                    "day": value.get("day"),
+                    "hospital_id": value.get("hospital_id")
+                })
+            else:
+                if timings[len(timings) - 1].get("hospital_id") == value.get("hospital_id"):
+                    timings.append({
+                        'start': value.get("start"),
+                        "end": value.get("end"),
+                        "day": value.get("day"),
+                        "hospital_id": value.get("hospital_id")
+                    })
+        availability = hospitals[0] if len(hospitals) > 0 else {}
+        availability.update({
+            "timings": timings
+        })
+        availability.pop("start", None)
+        availability.pop("end", None)
+        availability.pop("day", None)
+        response_data['availability'] = availability
+        return Response(response_data)
 
 
 class DoctorHospitalView(mixins.ListModelMixin,
@@ -373,13 +407,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         specialization_ids = validated_data.get("specialization_ids").strip(",").split(",") if validated_data.get(
             "specialization_ids") else []
 
-        # doctor_ids = set([doctor_hospital.doctor.id for doctor_hospital in
-        #                   models.DoctorHospital.objects.filter(hospital__location__distance_lte=(point, MAX_DISTANCE)
-        #                                                        ).select_related('doctor')])
-        # if specialization_ids:
-        #     doctor_ids = set(
-        #         [doctor_qualification.doctor.id for doctor_qualification in models.DoctorQualification.objects.filter(
-        #             doctor__id__in=doctor_ids).filter(specialization__in=specialization_ids).select_related("doctor")])
         filtering_params = {}
         if specialization_ids:
             filtering_params.update({
@@ -407,6 +434,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "availability__day": current_time.day,
                 "availability__end__gte": current_time.hour
             })
+
         order_by_field = 'distance'
         if validated_data.get('sort_on'):
             if validated_data.get('sort_on') == 'experience':
@@ -450,6 +478,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             hospital.update({
                 "timings": timings
             })
+            hospital.pop("start", None)
+            hospital.pop("end", None)
+            hospital.pop("day", None)
             data['hospital'] = hospital
         return Response(response_data)
 
