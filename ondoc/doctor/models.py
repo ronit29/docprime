@@ -190,18 +190,7 @@ class Doctor(TimeStampedModel, QCModel):
         return self.availability.all().count()
 
     def hospital(self):
-        # return None
-        return self.availability.all()
-
-    def timings(self):
-        availability = self.availability.all().first()
-        if not availability:
-            return []
-        days_mapping = dict(DoctorHospital.DAY_CHOICES)
-        return [{"day": days_mapping.get(availability.get('day')),
-                 "start": availability.get("start"),
-                 "end": availability.get("end")} for availability in
-                self.availability.filter(id=availability.id).values("day", "start", "end")]
+        return self.availability.all().order_by("fees")
 
     class Meta:
         db_table = "doctor"

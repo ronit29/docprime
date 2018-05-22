@@ -16,6 +16,8 @@ from django.db import transaction
 from django.http import Http404
 from django.db.models import Q
 import datetime
+from operator import itemgetter
+from django.contrib.gis.db.models.functions import Distance
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
@@ -371,20 +373,85 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         specialization_ids = validated_data.get("specialization_ids").strip(",").split(",") if validated_data.get(
             "specialization_ids") else []
 
-        doctor_ids = set([doctor_hospital.doctor.id for doctor_hospital in
-                          models.DoctorHospital.objects.filter(hospital__location__distance_lte=(point, MAX_DISTANCE)
-                                                               ).select_related('doctor')])
+        # doctor_ids = set([doctor_hospital.doctor.id for doctor_hospital in
+        #                   models.DoctorHospital.objects.filter(hospital__location__distance_lte=(point, MAX_DISTANCE)
+        #                                                        ).select_related('doctor')])
+        # if specialization_ids:
+        #     doctor_ids = set(
+        #         [doctor_qualification.doctor.id for doctor_qualification in models.DoctorQualification.objects.filter(
+        #             doctor__id__in=doctor_ids).filter(specialization__in=specialization_ids).select_related("doctor")])
+        filtering_params = {}
         if specialization_ids:
-            doctor_ids = set(
-                [doctor_qualification.doctor.id for doctor_qualification in models.DoctorQualification.objects.filter(
-                    doctor__id__in=doctor_ids).filter(specialization__in=specialization_ids).select_related("doctor")])
-        queryset = models.Doctor.objects.prefetch_related("qualifications", "qualifications__specialization",
-                                                          "qualifications__qualification", "availability__doctor",
-                                                          "availability__hospital", "experiences__doctor",
-                                                          ).filter(id__in=doctor_ids)
+            filtering_params.update({
+                "qualifications__specialization__id__in": specialization_ids
+            })
+        if validated_data.get("sits_at"):
+            filtering_params.update({
+                "availability__hospital__hospital_type": validated_data.get("sits_at")
+            })
+        if validated_data.get("min_fees"):
+            filtering_params.update({
+                "availability__fees__gte": validated_data.get("min_fees")
+            })
+        if validated_data.get("max_fees"):
+            filtering_params.update({
+                "availability__fees__lte": validated_data.get("max_fees")
+            })
+        if validated_data.get("is_female"):
+            filtering_params.update({
+                "gender": "f"
+            })
+        if validated_data.get("is_available"):
+            current_time = timezone.now()
+            filtering_params.update({
+                "availability__day": current_time.day,
+                "availability__end__gte": current_time.hour
+            })
+        order_by_field = 'distance'
+        if validated_data.get('sort_on'):
+            if validated_data.get('sort_on') == 'experience':
+                order_by_field = '-practicing_since'
+            if validated_data.get('sort_on') == 'fees':
+                order_by_field = "min_fees"
+
+        queryset = (models.Doctor
+                    .objects.prefetch_related("qualifications", "qualifications__specialization",
+                                              "qualifications__qualification", "availability__doctor",
+                                              "availability__hospital", "experiences__doctor")
+                    .filter(availability__hospital__location__distance_lte=(point, MAX_DISTANCE))
+                    .filter(**filtering_params)
+                    .annotate(distance=Distance('availability__hospital__location', point),
+                              min_fees=Min('availability__fees'))
+                    .order_by(order_by_field)
+                    )
         queryset = paginate_queryset(queryset, request)
         search_result_serializer = serializers.DoctorSearchResultSerializer(queryset, many=True)
-        return Response(search_result_serializer.data)
+        response_data = search_result_serializer.data
+        for data in response_data:
+            timings = []
+            hospitals = sorted(data.get('hospital'), key=itemgetter("fees"))
+            for ndx, value in enumerate(hospitals):
+                if ndx == 0:
+                    timings.append({
+                        'start': value.get("start"),
+                        "end": value.get("end"),
+                        "day": value.get("day"),
+                        "hospital": value.get("hospital")
+                    })
+                else:
+                    if timings[len(timings)-1].get("hospital") == value.get("hospital"):
+                        timings.append({
+                            'start': value.get("start"),
+                            "end": value.get("end"),
+                            "day": value.get("day"),
+                            "hospital": value.get("hospital")
+                        })
+            hospital = hospitals[0] if len(hospitals) > 0 else {}
+            hospital.update({
+                "timings": timings
+            })
+            data['hospital'] = hospital
+        return Response(response_data)
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):

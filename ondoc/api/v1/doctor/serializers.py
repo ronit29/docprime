@@ -199,7 +199,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     hospital_name = serializers.ReadOnlyField(source='hospital.name')
     address = serializers.ReadOnlyField(source='hospital.locality')
     hospital_id = serializers.ReadOnlyField(source='hospital.pk')
-    # day = serializers.SerializerMethodField()
+    day = serializers.SerializerMethodField()
 
     def get_day(self, attrs):
         day  = attrs.day
@@ -217,7 +217,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorHospital
-        fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'fees',)
+        fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'fees',)
 
 
 class DoctorEmailSerializer(serializers.ModelSerializer):
@@ -391,9 +391,17 @@ class PrescriptionSerializer(serializers.Serializer):
 
 
 class DoctorListSerializer(serializers.Serializer):
+    SORT_CHOICES = ('fees', 'experience', 'distance', )
+    SITTING_CHOICES = ((1, 'Private'), (2, 'Clinic'), (3, 'Hospital'),)
     specialization_ids = serializers.CharField(required=False)
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
+    sits_at = serializers.ChoiceField(choices=SITTING_CHOICES, required=False)
+    sort_on = serializers.ChoiceField(choices=SORT_CHOICES, required=False)
+    min_fees = serializers.IntegerField(required=False)
+    max_fees = serializers.IntegerField(required=False)
+    is_female = serializers.BooleanField(required=False)
+    is_available = serializers.BooleanField(required=False)
 
     def validate_specialization_id(self, value):
         if not Specialization.objects.filter(id__in=value.strip()).count() == len(value.strip()):
@@ -405,17 +413,16 @@ class DoctorHospitalSearchSerializer(DoctorHospitalSerializer):
     discounted_fees = serializers.IntegerField(read_only=True, allow_null=True)
     hospital_id = None
     doctor = None
-    day = None
 
     class Meta:
         model = DoctorHospital
-        exclude = ("id", "created_at", "updated_at", "day", "start", "end", "doctor")
+        exclude = ("id", "created_at", "updated_at", "doctor")
 
 
 class DoctorSearchResultSerializer(serializers.ModelSerializer):
     qualifications = DoctorQualificationSerializer(read_only=True, many=True)
     hospital = DoctorHospitalSearchSerializer(read_only=True, many=True)
-    timings = serializers.ListField(read_only=True, min_length=0)
+    # timings = serializers.ListField(read_only=True, min_length=0)
     experience_years = serializers.IntegerField(read_only=True, allow_null=True)
     experiences = DoctorExperienceSerializer(read_only=True, many=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
@@ -423,7 +430,7 @@ class DoctorSearchResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
         fields = ('id', 'qualifications', 'hospital', 'experience_years', 'experiences',
-                  'timings', 'hospital_count', 'name', 'gender', )
+                  'hospital_count', 'name', 'gender', )
 
 
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
