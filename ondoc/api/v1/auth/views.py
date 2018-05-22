@@ -1,10 +1,11 @@
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import mixins
 
 from .serializers import (OTPSerializer, OTPVerificationSerializer, UserSerializer, DoctorLoginSerializer,
                           NotificationEndpointSaveSerializer, NotificationEndpointSerializer,
-                          NotificationEndpointDeleteSerializer, NotificationSerializer)
+                          NotificationEndpointDeleteSerializer, NotificationSerializer, UserProfileSerializer)
 from rest_framework.response import Response
 from django.db import transaction
 from rest_framework.authtoken.models import Token
@@ -12,7 +13,7 @@ from rest_framework.authtoken.models import Token
 from ondoc.sms.api import send_otp
 
 from ondoc.doctor.models import DoctorMobile
-from ondoc.authentication.models import OtpVerifications, NotificationEndpoint, Notification
+from ondoc.authentication.models import OtpVerifications, NotificationEndpoint, Notification, UserProfile
 from django.contrib.auth import get_user_model
 from ondoc.api.pagination import paginate_queryset
 
@@ -160,3 +161,17 @@ class NotificationViewSet(GenericViewSet):
                                      request=request)
         serializer = NotificationSerializer(queryset, many=True)
         return Response(serializer.data)
+
+
+class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
+                         mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
+                         GenericViewSet):
+    serializer_class = UserProfileSerializer
+    queryset = UserProfile.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        request = self.request
+        queryset = UserProfile.objects.filter(user=request.user)
+        return queryset

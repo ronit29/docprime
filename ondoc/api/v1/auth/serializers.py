@@ -113,3 +113,10 @@ class NotificationEndpointDeleteSerializer(serializers.Serializer):
         if not NotificationEndpoint.objects.filter(user=request.user, token=attrs.get('token')).exists():
             raise serializers.ValidationError("Token does not  match.")
         return attrs
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UserProfile
+        exclude = ('created_at', 'updated_at', )
