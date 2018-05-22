@@ -404,9 +404,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         point = Point(validated_data.get("longitude"),
                       validated_data.get("latitude"), srid=4326)
-        specialization_ids = validated_data.get("specialization_ids").strip(",").split(",") if validated_data.get(
-            "specialization_ids") else []
-
+        specialization_ids = validated_data.get("specialization_ids")
         filtering_params = {}
         if specialization_ids:
             filtering_params.update({
@@ -414,7 +412,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             })
         if validated_data.get("sits_at"):
             filtering_params.update({
-                "availability__hospital__hospital_type": validated_data.get("sits_at")
+                "availability__hospital__hospital_type__in": validated_data.get("sits_at")
             })
         if validated_data.get("min_fees"):
             filtering_params.update({

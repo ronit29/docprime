@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.fields import CharField
 from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital, DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
@@ -8,6 +9,15 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, 
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 User = get_user_model()
+
+
+class CommaSepratedToListField(CharField):
+    def to_internal_value(self, data):
+        return list(map(int, data.strip(",").split(",")))
+
+    def to_representation(self, value):
+        return list(map(int, value.strip(",").split(",")))
+
 
 
 class OTPSerializer(serializers.Serializer):
@@ -392,11 +402,11 @@ class PrescriptionSerializer(serializers.Serializer):
 
 class DoctorListSerializer(serializers.Serializer):
     SORT_CHOICES = ('fees', 'experience', 'distance', )
-    SITTING_CHOICES = ((1, 'Private'), (2, 'Clinic'), (3, 'Hospital'),)
-    specialization_ids = serializers.CharField(required=False)
+    SITTING_CHOICES = (Hospital.PRIVATE, Hospital.CLINIC, Hospital.HOSPITAL)
+    specialization_ids = CommaSepratedToListField(required=False, max_length=100)
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
-    sits_at = serializers.ChoiceField(choices=SITTING_CHOICES, required=False)
+    sits_at = CommaSepratedToListField(required=False, max_length=100)
     sort_on = serializers.ChoiceField(choices=SORT_CHOICES, required=False)
     min_fees = serializers.IntegerField(required=False)
     max_fees = serializers.IntegerField(required=False)
@@ -407,6 +417,12 @@ class DoctorListSerializer(serializers.Serializer):
         if not Specialization.objects.filter(id__in=value.strip()).count() == len(value.strip()):
             raise serializers.ValidationError("Invalid specialization Id.")
         return value
+
+    def validate_sits_at(self, value):
+        if not set(value).issubset(set(self.SITTING_CHOICES)):
+            raise serializers.ValidationError("Not a Valid Choice")
+        return value
+
 
 
 class DoctorHospitalSearchSerializer(DoctorHospitalSerializer):

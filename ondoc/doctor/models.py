@@ -46,7 +46,10 @@ class MedicalService(TimeStampedModel,UniqueNameModel):
 
 
 class Hospital(TimeStampedModel, CreatedByModel, QCModel):
-
+    PRIVATE = 1
+    CLINIC = 2
+    HOSPITAL = 3
+    HOSPITAL_TYPE_CHOICES = (("", "Select"), (PRIVATE, 'Private'), (CLINIC, "Clinic"), (HOSPITAL, "Hospital"), )
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
@@ -60,7 +63,7 @@ class Hospital(TimeStampedModel, CreatedByModel, QCModel):
     state = models.CharField(max_length=100)
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
-    hospital_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Private"), (2,"Clinic"), (3,"Hospital")])
+    hospital_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=HOSPITAL_TYPE_CHOICES)
     network_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Non Network Hospital"), (2,"Network Hospital")])
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL)
 
