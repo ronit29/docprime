@@ -78,15 +78,16 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
 
 class LabCustomSerializer(serializers.Serializer):
-    lab = serializers.SerializerMethodField()
-    price = serializers.IntegerField()
+    # lab = serializers.SerializerMethodField()
+    lab = LabModelSerializer()
+    price = serializers.IntegerField(default=None)
     distance = serializers.IntegerField(source='distance.m')
     pickup_available = serializers.IntegerField(default=0)
 
-    def get_lab(self, obj):
-        queryset = Lab.objects.get(pk=obj['lab'])
-        serializer = LabModelSerializer(queryset)
-        return serializer.data
+    # def get_lab(self, obj):
+    #     queryset = Lab.objects.get(pk=obj['lab'])
+    #     serializer = LabModelSerializer(queryset)
+    #     return serializer.data
 
 
 class CommonTestSerializer(serializers.ModelSerializer):

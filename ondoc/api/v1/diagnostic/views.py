@@ -82,11 +82,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         parameters = request.query_params
         queryset = self.get_lab_list(parameters)
 
-        serializer = LabCustomSerializer(queryset, many=True)
+        whole_queryset = self.get_lab_whole_data(queryset)
+
+        serializer = LabCustomSerializer(whole_queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, lab_id):
-        queryset = AvailableLabTest.objects.filter(lab=lab_id)
+        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
 
         if len(queryset) == 0:
             raise Http404("No labs available")
@@ -116,8 +118,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 temp_str += " | " + start + " - " + end
         return temp_str
 
-    @staticmethod
-    def convert_time(time):
+    def convert_time(self, time):
         hour = int(time)
         min = int((time - hour) * 60)
         am_pm = ''
@@ -126,8 +127,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         else:
             am_pm = 'PM'
             hour -= 12
+        min_str = self.convert_min(min)
+        return str(hour) + ":" + min_str + " " + am_pm
 
-        return str(hour) + ":" + str(min) + " " + am_pm
+    def convert_min(self, min):
+        min_str = str(min)
+        if min/10 < 1:
+            min_str = '0' + str(min)
+        return min_str
 
     def get_lab_list(self, parameters):
         # distance in meters
@@ -163,10 +170,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if max_price:
             queryset = queryset.filter(mrp__lte=max_price)
 
-        queryset = (
-            queryset.values('lab').annotate(price=Sum('mrp'), count=Count('id'),
-                                            distance=Max(Distance('lab__location', pnt)),
-                                            name=Max('lab__name')).filter(count__gte=len(ids)))
+        if ids:
+            queryset = (
+                queryset.values('lab').annotate(price=Sum('mrp'), count=Count('id'),
+                                                distance=Max(Distance('lab__location', pnt)),
+                                                name=Max('lab__name')).filter(count__gte=len(ids)))
+        else:
+            queryset = (
+                queryset.values('lab').annotate(count=Count('id'),
+                                                distance=Max(Distance('lab__location', pnt)),
+                                                name=Max('lab__name')).filter(count__gte=len(ids)))
 
         queryset = self.apply_custom_filters(queryset, parameters)
         return queryset
@@ -182,6 +195,25 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             elif order_by == 'name':
                 queryset = queryset.order_by("name")
         return queryset
+
+    def get_lab_whole_data(self, queryset):
+        ids, id_details = self.extract_lab_ids(queryset)
+        labs = Lab.objects.prefetch_related('lab_image').filter(id__in=ids)
+        resp_queryset = list()
+        for obj in labs:
+            temp_var = id_details[obj.id]
+            temp_var['lab'] = obj
+            resp_queryset.append(temp_var)
+
+        return resp_queryset
+
+    def extract_lab_ids(self, queryset):
+        ids = list()
+        temp_dict = dict()
+        for obj in queryset:
+            ids.append(obj['lab'])
+            temp_dict[obj['lab']] = obj
+        return ids, temp_dict
 
 
 class LabAppointmentView(mixins.CreateModelMixin,
@@ -271,29 +303,16 @@ class LabTimingListView(mixins.ListModelMixin,
         queryset = LabTiming.objects.filter(lab=params.get('lab'), pickup_flag=flag)
         if not queryset:
             return Response([])
-        resp_dict = dict()
 
-        for i in range(7):
-            resp_dict[i] = dict()
+        obj = LabSlotExtraction(queryset)
 
-        serializer = TimeSlotSerializer(queryset, many=True, context={'timing': resp_dict})
+        # resp_dict = obj.get_timing()
+        resp_list = obj.get_timing_list()
 
-        temp_data = serializer.data
-
-        for i in range(7):
-            if resp_dict[i].get('timing'):
-                temp_list = list()
-                temp_list = [[k, v] for k, v in resp_dict[i]['timing'][0].items()]
-                resp_dict[i]['timing'][0] = temp_list
-                temp_list = [[k, v] for k, v in resp_dict[i]['timing'][1].items()]
-                resp_dict[i]['timing'][1] = temp_list
-                temp_list = [[k, v] for k, v in resp_dict[i]['timing'][2].items()]
-                resp_dict[i]['timing'][2] = temp_list
-
-        return Response(resp_dict)
+        return Response(resp_list)
 
 
-class AvailableTestViewSet(mixins.ListModelMixin,
+class AvailableTestViewSet(mixins.RetrieveModelMixin,
                            viewsets.GenericViewSet):
 
     def retrive(self, request, lab_id):
@@ -303,3 +322,85 @@ class AvailableTestViewSet(mixins.ListModelMixin,
         serializer = AvailableLabTestSerializer(queryset, many=True)
         return Response(serializer.data)
 
+
+class LabSlotExtraction(object):
+    MORNING = 0
+    AFTERNOON = 1
+    EVENING = 2
+    TIME_SPAN = 15
+    timing = dict()
+
+    def __init__(self, queryset):
+        for i in range(7):
+            self.timing[i] = dict()
+        self.extract_time_slot(queryset)
+
+    def extract_time_slot(self, queryset):
+        for obj in queryset:
+            self.fetch_time_slot(obj)
+
+    def fetch_time_slot(self, obj):
+        start = obj.start
+        end = obj.end
+        time_span = self.TIME_SPAN
+        day = obj.day
+        # timing = self.context['timing']
+
+        int_span = (time_span / 60)
+        # timing = dict()
+        if not self.timing[day].get('timing'):
+            self.timing[day]['timing'] = dict()
+            self.timing[day]['timing'][self.MORNING] = OrderedDict()
+            self.timing[day]['timing'][self.AFTERNOON] = OrderedDict()
+            self.timing[day]['timing'][self.EVENING] = OrderedDict()
+        num_slots = int(60 / time_span)
+        if 60 % time_span != 0:
+            num_slots += 1
+        for h in range(start, end):
+            for i in range(0, num_slots):
+                temp_h = h + i * int_span
+                day_slot, am_pm = self.get_day_slot(temp_h)
+                time_str = self.form_time_string(temp_h, am_pm)
+                self.timing[day]['timing'][day_slot][temp_h] = time_str
+
+    def get_day_slot(self, hour):
+        am = 'AM'
+        pm = 'PM'
+        if hour < 12:
+            return self.MORNING, am
+        elif hour < 16:
+            return self.AFTERNOON, pm
+        else:
+            return self.EVENING, pm
+
+    def form_time_string(self, time, am_pm):
+
+        day_time_hour = int(time)
+        day_time_min = (time - day_time_hour) * 60
+
+        if time >= 12:
+            day_time_hour -= 12
+
+        day_time_hour_str = str(int(day_time_hour))
+        if int(day_time_hour) / 10 < 1:
+            day_time_hour_str = '0' + str(int(day_time_hour))
+
+        day_time_min_str = str(int(day_time_min))
+        if int(day_time_min) / 10 < 1:
+            day_time_min_str = '0' + str(int(day_time_min))
+
+        time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
+
+        return time_str
+
+    def get_timing_list(self):
+        for i in range(7):
+            if self.timing[i].get('timing'):
+                temp_list = list()
+                temp_list = [[k, v] for k, v in self.timing[i]['timing'][0].items()]
+                self.timing[i]['timing'][0] = temp_list
+                temp_list = [[k, v] for k, v in self.timing[i]['timing'][1].items()]
+                self.timing[i]['timing'][1] = temp_list
+                temp_list = [[k, v] for k, v in self.timing[i]['timing'][2].items()]
+                self.timing[i]['timing'][2] = temp_list
+        return self.timing
