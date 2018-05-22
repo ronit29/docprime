@@ -383,8 +383,8 @@ class PrescriptionFileViewset(OndocViewSet):
 
 
 class SearchedItemsViewSet(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated, DoctorPermission,)
+    # authentication_classes = (TokenAuthentication,)
+    # permission_classes = (IsAuthenticated, DoctorPermission,)
 
     def list(self, request, *args, **kwargs):
         medical_conditions = models.MedicalCondition.objects.all().values("id", "name")
