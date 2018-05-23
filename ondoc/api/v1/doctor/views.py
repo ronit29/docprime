@@ -2,6 +2,7 @@ from ondoc.doctor import models
 from . import serializers
 from ondoc.api.v1.diagnostic.serializers import TimeSlotSerializer
 from ondoc.api.pagination import paginate_queryset
+from ondoc.api.v1.utils import convert_timings
 from django.db.models import Min
 from django.contrib.gis.geos import Point
 from django.shortcuts import get_object_or_404
@@ -225,6 +226,46 @@ class DoctorProfileView(viewsets.GenericViewSet):
 
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
+    def prepare_response(self, response_data):
+        hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
+        availability = []
+        prev = {}
+        timings = []
+        for ndx, hospital in enumerate(hospitals):
+            if ndx == 0:
+                timings = [{
+                    "start": hospital.get("start"),
+                    "end": hospital.get("end"),
+                    "day": hospital.get("day")
+                }]
+                prev = hospital
+                prev.pop("start")
+                prev.pop("end")
+                prev.pop("day")
+                continue
+            if hospital.get("hospital_id") != prev.get("hospital_id"):
+                prev['timings'] = convert_timings(timings)
+                availability.append(prev)
+                timings = [{
+                    "start": hospital.get("start"),
+                    "end": hospital.get("end"),
+                    "day": hospital.get("day")
+                }]
+            else:
+                timings.append({
+                    "start": hospital.get("start"),
+                    "end": hospital.get("end"),
+                    "day": hospital.get("day")
+                })
+            prev = hospital
+            prev.pop("start")
+            prev.pop("end")
+            prev.pop("day")
+        prev['timings'] = convert_timings(timings)
+        availability.append(prev)
+        response_data['hospitals'] = availability
+        return response_data
+
     def retrieve(self, request, pk):
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
@@ -236,33 +277,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if not doctor:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False)
-        response_data = serializer.data
-        timings = []
-        hospitals = sorted(response_data.get('availability'), key=itemgetter("fees"))
-        for ndx, value in enumerate(hospitals):
-            if ndx == 0:
-                timings.append({
-                    'start': value.get("start"),
-                    "end": value.get("end"),
-                    "day": value.get("day"),
-                    "hospital_id": value.get("hospital_id")
-                })
-            else:
-                if timings[len(timings) - 1].get("hospital_id") == value.get("hospital_id"):
-                    timings.append({
-                        'start': value.get("start"),
-                        "end": value.get("end"),
-                        "day": value.get("day"),
-                        "hospital_id": value.get("hospital_id")
-                    })
-        availability = hospitals[0] if len(hospitals) > 0 else {}
-        availability.update({
-            "timings": timings
-        })
-        availability.pop("start", None)
-        availability.pop("end", None)
-        availability.pop("day", None)
-        response_data['availability'] = availability
+        response_data = self.prepare_response(serializer.data)
         return Response(response_data)
 
 
@@ -397,6 +412,70 @@ class DoctorListViewSet(viewsets.GenericViewSet):
     # permission_classes = (IsAuthenticated, DoctorPermission,)
     queryset = models.Doctor.objects.all()
 
+    def prepare_response(self, response_data):
+        """Helper function to prepare response expected by client"""
+
+        for data in response_data:
+            timings = []
+            hospitals = sorted(data.get('hospitals'), key=itemgetter("fees"))
+            for ndx, value in enumerate(hospitals):
+                if ndx == 0:
+                    timings.append({
+                        'start': value.get("start"),
+                        "end": value.get("end"),
+                        "day": value.get("day"),
+                        "hospital_id": value.get("hospital_id")
+                    })
+                else:
+                    if timings[len(timings) - 1].get("hospital_id") == value.get("hospital_id"):
+                        timings.append({
+                            'start': value.get("start"),
+                            "end": value.get("end"),
+                            "day": value.get("day"),
+                            "hospital_id": value.get("hospital_id")
+                        })
+            hospital = hospitals[0] if len(hospitals) > 0 else {}
+            hospital.update({
+                "timings": convert_timings(timings)
+            })
+            hospital.pop("start", None)
+            hospital.pop("end", None)
+            hospital.pop("day", None)
+            data['hospitals'] = [hospital, ]
+        return response_data
+
+    def get_filtering_params(self, data):
+        """Helper function that prepare dynamic query for filtering"""
+
+        filtering_params = {}
+        if data.get("specialization_ids"):
+            filtering_params.update({
+                "qualifications__specialization__id__in": data.get("specialization_ids")
+            })
+        if data.get("sits_at"):
+            filtering_params.update({
+                "availability__hospital__hospital_type__in": data.get("sits_at")
+            })
+        if data.get("min_fees"):
+            filtering_params.update({
+                "availability__fees__gte": data.get("min_fees")
+            })
+        if data.get("max_fees"):
+            filtering_params.update({
+                "availability__fees__lte": data.get("max_fees")
+            })
+        if data.get("is_female"):
+            filtering_params.update({
+                "gender": "f"
+            })
+        if data.get("is_available"):
+            current_time = timezone.now()
+            filtering_params.update({
+                "availability__day": current_time.day,
+                "availability__end__gte": current_time.hour
+            })
+        return filtering_params
+
     def list(self, request, *args, **kwargs):
         MAX_DISTANCE = 10000
         serializer = serializers.DoctorListSerializer(data=request.query_params)
@@ -404,35 +483,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         point = Point(validated_data.get("longitude"),
                       validated_data.get("latitude"), srid=4326)
-        specialization_ids = validated_data.get("specialization_ids")
-        filtering_params = {}
-        if specialization_ids:
-            filtering_params.update({
-                "qualifications__specialization__id__in": specialization_ids
-            })
-        if validated_data.get("sits_at"):
-            filtering_params.update({
-                "availability__hospital__hospital_type__in": validated_data.get("sits_at")
-            })
-        if validated_data.get("min_fees"):
-            filtering_params.update({
-                "availability__fees__gte": validated_data.get("min_fees")
-            })
-        if validated_data.get("max_fees"):
-            filtering_params.update({
-                "availability__fees__lte": validated_data.get("max_fees")
-            })
-        if validated_data.get("is_female"):
-            filtering_params.update({
-                "gender": "f"
-            })
-        if validated_data.get("is_available"):
-            current_time = timezone.now()
-            filtering_params.update({
-                "availability__day": current_time.day,
-                "availability__end__gte": current_time.hour
-            })
-
+        filtering_params = self.get_filtering_params(validated_data)
         order_by_field = 'distance'
         if validated_data.get('sort_on'):
             if validated_data.get('sort_on') == 'experience':
@@ -446,40 +497,13 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                               "availability__hospital", "experiences__doctor")
                     .filter(availability__hospital__location__distance_lte=(point, MAX_DISTANCE))
                     .filter(**filtering_params)
-                    .annotate(distance=Distance('availability__hospital__location', point),
+                    .annotate(distance=Min(Distance('availability__hospital__location', point)),
                               min_fees=Min('availability__fees'))
                     .order_by(order_by_field)
                     )
         queryset = paginate_queryset(queryset, request)
-        search_result_serializer = serializers.DoctorSearchResultSerializer(queryset, many=True)
-        response_data = search_result_serializer.data
-        for data in response_data:
-            timings = []
-            hospitals = sorted(data.get('hospital'), key=itemgetter("fees"))
-            for ndx, value in enumerate(hospitals):
-                if ndx == 0:
-                    timings.append({
-                        'start': value.get("start"),
-                        "end": value.get("end"),
-                        "day": value.get("day"),
-                        "hospital": value.get("hospital")
-                    })
-                else:
-                    if timings[len(timings)-1].get("hospital") == value.get("hospital"):
-                        timings.append({
-                            'start': value.get("start"),
-                            "end": value.get("end"),
-                            "day": value.get("day"),
-                            "hospital": value.get("hospital")
-                        })
-            hospital = hospitals[0] if len(hospitals) > 0 else {}
-            hospital.update({
-                "timings": timings
-            })
-            hospital.pop("start", None)
-            hospital.pop("end", None)
-            hospital.pop("day", None)
-            data['hospital'] = hospital
+        search_result_serializer = serializers.DoctorProfileUserViewSerializer(queryset, many=True)
+        response_data = self.prepare_response(search_result_serializer.data)
         return Response(response_data)
 
 

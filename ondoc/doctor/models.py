@@ -192,7 +192,7 @@ class Doctor(TimeStampedModel, QCModel):
     def hospital_count(self):
         return self.availability.all().count()
 
-    def hospital(self):
+    def hospitals(self):
         return self.availability.all()
 
     class Meta:
