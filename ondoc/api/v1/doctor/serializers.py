@@ -443,3 +443,12 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
     doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+
+
+class DoctorTimeSlotSerializer(serializers.Serializer):
+    images = DoctorImageSerializer(read_only=True, many=True)
+    qualifications = DoctorQualificationSerializer(read_only=True, many=True)
+
+    class Meta:
+        model = Doctor
+        fields = ('id', 'images', 'qualifications', )

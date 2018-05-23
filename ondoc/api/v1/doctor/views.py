@@ -493,6 +493,11 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         validated_data = serializer.validated_data
         queryset = models.DoctorHospital.objects.filter(doctor=validated_data.get('doctor_id'),
                                                         hospital=validated_data.get('hospital_id'))
+        doctor_queryset = (models.Doctor
+                           .objects.prefetch_related("qualifications__qualification",
+                                                     "qualifications__specialization")
+                           .filter(pk=validated_data.get('doctor_id').id))
+        doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
         timeslots = dict()
         for i in range(0, 7):
             timeslots[i] = dict()
@@ -507,4 +512,4 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                 timeslots[i]['timing'][1] = temp_list
                 temp_list = [[k, v] for k, v in timeslots[i]['timing'][2].items()]
                 timeslots[i]['timing'][2] = temp_list
-        return Response(timeslots)
+        return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data})
