@@ -18,6 +18,7 @@ from django.http import Http404
 from django.db.models import Q
 import datetime
 from operator import itemgetter
+from itertools import groupby
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -229,40 +230,17 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
     def prepare_response(self, response_data):
         hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
         availability = []
-        prev = {}
-        timings = []
-        for ndx, hospital in enumerate(hospitals):
-            if ndx == 0:
-                timings = [{
-                    "start": hospital.get("start"),
-                    "end": hospital.get("end"),
-                    "day": hospital.get("day")
-                }]
-                prev = hospital
-                prev.pop("start")
-                prev.pop("end")
-                prev.pop("day")
-                continue
-            if hospital.get("hospital_id") != prev.get("hospital_id"):
-                prev['timings'] = convert_timings(timings)
-                availability.append(prev)
-                timings = [{
-                    "start": hospital.get("start"),
-                    "end": hospital.get("end"),
-                    "day": hospital.get("day")
-                }]
-            else:
-                timings.append({
-                    "start": hospital.get("start"),
-                    "end": hospital.get("end"),
-                    "day": hospital.get("day")
-                })
-            prev = hospital
-            prev.pop("start")
-            prev.pop("end")
-            prev.pop("day")
-        prev['timings'] = convert_timings(timings)
-        availability.append(prev)
+        for key, group in groupby(hospitals, lambda x: x['hospital_id']):
+            hospital_groups = list(group)
+            hospital = hospital_groups[0]
+            timings = convert_timings(hospital_groups)
+            hospital.update({
+                "timings": timings
+            })
+            hospital.pop("start", None)
+            hospital.pop("end", None)
+            hospital.pop("day",  None)
+            availability.append(hospital)
         response_data['hospitals'] = availability
         return response_data
 
