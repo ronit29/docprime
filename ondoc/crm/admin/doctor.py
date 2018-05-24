@@ -283,7 +283,7 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
 
     change_form_template = 'custom_change_form.html'
 
-    list_display = ('name', 'updated_at','data_status', 'created_by','get_onboard_link')
+    list_display = ('name', 'updated_at','data_status','onboarding_status','created_by','get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = ('data_status',)
     form = DoctorForm
@@ -302,7 +302,6 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
     ]
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
     search_fields = ['name']
-
     def get_urls(self):
         urls = super().get_urls()
         my_urls = [
@@ -370,10 +369,10 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        if request.user.is_superuser:
+        if request.user.is_superuser or request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
             return qs
-        if request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-            return qs.filter(Q(data_status=2) | Q(data_status=3))
+        # if request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
+        #     return qs.filter(Q(data_status=2) | Q(data_status=3))
         if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
             return qs.filter(created_by=request.user )
 
@@ -396,9 +395,8 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
 
         if request.user.is_superuser and request.user.is_staff:
             return True
-        if request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() and obj.data_status in (2, 3):
+        if request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() and obj.data_status in (1, 2, 3):
             return True
-
         return obj.created_by == request.user
 
     class Media:
