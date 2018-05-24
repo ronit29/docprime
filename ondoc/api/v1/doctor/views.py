@@ -424,7 +424,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
     def get_filtering_params(self, data):
         """Helper function that prepare dynamic query for filtering"""
-
+        HOSPITAL_TYPE_MAPPING = {hospital_type[1]: hospital_type[0] for hospital_type in
+                                 models.Hospital.HOSPITAL_TYPE_CHOICES}
         filtering_params = {}
         if data.get("specialization_ids"):
             filtering_params.update({
@@ -432,7 +433,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             })
         if data.get("sits_at"):
             filtering_params.update({
-                "availability__hospital__hospital_type__in": data.get("sits_at")
+                "availability__hospital__hospital_type__in": [HOSPITAL_TYPE_MAPPING.get(sits_at) for sits_at in
+                                                              data.get("sits_at")]
             })
         if data.get("min_fees"):
             filtering_params.update({

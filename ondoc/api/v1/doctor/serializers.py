@@ -12,11 +12,15 @@ User = get_user_model()
 
 
 class CommaSepratedToListField(CharField):
+    def __init__(self, **kwargs):
+        self.typecast_to = kwargs.pop('typecast_to', int)
+        super(CommaSepratedToListField, self).__init__(**kwargs)
+
     def to_internal_value(self, data):
-        return list(map(int, data.strip(",").split(",")))
+        return list(map(self.typecast_to, data.strip(",").split(",")))
 
     def to_representation(self, value):
-        return list(map(int, value.strip(",").split(",")))
+        return list(map(self.typecast_to, value.strip(",").split(",")))
 
 
 
@@ -405,11 +409,11 @@ class PrescriptionSerializer(serializers.Serializer):
 
 class DoctorListSerializer(serializers.Serializer):
     SORT_CHOICES = ('fees', 'experience', 'distance', )
-    SITTING_CHOICES = (Hospital.PRIVATE, Hospital.CLINIC, Hospital.HOSPITAL)
-    specialization_ids = CommaSepratedToListField(required=False, max_length=100)
+    SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
+    specialization_ids = CommaSepratedToListField(required=False, max_length=100, typecast_to=int)
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
-    sits_at = CommaSepratedToListField(required=False, max_length=100)
+    sits_at = CommaSepratedToListField(required=False, max_length=100, typecast_to=str)
     sort_on = serializers.ChoiceField(choices=SORT_CHOICES, required=False)
     min_fees = serializers.IntegerField(required=False)
     max_fees = serializers.IntegerField(required=False)
