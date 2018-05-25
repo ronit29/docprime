@@ -119,7 +119,7 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         models.BigIntegerField: {'widget': forms.TextInput},
     }
     list_display = ('name', 'updated_at', 'data_status', 'created_by')
-
+    list_filter = ('data_status',)
     search_fields = ['name']
     inlines = [LabNetworkManagerInline,
         LabNetworkHelplineInline,

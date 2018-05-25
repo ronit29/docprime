@@ -121,6 +121,8 @@ class HospitalForm(forms.ModelForm):
 
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
+    list_filter = ('data_status',)
+
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user

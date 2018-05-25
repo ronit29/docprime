@@ -283,7 +283,7 @@ class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
 
     list_display = ('name', 'updated_at','data_status','onboarding_status','created_by','get_onboard_link')
     date_hierarchy = 'created_at'
-    list_filter = ('data_status',)
+    list_filter = ('data_status','onboarding_status')
     form = DoctorForm
     inlines = [
         DoctorMobileInline,
