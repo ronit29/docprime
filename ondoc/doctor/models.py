@@ -507,6 +507,9 @@ class DoctorOnboardingToken(TimeStampedModel):
     verified_token = models.CharField(max_length=100, null=True)
     status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=GENERATED)
 
+    def __str__(self):
+        return self.doctor.name+" "+self.email+" "+str(self.mobile)
+
     class Meta:
         db_table = "doctor_onboarding_token"
 

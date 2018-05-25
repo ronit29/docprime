@@ -1,5 +1,5 @@
-from .base import *
-from .base import env
+from config.settings.base import *
+# from .base import env
 
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='!!!SET DJANGO_SECRET_KEY!!!')

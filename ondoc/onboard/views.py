@@ -148,7 +148,6 @@ def generate_doctor(request):
     doctor.onboarding_status = doctor.REQUEST_SENT
     doctor.save()
 
-    # qprint("The generated onboarding url is: " + url)
     return JsonResponse({'message': 'ok'})
 
 
