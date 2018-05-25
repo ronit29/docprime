@@ -73,10 +73,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.phone_number
+        if self.user_type==1 and hasattr(self, 'staffprofile'):
+            return self.staffprofile.name
+        return str(self.phone_number)
 
     def save(self, *args, **kwargs):
-        if self.email:    
+        if self.email:
             self.email = self.email.lower()
         return super().save(*args, **kwargs)
 
@@ -88,6 +90,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 class StaffProfile(models.Model):
     name = models.CharField(max_length=100, blank=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    #user = models.OneToOneField(User, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
