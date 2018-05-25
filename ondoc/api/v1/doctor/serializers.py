@@ -32,6 +32,7 @@ class AppointmentFilterSerializer(serializers.Serializer):
 
     range = serializers.ChoiceField(choices=CHOICES, required=False)
     hospital_id = serializers.IntegerField(required=False)
+    profile_id = serializers.IntegerField(required=False)
 
 class OpdAppointmentSerializer(serializers.ModelSerializer):
 

@@ -104,14 +104,19 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         elif user.user_type == User.CONSUMER:
             return models.OpdAppointment.objects.filter(user=user)
 
-
     def list(self, request):
         queryset = self.get_queryset()
-        serializer = models.AppointmentFilterSerializer(data=request.query_params)
+        if not queryset:
+            return Response([])
+        serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         range = serializer.validated_data.get('range')
         hospital_id = serializer.validated_data.get('hospital_id')
+        profile_id = serializer.validated_data.get('profile_id')
+
+        if profile_id:
+            queryset = queryset.filter(profile=profile_id)
 
         if hospital_id:
             queryset = queryset.filter(hospital_id=hospital_id)
@@ -133,7 +138,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     @transaction.atomic
     def create(self, request):
-        serializer = models.CreateAppointmentSerializer(data=request.data, context={'request': request})
+        serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         time_slot_start = data.get("time_slot_start")
@@ -173,7 +178,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp = {}
             resp['allowed'] = allowed
             return Response(resp, status=status.HTTP_400_BAD_REQUEST)
-
 
         if request.user.user_type == User.DOCTOR:
             updated_opd_appointment = self.doctor_update(opd_appointment, validated_data)
@@ -316,7 +320,7 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        serializer = models.DoctorBlockCalenderSerialzer(data=request.data, context={"request": request})
+        serializer = serializers.DoctorBlockCalenderSerialzer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         doctor_leave_data = {
