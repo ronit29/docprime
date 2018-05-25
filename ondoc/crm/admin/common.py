@@ -1,6 +1,6 @@
 from django.contrib.gis import admin
 import datetime
-
+from django.db.models import Q
 from ondoc.crm.constants import constants
 
 
@@ -19,6 +19,18 @@ def award_year_choices():
 
 def award_year_choices_no_blank():
     return [(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
+
+class QCPemAdmin(admin.ModelAdmin):
+    change_form_template = 'custom_change_form.html'
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser or request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
+            return qs
+        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
+            return qs.filter(created_by=request.user )
+
+    class Meta:
+        abstract = True
 
 
 class ActionAdmin(admin.ModelAdmin):

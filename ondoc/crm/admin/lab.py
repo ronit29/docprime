@@ -178,12 +178,11 @@ class LabForm(forms.ModelForm):
         if not self.request.user.is_superuser:
             if self.instance.data_status == 3:
                 raise forms.ValidationError("Cannot update QC approved Lab")
-
-            if self.instance.data_status == 2 and not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-                raise forms.ValidationError("Cannot update Lab submitted for QC approval")
-
-            if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
-                raise forms.ValidationError("Cannot modify Lab added by other users")
+            if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
+                if self.instance.data_status == 2:
+                    raise forms.ValidationError("Cannot update Lab submitted for QC approval")
+                if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
+                    raise forms.ValidationError("Cannot modify Lab added by other users")
 
 
             if '_submit_for_qc' in self.data:
@@ -203,8 +202,7 @@ class LabForm(forms.ModelForm):
         return super(LabForm, self).clean()
 
 
-class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
-    change_form_template = 'custom_change_form.html'
+class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_display = ('name', 'updated_at','onboarding_status','data_status', 'created_by', 'get_onboard_link',)
     # readonly_fields=('onboarding_status', )
 
@@ -285,14 +283,7 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin):
 
         super().save_model(request, obj, form, change)
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        if request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-            return qs.filter(Q(data_status=2) | Q(data_status=3))
-        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
-            return qs.filter(created_by=request.user )
+
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(LabAdmin, self).get_form(request, obj=obj, **kwargs)

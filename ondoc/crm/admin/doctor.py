@@ -279,9 +279,7 @@ class DoctorForm(forms.ModelForm):
         return super(DoctorForm, self).clean()
 
 
-class DoctorAdmin(VersionAdmin, ActionAdmin):
-
-    change_form_template = 'custom_change_form.html'
+class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
 
     list_display = ('name', 'updated_at','data_status','onboarding_status','created_by','get_onboard_link')
     date_hierarchy = 'created_at'
@@ -366,15 +364,6 @@ class DoctorAdmin(VersionAdmin, ActionAdmin):
                 pass
 
         formset.save()
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser or request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-            return qs
-        # if request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-        #     return qs.filter(Q(data_status=2) | Q(data_status=3))
-        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
-            return qs.filter(created_by=request.user )
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
