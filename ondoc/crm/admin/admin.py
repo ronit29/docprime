@@ -6,8 +6,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,
                                      LabTestSubType, AvailableLabTest)
-from ondoc.lead.models import HospitalLead
-from .lead import HospitalLeadAdmin
+from ondoc.lead.models import HospitalLead, DoctorLead
+from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin, CollegeAdmin)
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -50,3 +50,4 @@ admin.site.register(LabTestSubType, LabSubTestTypeAdmin)
 admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
+admin.site.register(DoctorLead, DoctorLeadAdmin)
