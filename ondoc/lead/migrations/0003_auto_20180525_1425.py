@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('doctor', '0039_remove_doctor_hospitals'),
+        ('doctor', '0038_medicalcondition'),
         ('lead', '0002_doctorlead'),
     ]
 
@@ -15,11 +15,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='doctorlead',
             name='doctor',
-            field=models.OneToOneField(null=True, on_delete=django.db.models.deletion.SET_NULL, to='doctor.Doctor'),
+            field=models.OneToOneField(null=True, blank=True, on_delete=django.db.models.deletion.SET_NULL, to='doctor.Doctor'),
         ),
         migrations.AddField(
             model_name='hospitallead',
             name='hospital',
-            field=models.OneToOneField(null=True, on_delete=django.db.models.deletion.SET_NULL, to='doctor.Hospital'),
+            field=models.OneToOneField(null=True, blank=True, on_delete=django.db.models.deletion.SET_NULL, to='doctor.Hospital'),
         ),
     ]

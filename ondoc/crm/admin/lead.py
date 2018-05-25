@@ -91,7 +91,7 @@ class DoctorLeadAdmin(ImportMixin, VersionAdmin):
     resource_class = DoctorLeadResource
 
     def save_model(self, request, obj, form, change):
-
+        obj.convert_lead(request.user)
         super(DoctorLeadAdmin, self).save_model(request, obj, form, change)
 
     def has_delete_permission(self, request, obj=None):
