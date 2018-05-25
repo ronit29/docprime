@@ -86,12 +86,11 @@ class LabNetworkForm(forms.ModelForm):
         if not self.request.user.is_superuser:
             if self.instance.data_status == 3:
                 raise forms.ValidationError("Cannot update QC approved Lab Network")
-
-            if self.instance.data_status == 2 and not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-                raise forms.ValidationError("Cannot update Lab Network  submitted for QC approval")
-
-            if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
-                raise forms.ValidationError("Cannot modify Lab Network added by other users")
+            if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
+                if self.instance.data_status == 2 :
+                    raise forms.ValidationError("Cannot update Lab Network  submitted for QC approval")
+                if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
+                    raise forms.ValidationError("Cannot modify Lab Network added by other users")
 
             if '_submit_for_qc' in self.data:
                 self.validate_qc()
@@ -114,11 +113,8 @@ class LabNetworkForm(forms.ModelForm):
         return data
 
 
-class LabNetworkAdmin(VersionAdmin, ActionAdmin):
-    change_form_template = 'custom_change_form.html'
-
+class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     form = LabNetworkForm
-
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
@@ -134,13 +130,11 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-
-        if request.user.is_superuser:
-            return qs
-        if request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-            return qs.filter(Q(data_status=2) | Q(data_status=3))
+        parent_qs = super(QCPemAdmin, self).get_queryset(request)
         if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
-            return qs.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user))
+                return parent_qs.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user))
+        else:
+            return qs
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:

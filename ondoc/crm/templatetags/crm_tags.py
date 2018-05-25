@@ -18,18 +18,18 @@ def show_actions(context, original):
     available_actions = {'_submit_for_qc':'Submit for Quality Check','_qc_approve':'Approve Quality Check','_mark_in_progress':'Reject Quality Check'}
     actions = {}
 
-    if request.user.is_superuser and request.user.is_staff:
+    if (request.user.is_superuser and request.user.is_staff):
         actions['_submit_for_qc'] = available_actions['_submit_for_qc']
         actions['_qc_approve'] = available_actions['_qc_approve']
         actions['_mark_in_progress'] = available_actions['_mark_in_progress']
 
     # check if member of QC Team
     if request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-        if data_status == 2:
+        if data_status == 1:
+            actions['_submit_for_qc'] = available_actions['_submit_for_qc']
+        elif data_status == 2:
             actions['_qc_approve'] = available_actions['_qc_approve']
             actions['_mark_in_progress'] = available_actions['_mark_in_progress']
-        #if data_status == 2:
-        #    actions['mark_in_progress'] = available_actions['mark_in_progress']
 
     # if field team member
     if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
