@@ -4,8 +4,9 @@ from django.contrib.postgres.operations import CreateExtension
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
-from django.utils.safestring import mark_safe
-
+from django.conf import settings
+from datetime import datetime, timedelta
+from django.utils import timezone
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
 
 
@@ -45,7 +46,10 @@ class MedicalService(TimeStampedModel,UniqueNameModel):
 
 
 class Hospital(TimeStampedModel, CreatedByModel, QCModel):
-
+    PRIVATE = 1
+    CLINIC = 2
+    HOSPITAL = 3
+    HOSPITAL_TYPE_CHOICES = (("", "Select"), (PRIVATE, 'Private'), (CLINIC, "Clinic"), (HOSPITAL, "Hospital"), )
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
@@ -59,7 +63,7 @@ class Hospital(TimeStampedModel, CreatedByModel, QCModel):
     state = models.CharField(max_length=100)
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
-    hospital_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Private"), (2,"Clinic"), (3,"Hospital")])
+    hospital_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=HOSPITAL_TYPE_CHOICES)
     network_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Non Network Hospital"), (2,"Network Hospital")])
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL)
 
@@ -146,7 +150,7 @@ class College(TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(TimeStampedModel, CreatedByModel, QCModel):
+class Doctor(TimeStampedModel, QCModel):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
@@ -162,7 +166,9 @@ class Doctor(TimeStampedModel, CreatedByModel, QCModel):
     additional_details = models.CharField(max_length=2000, blank=True)
     # email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name= 'Email Verified', default=False)
-    user = models.ForeignKey(User, related_name="doctor_profile", on_delete=models.CASCADE, default=None, blank=True, null=True)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name="doctor", on_delete=models.CASCADE, default=None, blank=True, null=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="created_doctors", null=True, editable=False, on_delete=models.SET_NULL)
+
     is_insurance_enabled = models.BooleanField(verbose_name= 'Enabled for Insurance Customer',default=False)
     is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
     hospitals = models.ManyToManyField(
@@ -173,6 +179,21 @@ class Doctor(TimeStampedModel, CreatedByModel, QCModel):
 
     def __str__(self):
         return self.name
+
+    def experience_years(self):
+        if not self.practicing_since:
+            return None
+        current_year = timezone.now().year
+        return int(current_year - self.practicing_since)
+
+    def experiences(self):
+        return self.experiences.all()
+
+    def hospital_count(self):
+        return self.availability.all().count()
+
+    def hospitals(self):
+        return self.availability.all()
 
     class Meta:
         db_table = "doctor"
@@ -227,9 +248,10 @@ class DoctorQualification(TimeStampedModel):
 
 
 class DoctorHospital(TimeStampedModel):
+    DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
     doctor = models.ForeignKey(Doctor, related_name="availability", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
+    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
 
     TIME_CHOICES = [(7.0, "7 AM"), (7.5, "7:30 AM"),
     (8.0, "8 AM"), (8.5, "8:30 AM"),
@@ -251,24 +273,14 @@ class DoctorHospital(TimeStampedModel):
     start = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
     end = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
 
-    # start = models.PositiveSmallIntegerField(
-    #     blank=False, null=False, choices=[(6, "6 AM"), (7, "7 AM"),
-    #     (8, "8 AM"), (9, "9 AM"), (10, "10 AM"), (11, "11 AM"),
-    #     (12, "12 PM"), (13, "1 PM"), (14, "2 PM"), (15, "3 PM"),
-    #     (16, "4 PM"), (17, "5 PM"), (18, "6 PM"), (19, "7 PM"),
-    #     (20, "8 PM"), (21, "9 PM"), (22, "10 PM"), (23, "11 PM")])
-
-    # end = models.PositiveSmallIntegerField(
-    #     blank=False, null=False, choices=[(6, "6 AM"), (7, "7 AM"),
-    #     (8, "8 AM"), (9, "9 AM"), (10, "10 AM"), (11, "11 AM"),
-    #     (12, "12 PM"), (13, "1 PM"), (14, "2 PM"), (15, "3 PM"),
-    #     (16, "4 PM"), (17, "5 PM"), (18, "6 PM"), (19, "7 PM"),
-    #     (20, "8 PM"), (21, "9 PM"), (22, "10 PM"), (23, "11 PM")])
 
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
 
     def __str__(self):
         return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
+
+    def discounted_fees(self):
+        return self.fees
 
     class Meta:
         db_table = "doctor_hospital"
@@ -527,9 +539,19 @@ class DoctorOnboardingToken(TimeStampedModel):
 
 class OpdAppointment(TimeStampedModel):
     CREATED = 1
-    ACCEPTED = 2
-    RESCHEDULED = 3
-    REJECTED = 4    
+    BOOKED = 2
+    RESCHEDULED_DOCTOR = 3
+    RESCHEDULED_PATIENT = 4
+    ACCEPTED = 5
+
+    #RESCHEDULED_BY_USER = 4
+    #REJECTED = 4
+    CANCELED = 6
+    COMPLETED = 7
+
+    # PATIENT_SHOW = 1
+    # PATIENT_DIDNT_SHOW = 2
+    # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
     doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
@@ -537,22 +559,50 @@ class OpdAppointment(TimeStampedModel):
     booked_by = models.ForeignKey(User, related_name="booked_appointements", on_delete=models.CASCADE)
     fees = models.PositiveSmallIntegerField()
     status = models.PositiveSmallIntegerField(default=CREATED)
+
+    #patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
+    def allowed_action(self, user_type):
+
+        allowed = []
+        current_datetime = timezone.now()
+
+        if user_type == User.DOCTOR and self.time_slot_start<current_datetime:
+            if self.status == self.BOOKED:
+                allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
+            elif self.status == self.ACCEPTED:
+                allowed = [self.RESCHEDULED_DOCTOR]
+            elif self.status == self.RESCHEDULED_DOCTOR:
+                allowed = [self.ACCEPTED]
+
+        elif user_type == User.CONSUMER and current_datetime<self.time_slot_start+timedelta(hours=6):
+            if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
+                allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
+
+        return allowed
+
+
     class Meta:
         db_table = "opd_appointment"
 
 
-class DoctorLeave (TimeStampedModel):
+class DoctorLeave(TimeStampedModel):
+    INTERVAL_MAPPING = {
+        ("00:00:00", "14:00:00"): 'morning',
+        ("14:00:00", "23:59:59"): 'evening',
+        ("00:00:00", "23:59:59"): 'all',
+    }
     doctor = models.ForeignKey(Doctor, related_name="leaves", on_delete=models.CASCADE)
     start_time = models.TimeField(blank=True, null=True)
     end_time = models.TimeField(blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)
     end_date = models.DateField(blank=True, null=True)
+    deleted_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return self.doctor.name + "(" + str(self.start_time) + "," + str(self.end_date) + str(self.start_date)
@@ -560,3 +610,38 @@ class DoctorLeave (TimeStampedModel):
     class Meta:
         db_table = "doctor_leave"
 
+    @property
+    def interval(self):
+        return self.INTERVAL_MAPPING.get((str(self.start_time), str(self.end_time)))
+
+
+class Prescription (TimeStampedModel):
+    appointment = models.ForeignKey(OpdAppointment,  on_delete=models.CASCADE)
+    prescription_details = models.TextField(max_length=300, blank=True, null=True)
+
+    def __str__(self):
+        return "{}-{}".format(self.id, self.appointment.id)
+
+    class Meta:
+        db_table = "prescription"
+
+
+class PrescriptionFile(TimeStampedModel):
+    prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE)
+    file = models.FileField(upload_to='prescriptions', blank=False, null=False)
+
+    def __str__(self):
+        return "{}-{}".format(self.id, self.prescription.id)
+
+    class Meta:
+        db_table = "prescription_file"
+
+
+class MedicalCondition(TimeStampedModel):
+    name = models.CharField(max_length=100, verbose_name="Name")
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = "medical_condition"

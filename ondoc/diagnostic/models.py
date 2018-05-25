@@ -1,7 +1,9 @@
 from django.contrib.gis.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
 from ondoc.doctor.models import Hospital
+from django.utils import timezone
+from datetime import timedelta
 
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
@@ -33,7 +35,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     agreed_rate_list = models.FileField(upload_to='lab/docs',max_length=200, null=True, blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
-
 
     def __str__(self):
         return self.name
@@ -92,8 +93,8 @@ class LabManager(TimeStampedModel):
 
 
 class LabImage(TimeStampedModel, Image):
-    lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
-    name = models.ImageField(upload_to='lab/images',height_field='height', width_field='width')
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='lab_image')
+    name = models.ImageField(upload_to='lab/images', height_field='height', width_field='width')
 
     class Meta:
         db_table = "lab_image"
@@ -120,6 +121,7 @@ class LabTiming(TimeStampedModel):
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
 
+    pickup_flag = models.BooleanField(default=False)
     day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
     start = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
     end = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
@@ -163,6 +165,7 @@ class LabNetworkAward(TimeStampedModel):
     network = models.ForeignKey(LabNetwork, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
     year = models.PositiveSmallIntegerField(validators=[MinValueValidator(1900)])
+
     def __str__(self):
         return self.network.name + " (" + self.name + ")"
 
@@ -179,6 +182,7 @@ class LabNetworkAccreditation(TimeStampedModel):
 
     class Meta:
         db_table = "lab_network_accreditation"
+
 
 class LabNetworkManager(TimeStampedModel):
     network = models.ForeignKey(LabNetwork, on_delete=models.CASCADE)
@@ -266,6 +270,7 @@ class LabTest(TimeStampedModel):
     class Meta:
         db_table = "lab_test"
 
+
 class AvailableLabTest(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests')
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='availablelabs')
@@ -274,10 +279,45 @@ class AvailableLabTest(TimeStampedModel):
     deal_price = models.PositiveSmallIntegerField()
 
     def __str__(self):
-        return self.name+', '+self.lab.name
+        return self.test.name+', '+self.lab.name
 
     class Meta:
         db_table = "available_lab_test"
+
+
+class LabAppointment(TimeStampedModel):
+    CREATED = 1
+    BOOKED = 2
+    RESCHEDULED_LAB = 3
+    RESCHEDULED_PATIENT = 4
+    ACCEPTED = 5
+
+    # RESCHEDULED_BY_USER = 4
+    # REJECTED = 4
+    CANCELED = 6
+    COMPLETED = 7
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
+    lab_test = models.ManyToManyField(AvailableLabTest)
+    profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)
+    status = models.PositiveSmallIntegerField(default=CREATED)
+    price = models.PositiveSmallIntegerField()
+    time_slot_start = models.DateTimeField(blank=True, null=True)
+    time_slot_end = models.DateTimeField(blank=True, null=True)
+
+    def allowed_action(self, user_type):
+        allowed = []
+        current_datetime = timezone.now()
+        if user_type == User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
+            if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
+                allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
+
+        return allowed
+
+    def __str__(self):
+        return self.profile.name+', '+self.lab.name
+
+    class Meta:
+        db_table = "lab_appointment"
 
 
 class CommonTest(TimeStampedModel):
@@ -286,6 +326,7 @@ class CommonTest(TimeStampedModel):
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)
+    test = models.ManyToManyField(LabTest)
 
     def __str__(self):
         return self.name
@@ -317,6 +358,7 @@ class PromotedLab(TimeStampedModel):
 #     class Meta:
 #         db_table = "radiology_test"
 
+
 class LabService(TimeStampedModel):
     PATHOLOGY = 1
     RADIOLOGY = 2
@@ -330,6 +372,7 @@ class LabService(TimeStampedModel):
     class Meta:
         db_table = "lab_service"
 
+
 class LabDoctorAvailability(TimeStampedModel):
     SLOT_CHOICES = [("m","Morning"), ("e","Evening")]
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
@@ -342,6 +385,7 @@ class LabDoctorAvailability(TimeStampedModel):
 
     class Meta:
         db_table = "lab_doctor_availability"
+
 
 class LabDoctor(TimeStampedModel):
     registration_number = models.CharField(max_length=100, blank=False)
@@ -361,7 +405,7 @@ class LabDocument(TimeStampedModel):
     REGISTRATION = 4
     CHEQUE = 5
     LOGO = 6
-    CHOICES = [(PAN,"PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"Registration Certificate"),(CHEQUE,"Cancel Cheque Copy"),(LOGO,"LOGO")]
+    CHOICES = [(PAN, "PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"Registration Certificate"),(CHEQUE,"Cancel Cheque Copy"),(LOGO,"LOGO")]
     lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.FileField(upload_to='lab/images', validators=[FileExtensionValidator(allowed_extensions=['pdf','jfif','jpg','jpeg','png'])])
@@ -379,6 +423,7 @@ class LabDocument(TimeStampedModel):
 
     class Meta:
         db_table = "lab_document"
+
 
 class LabOnboardingToken(TimeStampedModel):
     GENERATED = 1

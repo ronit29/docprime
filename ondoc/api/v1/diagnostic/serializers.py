@@ -1,14 +1,16 @@
 from rest_framework import serializers
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonTest, CommonDiagnosticCondition)
-from ondoc.authentication.models import UserProfile
+                                     CommonTest, CommonDiagnosticCondition, LabImage)
+from ondoc.authentication.models import UserProfile, Address
 from django.db.models import Count, Sum
 from django.db.models import Q
-
+from django.contrib.auth import get_user_model
+from collections import OrderedDict
 import datetime
 import pytz
 
 utc = pytz.UTC
+User = get_user_model()
 
 
 class LabTestListSerializer(serializers.ModelSerializer):
@@ -30,16 +32,34 @@ class LabTestSerializer(serializers.ModelSerializer):
         # fields = ('id', 'account_name', 'users', 'created')
 
 
+class LabImageModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LabImage
+        exclude = ('created_at', 'updated_at',)
+
+
 class LabModelSerializer(serializers.ModelSerializer):
 
-    lat = serializers.SerializerMethodField()
-    long = serializers.SerializerMethodField()
+    lat = serializers.FloatField(source='location.y')
+    long = serializers.FloatField(source='location.x')
+    address = serializers.SerializerMethodField()
+    lab_image = LabImageModelSerializer(many=True)
 
-    def get_lat(self, obj):
-        return obj.location.y
-
-    def get_long(self, obj):
-        return obj.location.x
+    def get_address(self, obj):
+        address = ''
+        if obj.building:
+            address += str(obj.building)
+        if obj.locality:
+            address += str(obj.locality) + ' , '
+        if obj.sublocality:
+            address += str(obj.sublocality) + ' , '
+        if obj.city:
+            address += str(obj.city) + ' , '
+        if obj.state:
+            address += str(obj.state) + ' , '
+        if obj.country:
+            address += str(obj.country)
+        return address
 
     class Meta:
         model = Lab
@@ -49,21 +69,25 @@ class LabModelSerializer(serializers.ModelSerializer):
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
+    test_id = serializers.ReadOnlyField(source='test.id')
 
     class Meta:
         model = AvailableLabTest
-        # fields = '__all__'
-        exclude = ('lab', 'agreed_price', 'deal_price')
+        fields = ('test_id', 'mrp', 'test', )
+        # exclude = ('lab', 'agreed_price', 'deal_price')
 
 
 class LabCustomSerializer(serializers.Serializer):
-    lab = serializers.SerializerMethodField()
-    price = serializers.IntegerField()
+    # lab = serializers.SerializerMethodField()
+    lab = LabModelSerializer()
+    price = serializers.IntegerField(default=None)
+    distance = serializers.IntegerField(source='distance.m')
+    pickup_available = serializers.IntegerField(default=0)
 
-    def get_lab(self, obj):
-        queryset = Lab.objects.get(pk=obj['lab'])
-        serializer = LabModelSerializer(queryset)
-        return serializer.data
+    # def get_lab(self, obj):
+    #     queryset = Lab.objects.get(pk=obj['lab'])
+    #     serializer = LabModelSerializer(queryset)
+    #     return serializer.data
 
 
 class CommonTestSerializer(serializers.ModelSerializer):
@@ -131,8 +155,8 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
 
     @staticmethod
     def reschedule_validation(instance, data):
-        now = datetime.datetime.now().replace(tzinfo=utc)
-        if instance.time_slot_start < now and data['start_time'] < now:
+        d = datetime.datetime.now().replace(tzinfo=utc)
+        if instance.time_slot_start < d and data['start_time'] < d:
             raise serializers.ValidationError("Cannot Reschedule")
 
     def cancel_validation(self, instance, data):
@@ -223,8 +247,95 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("No time slot available")
 
 
-class LabTimingModelSerializer(serializers.ModelSerializer):
+class AddressSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = LabTiming
-        fields = ('id', 'day', 'start', 'end')
+        model = Address
+        fields = "__all__"
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if attrs.get("user") != request.user.id:
+            raise serializers.ValidationError("User is not correct.")
+        if not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
+            raise serializers.ValidationError("Profile is not correct.")
+        return attrs
+
+
+class TimeSlotSerializer(serializers.Serializer):
+    MORNING = 0
+    AFTERNOON = 1
+    EVENING = 2
+    TIME_SPAN = 15
+    # INT_SPAN = (TIME_SPAN/60)
+    # TIME_INTERVAL = [":"+str(i) for i in range()]
+    timing = serializers.SerializerMethodField()
+
+    def get_timing(self, obj):
+        start = obj.start
+        end = obj.end
+        time_span = self.TIME_SPAN
+        day = obj.day
+        timing = self.context['timing']
+
+        int_span = (time_span / 60)
+        # timing = dict()
+        if not timing[day].get('timing'):
+            timing[day]['timing'] = dict()
+            timing[day]['timing'][self.MORNING] = OrderedDict()
+            timing[day]['timing'][self.AFTERNOON] = OrderedDict()
+            timing[day]['timing'][self.EVENING] = OrderedDict()
+        num_slots = int(60 / time_span)
+        if 60 % time_span != 0:
+            num_slots += 1
+        for h in range(start, end):
+            for i in range(0, num_slots):
+                temp_h = h + i * int_span
+                day_slot, am_pm = self.get_day_slot(temp_h)
+                day_time_hour = int(temp_h)
+                day_time_min = (temp_h - day_time_hour) * 60
+                if temp_h >= 12:
+                    day_time_hour -= 12
+                day_time_min_str = str(int(day_time_min))
+                day_time_hour_str = str(int(day_time_hour))
+
+                if int(day_time_hour)/10 < 1:
+                    day_time_hour_str = '0' + str(int(day_time_hour))
+
+                if int(day_time_min)/10 < 1:
+                    day_time_min_str = '0' + str(int(day_time_min))
+                time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
+                # temp_dict[temp_h] = time_str
+                timing[day]['timing'][day_slot][temp_h] = time_str
+        return timing
+
+    def get_day_slot(self, hour):
+        am = 'AM'
+        pm = 'PM'
+        if hour < 12:
+            return self.MORNING, am
+        elif hour < 16:
+            return self.AFTERNOON, pm
+        else:
+            return self.EVENING, pm
+
+
+class IdListField(serializers.Field):
+    def to_internal_value(self, data):
+        try:
+            id_str = data.strip(',')
+            ids = set(map(int, id_str.split(",")))
+        except:
+            raise serializers.ValidationError("Wrong Ids")
+        return ids
+
+
+class SearchLabListSerializer(serializers.Serializer):
+    min_distance = serializers.IntegerField(required=False)
+    max_distance = serializers.IntegerField(required=False)
+    min_price = serializers.IntegerField(required=False)
+    max_price = serializers.IntegerField(required=False)
+    long = serializers.FloatField(required=False)
+    lat = serializers.FloatField(required=False)
+    ids = IdListField(required=False)
+    order_by = serializers.CharField(required=False)

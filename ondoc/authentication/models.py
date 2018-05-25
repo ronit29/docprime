@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.contrib.postgres.fields import JSONField
+
 
 class Image(models.Model):
     # name = models.ImageField(height_field='height', width_field='width')
@@ -56,7 +58,10 @@ class CustomUserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    USER_TYPE_CHOICES = ((1, 'staff'), (2, 'doctor'), (3, 'user'))
+    STAFF = 1
+    DOCTOR = 2
+    CONSUMER = 3
+    USER_TYPE_CHOICES = ((STAFF, 'staff'), (DOCTOR, 'doctor'), (CONSUMER, 'user'))
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['phone_number']
 
@@ -123,11 +128,14 @@ class CreatedByModel(models.Model):
         abstract = True
 
 class UserProfile(TimeStampedModel, Image):
-    
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE,"Male"), (FEMALE,"Female"), (OTHER,"Other")]
     user = models.ForeignKey(User, related_name="profiles", on_delete=models.CASCADE)
     name = models.CharField(max_length=100, blank=False, default=None)
     email = models.CharField(max_length=20, blank=False, default=None)
-    gender = models.CharField(max_length=2, default=None, blank=True, choices=[("","Select"), ("m","Male"), ("f","Female"), ("o","Other")])
+    gender = models.CharField(max_length=2, default=None, blank=True, choices=GENDER_CHOICES)
     phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     is_otp_verified = models.BooleanField(default=False)
     is_default_user = models.BooleanField(default=False)
@@ -145,10 +153,55 @@ class OtpVerifications(TimeStampedModel):
     phone_number = models.CharField(max_length=10)
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)
-    isExpired = models.BooleanField(default=False)
+    is_expired = models.BooleanField(default=False)
 
     def __str__(self):
         return self.phone_number
 
     class Meta:
         db_table = "otp_verification"
+
+
+class NotificationEndpoint(TimeStampedModel):
+    user = models.ForeignKey(User, related_name='notification_endpoints', on_delete=models.CASCADE)
+    device_id = models.TextField(blank=True, null=True)
+    token = models.TextField(unique=True)
+
+    class Meta:
+        db_table = 'notification_endpoint'
+
+    def __str__(self):
+        return "{}-{}".format(self.user.phone_number, self.token)
+
+
+class Notification(TimeStampedModel):
+    ACCEPTED = 1
+    REJECTED = 2
+    TYPE_CHOICES = ((ACCEPTED, 'Accepted'), (REJECTED, 'Rejected'), )
+    user = models.ForeignKey(User, related_name='notifications', on_delete=models.CASCADE)
+    content = JSONField()
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES)
+    viewed_at = models.DateTimeField(blank=True, null=True)
+    read_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'notification'
+
+    def __str__(self):
+        return "{}-{}".format(self.user.phone_number, self.id)
+
+
+class Address(TimeStampedModel):
+    HOME_ADDRESS = 1
+    WORK_ADDRESS = 2
+    OTHER = 3
+    TYPE_CHOICES = (
+        (HOME_ADDRESS, 'Home Address'),
+        (WORK_ADDRESS, 'Work Address'),
+        (OTHER, 'Other'),
+    )
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
+    place_id = models.CharField(max_length=100)
+    address = models.TextField()

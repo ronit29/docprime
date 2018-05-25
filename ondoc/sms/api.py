@@ -9,6 +9,12 @@ def send_sms(message, phone_no):
     # return True
     return get_connection().send_message(message, phone_no)
 
+def send_otp(message, phone_no):
+
+    # print(message)
+    # return True
+    return get_connection().send_otp(message, phone_no)
+
 def get_connection():
     path = settings.SMS_BACKEND
     try:

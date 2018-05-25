@@ -11,9 +11,9 @@ def verifyOTP(f):
         try:
             phone_number = request.data['phone_number']
             otp = request.data['otp']
-            otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, isExpired=False)
+            otpEntry = OtpVerifications.objects.get(phone_number=phone_number, code=otp, is_expired=False)
             otp_time = getTimeDifferenceInMinutes(otpEntry.created_at)
-            otpEntry.isExpired = True
+            otpEntry.is_expired = True
             otpEntry.save()
             if otp_time > 15 :
                 return Response('OTP Expired/Invalid',status=404)

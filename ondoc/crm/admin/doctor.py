@@ -13,6 +13,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
     DoctorEmail, College)
+from .filters import RelatedDropdownFilter
 
 from .common import *
 from .autocomplete import CustomAutoComplete
