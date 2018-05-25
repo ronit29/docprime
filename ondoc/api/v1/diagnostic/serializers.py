@@ -318,3 +318,24 @@ class TimeSlotSerializer(serializers.Serializer):
             return self.AFTERNOON, pm
         else:
             return self.EVENING, pm
+
+
+class IdListField(serializers.Field):
+    def to_internal_value(self, data):
+        try:
+            id_str = data.strip(',')
+            ids = set(map(int, id_str.split(",")))
+        except:
+            raise serializers.ValidationError("Wrong Ids")
+        return ids
+
+
+class SearchLabListSerializer(serializers.Serializer):
+    min_distance = serializers.IntegerField(required=False)
+    max_distance = serializers.IntegerField(required=False)
+    min_price = serializers.IntegerField(required=False)
+    max_price = serializers.IntegerField(required=False)
+    long = serializers.FloatField(required=False)
+    lat = serializers.FloatField(required=False)
+    ids = IdListField(required=False)
+    order_by = serializers.CharField(required=False)
