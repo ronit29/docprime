@@ -32,16 +32,20 @@ class DoctorLead(models.Model):
         db_table = "doctor_lead"
 
     def convert_lead(self, user):
-        doctor_id = self.create_doctor(user)
+        doctor = self.create_doctor(user)
+        self.doctor = doctor
         for hospital in self.json.get("LinkedClinics").values():
             clinic_url = hospital[2].get("Clinic URL")
-            visiting_days = hospital[0]
+            visiting_days = hospital[0].get("Visiting Days")
             fees = hospital[1].get("Fee").split()[-1]
             hospital_lead = HospitalLead.objects.filter(json__URL=clinic_url).first()
-            hospital_id = self.create_hospital(hospital_lead)
-            self.create_doctor_hospital(doctor_id, hospital_id, visiting_days, fees)
-            print(hospital_id)
-
+            if not hospital_lead:
+                continue
+            hospital = self.create_hospital(hospital_lead, user)
+            hospital_lead.hospital = hospital
+            self.create_doctor_hospital(doctor, hospital, visiting_days, fees)
+            hospital_lead.save()
+        self.save()
 
     def create_doctor(self, user):
         name = self.json.get("Name")
@@ -52,9 +56,9 @@ class DoctorLead(models.Model):
                                        gender=gender)
         if not doctor:
             return
-        return doctor.id
+        return doctor
 
-    def create_hospital(self, hospital_lead):
+    def create_hospital(self, hospital_lead, created_by):
         if not hospital_lead:
             return
         HOSPITAL_TYPE_MAPPING = {hospital_type[1]: hospital_type[0]
@@ -68,10 +72,46 @@ class DoctorLead(models.Model):
         hospital = Hospital.objects.create(
             name=hospital_name,
             hospital_type=hospital_type,
-            location=location_point
+            location=location_point,
+            created_by=created_by
         )
-        return hospital.id
+        return hospital
 
-    def create_doctor_hospital(self, doctor_id, hospital_id, visiting_days, fees):
-        print("here")
-        pass
+    def create_doctor_hospital(self, doctor, hospital, visiting_days, fees):
+        DAYS_MAPPING = {
+            "Mon": 0,
+            "Tue": 1,
+            "Wed": 2,
+            "Thu": 3,
+            "Fri": 4,
+            "Sat": 5,
+            "Sun": 6,
+        }
+        TIME_SLOT_MAPPING = {time_slot_choice[1]: time_slot_choice[0] for time_slot_choice in
+                             DoctorHospital.TIME_SLOT_CHOICES}
+        for key, value in visiting_days.items():
+            for day_range_str in key.split(","):
+                day_range = range(DAYS_MAPPING.get(day_range_str.strip().split("-")[0].strip()),
+                                  DAYS_MAPPING.get(day_range_str.strip().split("-")[-1].strip()) + 1)
+                for day in day_range:
+                    for timing in value:
+                        start_time = timing.split("-")[0].strip()
+                        end_time = timing.split("-")[-1].strip()
+                        start_time_db_value = (
+                            TIME_SLOT_MAPPING.get("{} {}".format(start_time.split(":")[0], start_time.split(" ")[-1]))
+                        )
+                        end_time_db_value = (
+                            TIME_SLOT_MAPPING.get("{} {}".format(end_time.split(":")[0], end_time.split(" ")[-1]))
+                        )
+                        if (not start_time_db_value) or (not end_time_db_value):
+                            continue
+                        DoctorHospital.objects.create(
+                            doctor=doctor,
+                            hospital=hospital,
+                            day=day,
+                            start=start_time_db_value,
+                            end=end_time_db_value,
+                            fees=fees
+                        )
+
+

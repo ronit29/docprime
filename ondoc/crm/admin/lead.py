@@ -85,7 +85,7 @@ class DoctorLeadAdmin(ImportMixin, VersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = []
     list_display = ('city', 'lab', )
-    readonly_fields = ("name", "city", "lab",  "services", "specializations", "awards", "about",
+    readonly_fields = ("doctor", "name", "city", "lab",  "services", "specializations", "awards", "about",
                        "LinkedClinic", )
     exclude = ('json', 'source_id',)
     resource_class = DoctorLeadResource
