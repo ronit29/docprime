@@ -43,7 +43,7 @@ class DoctorLead(models.Model):
             clinic_url = hospital[2].get("Clinic URL")
             visiting_days = hospital[0].get("Visiting Days")
             fees = hospital[1].get("Fee").split()[-1]
-            hospital_lead = HospitalLead.objects.filter(json__URL=clinic_url).first()
+            hospital_lead = self.hospital_leads.filter(json__URL=clinic_url).first()
             if not hospital_lead:
                 continue
             hospital = self.create_hospital(hospital_lead, user)
@@ -94,6 +94,8 @@ class DoctorLead(models.Model):
         }
         TIME_SLOT_MAPPING = {time_slot_choice[1]: time_slot_choice[0] for time_slot_choice in
                              DoctorHospital.TIME_SLOT_CHOICES}
+
+        doctor_hospital_values = []
         for key, value in visiting_days.items():
             for day_range_str in key.split(","):
                 day_range = range(DAYS_MAPPING.get(day_range_str.strip().split("-")[0].strip()),
@@ -110,14 +112,19 @@ class DoctorLead(models.Model):
                         )
                         if (not start_time_db_value) or (not end_time_db_value):
                             continue
-                        DoctorHospital.objects.create(
-                            doctor=doctor,
-                            hospital=hospital,
-                            day=day,
-                            start=start_time_db_value,
-                            end=end_time_db_value,
-                            fees=fees
+                        doctor_hospital_values.append(
+                            DoctorHospital(
+                                doctor=doctor,
+                                hospital=hospital,
+                                day=day,
+                                start=start_time_db_value,
+                                end=end_time_db_value,
+                                fees=fees
+                            )
                         )
+
+        if doctor_hospital_values:
+            DoctorHospital.objects.bulk_create(doctor_hospital_values)
 
 
 class DoctorHospitalLead(models.Model):
