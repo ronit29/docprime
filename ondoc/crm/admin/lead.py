@@ -3,7 +3,7 @@ from import_export import resources
 from import_export.admin import ImportMixin, base_formats
 from ondoc.lead import models
 from ondoc.doctor.models import MedicalService, Specialization
-from reversion.admin import VersionAdmin
+from reversion.admin import VersionAdmin, admin
 from django.utils.html import format_html_join
 from django.utils.safestring import mark_safe
 from django.contrib.admin.templatetags.admin_modify import register, submit_row as original_submit_row
@@ -44,12 +44,79 @@ class DoctorLeadResource(resources.ModelResource):
             instance.json = json.loads(instance.json)
         super().before_save_instance(instance, using_transactions, dry_run)
 
+    def after_save_instance(self, instance, using_transactions, dry_run):
+        data = instance.json
+        clinic_urls = list(
+            map(lambda x: data.get("LinkedClinics").get(x)[2].get("Clinic URL"), data.get("LinkedClinics")))
+        clinics = models.HospitalLead.objects.filter(json__URL__in=clinic_urls)
+        for clinic in clinics:
+            models.DoctorHospitalLead.objects.create(
+                doctor_lead=instance,
+                hospital_lead=clinic
+            )
+
+
+class DoctorHospitalInline(admin.StackedInline):
+    model = models.DoctorHospitalLead
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = False
+    readonly_fields = ("name", "timings", "services", "address", "about", )
+    autocomplete_fields = ['hospital_lead', ]
+
+    def has_add_permission(self, request):
+        return False
+
+
+    def timings(self, instance):
+        data = instance.hospital_lead.json
+        if data:
+            return format_html_join(
+                mark_safe('<br/>'),
+                '{} : {}',
+                ((key, data.get("WeeklyOpenTime").get(key)) for key in data.get("WeeklyOpenTime").keys()),
+            )
+
+    def address(self, instance):
+        data = instance.hospital_lead.json
+        if data:
+            return data.get("Address")
+
+    def services(self, instance):
+        data = instance.hospital_lead.json
+        if not data:
+            return
+        return format_html_join(
+            mark_safe('<br/>'),
+            '{}',
+            ((service_name if MedicalService.objects.filter(
+                name=service_name).exists() else "{} - Does not exists.".format(service_name),) for service_name in
+             data.get("Services").values()),
+        )
+
+    def name(self, instance):
+        data = instance.hospital_lead.json
+        if data:
+            return data.get('Name')
+
+    def about(self, instance):
+        data = instance.hospital_lead.json
+        if data:
+            return data.get("About")
+
+    address.short_description = 'Address'
+    timings.short_description = "Timings"
+    services.short_description = "Services"
+    name.short_description = "Name"
+    about.short_description = "About"
+
 
 class HospitalLeadAdmin(ImportMixin, VersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
-    search_fields = []
-    list_display = ('city', 'lab', 'name',)
-    readonly_fields = ('name', 'lab', "timings", "services", 'city', "address", 'about',)
+    search_fields = ['city', ]
+    list_display = ('city', 'lab', )
+    readonly_fields = ('hospital', 'name', 'lab', "timings", "services", 'city', "address", 'about',)
     exclude = ('source_id', "json", )
     resource_class = HospitalLeadResource
 
@@ -70,7 +137,6 @@ class HospitalLeadAdmin(ImportMixin, VersionAdmin):
         return False
 
     def timings(self, instance):
-        # data = json.loads(instance.json)
         data = instance.json
         if data:
             return format_html_join(
@@ -80,13 +146,11 @@ class HospitalLeadAdmin(ImportMixin, VersionAdmin):
             )
 
     def address(self, instance):
-        # data = json.loads(instance.json)
         data = instance.json
         if data:
             return data.get("Address")
 
     def services(self, instance):
-        # data = json.loads(instance.json)
         data = instance.json
         if not data:
             return
@@ -99,13 +163,11 @@ class HospitalLeadAdmin(ImportMixin, VersionAdmin):
         )
 
     def name(self, instance):
-        # data = json.loads(instance.json)
         data = instance.json
         if data:
             return data.get('Name')
 
     def about(self, instance):
-        # data = json.loads(instance.json)
         data = instance.json
         if data:
             return data.get("About")
@@ -118,11 +180,11 @@ class HospitalLeadAdmin(ImportMixin, VersionAdmin):
 
 
 class DoctorLeadAdmin(ImportMixin, VersionAdmin):
+    inlines = [DoctorHospitalInline, ]
     formats = (base_formats.XLS, base_formats.XLSX,)
-    search_fields = []
+    search_fields = ['city', ]
     list_display = ('city', 'lab', )
-    readonly_fields = ("doctor", "name", "city", "lab",  "services", "specializations", "awards", "about",
-                       "LinkedClinic", )
+    readonly_fields = ("doctor", "name", "city", "lab",  "services", "specializations", "awards", "about", )
     exclude = ('json', 'source_id',)
     resource_class = DoctorLeadResource
 
@@ -196,13 +258,4 @@ class DoctorLeadAdmin(ImportMixin, VersionAdmin):
         data = instance.json
         if data:
             return data.get("About")
-
-    def LinkedClinic(self, instance):
-        # data = json.loads(instance.json)
-        data = instance.json
-        clinic_urls = list(map(lambda x:data.get("LinkedClinics").get(x)[2].get("Clinic URL"), data.get("LinkedClinics")))
-        clinics = models.HospitalLead.objects.filter(json__URL__in=clinic_urls)
-        if not clinics:
-            return
-        return clinics.values()
 

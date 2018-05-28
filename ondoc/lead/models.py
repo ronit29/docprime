@@ -24,6 +24,11 @@ class DoctorLead(models.Model):
     lab = models.CharField(max_length=256)
     doctor = models.OneToOneField(Doctor, on_delete=models.SET_NULL, null=True, blank=True)
     json = JSONField()
+    hospital_leads = models.ManyToManyField(
+        HospitalLead,
+        through='DoctorHospitalLead',
+        through_fields=('doctor_lead', 'hospital_lead'),
+    )
 
     def __str__(self):
         return "{}-{}".format(self.lab, self.id)
@@ -115,3 +120,13 @@ class DoctorLead(models.Model):
                         )
 
 
+class DoctorHospitalLead(models.Model):
+    doctor_lead = models.ForeignKey(DoctorLead, on_delete=models.SET_NULL, null=True, blank=True)
+    hospital_lead = models.ForeignKey(HospitalLead, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        db_table = "doctor_hospital_lead"
+
+    def __str__(self):
+        return "doctor-lead-{} hospital-lead-{}".format(self.doctor_lead.id,
+                                                        self.hospital_lead.id)
