@@ -229,7 +229,7 @@ class DoctorEmailInline(admin.TabularInline):
     fields = ['email','is_primary']
 
 
-class DoctorForm(forms.ModelForm):
+class DoctorForm(FormCleanMixin):
     additional_details = forms.CharField(widget=forms.Textarea, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
     # primary_mobile = forms.CharField(required=True)
@@ -252,31 +252,6 @@ class DoctorForm(forms.ModelForm):
         if data == '':
             return None
         return data
-
-    def clean(self):
-        if not self.request.user.is_superuser:
-            if self.instance.data_status == 3:
-                raise forms.ValidationError("Cannot modify QC approved Data")
-            if self.instance.data_status == 2 and not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() :
-                raise forms.ValidationError("Cannot modify QC submitted Data")
-
-            if '_submit_for_qc' in self.data:
-                self.validate_qc()
-                for h in self.instance.hospitals.all():
-                    if(h.data_status < 2):
-                        raise forms.ValidationError("Cannot submit for QC without submitting associated Hospitals: " + h.name)
-
-            if '_qc_approve' in self.data:
-                self.validate_qc()
-                for h in self.instance.hospitals.all():
-                    if(h.data_status < 3):
-                        raise forms.ValidationError("Cannot approve QC check without approving associated Hospitals: " + h.name)
-
-            if '_mark_in_progress' in self.data:
-                if self.instance.data_status == 3:
-                    raise forms.ValidationError("Cannot reject QC approved data")
-
-        return super(DoctorForm, self).clean()
 
 
 class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):

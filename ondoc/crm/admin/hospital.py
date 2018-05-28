@@ -64,7 +64,7 @@ class HospitalSpecialityInline(admin.TabularInline):
 #     show_change_link = False
 
 
-class HospitalForm(forms.ModelForm):
+class HospitalForm(FormCleanMixin):
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
 
     def clean_location(self):
@@ -91,33 +91,6 @@ class HospitalForm(forms.ModelForm):
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
         if self.cleaned_data['network_type']==2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
-
-    def clean(self):
-        if not self.request.user.is_superuser:
-            if self.instance.data_status == 3:
-                raise forms.ValidationError("Cannot update QC approved hospital")
-            if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-                if self.instance.data_status == 2:
-                    raise forms.ValidationError("Cannot update Hospital submitted for QC approval")
-                if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
-                    raise forms.ValidationError("Cannot modify Hospital added by other users")
-
-
-            if '_submit_for_qc' in self.data:
-                self.validate_qc()
-                if self.instance.network and self.instance.network.data_status <2:
-                    raise forms.ValidationError("Cannot submit for QC without submitting associated Hospital Network: " + self.instance.network.name)
-
-            if '_qc_approve' in self.data:
-                self.validate_qc()
-                if self.instance.network and  self.instance.network.data_status < 3:
-                    raise forms.ValidationError("Cannot approve QC check without approving associated Hospital Network: " + self.instance.network.name)
-
-            if '_mark_in_progress' in self.data:
-                if self.instance.data_status == 3:
-                    raise forms.ValidationError("Cannot reject QC approved data")
-
-        return super(HospitalForm, self).clean()
 
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
