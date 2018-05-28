@@ -332,7 +332,9 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
             raise Http404("No data available")
 
         if params.get('test_name'):
-            queryset = queryset.filter(test__name__contains=params['test_name'])[:20]
+            queryset = queryset.filter(test__name__contains=params['test_name'])
+
+        queryset = queryset[:20]
 
         serializer = AvailableLabTestSerializer(queryset, many=True)
         return Response(serializer.data)
