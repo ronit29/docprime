@@ -1,7 +1,9 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.contrib.gis.geos import Point
-from ondoc.doctor.models import Hospital,  Doctor, DoctorHospital
+from ondoc.doctor.models import (Hospital,  Doctor, DoctorHospital,
+                                 DoctorAward, DoctorQualification, DoctorExperience, DoctorMedicalService,
+                                 MedicalService, Qualification, College)
 
 
 class HospitalLead(models.Model):
@@ -38,6 +40,9 @@ class DoctorLead(models.Model):
 
     def convert_lead(self, user):
         doctor = self.create_doctor(user)
+        self.create_services(doctor)
+        self.create_experiences(doctor)
+        self.create_qualifications(doctor)
         self.doctor = doctor
         for hospital in self.json.get("LinkedClinics").values():
             clinic_url = hospital[2].get("Clinic URL")
@@ -125,6 +130,56 @@ class DoctorLead(models.Model):
 
         if doctor_hospital_values:
             DoctorHospital.objects.bulk_create(doctor_hospital_values)
+
+    def create_services(self, doctor):
+        doctor_services = []
+        for service in self.json.get("Services").values():
+            medical_service = MedicalService.objects.filter(name=service).first()
+            if medical_service:
+                doctor_services.append(DoctorMedicalService(
+                    doctor=doctor,
+                    service=medical_service
+                ))
+        if doctor_services:
+            DoctorMedicalService.objects.bulk_create(doctor_services)
+            return True
+        return False
+
+    def create_experiences(self, doctor):
+        doctor_experiences = []
+        for experience in self.json.get("Experience").values():
+            start_year = experience.get("Year").split("-")[0].strip()
+            end_year = experience.get("Year").split("-")[-1].strip()
+            doctor_experiences.append(DoctorExperience(
+                doctor=doctor,
+                hospital=experience.get("Location") if experience.get("Location") else "NA",
+                start_year=start_year,
+                end_year=None if end_year == "Present" else end_year
+            ))
+        if doctor_experiences:
+            DoctorExperience.objects.bulk_create(doctor_experiences)
+            return True
+        return False
+
+    def create_qualifications(self, doctor):
+        doctor_qualifications = []
+        for qualification in self.json.get("Education").values():
+            qualification_name = qualification.get("Qualification", "").strip()
+            passing_year = qualification.get("Year", None)
+            college = qualification.get("Institute", "").strip()
+            qualification_obj = Qualification.objects.filter(name=qualification_name).first()
+            college_obj = College.objects.filter(name=college).first()
+            if qualification_obj and college_obj:
+                doctor_qualifications.append(DoctorQualification(
+                    doctor=doctor,
+                    qualification=qualification_obj,
+                    college=college_obj,
+                    passing_year=passing_year
+                ))
+        if doctor_qualifications:
+            DoctorQualification.objects.bulk_create(doctor_qualifications)
+            return True
+        return False
 
 
 class DoctorHospitalLead(models.Model):

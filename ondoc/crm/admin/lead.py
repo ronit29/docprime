@@ -183,7 +183,7 @@ class DoctorLeadAdmin(ImportMixin, VersionAdmin):
     inlines = [DoctorHospitalInline, ]
     formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = ['city', ]
-    list_display = ('city', 'lab', )
+    list_display = ('city', 'lab', "name")
     readonly_fields = ("doctor", "name", "city", "lab",  "services", "specializations", "awards", "about", )
     exclude = ('json', 'source_id',)
     resource_class = DoctorLeadResource
@@ -248,7 +248,6 @@ class DoctorLeadAdmin(ImportMixin, VersionAdmin):
              ))
 
     def name(self, instance):
-        # data = json.loads(instance.json)
         data = instance.json
         if data:
             return data.get('Name')
@@ -258,4 +257,3 @@ class DoctorLeadAdmin(ImportMixin, VersionAdmin):
         data = instance.json
         if data:
             return data.get("About")
-
