@@ -321,10 +321,19 @@ class LabTimingListView(mixins.ListModelMixin,
 class AvailableTestViewSet(mixins.RetrieveModelMixin,
                            viewsets.GenericViewSet):
 
+    queryset = AvailableLabTest.objects.all()
+    serializer_class = AvailableLabTestSerializer
+
     def retrive(self, request, lab_id):
         params = request.query_params
+        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
 
-        queryset = AvailableLabTest.objects.filter(lab=lab_id)
+        if not queryset:
+            raise Http404("No data available")
+
+        if params.get('test_name'):
+            queryset = queryset.filter(test__name__contains=params['test_name'])[:20]
+
         serializer = AvailableLabTestSerializer(queryset, many=True)
         return Response(serializer.data)
 
