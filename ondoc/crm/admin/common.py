@@ -45,25 +45,25 @@ class FormCleanMixin(forms.ModelForm):
            if '_submit_for_qc' in self.data:
                self.validate_qc()
                if hasattr(self.instance,'hospitals'):
-                   for h in self.instance.hospitals.all():
-                       if (h.data_status < 2):
+                   for h in self.instance.availability.all():
+                       if (h.hospital.data_status < 2):
                            raise forms.ValidationError(
                                "Cannot submit for QC without submitting associated Hospitals: " + h.name)
-               if hasattr(self.instance,'network') and self.instance.network.data_status < 2:
-                   class_name = self.instance.network.__class__.__name__
-                   raise forms.ValidationError(
-                       "Cannot submit for QC without submitting associated " + class_name.rstrip('Form')+ ": " + self.instance.network.name)
+               if hasattr(self.instance,'network'):
+                   if self.instance.network.data_status < 2:
+                       class_name = self.instance.network.__class__.__name__
+                       raise forms.ValidationError("Cannot submit for QC without submitting associated " + class_name.rstrip('Form')+ ": " + self.instance.network.name)
            if '_qc_approve' in self.data:
                self.validate_qc()
                if hasattr(self.instance,'hospitals'):
-                   for h in self.instance.hospitals.all():
-                       if (h.data_status < 3):
+                   for h in self.instance.availability.all():
+                       if (h.hospital.data_status < 3):
                            raise forms.ValidationError(
                                 "Cannot approve QC check without approving associated Hospitals: " + h.name)
-               if hasattr(self.instance,'network') and self.instance.network.data_status < 3:
-                   class_name = self.instance.network.__class__.__name__
-                   raise forms.ValidationError(
-                       "Cannot approve QC check without approving associated"+ class_name.rstrip('Form') + ": " + self.instance.network.name)
+               if hasattr(self.instance,'network'):
+                   if self.instance.network.data_status < 3:
+                       class_name = self.instance.network.__class__.__name__
+                       raise forms.ValidationError("Cannot approve QC check without approving associated"+ class_name.rstrip('Form') + ": " + self.instance.network.name)
            if '_mark_in_progress' in self.data:
                if self.instance.data_status == 3:
                    raise forms.ValidationError("Cannot reject QC approved data")
