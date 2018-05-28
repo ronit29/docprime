@@ -192,7 +192,7 @@ class Doctor(TimeStampedModel, QCModel):
     def hospital_count(self):
         return self.availability.all().count()
 
-    def hospitals(self):
+    def get_hospitals(self):
         return self.availability.all()
 
     class Meta:
@@ -272,8 +272,6 @@ class DoctorHospital(TimeStampedModel):
 
     start = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
     end = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
-
-
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
 
     def __str__(self):
