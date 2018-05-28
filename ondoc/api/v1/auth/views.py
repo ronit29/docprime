@@ -55,6 +55,7 @@ class LoginOTP(GenericViewSet):
 
         return Response({"message" : "OTP Generated Sucessfuly."})
 
+
 class UserViewset(GenericViewSet):
 
     @transaction.atomic
@@ -78,12 +79,12 @@ class UserViewset(GenericViewSet):
     def register(self, request, format=None):
 
         data = {'phone_number':request.data.get('phone_number'),'otp':request.data.get('otp')}
-        data['profile'] = {
-            'name': request.data.get('name'),
-            'age': request.data.get('age'),
-            'gender': request.data.get('gender'),
-            'email': request.data.get('email'),
-        }
+        # data['profile'] = {
+        #     'name': request.data.get('name'),
+        #     'age': request.data.get('age'),
+        #     'gender': request.data.get('gender'),
+        #     'email': request.data.get('email'),
+        # }
 
         serializer = UserSerializer(data=data)
         serializer.is_valid(raise_exception=True)

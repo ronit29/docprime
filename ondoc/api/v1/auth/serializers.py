@@ -51,7 +51,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    profile = UserProfileSerializer(required=True)
+    # profile = UserProfileSerializer(required=True)
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
 
@@ -66,23 +66,25 @@ class UserSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        profile_data = validated_data.pop('profile')
+        # profile_data = validated_data.pop('profile')
+        # age = profile_data.pop('age')
+        # # need to convert age to date of birth
+        # dob = datetime.datetime.now() - relativedelta(years=age)
+        # profile_data['dob'] = dob
+
         validated_data.pop('otp')
         validated_data['user_type'] = User.CONSUMER
         validated_data['is_phone_number_verified'] = True
-        # need to convert age to date of birth
-        age = profile_data.pop('age')
-        dob = datetime.datetime.now() - relativedelta(years=age)
-        profile_data['dob'] = dob
 
         user = User.objects.create(**validated_data)
-        profile = UserProfile.objects.create(user=user, **profile_data)
+        # profile = UserProfile.objects.create(user=user, **profile_data)
 
         return user
 
     class Meta:
         model = User
-        fields = ('phone_number', 'profile', 'otp')
+        fields = ('phone_number', 'otp')
+        # fields = ('phone_number', 'profile', 'otp')
 
 
 class NotificationSerializer(serializers.ModelSerializer):
