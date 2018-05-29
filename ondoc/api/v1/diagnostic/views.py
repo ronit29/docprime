@@ -2,7 +2,7 @@ from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSe
                           LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
                           LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
                           PromotedLabsSerializer, CommonConditionsSerializer, TimeSlotSerializer,
-                          AddressSerializer)
+                          AddressSerializer, SearchLabListSerializer)
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
 from ondoc.authentication.models import UserProfile, Address
@@ -26,6 +26,7 @@ from django.http import Http404
 from rest_framework import status
 from collections import OrderedDict
 from django.utils import timezone
+import copy
 
 
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -82,7 +83,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         parameters = request.query_params
         queryset = self.get_lab_list(parameters)
 
-        whole_queryset = self.get_lab_whole_data(queryset)
+        whole_queryset = self.form_lab_whole_data(queryset)
 
         serializer = LabCustomSerializer(whole_queryset, many=True)
         return Response(serializer.data)
@@ -138,6 +139,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def get_lab_list(self, parameters):
         # distance in meters
+        serializer = SearchLabListSerializer(data=parameters)
+        serializer.is_valid(raise_exception=True)
+        parameters = serializer.validated_data
+
         DEFAULT_DISTANCE = 10000
 
         default_long = 77.071848
@@ -146,15 +151,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = parameters.get('max_distance', DEFAULT_DISTANCE)
         long = parameters.get('long', default_long)
         lat = parameters.get('lat', default_lat)
-        id_str = parameters.get('ids')
+        ids = parameters.get('ids', [])
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
-        ids = list()
+
         queryset = AvailableLabTest.objects
 
-        if id_str:
-            id_str = id_str.strip(',')
-            ids = list(map(int, id_str.split(",")))
+        if ids:
             queryset = queryset.filter(test__in=ids)
 
         if lat is not None and long is not None:
@@ -188,7 +191,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def apply_custom_filters(queryset, parameters):
         order_by = parameters.get("order_by")
         if order_by is not None:
-            if order_by == "price":
+            if order_by == "price" and parameters.get('ids'):
                 queryset = queryset.order_by("price")
             elif order_by == 'distance':
                 queryset = queryset.order_by("distance")
@@ -196,7 +199,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.order_by("name")
         return queryset
 
-    def get_lab_whole_data(self, queryset):
+    def form_lab_whole_data(self, queryset):
         ids, id_details = self.extract_lab_ids(queryset)
         labs = Lab.objects.prefetch_related('lab_image').filter(id__in=ids)
         resp_queryset = list()
@@ -295,6 +298,9 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
+
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         params = request.query_params

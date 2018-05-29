@@ -170,8 +170,22 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
     queryset = UserProfile.objects.all()
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
+    pagination_class = None
 
     def get_queryset(self):
         request = self.request
         queryset = UserProfile.objects.filter(user=request.user)
         return queryset
+
+    def create(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        data = request.data
+        data['user'] = request.user.id
+        if not data.get('phone_number'):
+            data['phone_number'] = request.user.phone_number
+        serializer = UserProfileSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        if not queryset.exists():
+            serializer.validated_data['is_default_user'] = True
+        serializer.save()
+        return Response(serializer.data)
