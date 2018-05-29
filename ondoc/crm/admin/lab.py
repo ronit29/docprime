@@ -164,11 +164,11 @@ class LabForm(FormCleanMixin):
     def validate_qc(self):
         qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
             'license':'req','building':'req','locality':'req','city':'req','state':'req',
-            'country':'req','pin_code':'req','network_type':'req','labimage':'count'}
+            'country':'req','pin_code':'req','network_type':'req','lab_image':'count'}
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+            if value=='count' and int(self.data[key+'-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
         if self.cleaned_data['network_type']==2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Lab")
