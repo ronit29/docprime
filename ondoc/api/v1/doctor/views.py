@@ -10,7 +10,6 @@ from rest_framework import viewsets
 from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db import transaction
@@ -51,7 +50,6 @@ class OndocViewSet(mixins.CreateModelMixin,
 
 
 class DoctorAppointmentsViewSet(OndocViewSet):
-    authentication_classes = (TokenAuthentication, )
 #     filter_backends = (DjangoFilterBackend)
     permission_classes = (IsAuthenticated,)
 #     #queryset = OpdAppointment.objects.all()
@@ -208,7 +206,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
 
 class DoctorProfileView(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request):
@@ -267,7 +264,6 @@ class DoctorHospitalView(mixins.ListModelMixin,
                          mixins.RetrieveModelMixin,
                          viewsets.GenericViewSet):
 
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     queryset = models.DoctorHospital.objects.all()
@@ -304,7 +300,8 @@ class DoctorHospitalView(mixins.ListModelMixin,
 
 
 class DoctorBlockCalendarViewSet(OndocViewSet):
-    authentication_classes = (TokenAuthentication,)
+
+    serializer_class = serializers.DoctorLeaveSerializer
     permission_classes = (IsAuthenticated, DoctorPermission,)
     INTERVAL_MAPPING = {models.DoctorLeave.INTERVAL_MAPPING.get(key): key for key in
                         models.DoctorLeave.INTERVAL_MAPPING.keys()}
@@ -347,7 +344,8 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
 
 
 class PrescriptionFileViewset(OndocViewSet):
-    authentication_classes = (TokenAuthentication,)
+    serializer_class = serializers.PrescriptionFileSerializer
+
     permission_classes = (IsAuthenticated, DoctorPermission,)
 
     def get_queryset(self):
@@ -380,7 +378,6 @@ class PrescriptionFileViewset(OndocViewSet):
 
 
 class SearchedItemsViewSet(viewsets.GenericViewSet):
-    # authentication_classes = (TokenAuthentication,)
     # permission_classes = (IsAuthenticated, DoctorPermission,)
 
     def list(self, request, *args, **kwargs):
@@ -390,7 +387,6 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
-    # authentication_classes = (TokenAuthentication,)
     # permission_classes = (IsAuthenticated, DoctorPermission,)
     queryset = models.Doctor.objects.all()
 

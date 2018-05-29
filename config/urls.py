@@ -24,14 +24,25 @@ from ondoc import crm
 # DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 additional_urls = [
-    path('doctors/', include('ondoc.doctor.urls')),
-    path('auth/', include('ondoc.authentication.urls')),
-    path('diagnostic/', include('ondoc.diagnostic.urls')),
+    # path('doctors/', include('ondoc.doctor.urls')),
+    # path('auth/', include('ondoc.authentication.urls')),
+    # path('diagnostic/', include('ondoc.diagnostic.urls')),
     path('api/', include('ondoc.api.urls'))
     ]
 
 if not settings.DEBUG:
     additional_urls = []
+else:
+    from rest_framework_swagger.views import get_swagger_view
+    schema_view = get_swagger_view(title='DocPrime API')
+
+    additional_urls += [path('api-docs', schema_view)]
+    #from rest_framework.documentation import include_docs_urls
+    #additional_urls += [path('docs/',  include_docs_urls(title='My API title'))]
+    #url(r'^docs/', include_docs_urls(title='My API title'))
+
+
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),

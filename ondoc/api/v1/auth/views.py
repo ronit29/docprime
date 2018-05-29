@@ -1,5 +1,4 @@
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins
 
@@ -24,6 +23,8 @@ def expire_otp(phone_number):
     OtpVerifications.objects.filter(phone_number=phone_number).update(is_expired=True)
 
 class LoginOTP(GenericViewSet):
+
+    serializer_class = OTPSerializer
 
     @transaction.atomic
     def generate(self, request, format=None):
@@ -56,6 +57,8 @@ class LoginOTP(GenericViewSet):
         return Response({"message" : "OTP Generated Sucessfuly."})
 
 class UserViewset(GenericViewSet):
+
+    serializer_class = UserSerializer
 
     @transaction.atomic
     def login(self, request, format=None):
@@ -126,8 +129,8 @@ class UserViewset(GenericViewSet):
 
 
 class NotificationEndpointViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
+    serializer_class = NotificationEndpointSaveSerializer
 
     def save(self, request):
         serializer = NotificationEndpointSaveSerializer(data=request.data)
@@ -153,7 +156,6 @@ class NotificationEndpointViewSet(GenericViewSet):
 
 
 class NotificationViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def list(self, request):
@@ -168,7 +170,6 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                          GenericViewSet):
     serializer_class = UserProfileSerializer
     queryset = UserProfile.objects.all()
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 

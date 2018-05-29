@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospitalView,
-                    DoctorBlockCalendarViewSet,  PrescriptionFileViewset, SearchedItemsViewSet, DoctorListViewSet,
+                    DoctorBlockCalendarViewSet, PrescriptionFileViewset, SearchedItemsViewSet, DoctorListViewSet,
                     DoctorProfileUserViewSet, DoctorAvailabilityTimingViewSet)
 
 urlpatterns = [
