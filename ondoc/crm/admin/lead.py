@@ -3,7 +3,7 @@ from import_export import resources
 from import_export.admin import ImportMixin, base_formats
 from ondoc.lead import models
 from ondoc.doctor.models import MedicalService, Specialization
-from reversion.admin import VersionAdmin, admin
+from reversion.admin import admin
 from django.utils.html import format_html_join
 from django.utils.safestring import mark_safe
 from django.contrib.admin.templatetags.admin_modify import register, submit_row as original_submit_row
@@ -112,7 +112,7 @@ class DoctorHospitalInline(admin.StackedInline):
     about.short_description = "About"
 
 
-class HospitalLeadAdmin(ImportMixin, VersionAdmin):
+class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = ['city', ]
     list_display = ('city', 'lab', )
@@ -179,7 +179,7 @@ class HospitalLeadAdmin(ImportMixin, VersionAdmin):
     about.short_description = "About"
 
 
-class DoctorLeadAdmin(ImportMixin, VersionAdmin):
+class DoctorLeadAdmin(ImportMixin, admin.ModelAdmin):
     inlines = [DoctorHospitalInline, ]
     formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = ['city', ]
