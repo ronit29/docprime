@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ondoc.authentication.models import OtpVerifications, User, UserProfile, Notification, NotificationEndpoint
+from ondoc.authentication.models import OtpVerifications, User, UserProfile, Notification, NotificationEndpoint, UserPermission
 from ondoc.doctor.models import DoctorMobile
 import datetime
 from dateutil.relativedelta import relativedelta
@@ -40,14 +40,14 @@ class DoctorLoginSerializer(serializers.Serializer):
         return attrs        
 
 
-class UserProfileSerializer(serializers.ModelSerializer):
-    name = serializers.CharField()
-    age = serializers.IntegerField(min_value=1, max_value=150)
-    email = serializers.EmailField()
-    gender = serializers.ChoiceField(UserProfile.GENDER_CHOICES)
-    class Meta:
-        model = UserProfile
-        fields = ('name', 'age', 'email', 'gender')
+# class UserProfileSerializer(serializers.ModelSerializer):
+#     name = serializers.CharField()
+#     age = serializers.IntegerField(min_value=1, max_value=150)
+#     email = serializers.EmailField()
+#     gender = serializers.ChoiceField(UserProfile.GENDER_CHOICES)
+#     class Meta:
+#         model = UserProfile
+#         fields = ('name', 'age', 'email', 'gender')
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -122,3 +122,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         exclude = ('created_at', 'updated_at', )
+
+
+class UserPermissionSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UserPermission
+        exclude = ('created_at', 'updated_at',)

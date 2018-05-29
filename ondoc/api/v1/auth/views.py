@@ -5,16 +5,19 @@ from rest_framework import mixins
 
 from .serializers import (OTPSerializer, OTPVerificationSerializer, UserSerializer, DoctorLoginSerializer,
                           NotificationEndpointSaveSerializer, NotificationEndpointSerializer,
-                          NotificationEndpointDeleteSerializer, NotificationSerializer, UserProfileSerializer)
+                          NotificationEndpointDeleteSerializer, NotificationSerializer, UserProfileSerializer,
+                          UserPermissionSerializer)
 from rest_framework.response import Response
 from django.db import transaction
 from rest_framework.authtoken.models import Token
 
 from ondoc.sms.api import send_otp
 
-from ondoc.doctor.models import DoctorMobile
-from ondoc.authentication.models import OtpVerifications, NotificationEndpoint, Notification, UserProfile
+from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
+from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
+                                         UserPermission)
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
 
 User = get_user_model()
@@ -190,3 +193,50 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             serializer.validated_data['is_default_user'] = True
         serializer.save()
         return Response(serializer.data)
+
+
+class UserPermissionViewSet(mixins.CreateModelMixin,
+                            mixins.ListModelMixin,
+                            GenericViewSet):
+    queryset = DoctorHospital.objects.all()
+    serializer_class = UserPermissionSerializer
+
+    def list(self, request, *args, **kwargs):
+        params = request.query_params
+        dp_obj = ResetDoctorPermission(params['doctor_id'])
+        permission_data = dp_obj.create_permission()
+        serializer = UserPermissionSerializer(data=permission_data, many=True)
+        # serializer.is_valid(raise_exception=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response([])
+
+
+class ResetDoctorPermission(object):
+
+    def __init__(self, doctor_id):
+        self.doctor_id = doctor_id
+
+    def create_permission(self):
+        hospital_queryset = (DoctorHospital.objects.
+                             prefetch_related('hospital__hospital_admins',
+                                              'hospital__network__network_admins').
+                             filter(doctor=self.doctor_id))
+        # hospital_network_queryset = HospitalNetwork.objects.filter()
+        # admin = UserPermission.objects.filter(doctor=self.doctor_id)
+        permission_data = list()
+        for data in hospital_queryset:
+            temp_dict = dict()
+            temp_dict['user'] = data.doctor.user.id
+            temp_dict['doctor'] = data.doctor.id
+            temp_dict['hospital_network'] = None
+            temp_dict['hospital'] = data.hospital.id
+            if data.hospital.hospital_admins or data.hospital.network.network_admins:
+                temp_dict['permission'] = UserPermission.APPOINTMENT_READ
+            else:
+                temp_dict['permission'] = UserPermission.APPOINTMENT_WRITE
+
+            permission_data.append(temp_dict)
+
+        return permission_data
+

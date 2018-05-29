@@ -192,16 +192,47 @@ class Notification(TimeStampedModel):
 
 
 class Address(TimeStampedModel):
-    HOME_ADDRESS = 1
-    WORK_ADDRESS = 2
-    OTHER = 3
+    HOME_ADDRESS = "home"
+    WORK_ADDRESS = "office"
+    OTHER = "other"
     TYPE_CHOICES = (
         (HOME_ADDRESS, 'Home Address'),
         (WORK_ADDRESS, 'Work Address'),
         (OTHER, 'Other'),
     )
-    type = models.PositiveIntegerField(choices=TYPE_CHOICES)
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
-    place_id = models.CharField(max_length=100)
-    address = models.TextField()
+    profile = models.ForeignKey(UserProfile, null=True, blank=True, on_delete=models.CASCADE)
+    place_id = models.CharField(null=True, blank=True, max_length=100)
+    address = models.TextField(null=True, blank=True)
+    land_mark = models.TextField(null=True, blank=True)
+    pincode = models.PositiveIntegerField(null=True, blank=True, max_length=6)
+    phone_number = models.CharField(null=True, blank=True, max_length=10)
+    is_default = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "address"
+
+    def __str__(self):
+        return str(self.user)
+
+
+class UserPermission(TimeStampedModel):
+    from ondoc.doctor.models import Hospital, HospitalNetwork, Doctor
+    APPOINTMENT_READ = 0
+    APPOINTMENT_WRITE = 1
+    permission_type = ((APPOINTMENT_READ, 'Read Appointment'),
+                   (APPOINTMENT_WRITE, 'Write Appointment'))
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    hospital_network = models.ForeignKey(HospitalNetwork, null=True, blank=True, on_delete=models.CASCADE,
+                                         related_name='network_admins')
+    hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.CASCADE,
+                                 related_name='hospital_admins')
+    doctor = models.ForeignKey(Doctor, null=True, blank=True, on_delete=models.CASCADE)
+    permission = models.PositiveSmallIntegerField(choices=permission_type)
+
+    class Meta:
+        db_table = 'user_permission'
+
+    def __str__(self):
+        return str(self.user.email)

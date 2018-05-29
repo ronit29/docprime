@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import LoginOTP, UserViewset, NotificationEndpointViewSet, NotificationViewSet, UserProfileViewSet
+from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet, NotificationViewSet, UserProfileViewSet,
+                    UserPermissionViewSet)
 
 urlpatterns = [
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
@@ -16,6 +17,7 @@ urlpatterns = [
     path('userprofile/add', UserProfileViewSet.as_view({'post': 'create'}), name='user-profile-add'),
     path('userprofile/<int:pk>/edit', UserProfileViewSet.as_view({'post': 'update'}), name='user-profile-edit'),
     path('userprofile/<int:pk>', UserProfileViewSet.as_view({'get': 'retrieve'}), name='user-profile-retrieve'),
+    path('createpermission', UserPermissionViewSet.as_view({'get': 'list'}), name='user-profile-retrieve'),
 
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),

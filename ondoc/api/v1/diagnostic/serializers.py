@@ -255,9 +255,9 @@ class AddressSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context.get("request")
-        if attrs.get("user") != request.user.id:
+        if attrs.get("user") != request.user:
             raise serializers.ValidationError("User is not correct.")
-        if not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
+        if attrs.get("profile") and not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
 

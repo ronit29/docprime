@@ -21,6 +21,7 @@ urlpatterns = [
          name='lab-update-appointment'),
     path('address/create', AddressViewsSet.as_view({"post": "create"}), name='address-create'),
     path('address/<int:pk>/delete', AddressViewsSet.as_view({"post": "destroy"}), name='address-delete'),
+    path('address/<int:pk>/update', AddressViewsSet.as_view({"post": "update"}), name='address-list'),
     path('address/<int:pk>', AddressViewsSet.as_view({"get": "retrieve"}), name='address-detail'),
     path('address', AddressViewsSet.as_view({"get": "list"}), name='address-list'),
 

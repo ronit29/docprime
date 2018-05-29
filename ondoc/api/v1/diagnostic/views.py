@@ -283,7 +283,20 @@ class AddressViewsSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = dict(request.data)
         data["user"] = request.user.id
+        # Added recently
+        if 'is_default' not in data:
+            if not Address.objects.filter(user=request.user.id).exists():
+                data['is_default'] = True
         serializer = AddressSerializer(data=data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def update(self, request, pk=None):
+        data = request.data
+        data['user'] = request.user.id
+        queryset = get_object_or_404(Address, pk=pk)
+        serializer = AddressSerializer(queryset, data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
