@@ -1,5 +1,6 @@
 from django.contrib.gis.db import models
 from django.db import migrations
+from django.db.models import Count
 from django.contrib.postgres.operations import CreateExtension
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
@@ -190,7 +191,7 @@ class Doctor(TimeStampedModel, QCModel):
         return self.experiences.all()
 
     def hospital_count(self):
-        return self.availability.all().count()
+        return self.availability.all().values("hospital").distinct().count()
 
     def get_hospitals(self):
         return self.availability.all()

@@ -344,11 +344,11 @@ class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
 
     def get_start(self, obj):
         start = obj.start
-        return dict(DoctorHospital.TIME_SLOT_CHOICES).get(start)
+        return dict(DoctorHospital.TIME_CHOICES).get(start)
 
     def get_end(self, obj):
         end = obj.end
-        return dict(DoctorHospital.TIME_SLOT_CHOICES).get(end)
+        return dict(DoctorHospital.TIME_CHOICES).get(end)
 
     class Meta:
         model = DoctorHospital
@@ -435,7 +435,7 @@ class DoctorListSerializer(serializers.Serializer):
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     emails = None
     experience_years = serializers.IntegerField(allow_null=True)
-    hospitals = DoctorHospitalSerializer(read_only=True, many=True)
+    hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
     availability = None
 
