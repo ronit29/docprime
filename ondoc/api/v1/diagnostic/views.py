@@ -298,10 +298,9 @@ class AddressViewsSet(viewsets.ModelViewSet):
         data['user'] = request.user.id
         queryset = get_object_or_404(Address, pk=pk)
         if data.get("is_default"):
-            add_default_qs = Address.objects.filter(user=request.user.id, is_default=True).first()
+            add_default_qs = Address.objects.filter(user=request.user.id, is_default=True)
             if add_default_qs:
-                add_default_qs.is_default = False
-                add_default_qs.save()
+                add_default_qs.update(is_default=False)
         serializer = AddressSerializer(queryset, data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
