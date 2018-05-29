@@ -49,12 +49,12 @@ class LoginOTP(GenericViewSet):
 
         return Response(response)
 
-    def verify(self, request, format=None):
+    # def verify(self, request, format=None):
 
-        serializer = OTPVerificationSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+    #     serializer = OTPVerificationSerializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
 
-        return Response({"message" : "OTP Generated Sucessfuly."})
+    #     return Response({"message" : "OTP Generated Sucessfuly."})
 
 class UserViewset(GenericViewSet):
 
