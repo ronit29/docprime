@@ -218,6 +218,8 @@ class ResetDoctorPermission(object):
         self.doctor_id = doctor_id
 
     def create_permission(self):
+
+        up_queryset = (UserPermission.objects.all().select_related('hospital_network__hospital_set'))
         hospital_queryset = (DoctorHospital.objects.
                              prefetch_related('hospital__hospital_admins',
                                               'hospital__network__network_admins').

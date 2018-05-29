@@ -287,6 +287,7 @@ class AddressViewsSet(viewsets.ModelViewSet):
         if 'is_default' not in data:
             if not Address.objects.filter(user=request.user.id).exists():
                 data['is_default'] = True
+
         serializer = AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -296,13 +297,26 @@ class AddressViewsSet(viewsets.ModelViewSet):
         data = request.data
         data['user'] = request.user.id
         queryset = get_object_or_404(Address, pk=pk)
+        if data.get("is_default"):
+            add_default_qs = Address.objects.filter(user=request.user.id, is_default=True).first()
+            if add_default_qs:
+                add_default_qs.is_default = False
+                add_default_qs.save()
         serializer = AddressSerializer(queryset, data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
     def destroy(self, request, pk=None):
-        address = Address.objects.filter(pk=pk).first()
+        address = get_object_or_404(Address, pk=pk)
+
+        if address.is_default:
+            temp_addr = Address.objects.filter(user=request.user.id).first()
+            if temp_addr:
+                temp_addr.is_default = True
+                temp_addr.save()
+
+        # address = Address.objects.filter(pk=pk).first()
         address.delete()
         return Response({
             "status": 1
