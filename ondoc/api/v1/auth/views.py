@@ -199,7 +199,7 @@ class UserPermissionViewSet(mixins.CreateModelMixin,
                             mixins.ListModelMixin,
                             GenericViewSet):
     queryset = DoctorHospital.objects.all()
-    serializer_class = UserPermissionSerializer
+    # serializer_class = UserPermissionSerializer
 
     def list(self, request, *args, **kwargs):
         params = request.query_params
@@ -208,7 +208,7 @@ class UserPermissionViewSet(mixins.CreateModelMixin,
         serializer = UserPermissionSerializer(data=permission_data, many=True)
         # serializer.is_valid(raise_exception=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        # serializer.save()
         return Response([])
 
 
@@ -219,11 +219,12 @@ class ResetDoctorPermission(object):
 
     def create_permission(self):
 
-        up_queryset = (UserPermission.objects.all().select_related('hospital_network__hospital_set'))
-        hospital_queryset = (DoctorHospital.objects.
-                             prefetch_related('hospital__hospital_admins',
-                                              'hospital__network__network_admins').
-                             filter(doctor=self.doctor_id))
+        # up_queryset = (UserPermission.objects.all().prefetch_related('hospital_network__hospital_set').
+        #                filter(permission=UserPermission.APPOINTMENT_WRITE))
+
+        up1 = (UserPermission.objects.prefetch_related('hospital_network__hospital_set').
+               filter(permission=UserPermission.APPOINTMENT_WRITE))
+        hospital_queryset = (DoctorHospital.objects.select_related("doctor").filter(doctor=self.doctor_id))
         # hospital_network_queryset = HospitalNetwork.objects.filter()
         # admin = UserPermission.objects.filter(doctor=self.doctor_id)
         permission_data = list()

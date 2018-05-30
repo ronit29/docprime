@@ -383,8 +383,8 @@ class LabSlotExtraction(object):
             self.fetch_time_slot(obj)
 
     def fetch_time_slot(self, obj):
-        start = obj.start
-        end = obj.end
+        start = float(obj.start)
+        end = float(obj.end)
         time_span = self.TIME_SPAN
         day = obj.day
         # timing = self.context['timing']
@@ -399,19 +399,22 @@ class LabSlotExtraction(object):
         num_slots = int(60 / time_span)
         if 60 % time_span != 0:
             num_slots += 1
-        for h in range(start, end):
+        h = start
+        while h < end:
+        # for h in range(start, end):
             for i in range(0, num_slots):
                 temp_h = h + i * int_span
                 day_slot, am_pm = self.get_day_slot(temp_h)
                 time_str = self.form_time_string(temp_h, am_pm)
                 self.timing[day]['timing'][day_slot][temp_h] = time_str
+            h += 1
 
-    def get_day_slot(self, hour):
+    def get_day_slot(self, time):
         am = 'AM'
         pm = 'PM'
-        if hour < 12:
+        if time < 12:
             return self.MORNING, am
-        elif hour < 16:
+        elif time < 16:
             return self.AFTERNOON, pm
         else:
             return self.EVENING, pm
@@ -425,11 +428,11 @@ class LabSlotExtraction(object):
             day_time_hour -= 12
 
         day_time_hour_str = str(int(day_time_hour))
-        if int(day_time_hour) / 10 < 1:
+        if int(day_time_hour) < 10:
             day_time_hour_str = '0' + str(int(day_time_hour))
 
         day_time_min_str = str(int(day_time_min))
-        if int(day_time_min) / 10 < 1:
+        if int(day_time_min) < 10:
             day_time_min_str = '0' + str(int(day_time_min))
 
         time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
