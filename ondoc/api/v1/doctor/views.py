@@ -494,8 +494,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                        'where dh.doctor_id=x.doctor_id and dh.hospital_id = x.hospital_id) timings, ' \
                        '(select json_agg(to_json(de.*)) ' \
                        'from doctor_experience de where de.doctor_id=x.doctor_id) experiences, ' \
-                       '(select json_agg(to_json(di.*)) ' \
-                       'from doctor_image di where di.doctor_id=x.doctor_id) images, ' \
+                       '(SELECT Json_agg(To_json(doctor_images.*)) from ' \
+                       '(select di.name from doctor_image di ' \
+                       'WHERE  di.doctor_id=x.doctor_id) doctor_images) images, ' \
                        '((select json_agg(to_json(qualification.*)) ' \
                        'from (select dq.passing_year as passing_year,  q.name as qualification, clg.name as college, ' \
                        'spl.name as specialization ' \
@@ -507,9 +508,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                        'where dq.doctor_id=x.doctor_id ) qualification)) qualifications ' \
                        'from (select row_number() over(partition by d.id order by h.name desc) rnm,' \
                        'st_distance(st_setsrid(st_point(%s,%s),4326),h.location) distance,' \
-                       'd.id doctor_id,d.name as name, d.practicing_since, dh.fees as fees,h.name as hospital_name,' \
-                       'dh.day, dh.end, d.about,  d.additional_details, ' \
-                       'h.id hospital_id, sp.id, ' \
+                       'd.id doctor_id,d.name as name, d.practicing_since, dh.fees as fees,h.name as hospital_name, ' \
+                       'd.about,  d.additional_details, ' \
+                       'h.id hospital_id, ' \
                        'h.locality as hospital_address, d.gender as gender  ' \
                        'from doctor d inner join doctor_hospital dh on d.id = dh.doctor_id ' \
                        'inner join hospital h on h.id = dh.hospital_id ' \
@@ -540,7 +541,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             # value.pop("hospital_name")
             # value.pop("hospital_address")
             # value.pop("fees")
-            value.pop("images")
+            # value.pop("images")
         # result['timings'] = convert_timings(result['timings'])
         # queryset = paginate_queryset(queryset, request)
         # search_result_serializer = serializers.DoctorProfileUserViewSerializer(queryset, many=True)
