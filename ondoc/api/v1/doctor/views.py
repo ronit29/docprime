@@ -1,7 +1,7 @@
 from ondoc.doctor import models
 from . import serializers
 from ondoc.api.v1.diagnostic.serializers import TimeSlotSerializer
-from ondoc.api.pagination import paginate_queryset
+from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings
 from django.db.models import Min
 from django.contrib.gis.geos import Point
@@ -497,6 +497,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                        '(SELECT Json_agg(To_json(doctor_images.*)) from ' \
                        '(select di.name from doctor_image di ' \
                        'WHERE  di.doctor_id=x.doctor_id) doctor_images) images, ' \
+                       '(SELECT count(distinct dh_subq.hospital_id) as hospital_count ' \
+                       'FROM   doctor_hospital dh_subq ' \
+                       'WHERE  dh_subq.doctor_id=x.doctor_id), ' \
                        '((select json_agg(to_json(qualification.*)) ' \
                        'from (select dq.passing_year as passing_year,  q.name as qualification, clg.name as college, ' \
                        'spl.name as specialization ' \
@@ -519,10 +522,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                        'where %s ' \
                        'order by %s asc ' \
                        ') x ' \
-                       'where distance < %s and rnm =1  offset 0 limit 20 ' % (longitude, latitude,
-                                                                               filtering_params, order_by_field,
-                                                                               MAX_DISTANCE)
-        result = RawSql(query_string).fetch_all()
+                       'where distance < %s and rnm =1 ' % (longitude, latitude,
+                                                            filtering_params, order_by_field,
+                                                            MAX_DISTANCE)
+        paginated_query_string = paginate_raw_query(request, query_string)
+        result = RawSql(paginated_query_string).fetch_all()
         for value in result:
             value.update({
                 "hospitals": [
@@ -538,10 +542,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 ]
             })
             value.pop("timings")
-            # value.pop("hospital_name")
-            # value.pop("hospital_address")
-            # value.pop("fees")
-            # value.pop("images")
         # result['timings'] = convert_timings(result['timings'])
         # queryset = paginate_queryset(queryset, request)
         # search_result_serializer = serializers.DoctorProfileUserViewSerializer(queryset, many=True)
