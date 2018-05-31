@@ -60,9 +60,11 @@ def group_consecutive_numbers(data):
     return ranges
 
 
-def convert_timings(timings):
-    DAY_MAPPING = {value[0]: (value[0], value[1][:3]) for value in DoctorHospital.DAY_CHOICES}
-    # DAY_MAPPING = {value[1]: (value[0], value[1][:3]) for value in DoctorHospital.DAY_CHOICES}
+def convert_timings(timings, is_day_human_readable=True):
+    if not is_day_human_readable:
+        DAY_MAPPING = {value[0]: (value[0], value[1][:3]) for value in DoctorHospital.DAY_CHOICES}
+    else:
+        DAY_MAPPING = {value[1]: (value[0], value[1][:3]) for value in DoctorHospital.DAY_CHOICES}
     DAY_MAPPING_REVERSE = {value[0]: value[1][:3] for value in DoctorHospital.DAY_CHOICES}
     TIMESLOT_MAPPING = {value[0]: value[1] for value in DoctorHospital.TIME_CHOICES}
     temp = defaultdict(list)

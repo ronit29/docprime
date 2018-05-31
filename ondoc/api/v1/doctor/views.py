@@ -395,38 +395,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
     # permission_classes = (IsAuthenticated, DoctorPermission,)
     queryset = models.Doctor.objects.all()
 
-    def prepare_response(self, response_data):
-        """Helper function to prepare response expected by client"""
-
-        for data in response_data:
-            timings = []
-            hospitals = sorted(data.get('hospitals'), key=itemgetter("fees"))
-            for ndx, value in enumerate(hospitals):
-                if ndx == 0:
-                    timings.append({
-                        'start': value.get("start"),
-                        "end": value.get("end"),
-                        "day": value.get("day"),
-                        "hospital_id": value.get("hospital_id")
-                    })
-                else:
-                    if timings[len(timings) - 1].get("hospital_id") == value.get("hospital_id"):
-                        timings.append({
-                            'start': value.get("start"),
-                            "end": value.get("end"),
-                            "day": value.get("day"),
-                            "hospital_id": value.get("hospital_id")
-                        })
-            hospital = hospitals[0] if len(hospitals) > 0 else {}
-            hospital.update({
-                "timings": convert_timings(timings)
-            })
-            hospital.pop("start", None)
-            hospital.pop("end", None)
-            hospital.pop("day", None)
-            data['hospitals'] = [hospital, ]
-        return response_data
-
     def get_filtering_params(self, data):
         """Helper function that prepare dynamic query for filtering"""
         HOSPITAL_TYPE_MAPPING = {hospital_type[1]: hospital_type[0] for hospital_type in
@@ -437,9 +405,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             filtering_params.append(
                 "sp.id IN({})".format(",".join(data.get("specialization_ids")))
             )
-            # filtering_params.update({
-            #     "qualifications__specialization__id__in": data.get("specialization_ids")
-            # })
         if data.get("sits_at"):
             filtering_params.append(
                 "hospital_type IN({})".format(", ".join([str(HOSPITAL_TYPE_MAPPING.get(sits_at)) for sits_at in
@@ -473,22 +438,13 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         latitude = str(validated_data.get("latitude"))
         filtering_params = self.get_filtering_params(validated_data)
         order_by_field = 'distance'
+        rank_by = "rank_distance=1"
         if validated_data.get('sort_on'):
             if validated_data.get('sort_on') == 'experience':
                 order_by_field = 'practicing_since'
             if validated_data.get('sort_on') == 'fees':
                 order_by_field = "fees"
-
-        # queryset = (models.Doctor
-        #             .objects.prefetch_related("qualifications", "qualifications__specialization",
-        #                                       "qualifications__qualification", "availability__doctor",
-        #                                       "availability__hospital", "experiences__doctor")
-        #             .filter(availability__hospital__location__distance_lte=(point, MAX_DISTANCE))
-        #             .filter(**filtering_params)
-        #             .annotate(distance=Min(Distance('availability__hospital__location', point)),
-        #                       min_fees=Min('availability__fees'))
-        #             .order_by(order_by_field)
-        #             )
+                rank_by = "rank_fees=1"
         query_string = 'select x.*, ' \
                        '(select json_agg(to_json(dh.*)) from doctor_hospital dh ' \
                        'where dh.doctor_id=x.doctor_id and dh.hospital_id = x.hospital_id) timings, ' \
@@ -509,10 +465,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                        'left join college clg  on dq.college_id = clg.id ' \
                        'left join specialization spl on dq.specialization_id = spl.id ' \
                        'where dq.doctor_id=x.doctor_id ) qualification)) qualifications ' \
-                       'from (select row_number() over(partition by d.id order by h.name desc) rnm,' \
+                       'from (select row_number() over(partition by d.id order by dh.fees asc) rank_fees, ' \
+                       'row_number() over(partition by d.id order by  st_distance(st_setsrid(st_point(%s,%s),4326), ' \
+                       'h.location) asc) rank_distance, ' \
                        'st_distance(st_setsrid(st_point(%s,%s),4326),h.location) distance,' \
                        'd.id doctor_id,d.name as name, d.practicing_since, dh.fees as fees,h.name as hospital_name, ' \
-                       'd.about,  d.additional_details, ' \
+                       'd.about,  d.additional_details, d.license, ' \
                        'h.id hospital_id, ' \
                        'h.locality as hospital_address, d.gender as gender  ' \
                        'from doctor d inner join doctor_hospital dh on d.id = dh.doctor_id ' \
@@ -522,9 +480,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                        'where %s ' \
                        'order by %s asc ' \
                        ') x ' \
-                       'where distance < %s and rnm =1 ' % (longitude, latitude,
-                                                            filtering_params, order_by_field,
-                                                            MAX_DISTANCE)
+                       'where distance < %s and %s ' % (longitude, latitude,
+                                                        longitude, latitude,
+                                                        filtering_params, order_by_field,
+                                                        MAX_DISTANCE, rank_by)
         paginated_query_string = paginate_raw_query(request, query_string)
         result = RawSql(paginated_query_string).fetch_all()
         for value in result:
@@ -537,17 +496,19 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         "fees": value.get("fees"),
                         "hospital_id": value.get("hospital_id"),
                         "discounted_fees": value.get("fees"),
-                        "timings": convert_timings(value.get("timings"))
+                        "timings": convert_timings(timings=value.get("timings"), is_day_human_readable=False)
                     }
                 ]
             })
+            value['images'] = [] if not value.get("images") else [
+                {"name": "/media/{}".format(value["images"][0].get("name"))}]
+            value['experiences'] = [] if not value.get("experiences") else value.get("experiences")
             value.pop("timings")
-        # result['timings'] = convert_timings(result['timings'])
-        # queryset = paginate_queryset(queryset, request)
-        # search_result_serializer = serializers.DoctorProfileUserViewSerializer(queryset, many=True)
-        # response_data = self.prepare_response(search_result_serializer.data)
-        # return Response(response_data)
-        return Response(result)
+        response_data = {
+            "count": 10,
+            "result": result
+        }
+        return Response(response_data)
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
