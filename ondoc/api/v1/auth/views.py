@@ -203,30 +203,28 @@ class UserPermissionViewSet(mixins.CreateModelMixin,
 
     def list(self, request, *args, **kwargs):
         params = request.query_params
-        dp_obj = ResetDoctorPermission(params['doctor_id'])
+        doctor_list = params['doctor_id'].split(",")
+        dp_obj = ResetDoctorPermission(doctor_list, request)
         permission_data = dp_obj.create_permission()
-        serializer = UserPermissionSerializer(data=permission_data, many=True)
+        # serializer = UserPermissionSerializer(data=permission_data, many=True)
+        # # serializer.is_valid(raise_exception=True)
         # serializer.is_valid(raise_exception=True)
-        serializer.is_valid(raise_exception=True)
         # serializer.save()
-        return Response([])
+        return Response(permission_data)
 
 
 class ResetDoctorPermission(object):
 
-    def __init__(self, doctor_id):
-        self.doctor_id = doctor_id
+    def __init__(self, doctor_list, request):
+        self.doctor_list = doctor_list
+        self.request = request
 
     def create_permission(self):
 
-        # up_queryset = (UserPermission.objects.all().prefetch_related('hospital_network__hospital_set').
-        #                filter(permission=UserPermission.APPOINTMENT_WRITE))
+        hospital_queryset = (DoctorHospital.objects.
+                             prefetch_related('hospital__hospital_admins', 'doctor', 'doctor__user').
+                             filter(doctor__in=self.doctor_list))
 
-        up1 = (UserPermission.objects.prefetch_related('hospital_network__hospital_set').
-               filter(permission=UserPermission.APPOINTMENT_WRITE))
-        hospital_queryset = (DoctorHospital.objects.select_related("doctor").filter(doctor=self.doctor_id))
-        # hospital_network_queryset = HospitalNetwork.objects.filter()
-        # admin = UserPermission.objects.filter(doctor=self.doctor_id)
         permission_data = list()
         for data in hospital_queryset:
             temp_dict = dict()
@@ -234,7 +232,13 @@ class ResetDoctorPermission(object):
             temp_dict['doctor'] = data.doctor.id
             temp_dict['hospital_network'] = None
             temp_dict['hospital'] = data.hospital.id
-            if data.hospital.hospital_admins or data.hospital.network.network_admins:
+            x = data.hospital.hospital_admins.all()
+            flag = False
+            for x_permission in x:
+                if x_permission.permission == UserPermission.APPOINTMENT_WRITE:
+                    flag = True
+                    break
+            if flag:
                 temp_dict['permission'] = UserPermission.APPOINTMENT_READ
             else:
                 temp_dict['permission'] = UserPermission.APPOINTMENT_WRITE

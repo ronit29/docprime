@@ -6,6 +6,7 @@ from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSe
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
 from ondoc.authentication.models import UserProfile, Address
+from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
 from rest_framework.response import Response
@@ -85,7 +86,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         whole_queryset = self.form_lab_whole_data(queryset)
 
-        serializer = LabCustomSerializer(whole_queryset, many=True)
+        paginated_queryset = paginate_queryset(whole_queryset, request)
+
+        serializer = LabCustomSerializer(paginated_queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, lab_id):
