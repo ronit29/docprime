@@ -75,7 +75,7 @@ class UserViewset(GenericViewSet):
             "login":1,
             "token" : str(token[0])
         }
-        return Response(response)        
+        return Response(response)
 
     @transaction.atomic
     def register(self, request, format=None):
