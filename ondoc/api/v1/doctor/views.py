@@ -496,15 +496,22 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         "fees": value.get("fees"),
                         "hospital_id": value.get("hospital_id"),
                         "discounted_fees": value.get("fees"),
-                        "timings": convert_timings(timings=value.get("timings"), is_day_human_readable=False)
+                        "timings": convert_timings(timings=value.get("timings"),
+                                                   is_day_human_readable=False)
                     }
-                ]
+                ],
+                "id": value.get("doctor_id"),
+                "experiences":  [] if not value.get("experiences") else value.get("experiences"),
+                "images": [] if not value.get("images") else [
+                    {"name": "/media/{}".format(value["images"][0].get("name"))}],
+                "languages": [],
+                "mobiles": [],
+                "medical_services": [],
+                "associations": [],
+                "awards": [],
+                "experience_years": None,
+                "data_status": None
             })
-
-            value['images'] = [] if not value.get("images") else [
-                {"name": "/media/{}".format(value["images"][0].get("name"))}]
-            value['experiences'] = [] if not value.get("experiences") else value.get("experiences")
-            value.update({"id": value.get("doctor_id")})
             value.pop("timings")
         response_data = {
             "count": 10,
