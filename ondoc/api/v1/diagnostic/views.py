@@ -84,11 +84,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         parameters = request.query_params
         queryset = self.get_lab_list(parameters)
 
-        whole_queryset = self.form_lab_whole_data(queryset)
+        paginated_queryset = paginate_queryset(queryset, request)
+        response_queryset = self.form_lab_whole_data(paginated_queryset)
 
-        paginated_queryset = paginate_queryset(whole_queryset, request)
 
-        serializer = LabCustomSerializer(paginated_queryset, many=True)
+        serializer = LabCustomSerializer(response_queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, lab_id):
