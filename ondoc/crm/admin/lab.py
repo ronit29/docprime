@@ -145,7 +145,7 @@ class LabCertificationInline(admin.TabularInline):
     show_change_link = False
 
 
-class LabForm(forms.ModelForm):
+class LabForm(FormCleanMixin):
     about = forms.CharField(widget=forms.Textarea, required=False)
     primary_mobile = forms.CharField(required=True)
     primary_email = forms.EmailField(required=True)
@@ -164,42 +164,14 @@ class LabForm(forms.ModelForm):
     def validate_qc(self):
         qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
             'license':'req','building':'req','locality':'req','city':'req','state':'req',
-            'country':'req','pin_code':'req','network_type':'req','labimage':'count'}
+            'country':'req','pin_code':'req','network_type':'req','lab_image':'count'}
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+            if value=='count' and int(self.data[key+'-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
         if self.cleaned_data['network_type']==2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Lab")
-
-
-    def clean(self):
-        if not self.request.user.is_superuser:
-            if self.instance.data_status == 3:
-                raise forms.ValidationError("Cannot update QC approved Lab")
-            if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-                if self.instance.data_status == 2:
-                    raise forms.ValidationError("Cannot update Lab submitted for QC approval")
-                if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
-                    raise forms.ValidationError("Cannot modify Lab added by other users")
-
-
-            if '_submit_for_qc' in self.data:
-                self.validate_qc()
-                if self.instance.network and self.instance.network.data_status <2:
-                    raise forms.ValidationError("Cannot submit for QC without submitting associated Lab Network: " + self.instance.network.name)
-
-            if '_qc_approve' in self.data:
-                self.validate_qc()
-                if self.instance.network and  self.instance.network.data_status < 3:
-                    raise forms.ValidationError("Cannot approve QC check without approving associated Lab Network: " + self.instance.network.name)
-
-            if '_mark_in_progress' in self.data:
-                if self.instance.data_status == 3:
-                    raise forms.ValidationError("Cannot reject QC approved data")
-
-        return super(LabForm, self).clean()
 
 
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):

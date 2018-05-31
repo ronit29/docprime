@@ -3,6 +3,7 @@ from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
 from ondoc.doctor.models import DoctorHospital
+from django.db import connection
 
 
 def flatten_dict(d):
@@ -59,8 +60,11 @@ def group_consecutive_numbers(data):
     return ranges
 
 
-def convert_timings(timings):
-    DAY_MAPPING = {value[1]: (value[0], value[1][:3]) for value in DoctorHospital.DAY_CHOICES}
+def convert_timings(timings, is_day_human_readable=True):
+    if not is_day_human_readable:
+        DAY_MAPPING = {value[0]: (value[0], value[1][:3]) for value in DoctorHospital.DAY_CHOICES}
+    else:
+        DAY_MAPPING = {value[1]: (value[0], value[1][:3]) for value in DoctorHospital.DAY_CHOICES}
     DAY_MAPPING_REVERSE = {value[0]: value[1][:3] for value in DoctorHospital.DAY_CHOICES}
     TIMESLOT_MAPPING = {value[0]: value[1] for value in DoctorHospital.TIME_CHOICES}
     temp = defaultdict(list)
@@ -81,3 +85,19 @@ def convert_timings(timings):
         final_dict[",".join(response_keys)].append("{} to {}".format(TIMESLOT_MAPPING.get(key[0]),
                                                                      TIMESLOT_MAPPING.get(key[1])))
     return final_dict
+
+
+class RawSql:
+    def __init__(self, query):
+        self.query = query
+
+    def fetch_all(self):
+        with connection.cursor() as cursor:
+            cursor.execute(self.query)
+            columns = [col[0] for col in cursor.description]
+            result = [
+                dict(zip(columns, row))
+                for row in cursor.fetchall()
+            ]
+        return result
+

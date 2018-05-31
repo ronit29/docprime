@@ -1,6 +1,6 @@
 from django.contrib.gis import admin
 import datetime
-from django.db.models import Q
+from django.contrib.gis import forms
 from ondoc.crm.constants import constants
 
 
@@ -31,6 +31,43 @@ class QCPemAdmin(admin.ModelAdmin):
 
     class Meta:
         abstract = True
+
+class FormCleanMixin(forms.ModelForm):
+   def clean(self):
+       if not self.request.user.is_superuser:
+           if self.instance.data_status == 3:
+               raise forms.ValidationError("Cannot modify QC approved Data")
+           if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
+               if self.instance.data_status == 2:
+                   raise forms.ValidationError("Cannot update Data submitted for QC approval")
+               elif self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
+                   raise forms.ValidationError("Cannot modify Data added by other users")
+           if '_submit_for_qc' in self.data:
+               self.validate_qc()
+               if hasattr(self.instance,'availability') and self.instance.availability is not None:
+                   for h in self.instance.availability.all():
+                       if (h.hospital.data_status < 2):
+                           raise forms.ValidationError(
+                               "Cannot submit for QC without submitting associated Hospitals: " + h.hospital.name)
+               if hasattr(self.instance,'network') and self.instance.network is not None:
+                   if self.instance.network.data_status < 2:
+                       class_name = self.instance.network.__class__.__name__
+                       raise forms.ValidationError("Cannot submit for QC without submitting associated " + class_name.rstrip('Form')+ ": " + self.instance.network.name)
+           if '_qc_approve' in self.data:
+               self.validate_qc()
+               if hasattr(self.instance,'availability') and self.instance.availability is not None:
+                   for h in self.instance.availability.all():
+                       if (h.hospital.data_status < 3):
+                           raise forms.ValidationError(
+                                "Cannot approve QC check without approving associated Hospitals: " + h.hospital.name)
+               if hasattr(self.instance,'network') and self.instance.network is not None:
+                   if self.instance.network.data_status < 3:
+                       class_name = self.instance.network.__class__.__name__
+                       raise forms.ValidationError("Cannot approve QC check without approving associated"+ class_name.rstrip('Form') + ": " + self.instance.network.name)
+           if '_mark_in_progress' in self.data:
+               if self.instance.data_status == 3:
+                   raise forms.ValidationError("Cannot reject QC approved data")
+           return super().clean()
 
 
 class ActionAdmin(admin.ModelAdmin):

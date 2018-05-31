@@ -66,7 +66,7 @@ class LabNetworkManagerInline(admin.TabularInline):
 
 
 
-class LabNetworkForm(forms.ModelForm):
+class LabNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
 
@@ -81,29 +81,6 @@ class LabNetworkForm(forms.ModelForm):
                 raise forms.ValidationError(key+" is required for Quality Check")
             if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
-
-    def clean(self):
-        if not self.request.user.is_superuser:
-            if self.instance.data_status == 3:
-                raise forms.ValidationError("Cannot update QC approved Lab Network")
-            if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-                if self.instance.data_status == 2 :
-                    raise forms.ValidationError("Cannot update Lab Network  submitted for QC approval")
-                if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
-                    raise forms.ValidationError("Cannot modify Lab Network added by other users")
-
-            if '_submit_for_qc' in self.data:
-                self.validate_qc()
-
-            if '_qc_approve' in self.data:
-                self.validate_qc()
-
-            if '_mark_in_progress' in self.data:
-                if self.instance.data_status == 3:
-                    raise forms.ValidationError("Cannot reject QC approved data")
-
-
-        return super(LabNetworkForm, self).clean()
 
 
     def clean_operational_since(self):
