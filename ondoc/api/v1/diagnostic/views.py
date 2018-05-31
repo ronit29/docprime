@@ -83,13 +83,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def list(self, request, **kwargs):
         parameters = request.query_params
         queryset = self.get_lab_list(parameters)
-
+        count = queryset.count()
         paginated_queryset = paginate_queryset(queryset, request)
         response_queryset = self.form_lab_whole_data(paginated_queryset)
-
-
         serializer = LabCustomSerializer(response_queryset, many=True)
-        return Response(serializer.data)
+        return Response({"result": serializer.data,
+                         "count": count})
 
     def retrieve(self, request, lab_id):
         queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
