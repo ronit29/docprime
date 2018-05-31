@@ -133,9 +133,9 @@ class UserProfile(TimeStampedModel, Image):
     OTHER = 'o'
     GENDER_CHOICES = [(MALE,"Male"), (FEMALE,"Female"), (OTHER,"Other")]
     user = models.ForeignKey(User, related_name="profiles", on_delete=models.CASCADE)
-    name = models.CharField(max_length=100, blank=False, default=None)
-    email = models.CharField(max_length=20, blank=False, default=None)
-    gender = models.CharField(max_length=2, default=None, blank=True, choices=GENDER_CHOICES)
+    name = models.CharField(max_length=100, blank=False, null=True, default=None)
+    email = models.CharField(max_length=256, blank=False, null=True, default=None)
+    gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=GENDER_CHOICES)
     phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     is_otp_verified = models.BooleanField(default=False)
     is_default_user = models.BooleanField(default=False)

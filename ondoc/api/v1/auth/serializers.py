@@ -17,8 +17,8 @@ class OTPVerificationSerializer(serializers.Serializer):
 
     def validate(self, attrs):
 
-        if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.CONSUMER).exists():
-            raise serializers.ValidationError('User does not exist')
+        # if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.CONSUMER).exists():
+        #     raise serializers.ValidationError('User does not exist')
 
         if not OtpVerifications.objects.filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False).exists():
             raise serializers.ValidationError("Invalid OTP")

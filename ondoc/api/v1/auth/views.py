@@ -66,15 +66,22 @@ class UserViewset(GenericViewSet):
         serializer = OTPVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-
+        user_exists = 1
         user = User.objects.filter(phone_number=data['phone_number'], user_type=User.CONSUMER).first()
+        if not user:
+            user_exists = 0
+            user = User.objects.create(phone_number=data['phone_number'],
+                                       is_phone_number_verified=True,
+                                       user_type=User.CONSUMER)
+
         token = Token.objects.get_or_create(user=user)
 
         expire_otp(data['phone_number'])
 
         response = {
             "login":1,
-            "token" : str(token[0])
+            "token" : str(token[0]),
+            "user_exists": user_exists,
         }
         return Response(response)        
 
@@ -183,7 +190,8 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
     def create(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        data = request.data
+        data = {}
+        data.update(request.data)
         data['user'] = request.user.id
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
