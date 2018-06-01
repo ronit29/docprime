@@ -1,4 +1,5 @@
 from ondoc.doctor import models
+from ondoc.authentication import models as auth_models
 from . import serializers
 from ondoc.api.v1.diagnostic.serializers import TimeSlotSerializer
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
@@ -22,6 +23,8 @@ from itertools import groupby
 from django.contrib.gis.db.models.functions import Distance
 from ondoc.api.v1.utils import RawSql
 from django.contrib.auth import get_user_model
+from django.db.models import F
+from collections import defaultdict
 User = get_user_model()
 
 
@@ -104,9 +107,21 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             return models.OpdAppointment.objects.filter(doctor=user.doctor)
         elif user.user_type == User.CONSUMER:
             return models.OpdAppointment.objects.filter(user=user)
+    # queryset = auth_models.UserPermission.objects.all()
 
     def list(self, request):
-        queryset = self.get_queryset()
+
+        user_permission = (auth_models.UserPermission.objects.
+                           filter(user=request.user, doctor__appointments__hospital=F('hospital'),
+                                  doctor__appointments__doctor=F('doctor')).
+                           prefetch_related('doctor__appointments', 'doctor', 'hospital', 'user').
+                           values('permission_type', 'read_permission', 'write_permission', 'delete_permission',
+                                  'doctor__appointments__id'))
+
+        ids, id_dict = self.extract_appointment_ids(user_permission)
+
+        queryset = models.OpdAppointment.objects.filter(id__in=ids)
+
         if not queryset:
             return Response([])
         serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
@@ -126,7 +141,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
         elif range=='upcoming':
             queryset = queryset.filter(
-                status__in=[models.OpdAppointment.CREATED, models.OpdAppointment.RESCHEDULED, models.OpdAppointment.ACCEPTED],
+                status__in=[models.OpdAppointment.CREATED, models.OpdAppointment.RESCHEDULED_PATIENT,
+                            models.OpdAppointment.RESCHEDULED_DOCTOR, models.OpdAppointment.ACCEPTED],
                 time_slot_start__gt=timezone.now()).order_by('time_slot_start')
         elif range =='pending':
             queryset = queryset.filter(time_slot_start__gt=timezone.now(), status = models.OpdAppointment.CREATED).order_by('time_slot_start')
@@ -134,8 +150,42 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.order_by('-time_slot_start')
 
         queryset = paginate_queryset(queryset, request)
-        serializer = serializers.OpdAppointmentSerializer(queryset, many=True)
+        whole_queryset = self.extract_whole_queryset(queryset, id_dict)
+        # serializer = serializers.OpdAppointmentSerializer(queryset, many=True)
+        serializer = serializers.OpdAppointmentPermissionSerializer(whole_queryset, many=True)
         return Response(serializer.data)
+
+        # New code ends here***********************************************************************
+        # queryset = self.get_queryset()
+        # if not queryset:
+        #     return Response([])
+        # serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
+        # serializer.is_valid(raise_exception=True)
+        #
+        # range = serializer.validated_data.get('range')
+        # hospital_id = serializer.validated_data.get('hospital_id')
+        # profile_id = serializer.validated_data.get('profile_id')
+        #
+        # if profile_id:
+        #     queryset = queryset.filter(profile=profile_id)
+        #
+        # if hospital_id:
+        #     queryset = queryset.filter(hospital_id=hospital_id)
+        #
+        # if range=='previous':
+        #     queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
+        # elif range=='upcoming':
+        #     queryset = queryset.filter(
+        #         status__in=[models.OpdAppointment.CREATED, models.OpdAppointment.RESCHEDULED, models.OpdAppointment.ACCEPTED],
+        #         time_slot_start__gt=timezone.now()).order_by('time_slot_start')
+        # elif range =='pending':
+        #     queryset = queryset.filter(time_slot_start__gt=timezone.now(), status = models.OpdAppointment.CREATED).order_by('time_slot_start')
+        # else:
+        #     queryset = queryset.order_by('-time_slot_start')
+        #
+        # queryset = paginate_queryset(queryset, request)
+        # serializer = serializers.OpdAppointmentSerializer(queryset, many=True)
+        # return Response(serializer.data)
 
     @transaction.atomic
     def create(self, request):
@@ -206,6 +256,29 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             opd_appointment.time_slot_end = validated_data.get("time_slot_end")
         opd_appointment.save()
         return opd_appointment
+
+    def extract_appointment_ids(self, appointment_data):
+        id_dict = defaultdict(dict)
+        id_list = list()
+        for data in appointment_data:
+            temp = dict()
+            temp["appointment"] = data['doctor__appointments__id']
+            temp["permission_type"] = data['permission_type']
+            temp["read_permission"] = data['read_permission']
+            temp["write_permission"] = data['write_permission']
+            temp["delete_permission"] = data['delete_permission']
+            # temp["permission"] = data['permission']
+            id_dict[data['doctor__appointments__id']] = temp
+            id_list.append(data['doctor__appointments__id'])
+        return id_list, id_dict
+
+    def extract_whole_queryset(self, queryset, id_dict):
+        whole_queryset = list()
+        for data in queryset:
+            temp = id_dict[data.id]
+            temp['appointment'] = data
+            whole_queryset.append(temp)
+        return whole_queryset
 
 
 class DoctorProfileView(viewsets.GenericViewSet):

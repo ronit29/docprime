@@ -117,6 +117,8 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
 
 
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(default="lab")
+
     class Meta:
         model = LabAppointment
         fields = '__all__'

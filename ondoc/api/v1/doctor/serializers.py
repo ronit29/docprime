@@ -42,6 +42,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     patient_dob = serializers.ReadOnlyField(source='profile.dob')
     patient_gender = serializers.ReadOnlyField(source='profile.gender'),
     patient_image = serializers.SerializerMethodField()
+    type = serializers.CharField(default='doctor')
 
     class Meta:
         model = OpdAppointment
@@ -54,6 +55,11 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             return None
 
 
+class OpdAppointmentPermissionSerializer(serializers.Serializer):
+    appointment = OpdAppointmentSerializer()
+    permission = serializers.IntegerField()
+
+
 class CreateAppointmentSerializer(serializers.Serializer):
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
@@ -62,7 +68,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
     time_slot_end = serializers.DateTimeField()
 
     def validate(self, data):
-        ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.CREATED, OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]
+        ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.CREATED, OpdAppointment.ACCEPTED,
+                                     OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.RESCHEDULED_DOCTOR]
         MAX_APPOINTMENTS_ALLOWED = 3
         MAX_FUTURE_DAY = 7
         request = self.context.get("request")

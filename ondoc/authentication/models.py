@@ -219,17 +219,23 @@ class Address(TimeStampedModel):
 
 class UserPermission(TimeStampedModel):
     from ondoc.doctor.models import Hospital, HospitalNetwork, Doctor
-    APPOINTMENT_READ = 0
-    APPOINTMENT_WRITE = 1
-    permission_type = ((APPOINTMENT_READ, 'Read Appointment'),
-                   (APPOINTMENT_WRITE, 'Write Appointment'))
+    APPOINTMENT = 'appointment'
+    type_choices = ((APPOINTMENT, 'Appointment'), )
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     hospital_network = models.ForeignKey(HospitalNetwork, null=True, blank=True, on_delete=models.CASCADE,
+
+
                                          related_name='network_admins')
     hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.CASCADE,
                                  related_name='hospital_admins')
-    doctor = models.ForeignKey(Doctor, null=True, blank=True, on_delete=models.CASCADE)
-    permission = models.PositiveSmallIntegerField(choices=permission_type)
+    doctor = models.ForeignKey(Doctor, null=True, blank=True, on_delete=models.CASCADE,
+                               related_name='doc_permission')
+
+    permission_type = models.CharField(max_length=20, choices=type_choices, default=APPOINTMENT)
+
+    read_permission = models.BooleanField(default=False)
+    write_permission = models.BooleanField(default=False)
+    delete_permission = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'user_permission'

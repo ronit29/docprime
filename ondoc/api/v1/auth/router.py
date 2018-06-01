@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet, NotificationViewSet, UserProfileViewSet,
-                    UserPermissionViewSet)
+                    UserPermissionViewSet, UserAppointmentsViewSet)
 
 urlpatterns = [
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
@@ -18,6 +18,11 @@ urlpatterns = [
     path('userprofile/<int:pk>/edit', UserProfileViewSet.as_view({'post': 'update'}), name='user-profile-edit'),
     path('userprofile/<int:pk>', UserProfileViewSet.as_view({'get': 'retrieve'}), name='user-profile-retrieve'),
     path('createpermission', UserPermissionViewSet.as_view({'get': 'list'}), name='user-profile-retrieve'),
+    path('appointment', UserAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
+    path('appointment/create', UserAppointmentsViewSet.as_view({'post': 'create'}), name='create-appointment'),
+    path('appointment/<int:pk>', UserAppointmentsViewSet.as_view({'get': 'retrieve'}), name='get-appointment-detail'),
+    path('appointment/<int:pk>/update', UserAppointmentsViewSet.as_view({'post': 'update'}),
+         name='update-appointment-detail'),
 
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),

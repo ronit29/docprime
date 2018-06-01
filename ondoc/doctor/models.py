@@ -559,7 +559,7 @@ class OpdAppointment(TimeStampedModel):
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
     doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, related_name="hospital_appointments", on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
     user  = models.ForeignKey(User, related_name="appointments", on_delete=models.CASCADE)
     booked_by = models.ForeignKey(User, related_name="booked_appointements", on_delete=models.CASCADE)
