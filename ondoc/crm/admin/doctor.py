@@ -257,7 +257,7 @@ class DoctorForm(FormCleanMixin):
 
 class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
 
-    list_display = ('name', 'updated_at','data_status','onboarding_status','created_by','get_onboard_link')
+    list_display = ('name', 'updated_at','data_status','onboarding_status','list_created_by','get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = ('data_status','onboarding_status')
     form = DoctorForm
@@ -276,6 +276,7 @@ class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     ]
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
     search_fields = ['name']
+
     def get_urls(self):
         urls = super().get_urls()
         my_urls = [

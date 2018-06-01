@@ -1,10 +1,8 @@
-from django.contrib.gis import forms
 from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
 from django.db.models import Q
-
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,
-    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork)
+    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Doctor)
 from .common import *
 from ondoc.crm.constants import constants
 
@@ -16,6 +14,13 @@ class HospitalImageInline(admin.TabularInline):
     show_change_link = False
     max_num = 5
 
+
+# class DcotorInline(admin.TabularInline):
+#     model = DoctorHospital
+#     # template = 'imageinline.html'
+#     extra = 0
+#     can_delete = False
+#     show_change_link = False
 
 class HospitalDocumentInline(admin.TabularInline):
     model = HospitalDocument
@@ -95,6 +100,17 @@ class HospitalForm(FormCleanMixin):
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status',)
+    readonly_fields = ('associated_doctors',)
+
+    def associated_doctors(self, instance):
+        if instance.id:
+            html = "<ul style='margin-left:0px !important'>"
+            for doc in Doctor.objects.filter(hospitals=instance.id):
+                html += "<li><a target='_blank' href='/admin/doctor/doctor/%s/change'>%s</a></li>"% (doc.id, doc.name)
+            html += "</ul>"
+            return mark_safe(html)
+        else:
+            return ''
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
@@ -119,10 +135,9 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         form = super(HospitalAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
         form.base_fields['network'].queryset = HospitalNetwork.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
-
         return form
 
-    list_display = ('name', 'updated_at', 'data_status', 'created_by')
+    list_display = ('name', 'updated_at', 'data_status', 'list_created_by')
     form = HospitalForm
     search_fields = ['name']
     inlines = [

@@ -175,7 +175,7 @@ class LabForm(FormCleanMixin):
 
 
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
-    list_display = ('name', 'updated_at','onboarding_status','data_status', 'created_by', 'get_onboard_link',)
+    list_display = ('name', 'updated_at','onboarding_status','data_status', 'list_created_by', 'get_onboard_link',)
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status','onboarding_status')
 
