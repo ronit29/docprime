@@ -4,7 +4,7 @@ from django.db import models
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 
-from ondoc.doctor.models import (HospitalNetworkManager, HospitalNetwork,
+from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
     HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
     HospitalNetworkAward, HospitalNetworkCertification)
 
@@ -95,9 +95,10 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
-    list_display = ('name', 'updated_at', 'data_status', 'created_by')
+    list_display = ('name', 'updated_at', 'data_status', 'list_created_by')
     list_filter = ('data_status',)
     search_fields = ['name']
+    readonly_fields = ('associated_hospitals',)
     inlines = [
         HospitalNetworkManagerInline,
         HospitalNetworkHelplineInline,
@@ -105,6 +106,17 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkAccreditationInline,
         HospitalNetworkAwardInline,
         HospitalNetworkCertificationInline]
+
+
+    def associated_hospitals(self, instance):
+        if instance.id:
+            html = "<ul style='margin-left:0px !important'>"
+            for hosp in Hospital.objects.filter(network=instance.id):
+                html += "<li><a target='_blank' href='/admin/doctor/hospital/%s/change'>%s</a></li>"% (hosp.id, hosp.name)
+            html += "</ul>"
+            return mark_safe(html)
+        else:
+            return ''
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

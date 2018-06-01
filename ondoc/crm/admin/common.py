@@ -1,8 +1,8 @@
 from django.contrib.gis import admin
 import datetime
 from django.contrib.gis import forms
+from django.core.exceptions import ObjectDoesNotExist
 from ondoc.crm.constants import constants
-
 
 def practicing_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
@@ -20,8 +20,19 @@ def award_year_choices():
 def award_year_choices_no_blank():
     return [(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
 
+
 class QCPemAdmin(admin.ModelAdmin):
     change_form_template = 'custom_change_form.html'
+    def list_created_by(self, obj):
+        field =  ''
+        try:
+            field = obj.created_by.staffprofile.name
+        except ObjectDoesNotExist:
+            field = obj.created_by.email if obj.created_by.email is not None else obj.created_by.phone_number
+        return field
+    list_created_by.admin_order_field = 'created_by'
+    list_created_by.short_description = "Created By"
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser or request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
