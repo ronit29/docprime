@@ -117,6 +117,8 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
 
 
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(default="lab")
+
     class Meta:
         model = LabAppointment
         fields = '__all__'
@@ -255,9 +257,9 @@ class AddressSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context.get("request")
-        if attrs.get("user") != request.user.id:
+        if attrs.get("user") != request.user:
             raise serializers.ValidationError("User is not correct.")
-        if not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
+        if attrs.get("profile") and not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
 
@@ -272,8 +274,8 @@ class TimeSlotSerializer(serializers.Serializer):
     timing = serializers.SerializerMethodField()
 
     def get_timing(self, obj):
-        start = obj.start
-        end = obj.end
+        start = float(obj.start)
+        end = float(obj.end)
         time_span = self.TIME_SPAN
         day = obj.day
         timing = self.context['timing']
@@ -288,7 +290,9 @@ class TimeSlotSerializer(serializers.Serializer):
         num_slots = int(60 / time_span)
         if 60 % time_span != 0:
             num_slots += 1
-        for h in range(start, end):
+        h = start
+        while h < end:
+        # for h in range(start, end):
             for i in range(0, num_slots):
                 temp_h = h + i * int_span
                 day_slot, am_pm = self.get_day_slot(temp_h)
@@ -299,22 +303,23 @@ class TimeSlotSerializer(serializers.Serializer):
                 day_time_min_str = str(int(day_time_min))
                 day_time_hour_str = str(int(day_time_hour))
 
-                if int(day_time_hour)/10 < 1:
+                if int(day_time_hour) < 10:
                     day_time_hour_str = '0' + str(int(day_time_hour))
 
-                if int(day_time_min)/10 < 1:
+                if int(day_time_min) < 10:
                     day_time_min_str = '0' + str(int(day_time_min))
                 time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
                 # temp_dict[temp_h] = time_str
                 timing[day]['timing'][day_slot][temp_h] = time_str
+            h += 1
         return timing
 
-    def get_day_slot(self, hour):
+    def get_day_slot(self, time):
         am = 'AM'
         pm = 'PM'
-        if hour < 12:
+        if time < 12:
             return self.MORNING, am
-        elif hour < 16:
+        elif time < 16:
             return self.AFTERNOON, pm
         else:
             return self.EVENING, pm

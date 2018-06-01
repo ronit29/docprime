@@ -6,6 +6,7 @@ from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSe
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
 from ondoc.authentication.models import UserProfile, Address
+from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
 from rest_framework.response import Response
@@ -82,11 +83,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def list(self, request, **kwargs):
         parameters = request.query_params
         queryset = self.get_lab_list(parameters)
-
-        whole_queryset = self.form_lab_whole_data(queryset)
-
-        serializer = LabCustomSerializer(whole_queryset, many=True)
-        return Response(serializer.data)
+        count = queryset.count()
+        paginated_queryset = paginate_queryset(queryset, request)
+        response_queryset = self.form_lab_whole_data(paginated_queryset)
+        serializer = LabCustomSerializer(response_queryset, many=True)
+        return Response({"result": serializer.data,
+                         "count": count})
 
     def retrieve(self, request, lab_id):
         queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
@@ -283,13 +285,39 @@ class AddressViewsSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = dict(request.data)
         data["user"] = request.user.id
+        # Added recently
+        if 'is_default' not in data:
+            if not Address.objects.filter(user=request.user.id).exists():
+                data['is_default'] = True
+
         serializer = AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
+    def update(self, request, pk=None):
+        data = request.data
+        data['user'] = request.user.id
+        queryset = get_object_or_404(Address, pk=pk)
+        if data.get("is_default"):
+            add_default_qs = Address.objects.filter(user=request.user.id, is_default=True)
+            if add_default_qs:
+                add_default_qs.update(is_default=False)
+        serializer = AddressSerializer(queryset, data=data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
     def destroy(self, request, pk=None):
-        address = Address.objects.filter(pk=pk).first()
+        address = get_object_or_404(Address, pk=pk)
+
+        if address.is_default:
+            temp_addr = Address.objects.filter(user=request.user.id).first()
+            if temp_addr:
+                temp_addr.is_default = True
+                temp_addr.save()
+
+        # address = Address.objects.filter(pk=pk).first()
         address.delete()
         return Response({
             "status": 1
@@ -321,10 +349,21 @@ class LabTimingListView(mixins.ListModelMixin,
 class AvailableTestViewSet(mixins.RetrieveModelMixin,
                            viewsets.GenericViewSet):
 
+    queryset = AvailableLabTest.objects.all()
+    serializer_class = AvailableLabTestSerializer
+
     def retrive(self, request, lab_id):
         params = request.query_params
+        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
 
-        queryset = AvailableLabTest.objects.filter(lab=lab_id)
+        if not queryset:
+            raise Http404("No data available")
+
+        if params.get('test_name'):
+            queryset = queryset.filter(test__name__contains=params['test_name'])
+
+        queryset = queryset[:20]
+
         serializer = AvailableLabTestSerializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -346,8 +385,8 @@ class LabSlotExtraction(object):
             self.fetch_time_slot(obj)
 
     def fetch_time_slot(self, obj):
-        start = obj.start
-        end = obj.end
+        start = float(obj.start)
+        end = float(obj.end)
         time_span = self.TIME_SPAN
         day = obj.day
         # timing = self.context['timing']
@@ -362,19 +401,22 @@ class LabSlotExtraction(object):
         num_slots = int(60 / time_span)
         if 60 % time_span != 0:
             num_slots += 1
-        for h in range(start, end):
+        h = start
+        while h < end:
+        # for h in range(start, end):
             for i in range(0, num_slots):
                 temp_h = h + i * int_span
                 day_slot, am_pm = self.get_day_slot(temp_h)
                 time_str = self.form_time_string(temp_h, am_pm)
                 self.timing[day]['timing'][day_slot][temp_h] = time_str
+            h += 1
 
-    def get_day_slot(self, hour):
+    def get_day_slot(self, time):
         am = 'AM'
         pm = 'PM'
-        if hour < 12:
+        if time < 12:
             return self.MORNING, am
-        elif hour < 16:
+        elif time < 16:
             return self.AFTERNOON, pm
         else:
             return self.EVENING, pm
@@ -388,11 +430,11 @@ class LabSlotExtraction(object):
             day_time_hour -= 12
 
         day_time_hour_str = str(int(day_time_hour))
-        if int(day_time_hour) / 10 < 1:
+        if int(day_time_hour) < 10:
             day_time_hour_str = '0' + str(int(day_time_hour))
 
         day_time_min_str = str(int(day_time_min))
-        if int(day_time_min) / 10 < 1:
+        if int(day_time_min) < 10:
             day_time_min_str = '0' + str(int(day_time_min))
 
         time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm

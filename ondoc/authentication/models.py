@@ -133,9 +133,9 @@ class UserProfile(TimeStampedModel, Image):
     OTHER = 'o'
     GENDER_CHOICES = [(MALE,"Male"), (FEMALE,"Female"), (OTHER,"Other")]
     user = models.ForeignKey(User, related_name="profiles", on_delete=models.CASCADE)
-    name = models.CharField(max_length=100, blank=False, default=None)
-    email = models.CharField(max_length=20, blank=False, default=None)
-    gender = models.CharField(max_length=2, default=None, blank=True, choices=GENDER_CHOICES)
+    name = models.CharField(max_length=100, blank=False, null=True, default=None)
+    email = models.CharField(max_length=256, blank=False, null=True, default=None)
+    gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=GENDER_CHOICES)
     phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     is_otp_verified = models.BooleanField(default=False)
     is_default_user = models.BooleanField(default=False)
@@ -192,16 +192,53 @@ class Notification(TimeStampedModel):
 
 
 class Address(TimeStampedModel):
-    HOME_ADDRESS = 1
-    WORK_ADDRESS = 2
-    OTHER = 3
+    HOME_ADDRESS = "home"
+    WORK_ADDRESS = "office"
+    OTHER = "other"
     TYPE_CHOICES = (
         (HOME_ADDRESS, 'Home Address'),
         (WORK_ADDRESS, 'Work Address'),
         (OTHER, 'Other'),
     )
-    type = models.PositiveIntegerField(choices=TYPE_CHOICES)
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
-    place_id = models.CharField(max_length=100)
-    address = models.TextField()
+    profile = models.ForeignKey(UserProfile, null=True, blank=True, on_delete=models.CASCADE)
+    place_id = models.CharField(null=True, blank=True, max_length=100)
+    address = models.TextField(null=True, blank=True)
+    land_mark = models.TextField(null=True, blank=True)
+    pincode = models.PositiveIntegerField(null=True, blank=True, max_length=6)
+    phone_number = models.CharField(null=True, blank=True, max_length=10)
+    is_default = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "address"
+
+    def __str__(self):
+        return str(self.user)
+
+
+class UserPermission(TimeStampedModel):
+    from ondoc.doctor.models import Hospital, HospitalNetwork, Doctor
+    APPOINTMENT = 'appointment'
+    type_choices = ((APPOINTMENT, 'Appointment'), )
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    hospital_network = models.ForeignKey(HospitalNetwork, null=True, blank=True, on_delete=models.CASCADE,
+
+
+                                         related_name='network_admins')
+    hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.CASCADE,
+                                 related_name='hospital_admins')
+    doctor = models.ForeignKey(Doctor, null=True, blank=True, on_delete=models.CASCADE,
+                               related_name='doc_permission')
+
+    permission_type = models.CharField(max_length=20, choices=type_choices, default=APPOINTMENT)
+
+    read_permission = models.BooleanField(default=False)
+    write_permission = models.BooleanField(default=False)
+    delete_permission = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'user_permission'
+
+    def __str__(self):
+        return str(self.user.email)

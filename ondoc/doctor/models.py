@@ -293,6 +293,7 @@ class DoctorImage(TimeStampedModel, Image):
     class Meta:
         db_table = "doctor_image"
 
+
 class DoctorDocument(TimeStampedModel):
     PAN = 1
     ADDRESS = 2
@@ -324,6 +325,7 @@ class HospitalImage(TimeStampedModel, Image):
     class Meta:
         db_table = "hospital_image"
 
+
 class HospitalDocument(TimeStampedModel, Image):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     name = models.ImageField(upload_to='hospital/documents',height_field='height', width_field='width')
@@ -354,6 +356,7 @@ class DoctorLanguage(TimeStampedModel):
         db_table = "doctor_language"
         unique_together = (("doctor", "language"))
 
+
 class DoctorAward(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="awards", on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
@@ -364,6 +367,7 @@ class DoctorAward(TimeStampedModel):
 
     class Meta:
         db_table = "doctor_awards"
+
 
 class DoctorAssociation(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="associations", on_delete=models.CASCADE)
@@ -394,6 +398,7 @@ class DoctorMedicalService(TimeStampedModel):
         db_table = "doctor_medical_service"
         unique_together = (("doctor", "service"))
 
+
 class DoctorMobile(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="mobiles", on_delete=models.CASCADE)
     country_code = models.PositiveSmallIntegerField(default=91, blank=True, null=True)
@@ -404,6 +409,7 @@ class DoctorMobile(TimeStampedModel):
     class Meta:
         db_table = "doctor_mobile"
         unique_together = (("doctor", "number"))
+
 
 class DoctorEmail(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="emails", on_delete=models.CASCADE)
@@ -467,6 +473,7 @@ class HospitalNetworkAccreditation(TimeStampedModel):
 
     class Meta:
         db_table = "hospital_network_accreditation"
+
 
 class HospitalNetworkManager(TimeStampedModel):
     network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
@@ -552,7 +559,7 @@ class OpdAppointment(TimeStampedModel):
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
     doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, related_name="hospital_appointments", on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
     user  = models.ForeignKey(User, related_name="appointments", on_delete=models.CASCADE)
     booked_by = models.ForeignKey(User, related_name="booked_appointements", on_delete=models.CASCADE)
