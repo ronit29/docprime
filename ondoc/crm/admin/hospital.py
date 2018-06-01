@@ -5,6 +5,7 @@ from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,
     HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Doctor)
 from .common import *
 from ondoc.crm.constants import constants
+from django.utils.safestring import mark_safe
 
 class HospitalImageInline(admin.TabularInline):
     model = HospitalImage
