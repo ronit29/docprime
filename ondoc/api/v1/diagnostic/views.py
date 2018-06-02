@@ -12,7 +12,6 @@ from rest_framework import viewsets, mixins
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 
 from django_filters.rest_framework import DjangoFilterBackend
@@ -73,7 +72,6 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
 
 class LabList(viewsets.ReadOnlyModelViewSet):
     # queryset = self.form_queryset()
-    authentication_classes = (TokenAuthentication,)
     queryset = AvailableLabTest.objects.all()
     serializer_class = LabModelSerializer
     lookup_field = 'id'
@@ -228,7 +226,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     queryset = LabAppointment.objects.all()
     serializer_class = LabAppointmentModelSerializer
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
@@ -274,7 +271,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
 class AddressViewsSet(viewsets.ModelViewSet):
     serializer_class = AddressSerializer
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -327,7 +323,6 @@ class AddressViewsSet(viewsets.ModelViewSet):
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
 
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):

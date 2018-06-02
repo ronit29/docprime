@@ -1,5 +1,4 @@
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
 
@@ -38,6 +37,8 @@ def expire_otp(phone_number):
 
 class LoginOTP(GenericViewSet):
 
+    serializer_class = serializers.OTPSerializer
+
     @transaction.atomic
     def generate(self, request, format=None):
 
@@ -70,7 +71,7 @@ class LoginOTP(GenericViewSet):
 
 
 class UserViewset(GenericViewSet):
-
+    serializer_class = serializers.UserSerializer
     @transaction.atomic
     def login(self, request, format=None):
         serializer = serializers.OTPVerificationSerializer(data=request.data)
@@ -147,8 +148,8 @@ class UserViewset(GenericViewSet):
 
 
 class NotificationEndpointViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
+    serializer_class = serializers.NotificationEndpointSerializer
 
     def save(self, request):
         serializer = serializers.NotificationEndpointSaveSerializer(data=request.data)
@@ -174,7 +175,6 @@ class NotificationEndpointViewSet(GenericViewSet):
 
 
 class NotificationViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def list(self, request):
@@ -189,7 +189,6 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                          GenericViewSet):
     serializer_class = serializers.UserProfileSerializer
     queryset = UserProfile.objects.all()
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -280,7 +279,6 @@ class OndocViewSet(mixins.CreateModelMixin,
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
