@@ -5,6 +5,7 @@ from django.core.exceptions import FieldDoesNotExist
 import datetime
 from django.forms.models import BaseFormSet
 from django.db.models import Q
+from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
 from django.shortcuts import render
@@ -254,12 +255,23 @@ class DoctorForm(FormCleanMixin):
             return None
         return data
 
+class CityFilter(SimpleListFilter):
+    title = 'city'
+    parameter_name = 'hospitals__city'
+    def lookups(self, request, model_admin):
+        model_name = model_admin.model.__name__
+        cities = set([(c['hospitals__city'].upper(),c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('') for c in Doctor.objects.all().values('hospitals__city')])
+        return cities
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(hospitals__city__iexact=self.value()).distinct()
+
 
 class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
-
     list_display = ('name', 'updated_at','data_status','onboarding_status','list_created_by','get_onboard_link')
     date_hierarchy = 'created_at'
-    list_filter = ('data_status','onboarding_status')
+    list_filter = ('data_status','onboarding_status',CityFilter,)
     form = DoctorForm
     inlines = [
         DoctorMobileInline,

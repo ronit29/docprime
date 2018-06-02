@@ -4,6 +4,7 @@ from django.urls import include, path, reverse
 from django.utils.safestring import mark_safe
 from django.contrib.gis import forms
 from django.contrib.gis import admin
+from django.contrib.admin import SimpleListFilter
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from django.db import models
@@ -174,11 +175,21 @@ class LabForm(FormCleanMixin):
             raise forms.ValidationError("Network cannot be empty for Network Lab")
 
 
+class LabCityFilter(SimpleListFilter):
+    title = 'city'
+    parameter_name = 'city'
+    def lookups(self, request, model_admin):
+        cities = set([(c['city'].upper(),c['city'].upper()) for c in Lab.objects.values('city')])
+        return cities
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(city__iexact=self.value()).distinct()
+
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_display = ('name', 'updated_at','onboarding_status','data_status', 'list_created_by', 'get_onboard_link',)
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status','onboarding_status')
-
+    list_filter = ('data_status','onboarding_status',LabCityFilter)
 
     def get_urls(self):
         urls = super().get_urls()
