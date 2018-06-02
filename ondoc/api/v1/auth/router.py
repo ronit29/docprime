@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet, NotificationViewSet, UserProfileViewSet,
-                    UserPermissionViewSet, UserAppointmentsViewSet)
+                    UserPermissionViewSet, UserAppointmentsViewSet, AddressViewsSet)
 
 urlpatterns = [
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
@@ -19,10 +19,11 @@ urlpatterns = [
     path('userprofile/<int:pk>', UserProfileViewSet.as_view({'get': 'retrieve'}), name='user-profile-retrieve'),
     path('createpermission', UserPermissionViewSet.as_view({'get': 'list'}), name='user-profile-retrieve'),
     path('appointment', UserAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
-    path('appointment/create', UserAppointmentsViewSet.as_view({'post': 'create'}), name='create-appointment'),
-    path('appointment/<int:pk>', UserAppointmentsViewSet.as_view({'get': 'retrieve'}), name='get-appointment-detail'),
-    path('appointment/<int:pk>/update', UserAppointmentsViewSet.as_view({'post': 'update'}),
-         name='update-appointment-detail'),
+    path('address/create', AddressViewsSet.as_view({"post": "create"}), name='address-create'),
+    path('address/<int:pk>/delete', AddressViewsSet.as_view({"post": "destroy"}), name='address-delete'),
+    path('address/<int:pk>/update', AddressViewsSet.as_view({"post": "update"}), name='address-list'),
+    path('address/<int:pk>', AddressViewsSet.as_view({"get": "retrieve"}), name='address-detail'),
+    path('address', AddressViewsSet.as_view({"get": "list"}), name='address-list'),
 
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),

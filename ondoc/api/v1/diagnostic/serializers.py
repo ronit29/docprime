@@ -2,12 +2,13 @@ from rest_framework import serializers
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage)
 from ondoc.authentication.models import UserProfile, Address
+from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from django.db.models import Count, Sum
-from django.db.models import Q
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
 import datetime
 import pytz
+import json
 
 utc = pytz.UTC
 User = get_user_model()
@@ -117,7 +118,7 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
 
 
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
-    type = serializers.CharField(default="lab")
+    type = serializers.ReadOnlyField(default="lab")
 
     class Meta:
         model = LabAppointment
@@ -168,11 +169,13 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
 
 
 class LabAppointmentCreateSerializer(serializers.Serializer):
-    lab_id = serializers.IntegerField()
-    test_ids = serializers.ListField(child=serializers.IntegerField())
-    profile_id = serializers.IntegerField()
-    start_time = serializers.DateTimeField()
-    end_time = serializers.DateTimeField()
+    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all())
+    test_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all()))
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
+    start_date = serializers.CharField()
+    start_time = serializers.FloatField()
+    end_date = serializers.CharField(required=False)
+    end_time = serializers.FloatField(required=False)
 
     def validate(self, data):
 
@@ -189,10 +192,10 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         self.num_appointment_validator(data)
 
         appointment_data = dict()
-        appointment_data['lab'] = Lab.objects.get(pk=data["lab_id"])
-        appointment_data['profile'] = UserProfile.objects.get(pk=data["profile_id"])
+        appointment_data['lab'] = Lab.objects.get(pk=data["lab"])
+        appointment_data['profile'] = UserProfile.objects.get(pk=data["profile"])
 
-        lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab_id"], test__in=data['test_ids'])
+        lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
         temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"), total_deal_price=Sum("deal_price"))
 
         total_deal_price = total_mrp = 0
@@ -203,6 +206,13 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         appointment_data['price'] = total_mrp
         appointment_data['time_slot_start'] = data["start_time"]
         appointment_data['time_slot_end'] = data["end_time"]
+        profile_detail = dict()
+        profile_model = appointment_data["profile"]
+        profile_detail["name"] = profile_model.name
+        profile_detail["gender"] = profile_model.gender
+        profile_detail["dob"] = profile_model.dob
+        profile_detail["profile_image"] = profile_model.profile_image
+        appointment_data['profile_detail'] = json.dumps(profile_detail)
 
         queryset = LabAppointment.objects.create(**appointment_data)
         queryset.lab_test.add(*lab_test_queryset)
@@ -214,8 +224,11 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
     @staticmethod
     def num_appointment_validator(data):
-        count = LabAppointment.objects.filter(lab=data['lab_id'], profile=data['profile_id']).\
-            exclude(status=LabAppointment.REJECTED).count()
+        ACTIVE_APPOINTMENT_STATUS = [LabAppointment.CREATED, LabAppointment.ACCEPTED,
+                                     LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
+        count = (LabAppointment.objects.filter(lab=data['lab'],
+                                               profile=data['profile'],
+                                               status__in=ACTIVE_APPOINTMENT_STATUS).exists())
         if count >= 2:
             raise serializers.ValidationError("More than 2 appointment with the lab")
 
@@ -237,31 +250,18 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
     @staticmethod
     def time_slot_validator(data):
-        if data['start_time'] > data['end_time']:
+        start_dt = CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time'))
+        if start_dt > data['end_time']:
             raise serializers.ValidationError("Invalid Time Slot")
 
-        day_of_week = data['start_time'].weekday()
-        start_hour = data['start_time'].hour
-        end_hour = data['end_time'].hour
-        lab_timing_queryset = LabTiming.objects.filter(lab=data['lab_id'], day=day_of_week, start__lte=start_hour,
+        day_of_week = start_dt.weekday()
+        start_hour = start_dt.hour
+        end_hour = int(data['end_time'])
+        # end_hour = data['end_time'].hour
+        lab_timing_queryset = LabTiming.objects.filter(lab=data['lab'], day=day_of_week, start__lte=start_hour,
                                                        end__gte=end_hour)
         if not lab_timing_queryset:
             raise serializers.ValidationError("No time slot available")
-
-
-class AddressSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Address
-        fields = "__all__"
-
-    def validate(self, attrs):
-        request = self.context.get("request")
-        if attrs.get("user") != request.user:
-            raise serializers.ValidationError("User is not correct.")
-        if attrs.get("profile") and not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
-            raise serializers.ValidationError("Profile is not correct.")
-        return attrs
 
 
 class TimeSlotSerializer(serializers.Serializer):

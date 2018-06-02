@@ -8,6 +8,9 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, 
 
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+import math
+import datetime
+import pytz
 User = get_user_model()
 
 
@@ -42,7 +45,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     patient_dob = serializers.ReadOnlyField(source='profile.dob')
     patient_gender = serializers.ReadOnlyField(source='profile.gender'),
     patient_image = serializers.SerializerMethodField()
-    type = serializers.CharField(default='doctor')
+    type = serializers.ReadOnlyField(default='doctor')
 
     class Meta:
         model = OpdAppointment
@@ -52,7 +55,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         if obj.profile.profile_image:
             return obj.profile.profile_image
         else:
-            return None
+            return ""
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
@@ -64,8 +67,12 @@ class CreateAppointmentSerializer(serializers.Serializer):
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
-    time_slot_start = serializers.DateTimeField()
-    time_slot_end = serializers.DateTimeField()
+    start_date = serializers.CharField()
+    start_time = serializers.FloatField()
+    end_date = serializers.CharField(required=False)
+    end_time = serializers.FloatField(required=False)
+    # time_slot_start = serializers.DateTimeField()
+    # time_slot_end = serializers.DateTimeField()
 
     def validate(self, data):
         ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.CREATED, OpdAppointment.ACCEPTED,
@@ -73,8 +80,11 @@ class CreateAppointmentSerializer(serializers.Serializer):
         MAX_APPOINTMENTS_ALLOWED = 3
         MAX_FUTURE_DAY = 7
         request = self.context.get("request")
-        time_slot_start = data.get("time_slot_start")
-        time_slot_end = data.get("time_slot_end")
+        time_slot_start = self.form_time_slot(data.get('start_date'), data.get('start_time'))
+
+        time_slot_end = None
+        if data.get('end_date') and data.get('end_time'):
+            time_slot_end = self.form_time_slot(data.get('end_date'), data.get('end_time'))
 
         if not request.user.user_type == User.CONSUMER:
             raise serializers.ValidationError("Not allowed to create appointment")
@@ -82,13 +92,12 @@ class CreateAppointmentSerializer(serializers.Serializer):
         if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
             raise serializers.ValidationError("Invalid profile id")
 
-        if time_slot_start<timezone.now():
+        if time_slot_start < timezone.now():
             raise serializers.ValidationError("Cannot book in past")
 
         delta = time_slot_start - timezone.now()
         if delta.days > MAX_FUTURE_DAY:
             raise serializers.ValidationError("Cannot book appointment more than "+str(MAX_FUTURE_DAY)+" days ahead")
-
 
         if not DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
             day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).exists():
@@ -101,6 +110,21 @@ class CreateAppointmentSerializer(serializers.Serializer):
             raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
 
         return data
+
+    @staticmethod
+    def form_time_slot(date_str, time):
+        date, temp = date_str.split("T")
+        date_str = str(date)
+        min, hour = math.modf(time)
+        if min < 10:
+            min = "0" + str(int(min))
+        else:
+            min = str(int(min))
+        time_str = str(int(hour))+":"+str(min)
+        date_time_field = str(date_str) + "T" + time_str
+        dt_field = datetime.datetime.strptime(date_time_field, "%Y-%m-%dT%H:%M")
+        dt_field = pytz.utc.localize(dt_field)
+        return dt_field
 
 
 class SetAppointmentSerializer(serializers.Serializer):

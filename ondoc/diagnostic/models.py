@@ -4,6 +4,7 @@ from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image,
 from ondoc.doctor.models import Hospital
 from django.utils import timezone
 from datetime import timedelta
+from django.contrib.postgres.fields import JSONField
 
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
@@ -299,6 +300,7 @@ class LabAppointment(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
     lab_test = models.ManyToManyField(AvailableLabTest)
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)
+    profile_detail = JSONField(blank=True, null=True)
     status = models.PositiveSmallIntegerField(default=CREATED)
     price = models.PositiveSmallIntegerField()
     time_slot_start = models.DateTimeField(blank=True, null=True)

@@ -25,6 +25,7 @@ from ondoc.api.v1.utils import RawSql
 from django.contrib.auth import get_user_model
 from django.db.models import F
 from collections import defaultdict
+import json
 User = get_user_model()
 
 
@@ -192,16 +193,27 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        time_slot_start = data.get("time_slot_start")
+        time_slot_start = serializers.CreateAppointmentSerializer.form_time_slot(data.get("start_date"),
+                                                                                 data.get("start_time"))
+        # time_slot_start = data.get("time_slot_start")
 
         doctor_hospital = models.DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
             day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).first()
         fees = doctor_hospital.fees
 
+        profile_detail = dict()
+        # profile_model = auth_models.UserProfile.objects.get()
+        profile_model = data.get("profile")
+        profile_detail["name"] = profile_model.name
+        profile_detail["gender"] = profile_model.gender
+        profile_detail["dob"] = str(profile_model.dob)
+        # profile_detail["profile_image"] = profile_model.profile_image
+
         data = {
             "doctor": data.get("doctor").id,
             "hospital": data.get("hospital").id,
             "profile": data.get("profile").id,
+            "profile_detail": json.dumps(profile_detail),
             "user": request.user.id,
             "booked_by": request.user.id,
             "fees": fees,
@@ -215,6 +227,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         resp = {}
         resp["status"] = 1
         resp["data"] = appointment_serializer.data
+        resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 1)
         return Response(data=resp)
 
     def update(self, request, pk=None):
@@ -279,6 +292,36 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             temp['appointment'] = data
             whole_queryset.append(temp)
         return whole_queryset
+
+    def payment_details(self, request, appointment_details, product_id):
+        details = dict()
+        pgdata = dict()
+        user = request.user
+        user_profile = user.profiles.filter(is_default_user=True).first()
+        pgdata['custId'] = user.id
+        pgdata['mobile'] = user.phone_number
+        pgdata['email'] = user.email
+        if not user.email:
+            pgdata['email'] = "dummy_appointment@policybazaar.com"
+
+        pgdata['productId'] = product_id
+        pgdata['surl'] = '/user/payment/success'
+        pgdata['furl'] = '/user/payment/failure'
+        pgdata['checkSum'] = ''
+        pgdata['appointmentId'] = appointment_details['id']
+        if user_profile:
+            pgdata['name'] = user_profile.name
+        else:
+            pgdata['name'] = "DummyName"
+        pgdata['txAmount'] = appointment_details['fees']
+
+        if pgdata:
+            details['required'] = True
+            details['pgdata'] = pgdata
+        else:
+            details['required'] = False
+
+        return details
 
 
 class DoctorProfileView(viewsets.GenericViewSet):

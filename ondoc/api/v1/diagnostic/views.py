@@ -2,7 +2,7 @@ from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSe
                           LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
                           LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
                           PromotedLabsSerializer, CommonConditionsSerializer, TimeSlotSerializer,
-                          AddressSerializer, SearchLabListSerializer)
+                          SearchLabListSerializer)
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
 from ondoc.authentication.models import UserProfile, Address
@@ -250,8 +250,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
 
         lab_appointment_queryset = serializer.save()
-        serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
-        return Response(serializer.data)
+        appointment_serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
+        resp = {}
+        resp["status"] = 1
+        resp["data"] = appointment_serializer.data
+        resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 2)
+        return Response(data=resp)
 
     def update(self, request, pk):
         data = request.data
@@ -271,57 +275,35 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
         return Response(serializer.data)
 
+    def payment_details(self, request, appointment_details, product_id):
+        details = dict()
+        pgdata = dict()
+        user = request.user
+        user_profile = user.profiles.filter(is_default_user=True).first()
+        pgdata['custId'] = user.id
+        pgdata['mobile'] = user.phone_number
+        pgdata['email'] = user.email
+        if not user.email:
+            pgdata['email'] = "dummy_appointment@policybazaar.com"
 
-class AddressViewsSet(viewsets.ModelViewSet):
-    serializer_class = AddressSerializer
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
-    pagination_class = None
+        pgdata['productId'] = product_id
+        pgdata['surl'] = '/user/payment/success'
+        pgdata['furl'] = '/user/payment/failure'
+        pgdata['checkSum'] = ''
+        pgdata['appointmentId'] = appointment_details['id']
+        if user_profile:
+            pgdata['name'] = user_profile.name
+        else:
+            pgdata['name'] = "DummyName"
+        pgdata['txAmount'] = appointment_details['price']
 
-    def get_queryset(self):
-        request = self.request
-        return Address.objects.filter(user=request.user)
+        if pgdata:
+            details['required'] = True
+            details['pgdata'] = pgdata
+        else:
+            details['required'] = False
 
-    def create(self, request, *args, **kwargs):
-        data = dict(request.data)
-        data["user"] = request.user.id
-        # Added recently
-        if 'is_default' not in data:
-            if not Address.objects.filter(user=request.user.id).exists():
-                data['is_default'] = True
-
-        serializer = AddressSerializer(data=data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-
-    def update(self, request, pk=None):
-        data = request.data
-        data['user'] = request.user.id
-        queryset = get_object_or_404(Address, pk=pk)
-        if data.get("is_default"):
-            add_default_qs = Address.objects.filter(user=request.user.id, is_default=True)
-            if add_default_qs:
-                add_default_qs.update(is_default=False)
-        serializer = AddressSerializer(queryset, data=data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-
-    def destroy(self, request, pk=None):
-        address = get_object_or_404(Address, pk=pk)
-
-        if address.is_default:
-            temp_addr = Address.objects.filter(user=request.user.id).first()
-            if temp_addr:
-                temp_addr.is_default = True
-                temp_addr.save()
-
-        # address = Address.objects.filter(pk=pk).first()
-        address.delete()
-        return Response({
-            "status": 1
-        })
+        return details
 
 
 class LabTimingListView(mixins.ListModelMixin,

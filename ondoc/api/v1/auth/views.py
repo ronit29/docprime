@@ -18,7 +18,7 @@ from ondoc.sms.api import send_otp
 
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         UserPermission)
+                                         UserPermission, Address)
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -340,68 +340,55 @@ class UserAppointmentsViewSet(OndocViewSet):
         serializer = OpdAppointmentSerializer(queryset, many=True)
         return serializer.data
 
-    @transaction.atomic
-    def create(self, request):
-        serializer = CreateAppointmentSerializer(data=request.data, context={'request': request})
+
+class AddressViewsSet(viewsets.ModelViewSet):
+    serializer_class = serializers.AddressSerializer
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    pagination_class = None
+
+    def get_queryset(self):
+        request = self.request
+        return Address.objects.filter(user=request.user)
+
+    def create(self, request, *args, **kwargs):
+        data = dict(request.data)
+        data["user"] = request.user.id
+        # Added recently
+        if 'is_default' not in data:
+            if not Address.objects.filter(user=request.user.id).exists():
+                data['is_default'] = True
+
+        serializer = serializers.AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        time_slot_start = data.get("time_slot_start")
-
-        doctor_hospital = DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
-                                                        day=time_slot_start.weekday(),
-                                                        start__lte=time_slot_start.hour,
-                                                        end__gte=time_slot_start.hour).first()
-        fees = doctor_hospital.fees
-
-        data = {
-            "doctor": data.get("doctor").id,
-            "hospital": data.get("hospital").id,
-            "profile": data.get("profile").id,
-            "user": request.user.id,
-            "booked_by": request.user.id,
-            "fees": fees,
-            "time_slot_start": time_slot_start,
-            # "time_slot_end": time_slot_end,
-        }
-
-        appointment_serializer = OpdAppointmentSerializer(data=data)
-        appointment_serializer.is_valid(raise_exception=True)
-        appointment_serializer.save()
-        resp = {}
-        resp["status"] = 1
-        resp["data"] = appointment_serializer.data
-        return Response(data=resp)
+        serializer.save()
+        return Response(serializer.data)
 
     def update(self, request, pk=None):
-        opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
-        serializer = UpdateStatusSerializer(data=request.data,
-                                                        context={'request': request,
-                                                                 'opd_appointment': opd_appointment})
+        data = request.data
+        data['user'] = request.user.id
+        queryset = get_object_or_404(Address, pk=pk)
+        if data.get("is_default"):
+            add_default_qs = Address.objects.filter(user=request.user.id, is_default=True)
+            if add_default_qs:
+                add_default_qs.update(is_default=False)
+        serializer = serializers.AddressSerializer(queryset, data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        allowed = opd_appointment.allowed_action(request.user.user_type)
-        appt_status = validated_data['status']
-        if appt_status not in allowed:
-            resp = {}
-            resp['allowed'] = allowed
-            return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(serializer.data)
 
-        # if request.user.user_type == User.DOCTOR:
-        #     updated_opd_appointment = self.doctor_update(opd_appointment, validated_data)
-        # elif request.user.user_type == User.CONSUMER:
-        updated_opd_appointment = self.consumer_update(opd_appointment, validated_data)
+    def destroy(self, request, pk=None):
+        address = get_object_or_404(Address, pk=pk)
 
-        opd_appointment_serializer = OpdAppointmentSerializer(updated_opd_appointment)
-        response = {
-            "status": 1,
-            "data": opd_appointment_serializer.data
-        }
-        return Response(response)
+        if address.is_default:
+            temp_addr = Address.objects.filter(user=request.user.id).first()
+            if temp_addr:
+                temp_addr.is_default = True
+                temp_addr.save()
 
-    def consumer_update(self, opd_appointment, validated_data):
-        opd_appointment.status = validated_data.get('status')
-        if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
-            opd_appointment.time_slot_start = validated_data.get("time_slot_start")
-            opd_appointment.time_slot_end = validated_data.get("time_slot_end")
-        opd_appointment.save()
-        return opd_appointment
+        # address = Address.objects.filter(pk=pk).first()
+        address.delete()
+        return Response({
+            "status": 1
+        })
+
