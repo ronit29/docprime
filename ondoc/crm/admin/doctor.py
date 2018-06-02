@@ -259,7 +259,7 @@ class CityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'hospitals__city'
     def lookups(self, request, model_admin):
-        cities = set([(c['hospitals__city'].upper(),c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('') for c in Doctor.objects.all().values('hospitals__city')])
+        cities = set([(c['hospitals__city'].upper(),c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('','') for c in Doctor.objects.all().values('hospitals__city')])
         return cities
 
     def queryset(self, request, queryset):
