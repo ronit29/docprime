@@ -259,7 +259,6 @@ class CityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'hospitals__city'
     def lookups(self, request, model_admin):
-        model_name = model_admin.model.__name__
         cities = set([(c['hospitals__city'].upper(),c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('') for c in Doctor.objects.all().values('hospitals__city')])
         return cities
 

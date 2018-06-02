@@ -1,7 +1,7 @@
 from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
 from django.db.models import Q
-from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,
+from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,Doctor,
     HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
 from .common import *
 from ondoc.crm.constants import constants
@@ -105,7 +105,6 @@ class HospCityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'city'
     def lookups(self, request, model_admin):
-        model_name = model_admin.model.__name__
         cities = set([(c['city'].upper(),c['city'].upper()) for c in Hospital.objects.all().values('city')])
         return cities
 
@@ -120,7 +119,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def associated_doctors(self, instance):
         if instance.id:
             html = "<ul style='margin-left:0px !important'>"
-            for doc in Doctor.objects.filter(hospitals=instance.id):
+            for doc in Doctor.objects.filter(hospitals=instance.id).distinct():
                 html += "<li><a target='_blank' href='/admin/doctor/doctor/%s/change'>%s</a></li>"% (doc.id, doc.name)
             html += "</ul>"
             return mark_safe(html)
