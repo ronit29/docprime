@@ -307,7 +307,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
 
-    authentication_classes = (TokenAuthentication,)
+    # authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
