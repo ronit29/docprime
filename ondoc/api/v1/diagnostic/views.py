@@ -2,7 +2,7 @@ from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSe
                           LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
                           LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
                           PromotedLabsSerializer, CommonConditionsSerializer, TimeSlotSerializer,
-                          AddressSerializer, SearchLabListSerializer)
+                          SearchLabListSerializer)
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
 from ondoc.authentication.models import UserProfile, Address
@@ -21,6 +21,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
+from django.db import transaction
 from django.db.models import Count, Sum, Max
 from django.http import Http404
 from rest_framework import status
@@ -241,14 +242,19 @@ class LabAppointmentView(mixins.CreateModelMixin,
     #     serializer = LabAppointmentModelSerializer(queryset)
     #     return Response(serializer.data)
 
+    @transaction.atomic
     def create(self, request, **kwargs):
         serializer = LabAppointmentCreateSerializer(data=request.data)
 
         serializer.is_valid(raise_exception=True)
 
         lab_appointment_queryset = serializer.save()
-        serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
-        return Response(serializer.data)
+        appointment_serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
+        resp = {}
+        resp["status"] = 1
+        resp["data"] = appointment_serializer.data
+        resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 2)
+        return Response(data=resp)
 
     def update(self, request, pk):
         data = request.data
@@ -268,61 +274,40 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
         return Response(serializer.data)
 
+    def payment_details(self, request, appointment_details, product_id):
+        details = dict()
+        pgdata = dict()
+        user = request.user
+        user_profile = user.profiles.filter(is_default_user=True).first()
+        pgdata['custId'] = user.id
+        pgdata['mobile'] = user.phone_number
+        pgdata['email'] = user.email
+        if not user.email:
+            pgdata['email'] = "dummy_appointment@policybazaar.com"
 
-class AddressViewsSet(viewsets.ModelViewSet):
-    serializer_class = AddressSerializer
-    permission_classes = (IsAuthenticated,)
-    pagination_class = None
+        pgdata['productId'] = product_id
+        pgdata['surl'] = '/user/payment/success'
+        pgdata['furl'] = '/user/payment/failure'
+        pgdata['checkSum'] = ''
+        pgdata['appointmentId'] = appointment_details['id']
+        if user_profile:
+            pgdata['name'] = user_profile.name
+        else:
+            pgdata['name'] = "DummyName"
+        pgdata['txAmount'] = appointment_details['price']
 
-    def get_queryset(self):
-        request = self.request
-        return Address.objects.filter(user=request.user)
-
-    def create(self, request, *args, **kwargs):
-        data = dict(request.data)
-        data["user"] = request.user.id
-        # Added recently
-        if 'is_default' not in data:
-            if not Address.objects.filter(user=request.user.id).exists():
-                data['is_default'] = True
-
-        serializer = AddressSerializer(data=data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-
-    def update(self, request, pk=None):
-        data = request.data
-        data['user'] = request.user.id
-        queryset = get_object_or_404(Address, pk=pk)
-        if data.get("is_default"):
-            add_default_qs = Address.objects.filter(user=request.user.id, is_default=True)
-            if add_default_qs:
-                add_default_qs.update(is_default=False)
-        serializer = AddressSerializer(queryset, data=data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-
-    def destroy(self, request, pk=None):
-        address = get_object_or_404(Address, pk=pk)
-
-        if address.is_default:
-            temp_addr = Address.objects.filter(user=request.user.id).first()
-            if temp_addr:
-                temp_addr.is_default = True
-                temp_addr.save()
-
-        # address = Address.objects.filter(pk=pk).first()
-        address.delete()
-        return Response({
-            "status": 1
-        })
+        if pgdata:
+            details['required'] = True
+            details['pgdata'] = pgdata
+        else:
+            details['required'] = False
+        return details
 
 
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
 
+    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
@@ -333,7 +318,10 @@ class LabTimingListView(mixins.ListModelMixin,
         if not queryset:
             return Response([])
 
-        obj = LabSlotExtraction(queryset)
+        obj = TimeSlotExtraction()
+
+        for data in queryset:
+            obj.form_time_slots(data.day, data.start, data.end, None, True)
 
         # resp_dict = obj.get_timing()
         resp_list = obj.get_timing_list()
@@ -363,28 +351,30 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
         return Response(serializer.data)
 
 
-class LabSlotExtraction(object):
-    MORNING = 0
-    AFTERNOON = 1
-    EVENING = 2
+class TimeSlotExtraction(object):
+    MORNING = "Morning"
+    AFTERNOON = "Afternoon"
+    EVENING = "Evening"
     TIME_SPAN = 15
     timing = dict()
+    price_available = dict()
 
-    def __init__(self, queryset):
+    def __init__(self):
         for i in range(7):
             self.timing[i] = dict()
-        self.extract_time_slot(queryset)
+            self.price_available[i] = dict()
+        # self.extract_time_slot(queryset)
 
-    def extract_time_slot(self, queryset):
-        for obj in queryset:
-            self.fetch_time_slot(obj)
+    # def extract_time_slot(self, queryset):
+    #     for obj in queryset:
+    #         self.form_time_slots(obj.day, obj.start, obj.end, obj.)
 
-    def fetch_time_slot(self, obj):
-        start = float(obj.start)
-        end = float(obj.end)
-        time_span = self.TIME_SPAN
-        day = obj.day
+    def form_time_slots(self, day, start, end, price=None, is_available=True):
+        start = float(start)
+        end = float(end)
+        # day = obj.day
         # timing = self.context['timing']
+        time_span = self.TIME_SPAN
 
         int_span = (time_span / 60)
         # timing = dict()
@@ -393,6 +383,7 @@ class LabSlotExtraction(object):
             self.timing[day]['timing'][self.MORNING] = OrderedDict()
             self.timing[day]['timing'][self.AFTERNOON] = OrderedDict()
             self.timing[day]['timing'][self.EVENING] = OrderedDict()
+
         num_slots = int(60 / time_span)
         if 60 % time_span != 0:
             num_slots += 1
@@ -404,6 +395,7 @@ class LabSlotExtraction(object):
                 day_slot, am_pm = self.get_day_slot(temp_h)
                 time_str = self.form_time_string(temp_h, am_pm)
                 self.timing[day]['timing'][day_slot][temp_h] = time_str
+                self.price_available[day][temp_h] = {"price": price, "is_available": is_available}
             h += 1
 
     def get_day_slot(self, time):
@@ -437,13 +429,24 @@ class LabSlotExtraction(object):
         return time_str
 
     def get_timing_list(self):
+        whole_timing_data = dict()
         for i in range(7):
+            whole_timing_data[i] = list()
+            pa = self.price_available[i]
             if self.timing[i].get('timing'):
-                temp_list = list()
-                temp_list = [[k, v] for k, v in self.timing[i]['timing'][0].items()]
-                self.timing[i]['timing'][0] = temp_list
-                temp_list = [[k, v] for k, v in self.timing[i]['timing'][1].items()]
-                self.timing[i]['timing'][1] = temp_list
-                temp_list = [[k, v] for k, v in self.timing[i]['timing'][2].items()]
-                self.timing[i]['timing'][2] = temp_list
-        return self.timing
+                # data = self.format_data(self.timing[i]['timing'][self.MORNING], pa)
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
+
+        return whole_timing_data
+
+    def format_data(self, data, day_time, pa):
+        data_list = list()
+        for k, v in data.items():
+            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_available": pa[k]["is_available"]})
+        format_data = dict()
+        format_data['title'] = day_time
+        format_data['timing'] = data_list
+        return format_data
+
