@@ -1,6 +1,7 @@
 from django.contrib.gis import admin
 from django.contrib.gis import forms
 from django.db import models
+from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 
@@ -111,7 +112,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     def associated_hospitals(self, instance):
         if instance.id:
             html = "<ul style='margin-left:0px !important'>"
-            for hosp in Hospital.objects.filter(network=instance.id):
+            for hosp in Hospital.objects.filter(network=instance.id).distinct():
                 html += "<li><a target='_blank' href='/admin/doctor/hospital/%s/change'>%s</a></li>"% (hosp.id, hosp.name)
             html += "</ul>"
             return mark_safe(html)

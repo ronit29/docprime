@@ -1,5 +1,6 @@
 from django.contrib.gis import forms
 from django.contrib.gis import admin
+from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from django.db import models
@@ -103,7 +104,7 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     def associated_labs(self, instance):
         if instance.id:
             html = "<ul style='margin-left:0px !important'>"
-            for lab in Lab.objects.filter(network=instance.id):
+            for lab in Lab.objects.filter(network=instance.id).distinct():
                 html += "<li><a target='_blank' href='/admin/diagnostic/lab/%s/change'>%s</a></li>" % (lab.id, lab.name)
             html += "</ul>"
             return mark_safe(html)
