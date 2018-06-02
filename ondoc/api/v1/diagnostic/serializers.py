@@ -144,14 +144,14 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
         pass
 
     def update(self, instance, data):
-        if data['status'] == LabAppointment.RESCHEDULED_PATIENT:
-            self.reschedule_validation(instance, data)
-            instance.time_slot_start = data.get("start_time", instance.time_slot_start)
-            instance.time_slot_end = data.get("end_time", instance.time_slot_end)
-        elif data['status'] == LabAppointment.CANCELED:
-            self.cancel_validation(instance, data)
-        else:
-            raise serializers.ValidationError("Invalid Status")
+        # if data['status'] == LabAppointment.RESCHEDULED_PATIENT:
+        #     self.reschedule_validation(instance, data)
+        # elif data['status'] == LabAppointment.CANCELED:
+        #     self.cancel_validation(instance, data)
+        # else:
+        #     raise serializers.ValidationError("Invalid Status")
+        instance.time_slot_start = data.get("start_time", instance.time_slot_start)
+        instance.time_slot_end = data.get("end_time", instance.time_slot_end)
         instance.status = data.get("status", instance.status)
         instance.save()
         return instance
@@ -181,7 +181,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
         self.test_lab_id_validator(data)
 
-        self.profile_validator(data)
+        # self.profile_validator(data)
 
         self.time_slot_validator(data)
 
@@ -192,8 +192,10 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         self.num_appointment_validator(data)
 
         appointment_data = dict()
-        appointment_data['lab'] = Lab.objects.get(pk=data["lab"])
-        appointment_data['profile'] = UserProfile.objects.get(pk=data["profile"])
+        appointment_data['lab'] = data["lab"]
+        # appointment_data['lab'] = Lab.objects.get(pk=data["lab"])
+        appointment_data['profile'] = data["profile"]
+        # appointment_data['profile'] = UserProfile.objects.get(pk=data["profile"])
 
         lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
         temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"), total_deal_price=Sum("deal_price"))
@@ -204,14 +206,15 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
 
         appointment_data['price'] = total_mrp
-        appointment_data['time_slot_start'] = data["start_time"]
-        appointment_data['time_slot_end'] = data["end_time"]
+        start_dt = CreateAppointmentSerializer.form_time_slot(data["start_date"], data["start_time"])
+        appointment_data['time_slot_start'] = start_dt
+        # appointment_data['time_slot_end'] = data["end_time"]
         profile_detail = dict()
         profile_model = appointment_data["profile"]
         profile_detail["name"] = profile_model.name
         profile_detail["gender"] = profile_model.gender
-        profile_detail["dob"] = profile_model.dob
-        profile_detail["profile_image"] = profile_model.profile_image
+        profile_detail["dob"] = str(profile_model.dob)
+        # profile_detail["profile_image"] = profile_model.profile_image
         appointment_data['profile_detail'] = json.dumps(profile_detail)
 
         queryset = LabAppointment.objects.create(**appointment_data)
@@ -236,30 +239,29 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     def test_lab_id_validator(data):
         if not data['test_ids']:
             raise serializers.ValidationError(" No Test Ids given")
-        avail_test_queryset = AvailableLabTest.objects.filter(lab=data["lab_id"], test__in=data['test_ids']).values(
+        avail_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids']).values(
             'id')
 
         if len(avail_test_queryset) != len(data['test_ids']):
             raise serializers.ValidationError("Test Ids or lab Id is incorrect")
 
-    @staticmethod
-    def profile_validator(data):
-        profile_queryset = UserProfile.objects.filter(pk=data['profile_id'])
-        if not profile_queryset:
-            raise serializers.ValidationError("Profile Id is incorrect")
+    # @staticmethod
+    # def profile_validator(data):
+    #     profile_queryset = UserProfile.objects.filter(pk=data['profile'].id)
+    #     if not profile_queryset:
+    #         raise serializers.ValidationError("Profile Id is incorrect")
 
     @staticmethod
     def time_slot_validator(data):
         start_dt = CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time'))
-        if start_dt > data['end_time']:
-            raise serializers.ValidationError("Invalid Time Slot")
+        # if start_dt.hour > data['end_time']:
+        #     raise serializers.ValidationError("Invalid Time Slot")
 
         day_of_week = start_dt.weekday()
         start_hour = start_dt.hour
-        end_hour = int(data['end_time'])
+        # end_hour = int(data['end_time'])
         # end_hour = data['end_time'].hour
-        lab_timing_queryset = LabTiming.objects.filter(lab=data['lab'], day=day_of_week, start__lte=start_hour,
-                                                       end__gte=end_hour)
+        lab_timing_queryset = LabTiming.objects.filter(lab=data['lab'], day=day_of_week, start__lte=start_hour)
         if not lab_timing_queryset:
             raise serializers.ValidationError("No time slot available")
 

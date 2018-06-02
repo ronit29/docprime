@@ -22,6 +22,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
+from django.db import transaction
 from django.db.models import Count, Sum, Max
 from django.http import Http404
 from rest_framework import status
@@ -244,6 +245,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
     #     serializer = LabAppointmentModelSerializer(queryset)
     #     return Response(serializer.data)
 
+    @transaction.atomic
     def create(self, request, **kwargs):
         serializer = LabAppointmentCreateSerializer(data=request.data)
 
@@ -309,8 +311,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
 
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    # authentication_classes = (TokenAuthentication,)
+    # permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         params = request.query_params
@@ -320,7 +322,10 @@ class LabTimingListView(mixins.ListModelMixin,
         if not queryset:
             return Response([])
 
-        obj = LabSlotExtraction(queryset)
+        obj = TimeSlotExtraction()
+
+        for data in queryset:
+            obj.form_time_slots(data.day, data.start, data.end, None, True)
 
         # resp_dict = obj.get_timing()
         resp_list = obj.get_timing_list()
@@ -350,28 +355,30 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
         return Response(serializer.data)
 
 
-class LabSlotExtraction(object):
-    MORNING = 0
-    AFTERNOON = 1
-    EVENING = 2
+class TimeSlotExtraction(object):
+    MORNING = "Morning"
+    AFTERNOON = "Afternoon"
+    EVENING = "Evening"
     TIME_SPAN = 15
     timing = dict()
+    price_available = dict()
 
-    def __init__(self, queryset):
+    def __init__(self):
         for i in range(7):
             self.timing[i] = dict()
-        self.extract_time_slot(queryset)
+            self.price_available[i] = dict()
+        # self.extract_time_slot(queryset)
 
-    def extract_time_slot(self, queryset):
-        for obj in queryset:
-            self.fetch_time_slot(obj)
+    # def extract_time_slot(self, queryset):
+    #     for obj in queryset:
+    #         self.form_time_slots(obj.day, obj.start, obj.end, obj.)
 
-    def fetch_time_slot(self, obj):
-        start = float(obj.start)
-        end = float(obj.end)
-        time_span = self.TIME_SPAN
-        day = obj.day
+    def form_time_slots(self, day, start, end, price=None, is_available=True):
+        start = float(start)
+        end = float(end)
+        # day = obj.day
         # timing = self.context['timing']
+        time_span = self.TIME_SPAN
 
         int_span = (time_span / 60)
         # timing = dict()
@@ -380,6 +387,7 @@ class LabSlotExtraction(object):
             self.timing[day]['timing'][self.MORNING] = OrderedDict()
             self.timing[day]['timing'][self.AFTERNOON] = OrderedDict()
             self.timing[day]['timing'][self.EVENING] = OrderedDict()
+
         num_slots = int(60 / time_span)
         if 60 % time_span != 0:
             num_slots += 1
@@ -391,6 +399,7 @@ class LabSlotExtraction(object):
                 day_slot, am_pm = self.get_day_slot(temp_h)
                 time_str = self.form_time_string(temp_h, am_pm)
                 self.timing[day]['timing'][day_slot][temp_h] = time_str
+                self.price_available[day][temp_h] = {"price": price, "is_available": is_available}
             h += 1
 
     def get_day_slot(self, time):
@@ -424,13 +433,24 @@ class LabSlotExtraction(object):
         return time_str
 
     def get_timing_list(self):
+        whole_timing_data = dict()
         for i in range(7):
+            whole_timing_data[i] = list()
+            pa = self.price_available[i]
             if self.timing[i].get('timing'):
-                temp_list = list()
-                temp_list = [[k, v] for k, v in self.timing[i]['timing'][0].items()]
-                self.timing[i]['timing'][0] = temp_list
-                temp_list = [[k, v] for k, v in self.timing[i]['timing'][1].items()]
-                self.timing[i]['timing'][1] = temp_list
-                temp_list = [[k, v] for k, v in self.timing[i]['timing'][2].items()]
-                self.timing[i]['timing'][2] = temp_list
-        return self.timing
+                # data = self.format_data(self.timing[i]['timing'][self.MORNING], pa)
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
+
+        return whole_timing_data
+
+    def format_data(self, data, day_time, pa):
+        data_list = list()
+        for k, v in data.items():
+            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_available": pa[k]["is_available"]})
+        format_data = dict()
+        format_data['title'] = day_time
+        format_data['timing'] = data_list
+        return format_data
+

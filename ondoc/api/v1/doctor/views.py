@@ -1,7 +1,7 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from . import serializers
-from ondoc.api.v1.diagnostic.serializers import TimeSlotSerializer
+from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings
 from django.db.models import Min
@@ -649,18 +649,30 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                                                      "qualifications__specialization")
                            .filter(pk=validated_data.get('doctor_id').id))
         doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
+
         timeslots = dict()
-        for i in range(0, 7):
-            timeslots[i] = dict()
-        timeslot_serializer = TimeSlotSerializer(queryset, context={'timing': timeslots}, many=True)
-        data = timeslot_serializer.data
-        for i in range(7):
-            if timeslots[i].get('timing'):
-                temp_list = list()
-                temp_list = [[k, v] for k, v in timeslots[i]['timing'][0].items()]
-                timeslots[i]['timing'][0] = temp_list
-                temp_list = [[k, v] for k, v in timeslots[i]['timing'][1].items()]
-                timeslots[i]['timing'][1] = temp_list
-                temp_list = [[k, v] for k, v in timeslots[i]['timing'][2].items()]
-                timeslots[i]['timing'][2] = temp_list
+        obj = TimeSlotExtraction()
+
+        for data in queryset:
+            obj.form_time_slots(data.day, data.start, data.end, data.fees, True)
+
+        # resp_dict = obj.get_timing()
+        timeslots = obj.get_timing_list()
+
+
+
+
+        # for i in range(0, 7):
+        #     timeslots[i] = dict()
+        # timeslot_serializer = TimeSlotSerializer(queryset, context={'timing': timeslots}, many=True)
+        # data = timeslot_serializer.data
+        # for i in range(7):
+        #     if timeslots[i].get('timing'):
+        #         temp_list = list()
+        #         temp_list = [[k, v] for k, v in timeslots[i]['timing'][0].items()]
+        #         timeslots[i]['timing'][0] = temp_list
+        #         temp_list = [[k, v] for k, v in timeslots[i]['timing'][1].items()]
+        #         timeslots[i]['timing'][1] = temp_list
+        #         temp_list = [[k, v] for k, v in timeslots[i]['timing'][2].items()]
+        #         timeslots[i]['timing'][2] = temp_list
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data})
