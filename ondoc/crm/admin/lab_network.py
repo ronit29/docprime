@@ -1,5 +1,6 @@
 from django.contrib.gis import forms
 from django.contrib.gis import admin
+from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from django.db import models

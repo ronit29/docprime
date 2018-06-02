@@ -2,10 +2,12 @@ from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,
-    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Doctor)
+    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
+from django.contrib.admin import SimpleListFilter
+
 
 class HospitalImageInline(admin.TabularInline):
     model = HospitalImage
@@ -99,8 +101,20 @@ class HospitalForm(FormCleanMixin):
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
 
 
+class HospCityFilter(SimpleListFilter):
+    title = 'city'
+    parameter_name = 'city'
+    def lookups(self, request, model_admin):
+        model_name = model_admin.model.__name__
+        cities = set([(c['city'].upper(),c['city'].upper()) for c in Hospital.objects.all().values('city')])
+        return cities
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(city__iexact=self.value()).distinct()
+
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
-    list_filter = ('data_status',)
+    list_filter = ('data_status',HospCityFilter)
     readonly_fields = ('associated_doctors',)
 
     def associated_doctors(self, instance):
