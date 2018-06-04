@@ -35,10 +35,14 @@ class QCPemAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
+        final_qs = None
         if request.user.is_superuser or request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-            return qs
+            final_qs = qs
         if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
-            return qs.filter(created_by=request.user )
+            final_qs = qs.filter(created_by=request.user)
+        if final_qs:
+            final_qs = final_qs.prefetch_related('created_by','created_by__staffprofile')
+        return final_qs
 
     class Meta:
         abstract = True

@@ -13,8 +13,8 @@ TEMPLATES[0]['OPTIONS']['debug'] = DEBUG
 # SESSION_COOKIE_SECURE=True
 # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# INSTALLED_APPS += ('debug_toolbar',)
-# MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
+INSTALLED_APPS += ('debug_toolbar',)
+MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
 
 # DEBUG_TOOLBAR_CONFIG = {
 #     'DISABLE_PANELS': [
