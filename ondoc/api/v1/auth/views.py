@@ -341,7 +341,6 @@ class UserAppointmentsViewSet(OndocViewSet):
 
 class AddressViewsSet(viewsets.ModelViewSet):
     serializer_class = serializers.AddressSerializer
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
