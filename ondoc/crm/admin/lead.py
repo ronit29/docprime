@@ -154,12 +154,17 @@ class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
         data = instance.json
         if not data:
             return
+        format_string = ""
+        for service_name in data.get("Services").values():
+            if MedicalService.objects.filter(name=service_name).exists():
+                format_string += "<div><span>{}</span></div>".format(service_name)
+            else:
+                format_string += "<div><span>{}</span><span style='color:red;'>-Does not exists.</span></div>".format(
+                    service_name)
         return format_html_join(
             mark_safe('<br/>'),
-            '{}',
-            ((service_name if MedicalService.objects.filter(
-                name=service_name).exists() else "{} - Does not exists.".format(service_name),) for service_name in
-             data.get("Services").values()),
+            format_string,
+            ((),),
         )
 
     def name(self, instance):
@@ -213,12 +218,16 @@ class DoctorLeadAdmin(ImportMixin, admin.ModelAdmin):
         data = instance.json
         if not data:
             return
+        format_string = ""
+        for service_name in data.get("Services").values():
+            if MedicalService.objects.filter(name=service_name).exists():
+                format_string += "<div><span>{}</span></div>".format(service_name)
+            else:
+                format_string += "<div><span>{}</span><span style='color:red;'>-Does not exists.</span></div>".format(service_name)
         return format_html_join(
             mark_safe('<br/>'),
-            '{}',
-            ((service_name if MedicalService.objects.filter(
-                name=service_name).exists() else "{} - Does not exists.".format(service_name),) for service_name in
-             data.get("Services").values()),
+            format_string,
+            ((),),
         )
 
     def specializations(self, instance):
@@ -226,13 +235,16 @@ class DoctorLeadAdmin(ImportMixin, admin.ModelAdmin):
         data = instance.json
         if not data:
             return
+        format_string = ""
+        for specialization_name in data.get("Specializations").values():
+            if Specialization.objects.filter(name=specialization_name).exists():
+                format_string += "<div><span>{}</span></div>".format(specialization_name)
+            else:
+                format_string += "<div><span>{}</span><span style='color:red;'>-Does not exists.</span></div>".format(specialization_name)
         return format_html_join(
             mark_safe('<br/>'),
-            '{}',
-            ((specialization_name if Specialization.objects.filter(
-                name=specialization_name).exists() else "{} - Does not exists.".format(specialization_name),) for
-             specialization_name in
-             data.get("Specializations").values()),
+            format_string,
+            ((),),
         )
 
     def awards(self, instance):
