@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.postgres.fields import JSONField
 from ondoc.authentication.models import TimeStampedModel
 from django.contrib.auth import get_user_model
+from django.template.loader import render_to_string
 
 
 User = get_user_model()
@@ -26,6 +27,20 @@ class EmailNotification(TimeStampedModel):
 
     class Meta:
         db_table = "email_notification"
+
+    @classmethod
+    def send_email_notification(cls, user, email, notification_type, context):
+        if notification_type == NotificationConstants.APPOINTMENT_ACCEPTED:
+            html_body = render_to_string("email/appointment_accepted.html", context=context)
+        EmailNotification.objects.create(
+            user=user,
+            email=email,
+            notification_type=notification_type,
+            content=html_body
+        )
+
+
+#         TODO - call function to pusblish this message to RabbitMQ
 
 
 class SmsNotification(TimeStampedModel):
