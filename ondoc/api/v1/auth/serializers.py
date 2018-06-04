@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from ondoc.authentication.models import OtpVerifications, User, UserProfile, Notification, NotificationEndpoint, UserPermission
+from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
+                                         UserPermission, Address)
 from ondoc.doctor.models import DoctorMobile
 import datetime
 from dateutil.relativedelta import relativedelta
@@ -129,3 +130,20 @@ class UserPermissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserPermission
         exclude = ('created_at', 'updated_at',)
+
+
+class AddressSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Address
+        fields = "__all__"
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if attrs.get("user") != request.user:
+            raise serializers.ValidationError("User is not correct.")
+        if attrs.get("profile") and not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
+            raise serializers.ValidationError("Profile is not correct.")
+        return attrs
+
+

@@ -2,6 +2,7 @@ from django.contrib.gis.db import models
 from django.db import migrations
 from django.db.models import Count
 from django.contrib.postgres.operations import CreateExtension
+from django.contrib.postgres.fields import JSONField
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
@@ -561,6 +562,7 @@ class OpdAppointment(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, related_name="hospital_appointments", on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
+    profile_detail = JSONField(blank=True, null=True)
     user  = models.ForeignKey(User, related_name="appointments", on_delete=models.CASCADE)
     booked_by = models.ForeignKey(User, related_name="booked_appointements", on_delete=models.CASCADE)
     fees = models.PositiveSmallIntegerField()
