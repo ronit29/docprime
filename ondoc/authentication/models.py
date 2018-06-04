@@ -3,6 +3,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import JSONField
+# from ondoc.doctor.models import OpdAppointment
 
 
 class Image(models.Model):
@@ -242,3 +243,18 @@ class UserPermission(TimeStampedModel):
 
     def __str__(self):
         return str(self.user.email)
+
+
+class AppointmentTransaction(TimeStampedModel):
+    from ondoc.doctor.models import OpdAppointment
+    appointment = models.ForeignKey(OpdAppointment, on_delete=models.SET_NULL, blank=True, null=True)
+    transaction_time = models.DateTimeField()
+    transaction_status = models.CharField(max_length=100)
+    status_code = models.PositiveIntegerField()
+    transaction_details = JSONField()
+
+    class Meta:
+        db_table = "appointment_transaction"
+
+    def __str__(self):
+        return "{}-{}".format(self.id, self.OpdAppointment)
