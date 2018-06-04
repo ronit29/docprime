@@ -206,7 +206,7 @@ class Address(TimeStampedModel):
     place_id = models.CharField(null=True, blank=True, max_length=100)
     address = models.TextField(null=True, blank=True)
     land_mark = models.TextField(null=True, blank=True)
-    pincode = models.PositiveIntegerField(null=True, blank=True, max_length=6)
+    pincode = models.PositiveIntegerField(null=True, blank=True)
     phone_number = models.CharField(null=True, blank=True, max_length=10)
     is_default = models.BooleanField(default=False)
 
