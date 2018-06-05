@@ -3,7 +3,8 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      CommonTest, CommonDiagnosticCondition, LabImage)
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
-from ondoc.api.v1.auth.serializers import AddressSerializer
+from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
+from ondoc.doctor.models import OpdAppointment
 from django.db.models import Count, Sum
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
@@ -42,10 +43,18 @@ class LabImageModelSerializer(serializers.ModelSerializer):
 
 class LabModelSerializer(serializers.ModelSerializer):
 
-    lat = serializers.FloatField(source='location.y')
-    long = serializers.FloatField(source='location.x')
+    lat = serializers.SerializerMethodField()
+    long = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     lab_image = LabImageModelSerializer(many=True)
+
+    def get_lat(self,obj):
+        if obj.location:
+            return obj.location.y
+
+    def get_long(self,obj):
+        if obj.location:
+            return obj.location.x
 
     def get_address(self, obj):
         address = ''
@@ -358,3 +367,18 @@ class SearchLabListSerializer(serializers.Serializer):
     lat = serializers.FloatField(required=False)
     ids = IdListField(required=False)
     order_by = serializers.CharField(required=False)
+
+
+class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
+    profile = UserProfileSerializer()
+    allowed_action = serializers.SerializerMethodField()
+    lab = LabModelSerializer()
+    lab_test = AvailableLabTestSerializer(many=True)
+
+    def get_allowed_action(self,obj):
+        user_type = ''
+        if self.context.get('request'):
+            user_type = self.context['request'].user.user_type
+            return OpdAppointment.allowed_action(obj,user_type)
+        else:
+            return []

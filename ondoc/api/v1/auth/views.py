@@ -29,9 +29,10 @@ from ondoc.api.pagination import paginate_queryset
 
 from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterSerializer,
-                                             UpdateStatusSerializer, CreateAppointmentSerializer,AppointmentRetrieveSerializer)
+                                             UpdateStatusSerializer, CreateAppointmentSerializer,AppointmentRetrieveSerializer
+                                             )
 from ondoc.diagnostic.models import (LabAppointment)
-from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer)
+from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer, LabAppointmentRetrieveSerializer)
 
 
 User = get_user_model()
@@ -307,7 +308,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         appointment_type = input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
             queryset = LabAppointment.objects.filter(pk=pk)
-            serializer = LabAppointmentModelSerializer(queryset, many=True)
+            serializer = LabAppointmentRetrieveSerializer(queryset, many=True,context={"request": request})
             return Response(serializer.data)
         elif appointment_type == 'doctor':
             queryset = OpdAppointment.objects.filter(pk=pk)
