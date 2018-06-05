@@ -581,12 +581,14 @@ class OpdAppointment(TimeStampedModel):
         current_datetime = timezone.now()
 
         if user_type == User.DOCTOR and self.time_slot_start<current_datetime:
-            if self.status == self.BOOKED:
-                allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
-            elif self.status == self.ACCEPTED:
-                allowed = [self.RESCHEDULED_DOCTOR]
-            elif self.status == self.RESCHEDULED_DOCTOR:
-                allowed = [self.ACCEPTED]
+            perm_queryset =  self.user.userpermission_set.filter(doctor=self.doctor.id).filter(hospital=self.hospital_id).first()
+            if not perm_queryset.read_permission:
+                if self.status == self.BOOKED:
+                    allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
+                elif self.status == self.ACCEPTED:
+                    allowed = [self.RESCHEDULED_DOCTOR]
+                elif self.status == self.RESCHEDULED_DOCTOR:
+                    allowed = [self.ACCEPTED]
 
         elif user_type == User.CONSUMER and current_datetime<self.time_slot_start+timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
