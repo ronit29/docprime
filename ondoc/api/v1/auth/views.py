@@ -1,5 +1,6 @@
 import base64
 import json
+import random
 from dateutil.parser import parse
 from django.http import HttpResponseRedirect
 from rest_framework.viewsets import GenericViewSet
@@ -410,6 +411,11 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
                                               transaction_status=response.get("txStatus"),
                                               status_code=response.get("statusCode"),
                                               transaction_details=response)
+        if response.get("statusCode") == 1:
+            ucc = random.randint(1000, 9999)
+            opd_appintment.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+            opd_appintment.ucc = ucc
+            opd_appintment.save()
         if response.get("productId") == 1:
             REDIRECT_URL = LAB_REDIRECT_URL.format(response.get("appointmentId"))
         else:

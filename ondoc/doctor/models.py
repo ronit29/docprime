@@ -556,6 +556,13 @@ class OpdAppointment(TimeStampedModel):
     CANCELED = 6
     COMPLETED = 7
 
+    PAYMENT_ACCEPTED = 1
+    PAYMENT_PENDING = 0
+    PAYMENT_STATUS_CHOICES = (
+        (PAYMENT_ACCEPTED, "Payment Accepted"),
+        (PAYMENT_PENDING, "Payment Pending"),
+    )
+
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
@@ -567,6 +574,8 @@ class OpdAppointment(TimeStampedModel):
     booked_by = models.ForeignKey(User, related_name="booked_appointements", on_delete=models.CASCADE)
     fees = models.PositiveSmallIntegerField()
     status = models.PositiveSmallIntegerField(default=CREATED)
+    payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
+    ucc = models.PositiveIntegerField(blank=True, null=True)
 
     #patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
     time_slot_start = models.DateTimeField(blank=True, null=True)
