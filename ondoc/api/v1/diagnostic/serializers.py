@@ -379,6 +379,6 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
         user_type = ''
         if self.context.get('request'):
             user_type = self.context['request'].user.user_type
-            return OpdAppointment.allowed_action(obj,user_type)
+            return LabAppointment.allowed_action(obj,user_type)
         else:
             return []
