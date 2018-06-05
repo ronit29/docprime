@@ -322,7 +322,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         allowed = opd_appointment.allowed_action(request.user.user_type)
-        appt_status = validated_data.status
+        appt_status = validated_data.get('status')
         if appt_status not in allowed:
             resp = {}
             resp['allowed'] = allowed
