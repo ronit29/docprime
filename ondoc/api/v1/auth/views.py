@@ -318,27 +318,54 @@ class UserAppointmentsViewSet(OndocViewSet):
             return Response({'Error':'Invalid Request Type'})
 
     def update(self, request, pk=None):
-        opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
         serializer = UpdateStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        allowed = opd_appointment.allowed_action(request.user.user_type)
-        appt_status = validated_data.get('status')
-        if appt_status not in allowed:
-            resp = {}
-            resp['allowed'] = allowed
-            return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+        query_input_serializer = serializers.AppointmentRetrieveSerializer(data=request.query_params)
+        query_input_serializer.is_valid(raise_exception=True)
+        appointment_type = query_input_serializer.validated_data.get('type')
+        if appointment_type == 'lab':
+            lab_appointment = get_object_or_404(LabAppointment, pk=pk)
+            allowed = lab_appointment.allowed_action(request.user.user_type)
+            appt_status = validated_data.get('status')
+            if appt_status not in allowed:
+                resp = {}
+                resp['allowed'] = allowed
+                return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+            updated_lab_appointment = self.lab_appointment_update(lab_appointment, validated_data)
+            lab_appointment_serializer = LabAppointmentRetrieveSerializer(updated_lab_appointment,context={"request": request})
+            response = {
+                "status": 1,
+                "data": lab_appointment_serializer.data
+            }
+            return Response(response)
+        if appointment_type == 'doctor':
+            opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
+            allowed = opd_appointment.allowed_action(request.user.user_type)
+            appt_status = validated_data.get('status')
+            if appt_status not in allowed:
+                resp = {}
+                resp['allowed'] = allowed
+                return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+            updated_opd_appointment = self.doctor_appointment_update(opd_appointment, validated_data)
+            opd_appointment_serializer = AppointmentRetrieveSerializer(updated_opd_appointment)
+            response = {
+               "status": 1,
+               "data": opd_appointment_serializer.data
+            }
+            return Response(response)
 
-        updated_opd_appointment = self.consumer_update(opd_appointment, validated_data)
-        opd_appointment_serializer = AppointmentRetrieveSerializer(updated_opd_appointment)
-        response = {
-            "status": 1,
-            "data": opd_appointment_serializer.data
-        }
-        return Response(response)
+    def lab_appointment_update(self, lab_appointment, validated_data):
+        if validated_data.get('status'):
+            lab_appointment.status = validated_data.get('status')
+        if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
+            if validated_data.get("start_date") and validated_data.get('start_time'):
+               lab_appointment.time_slot_start = CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
+                                                                                                        validated_data.get("start_time"))
+        lab_appointment.save()
+        return lab_appointment
 
-
-    def consumer_update(self, opd_appointment, validated_data):
+    def doctor_appointment_update(self, opd_appointment, validated_data):
         if validated_data.get('status'):
             opd_appointment.status = validated_data.get('status')
         if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
