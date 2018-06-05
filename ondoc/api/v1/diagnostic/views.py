@@ -286,8 +286,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
             pgdata['email'] = "dummy_appointment@policybazaar.com"
 
         pgdata['productId'] = product_id
-        pgdata['surl'] = request.build_absolute_uri('/user/payment/success')
-        pgdata['furl'] = request.build_absolute_uri('/user/payment/failure')
+        pgdata['surl'] = request.build_absolute_uri('/api/v1/user/transaction/save')
+        pgdata['furl'] = request.build_absolute_uri('/api/v1/user/transaction/save')
         pgdata['checkSum'] = ''
         pgdata['appointmentId'] = appointment_details['id']
         if user_profile:
