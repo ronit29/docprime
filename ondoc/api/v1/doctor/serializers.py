@@ -346,6 +346,25 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 class HospitalModelSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
     lng = serializers.SerializerMethodField()
+
+    address = serializers.SerializerMethodField()
+
+    def get_address(self, obj):
+        address = ''
+        if obj.building:
+            address += str(obj.building)
+        if obj.locality:
+            address += str(obj.locality) + ' , '
+        if obj.sublocality:
+            address += str(obj.sublocality) + ' , '
+        if obj.city:
+            address += str(obj.city) + ' , '
+        if obj.state:
+            address += str(obj.state) + ' , '
+        if obj.country:
+            address += str(obj.country)
+        return address
+
     def get_lat(self, obj):
         loc = obj.location
         if loc:
@@ -360,7 +379,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'operational_since', 'lat', 'lng', 'registration_number','building', 'sublocality', 'locality', 'city')
+        fields = ('id', 'name', 'operational_since', 'lat', 'lng','address', 'registration_number','building', 'sublocality', 'locality', 'city')
 
 
 class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
@@ -492,7 +511,7 @@ class DoctorTimeSlotSerializer(serializers.Serializer):
 class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'gender', 'about', 'practicing_since',
+        fields = ('id', 'name', 'gender', 'images','about', 'practicing_since',
                  'qualifications', 'mobiles',)
 
 class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
