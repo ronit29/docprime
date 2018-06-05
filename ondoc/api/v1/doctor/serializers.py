@@ -46,6 +46,10 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     patient_gender = serializers.ReadOnlyField(source='profile.gender'),
     patient_image = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='doctor')
+    allowed_action = serializers.SerializerMethodField()
+
+    def get_allowed_action(self, obj):
+        return OpdAppointment.allowed_action(obj, obj.user.user_type)
 
     class Meta:
         model = OpdAppointment

@@ -151,8 +151,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         queryset = paginate_queryset(queryset, request)
         whole_queryset = self.extract_whole_queryset(queryset, id_dict)
-        # serializer = serializers.OpdAppointmentSerializer(queryset, many=True)
-        serializer = serializers.OpdAppointmentPermissionSerializer(whole_queryset, many=True)
+        serializer = serializers.OpdAppointmentSerializer(queryset, many=True)
+        # serializer = serializers.OpdAppointmentPermissionSerializer(whole_queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
