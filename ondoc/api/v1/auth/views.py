@@ -322,7 +322,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         allowed = opd_appointment.allowed_action(request.user.user_type)
-        appt_status = validated_data['status']
+        appt_status = opd_appointment.status
         if appt_status not in allowed:
             resp = {}
             resp['allowed'] = allowed
@@ -338,10 +338,12 @@ class UserAppointmentsViewSet(OndocViewSet):
 
 
     def consumer_update(self, opd_appointment, validated_data):
-        opd_appointment.status = validated_data.get('status')
+        if validated_data.get('status'):
+            opd_appointment.status = validated_data.get('status')
         if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
-            opd_appointment.time_slot_start = validated_data.get("time_slot_start")
-            opd_appointment.time_slot_end = validated_data.get("time_slot_end")
+            if validated_data.get("start_date"):
+               opd_appointment.time_slot_start = validated_data.get("start_date")
+            # opd_appointment.time_slot_end = validated_data.get("end_date")
         opd_appointment.save()
         return opd_appointment
 
