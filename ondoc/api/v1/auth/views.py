@@ -404,18 +404,26 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
         coded_response = data.get("response")[0]
         decoded_response = base64.urlsafe_b64decode(coded_response).decode()
         response = json.loads(decoded_response)
-        opd_appintment = OpdAppointment.objects.filter(pk=response.get("appointmentId")).first()
         transaction_time = parse(response.get("txDate"))
-        AppointmentTransaction.objects.create(appointment=opd_appintment,
+        AppointmentTransaction.objects.create(appointment=response.get("appointmentId"),
                                               transaction_time=transaction_time,
                                               transaction_status=response.get("txStatus"),
                                               status_code=response.get("statusCode"),
                                               transaction_details=response)
-        if response.get("statusCode") == 1:
-            ucc = random.randint(1000, 9999)
-            opd_appintment.payment_status = OpdAppointment.PAYMENT_ACCEPTED
-            opd_appintment.ucc = ucc
-            opd_appintment.save()
+        if response.get("statusCode") == 1 and response.get("productId") == 2:
+            opd_appointment = OpdAppointment.objects.filter(pk=response.get("appointmentId")).first()
+            if opd_appointment:
+                ucc = random.randint(1000, 9999)
+                opd_appointment.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+                opd_appointment.ucc = ucc
+                opd_appointment.save()
+        elif response.get("statusCode") == 1 and response.get("productId") == 1:
+            lab_appointment = LabAppointment.objects.filter(pk=response.get("appointmentId")).first()
+            if lab_appointment:
+                ucc = random.randint(1000, 9999)
+                lab_appointment.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+                lab_appointment.ucc = ucc
+                lab_appointment.save()
         if response.get("productId") == 1:
             REDIRECT_URL = LAB_REDIRECT_URL.format(response.get("appointmentId"))
         else:

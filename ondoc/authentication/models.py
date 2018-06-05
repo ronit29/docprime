@@ -246,8 +246,7 @@ class UserPermission(TimeStampedModel):
 
 
 class AppointmentTransaction(TimeStampedModel):
-    from ondoc.doctor.models import OpdAppointment
-    appointment = models.ForeignKey(OpdAppointment, on_delete=models.SET_NULL, blank=True, null=True)
+    appointment = models.PositiveIntegerField(blank=True, null=True)
     transaction_time = models.DateTimeField()
     transaction_status = models.CharField(max_length=100)
     status_code = models.PositiveIntegerField()
@@ -257,4 +256,4 @@ class AppointmentTransaction(TimeStampedModel):
         db_table = "appointment_transaction"
 
     def __str__(self):
-        return "{}-{}".format(self.id, self.OpdAppointment)
+        return "{}-{}".format(self.id, self.appointment)
