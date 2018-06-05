@@ -285,7 +285,6 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
     permission_classes = (IsAuthenticated,)
-
     def get_queryset(self):
         user = self.request.user
         return OpdAppointment.objects.filter(user=user)
@@ -305,7 +304,6 @@ class UserAppointmentsViewSet(OndocViewSet):
         user = request.user
         input_serializer = serializers.AppointmentRetrieveSerializer(data=request.query_params)
         input_serializer.is_valid(raise_exception=True)
-        # appointment_id = input_serializer.validated_data.get('id')
         appointment_type = input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
             queryset = LabAppointment.objects.filter(pk=pk)
@@ -318,6 +316,37 @@ class UserAppointmentsViewSet(OndocViewSet):
         else:
             return Response({'Error':'Invalid Request Type'})
 
+    def update(self, request, pk=None):
+        opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
+        serializer = UpdateStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        allowed = opd_appointment.allowed_action(request.user.user_type)
+        appt_status = validated_data.get('status')
+        if appt_status not in allowed:
+            resp = {}
+            resp['allowed'] = allowed
+            return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_opd_appointment = self.consumer_update(opd_appointment, validated_data)
+        opd_appointment_serializer = AppointmentRetrieveSerializer(updated_opd_appointment)
+        response = {
+            "status": 1,
+            "data": opd_appointment_serializer.data
+        }
+        return Response(response)
+
+
+    def consumer_update(self, opd_appointment, validated_data):
+        if validated_data.get('status'):
+            opd_appointment.status = validated_data.get('status')
+        if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
+            if validated_data.get("start_date") and validated_data.get('start_time'):
+               opd_appointment.time_slot_start = CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
+                                                                                                        validated_data.get("start_time"))
+            # opd_appointment.time_slot_end = validated_data.get("end_date")
+        opd_appointment.save()
+        return opd_appointment
 
 
     def lab_appointment_list(self, request):

@@ -158,7 +158,8 @@ class UpdateStatusSerializer(serializers.Serializer):
     status = serializers.IntegerField()
     time_slot_start = serializers.DateTimeField(required=False)
     time_slot_end = serializers.DateTimeField(required=False)
-
+    start_date = serializers.CharField(required=False)
+    start_time = serializers.FloatField(required=False)
     # def validate(self, data):
     #     request = self.context.get("request")
     #     user_type = request.user.user_type

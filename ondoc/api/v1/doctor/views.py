@@ -24,6 +24,7 @@ from ondoc.api.v1.utils import RawSql
 from django.contrib.auth import get_user_model
 from django.db.models import F
 from collections import defaultdict
+
 import json
 User = get_user_model()
 
@@ -153,6 +154,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         # serializer = serializers.OpdAppointmentSerializer(queryset, many=True)
         serializer = serializers.OpdAppointmentPermissionSerializer(whole_queryset, many=True)
         return Response(serializer.data)
+
+    def retrieve(self, request, pk=None):
+        user = request.user
+        queryset = models.OpdAppointment.objects.filter(pk=pk).filter(doctor=user.doctor)
+        if queryset:
+            serializer = serializers.AppointmentRetrieveSerializer(queryset, many=True)
+            return Response(serializer.data)
+        else:
+            return Response([])
 
         # New code ends here***********************************************************************
         # queryset = self.get_queryset()
