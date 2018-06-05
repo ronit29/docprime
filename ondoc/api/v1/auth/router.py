@@ -1,6 +1,7 @@
 from django.urls import path
-from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet, NotificationViewSet, UserProfileViewSet,
-                    UserPermissionViewSet, UserAppointmentsViewSet, AddressViewsSet)
+from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet, NotificationViewSet,
+                    UserProfileViewSet,UserPermissionViewSet, UserAppointmentsViewSet, AddressViewsSet,
+                    AppointmentTransactionViewSet)
 
 urlpatterns = [
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
@@ -25,6 +26,8 @@ urlpatterns = [
     path('address/<int:pk>/update', AddressViewsSet.as_view({"post": "update"}), name='address-list'),
     path('address/<int:pk>', AddressViewsSet.as_view({"get": "retrieve"}), name='address-detail'),
     path('address', AddressViewsSet.as_view({"get": "list"}), name='address-list'),
+    path('transaction/save', AppointmentTransactionViewSet.as_view({'post': 'save'}),
+         name='appointment-transaction-save'),
 
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),

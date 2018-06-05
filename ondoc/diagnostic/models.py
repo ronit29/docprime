@@ -5,7 +5,7 @@ from ondoc.doctor.models import Hospital
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.postgres.fields import JSONField
-
+from ondoc.doctor.models import OpdAppointment
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
     NOT_ONBOARDED = 1
@@ -299,6 +299,7 @@ class LabAppointment(TimeStampedModel):
     # REJECTED = 4
     CANCELED = 6
     COMPLETED = 7
+
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
     lab_test = models.ManyToManyField(AvailableLabTest)
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)
@@ -307,6 +308,9 @@ class LabAppointment(TimeStampedModel):
     price = models.PositiveSmallIntegerField()
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
+    otp = models.PositiveIntegerField(blank=True, null=True)
+    payment_status = models.PositiveIntegerField(choices=OpdAppointment.PAYMENT_STATUS_CHOICES,
+                                                 default=OpdAppointment.PAYMENT_PENDING)
 
     def allowed_action(self, user_type):
         allowed = []

@@ -1,3 +1,8 @@
+import base64
+import json
+import random
+from dateutil.parser import parse
+from django.http import HttpResponseRedirect
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
@@ -17,7 +22,7 @@ from ondoc.sms.api import send_otp
 
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         UserPermission, Address)
+                                         UserPermission, Address, AppointmentTransaction)
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -410,3 +415,38 @@ class AddressViewsSet(viewsets.ModelViewSet):
             "status": 1
         })
 
+
+class AppointmentTransactionViewSet(viewsets.GenericViewSet):
+
+    def save(self, request):
+        LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appintment/{}"
+        OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appintment/{}"
+        data = request.data
+        coded_response = data.get("response")[0]
+        decoded_response = base64.urlsafe_b64decode(coded_response).decode()
+        response = json.loads(decoded_response)
+        transaction_time = parse(response.get("txDate"))
+        AppointmentTransaction.objects.create(appointment=response.get("appointmentId"),
+                                              transaction_time=transaction_time,
+                                              transaction_status=response.get("txStatus"),
+                                              status_code=response.get("statusCode"),
+                                              transaction_details=response)
+        if response.get("statusCode") == 1 and response.get("productId") == 2:
+            opd_appointment = OpdAppointment.objects.filter(pk=response.get("appointmentId")).first()
+            if opd_appointment:
+                otp = random.randint(1000, 9999)
+                opd_appointment.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+                opd_appointment.ucc = otp
+                opd_appointment.save()
+        elif response.get("statusCode") == 1 and response.get("productId") == 1:
+            lab_appointment = LabAppointment.objects.filter(pk=response.get("appointmentId")).first()
+            if lab_appointment:
+                otp = random.randint(1000, 9999)
+                lab_appointment.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+                lab_appointment.ucc = otp
+                lab_appointment.save()
+        if response.get("productId") == 1:
+            REDIRECT_URL = LAB_REDIRECT_URL.format(response.get("appointmentId"))
+        else:
+            REDIRECT_URL = OPD_REDIRECT_URL.format(response.get("appointmentId"))
+        return HttpResponseRedirect(redirect_to=REDIRECT_URL, status=status.HTTP_302_FOUND)
