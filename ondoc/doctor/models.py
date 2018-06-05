@@ -544,7 +544,7 @@ class DoctorOnboardingToken(TimeStampedModel):
 #         db_table = "hospital_network_mapping"
 
 
-class OpdAppointment(TimeStampedModel):
+class   OpdAppointment(TimeStampedModel):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_DOCTOR = 3
@@ -585,12 +585,12 @@ class OpdAppointment(TimeStampedModel):
         return self.profile.name + " (" + self.doctor.name + ")"
 
     def allowed_action(self, user_type):
-
+        from ondoc.authentication.models import UserPermission
         allowed = []
         current_datetime = timezone.now()
 
         if user_type == User.DOCTOR and self.time_slot_start<current_datetime:
-            perm_queryset =  self.user.userpermission_set.filter(doctor=self.doctor.id).filter(hospital=self.hospital_id).first()
+            perm_queryset =  UserPermission.objects.filter(doctor=self.doctor.id).filter(hospital=self.hospital_id).first()
             if not perm_queryset.read_permission:
                 if self.status == self.BOOKED:
                     allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
