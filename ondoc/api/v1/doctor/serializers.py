@@ -5,7 +5,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, 
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization)
-
+from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 import math
@@ -488,3 +488,21 @@ class DoctorTimeSlotSerializer(serializers.Serializer):
     class Meta:
         model = Doctor
         fields = ('id', 'images', 'qualifications', )
+
+class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
+    class Meta:
+        model = Doctor
+        fields = ('id', 'name', 'gender', 'about', 'practicing_since',
+                 'qualifications', 'mobiles',)
+
+class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
+    profile = UserProfileSerializer()
+    hospital = HospitalModelSerializer()
+    doctor = AppointmentRetrieveDoctorSerializer()
+    allowed_action = serializers.SerializerMethodField()
+
+    def get_allowed_action(self,obj):
+        return OpdAppointment.allowed_action(obj,obj.user.user_type)
+
+
+

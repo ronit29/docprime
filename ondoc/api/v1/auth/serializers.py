@@ -4,7 +4,6 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
 from ondoc.doctor.models import DoctorMobile
 import datetime
 from dateutil.relativedelta import relativedelta
-
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
@@ -146,4 +145,6 @@ class AddressSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
 
-
+class AppointmentRetrieveSerializer(serializers.Serializer):
+    type = serializers.CharField(required=True)
+    # id = serializers.IntegerField(required=True)

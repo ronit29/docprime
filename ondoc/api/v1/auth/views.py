@@ -24,7 +24,7 @@ from ondoc.api.pagination import paginate_queryset
 
 from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterSerializer,
-                                             UpdateStatusSerializer, CreateAppointmentSerializer)
+                                             UpdateStatusSerializer, CreateAppointmentSerializer,AppointmentRetrieveSerializer)
 from ondoc.diagnostic.models import (LabAppointment)
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer)
 
@@ -295,6 +295,26 @@ class UserAppointmentsViewSet(OndocViewSet):
         combined_data = combined_data[:20]
         return Response(combined_data)
 
+
+    def retrieve(self, request, pk=None):
+        user = request.user
+        input_serializer = serializers.AppointmentRetrieveSerializer(data=request.query_params)
+        input_serializer.is_valid(raise_exception=True)
+        # appointment_id = input_serializer.validated_data.get('id')
+        appointment_type = input_serializer.validated_data.get('type')
+        if appointment_type == 'lab':
+            queryset = LabAppointment.objects.filter(profile__user=user).filter(pk=pk)
+            serializer = LabAppointmentModelSerializer(queryset, many=True)
+            return Response(serializer.data)
+        elif appointment_type == 'doctor':
+            queryset = OpdAppointment.objects.filter(user=user).filter(pk=pk)
+            serializer = AppointmentRetrieveSerializer(queryset, many=True)
+            return Response(serializer.data)
+        else:
+            return Response({'Error':'Invalid Request Type'})
+
+
+
     def lab_appointment_list(self, request):
         user = request.user
         queryset = LabAppointment.objects.filter(profile__user=user)
@@ -337,6 +357,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         queryset = paginate_queryset(queryset, request, 20)
         serializer = OpdAppointmentSerializer(queryset, many=True)
         return serializer.data
+
 
 
 class AddressViewsSet(viewsets.ModelViewSet):
