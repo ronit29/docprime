@@ -145,7 +145,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                             models.OpdAppointment.RESCHEDULED_DOCTOR, models.OpdAppointment.ACCEPTED],
                 time_slot_start__gt=timezone.now()).order_by('time_slot_start')
         elif range =='pending':
-            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status = models.OpdAppointment.CREATED).order_by('time_slot_start')
+            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status = models.OpdAppointment.BOOKED).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
 

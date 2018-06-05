@@ -6,13 +6,10 @@ from django.http import HttpResponseRedirect
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
-
+import math
+import datetime
+import pytz
 from ondoc.api.v1.auth import serializers
-
-# from .serializers import (OTPSerializer, OTPVerificationSerializer, UserSerializer, DoctorLoginSerializer,
-#                           NotificationEndpointSaveSerializer, NotificationEndpointSerializer,
-#                           NotificationEndpointDeleteSerializer, NotificationSerializer, UserProfileSerializer,
-#                           UserPermissionSerializer)
 from rest_framework.response import Response
 from django.db import transaction
 from django.utils import timezone
@@ -360,8 +357,18 @@ class UserAppointmentsViewSet(OndocViewSet):
             lab_appointment.status = validated_data.get('status')
         if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
             if validated_data.get("start_date") and validated_data.get('start_time'):
-               lab_appointment.time_slot_start = CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
-                                                                                                        validated_data.get("start_time"))
+               date, temp = validated_data["start_date"].split("T")
+               date_str = str(date)
+               min, hour = math.modf(validated_data["start_time"])
+               if min < 10:
+                   min = "0" + str(int(min))
+               else:
+                   min = str(int(min))
+               time_str = str(int(hour)) + ":" + str(min)
+               date_time_field = str(date_str) + "T" + time_str
+               dt_field = datetime.datetime.strptime(date_time_field, "%Y-%m-%dT%H:%M")
+               dt_field = pytz.utc.localize(dt_field)
+               lab_appointment.time_slot_start = dt_field
         lab_appointment.save()
         return lab_appointment
 
