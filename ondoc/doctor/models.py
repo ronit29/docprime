@@ -575,7 +575,7 @@ class OpdAppointment(TimeStampedModel):
     fees = models.PositiveSmallIntegerField()
     status = models.PositiveSmallIntegerField(default=CREATED)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
-    ucc = models.PositiveIntegerField(blank=True, null=True)
+    otp = models.PositiveIntegerField(blank=True, null=True)
 
     #patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
     time_slot_start = models.DateTimeField(blank=True, null=True)

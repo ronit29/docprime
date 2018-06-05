@@ -308,7 +308,7 @@ class LabAppointment(TimeStampedModel):
     price = models.PositiveSmallIntegerField()
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
-    ucc = models.PositiveIntegerField(blank=True, null=True)
+    otp = models.PositiveIntegerField(blank=True, null=True)
     payment_status = models.PositiveIntegerField(choices=OpdAppointment.PAYMENT_STATUS_CHOICES,
                                                  default=OpdAppointment.PAYMENT_PENDING)
 

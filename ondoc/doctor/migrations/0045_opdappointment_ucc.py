@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='opdappointment',
-            name='ucc',
+            name='otp',
             field=models.PositiveIntegerField(blank=True, null=True),
         ),
     ]

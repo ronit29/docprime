@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='labappointment',
-            name='ucc',
+            name='otp',
             field=models.PositiveIntegerField(blank=True, null=True),
         ),
     ]
