@@ -3,6 +3,7 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      CommonTest, CommonDiagnosticCondition, LabImage)
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
+from ondoc.api.v1.auth.serializers import AddressSerializer
 from django.db.models import Count, Sum
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
@@ -176,8 +177,13 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     start_time = serializers.FloatField()
     end_date = serializers.CharField(required=False)
     end_time = serializers.FloatField(required=False)
+    is_home_pickup = serializers.BooleanField(default=False)
+    address = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, data):
+
+        if data.get("is_home_pickup") is True and (not data.get("address")):
+            raise serializers.ValidationError("Address required for home pickup")
 
         self.test_lab_id_validator(data)
 
@@ -216,6 +222,12 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         profile_detail["dob"] = str(profile_model.dob)
         # profile_detail["profile_image"] = profile_model.profile_image
         appointment_data['profile_detail'] = json.dumps(profile_detail)
+
+        if data.get("is_home_pickup") is True:
+            address = Address.objects.filter(pk=data.get("address")).first()
+            address_serialzer = AddressSerializer(address)
+            appointment_data['address'] = address_serialzer.data
+            appointment_data['is_home_pickup'] = True
 
         queryset = LabAppointment.objects.create(**appointment_data)
         queryset.lab_test.add(*lab_test_queryset)

@@ -311,6 +311,8 @@ class LabAppointment(TimeStampedModel):
     otp = models.PositiveIntegerField(blank=True, null=True)
     payment_status = models.PositiveIntegerField(choices=OpdAppointment.PAYMENT_STATUS_CHOICES,
                                                  default=OpdAppointment.PAYMENT_PENDING)
+    is_home_pickup = models.BooleanField(default=False)
+    address = JSONField(blank=True, null=True)
 
     def allowed_action(self, user_type):
         allowed = []
