@@ -284,10 +284,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['email'] = user.email
         if not user.email:
             pgdata['email'] = "dummy_appointment@policybazaar.com"
-
+        base_url = (
+            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
         pgdata['productId'] = product_id
-        pgdata['surl'] = request.build_absolute_uri('/api/v1/user/transaction/save')
-        pgdata['furl'] = request.build_absolute_uri('/api/v1/user/transaction/save')
+        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['checkSum'] = ''
         pgdata['appointmentId'] = appointment_details['id']
         if user_profile:
