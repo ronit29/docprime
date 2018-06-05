@@ -156,9 +156,10 @@ class UpdateStatusSerializer(serializers.Serializer):
     # status = serializers.ChoiceField(choices=STATUS_CHOICES)
     #patient_status = serializers.ChoiceField(choices=OpdAppointment.PATIENT_STATUS_CHOICES, required=False)
     status = serializers.IntegerField()
-    start_date = serializers.DateTimeField(required=False)
-    end_date = serializers.DateTimeField(required=False)
-
+    time_slot_start = serializers.DateTimeField(required=False)
+    time_slot_end = serializers.DateTimeField(required=False)
+    start_date = serializers.CharField(required=False)
+    start_time = serializers.FloatField(required=False)
     # def validate(self, data):
     #     request = self.context.get("request")
     #     user_type = request.user.user_type
