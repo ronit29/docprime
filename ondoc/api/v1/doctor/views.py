@@ -432,7 +432,10 @@ class PrescriptionFileViewset(OndocViewSet):
         return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
+        appointment = request.query_params.get("appointment")
+        if not appointment:
+            return Response(status=400)
+        queryset = self.get_queryset().filter(prescription__appointment=appointment)
         serializer = serializers.PrescriptionFileSerializer(queryset, many=True)
         return Response(serializer.data)
 
