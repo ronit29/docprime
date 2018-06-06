@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
+from django.forms.models import model_to_dict
 from ondoc.authentication.models import TimeStampedModel
+# from ondoc.api.v1.notification import serializers
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 
@@ -84,12 +86,13 @@ class EmailNotification(TimeStampedModel):
             html_body = render_to_string("email/appointment_accepted.html", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
             html_body = render_to_string("email/appointment_booked_patient.html", context=context)
-        EmailNotification.objects.create(
+        email_noti = EmailNotification.objects.create(
             user=user,
             email=email,
             notification_type=notification_type,
             content=html_body
         )
+        message = model_to_dict(email_noti)
 
 
 class SmsNotification(TimeStampedModel):
