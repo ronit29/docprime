@@ -208,6 +208,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         data['user'] = request.user.id
         if data.get('age'):
             data['dob'] = datetime.datetime.now() - relativedelta(years=data.get('age'))
+            data['dob'] = data['dob'].date()
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data)
@@ -386,18 +387,16 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     def lab_appointment_list(self, request, params):
         user = request.user
-        queryset = LabAppointment.objects.filter(profile__user=user)
-        if params.get('profile'):
-            queryset = queryset.filter(profile=params['profile'])
+        queryset = LabAppointment.objects.select_related('lab').filter(profile__user=user)
+        if queryset and params.get('profile_id'):
+            queryset = queryset.filter(profile=params['profile_id'])
         queryset = paginate_queryset(queryset, request, 20)
-        serializer = LabAppointmentModelSerializer(queryset, many=True,context={"request": request})
+        serializer = LabAppointmentModelSerializer(queryset, many=True, context={"request": request})
         return serializer
 
     def doctor_appointment_list(self, request, params):
         user = request.user
         queryset = OpdAppointment.objects.filter(user=user)
-        if params.get('profile'):
-            queryset = queryset.filter(profile=params['profile'])
 
         if not queryset:
             return Response([])
