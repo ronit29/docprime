@@ -121,6 +121,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
         date, temp = date_str.split("T")
         date_str = str(date)
         min, hour = math.modf(time)
+        min *= 60
         if min < 10:
             min = "0" + str(int(min))
         else:
@@ -128,7 +129,9 @@ class CreateAppointmentSerializer(serializers.Serializer):
         time_str = str(int(hour))+":"+str(min)
         date_time_field = str(date_str) + "T" + time_str
         dt_field = datetime.datetime.strptime(date_time_field, "%Y-%m-%dT%H:%M")
-        dt_field = pytz.utc.localize(dt_field)
+        defined_timezone = str(timezone.get_default_timezone())
+        dt_field = pytz.timezone(defined_timezone).localize(dt_field)
+        # dt_field = pytz.utc.localize(dt_field)
         return dt_field
 
 

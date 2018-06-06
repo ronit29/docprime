@@ -444,11 +444,16 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
 class PrescriptionFileViewset(OndocViewSet):
     serializer_class = serializers.PrescriptionFileSerializer
 
-    permission_classes = (IsAuthenticated, DoctorPermission,)
+    permission_classes = (IsAuthenticated, )
 
     def get_queryset(self):
         request = self.request
-        return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
+        if request.user.user_type == User.DOCTOR:
+            return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
+        elif request.user.user_type == User.CONSUMER:
+            return models.PrescriptionFile.objects.filter(prescription__appointment__user=request.user)
+        else:
+            return models.PrescriptionFile.objects.none()
 
     def list(self, request, *args, **kwargs):
         appointment = request.query_params.get("appointment")

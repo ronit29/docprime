@@ -2,6 +2,7 @@ import base64
 import json
 import random
 from dateutil.parser import parse
+from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -205,6 +206,8 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         data = {}
         data.update(request.data)
         data['user'] = request.user.id
+        if data.get('age'):
+            data['dob'] = datetime.datetime.now() - relativedelta(years=data.get('age'))
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data)
@@ -288,15 +291,17 @@ class UserAppointmentsViewSet(OndocViewSet):
         return OpdAppointment.objects.filter(user=user)
 
     def list(self, request):
-        doctor_serializer = self.doctor_appointment_list(request)
-        lab_serializer = self.lab_appointment_list(request)
+        params = request.query_params
+        doctor_serializer = self.doctor_appointment_list(request, params)
+        lab_serializer = self.lab_appointment_list(request, params)
         combined_data = list()
-        combined_data.extend(doctor_serializer)
-        combined_data.extend(lab_serializer)
+        if doctor_serializer.data:
+            combined_data.extend(doctor_serializer.data)
+        if lab_serializer.data:
+            combined_data.extend(lab_serializer.data)
         combined_data = sorted(combined_data, key=lambda k: k['time_slot_start'])
         combined_data = combined_data[:20]
         return Response(combined_data)
-
 
     def retrieve(self, request, pk=None):
         user = request.user
@@ -336,7 +341,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 "data": lab_appointment_serializer.data
             }
             return Response(response)
-        if appointment_type == 'doctor':
+        elif appointment_type == 'doctor':
             opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
             allowed = opd_appointment.allowed_action(request.user.user_type)
             appt_status = validated_data.get('status')
@@ -379,17 +384,20 @@ class UserAppointmentsViewSet(OndocViewSet):
         opd_appointment.save()
         return opd_appointment
 
-
-    def lab_appointment_list(self, request):
+    def lab_appointment_list(self, request, params):
         user = request.user
         queryset = LabAppointment.objects.filter(profile__user=user)
+        if params.get('profile'):
+            queryset = queryset.filter(profile=params['profile'])
         queryset = paginate_queryset(queryset, request, 20)
         serializer = LabAppointmentModelSerializer(queryset, many=True,context={"request": request})
-        return serializer.data
+        return serializer
 
-    def doctor_appointment_list(self, request):
+    def doctor_appointment_list(self, request, params):
         user = request.user
         queryset = OpdAppointment.objects.filter(user=user)
+        if params.get('profile'):
+            queryset = queryset.filter(profile=params['profile'])
 
         if not queryset:
             return Response([])
@@ -421,8 +429,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
         queryset = paginate_queryset(queryset, request, 20)
         serializer = OpdAppointmentSerializer(queryset, many=True,context={"request": request})
-        return serializer.data
-
+        return serializer
 
 
 class AddressViewsSet(viewsets.ModelViewSet):
