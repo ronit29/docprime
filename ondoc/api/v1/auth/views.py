@@ -207,8 +207,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         data.update(request.data)
         data['user'] = request.user.id
         if data.get('age'):
-            data['dob'] = datetime.datetime.now() - relativedelta(years=data.get('age'))
-            data['dob'] = data['dob'].date()
+            try:
+                age = int(data.get("age"))
+                data['dob'] = datetime.datetime.now() - relativedelta(years=age)
+                data['dob'] = data['dob'].date()
+            except:
+                return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data)
