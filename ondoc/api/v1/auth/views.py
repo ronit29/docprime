@@ -207,7 +207,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         data.update(request.data)
         data['user'] = request.user.id
         if data.get('age'):
-            data['dob'] = datetime.datetime.now() - relativedelta(years=data.get('age'))
+            try:
+                age = int(data.get("age"))
+                data['dob'] = datetime.datetime.now() - relativedelta(years=age)
+                data['dob'] = data['dob'].date()
+            except:
+                return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data)
@@ -386,18 +391,16 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     def lab_appointment_list(self, request, params):
         user = request.user
-        queryset = LabAppointment.objects.filter(profile__user=user)
-        if params.get('profile'):
-            queryset = queryset.filter(profile=params['profile'])
+        queryset = LabAppointment.objects.select_related('lab').filter(profile__user=user)
+        if queryset and params.get('profile_id'):
+            queryset = queryset.filter(profile=params['profile_id'])
         queryset = paginate_queryset(queryset, request, 20)
-        serializer = LabAppointmentModelSerializer(queryset, many=True,context={"request": request})
+        serializer = LabAppointmentModelSerializer(queryset, many=True, context={"request": request})
         return serializer
 
     def doctor_appointment_list(self, request, params):
         user = request.user
         queryset = OpdAppointment.objects.filter(user=user)
-        if params.get('profile'):
-            queryset = queryset.filter(profile=params['profile'])
 
         if not queryset:
             return Response([])

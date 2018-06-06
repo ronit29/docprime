@@ -129,6 +129,7 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
 
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
     type = serializers.ReadOnlyField(default="lab")
+    lab_name = serializers.ReadOnlyField(source="lab.name")
 
     class Meta:
         model = LabAppointment

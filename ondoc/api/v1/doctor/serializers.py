@@ -155,6 +155,21 @@ class SetAppointmentSerializer(serializers.Serializer):
         return data
 
 
+class OTPFieldSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    otp = serializers.IntegerField(max_value=9999)
+
+
+class OTPConfirmationSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    otp = serializers.IntegerField(max_value=9999)
+
+    def validate(self, attrs):
+        if not OpdAppointment.objects.filter(id=attrs['id']).filter(otp=attrs['otp']).exists():
+            raise serializers.ValidationError("Invalid OTP")
+        return attrs
+
+
 class UpdateStatusSerializer(serializers.Serializer):
     # DOCTOR_ALLOWED_CHOICES = [OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]
     # PATIENT_ALLOWED_CHOICES = [OpdAppointment.CANCELED, OpdAppointment.RESCHEDULED]
