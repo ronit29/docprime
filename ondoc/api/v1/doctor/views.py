@@ -146,6 +146,25 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             payment_response = self.payment_details(request, serializer_data.data, 1)
         return Response(payment_response)
 
+
+    def complete(self, request):
+        serializer = serializers.OTPFieldSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('id'))
+        permission_queryset = (auth_models.UserPermission.objects.filter(doctor=opd_appointment.doctor.id).
+                               filter(hospital=opd_appointment.hospital_id))
+        if permission_queryset:
+            perm_data = permission_queryset.first()
+            if request.user.user_type == User.DOCTOR and perm_data.write_permission:
+                otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
+                otp_valid_serializer.is_valid(raise_exception=True)
+                opd_appointment.status = models.OpdAppointment.COMPLETED
+                opd_appointment.save()
+        opd_appointment_serializer = serializers.OpdAppointmentSerializer(opd_appointment, context={'request': request})
+        return Response(opd_appointment_serializer.data)
+
+
     @transaction.atomic
     def create(self, request):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
@@ -187,6 +206,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         resp["data"] = appointment_serializer.data
         resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 1)
         return Response(data=resp)
+
 
     def update(self, request, pk=None):
         opd_appointment = get_object_or_404(models.OpdAppointment, pk=pk)
@@ -250,7 +270,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             temp['appointment'] = data
             whole_queryset.append(temp)
         return whole_queryset
-
 
     def payment_details(self, request, appointment_details, product_id):
         details = dict()
