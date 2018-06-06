@@ -7,6 +7,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                      LabTestSubType, AvailableLabTest)
 from ondoc.lead.models import HospitalLead, DoctorLead
+from ondoc.notification import models as notifcation_model
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin, CollegeAdmin)
 from .hospital import HospitalAdmin
@@ -14,6 +15,8 @@ from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, LabSubTestTypeAdmin, AvailableLabTestAdmin
 from .lab_network import LabNetworkAdmin
+from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
+                           PushNotificationAdmin, AppNotificationAdmin)
 from django.contrib.auth import get_user_model
 User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
@@ -51,3 +54,8 @@ admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
 admin.site.register(DoctorLead, DoctorLeadAdmin)
+
+admin.site.register(notifcation_model.EmailNotification, EmailNotificationAdmin)
+admin.site.register(notifcation_model.SmsNotification, SmsNotificationAdmin)
+admin.site.register(notifcation_model.PushNotification, PushNotificationAdmin)
+admin.site.register(notifcation_model.AppNotification, AppNotificationAdmin)

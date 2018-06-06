@@ -1,0 +1,1 @@
+Patient - {{patient_name}} has rescheduled the appointment - {{id}}.

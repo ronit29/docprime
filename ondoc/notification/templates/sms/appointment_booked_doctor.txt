@@ -1,0 +1,1 @@
+Patient -{{patient_name}} has booked an appointment with you.

@@ -10,6 +10,7 @@ from django.conf import settings
 from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
+from ondoc.notification import models as notification_models
 
 
 class Migration(migrations.Migration):
@@ -593,6 +594,34 @@ class OpdAppointment(TimeStampedModel):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
 
         return allowed
+
+    def send_notification(self, database_instance):
+        if not self.id:
+            return
+        if database_instance.status == self.status:
+            return
+        if self.status == OpdAppointment.ACCEPTED:
+            notification_models.NotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.APPOINTMENT_ACCEPTED,
+            )
+        elif self.status == OpdAppointment.RESCHEDULED_PATIENT:
+            notification_models.NotificationAction.trigger(
+                instance=self,
+                user=self.doctor.user,
+                notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
+        elif self.status == OpdAppointment.BOOKED:
+            notification_models.NotificationAction.trigger(
+                instance=self.user,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
+            )
+
+    def save(self, *args, **kwargs):
+        database_instance = OpdAppointment.objects.filter(pk=self.id).first()
+        self.send_notification(database_instance)
+        super().save(*args, **kwargs)
 
 
     class Meta:
