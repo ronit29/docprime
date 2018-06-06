@@ -309,7 +309,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             return Response(serializer.data)
         elif appointment_type == 'doctor':
             queryset = OpdAppointment.objects.filter(pk=pk)
-            serializer = AppointmentRetrieveSerializer(queryset, many=True)
+            serializer = AppointmentRetrieveSerializer(queryset, many=True,context={"request": request})
             return Response(serializer.data)
         else:
             return Response({'Error':'Invalid Request Type'})
@@ -345,7 +345,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(opd_appointment, validated_data)
-            opd_appointment_serializer = AppointmentRetrieveSerializer(updated_opd_appointment)
+            opd_appointment_serializer = AppointmentRetrieveSerializer(updated_opd_appointment,context={"request": request})
             response = {
                "status": 1,
                "data": opd_appointment_serializer.data
@@ -354,31 +354,25 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     def lab_appointment_update(self, lab_appointment, validated_data):
         if validated_data.get('status'):
-            lab_appointment.status = validated_data.get('status')
-        if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
-            if validated_data.get("start_date") and validated_data.get('start_time'):
-               date, temp = validated_data["start_date"].split("T")
-               date_str = str(date)
-               min, hour = math.modf(validated_data["start_time"])
-               if min < 10:
-                   min = "0" + str(int(min))
-               else:
-                   min = str(int(min))
-               time_str = str(int(hour)) + ":" + str(min)
-               date_time_field = str(date_str) + "T" + time_str
-               dt_field = datetime.datetime.strptime(date_time_field, "%Y-%m-%dT%H:%M")
-               dt_field = pytz.utc.localize(dt_field)
-               lab_appointment.time_slot_start = dt_field
-        lab_appointment.save()
+            if validated_data['status'] == LabAppointment.CANCELED:
+                lab_appointment.status = validated_data['status']
+            if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
+                if validated_data.get("start_date") and validated_data.get('start_time'):
+                    lab_appointment.status = validated_data['status']
+                    lab_appointment.time_slot_start =  CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
+                                                                                                            validated_data.get("start_time"))
+            lab_appointment.save()
         return lab_appointment
 
     def doctor_appointment_update(self, opd_appointment, validated_data):
         if validated_data.get('status'):
-            opd_appointment.status = validated_data.get('status')
-        if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
-            if validated_data.get("start_date") and validated_data.get('start_time'):
-               opd_appointment.time_slot_start = CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
-                                                                                                        validated_data.get("start_time"))
+            if validated_data['status'] == OpdAppointment.CANCELED:
+                opd_appointment.status = validated_data['status']
+            if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
+                if validated_data.get("start_date") and validated_data.get('start_time'):
+                    opd_appointment.status = validated_data['status']
+                    opd_appointment.time_slot_start = CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
+                                                                                                            validated_data.get("start_time"))
             # opd_appointment.time_slot_end = validated_data.get("end_date")
         opd_appointment.save()
         return opd_appointment
@@ -388,7 +382,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         user = request.user
         queryset = LabAppointment.objects.filter(profile__user=user)
         queryset = paginate_queryset(queryset, request, 20)
-        serializer = LabAppointmentModelSerializer(queryset, many=True)
+        serializer = LabAppointmentModelSerializer(queryset, many=True,context={"request": request})
         return serializer.data
 
     def doctor_appointment_list(self, request):
@@ -424,7 +418,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             queryset = queryset.order_by('-time_slot_start')
 
         queryset = paginate_queryset(queryset, request, 20)
-        serializer = OpdAppointmentSerializer(queryset, many=True)
+        serializer = OpdAppointmentSerializer(queryset, many=True,context={"request": request})
         return serializer.data
 
 

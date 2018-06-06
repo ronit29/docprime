@@ -49,7 +49,8 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     allowed_action = serializers.SerializerMethodField()
 
     def get_allowed_action(self, obj):
-        return OpdAppointment.allowed_action(obj, obj.user.user_type)
+        request = self.context.get('request')
+        return OpdAppointment.allowed_action(obj, request.user.user_type)
 
     class Meta:
         model = OpdAppointment
@@ -526,7 +527,8 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     allowed_action = serializers.SerializerMethodField()
 
     def get_allowed_action(self,obj):
-        return OpdAppointment.allowed_action(obj,obj.user.user_type)
+        request = self.context.get('request')
+        return OpdAppointment.allowed_action(obj,request.user.user_type)
 
 
 

@@ -151,7 +151,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         queryset = paginate_queryset(queryset, request)
         whole_queryset = self.extract_whole_queryset(queryset, id_dict)
-        serializer = serializers.OpdAppointmentSerializer(queryset, many=True)
+        serializer = serializers.OpdAppointmentSerializer(queryset, many=True, context={'request':request})
         # serializer = serializers.OpdAppointmentPermissionSerializer(whole_queryset, many=True)
         return Response(serializer.data)
 
@@ -159,7 +159,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         user = request.user
         queryset = models.OpdAppointment.objects.filter(pk=pk).filter(doctor=user.doctor)
         if queryset:
-            serializer = serializers.AppointmentRetrieveSerializer(queryset, many=True)
+            serializer = serializers.AppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
             return Response(serializer.data)
         else:
             return Response([])
@@ -229,7 +229,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             #"time_slot_end": time_slot_end,
         }
 
-        appointment_serializer = serializers.OpdAppointmentSerializer(data=data)
+        appointment_serializer = serializers.OpdAppointmentSerializer(data=data, context={'request':request})
         appointment_serializer.is_valid(raise_exception=True)
         appointment_serializer.save()
         resp = {}
@@ -256,7 +256,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         elif request.user.user_type == User.CONSUMER:
             updated_opd_appointment = self.consumer_update(opd_appointment, validated_data)
 
-        opd_appointment_serializer = serializers.OpdAppointmentSerializer(updated_opd_appointment)
+        opd_appointment_serializer = serializers.OpdAppointmentSerializer(updated_opd_appointment, context={'request':request})
         response = {
             "status": 1,
             "data": opd_appointment_serializer.data
