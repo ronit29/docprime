@@ -19,7 +19,8 @@ urlpatterns = [
          name='lab-create-appointment'),
     path('labappointment/<int:pk>', LabAppointmentView.as_view({'post':'update', 'get': 'retrieve'}),
          name='lab-update-appointment'),
-
+    path('appointment/payment/retry/<int:pk>', LabAppointmentView.as_view({'get': 'payment_retry'}),
+         name='payment-retry'),
     path('labtiming', LabTimingListView.as_view({'get': 'list'}),
          name='lab-timing'),
     path('labtest/<int:lab_id>', AvailableTestViewSet.as_view({'get': 'retrive'}),

@@ -256,6 +256,16 @@ class LabAppointmentView(mixins.CreateModelMixin,
         resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 2)
         return Response(data=resp)
 
+
+    def payment_retry(self, request, pk=None):
+        queryset = LabAppointment.objects.filter(pk=pk)
+        payment_response = dict()
+        if queryset:
+            serializer_data = LabAppointmentModelSerializer(queryset.first(), context={'request':request})
+            payment_response = self.payment_details(request, serializer_data.data, 1)
+        return Response(payment_response)
+
+
     def update(self, request, pk):
         data = request.data
         lab_appointment_obj = get_object_or_404(LabAppointment, pk=pk)
