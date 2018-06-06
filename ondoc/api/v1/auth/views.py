@@ -300,7 +300,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     def retrieve(self, request, pk=None):
         user = request.user
-        input_serializer = serializers.AppointmentRetrieveSerializer(data=request.query_params)
+        input_serializer = serializers.AppointmentqueryRetrieveSerializer(data=request.query_params)
         input_serializer.is_valid(raise_exception=True)
         appointment_type = input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
@@ -318,7 +318,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         serializer = UpdateStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        query_input_serializer = serializers.AppointmentRetrieveSerializer(data=request.query_params)
+        query_input_serializer = serializers.AppointmentqueryRetrieveSerializer(data=request.query_params)
         query_input_serializer.is_valid(raise_exception=True)
         appointment_type = query_input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
@@ -351,6 +351,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                "data": opd_appointment_serializer.data
             }
             return Response(response)
+
+
 
     def lab_appointment_update(self, lab_appointment, validated_data):
         if validated_data.get('status'):

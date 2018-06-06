@@ -73,33 +73,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 #         elif user.user_type== User.CONSUMER:
 #             return OpdAppointment.objects.all(user=user)
 
-#     def list(self, request):
-#         queryset = self.get_queryset()
-#         serializer = AppointmentFilterSerializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         range = serializer.validated_data['range']
-#         if range=='previous':
-#             queryset.filter(time_slot_start__lte=timezone.now())
-#         elif range=='upcoming':
-#             queryset.filter(time_slot_start__gt=timezone.now())
-#         serial = OpdAppointmentSerializer(queryset, many=True)
-#         return Response(serial.data)
-
-    # @action(methods=['post'], detail=True)
-    # def update_status(self, request, pk):
-    #     opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
-    #     serializer = UpdateStatusSerializer(data=request.data,
-    #                                         context={'request': request, 'opd_appointment': opd_appointment})
-    #     serializer.is_valid(raise_exception=True)
-    #     data = serializer.validated_data
-    #     opd_appointment.status = data.get('status')
-    #     if data.get('status') == OpdAppointment.RESCHEDULED and request.user.user_type == 3:
-    #         opd_appointment.time_slot_start = data.get("time_slot_start")
-    #         opd_appointment.time_slot_end = data.get("time_slot_end")
-    #     opd_appointment.save()
-    #     opd_appointment_serializer = OpdAppointmentSerializer(opd_appointment)
-    #     return Response(opd_appointment_serializer.data)
-
     def get_queryset(self):
 
         user = self.request.user
@@ -164,37 +137,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         else:
             return Response([])
 
-        # New code ends here***********************************************************************
-        # queryset = self.get_queryset()
-        # if not queryset:
-        #     return Response([])
-        # serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
-        # serializer.is_valid(raise_exception=True)
-        #
-        # range = serializer.validated_data.get('range')
-        # hospital_id = serializer.validated_data.get('hospital_id')
-        # profile_id = serializer.validated_data.get('profile_id')
-        #
-        # if profile_id:
-        #     queryset = queryset.filter(profile=profile_id)
-        #
-        # if hospital_id:
-        #     queryset = queryset.filter(hospital_id=hospital_id)
-        #
-        # if range=='previous':
-        #     queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
-        # elif range=='upcoming':
-        #     queryset = queryset.filter(
-        #         status__in=[models.OpdAppointment.CREATED, models.OpdAppointment.RESCHEDULED, models.OpdAppointment.ACCEPTED],
-        #         time_slot_start__gt=timezone.now()).order_by('time_slot_start')
-        # elif range =='pending':
-        #     queryset = queryset.filter(time_slot_start__gt=timezone.now(), status = models.OpdAppointment.CREATED).order_by('time_slot_start')
-        # else:
-        #     queryset = queryset.order_by('-time_slot_start')
-        #
-        # queryset = paginate_queryset(queryset, request)
-        # serializer = serializers.OpdAppointmentSerializer(queryset, many=True)
-        # return Response(serializer.data)
+
+    def payment_retry(self, request, pk=None):
+        queryset = models.OpdAppointment.objects.filter(pk=pk)
+        payment_response = dict()
+        if queryset:
+            serializer_data = serializers.OpdAppointmentSerializer(queryset.first(), context={'request':request})
+            payment_response = self.payment_details(request, serializer_data.data, 1)
+        return Response(payment_response)
 
     @transaction.atomic
     def create(self, request):
@@ -300,6 +250,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             temp['appointment'] = data
             whole_queryset.append(temp)
         return whole_queryset
+
 
     def payment_details(self, request, appointment_details, product_id):
         details = dict()

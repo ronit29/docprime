@@ -145,6 +145,6 @@ class AddressSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
 
-class AppointmentRetrieveSerializer(serializers.Serializer):
+class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
     # id = serializers.IntegerField(required=True)
