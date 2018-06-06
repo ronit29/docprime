@@ -36,10 +36,18 @@ class NotificationAction:
                 "id": instance.id
             }
             AppNotification.send_notification(user=user, notification_type=notification_type, context=context)
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
-            NotificationAction.trigger_all(user=user, notification_type=notification_type)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
-            NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type)
+            context = {
+                "patient_name": instance.profile.name,
+                "doctor_name": instance.doctor.name,
+            }
+            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
+            context = {
+                "patient_name": instance.profile.name,
+                "doctor_name": instance.doctor.name,
+            }
+            NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
 
     @classmethod
     def trigger_all(cls, user, notification_type, context=None):
@@ -74,6 +82,8 @@ class EmailNotification(TimeStampedModel):
     def send_notification(cls, user, email, notification_type, context):
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             html_body = render_to_string("email/appointment_accepted.html", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
+            html_body = render_to_string("email/appointment_booked_patient.html", context=context)
         EmailNotification.objects.create(
             user=user,
             email=email,
@@ -97,6 +107,8 @@ class SmsNotification(TimeStampedModel):
     def send_notification(cls, user, phone_number, notification_type, context):
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             html_body = render_to_string("sms/appointment_accepted.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
+            html_body = render_to_string("sms/appointment_booked_patient.txt", context=context)
         SmsNotification.objects.create(
             user=user,
             phone_number=phone_number,
