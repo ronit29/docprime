@@ -488,6 +488,9 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
 class AppointmentTransactionViewSet(viewsets.GenericViewSet):
 
+    serializer_class = None
+    queryset = AppointmentTransaction.objects.none()
+
     def save(self, request):
         LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appointment/{}"
         OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appointment/{}"
