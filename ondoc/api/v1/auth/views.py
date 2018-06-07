@@ -492,9 +492,11 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
         LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appointment/{}"
         OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appointment/{}"
         data = request.data
+
         coded_response = data.get("response")
-        if len(coded_response) % 4 != 0:
-            coded_response += "=="
+        if isinstance(coded_response, list):
+            coded_response = coded_response[0]
+        coded_response += "=="
         decoded_response = base64.b64decode(coded_response).decode()
         response = json.loads(decoded_response)
         transaction_time = parse(response.get("txDate"))
