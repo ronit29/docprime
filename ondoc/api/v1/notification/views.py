@@ -14,8 +14,8 @@ class AppNotificationViewSet(viewsets.GenericViewSet):
         request = self.request
         return models.AppNotification.objects.filter(user=request.user)
 
-    def list(self):
+    def list(self, request):
         queryset = self.get_queryset()
-        paginated_queryset = paginate_queryset(queryset)
+        paginated_queryset = paginate_queryset(queryset, request)
         serializer = serializers.AppNotificationSerializer(paginated_queryset, many=True)
         return Response(serializer.data)
