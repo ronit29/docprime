@@ -3,6 +3,7 @@ from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.forms.models import model_to_dict
 from ondoc.authentication.models import TimeStampedModel
+from ondoc.authentication.models import NotificationEndpoint
 from .rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
@@ -31,24 +32,40 @@ class NotificationAction:
             context = {
                 "doctor_name": instance.doctor.name,
                 "id": instance.id,
+                "title": "Appointment Accepted",
+                "body": "Your appointment with Dr. {} has been accepted.".format(instance.doctor.name),
+                "url": "/opd/appointment/{}".format(instance.id),
+                "image_url": ""
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT:
             context = {
                 "patient_name": instance.profile.name,
-                "id": instance.id
+                "id": instance.id,
+                "title": "Appointment Rescheduled",
+                "body": "Patient {} has rescheduled the appointment.".format(instance.profile.name),
+                "url": "/opd/appointment/{}".format(instance.id),
+                "image_url": ""
             }
             AppNotification.send_notification(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
             context = {
                 "patient_name": instance.profile.name,
                 "doctor_name": instance.doctor.name,
+                "title": "Appointment booked",
+                "body": "Your appointment with Dr. {} has been booked.".format(instance.doctor.name),
+                "url": "/opd/appointment/{}".format(instance.id),
+                "image_url": ""
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
             context = {
                 "patient_name": instance.profile.name,
                 "doctor_name": instance.doctor.name,
+                "title": "Notification Accepted",
+                "body": "Patient {} has booked an appointment with you".format(instance.doctor.name),
+                "url": "/opd/appointment/{}".format(instance.id),
+                "image_url": ""
             }
             NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
 
@@ -73,6 +90,7 @@ class NotificationAction:
 class EmailNotification(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
+    email_subject = models.TextField(blank=True, null=True)
     email = models.EmailField()
     viewed_at = models.DateTimeField(blank=True, null=True)
     read_at = models.DateTimeField(blank=True, null=True)
@@ -84,14 +102,17 @@ class EmailNotification(TimeStampedModel):
     @classmethod
     def send_notification(cls, user, email, notification_type, context):
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
-            html_body = render_to_string("email/appointment_accepted.html", context=context)
+            html_body = render_to_string("email/appointment_accepted/body.html", context=context)
+            email_subject = render_to_string("email/appointment_accepted/subject.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
-            html_body = render_to_string("email/appointment_booked_patient.html", context=context)
+            html_body = render_to_string("email/appointment_booked_patient/body.html", context=context)
+            email_subject = render_to_string("email/appointment_booked_patient/subject.txt", context=context)
         email_noti = EmailNotification.objects.create(
             user=user,
             email=email,
             notification_type=notification_type,
-            content=html_body
+            content=html_body,
+            email_subject=email_subject
         )
         message = {
             "data": model_to_dict(email_noti),
@@ -175,9 +196,11 @@ class PushNotification(TimeStampedModel):
             notification_type=notification_type,
             content=context
         )
-
+        tokens = [token for token in NotificationEndpoint.objects.filter(user=user)]
+        data = model_to_dict(push_noti)
+        data["tokens"] = tokens
         message = {
-            "data": model_to_dict(push_noti),
+            "data": data,
             "type": "push"
         }
         message = json.dumps(message)
