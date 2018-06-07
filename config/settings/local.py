@@ -57,3 +57,8 @@ INSTALLED_APPS += ('rest_framework_swagger',)
 SWAGGER_SETTINGS = {
     'USE_SESSION_AUTH': True,
 }
+
+RABBITMQ_CONNECTION_SETTINGS = {
+    'CONNECTION_URL': 'amqp://guest:guest@localhost:5672/%2F',
+    'NOTIFICATION_QUEUE': 'queue_name'
+}
