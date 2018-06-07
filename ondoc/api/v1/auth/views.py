@@ -523,4 +523,4 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
             REDIRECT_URL = LAB_REDIRECT_URL.format(response.get("appointmentId"))
         else:
             REDIRECT_URL = OPD_REDIRECT_URL.format(response.get("appointmentId"))
-        return HttpResponseRedirect(redirect_to=REDIRECT_URL, status=status.HTTP_302_FOUND)
+        return HttpResponseRedirect(redirect_to=REDIRECT_URL)
