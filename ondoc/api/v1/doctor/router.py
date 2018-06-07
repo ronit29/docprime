@@ -26,6 +26,7 @@ urlpatterns = [
          name='block-calender-delete'),
     path('prescription-file', PrescriptionFileViewset.as_view({'get': 'list'}), name='upload-list'),
     path('prescription-file/upload', PrescriptionFileViewset.as_view({'post': 'create'}), name='upload-prescription'),
+    path('prescription-file/remove', PrescriptionFileViewset.as_view({'delete': 'remove'}), name='remove-prescription'),
     path('searcheditems', SearchedItemsViewSet.as_view({'get': 'list'}), name='searched-items'),
     path('doctorsearch', DoctorListViewSet.as_view({'get': 'list'}), name='search-doctor'),
     path('doctortiming', DoctorAvailabilityTimingViewSet.as_view({'get': 'list'}), name='doctor-timing-availability'),

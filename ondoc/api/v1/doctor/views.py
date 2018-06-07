@@ -485,6 +485,23 @@ class PrescriptionFileViewset(OndocViewSet):
         prescription_file_serializer.save()
         return Response(prescription_file_serializer.data)
 
+    def remove(self, request):
+        serializer_data = serializers.PrescriptionFileDeleteSerializer(data=request.data, context={'request': request})
+        serializer_data.is_valid(raise_exception=True)
+        validated_data = serializer_data.validated_data
+        response = {
+            "status": 0,
+            "id": validated_data['id']
+        }
+        if validated_data.get('id'):
+            get_object_or_404(models.PrescriptionFile, pk=validated_data['id'])
+            delete_queryset = self.get_queryset().filter(pk=validated_data['id'])
+            delete_queryset.delete()
+            response['status'] = 1
+            return Response(response)
+        else:
+            return Response(response)
+
 
 class SearchedItemsViewSet(viewsets.GenericViewSet):
     # permission_classes = (IsAuthenticated, DoctorPermission,)

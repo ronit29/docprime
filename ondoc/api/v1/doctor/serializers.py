@@ -470,6 +470,17 @@ class PrescriptionFileSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class PrescriptionFileDeleteSerializer(serializers.Serializer):
+    appointment = serializers.PrimaryKeyRelatedField(queryset=OpdAppointment.objects.all())
+    id = serializers.IntegerField()
+
+    def validate_appointment(self, value):
+        request = self.context.get('request')
+        if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
+            raise serializers.ValidationError("Appointment is not correct.")
+        return value
+
+
 class PrescriptionSerializer(serializers.Serializer):
     appointment = serializers.PrimaryKeyRelatedField(queryset=OpdAppointment.objects.all())
     prescription_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
