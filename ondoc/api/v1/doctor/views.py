@@ -111,14 +111,17 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.filter(hospital_id=hospital_id)
 
         if range=='previous':
-            queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
+            queryset = queryset.filter(status__in = [models.OpdAppointment.COMPLETED,models.OpdAppointment.CANCELED]).order_by('-time_slot_start')
         elif range=='upcoming':
+            today = datetime.date.today()
             queryset = queryset.filter(
                 status__in=[models.OpdAppointment.CREATED, models.OpdAppointment.RESCHEDULED_PATIENT,
                             models.OpdAppointment.RESCHEDULED_DOCTOR, models.OpdAppointment.ACCEPTED],
-                time_slot_start__gt=timezone.now()).order_by('time_slot_start')
+                time_slot_start__date__gte=today).order_by('time_slot_start')
         elif range =='pending':
-            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status = models.OpdAppointment.BOOKED).order_by('time_slot_start')
+            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status__in = [models.OpdAppointment.BOOKED,
+                                                                                         models.OpdAppointment.RESCHEDULED_PATIENT
+                                                                                         ]).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
 
