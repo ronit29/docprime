@@ -60,5 +60,5 @@ SWAGGER_SETTINGS = {
 
 RABBITMQ_CONNECTION_SETTINGS = {
     'CONNECTION_URL': 'amqp://guest:guest@localhost:5672/%2F',
-    'NOTIFICATION_QUEUE': 'queue_name'
+    'NOTIFICATION_QUEUE': 'notifications'
 }

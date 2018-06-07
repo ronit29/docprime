@@ -1,8 +1,9 @@
+import json
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.forms.models import model_to_dict
 from ondoc.authentication.models import TimeStampedModel
-# from ondoc.api.v1.notification import serializers
+from .rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 
@@ -92,7 +93,13 @@ class EmailNotification(TimeStampedModel):
             notification_type=notification_type,
             content=html_body
         )
-        message = model_to_dict(email_noti)
+        message = {
+            "data": model_to_dict(email_noti),
+            "type": "email"
+        }
+        message = json.dumps(message)
+        publish_message(message)
+
 
 
 class SmsNotification(TimeStampedModel):
@@ -112,12 +119,18 @@ class SmsNotification(TimeStampedModel):
             html_body = render_to_string("sms/appointment_accepted.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
             html_body = render_to_string("sms/appointment_booked_patient.txt", context=context)
-        SmsNotification.objects.create(
+        sms_noti = SmsNotification.objects.create(
             user=user,
             phone_number=phone_number,
             notification_type=notification_type,
             content=html_body
         )
+        message = {
+            "data": model_to_dict(sms_noti),
+            "type": "sms"
+        }
+        message = json.dumps(message)
+        publish_message(message)
 
 
 class AppNotification(TimeStampedModel):
@@ -132,11 +145,17 @@ class AppNotification(TimeStampedModel):
 
     @classmethod
     def send_notification(cls, user, notification_type, context):
-        AppNotification.objects.create(
+        app_noti = AppNotification.objects.create(
             user=user,
             notification_type=notification_type,
             content=context
         )
+        message = {
+            "data": model_to_dict(app_noti),
+            "type": "app"
+        }
+        message = json.dumps(message)
+        publish_message(message)
 
 
 class PushNotification(TimeStampedModel):
@@ -151,8 +170,15 @@ class PushNotification(TimeStampedModel):
 
     @classmethod
     def send_notification(cls, user, notification_type, context):
-        PushNotification.objects.create(
+        push_noti = PushNotification.objects.create(
             user=user,
             notification_type=notification_type,
             content=context
         )
+
+        message = {
+            "data": model_to_dict(push_noti),
+            "type": "push"
+        }
+        message = json.dumps(message)
+        publish_message(message)
