@@ -484,7 +484,7 @@ class PrescriptionFileDeleteSerializer(serializers.Serializer):
 class PrescriptionSerializer(serializers.Serializer):
     appointment = serializers.PrimaryKeyRelatedField(queryset=OpdAppointment.objects.all())
     prescription_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
-    file = serializers.FileField()
+    name = serializers.FileField()
 
     def validate_appointment(self, value):
         request = self.context.get('request')

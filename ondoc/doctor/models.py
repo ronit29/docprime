@@ -673,9 +673,9 @@ class Prescription (TimeStampedModel):
         db_table = "prescription"
 
 
-class PrescriptionFile(TimeStampedModel):
+class PrescriptionFile(TimeStampedModel, Document):
     prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE)
-    file = models.FileField(upload_to='prescriptions', blank=False, null=False)
+    name = models.FileField(upload_to='prescriptions', blank=False, null=False)
 
     def __str__(self):
         return "{}-{}".format(self.id, self.prescription.id)
