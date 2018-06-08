@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.utils.safestring import mark_safe
 
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User
 
 
 class Migration(migrations.Migration):
@@ -282,7 +282,7 @@ class DoctorImage(TimeStampedModel, Image):
     class Meta:
         db_table = "doctor_image"
 
-class DoctorDocument(TimeStampedModel):
+class DoctorDocument(TimeStampedModel, Document):
     PAN = 1
     ADDRESS = 2
     GST = 3
@@ -313,9 +313,9 @@ class HospitalImage(TimeStampedModel, Image):
     class Meta:
         db_table = "hospital_image"
 
-class HospitalDocument(TimeStampedModel, Image):
+class HospitalDocument(TimeStampedModel, Document):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    name = models.ImageField(upload_to='hospital/documents',height_field='height', width_field='width')
+    name = models.FileField(upload_to='hospital/documents', validators=[FileExtensionValidator(allowed_extensions=['pdf','jfif','jpg','jpeg','png'])])
     class Meta:
         db_table = "hospital_document"
 
