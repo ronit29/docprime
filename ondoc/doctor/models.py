@@ -9,8 +9,8 @@ from django.core.exceptions import NON_FIELD_ERRORS
 from django.conf import settings
 from datetime import datetime, timedelta
 from django.utils import timezone
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
-
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User
+from django.utils.safestring import mark_safe
 
 class Migration(migrations.Migration):
 

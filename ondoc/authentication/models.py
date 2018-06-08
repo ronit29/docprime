@@ -4,6 +4,12 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import JSONField
 # from ondoc.doctor.models import OpdAppointment
+from PIL import Image as Img
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from io import BytesIO
+import math
+import os
+import hashlib
 
 
 class Image(models.Model):
@@ -11,8 +17,137 @@ class Image(models.Model):
     width = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
     height = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__original_name = self.name
+
+    def has_image_changed(self):
+        if not self.pk:
+            return False
+        old_value = self.__class__._default_manager.filter(pk=self.pk).values('name').get()['name']
+        return not getattr(self, 'name') == old_value
+
+
+    def save(self, *args, **kwargs):
+        self.has_image_changed()
+        if self.name:
+            max_allowed = 1000
+            img = Img.open(self.name)
+            size = img.size
+            #new_size = ()
+
+            if max(size)>max_allowed:
+                size = tuple(math.floor(ti/(max(size)/max_allowed)) for ti in size)
+
+            img = img.resize(size, Img.ANTIALIAS)
+
+            # if img.mode != 'RGB':
+            #     img = img.convert('RGB')
+
+            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            #if img.multiple_chunks():
+            #    for chunk in img.chunks():
+            #       hash.update(chunk)
+            # else:    
+            #   hash.update(img.read())
+
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+
+
+            #im = img.save(md5_hash+'.jpg')
+            self.name = InMemoryUploadedFile(new_image_io, None, md5_hash+".jpg", 'image/jpeg',
+                                  new_image_io.tell(), None)
+
+            # self.name = InMemoryUploadedFile(output, 'ImageField', md5_hash+".jpg", 'image/jpeg',
+            #                                     output.len, None)
+
+            # self.name = img
+            # img.thumbnail((self.image.width/1.5,self.image.height/1.5), Img.ANTIALIAS)
+            # output = StringIO.StringIO()
+            # img.save(output, format='JPEG', quality=70)
+            # output.seek(0)
+            # self.image= InMemoryUploadedFile(output,'ImageField', "%s.jpg" %self.image.name.split('.')[0], 'image/jpeg', output.len, None)
+        super().save(*args, **kwargs)
+
+
     class Meta:
         abstract = True
+
+class Document(models.Model):
+    # name = models.ImageField(height_field='height', width_field='width')
+    # width = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
+    # height = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
+    def save(self, *args, **kwargs):
+        if self.name:
+            max_allowed = 1000
+            img = None
+
+            try:
+                img = Img.open(self.name)
+            except IOError:
+                pass
+
+            if img:
+                size = img.size
+                #new_size = ()
+
+                if max(size)>max_allowed:
+                    size = tuple(math.floor(ti/(max(size)/max_allowed)) for ti in size)
+
+                img = img.resize(size, Img.ANTIALIAS)
+
+            # if img.mode != 'RGB':
+            #     img = img.convert('RGB')
+
+                md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+                #if img.multiple_chunks():
+                #    for chunk in img.chunks():
+                #       hash.update(chunk)
+                # else:    
+                #   hash.update(img.read())
+
+                new_image_io = BytesIO()
+                img.save(new_image_io, format='JPEG')
+
+
+            #im = img.save(md5_hash+'.jpg')
+                self.name = InMemoryUploadedFile(new_image_io, None, md5_hash+".jpg", 'image/jpeg',
+                                  new_image_io.tell(), None)
+            else:                
+                hash = None
+                md5 = hashlib.md5()
+                bytes_io = self.name.file.read()
+                md5.update(bytes_io)
+                hash = md5.hexdigest()
+                name, extension = os.path.splitext(self.name.name)
+                filename = hash+extension
+                self.name.file.seek(0,2)
+
+                self.name = InMemoryUploadedFile(self.name.file, None, filename, None,
+                    self.name.file.tell(), None)
+
+                # with self.name.file as f:
+                #     for chunk in f.chunks(8192):
+                #         md5.update(chunk)
+                #     hash = md5.hexdigest()
+                print(' not image ')
+
+            # self.name = InMemoryUploadedFile(output, 'ImageField', md5_hash+".jpg", 'image/jpeg',
+            #                                     output.len, None)
+
+            # self.name = img
+            # img.thumbnail((self.image.width/1.5,self.image.height/1.5), Img.ANTIALIAS)
+            # output = StringIO.StringIO()
+            # img.save(output, format='JPEG', quality=70)
+            # output.seek(0)
+            # self.image= InMemoryUploadedFile(output,'ImageField', "%s.jpg" %self.image.name.split('.')[0], 'image/jpeg', output.len, None)
+        super().save(*args, **kwargs)
+
+
+    class Meta:
+        abstract = True
+
 
 class QCModel(models.Model):
     IN_PROGRESS = 1
@@ -96,7 +231,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 class StaffProfile(models.Model):
     name = models.CharField(max_length=100, blank=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    #user = models.OneToOneField(User, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name

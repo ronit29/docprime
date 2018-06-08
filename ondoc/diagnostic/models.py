@@ -1,11 +1,12 @@
 from django.contrib.gis.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User
 from ondoc.doctor.models import Hospital
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
+from django.utils.text import slugify
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
     NOT_ONBOARDED = 1
@@ -408,7 +409,7 @@ class LabDoctor(TimeStampedModel):
         db_table = "lab_doctor"
 
 
-class LabDocument(TimeStampedModel):
+class LabDocument(TimeStampedModel, Document):
     PAN = 1
     ADDRESS = 2
     GST = 3
@@ -419,6 +420,11 @@ class LabDocument(TimeStampedModel):
     lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.FileField(upload_to='lab/images', validators=[FileExtensionValidator(allowed_extensions=['pdf','jfif','jpg','jpeg','png'])])
+
+    def prefix(self):
+        return slugify(self.lab.name)
+        
+
 
     def extension(self):
         name, extension = os.path.splitext(self.name.name)
