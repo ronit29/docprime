@@ -10,7 +10,13 @@ from django.conf import settings
 from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.utils.safestring import mark_safe
+from PIL import Image as Img
+from io import BytesIO
+import hashlib
+
+
 
 class Migration(migrations.Migration):
 
@@ -290,9 +296,30 @@ class DoctorHospital(TimeStampedModel):
 class DoctorImage(TimeStampedModel, Image):
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
     name = models.ImageField(upload_to='doctor/images',height_field='height', width_field='width')
+    cropped_image = models.ImageField(upload_to='doctor/cropped_images', height_field='height', width_field='width',
+                                      blank=True, null=True)
 
     class Meta:
         db_table = "doctor_image"
+
+    def crop_image(self):
+        if self.cropped_image:
+            return
+        if self.name:
+            img = Img.open(self.name)
+            w, h = img.size
+            if w > h:
+                cropping_area = (w / 2 - h / 2,  0, w / 2 + h / 2, h)
+            else:
+                cropping_area = (0, h / 2 - w / 2, w, h / 2 + w / 2)
+            if h != w:
+                img = img.crop(cropping_area)
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            self.cropped_image = InMemoryUploadedFile(new_image_io, None, md5_hash + ".jpg", 'image/jpeg',
+                                                      new_image_io.tell(), None)
+            self.save()
 
 
 class DoctorDocument(TimeStampedModel):
