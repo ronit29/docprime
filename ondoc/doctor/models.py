@@ -255,22 +255,22 @@ class DoctorHospital(TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
 
-    TIME_CHOICES = [(7.0, "7 AM"), (7.5, "7:30 AM"),
-    (8.0, "8 AM"), (8.5, "8:30 AM"),
-    (9.0, "9 AM"), (9.5, "9:30 AM"),
-    (10.0, "10 AM"), (10.5, "10:30 AM"),
-    (11.0, "11 AM"), (11.5, "11:30 AM"),
-    (12.0, "12 PM"), (12.5, "12:30 PM"),
-    (13.0, "1 PM"), (13.5, "1:30 PM"),
-    (14.0, "2 PM"), (14.5, "2:30 PM"),
-    (15.0, "3 PM"), (15.5, "3:30 PM"),
-    (16.0, "4 PM"), (16.5, "4:30 PM"),
-    (17.0, "5 PM"), (17.5, "5:30 PM"),
-    (18.0, "6 PM"), (18.5, "6:30 PM"),
-    (19.0, "7 PM"), (19.5, "7:30 PM"),
-    (20.0, "8 PM"), (20.5, "8:30 PM"),
-    (21.0, "9 PM"), (21.5, "9:30 PM"),
-    (22.0, "10 PM"), (22.5, "10:30 PM")]
+    TIME_CHOICES = [(7.0, "7:00 AM"), (7.5, "7:30 AM"),
+    (8.0, "8:00 AM"), (8.5, "8:30 AM"),
+    (9.0, "9:00 AM"), (9.5, "9:30 AM"),
+    (10.0, "10:00 AM"), (10.5, "10:30 AM"),
+    (11.0, "11:00 AM"), (11.5, "11:30 AM"),
+    (12.0, "12:00 PM"), (12.5, "12:30 PM"),
+    (13.0, "1:00 PM"), (13.5, "1:30 PM"),
+    (14.0, "2:00 PM"), (14.5, "2:30 PM"),
+    (15.0, "3:00 PM"), (15.5, "3:30 PM"),
+    (16.0, "4:00 PM"), (16.5, "4:30 PM"),
+    (17.0, "5:00 PM"), (17.5, "5:30 PM"),
+    (18.0, "6:00 PM"), (18.5, "6:30 PM"),
+    (19.0, "7:00 PM"), (19.5, "7:30 PM"),
+    (20.0, "8:00 PM"), (20.5, "8:30 PM"),
+    (21.0, "9:00 PM"), (21.5, "9:30 PM"),
+    (22.0, "10:00 PM"), (22.5, "10:30 PM")]
 
     start = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
     end = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
