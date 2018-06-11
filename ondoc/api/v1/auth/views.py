@@ -527,3 +527,14 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
         else:
             REDIRECT_URL = OPD_REDIRECT_URL.format(response.get("appointmentId"))
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+
+
+class UserIDViewSet(viewsets.GenericViewSet):
+    permission_classes = (IsAuthenticated,)
+    pagination_class = None
+
+    def retrieve(self, request):
+        data = {
+            "user_id": request.user.id
+        }
+        return Response(data)
