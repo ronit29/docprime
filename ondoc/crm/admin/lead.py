@@ -38,13 +38,18 @@ class DoctorLeadResource(resources.ModelResource):
 
     class Meta:
         model = models.DoctorLead
+        # exclude = ('json', )
 
     def before_save_instance(self, instance, using_transactions, dry_run):
+        if dry_run:
+            return True
         if isinstance(instance.json, str):
             instance.json = json.loads(instance.json)
         super().before_save_instance(instance, using_transactions, dry_run)
 
     def after_save_instance(self, instance, using_transactions, dry_run):
+        if dry_run:
+            return
         data = instance.json
         clinic_urls = list(
             map(lambda x: data.get("LinkedClinics").get(x)[2].get("Clinic URL"), data.get("LinkedClinics")))
@@ -87,12 +92,17 @@ class DoctorHospitalInline(admin.StackedInline):
         data = instance.hospital_lead.json
         if not data:
             return
+        format_string = ""
+        for service_name in data.get("Services").values():
+            if MedicalService.objects.filter(name=service_name).exists():
+                format_string += "<div><span>{}</span></div>".format(service_name)
+            else:
+                format_string += "<div><span>{}</span><span style='color:red;'>-Does not exists.</span></div>".format(
+                    service_name)
         return format_html_join(
             mark_safe('<br/>'),
-            '{}',
-            ((service_name if MedicalService.objects.filter(
-                name=service_name).exists() else "{} - Does not exists.".format(service_name),) for service_name in
-             data.get("Services").values()),
+            format_string,
+            ((),),
         )
 
     def name(self, instance):
@@ -115,7 +125,7 @@ class DoctorHospitalInline(admin.StackedInline):
 class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = ['city', ]
-    list_display = ('city', 'lab', )
+    list_display = ('city', 'lab', 'name', )
     readonly_fields = ('hospital', 'name', 'lab', "timings", "services", 'city', "address", 'about',)
     exclude = ('source_id', "json", )
     resource_class = HospitalLeadResource
@@ -154,12 +164,17 @@ class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
         data = instance.json
         if not data:
             return
+        format_string = ""
+        for service_name in data.get("Services").values():
+            if MedicalService.objects.filter(name=service_name).exists():
+                format_string += "<div><span>{}</span></div>".format(service_name)
+            else:
+                format_string += "<div><span>{}</span><span style='color:red;'>-Does not exists.</span></div>".format(
+                    service_name)
         return format_html_join(
             mark_safe('<br/>'),
-            '{}',
-            ((service_name if MedicalService.objects.filter(
-                name=service_name).exists() else "{} - Does not exists.".format(service_name),) for service_name in
-             data.get("Services").values()),
+            format_string,
+            ((),),
         )
 
     def name(self, instance):
@@ -184,7 +199,9 @@ class DoctorLeadAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = ['city', ]
     list_display = ('city', 'lab', "name")
-    readonly_fields = ("doctor", "name", "city", "lab",  "services", "specializations", "awards", "about", )
+    readonly_fields = ("doctor", "name", "city", "lab",  "services",
+                       "specializations", "education", "experience",
+                       "awards", "about", )
     exclude = ('json', 'source_id',)
     resource_class = DoctorLeadResource
 
@@ -213,12 +230,16 @@ class DoctorLeadAdmin(ImportMixin, admin.ModelAdmin):
         data = instance.json
         if not data:
             return
+        format_string = ""
+        for service_name in data.get("Services").values():
+            if MedicalService.objects.filter(name=service_name).exists():
+                format_string += "<div><span>{}</span></div>".format(service_name)
+            else:
+                format_string += "<div><span>{}</span><span style='color:red;'>-Does not exists.</span></div>".format(service_name)
         return format_html_join(
             mark_safe('<br/>'),
-            '{}',
-            ((service_name if MedicalService.objects.filter(
-                name=service_name).exists() else "{} - Does not exists.".format(service_name),) for service_name in
-             data.get("Services").values()),
+            format_string,
+            ((),),
         )
 
     def specializations(self, instance):
@@ -226,14 +247,54 @@ class DoctorLeadAdmin(ImportMixin, admin.ModelAdmin):
         data = instance.json
         if not data:
             return
+        format_string = ""
+        for specialization_name in data.get("Specializations").values():
+            if Specialization.objects.filter(name=specialization_name).exists():
+                format_string += "<div><span>{}</span></div>".format(specialization_name)
+            else:
+                format_string += "<div><span>{}</span><span style='color:red;'>-Does not exists.</span></div>".format(specialization_name)
         return format_html_join(
             mark_safe('<br/>'),
-            '{}',
-            ((specialization_name if Specialization.objects.filter(
-                name=specialization_name).exists() else "{} - Does not exists.".format(specialization_name),) for
-             specialization_name in
-             data.get("Specializations").values()),
+            format_string,
+            ((),),
         )
+
+    def education(self, instance):
+        data = instance.json
+        if not data:
+            return
+        format_string = ""
+        for education in data.get("Education").values():
+            format_string += "<div><b>Qualification</b> - {}</div>" \
+                             "<div><b>Year</b> - {}</div>" \
+                             "<div><b>Institute</b> - {}</div><br/>" \
+                             "".format(education.get("Qualification"),
+                                       education.get("Year"),
+                                       education.get("Institute"))
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+
+    def experience(self, instance):
+        data = instance.json
+        if not data:
+            return
+        format_string = ""
+        for experience in data.get("Experience").values():
+            format_string += "<div><b>Role</b> - {}</div>" \
+                             "<div><b>Year</b> - {}</div>" \
+                             "<div><b>Location</b> - {}</div><br/>" \
+                             "".format(experience.get("Role"),
+                                       experience.get("Year"),
+                                       experience.get("Location"))
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+
 
     def awards(self, instance):
         # data = json.loads(instance.json)

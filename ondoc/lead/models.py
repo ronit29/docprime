@@ -75,6 +75,7 @@ class DoctorLead(models.Model):
                                  for hospital_type in Hospital.HOSPITAL_TYPE_CHOICES}
         hospital_name = hospital_lead.json.get("Name")
         hospital_type = hospital_lead.json.get("ClinicOrHospital")
+        city = hospital_lead.json.get("Address").split(",")[-1]
         hospital_type = HOSPITAL_TYPE_MAPPING.get(hospital_type)
         location = (hospital_lead.json.get("GoogleAddress")
                     .split("/")[-1].split(",") if self.json.get("GoogleAddress").split("/") else None)
@@ -83,7 +84,8 @@ class DoctorLead(models.Model):
             name=hospital_name,
             hospital_type=hospital_type,
             location=location_point,
-            created_by=created_by
+            created_by=created_by,
+            city=city
         )
         return hospital
 
@@ -98,7 +100,7 @@ class DoctorLead(models.Model):
             "Sun": 6,
         }
         TIME_SLOT_MAPPING = {time_slot_choice[1]: time_slot_choice[0] for time_slot_choice in
-                             DoctorHospital.TIME_SLOT_CHOICES}
+                             DoctorHospital.TIME_CHOICES}
 
         doctor_hospital_values = []
         for key, value in visiting_days.items():
@@ -110,10 +112,10 @@ class DoctorLead(models.Model):
                         start_time = timing.split("-")[0].strip()
                         end_time = timing.split("-")[-1].strip()
                         start_time_db_value = (
-                            TIME_SLOT_MAPPING.get("{} {}".format(start_time.split(":")[0], start_time.split(" ")[-1]))
+                            TIME_SLOT_MAPPING.get(start_time)
                         )
                         end_time_db_value = (
-                            TIME_SLOT_MAPPING.get("{} {}".format(end_time.split(":")[0], end_time.split(" ")[-1]))
+                            TIME_SLOT_MAPPING.get(end_time)
                         )
                         if (not start_time_db_value) or (not end_time_db_value):
                             continue
