@@ -24,6 +24,7 @@ class AutoComplete:
     def autocomplete_view(self, request):
         return CustomAutoComplete.as_view(model_admin=self)(request)
 
+
 class DoctorQualificationForm(forms.ModelForm):
     passing_year = forms.ChoiceField(choices=college_passing_year_choices, required=False)
 
@@ -34,13 +35,24 @@ class DoctorQualificationForm(forms.ModelForm):
         return data
 
 
+class DoctorQualificationFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if not self.is_valid():
+            return
+        if not self.forms or not self.forms[0].cleaned_data:
+            raise forms.ValidationError('At least One Qualification is required')
+
+
 class DoctorQualificationInline(admin.TabularInline):
     model = DoctorQualification
     form = DoctorQualificationForm
+    formset = DoctorQualificationFormSet
     extra = 0
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['college']
+
 
 class DoctorHospitalForm(forms.ModelForm):
     def clean(self):
@@ -51,10 +63,21 @@ class DoctorHospitalForm(forms.ModelForm):
             raise forms.ValidationError("Availability start time should be less than end time")
 
 
+class DoctorHospitalFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if not self.is_valid():
+            return
+        if not self.forms or not self.forms[0].cleaned_data:
+            raise forms.ValidationError('At least One Hospital is required')
+
+
 class DoctorHospitalInline(admin.TabularInline):
     model = DoctorHospital
     form = DoctorHospitalForm
+    formset = DoctorHospitalFormSet
     extra = 0
+    min_num = 1
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['hospital']
@@ -65,6 +88,7 @@ class DoctorLanguageInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+
 
 class DoctorAwardForm(forms.ModelForm):
     year = forms.ChoiceField(choices=award_year_choices, required=False)
@@ -120,9 +144,19 @@ class DoctorMedicalServiceInline(admin.TabularInline):
 # class DoctorImageForm(forms.ModelForm):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
+
+class DoctorImageFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if not self.is_valid():
+            return
+        if not self.forms or not self.forms[0].cleaned_data:
+            raise forms.ValidationError('Images is required for Quality Check')
+
+
 class DoctorImageInline(admin.TabularInline):
     model = DoctorImage
-    #form = DoctorImageForm
+    formset = DoctorImageFormSet
     template = 'imageinline.html'
     extra = 0
     can_delete = True
@@ -157,6 +191,7 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
             for key, value in count.items():
                 if not key==DoctorDocument.GST and value<1:
                     raise forms.ValidationError(choices[key]+" is required")
+
 
 class DoctorDocumentInline(admin.TabularInline):
     formset = DoctorDocumentFormSet
@@ -259,7 +294,7 @@ class DoctorForm(FormCleanMixin):
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value == 'count' and (int(self.data[key+'-TOTAL_FORMS']) <= 0 or (not key=='qualifications' and self.data.get(key+'-0-id') == '')):
+            if value == 'count' and int(self.data[key+'-TOTAL_FORMS']) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
     def clean_practicing_since(self):
