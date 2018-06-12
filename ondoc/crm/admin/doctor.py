@@ -100,8 +100,26 @@ class DoctorHospitalInline(admin.TabularInline):
     autocomplete_fields = ['hospital']
 
 
+class DoctorLanguageFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+            language = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('language'):
+                language += 1
+
+        if count > 0:
+            if not language:
+                raise forms.ValidationError("Atleast one language is required")
+
+
 class DoctorLanguageInline(admin.TabularInline):
     model = DoctorLanguage
+    formset = DoctorLanguageFormSet
     extra = 0
     can_delete = True
     show_change_link = False
@@ -143,8 +161,27 @@ class DoctorExperienceForm(forms.ModelForm):
             raise forms.ValidationError("Start Year should be less than end Year")
 
 
+
+class DoctorExperienceFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        hospital = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('hospital'):
+                hospital += 1
+
+        if count > 0:
+            if not hospital:
+                raise forms.ValidationError("Atleast one Experience is required")
+
+
 class DoctorExperienceInline(admin.TabularInline):
     model = DoctorExperience
+    formset = DoctorExperienceFormSet
     extra = 0
     can_delete = True
     show_change_link = False
