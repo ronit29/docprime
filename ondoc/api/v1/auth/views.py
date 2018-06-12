@@ -155,6 +155,7 @@ class UserViewset(GenericViewSet):
 class NotificationEndpointViewSet(GenericViewSet):
     serializer_class = serializers.NotificationEndpointSerializer
 
+    @transaction.atomic
     def save(self, request):
         serializer = serializers.NotificationEndpointSaveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
