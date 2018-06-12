@@ -174,6 +174,8 @@ class Doctor(TimeStampedModel, QCModel):
 
     is_insurance_enabled = models.BooleanField(verbose_name= 'Enabled for Insurance Customer',default=False)
     is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
+    is_online_consultation_enabled = models.BooleanField(verbose_name='Available for Online Consultation', default=False)
+    online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     hospitals = models.ManyToManyField(
         Hospital,
         through='DoctorHospital',
