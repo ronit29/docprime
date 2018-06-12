@@ -145,7 +145,7 @@ class UserProfile(TimeStampedModel, Image):
     profile_image = models.ImageField(upload_to='users/images' ,height_field='height', width_field='width',blank=True, null=True)
 
     def __str__(self):
-        return self.name
+        return "{}-{}".format(self.name, self.id)
 
     class Meta:
         db_table = "user_profile"

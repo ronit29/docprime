@@ -25,6 +25,14 @@ class NotificationAction:
         (APPOINTMENT_BOOKED, "Appointment Booked"),
     )
 
+    OPD_APPOINTMENT = "opd_appointment"
+    LAB_APPOINTMENT = "lab_appoingment"
+
+    ACTION_TYPE_CHOICES = (
+        (OPD_APPOINTMENT, 'Opd Appointment'),
+        (LAB_APPOINTMENT, 'Lab Appointment'),
+    )
+
     @classmethod
     def trigger(cls, instance, user, notification_type):
         context = {}
@@ -35,6 +43,8 @@ class NotificationAction:
                 "title": "Appointment Accepted",
                 "body": "Your appointment with Dr. {} has been accepted.".format(instance.doctor.name),
                 "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.OPD_APPOINTMENT,
+                "action_id": instance.id,
                 "image_url": ""
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
@@ -45,6 +55,8 @@ class NotificationAction:
                 "title": "Appointment Rescheduled",
                 "body": "Patient {} has rescheduled the appointment.".format(instance.profile.name),
                 "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.OPD_APPOINTMENT,
+                "action_id": instance.id,
                 "image_url": ""
             }
             AppNotification.send_notification(user=user, notification_type=notification_type, context=context)
@@ -55,6 +67,8 @@ class NotificationAction:
                 "title": "Appointment booked",
                 "body": "Your appointment with Dr. {} has been booked.".format(instance.doctor.name),
                 "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.OPD_APPOINTMENT,
+                "action_id": instance.id,
                 "image_url": ""
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
@@ -65,6 +79,8 @@ class NotificationAction:
                 "title": "Notification Accepted",
                 "body": "Patient {} has booked an appointment with you".format(instance.doctor.name),
                 "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.OPD_APPOINTMENT,
+                "action_id": instance.id,
                 "image_url": ""
             }
             NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
