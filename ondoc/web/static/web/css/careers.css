@@ -78,6 +78,14 @@ input[type=number]::-webkit-outer-spin-button {
 	margin: 0; 
 }
 
+.resume-file-name{
+    color: rgba(0, 0, 0, 0.8);
+}
+
+.resume-file-display{
+    display: none;
+}
+
 #upload-resume {
 	opacity: 0;
 	width: 100%;

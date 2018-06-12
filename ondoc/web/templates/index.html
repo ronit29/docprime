@@ -25,6 +25,11 @@
 							<div class="detail-text-div">
 								<p class="detail-text">Become our partner & help us serve millions of patients across India</p>
 							</div>
+							{% if messages %}
+							 	{% for message in messages %}
+							     	<p style="text-align:center;color:green;margin-bottom:0;">{{ message }}</p>
+								{% endfor %}
+							{% endif %}
 							<div class="signup-div">
 								<p class="signup-label">SignUp as</p>
 							</div>
@@ -42,13 +47,11 @@
 								</div>
 								<div class="form-group">
 									{{ form.email }}
+									{% if form.email.errors %}
+										<span style="color:red;"> {{ form.email.errors }} </span>
+									{% endif %}
 								</div>
 								<button type="submit" class="btn btn-primary send-btn">Submit</button>
-								{% if messages %}
-									{% for message in messages %}
-								    	<p style="margin-top:10px;text-align:center;color:green;margin-bottom:0;">{{ message }}</p>
-									{% endfor %}
-								{% endif %}
 							</form>
 						</div>
 					</div>

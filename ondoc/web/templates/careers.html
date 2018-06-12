@@ -50,7 +50,9 @@
 								</div>
 								<div class="form-group">
 									{{ form.email }}
-									{{ form.email.errors }}
+									{% if form.email.errors %}
+										<span style="color:red;"> {{ form.email.errors }} </span>
+									{% endif %}
 								</div>
 								<div class="upload-resume-div">
 									<label class="resume-label" for="upload-resume">Upload Resume</label>
@@ -58,6 +60,7 @@
 										<img src="{% static 'web/images/upload.svg' %}" class="upload-icon">
 										<p class="upload-text">Upload</p>
 									</div>
+									<span class="resume-file-name resume-file-display"></span>
 									<div class="input-file">
 										{{ form.resume }}
 									</div>
@@ -117,5 +120,18 @@
 		</footer>
 	{% block page_script %}
 		<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+        <script>
+             $('#upload-resume').change(function(){
+    			file_path = $("input[id^='upload-resume']").val();
+    			if(file_path.length != 0){
+    			   path_array = file_path.split('\\');
+    			   if(path_array){
+    			      file_name = path_array.pop();
+    			      $('.resume-file-name').removeClass('resume-file-display');
+    			      $('.resume-file-name').html(file_name);
+    			   }
+    			}
+    			});
+		</script>
      {% endblock %}
      {% endblock %}
