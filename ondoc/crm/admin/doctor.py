@@ -105,7 +105,7 @@ class DoctorLanguageFormSet(forms.BaseInlineFormSet):
         super().clean()
         if any(self.errors):
             return
-            language = 0
+        language = 0
         count = 0
         for value in self.cleaned_data:
             count += 1
