@@ -19,7 +19,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.conf import settings
 
-from ondoc import crm
+from ondoc import web
 
 # DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
@@ -41,7 +41,8 @@ else:
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('',include('ondoc.crm.urls', namespace='crm')),
+    # path('',include('ondoc.crm.urls', namespace='crm')),
+    path('', include('ondoc.web.urls', namespace='web')),
     path('onboard/',include('ondoc.onboard.urls', namespace='onboard')),
     # path('doctors/', include('ondoc.doctor.urls')),
     # path('auth/', include('ondoc.authentication.urls'))
