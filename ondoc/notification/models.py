@@ -196,7 +196,7 @@ class PushNotification(TimeStampedModel):
             notification_type=notification_type,
             content=context
         )
-        tokens = [token for token in NotificationEndpoint.objects.filter(user=user)]
+        tokens = [token.token for token in NotificationEndpoint.objects.filter(user=user)]
         data = model_to_dict(push_noti)
         data["tokens"] = tokens
         message = {
