@@ -174,6 +174,8 @@ class Doctor(TimeStampedModel, QCModel):
 
     is_insurance_enabled = models.BooleanField(verbose_name= 'Enabled for Insurance Customer',default=False)
     is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
+    is_online_consultation_enabled = models.BooleanField(verbose_name='Available for Online Consultation', default=False)
+    online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     hospitals = models.ManyToManyField(
         Hospital,
         through='DoctorHospital',
@@ -404,7 +406,7 @@ class DoctorMedicalService(TimeStampedModel):
 class DoctorMobile(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="mobiles", on_delete=models.CASCADE)
     country_code = models.PositiveSmallIntegerField(default=91, blank=True, null=True)
-    number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(7000000000)])
     is_primary = models.BooleanField(verbose_name= 'Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name= 'Phone Number Verified?', default=False)
 

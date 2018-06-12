@@ -82,15 +82,25 @@ class DoctorAwardInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+
 class DoctorAssociationInline(admin.TabularInline):
     model = DoctorAssociation
     extra = 0
     can_delete = True
     show_change_link = False
 
+
 class DoctorExperienceForm(forms.ModelForm):
     start_year = forms.ChoiceField(required=False, choices=practicing_since_choices)
     end_year = forms.ChoiceField(required=False, choices=practicing_since_choices)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start_year")
+        end = cleaned_data.get("end_year")
+        if start and end and start >= end:
+            raise forms.ValidationError("Start Year should be less than end Year")
+
 
 class DoctorExperienceInline(admin.TabularInline):
     model = DoctorExperience
@@ -98,6 +108,7 @@ class DoctorExperienceInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
     form = DoctorExperienceForm
+
 
 class DoctorMedicalServiceInline(admin.TabularInline):
     model = DoctorMedicalService
@@ -203,6 +214,7 @@ class DoctorEmailForm(forms.ModelForm):
     email = forms.CharField(required=True)
     is_primary = forms.BooleanField(required=False)
 
+
 class DoctorEmailFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -220,6 +232,7 @@ class DoctorEmailFormSet(forms.BaseInlineFormSet):
                raise forms.ValidationError("One primary email is required")
             if primary>=2:
                raise forms.ValidationError("Only one email can be primary")
+
 
 class DoctorEmailInline(admin.TabularInline):
     model = DoctorEmail
@@ -241,12 +254,12 @@ class DoctorForm(FormCleanMixin):
     def validate_qc(self):
         qc_required = {'name':'req','gender':'req','practicing_since':'req',
         'about':'req','license':'req','mobiles':'count','emails':'count',
-        'qualifications':'count','availability':'count','languages':'count',
+        'qualifications':'count', 'availability': 'count', 'languages':'count',
         'images':'count','documents':'count'}
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'-TOTAL_FORMS'])<=0:
+            if value == 'count' and (int(self.data[key+'-TOTAL_FORMS']) <= 0 or self.data.get(key+'-0-id') == ''):
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
     def clean_practicing_since(self):
@@ -259,7 +272,7 @@ class CityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'hospitals__city'
     def lookups(self, request, model_admin):
-        cities = set([(c['hospitals__city'].upper(),c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('','') for c in Doctor.objects.all().values('hospitals__city')])
+        cities = set([(c['hospitals__city'].upper(), c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('','') for c in Doctor.objects.all().values('hospitals__city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -387,11 +400,14 @@ class SpecializationAdmin(AutoComplete, VersionAdmin):
 class QualificationAdmin(AutoComplete, VersionAdmin):
     search_fields = ['name']
 
+
 class MedicalServiceAdmin(VersionAdmin):
     search_fields = ['name']
 
+
 class LanguageAdmin(VersionAdmin):
     search_fields = ['name']
+
 
 class CollegeAdmin(AutoComplete, VersionAdmin):
     search_fields = ['name']
