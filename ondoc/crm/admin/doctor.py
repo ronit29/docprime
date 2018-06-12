@@ -252,14 +252,14 @@ class DoctorForm(FormCleanMixin):
     practicing_since = forms.ChoiceField(required=False, choices=practicing_since_choices)
     onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Doctor.ONBOARDING_STATUS)
     def validate_qc(self):
-        qc_required = {'name':'req','gender':'req','practicing_since':'req',
+        qc_required = {'name':'req', 'gender':'req','practicing_since':'req',
         'about':'req','license':'req','mobiles':'count','emails':'count',
         'qualifications':'count', 'availability': 'count', 'languages':'count',
         'images':'count','documents':'count'}
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value == 'count' and (int(self.data[key+'-TOTAL_FORMS']) <= 0 or self.data.get(key+'-0-id') == ''):
+            if value == 'count' and (int(self.data[key+'-TOTAL_FORMS']) <= 0 or (not key=='qualifications' and self.data.get(key+'-0-id') == '')):
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
     def clean_practicing_since(self):
@@ -311,7 +311,7 @@ class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     def onboarddoctor_admin(self, request, userid):
         host = request.get_host()
         try:
-            doctor = Doctor.objects.get(id = userid)
+            doctor = Doctor.objects.get(id=userid)
         except Exception as e:
             return HttpResponse('invalid doctor')
 
