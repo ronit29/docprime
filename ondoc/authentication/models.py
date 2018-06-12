@@ -164,7 +164,8 @@ class OtpVerifications(TimeStampedModel):
 
 
 class NotificationEndpoint(TimeStampedModel):
-    user = models.ForeignKey(User, related_name='notification_endpoints', on_delete=models.CASCADE)
+    user = models.ForeignKey(User, related_name='notification_endpoints', on_delete=models.CASCADE,
+                             blank=True, null=True)
     device_id = models.TextField(blank=True, null=True)
     token = models.TextField(unique=True)
 

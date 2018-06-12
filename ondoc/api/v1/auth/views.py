@@ -4,6 +4,7 @@ import random
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
+from django.db.models import Q
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
@@ -152,13 +153,13 @@ class UserViewset(GenericViewSet):
 
 
 class NotificationEndpointViewSet(GenericViewSet):
-    permission_classes = (IsAuthenticated,)
     serializer_class = serializers.NotificationEndpointSerializer
 
     def save(self, request):
         serializer = serializers.NotificationEndpointSaveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        NotificationEndpoint.objects.filter(token=validated_data.get('token')).delete()
         notification_endpoint_data = {
             "user": request.user.id,
             "device_id": validated_data.get("device_id"),
