@@ -224,6 +224,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer.save()
         return Response(serializer.data)
 
+    def update(self, request, *args, **kwargs):
+        kwargs.update({
+            "partial": True
+        })
+        return super().update(request, *args, **kwargs)
+
 
 class UserPermissionViewSet(mixins.CreateModelMixin,
                             mixins.ListModelMixin,
