@@ -38,10 +38,18 @@ class DoctorQualificationForm(forms.ModelForm):
 class DoctorQualificationFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
-        if not self.is_valid():
+        if any(self.errors):
             return
-        if not self.forms or not self.forms[0].cleaned_data:
-            raise forms.ValidationError('At least One Qualification is required')
+        doctor = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('doctor'):
+                doctor += 1
+
+        if count > 0:
+            if not doctor:
+                raise forms.ValidationError("Atleast one Qualification is required")
 
 
 class DoctorQualificationInline(admin.TabularInline):
@@ -66,10 +74,19 @@ class DoctorHospitalForm(forms.ModelForm):
 class DoctorHospitalFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
-        if not self.is_valid():
+        if any(self.errors):
             return
-        if not self.forms or not self.forms[0].cleaned_data:
-            raise forms.ValidationError('At least One Hospital is required')
+        hospital = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('hospital'):
+                hospital += 1
+
+        if count > 0:
+            if not hospital:
+                raise forms.ValidationError("Atleast one Hospital is required")
+
 
 
 class DoctorHospitalInline(admin.TabularInline):
@@ -77,7 +94,7 @@ class DoctorHospitalInline(admin.TabularInline):
     form = DoctorHospitalForm
     formset = DoctorHospitalFormSet
     extra = 0
-    min_num = 1
+    # min_num = 1
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['hospital']
@@ -148,10 +165,18 @@ class DoctorMedicalServiceInline(admin.TabularInline):
 class DoctorImageFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
-        if not self.is_valid():
+        if any(self.errors):
             return
-        if not self.forms or not self.forms[0].cleaned_data:
-            raise forms.ValidationError('Images is required for Quality Check')
+        name = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('name'):
+                name += 1
+
+        if count > 0:
+            if not name:
+                raise forms.ValidationError("Atleast one Image is required")
 
 
 class DoctorImageInline(admin.TabularInline):
