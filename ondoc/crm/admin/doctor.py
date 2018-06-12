@@ -94,6 +94,13 @@ class DoctorExperienceForm(forms.ModelForm):
     start_year = forms.ChoiceField(required=False, choices=practicing_since_choices)
     end_year = forms.ChoiceField(required=False, choices=practicing_since_choices)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start_year")
+        end = cleaned_data.get("end_year")
+        if start and end and start >= end:
+            raise forms.ValidationError("Start Year should be less than end Year")
+
 
 class DoctorExperienceInline(admin.TabularInline):
     model = DoctorExperience
