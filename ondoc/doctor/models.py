@@ -636,6 +636,12 @@ class   OpdAppointment(TimeStampedModel):
                 user=self.doctor.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
             )
+        elif self.status == OpdAppointment.CANCELED:
+            notification_models.NotificationAction.trigger(
+                instance=self,
+                user=self.doctor.user,
+                notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED,
+            )
 
     def save(self, *args, **kwargs):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
