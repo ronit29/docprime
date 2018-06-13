@@ -13,13 +13,13 @@ User = get_user_model()
 
 class NotificationAction:
     APPOINTMENT_ACCEPTED = 1
-    APPOINTMENT_REJECTED = 2
+    APPOINTMENT_CANCELLED = 2
     APPOINTMENT_RESCHEDULED_BY_PATIENT = 3
     APPOINTMENT_RESCHEDULED_BY_DOCTOR = 4
     APPOINTMENT_BOOKED = 5
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
-        (APPOINTMENT_REJECTED, "Appointment Rejected"),
+        (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
         (APPOINTMENT_RESCHEDULED_BY_PATIENT, "Appointment Rescheduled by Patient"),
         (APPOINTMENT_RESCHEDULED_BY_DOCTOR, "Appointment Rescheduled by Doctor"),
         (APPOINTMENT_BOOKED, "Appointment Booked"),
@@ -59,7 +59,7 @@ class NotificationAction:
                 "action_id": instance.id,
                 "image_url": ""
             }
-            AppNotification.send_notification(user=user, notification_type=notification_type, context=context)
+            NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
             context = {
                 "patient_name": instance.profile.name,
@@ -76,8 +76,20 @@ class NotificationAction:
             context = {
                 "patient_name": instance.profile.name,
                 "doctor_name": instance.doctor.name,
-                "title": "Notification Accepted",
-                "body": "Patient {} has booked an appointment with you".format(instance.doctor.name),
+                "title": "Appointment Booked",
+                "body": "Patient {} has booked an appointment with you".format(instance.profile.name),
+                "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.OPD_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
+            context = {
+                "patient_name": instance.profile.name,
+                "doctor_name": instance.doctor.name,
+                "title": "Appointment Cancelled",
+                "body": "Patient {} has cancelled the appointment.".format(instance.profile.name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
