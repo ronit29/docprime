@@ -357,7 +357,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                   .filter(pk=pk).first())
         if not doctor:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False)
+        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+                                                                 context={"request": request})
         response_data = self.prepare_response(serializer.data)
         return Response(response_data)
 
