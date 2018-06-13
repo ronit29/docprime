@@ -76,7 +76,7 @@ class NotificationAction:
             context = {
                 "patient_name": instance.profile.name,
                 "doctor_name": instance.doctor.name,
-                "title": "Notification Accepted",
+                "title": "Appointment Booked",
                 "body": "Patient {} has booked an appointment with you".format(instance.profile.name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
@@ -88,7 +88,7 @@ class NotificationAction:
             context = {
                 "patient_name": instance.profile.name,
                 "doctor_name": instance.doctor.name,
-                "title": "Notification Accepted",
+                "title": "Appointment Cancelled",
                 "body": "Patient {} has cancelled the appointment.".format(instance.profile.name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
