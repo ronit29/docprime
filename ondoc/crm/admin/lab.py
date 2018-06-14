@@ -341,6 +341,7 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
 
 class LabTestAdmin(ImportMixin, VersionAdmin):
+    change_list_template = 'change_list_import.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = ['name']
     resource_class = LabTestResource
