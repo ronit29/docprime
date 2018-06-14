@@ -294,9 +294,6 @@ class LabAppointment(TimeStampedModel):
     RESCHEDULED_LAB = 3
     RESCHEDULED_PATIENT = 4
     ACCEPTED = 5
-
-    # RESCHEDULED_BY_USER = 4
-    # REJECTED = 4
     CANCELED = 6
     COMPLETED = 7
 
@@ -322,6 +319,35 @@ class LabAppointment(TimeStampedModel):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
 
         return allowed
+
+
+    def action_rescheduled_lab(self, appointment):
+        appointment.status = self.RESCHEDULED_LAB
+        appointment.save()
+        return appointment
+
+    def action_rescheduled_patient(self, appointment, validated_data):
+        from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
+        appointment.status = self.RESCHEDULED_PATIENT
+        appointment.time_slot_start = CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
+                                                                                     validated_data.get("start_time"))
+        appointment.save()
+        return appointment
+
+    def action_accepted(self, appointment):
+        appointment.status = self.ACCEPTED
+        appointment.save()
+        return appointment
+
+    def action_cancelled(self, appointment):
+        appointment.status = self.CANCELED
+        appointment.save()
+        return appointment
+
+    def action_completed(self, appointment):
+        appointment.status = self.COMPLETED
+        appointment.save()
+        return appointment
 
     def __str__(self):
         return self.profile.name+', '+self.lab.name

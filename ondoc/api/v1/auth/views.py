@@ -369,27 +369,21 @@ class UserAppointmentsViewSet(OndocViewSet):
     def lab_appointment_update(self, lab_appointment, validated_data):
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELED:
-                lab_appointment.status = validated_data['status']
+                updated_lab_appointment = lab_appointment.action_cancelled(lab_appointment)
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
-                    lab_appointment.status = validated_data['status']
-                    lab_appointment.time_slot_start =  CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
-                                                                                                            validated_data.get("start_time"))
-            lab_appointment.save()
-        return lab_appointment
+                    updated_lab_appointment = lab_appointment.action_rescheduled_patient(lab_appointment,
+                                                                                         validated_data)
+        return updated_lab_appointment
 
     def doctor_appointment_update(self, opd_appointment, validated_data):
         if validated_data.get('status'):
             if validated_data['status'] == OpdAppointment.CANCELED:
-                opd_appointment.status = validated_data['status']
+                updated_opd_appointment = opd_appointment.action_cancelled(opd_appointment)
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
-                    opd_appointment.status = validated_data['status']
-                    opd_appointment.time_slot_start = CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
-                                                                                                            validated_data.get("start_time"))
-            # opd_appointment.time_slot_end = validated_data.get("end_date")
-        opd_appointment.save()
-        return opd_appointment
+                    updated_opd_appointment = opd_appointment.action_rescheduled_patient(opd_appointment, validated_data)
+        return updated_opd_appointment
 
     def lab_appointment_list(self, request, params):
         user = request.user
