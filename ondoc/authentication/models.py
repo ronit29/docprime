@@ -357,3 +357,14 @@ class ConsumerTransaction(TimeStampedModel):
     action = models.SmallIntegerField(choices=ACTION_CHOICES)
     amount = models.FloatField(default=0)
 
+
+class OrderTransaction(TimeStampedModel):
+    PAYMENT_INITIALISED = 0
+    PAYMENT_COMPLETED = 1
+    status_list = ["INITIALISED", "COMPLETED"]
+    STATUS_CHOICES = list(enumerate(status_list, 0))
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    product = models.SmallIntegerField(choices=PgTransaction.PRODUCT_IDS)
+    order = models.IntegerField()
+    status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES)
+    amount = models.FloatField(default=0)

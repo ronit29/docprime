@@ -566,26 +566,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         pg_tx_queryset = PgTransaction.objects.create(**response_data)
 
         self.block_pay_schedule_transaction(response_data)
-        # If transaction was successful
-        # if response_data["status_code"] == 1:
-        #     try:
-        #         appointment_obj = self.block_pay_schedule_transaction(response_data, pg_tx_queryset)
-        #     except:
-        #         error_flag = True
-        #
-        # if error_flag:
-        #     if response_data["product"] == 1:
-        #             REDIRECT_URL = LAB_REDIRECT_URL.format(response_data["order"])
-        #     else:
-        #             REDIRECT_URL = OPD_REDIRECT_URL.format(response_data["order"])
-        #
-        # else:
-        # self.confirm_appointment()
-        # if appointment_obj:
-        #     otp = random.randint(1000, 9999)
-        #     appointment_obj.payment_status = OpdAppointment.PAYMENT_ACCEPTED
-        #     appointment_obj.otp = otp
-        #     appointment_obj.save()
+
         if response_data["product"] == 1:
                 REDIRECT_URL = LAB_REDIRECT_URL.format(response_data["order"])
         else:
@@ -596,7 +577,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     def form_pg_transaction_data(self, response):
         data = dict()
-        user = User.objects.get(pk=response.get("customerId"))
+        # user = User.objects.get(pk=response.get("customerId"))
+        user = get_object_or_404(User, pk=response.get("customerId"))
         data['user'] = user
         data['product'] = response.get('productId')
         data['order'] = response.get('orderNo')
@@ -628,15 +610,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         consumer_account.credit_payment(data, tx_amount)
 
-        self.confirm_appointment(consumer_account, data, appointment_obj, tx_amount)
-
-    def confirm_appointment(self, consumer_account, data, appointment_obj, amount):
-        if appointment_obj:
-            otp = random.randint(1000, 9999)
-            appointment_obj.payment_status = OpdAppointment.PAYMENT_ACCEPTED
-            appointment_obj.otp = otp
-            appointment_obj.save()
-            consumer_account.debit_schedule(data, amount)
+        if appointment_obj and consumer_account.balance >= appointment_charge:
+            appointment_obj.payment_confirmation(consumer_account, data, appointment_charge)
 
     @transaction.atomic
     def block_cancel_refund_transaction(self, data):
@@ -676,7 +651,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         if consumer_account.balance < appointment_amount:
             return appointment_amount - consumer_account.balance
         else:
-            self.confirm_appointment(consumer_account, data, obj, appointment_amount)
+            obj.confirm_appointment(consumer_account, data, appointment_amount)
 
         return 0
 

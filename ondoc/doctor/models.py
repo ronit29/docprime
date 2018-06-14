@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
 from ondoc.notification import models as notification_models
+import random
 
 
 class Migration(migrations.Migration):
@@ -640,6 +641,12 @@ class   OpdAppointment(TimeStampedModel):
         self.send_notification(database_instance)
         super().save(*args, **kwargs)
 
+    def payment_confirmation(self, consumer_account, data, amount):
+        otp = random.randint(1000, 9999)
+        self.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+        self.otp = otp
+        self.save()
+        consumer_account.debit_schedule(data, amount)
 
     class Meta:
         db_table = "opd_appointment"

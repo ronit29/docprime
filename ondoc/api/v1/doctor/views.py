@@ -27,7 +27,6 @@ from collections import defaultdict
 
 import json
 import copy
-import random
 User = get_user_model()
 
 
@@ -148,7 +147,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         payment_response = dict()
         if queryset:
             serializer_data = serializers.OpdAppointmentSerializer(queryset.first(), context={'request':request})
-            payment_response = self.payment_details(request, serializer_data.data, 1)
+            payment_response = self.extract_payment_details(request, serializer_data.data, 1)
         return Response(payment_response)
 
 
@@ -208,7 +207,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         resp = {}
         resp["status"] = 1
         resp["data"] = appointment_serializer.data
-        resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 1)
+        resp["payment_details"] = self.extract_payment_details(request, appointment_serializer.data, 1)
         return Response(data=resp)
 
     def update(self, request, pk=None):
@@ -274,14 +273,29 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             whole_queryset.append(temp)
         return whole_queryset
 
-    def payment_confirmation(self, request, appointment_details, product_id):
-        from ondoc.api.v1.auth.views import TransactionViewSet
-        data = dict()
-        data["order"] = appointment_details["id"]
-        data["user"] = request.user
-        data["product"] = product_id
-        tx_obj = TransactionViewSet()
-        remaining_amount = tx_obj.block_schedule_transaction(data)
+    @transaction.atomic
+    def extract_payment_details(self, request, appointment_details, product_id):
+        remaining_amount = 0
+        user = request.user
+
+        if appointment_details["payment_status"] == models.OpdAppointment.PAYMENT_PENDING:
+            consumer_account = auth_models.ConsumerAccount.objects.get_or_create(user=user)
+            consumer_account = auth_models.ConsumerAccount.objects.select_for_update().get(user=user)
+
+            data = dict()
+            data["order"] = appointment_details["id"]
+            data["user"] = user
+            data["product"] = product_id
+
+            if consumer_account.balance < appointment_details["fees"]:
+                remaining_amount = appointment_details["fees"] - consumer_account.balance
+                data["status"] = auth_models.OrderTransaction.PAYMENT_INITIALISED
+                data["amount"] = remaining_amount
+                auth_models.OrderTransaction.objects.create(** data)
+            else:
+                obj = models.OpdAppointment.objects.get(pk=appointment_details["id"])
+                obj.payment_confirmation(consumer_account, data, appointment_details["fees"])
+
         ad = copy.deepcopy(appointment_details)
         ad["fees"] = remaining_amount
         return self.payment_details(request, ad, product_id)
