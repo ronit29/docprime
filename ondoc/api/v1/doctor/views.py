@@ -162,8 +162,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if request.user.user_type == User.DOCTOR and perm_data.write_permission:
                 otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
                 otp_valid_serializer.is_valid(raise_exception=True)
-                opd_appointment.action_completed(opd_appointment)
-        opd_appointment_serializer = serializers.OpdAppointmentSerializer(opd_appointment, context={'request': request})
+                updated_opd_appointment = opd_appointment.action_completed(opd_appointment)
+        opd_appointment_serializer = serializers.OpdAppointmentSerializer(updated_opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
     @transaction.atomic
