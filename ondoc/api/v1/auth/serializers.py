@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         UserPermission, Address)
+                                         UserPermission, Address, ConsumerAccount)
 from ondoc.doctor.models import DoctorMobile
 import datetime
 from dateutil.relativedelta import relativedelta
@@ -148,3 +148,9 @@ class AddressSerializer(serializers.ModelSerializer):
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
     # id = serializers.IntegerField(required=True)
+
+
+class ConsumerAccountModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConsumerAccount
+        fields = "__all__"

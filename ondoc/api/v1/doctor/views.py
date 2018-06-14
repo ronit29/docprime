@@ -26,6 +26,8 @@ from django.db.models import F
 from collections import defaultdict
 
 import json
+import copy
+import random
 User = get_user_model()
 
 
@@ -167,7 +169,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         opd_appointment_serializer = serializers.OpdAppointmentSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
-
     @transaction.atomic
     def create(self, request):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
@@ -209,7 +210,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         resp["data"] = appointment_serializer.data
         resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 1)
         return Response(data=resp)
-
 
     def update(self, request, pk=None):
         opd_appointment = get_object_or_404(models.OpdAppointment, pk=pk)
@@ -274,29 +274,42 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             whole_queryset.append(temp)
         return whole_queryset
 
+    def payment_confirmation(self, request, appointment_details, product_id):
+        from ondoc.api.v1.auth.views import TransactionViewSet
+        data = dict()
+        data["order"] = appointment_details["id"]
+        data["user"] = request.user
+        data["product"] = product_id
+        tx_obj = TransactionViewSet()
+        remaining_amount = tx_obj.block_schedule_transaction(data)
+        ad = copy.deepcopy(appointment_details)
+        ad["fees"] = remaining_amount
+        return self.payment_details(request, ad, product_id)
+
     def payment_details(self, request, appointment_details, product_id):
         details = dict()
         pgdata = dict()
-        user = request.user
-        user_profile = user.profiles.filter(is_default_user=True).first()
-        pgdata['custId'] = user.id
-        pgdata['mobile'] = user.phone_number
-        pgdata['email'] = user.email
-        if not user.email:
-            pgdata['email'] = "dummy_appointment@policybazaar.com"
+        if appointment_details["fees"] != 0:
+            user = request.user
+            user_profile = user.profiles.filter(is_default_user=True).first()
+            pgdata['custId'] = user.id
+            pgdata['mobile'] = user.phone_number
+            pgdata['email'] = user.email
+            if not user.email:
+                pgdata['email'] = "dummy_appointment@policybazaar.com"
 
-        pgdata['productId'] = product_id
-        base_url = (
-            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
-        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['checkSum'] = ''
-        pgdata['appointmentId'] = appointment_details['id']
-        if user_profile:
-            pgdata['name'] = user_profile.name
-        else:
-            pgdata['name'] = "DummyName"
-        pgdata['txAmount'] = appointment_details['fees']
+            pgdata['productId'] = product_id
+            base_url = (
+                "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+            pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+            pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+            pgdata['checkSum'] = ''
+            pgdata['appointmentId'] = appointment_details['id']
+            if user_profile:
+                pgdata['name'] = user_profile.name
+            else:
+                pgdata['name'] = "DummyName"
+            pgdata['txAmount'] = appointment_details['fees']
 
         if pgdata:
             details['required'] = True

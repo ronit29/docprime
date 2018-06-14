@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
 import math
 import datetime
+import time
 import pytz
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
@@ -21,7 +22,8 @@ from ondoc.sms.api import send_otp
 
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         UserPermission, Address, AppointmentTransaction)
+                                         UserPermission, Address, AppointmentTransaction, PgTransaction,
+                                         ConsumerAccount, ConsumerTransaction)
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -364,8 +366,6 @@ class UserAppointmentsViewSet(OndocViewSet):
             }
             return Response(response)
 
-
-
     def lab_appointment_update(self, lab_appointment, validated_data):
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELED:
@@ -540,3 +540,197 @@ class UserIDViewSet(viewsets.GenericViewSet):
             "user_id": request.user.id
         }
         return Response(data)
+
+
+class TransactionViewSet(viewsets.GenericViewSet):
+
+    serializer_class = None
+    queryset = PgTransaction.objects.none()
+
+    def save(self, request):
+        LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appointment/{}"
+        OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appointment/{}"
+        data = request.data
+        #
+        # coded_response = data.get("response")
+        # if isinstance(coded_response, list):
+        #     coded_response = coded_response[0]
+        # coded_response += "=="
+        # decoded_response = base64.b64decode(coded_response).decode()
+        # response = json.loads(decoded_response)
+
+        response = request.data
+
+        response_data = self.form_pg_transaction_data(response)
+
+        pg_tx_queryset = PgTransaction.objects.create(**response_data)
+
+        self.block_pay_schedule_transaction(response_data)
+        # If transaction was successful
+        # if response_data["status_code"] == 1:
+        #     try:
+        #         appointment_obj = self.block_pay_schedule_transaction(response_data, pg_tx_queryset)
+        #     except:
+        #         error_flag = True
+        #
+        # if error_flag:
+        #     if response_data["product"] == 1:
+        #             REDIRECT_URL = LAB_REDIRECT_URL.format(response_data["order"])
+        #     else:
+        #             REDIRECT_URL = OPD_REDIRECT_URL.format(response_data["order"])
+        #
+        # else:
+        # self.confirm_appointment()
+        # if appointment_obj:
+        #     otp = random.randint(1000, 9999)
+        #     appointment_obj.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+        #     appointment_obj.otp = otp
+        #     appointment_obj.save()
+        if response_data["product"] == 1:
+                REDIRECT_URL = LAB_REDIRECT_URL.format(response_data["order"])
+        else:
+                REDIRECT_URL = OPD_REDIRECT_URL.format(response_data["order"])
+
+        return Response({"url": REDIRECT_URL})
+        # return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+
+    def form_pg_transaction_data(self, response):
+        data = dict()
+        user = User.objects.get(pk=response.get("customerId"))
+        data['user'] = user
+        data['product'] = response.get('productId')
+        data['order'] = response.get('orderNo')
+        data['type'] = PgTransaction.CREDIT
+
+        data['payment_mode'] = response.get('paymentMode')
+        data['response_code'] = response.get('responseCode')
+        data['bank_id'] = response.get('bankTxId')
+        transaction_time = parse(response.get("txDate"))
+        data['transaction_date'] = transaction_time
+        data['bank_name'] = response.get('bankName')
+        data['currency'] = response.get('currency')
+        data['status_code'] = response.get('statusCode')
+        data['pg_name'] = response.get('pgGatewayName')
+        data['status_type'] = response.get('txStatus')
+        data['transaction_id'] = response.get('pgTxId')
+        data['pb_gateway_name'] = response.get('pbGatewayName')
+
+        return data
+
+    @transaction.atomic
+    def block_pay_schedule_transaction(self, data):
+
+        consumer_account = ConsumerAccount.objects.get_or_create(user=data["user"])
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=data["user"])
+
+        appointment_charge, appointment_obj = self.get_appointment_amount(data)
+        tx_amount = appointment_charge
+
+        consumer_account.credit_payment(data, tx_amount)
+
+        self.confirm_appointment(consumer_account, data, appointment_obj, tx_amount)
+
+    def confirm_appointment(self, consumer_account, data, appointment_obj, amount):
+        if appointment_obj:
+            otp = random.randint(1000, 9999)
+            appointment_obj.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+            appointment_obj.otp = otp
+            appointment_obj.save()
+            consumer_account.debit_schedule(data, amount)
+
+    @transaction.atomic
+    def block_cancel_refund_transaction(self, data):
+        consumer_account = ConsumerAccount.objects.select_for_update().filter(user=data["user"]).first()
+        if not consumer_account:
+            consumer_account = ConsumerAccount.objects.select_for_update().create(user=data["user"])
+
+        cancel_amount = self.get_cancel_amount(data)
+
+        self.credit_cancellation(data, cancel_amount)
+
+        refund_amount = cancel_amount + consumer_account.balance
+
+        self.debit_refund(data, refund_amount)
+        consumer_account.balance = 0
+        consumer_account.save()
+        return refund_amount
+
+    @transaction.atomic
+    def block_cancel_reschedule_transaction(self, data):
+        consumer_account = ConsumerAccount.objects.select_for_update().filter(user=data["user"]).first()
+        if not consumer_account:
+            consumer_account = ConsumerAccount.objects.select_for_update().create(user=data["user"])
+
+        cancel_amount = self.get_cancel_amount(data)
+        consumer_account.balance += cancel_amount
+        self.credit_cancellation(data, cancel_amount)
+        cancel_amount.save()
+
+    @transaction.atomic
+    def block_schedule_transaction(self, data):
+        consumer_account = ConsumerAccount.objects.get_or_create(user=data["user"])
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=data["user"])
+
+        appointment_amount, obj = self.get_appointment_amount(data)
+
+        if consumer_account.balance < appointment_amount:
+            return appointment_amount - consumer_account.balance
+        else:
+            self.confirm_appointment(consumer_account, data, obj, appointment_amount)
+
+        return 0
+
+    def get_cancel_amount(self, data):
+        consumer_tx = ConsumerTransaction.objects.filter(user=data["user"],
+                                                         product=data["product"],
+                                                         order=data["order"],
+                                                         type=PgTransaction.DEBIT,
+                                                         action=ConsumerTransaction.SALE).order_by("created_at").last()
+        return consumer_tx.amount
+
+    def get_appointment_amount(self, data):
+        amount = 0
+        if data["product"] == 2:
+            obj = get_object_or_404(LabAppointment, pk=data['order'])
+            amount = obj.price
+        elif data["product"] == 1:
+            obj = get_object_or_404(OpdAppointment, pk=data['order'])
+            amount = obj.fees
+
+        return amount, obj
+
+    def credit_payment(self, data, amount):
+        action = ConsumerTransaction.PAYMENT
+        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.CREDIT)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+
+    def credit_cancellation(self, data, amount):
+        action = ConsumerTransaction.CANCELLATION
+        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.CREDIT)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+
+    def debit_refund(self, data, amount):
+        action = ConsumerTransaction.REFUND
+        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.DEBIT)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+
+    def debit_schedule(self, data, amount):
+        action = ConsumerTransaction.SALE
+        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.DEBIT)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+
+    def form_consumer_tx_data(self, data, amount, action, tx_type):
+        consumer_tx_data = dict()
+        consumer_tx_data['user'] = data['user']
+        consumer_tx_data['product'] = data['product']
+        consumer_tx_data['order'] = data['order']
+        consumer_tx_data['transaction_id'] = data.get('transaction_id')
+        consumer_tx_data['type'] = tx_type
+        consumer_tx_data['action'] = action
+        consumer_tx_data['amount'] = amount
+        return consumer_tx_data
+
+
+class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
+    queryset = ConsumerAccount.objects.all()
+    serializer_class = serializers.ConsumerAccountModelSerializer

@@ -14,3 +14,4 @@ django-import-export==1.0.0
 raven==6.8.0
 django-rest-swagger
 coreapi
+pika==0.11.2
