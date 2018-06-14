@@ -141,7 +141,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         else:
             return Response([])
 
-
     def payment_retry(self, request, pk=None):
         queryset = models.OpdAppointment.objects.filter(pk=pk)
         payment_response = dict()
@@ -149,7 +148,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             serializer_data = serializers.OpdAppointmentSerializer(queryset.first(), context={'request':request})
             payment_response = self.extract_payment_details(request, serializer_data.data, 1)
         return Response(payment_response)
-
 
     def complete(self, request):
         serializer = serializers.OTPFieldSerializer(data=request.data)
@@ -163,9 +161,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if request.user.user_type == User.DOCTOR and perm_data.write_permission:
                 otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
                 otp_valid_serializer.is_valid(raise_exception=True)
-                opd_appointment.status = models.OpdAppointment.COMPLETED
-                opd_appointment.save()
-        opd_appointment_serializer = serializers.OpdAppointmentSerializer(opd_appointment, context={'request': request})
+                updated_opd_appointment = opd_appointment.action_completed(opd_appointment)
+        opd_appointment_serializer = serializers.OpdAppointmentSerializer(updated_opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
     @transaction.atomic
@@ -224,9 +221,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             return Response(resp, status=status.HTTP_400_BAD_REQUEST)
 
         if request.user.user_type == User.DOCTOR:
-            updated_opd_appointment = self.doctor_update(opd_appointment, validated_data)
-        elif request.user.user_type == User.CONSUMER:
-            updated_opd_appointment = self.consumer_update(opd_appointment, validated_data)
+            req_status = validated_data.get('status')
+            if req_status == models.OpdAppointment.RESCHEDULED_DOCTOR:
+                updated_opd_appointment = opd_appointment.action_rescheduled_doctor(opd_appointment)
+            elif req_status == models.OpdAppointment.ACCEPTED:
+                updated_opd_appointment = opd_appointment.action_accepted(opd_appointment)
 
         opd_appointment_serializer = serializers.OpdAppointmentSerializer(updated_opd_appointment, context={'request':request})
         response = {
@@ -235,20 +234,18 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         }
         return Response(response)
 
-    def doctor_update(self, opd_appointment, validated_data):
-        status = validated_data.get('status')
-        opd_appointment.status = validated_data.get('status')
+    # def doctor_update(self, opd_appointment, validated_data):
+    #     opd_appointment.status = validated_data.get('status')
+    #     opd_appointment.save()
+    #     return opd_appointment
 
-        opd_appointment.save()
-        return opd_appointment
-
-    def consumer_update(self, opd_appointment, validated_data):
-        opd_appointment.status = validated_data.get('status')
-        if validated_data.get('status') == models.OpdAppointment.RESCHEDULED_PATIENT:
-            opd_appointment.time_slot_start = validated_data.get("time_slot_start")
-            opd_appointment.time_slot_end = validated_data.get("time_slot_end")
-        opd_appointment.save()
-        return opd_appointment
+    # def consumer_update(self, opd_appointment, validated_data):
+    #     opd_appointment.status = validated_data.get('status')
+    #     if validated_data.get('status') == models.OpdAppointment.RESCHEDULED_PATIENT:
+    #         opd_appointment.time_slot_start = validated_data.get("time_slot_start")
+    #         opd_appointment.time_slot_end = validated_data.get("time_slot_end")
+    #     opd_appointment.save()
+    #     return opd_appointment
 
     def extract_appointment_ids(self, appointment_data):
         id_dict = defaultdict(dict)
