@@ -282,7 +282,6 @@ class DoctorHospital(TimeStampedModel):
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
     mrp = models.PositiveSmallIntegerField(blank=False, null=False, default=0)
     discounted_price = models.PositiveSmallIntegerField(blank=False, default=0, null=False)
-    effective_price = models.PositiveSmallIntegerField(blank=False, null=False, default=0)
 
     def __str__(self):
         return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
@@ -578,6 +577,9 @@ class OpdAppointment(TimeStampedModel):
     user  = models.ForeignKey(User, related_name="appointments", on_delete=models.CASCADE)
     booked_by = models.ForeignKey(User, related_name="booked_appointements", on_delete=models.CASCADE)
     fees = models.PositiveSmallIntegerField()
+    effective_price = models.PositiveSmallIntegerField(blank=False, null=False, default=0)
+    mrp = models.PositiveSmallIntegerField(blank=False, null=False, default=0)
+    discounted_price = models.PositiveSmallIntegerField(blank=False, default=0, null=False)
     status = models.PositiveSmallIntegerField(default=CREATED)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     otp = models.PositiveIntegerField(blank=True, null=True)

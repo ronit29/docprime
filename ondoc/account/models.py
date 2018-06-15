@@ -5,15 +5,15 @@ from ondoc.authentication.models import TimeStampedModel, User
 
 
 class Order(TimeStampedModel):
-    RESCHEDULE = 1
-    CREATE = 2
+    OPD_APPOINTMENT_RESCHEDULE = 1
+    OPD_APPOINTMENT_CREATE = 2
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_STATUS_CHOICES = (
         (PAYMENT_ACCEPTED, "Payment Accepted"),
         (PAYMENT_PENDING, "Payment Pending"),
     )
-    ACTION_CHOICES = (("", "Select"), (RESCHEDULE, 'Reschedule'), (CREATE, "Create"))
+    ACTION_CHOICES = (("", "Select"), (OPD_APPOINTMENT_RESCHEDULE, 'Reschedule'), (OPD_APPOINTMENT_CREATE, "Create"))
     DOCTOR_APPOINTMENT = 1
     LAB_APPOINTMENT = 2
     product_list = ["Doctor Appointment", "Lab Appointment"]
@@ -24,8 +24,8 @@ class Order(TimeStampedModel):
     action_data = JSONField(blank=True, null=True)
     amount = models.SmallIntegerField(blank=True, null=True)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
-    error_status = models.CharField(max_length=250, verbose_name="Error")
-    is_viewable = models.BooleanField(verbose_name='Is Viewable', default=False)
+    error_status = models.CharField(max_length=250, verbose_name="Error", blank=True, null=True)
+    is_viewable = models.BooleanField(verbose_name='Is Viewable', default=True)
 
 
     def __str__(self):
@@ -104,8 +104,8 @@ class ConsumerAccount(TimeStampedModel):
     def form_consumer_tx_data(self, data, amount, action, tx_type):
         consumer_tx_data = dict()
         consumer_tx_data['user'] = data['user']
-        consumer_tx_data['product'] = data['product']
-        consumer_tx_data['order'] = data['order']
+        consumer_tx_data['product_id'] = data['product_id']
+        consumer_tx_data['reference_id'] = data['reference_id']
         consumer_tx_data['transaction_id'] = data.get('transaction_id')
         consumer_tx_data['type'] = tx_type
         consumer_tx_data['action'] = action
@@ -124,8 +124,9 @@ class ConsumerTransaction(TimeStampedModel):
     action_list = ["Cancellation", "Payment", "Refund", "Sale"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
-    product = models.SmallIntegerField(choices=PgTransaction.PRODUCT_IDS)
-    order = models.IntegerField()
+    product_id = models.SmallIntegerField(choices=PgTransaction.PRODUCT_IDS)
+    reference_id = models.IntegerField()
+    order_id = models.IntegerField(blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
     # pg_transaction = models.ForeignKey(PgTransaction, blank=True, null=True, on_delete=models.SET_NULL)
     type = models.SmallIntegerField(choices=PgTransaction.TYPE_CHOICES)

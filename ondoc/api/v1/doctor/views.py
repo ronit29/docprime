@@ -1,5 +1,6 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
+from ondoc.account import models as account_models
 from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
@@ -186,7 +187,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         profile_detail["dob"] = str(profile_model.dob)
         # profile_detail["profile_image"] = profile_model.profile_image
 
-        data = {
+        opd_data = {
             "doctor": data.get("doctor").id,
             "hospital": data.get("hospital").id,
             "profile": data.get("profile").id,
@@ -195,17 +196,18 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "user": request.user.id,
             "booked_by": request.user.id,
             "fees": fees,
+            "discounted_price": doctor_hospital.discounted_price,
+            "effective_fees": doctor_hospital.discounted_price,
+            "mrp": doctor_hospital.mrp,
             "time_slot_start": time_slot_start,
-            #"time_slot_end": time_slot_end,
+            # "time_slot_end": time_slot_end,
         }
 
-        appointment_serializer = serializers.OpdAppointmentSerializer(data=data, context={'request':request})
-        appointment_serializer.is_valid(raise_exception=True)
-        appointment_serializer.save()
+
         resp = {}
         resp["status"] = 1
-        resp["data"] = appointment_serializer.data
-        resp["payment_details"] = self.extract_payment_details(request, appointment_serializer.data, 1)
+        # resp["data"] = appointment_serializer.data
+        resp = self.extract_payment_details(request, opd_data, 1)
         return Response(data=resp)
 
     def update(self, request, pk=None):
@@ -275,33 +277,38 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def extract_payment_details(self, request, appointment_details, product_id):
         remaining_amount = 0
         user = request.user
+        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+        balance = consumer_account.balance
+        resp = {}
+        opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details)
+        opd_seriailizer.is_valid(raise_exception=True)
+        if balance >= appointment_details.get("effective_price"):
+            opd_seriailizer.save()
+            user_account_data = {
+                "user": user,
+                "product_id": product_id,
+                "reference_id": opd_seriailizer.data.get("id")
+            }
+            consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
+            resp["status"] = 1
+            resp["data"] = opd_seriailizer.data
+        else:
+            order = account_models.Order.objects.create(
+                product_id=product_id,
+                action=account_models.Order.OPD_APPOINTMENT_CREATE,
+                action_data=appointment_details,
+                amount=appointment_details.get("effective_price"),
+                payment_status=account_models.Order.PAYMENT_PENDING
+            )
+            appointment_details["payable_amount"] = appointment_details.get("effective_price") - balance
+            resp['pg_details'] = self.payment_details(request, appointment_details, product_id, order.id)
+        return resp
 
-        if appointment_details["payment_status"] == models.OpdAppointment.PAYMENT_PENDING:
-            consumer_account = auth_models.ConsumerAccount.objects.get_or_create(user=user)
-            consumer_account = auth_models.ConsumerAccount.objects.select_for_update().get(user=user)
-
-            data = dict()
-            data["order"] = appointment_details["id"]
-            data["user"] = user
-            data["product"] = product_id
-
-            if consumer_account.balance < appointment_details["fees"]:
-                remaining_amount = appointment_details["fees"] - consumer_account.balance
-                data["status"] = auth_models.OrderTransaction.PAYMENT_INITIALISED
-                data["amount"] = remaining_amount
-                auth_models.OrderTransaction.objects.create(** data)
-            else:
-                obj = models.OpdAppointment.objects.get(pk=appointment_details["id"])
-                obj.payment_confirmation(consumer_account, data, appointment_details["fees"])
-
-        ad = copy.deepcopy(appointment_details)
-        ad["fees"] = remaining_amount
-        return self.payment_details(request, ad, product_id)
-
-    def payment_details(self, request, appointment_details, product_id):
+    def payment_details(self, request, appointment_details, product_id, order_id):
         details = dict()
         pgdata = dict()
-        if appointment_details["fees"] != 0:
+        if appointment_details["payable_amount"] != 0:
             user = request.user
             user_profile = user.profiles.filter(is_default_user=True).first()
             pgdata['custId'] = user.id
@@ -316,12 +323,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
             pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
             pgdata['checkSum'] = ''
-            pgdata['appointmentId'] = appointment_details['id']
+            pgdata['appointmentId'] = ""
+            pgdata['order_id'] = order_id
             if user_profile:
                 pgdata['name'] = user_profile.name
             else:
                 pgdata['name'] = "DummyName"
-            pgdata['txAmount'] = appointment_details['fees']
+            pgdata['txAmount'] = appointment_details['payable_amount']
 
         if pgdata:
             details['required'] = True
