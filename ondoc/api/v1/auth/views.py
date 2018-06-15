@@ -22,8 +22,8 @@ from ondoc.sms.api import send_otp
 
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         UserPermission, Address, AppointmentTransaction, PgTransaction,
-                                         ConsumerAccount, ConsumerTransaction)
+                                         UserPermission, Address, AppointmentTransaction)
+from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset

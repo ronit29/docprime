@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         UserPermission, Address, ConsumerAccount)
+                                         UserPermission, Address)
 from ondoc.doctor.models import DoctorMobile
+from ondoc.account.models import ConsumerAccount
 import datetime
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth import get_user_model
