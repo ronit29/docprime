@@ -276,6 +276,8 @@ class DoctorHospital(TimeStampedModel):
     start = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
     end = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
+    mrp = models.PositiveSmallIntegerField(blank=False, null=False)
+    discounted_price = models.PositiveSmallIntegerField(blank=False, null=False)
 
     def __str__(self):
         return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
