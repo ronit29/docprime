@@ -9,7 +9,8 @@ from django.core.exceptions import NON_FIELD_ERRORS
 from django.conf import settings
 from datetime import datetime, timedelta
 from django.utils import timezone
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User, ConsumerAccount, ConsumerTransaction, PgTransaction
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
+from ondoc.account.models import ConsumerAccount, ConsumerTransaction, PgTransaction
 from ondoc.notification import models as notification_models
 import random
 from django.db import transaction
