@@ -607,33 +607,33 @@ class TransactionViewSet(viewsets.GenericViewSet):
         if appointment_obj and consumer_account.balance >= appointment_charge:
             appointment_obj.payment_confirmation(consumer_account, data, appointment_charge)
 
-    @transaction.atomic
-    def block_cancel_refund_transaction(self, data):
-        consumer_account = ConsumerAccount.objects.select_for_update().filter(user=data["user"]).first()
-        if not consumer_account:
-            consumer_account = ConsumerAccount.objects.select_for_update().create(user=data["user"])
+    # @transaction.atomic
+    # def block_cancel_refund_transaction(self, data):
+    #     consumer_account = ConsumerAccount.objects.select_for_update().filter(user=data["user"]).first()
+    #     if not consumer_account:
+    #         consumer_account = ConsumerAccount.objects.select_for_update().create(user=data["user"])
+    #
+    #     cancel_amount = self.get_cancel_amount(data)
+    #
+    #     self.credit_cancellation(data, cancel_amount)
+    #
+    #     refund_amount = cancel_amount + consumer_account.balance
+    #
+    #     self.debit_refund(data, refund_amount)
+    #     consumer_account.balance = 0
+    #     consumer_account.save()
+    #     return refund_amount
 
-        cancel_amount = self.get_cancel_amount(data)
-
-        self.credit_cancellation(data, cancel_amount)
-
-        refund_amount = cancel_amount + consumer_account.balance
-
-        self.debit_refund(data, refund_amount)
-        consumer_account.balance = 0
-        consumer_account.save()
-        return refund_amount
-
-    @transaction.atomic
-    def block_cancel_reschedule_transaction(self, data):
-        consumer_account = ConsumerAccount.objects.select_for_update().filter(user=data["user"]).first()
-        if not consumer_account:
-            consumer_account = ConsumerAccount.objects.select_for_update().create(user=data["user"])
-
-        cancel_amount = self.get_cancel_amount(data)
-        consumer_account.balance += cancel_amount
-        self.credit_cancellation(data, cancel_amount)
-        cancel_amount.save()
+    # @transaction.atomic
+    # def block_cancel_reschedule_transaction(self, data):
+    #     consumer_account = ConsumerAccount.objects.select_for_update().filter(user=data["user"]).first()
+    #     if not consumer_account:
+    #         consumer_account = ConsumerAccount.objects.select_for_update().create(user=data["user"])
+    #
+    #     cancel_amount = self.get_cancel_amount(data)
+    #     consumer_account.balance += cancel_amount
+    #     self.credit_cancellation(data, cancel_amount)
+    #     cancel_amount.save()
 
     @transaction.atomic
     def block_schedule_transaction(self, data):
@@ -649,14 +649,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         return 0
 
-    def get_cancel_amount(self, data):
-        consumer_tx = ConsumerTransaction.objects.filter(user=data["user"],
-                                                         product=data["product"],
-                                                         order=data["order"],
-                                                         type=PgTransaction.DEBIT,
-                                                         action=ConsumerTransaction.SALE).order_by("created_at").last()
-        return consumer_tx.amount
-
+    # def get_cancel_amount(self, data):
+    #     consumer_tx = ConsumerTransaction.objects.filter(user=data["user"],
+    #                                                      product=data["product"],
+    #                                                      order=data["order"],
+    #                                                      type=PgTransaction.DEBIT,
+    #                                                      action=ConsumerTransaction.SALE).order_by("created_at").last()
+    #     return consumer_tx.amount
+    #
     def get_appointment_amount(self, data):
         amount = 0
         if data["product"] == 2:
@@ -667,37 +667,37 @@ class TransactionViewSet(viewsets.GenericViewSet):
             amount = obj.fees
 
         return amount, obj
-
-    def credit_payment(self, data, amount):
-        action = ConsumerTransaction.PAYMENT
-        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.CREDIT)
-        ConsumerTransaction.objects.create(**consumer_tx_data)
-
-    def credit_cancellation(self, data, amount):
-        action = ConsumerTransaction.CANCELLATION
-        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.CREDIT)
-        ConsumerTransaction.objects.create(**consumer_tx_data)
-
-    def debit_refund(self, data, amount):
-        action = ConsumerTransaction.REFUND
-        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.DEBIT)
-        ConsumerTransaction.objects.create(**consumer_tx_data)
-
-    def debit_schedule(self, data, amount):
-        action = ConsumerTransaction.SALE
-        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.DEBIT)
-        ConsumerTransaction.objects.create(**consumer_tx_data)
-
-    def form_consumer_tx_data(self, data, amount, action, tx_type):
-        consumer_tx_data = dict()
-        consumer_tx_data['user'] = data['user']
-        consumer_tx_data['product'] = data['product']
-        consumer_tx_data['order'] = data['order']
-        consumer_tx_data['transaction_id'] = data.get('transaction_id')
-        consumer_tx_data['type'] = tx_type
-        consumer_tx_data['action'] = action
-        consumer_tx_data['amount'] = amount
-        return consumer_tx_data
+    #
+    # def credit_payment(self, data, amount):
+    #     action = ConsumerTransaction.PAYMENT
+    #     consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.CREDIT)
+    #     ConsumerTransaction.objects.create(**consumer_tx_data)
+    #
+    # def credit_cancellation(self, data, amount):
+    #     action = ConsumerTransaction.CANCELLATION
+    #     consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.CREDIT)
+    #     ConsumerTransaction.objects.create(**consumer_tx_data)
+    #
+    # def debit_refund(self, data, amount):
+    #     action = ConsumerTransaction.REFUND
+    #     consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.DEBIT)
+    #     ConsumerTransaction.objects.create(**consumer_tx_data)
+    #
+    # def debit_schedule(self, data, amount):
+    #     action = ConsumerTransaction.SALE
+    #     consumer_tx_data = self.form_consumer_tx_data(data, amount, action, PgTransaction.DEBIT)
+    #     ConsumerTransaction.objects.create(**consumer_tx_data)
+    #
+    # def form_consumer_tx_data(self, data, amount, action, tx_type):
+    #     consumer_tx_data = dict()
+    #     consumer_tx_data['user'] = data['user']
+    #     consumer_tx_data['product'] = data['product']
+    #     consumer_tx_data['order'] = data['order']
+    #     consumer_tx_data['transaction_id'] = data.get('transaction_id')
+    #     consumer_tx_data['type'] = tx_type
+    #     consumer_tx_data['action'] = action
+    #     consumer_tx_data['amount'] = amount
+    #     return consumer_tx_data
 
 
 class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):

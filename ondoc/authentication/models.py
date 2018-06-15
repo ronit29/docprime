@@ -296,6 +296,7 @@ class ConsumerAccount(TimeStampedModel):
 
     def credit_payment(self, data, amount):
         self.balance += amount
+        ConsumerAccount.objects.select_for_update().get(user=data["user"])
         action = ConsumerTransaction.PAYMENT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = self.form_consumer_tx_data(data, amount, action, tx_type)

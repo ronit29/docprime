@@ -9,9 +9,11 @@ from django.core.exceptions import NON_FIELD_ERRORS
 from django.conf import settings
 from datetime import datetime, timedelta
 from django.utils import timezone
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User, ConsumerAccount, ConsumerTransaction, PgTransaction
 from ondoc.notification import models as notification_models
 import random
+from django.db import transaction
+import os
 
 
 class Migration(migrations.Migration):
@@ -604,9 +606,20 @@ class OpdAppointment(TimeStampedModel):
 
         return allowed
 
+    @transaction.atomic
     def action_rescheduled_doctor(self, appointment):
         appointment.status = self.RESCHEDULED_DOCTOR
         appointment.save()
+        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+        #
+        # data = dict()
+        # data["order"] = self.id
+        # data["user"] = self.user
+        # data["product"] = 1
+        #
+        # cancel_amount = self.get_cancel_amount(data)
+        # consumer_account.credit_cancellation(data, cancel_amount)
         return appointment
 
     def action_rescheduled_patient(self, appointment, validated_data):
@@ -615,6 +628,17 @@ class OpdAppointment(TimeStampedModel):
         appointment.time_slot_start = CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
                                                                                      validated_data.get("start_time"))
         appointment.save()
+
+        # consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+        # consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+        #
+        # data = dict()
+        # data["order"] = self.id
+        # data["user"] = self.user
+        # data["product"] = 1
+        #
+        # cancel_amount = self.get_cancel_amount(data)
+        # consumer_account.credit_cancellation(data, cancel_amount)
         return appointment
 
     def action_accepted(self, appointment):
@@ -622,9 +646,22 @@ class OpdAppointment(TimeStampedModel):
         appointment.save()
         return appointment
 
+    @transaction.atomic
     def action_cancelled(self, appointment):
         appointment.status = self.CANCELED
         appointment.save()
+
+        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+
+        data = dict()
+        data["order"] = self.id
+        data["user"] = self.user
+        data["product"] = 1
+
+        cancel_amount = self.get_cancel_amount(data)
+        consumer_account.credit_cancellation(data, cancel_amount)
+
         return appointment
 
     def action_completed(self, appointment):
@@ -632,6 +669,13 @@ class OpdAppointment(TimeStampedModel):
         appointment.save()
         return appointment
 
+    def get_cancel_amount(self, data):
+        consumer_tx = ConsumerTransaction.objects.filter(user=data["user"],
+                                                         product=data["product"],
+                                                         order=data["order"],
+                                                         type=PgTransaction.DEBIT,
+                                                         action=ConsumerTransaction.SALE).order_by("created_at").last()
+        return consumer_tx.amount
 
     def send_notification(self, database_instance):
         if not self.id:
