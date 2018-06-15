@@ -93,6 +93,7 @@ LOCAL_APPS = (
     'ondoc.lead',
     'ondoc.chat',
     'ondoc.notification',
+    'ondoc.web',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
