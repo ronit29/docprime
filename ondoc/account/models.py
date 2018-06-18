@@ -7,13 +7,19 @@ from ondoc.authentication.models import TimeStampedModel, User
 class Order(TimeStampedModel):
     OPD_APPOINTMENT_RESCHEDULE = 1
     OPD_APPOINTMENT_CREATE = 2
+    LAB_APPOINTMENT_RESCHEDULE = 3
+    LAB_APPOINTMENT_CREATE = 4
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_STATUS_CHOICES = (
         (PAYMENT_ACCEPTED, "Payment Accepted"),
         (PAYMENT_PENDING, "Payment Pending"),
     )
-    ACTION_CHOICES = (("", "Select"), (OPD_APPOINTMENT_RESCHEDULE, 'Reschedule'), (OPD_APPOINTMENT_CREATE, "Create"))
+    ACTION_CHOICES = (("", "Select"), (OPD_APPOINTMENT_RESCHEDULE, 'Opd Reschedule'),
+                      (OPD_APPOINTMENT_CREATE, "Opd Create"),
+                      (LAB_APPOINTMENT_CREATE, "Lab Create"),
+                      (LAB_APPOINTMENT_RESCHEDULE, "Lab Reschedule"),
+                      )
     DOCTOR_APPOINTMENT = 1
     LAB_APPOINTMENT = 2
     product_list = ["Doctor Appointment", "Lab Appointment"]
