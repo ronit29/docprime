@@ -27,7 +27,6 @@ class Order(TimeStampedModel):
     error_status = models.CharField(max_length=250, verbose_name="Error", blank=True, null=True)
     is_viewable = models.BooleanField(verbose_name='Is Viewable', default=True)
 
-
     def __str__(self):
         return self.appointment_id
 
@@ -132,4 +131,7 @@ class ConsumerTransaction(TimeStampedModel):
     type = models.SmallIntegerField(choices=PgTransaction.TYPE_CHOICES)
     action = models.SmallIntegerField(choices=ACTION_CHOICES)
     amount = models.FloatField(default=0)
+
+    class Meta:
+        db_table = 'consumer_transaction'
 
