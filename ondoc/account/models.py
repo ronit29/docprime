@@ -22,7 +22,7 @@ class Order(TimeStampedModel):
     appointment_id = models.PositiveSmallIntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
     action_data = JSONField(blank=True, null=True)
-    amount = models.SmallIntegerField(blank=True, null=True)
+    amount = models.FloatField(blank=True, null=True)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     error_status = models.CharField(max_length=250, verbose_name="Error", blank=True, null=True)
     is_viewable = models.BooleanField(verbose_name='Is Viewable', default=True)
