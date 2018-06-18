@@ -345,7 +345,8 @@ class DoctorProfileView(viewsets.GenericViewSet):
 
     def retrieve(self, request):
         doctor = get_object_or_404(models.Doctor, pk=request.user.doctor.id)
-        serializer = serializers.DoctorProfileSerializer(doctor, many=False)
+        serializer = serializers.DoctorProfileSerializer(doctor, many=False,
+                                                         context={"request": request})
 
         now = datetime.datetime.now()
         appointment_count = models.OpdAppointment.objects.filter(Q(doctor=request.user.doctor.id),
@@ -389,7 +390,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                   .filter(pk=pk).first())
         if not doctor:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False)
+        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+                                                                 context={"request": request})
         response_data = self.prepare_response(serializer.data)
         return Response(response_data)
 

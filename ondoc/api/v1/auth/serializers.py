@@ -119,11 +119,14 @@ class NotificationEndpointDeleteSerializer(serializers.Serializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = UserProfile
         exclude = ('created_at', 'updated_at', )
 
+    def validate_profile_image(self, value):
+        if value.image.width != value.image.height:
+            raise serializers.ValidationError("Image should be square")
+        return value
 
 class UserPermissionSerializer(serializers.ModelSerializer):
 

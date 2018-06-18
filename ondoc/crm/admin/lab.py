@@ -1,5 +1,7 @@
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
 from django.conf.urls import url
+from import_export import resources, fields
+from import_export.admin import ImportMixin, base_formats
 from django.urls import include, path, reverse
 from django.utils.safestring import mark_safe
 from django.contrib.gis import forms
@@ -13,8 +15,55 @@ from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument)
+    LabDoctor, LabDocument, LabTest, LabTestSubType, LabTestSubTypeMapping)
 from .common import *
+
+
+class LabTestResource(resources.ModelResource):
+    excel_id = fields.Field(attribute='excel_id', column_name='Test ID')
+    test_type = fields.Field(attribute='test_type', column_name='Test Type')
+    sub_type = fields.Field(attribute='sub_type', column_name='Test SubType')
+    name = fields.Field(attribute='name', column_name="Test Name")
+    is_package = fields.Field(attribute="is_package", column_name="Package (Y/N)", default="")
+    why = fields.Field(attribute='why', column_name="Why This Test")
+    pre_test_info = fields.Field(attribute='pre_test_info', column_name="Pre-Test Information")
+    preferred_time = fields.Field(attribute='preferred_time', column_name="Preferred Time of day")
+    sample_amount = fields.Field(attribute='sample_amount', column_name="Amount of Sample")
+    expected_tat = fields.Field(attribute='expected_tat', column_name="Expected TAT")
+    sample_collection_instructions = fields.Field(attribute='sample_collection_instructions',
+                                                  column_name="How to Collect Sample")
+    sample_handling_instructions = fields.Field(attribute='sample_handling_instructions',
+                                                column_name="Sample handling before pickup")
+    category = fields.Field(attribute='category', column_name='Category')
+
+    class Meta:
+        model = LabTest
+
+    def before_save_instance(self, instance, using_transactions, dry_run):
+        instance.test_type = (LabTest.RADIOLOGY if instance.test_type.strip() == 'Radiology'
+                              else LabTest.PATHOLOGY) if instance.test_type else None
+        instance.is_package = (True if instance.is_package.strip() == "Yes" else False) if instance.is_package else False
+        instance.excel_id = instance.excel_id.strip() if instance.excel_id else ""
+        instance.sub_type = instance.sub_type.strip().lower() if instance.sub_type else ""
+        instance.name = instance.name.strip() if instance.name else ""
+        instance.why = instance.why.strip() if instance.why else ""
+        instance.pre_test_info = instance.pre_test_info.strip() if instance.pre_test_info else ""
+        instance.preferred_time = instance.preferred_time.strip() if instance.preferred_time else ""
+        instance.sample_amount = str(instance.sample_amount).strip() if instance.sample_amount else ""
+        instance.expected_tat = instance.expected_tat.strip() if instance.expected_tat else ""
+        instance.category = instance.category.strip().upper() if instance.category else ""
+        instance.sample_handling_instructions = (instance.sample_handling_instructions.strip()
+                                                 if instance.sample_handling_instructions else "")
+        instance.sample_collection_instructions = (instance.sample_collection_instructions.strip()
+                                                   if instance.sample_collection_instructions else "")
+        super().before_save_instance(instance, using_transactions, dry_run)
+
+    def after_save_instance(self, instance, using_transactions, dry_run):
+        sub_type = instance.sub_type.strip().split(",")
+        for sub_type_name in sub_type:
+            obj, created = LabTestSubType.objects.get_or_create(name=sub_type_name.strip())
+            LabTestSubTypeMapping.objects.get_or_create(lab_test=instance,
+                                                        test_sub_type=obj)
 
 
 class LabTimingForm(forms.ModelForm):
@@ -291,8 +340,11 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     # extra_js = ['https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&libraries=places&callback=initMap']
 
 
-class LabTestAdmin(VersionAdmin):
+class LabTestAdmin(ImportMixin, VersionAdmin):
+    change_list_template = 'change_list_import.html'
+    formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = ['name']
+    resource_class = LabTestResource
 
 
 class LabTestTypeAdmin(VersionAdmin):

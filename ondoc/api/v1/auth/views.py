@@ -133,17 +133,20 @@ class UserViewset(GenericViewSet):
         serializer = serializers.DoctorLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-
         phone_number = data['phone_number']
         user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
+        doctor_list = [user.doctor.id]
 
         if not user:
             doctor = DoctorMobile.objects.get(number=phone_number, is_primary=True).doctor
             user = User.objects.create(phone_number=data['phone_number'], is_phone_number_verified=True, user_type=User.DOCTOR)
+            doctor_list = [user.doctor.id]
             doctor.user = user
             doctor.save()
 
         token = Token.objects.get_or_create(user=user)
+        pem_obj = DoctorPermission(doctor_list, request)
+        pem_obj.create_permission()
 
         expire_otp(data['phone_number'])
 
@@ -226,6 +229,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer.save()
         return Response(serializer.data)
 
+    def update(self, request, *args, **kwargs):
+        kwargs.update({
+            "partial": True
+        })
+        return super().update(request, *args, **kwargs)
+
 
 class UserPermissionViewSet(mixins.CreateModelMixin,
                             mixins.ListModelMixin,
@@ -274,10 +283,10 @@ class DoctorPermission(object):
                 if admin.permission_type == UserPermission.APPOINTMENT and admin.write_permission:
                     flag = True
                     break
-            if flag:
-                permission_dict['read_permission'] = True
-            else:
-                permission_dict['write_permission'] = True
+            # if flag:
+            #     permission_dict['read_permission'] = True
+            # else:
+            permission_dict['write_permission'] = True
 
             permission_data.append(permission_dict)
         return permission_data

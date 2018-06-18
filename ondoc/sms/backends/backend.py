@@ -9,7 +9,7 @@ class SmsBackend(object):
 
         payload = {'sender': 'PANCEA', 'route': '4','authkey':settings.SMS_AUTH_KEY}
         payload['message'] = message
-        payload['mobiles'] = '91' + phone_no
+        payload['mobiles'] = '91' + str(phone_no)
         r = requests.get('http://api.msg91.com/api/sendhttp.php', params=payload)
         if r.status_code == requests.codes.ok:
             return True
@@ -23,7 +23,7 @@ class SmsBackend(object):
 
         payload = {'sender': 'PANCEA', 'route': '4','authkey':settings.SMS_AUTH_KEY}
         payload['message'] = 'Otp is '+message
-        payload['mobiles'] = '91' + phone_no
+        payload['mobiles'] = '91' + str(phone_no)
         r = requests.get('http://api.msg91.com/api/sendhttp.php', params=payload)
         if r.status_code == requests.codes.ok:
             return True
