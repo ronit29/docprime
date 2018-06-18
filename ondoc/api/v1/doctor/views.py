@@ -174,40 +174,39 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         time_slot_start = serializers.CreateAppointmentSerializer.form_time_slot(data.get("start_date"),
                                                                                  data.get("start_time"))
         # time_slot_start = data.get("time_slot_start")
-
-        doctor_hospital = models.DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
-            day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).first()
-        fees = doctor_hospital.fees
-
-        profile_detail = dict()
-        # profile_model = auth_models.UserProfile.objects.get()
-        profile_model = data.get("profile")
-        profile_detail["name"] = profile_model.name
-        profile_detail["gender"] = profile_model.gender
-        profile_detail["dob"] = str(profile_model.dob)
-        # profile_detail["profile_image"] = profile_model.profile_image
-
-        opd_data = {
-            "doctor": data.get("doctor").id,
-            "hospital": data.get("hospital").id,
-            "profile": data.get("profile").id,
-            # "profile_detail": json.dumps(profile_detail),
-            "profile_detail": profile_detail,
-            "user": request.user.id,
-            "booked_by": request.user.id,
-            "fees": fees,
-            "discounted_price": doctor_hospital.discounted_price,
-            "effective_price": doctor_hospital.discounted_price,
-            "mrp": doctor_hospital.mrp,
-            "time_slot_start": str(time_slot_start),
-            # "time_slot_end": time_slot_end,
-        }
-
-
         resp = {}
-        resp["status"] = 1
-        # resp["data"] = appointment_serializer.data
-        resp = self.extract_payment_details(request, opd_data, 1)
+        resp['status'] = 0
+        doctor_hospital = models.DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
+            day=time_slot_start.weekday(), start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).first()
+        if(doctor_hospital):
+            fees = doctor_hospital.fees
+
+            profile_detail = dict()
+            # profile_model = auth_models.UserProfile.objects.get()
+            profile_model = data.get("profile")
+            profile_detail["name"] = profile_model.name
+            profile_detail["gender"] = profile_model.gender
+            profile_detail["dob"] = str(profile_model.dob)
+            # profile_detail["profile_image"] = profile_model.profile_image
+
+            opd_data = {
+                "doctor": data.get("doctor").id,
+                "hospital": data.get("hospital").id,
+                "profile": data.get("profile").id,
+                # "profile_detail": json.dumps(profile_detail),
+                "profile_detail": profile_detail,
+                "user": request.user.id,
+                "booked_by": request.user.id,
+                "fees": fees,
+                "discounted_price": doctor_hospital.discounted_price,
+                "effective_price": doctor_hospital.discounted_price,
+                "mrp": doctor_hospital.mrp,
+                "time_slot_start": str(time_slot_start),
+                # "time_slot_end": time_slot_end,
+            }
+            resp["status"] = 1
+            # resp["data"] = appointment_serializer.data
+            resp = self.extract_payment_details(request, opd_data, 1)
         return Response(data=resp)
 
     def update(self, request, pk=None):

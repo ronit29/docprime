@@ -101,6 +101,14 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
+    def credit_schedule(self, data, amount):
+        self.balance += amount
+        action = ConsumerTransaction.RESCHEDULE_PAYMENT
+        tx_type = PgTransaction.CREDIT
+        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, tx_type)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+        self.save()
+
     def form_consumer_tx_data(self, data, amount, action, tx_type):
         consumer_tx_data = dict()
         consumer_tx_data['user'] = data['user']
@@ -121,6 +129,7 @@ class ConsumerTransaction(TimeStampedModel):
     PAYMENT = 1
     REFUND = 2
     SALE = 3
+    RESCHEDULE_PAYMENT = 4
     action_list = ["Cancellation", "Payment", "Refund", "Sale"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
