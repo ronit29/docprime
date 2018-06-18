@@ -178,6 +178,8 @@ class Doctor(TimeStampedModel, QCModel):
 
     is_insurance_enabled = models.BooleanField(verbose_name= 'Enabled for Insurance Customer',default=False)
     is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
+    is_online_consultation_enabled = models.BooleanField(verbose_name='Available for Online Consultation', default=False)
+    online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     hospitals = models.ManyToManyField(
         Hospital,
         through='DoctorHospital',
@@ -279,9 +281,9 @@ class DoctorHospital(TimeStampedModel):
 
     start = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
     end = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
-    fees = models.PositiveSmallIntegerField(blank=False, null=False)
-    mrp = models.PositiveSmallIntegerField(blank=False, null=False, default=0)
-    discounted_price = models.PositiveSmallIntegerField(blank=False, default=0, null=False)
+    fees = models.FloatField(blank=False, null=False)
+    mrp = models.FloatField(blank=False, null=False, default=0)
+    discounted_price = models.FloatField(blank=False, default=0, null=False)
 
     def __str__(self):
         return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
@@ -410,7 +412,7 @@ class DoctorMedicalService(TimeStampedModel):
 class DoctorMobile(TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="mobiles", on_delete=models.CASCADE)
     country_code = models.PositiveSmallIntegerField(default=91, blank=True, null=True)
-    number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(7000000000)])
     is_primary = models.BooleanField(verbose_name= 'Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name= 'Phone Number Verified?', default=False)
 
@@ -574,12 +576,12 @@ class OpdAppointment(TimeStampedModel):
     hospital = models.ForeignKey(Hospital, related_name="hospital_appointments", on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, related_name="appointments", on_delete=models.CASCADE)
     profile_detail = JSONField(blank=True, null=True)
-    user  = models.ForeignKey(User, related_name="appointments", on_delete=models.CASCADE)
+    user = models.ForeignKey(User, related_name="appointments", on_delete=models.CASCADE)
     booked_by = models.ForeignKey(User, related_name="booked_appointements", on_delete=models.CASCADE)
-    fees = models.PositiveSmallIntegerField()
-    effective_price = models.PositiveSmallIntegerField(blank=False, null=False, default=0)
-    mrp = models.PositiveSmallIntegerField(blank=False, null=False, default=0)
-    discounted_price = models.PositiveSmallIntegerField(blank=False, default=0, null=False)
+    fees = models.FloatField()
+    effective_price = models.FloatField(blank=False, null=False, default=0)
+    mrp = models.FloatField(blank=False, null=False, default=0)
+    discounted_price = models.FloatField(blank=False, default=0, null=False)
     status = models.PositiveSmallIntegerField(default=CREATED)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     otp = models.PositiveIntegerField(blank=True, null=True)
@@ -667,9 +669,7 @@ class OpdAppointment(TimeStampedModel):
         return consumer_tx.amount
 
     def send_notification(self, database_instance):
-        if not self.id:
-            return
-        if database_instance.status == self.status:
+        if database_instance and database_instance.status == self.status:
             return
         if self.status == OpdAppointment.ACCEPTED:
             notification_models.NotificationAction.trigger(
@@ -693,11 +693,17 @@ class OpdAppointment(TimeStampedModel):
                 user=self.doctor.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
             )
+        elif self.status == OpdAppointment.CANCELED:
+            notification_models.NotificationAction.trigger(
+                instance=self,
+                user=self.doctor.user,
+                notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED,
+            )
 
     def save(self, *args, **kwargs):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
-        self.send_notification(database_instance)
         super().save(*args, **kwargs)
+        self.send_notification(database_instance)
 
     def payment_confirmation(self, consumer_account, data, amount):
         otp = random.randint(1000, 9999)

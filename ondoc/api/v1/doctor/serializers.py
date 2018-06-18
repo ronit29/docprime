@@ -5,6 +5,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, 
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization)
+from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -45,6 +46,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     patient_dob = serializers.ReadOnlyField(source='profile.dob')
     patient_gender = serializers.ReadOnlyField(source='profile.gender'),
     patient_image = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='doctor')
     allowed_action = serializers.SerializerMethodField()
 
@@ -61,6 +63,15 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             return obj.profile.profile_image.url
         else:
             return ""
+
+    def get_thumbnail(self, obj):
+        request = self.context.get('request')
+        if obj.profile.profile_image:
+            photo_url = obj.profile.profile_image.url
+            return request.build_absolute_uri(photo_url)
+        else:
+            url = static('doctor_images/no_image.png')
+            return request.build_absolute_uri(url)
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
@@ -349,6 +360,19 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     experiences = DoctorExperienceSerializer(read_only=True, many=True)
     associations = DoctorAssociationSerializer(read_only=True, many=True)
     awards = DoctorAwardSerializer(read_only=True, many=True)
+    thumbnail = serializers.SerializerMethodField()
+
+    def get_thumbnail(self, obj):
+        request = self.context.get('request')
+        default_image_url = static('doctor_images/no_image.png')
+        if obj.images.all().exists():
+            image = obj.images.all().first()
+            if not image.name:
+                return request.build_absolute_uri(default_image_url)
+            return request.build_absolute_uri(image.name.url)
+        else:
+            return request.build_absolute_uri(default_image_url)
+
 
     # def to_representation(self, doctor):
     #     parent_rep = super().to_representation(doctor)
@@ -364,7 +388,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         fields = (
         'id', 'name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
         'languages', 'qualifications', 'availability', 'mobiles', 'medical_services', 'experiences', 'associations',
-        'awards', 'appointments', 'hospitals')
+        'awards', 'appointments', 'hospitals', 'thumbnail', )
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):

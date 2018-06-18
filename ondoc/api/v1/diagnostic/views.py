@@ -5,6 +5,8 @@ from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSe
                           SearchLabListSerializer)
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
+from ondoc.account import models as account_models
+from ondoc.api.v1.utils import form_time_slot
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.pagination import paginate_queryset
 
@@ -247,14 +249,80 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = LabAppointmentCreateSerializer(data=request.data)
 
         serializer.is_valid(raise_exception=True)
-
-        lab_appointment_queryset = serializer.save()
-        appointment_serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
-        resp = {}
-        resp["status"] = 1
-        resp["data"] = appointment_serializer.data
-        resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 2)
+        resp = self.extract_payment_details(request, serializer.data, 2)
         return Response(data=resp)
+
+    def extract_payment_details(self, request, appointment_details, product_id):
+        remaining_amount = 0
+        user = request.user
+        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+        balance = consumer_account.balance
+        resp = {}
+        lab_appnt_seriailizer = LabAppointmentCreateSerializer(data=appointment_details, context={"request": request})
+        lab_appnt_seriailizer.is_valid(raise_exception=True)
+        lab_test_queryset = AvailableLabTest.objects.filter(lab=appointment_details["lab"],
+                                                            test__in=appointment_details['test_ids'])
+        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
+                                                                 total_deal_price=Sum("deal_price"))
+        effective_price = temp_lab_test[0].get("total_deal_price")
+        # TODO PM - call coupon function to calculate effective price
+        if balance >= effective_price:
+            lap_appointment = lab_appnt_seriailizer.save()
+            user_account_data = {
+                "user": user,
+                "product_id": product_id,
+                "reference_id": lap_appointment.id
+            }
+            lab_appointment_data = LabAppointmentModelSerializer(lap_appointment).data
+            consumer_account.debit_schedule(user_account_data, effective_price)
+            resp["status"] = 1
+            resp["data"] = lab_appointment_data
+        else:
+            order = account_models.Order.objects.create(
+                product_id=product_id,
+                action=account_models.Order.LAB_APPOINTMENT_CREATE,
+                action_data=appointment_details,
+                amount=effective_price,
+                payment_status=account_models.Order.PAYMENT_PENDING
+            )
+            appointment_details["payable_amount"] = effective_price - balance
+            resp['pg_details'] = self.get_payment_details(request, appointment_details, product_id, order.id)
+        return resp
+
+    def get_payment_details(self, request, appointment_details, product_id, order_id):
+        details = dict()
+        pgdata = dict()
+        if appointment_details["payable_amount"] != 0:
+            user = request.user
+            user_profile = user.profiles.filter(is_default_user=True).first()
+            pgdata['custId'] = user.id
+            pgdata['mobile'] = user.phone_number
+            pgdata['email'] = user.email
+            if not user.email:
+                pgdata['email'] = "dummy_appointment@policybazaar.com"
+
+            pgdata['productId'] = product_id
+            base_url = (
+                "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+            pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+            pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+            pgdata['checkSum'] = ''
+            pgdata['appointmentId'] = ""
+            pgdata['order_id'] = order_id
+            if user_profile:
+                pgdata['name'] = user_profile.name
+            else:
+                pgdata['name'] = "DummyName"
+            pgdata['txAmount'] = appointment_details['payable_amount']
+
+        if pgdata:
+            details['required'] = True
+            details['pgdata'] = pgdata
+        else:
+            details['required'] = False
+
+        return details
 
 
     def payment_retry(self, request, pk=None):
@@ -284,35 +352,35 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
         return Response(serializer.data)
 
-    def payment_details(self, request, appointment_details, product_id):
-        details = dict()
-        pgdata = dict()
-        user = request.user
-        user_profile = user.profiles.filter(is_default_user=True).first()
-        pgdata['custId'] = user.id
-        pgdata['mobile'] = user.phone_number
-        pgdata['email'] = user.email
-        if not user.email:
-            pgdata['email'] = "dummy_appointment@policybazaar.com"
-        base_url = (
-            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
-        pgdata['productId'] = product_id
-        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['checkSum'] = ''
-        pgdata['appointmentId'] = appointment_details['id']
-        if user_profile:
-            pgdata['name'] = user_profile.name
-        else:
-            pgdata['name'] = "DummyName"
-        pgdata['txAmount'] = appointment_details['price']
-
-        if pgdata:
-            details['required'] = True
-            details['pgdata'] = pgdata
-        else:
-            details['required'] = False
-        return details
+    # def payment_details(self, request, appointment_details, product_id):
+    #     details = dict()
+    #     pgdata = dict()
+    #     user = request.user
+    #     user_profile = user.profiles.filter(is_default_user=True).first()
+    #     pgdata['custId'] = user.id
+    #     pgdata['mobile'] = user.phone_number
+    #     pgdata['email'] = user.email
+    #     if not user.email:
+    #         pgdata['email'] = "dummy_appointment@policybazaar.com"
+    #     base_url = (
+    #         "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+    #     pgdata['productId'] = product_id
+    #     pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+    #     pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+    #     pgdata['checkSum'] = ''
+    #     pgdata['appointmentId'] = appointment_details['id']
+    #     if user_profile:
+    #         pgdata['name'] = user_profile.name
+    #     else:
+    #         pgdata['name'] = "DummyName"
+    #     pgdata['txAmount'] = appointment_details['price']
+    #
+    #     if pgdata:
+    #         details['required'] = True
+    #         details['pgdata'] = pgdata
+    #     else:
+    #         details['required'] = False
+    #     return details
 
 
 class LabTimingListView(mixins.ListModelMixin,

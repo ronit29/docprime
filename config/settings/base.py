@@ -22,7 +22,7 @@ env = environ.Env()
 READ_DOT_ENV_FILE = env.bool('DJANGO_READ_DOT_ENV_FILE', default=True)
 
 if READ_DOT_ENV_FILE:
-    if(env('DJANGO_SETTINGS_MODULE')=='config.settings.production'):
+    if(env('DJANGO_SETTINGS_MODULE')=='config.settings.production' or env('DJANGO_SETTINGS_MODULE')=='config.settings.staging'):
         env.read_env(str(ROOT_DIR.path('.env')))
     if(env('DJANGO_SETTINGS_MODULE')=='config.settings.local'):
         env.read_env(str(ROOT_DIR.path('.env.local')))
@@ -222,11 +222,6 @@ MAP_WIDGETS = {
 }
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
 SMS_AUTH_KEY = env('SMS_AUTH_KEY')
-EMAIL_HOST = 'smtpbp.falconide.com'
-EMAIL_PORT = 25
-EMAIL_HOST_USER = env('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
-#EMAIL_USE_TLS = True
 
 RABBITMQ_CONNECTION_SETTINGS = {
     'CONNECTION_URL': env('RABBITMQ_CONNECTION_URL'),
