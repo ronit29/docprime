@@ -181,7 +181,8 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
 
 class LabAppointmentCreateSerializer(serializers.Serializer):
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all())
-    test_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all()))
+    # test_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all()))
+    test_ids = serializers.ListField(child=serializers.IntegerField())
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     start_date = serializers.CharField()
     start_time = serializers.FloatField()

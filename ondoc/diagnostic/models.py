@@ -302,7 +302,10 @@ class LabAppointment(TimeStampedModel):
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)
     profile_detail = JSONField(blank=True, null=True)
     status = models.PositiveSmallIntegerField(default=CREATED)
-    price = models.PositiveSmallIntegerField()
+    price = models.FloatField(default=0)  # This is mrp
+    agreed_price = models.FloatField(default=0)
+    deal_price = models.FloatField(default=0)
+    effective_price = models.FloatField(default=0)
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
     otp = models.PositiveIntegerField(blank=True, null=True)

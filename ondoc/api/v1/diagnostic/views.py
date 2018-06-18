@@ -5,6 +5,8 @@ from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSe
                           SearchLabListSerializer)
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
+from ondoc.account import models as account_models
+from ondoc.api.v1.utils import form_time_slot
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.pagination import paginate_queryset
 
@@ -248,13 +250,81 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         serializer.is_valid(raise_exception=True)
 
-        lab_appointment_queryset = serializer.save()
+        print("here")
+        # lab_appointment_queryset = serializer.save()
+
         appointment_serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
         resp = {}
         resp["status"] = 1
         resp["data"] = appointment_serializer.data
         resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 2)
         return Response(data=resp)
+
+    @transaction.atomic
+    def extract_payment_details(self, request, appointment_details, product_id):
+        remaining_amount = 0
+        user = request.user
+        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+        balance = consumer_account.balance
+        resp = {}
+        lab_appnt_seriailizer = LabAppointmentCreateSerializer(data=appointment_details, context={"request": request})
+        lab_appnt_seriailizer.is_valid(raise_exception=True)
+        if balance >= appointment_details.get("effective_price"):
+            lab_appnt_seriailizer.save()
+            user_account_data = {
+                "user": user,
+                "product_id": product_id,
+                "reference_id": lab_appnt_seriailizer.data.get("id")
+            }
+            consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
+            resp["status"] = 1
+            resp["data"] = lab_appnt_seriailizer.data
+        else:
+            order = account_models.Order.objects.create(
+                product_id=product_id,
+                action=account_models.Order.LAB_APPOINTMENT,
+                action_data=appointment_details,
+                amount=appointment_details.get("effective_price"),
+                payment_status=account_models.Order.PAYMENT_PENDING
+            )
+            appointment_details["payable_amount"] = appointment_details.get("effective_price") - balance
+            resp['pg_details'] = self.payment_details(request, appointment_details, product_id, order.id)
+        return resp
+
+    def payment_details(self, request, appointment_details, product_id, order_id):
+        details = dict()
+        pgdata = dict()
+        if appointment_details["payable_amount"] != 0:
+            user = request.user
+            user_profile = user.profiles.filter(is_default_user=True).first()
+            pgdata['custId'] = user.id
+            pgdata['mobile'] = user.phone_number
+            pgdata['email'] = user.email
+            if not user.email:
+                pgdata['email'] = "dummy_appointment@policybazaar.com"
+
+            pgdata['productId'] = product_id
+            base_url = (
+                "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+            pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+            pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+            pgdata['checkSum'] = ''
+            pgdata['appointmentId'] = ""
+            pgdata['order_id'] = order_id
+            if user_profile:
+                pgdata['name'] = user_profile.name
+            else:
+                pgdata['name'] = "DummyName"
+            pgdata['txAmount'] = appointment_details['payable_amount']
+
+        if pgdata:
+            details['required'] = True
+            details['pgdata'] = pgdata
+        else:
+            details['required'] = False
+
+        return details
 
 
     def payment_retry(self, request, pk=None):
