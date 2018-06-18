@@ -197,9 +197,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "booked_by": request.user.id,
             "fees": fees,
             "discounted_price": doctor_hospital.discounted_price,
-            "effective_fees": doctor_hospital.discounted_price,
+            "effective_price": doctor_hospital.discounted_price,
             "mrp": doctor_hospital.mrp,
-            "time_slot_start": time_slot_start,
+            "time_slot_start": str(time_slot_start),
             # "time_slot_end": time_slot_end,
         }
 
@@ -281,7 +281,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
         resp = {}
-        opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details)
+        opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details, context={"request": request})
         opd_seriailizer.is_valid(raise_exception=True)
         if balance >= appointment_details.get("effective_price"):
             opd_seriailizer.save()
