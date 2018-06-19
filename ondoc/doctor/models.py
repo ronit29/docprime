@@ -621,7 +621,6 @@ class OpdAppointment(TimeStampedModel):
         return appointment
 
     def action_rescheduled_patient(self, appointment, data):
-        from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
         appointment.status = self.RESCHEDULED_PATIENT
         appointment.time_slot_start = data.get('time_slot_start')
         appointment.fees = data.get('fees', appointment.fees)

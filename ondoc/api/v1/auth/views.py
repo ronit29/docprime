@@ -5,7 +5,6 @@ from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
 from ondoc.account import models as account_models
-from django.db.models import Q
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
@@ -18,9 +17,9 @@ from rest_framework.response import Response
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
-
+from django.db.models import Count, Sum, Max, Q
 from ondoc.sms.api import send_otp
-
+from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          UserPermission, Address, AppointmentTransaction)
@@ -33,8 +32,8 @@ from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterSerializer,
                                              UpdateStatusSerializer, CreateAppointmentSerializer,AppointmentRetrieveSerializer
                                              )
-from ondoc.diagnostic.models import (LabAppointment)
-from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer, LabAppointmentRetrieveSerializer)
+from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
+from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer, LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer)
 
 
 User = get_user_model()
@@ -353,11 +352,10 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp = {}
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
-            updated_lab_appointment = self.lab_appointment_update(lab_appointment, validated_data)
-            lab_appointment_serializer = LabAppointmentRetrieveSerializer(updated_lab_appointment,context={"request": request})
+            updated_lab_appointment = self.lab_appointment_update(request, lab_appointment, validated_data)
             response = {
                 "status": 1,
-                "data": lab_appointment_serializer.data
+                "data": updated_lab_appointment
             }
             return Response(response)
         elif appointment_type == 'doctor':
@@ -369,22 +367,43 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
-            # opd_appointment_serializer = AppointmentRetrieveSerializer(updated_opd_appointment, context={"request": request})
             response = {
                "status": 1,
                "data": updated_opd_appointment
             }
             return Response(response)
 
-    def lab_appointment_update(self, lab_appointment, validated_data):
+    def lab_appointment_update(self, request, lab_appointment, validated_data):
         if validated_data.get('status'):
+            resp = {}
             if validated_data['status'] == LabAppointment.CANCELED:
                 updated_lab_appointment = lab_appointment.action_cancelled(lab_appointment)
+                resp = LabAppointmentRetrieveSerializer(updated_lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
-                    updated_lab_appointment = lab_appointment.action_rescheduled_patient(lab_appointment,
-                                                                                         validated_data)
-        return updated_lab_appointment
+                    time_slot_start = CreateAppointmentSerializer.form_time_slot(
+                        validated_data.get("start_date"),
+                        validated_data.get("start_time"))
+                    test_ids = lab_appointment.lab_test.values_list('id', flat=True)
+                    lab_test_queryset = AvailableLabTest.objects.filter(lab=lab_appointment.lab,
+                                                                        test__in=test_ids)
+                    temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
+                                                                             total_deal_price=Sum("deal_price"),
+                                                                             total_agreed_price=Sum("agreed_price"))
+                    old_deal_price = lab_appointment.deal_price
+                    old_effective_price = lab_appointment.effective_price
+                    coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
+                    new_deal_price = temp_lab_test[0].get("total_deal_price")
+                    new_effective_price = new_deal_price - coupon_price
+                    new_appointment = dict()
+                    new_appointment['id'] = lab_appointment.id
+                    new_appointment['deal_price'] = new_deal_price
+                    new_appointment['effective_price'] = new_effective_price
+                    new_appointment['agreed_price'] = temp_lab_test[0].get("total_agreed_price", 0)
+                    new_appointment['price'] = temp_lab_test[0].get("total_mrp")
+                    new_appointment['time_slot_start'] = time_slot_start
+                    resp = self.extract_payment_details(request, lab_appointment, new_appointment, 2)
+        return resp
 
     def doctor_appointment_update(self, request, opd_appointment, validated_data):
         if validated_data.get('status'):
@@ -407,7 +426,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                         old_effective_price = opd_appointment.effective_price
                         # COUPON PROCESS to be Discussed
                         coupon_price = self.get_appointment_coupon_price(old_discounted_price, old_effective_price)
-                        new_appointment = {}
+                        new_appointment = dict()
                         new_appointment['id'] = opd_appointment.id
                         new_appointment['discounted_price'] = doctor_hospital.discounted_price
                         new_effective_price = doctor_hospital.discounted_price - coupon_price
@@ -438,14 +457,23 @@ class UserAppointmentsViewSet(OndocViewSet):
         balance = consumer_account.balance
         if balance >= new_appointment_details.get('effective_price'):
             consumer_account.debit_schedule(user_account_data, new_appointment_details.get('effective_price'))
-            updated_opd_appointment = appointment_details.action_rescheduled_patient(appointment_details, new_appointment_details)
-            opd_appointment_serializer = AppointmentRetrieveSerializer(updated_opd_appointment, context={"request": request})
-            return opd_appointment_serializer.data
+            if product_id == 1:
+                updated_opd_appointment = appointment_details.action_rescheduled_patient(appointment_details, new_appointment_details)
+                appointment_serializer = AppointmentRetrieveSerializer(updated_opd_appointment, context={"request": request})
+            if product_id == 2:
+                updated_lab_appointment = appointment_details.action_rescheduled_patient(appointment_details, new_appointment_details)
+                appointment_serializer = LabAppointmentRetrieveSerializer(updated_lab_appointment, context={"request": request})
+            return appointment_serializer.data
         else:
             new_appointment_details['time_slot_start'] = str(new_appointment_details['time_slot_start'])
+            action = ''
+            if product_id == 1:
+                action = account_models.Order.OPD_APPOINTMENT_RESCHEDULE
+            if product_id == 2:
+                action = account_models.Order.LAB_APPOINTMENT_RESCHEDULE
             order = account_models.Order.objects.create(
                 product_id=product_id,
-                action=account_models.Order.OPD_APPOINTMENT_CREATE,
+                action=action,
                 action_data=new_appointment_details,
                 amount=new_appointment_details.get('effective_price'),
                 payment_status=account_models.Order.PAYMENT_PENDING
