@@ -4,6 +4,7 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
 from ondoc.doctor.models import DoctorMobile
 import datetime
 from dateutil.relativedelta import relativedelta
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
@@ -20,7 +21,11 @@ class OTPVerificationSerializer(serializers.Serializer):
         # if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.CONSUMER).exists():
         #     raise serializers.ValidationError('User does not exist')
 
-        if not OtpVerifications.objects.filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False).exists():
+        if (not OtpVerifications
+                .objects
+                .filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False,
+                        created_at__gte=timezone.now() - relativedelta(minutes=OtpVerifications.OTP_EXPIRY_TIME))
+                .exists()):
             raise serializers.ValidationError("Invalid OTP")
         return attrs
 
