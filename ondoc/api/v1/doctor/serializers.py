@@ -58,7 +58,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
     def get_patient_image(self, obj):
         if obj.profile.profile_image:
-            return obj.profile.profile_image
+            return obj.profile.profile_image.url
         else:
             return ""
 
