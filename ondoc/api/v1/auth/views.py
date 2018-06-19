@@ -211,15 +211,20 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
     def create(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         data = {}
-        data.update(request.data)
+        data['name'] = request.data.get('name')
+        data['gender'] = request.data.get('gender')
+        # data['age'] = request.data.get('age')
+        data['email'] = request.data.get('email')
+        data['phone_number'] = request.data.get('phone_number')
         data['user'] = request.user.id
+
         if not queryset.exists():
             data.update({
                 "is_default_user": True
             })
-        if data.get('age'):
+        if request.data.get('age'):
             try:
-                age = int(data.get("age"))
+                age = int(request.data.get("age"))
                 data['dob'] = datetime.datetime.now() - relativedelta(years=age)
                 data['dob'] = data['dob'].date()
             except:
