@@ -316,9 +316,12 @@ class DoctorProfileView(viewsets.GenericViewSet):
                                                          context={"request": request})
 
         now = datetime.datetime.now()
+        today = datetime.date.today()
         appointment_count = models.OpdAppointment.objects.filter(Q(doctor=request.user.doctor.id),
                                                                  ~Q(status=models.OpdAppointment.CANCELED),
-                                                                 Q(time_slot_start__gte=now)).count()
+                                                                 ~Q(status=models.OpdAppointment.COMPLETED),
+                                                                 ~Q(status=models.OpdAppointment.CREATED),
+                                                                 Q(time_slot_start__date=today)).count()
         hospital_queryset = doctor.hospitals.distinct()
         hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True)
 
