@@ -211,6 +211,10 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         data = {}
         data.update(request.data)
         data['user'] = request.user.id
+        if not queryset.exists():
+            data.update({
+                "is_default_user": True
+            })
         if data.get('age'):
             try:
                 age = int(data.get("age"))
@@ -222,16 +226,11 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        if not queryset.exists():
-            serializer.validated_data['is_default_user'] = True
         serializer.save()
         return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
-        kwargs.update({
-            "partial": True
-        })
-        return super().update(request, *args, **kwargs)
+        return super().update(request, partial=True, *args, **kwargs)
 
 
 class UserPermissionViewSet(mixins.CreateModelMixin,

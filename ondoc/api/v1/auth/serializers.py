@@ -118,9 +118,16 @@ class NotificationEndpointDeleteSerializer(serializers.Serializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    GENDER_CHOICES = UserProfile.GENDER_CHOICES
+    name = serializers.CharField()
+    age = serializers.IntegerField(read_only=True)
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES)
+    email = serializers.EmailField(required=False, allow_null=True)
+
     class Meta:
         model = UserProfile
-        exclude = ('created_at', 'updated_at', )
+        fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
+                  "profile_image", "age", "user", "dob")
 
     def validate_profile_image(self, value):
         if value.image.width != value.image.height:
