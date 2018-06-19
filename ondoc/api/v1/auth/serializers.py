@@ -13,7 +13,7 @@ class OTPSerializer(serializers.Serializer):
 
 class OTPVerificationSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
-    otp = serializers.IntegerField(min_value=100000,max_value=999999)
+    otp = serializers.IntegerField(min_value=100000, max_value=999999)
 
     def validate(self, attrs):
 

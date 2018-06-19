@@ -151,6 +151,7 @@ class UserProfile(TimeStampedModel, Image):
         db_table = "user_profile"
 
 class OtpVerifications(TimeStampedModel):
+    OTP_EXPIRY_TIME = 60  # In minutes
     phone_number = models.CharField(max_length=10)
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)

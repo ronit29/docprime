@@ -47,7 +47,9 @@ class LoginOTP(GenericViewSet):
     @transaction.atomic
     def generate(self, request, format=None):
 
-        response = {'exists':0}
+        response = {'exists': 0}
+        if request.data.get("phone_number"):
+            expire_otp(phone_number=request.data.get("phone_number"))
         serializer = serializers.OTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
