@@ -236,7 +236,7 @@ class LabTestType(TimeStampedModel):
 
 
 class LabTestSubType(TimeStampedModel):
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200, unique=True)
 
     def __str__(self):
         return self.name
@@ -254,24 +254,48 @@ class LabTestSubType(TimeStampedModel):
 #     class Meta:
 #         db_table = "radiology_test_type"
 
+
 class LabTest(TimeStampedModel):
-    name = models.CharField(max_length=200)
-    test_type = models.ForeignKey(LabTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_type')
-    test_sub_type = models.ForeignKey(LabTestSubType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_sub_type')
+    RADIOLOGY = 1
+    PATHOLOGY = 2
+    TEST_TYPE_CHOICES = (
+        (RADIOLOGY, "Radiology"),
+        (PATHOLOGY, "Pathology"),
+    )
+    name = models.CharField(max_length=200, unique=True)
+    test_type = models.PositiveIntegerField(choices=TEST_TYPE_CHOICES, blank=True, null=True)
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
-    why = models.CharField(max_length=1000, blank=True)
+    why = models.TextField(blank=True)
     pre_test_info = models.CharField(max_length=1000, blank=True)
     sample_handling_instructions = models.CharField(max_length=1000, blank=True)
     sample_collection_instructions = models.CharField(max_length=1000, blank=True)
     preferred_time = models.CharField(max_length=1000, blank=True)
     sample_amount = models.CharField(max_length=1000, blank=True)
     expected_tat = models.CharField(max_length=1000, blank=True)
+    category = models.CharField(max_length=100, blank=True)
+    excel_id = models.CharField(max_length=100, blank=True)
+    test_sub_type = models.ManyToManyField(
+        LabTestSubType,
+        through='LabTestSubTypeMapping',
+        through_fields=("lab_test", "test_sub_type", )
+    )
 
     def __str__(self):
         return self.name
 
     class Meta:
         db_table = "lab_test"
+
+
+class LabTestSubTypeMapping(TimeStampedModel):
+    lab_test = models.ForeignKey(LabTest, on_delete=models.CASCADE)
+    test_sub_type = models.ForeignKey(LabTestSubType, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "labtest_subtype_mapping"
+
+    def __str__(self):
+        return "{}-{}".format(self.lab_test.id, self.test_sub_type.id)
 
 
 class AvailableLabTest(TimeStampedModel):
@@ -302,7 +326,10 @@ class LabAppointment(TimeStampedModel):
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)
     profile_detail = JSONField(blank=True, null=True)
     status = models.PositiveSmallIntegerField(default=CREATED)
-    price = models.PositiveSmallIntegerField()
+    price = models.FloatField(default=0)  # This is mrp
+    agreed_price = models.FloatField(default=0)
+    deal_price = models.FloatField(default=0)
+    effective_price = models.FloatField(default=0)
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
     otp = models.PositiveIntegerField(blank=True, null=True)

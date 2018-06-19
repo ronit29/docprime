@@ -7,13 +7,19 @@ from ondoc.authentication.models import TimeStampedModel, User
 class Order(TimeStampedModel):
     OPD_APPOINTMENT_RESCHEDULE = 1
     OPD_APPOINTMENT_CREATE = 2
+    LAB_APPOINTMENT_RESCHEDULE = 3
+    LAB_APPOINTMENT_CREATE = 4
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_STATUS_CHOICES = (
         (PAYMENT_ACCEPTED, "Payment Accepted"),
         (PAYMENT_PENDING, "Payment Pending"),
     )
-    ACTION_CHOICES = (("", "Select"), (OPD_APPOINTMENT_RESCHEDULE, 'Reschedule'), (OPD_APPOINTMENT_CREATE, "Create"))
+    ACTION_CHOICES = (("", "Select"), (OPD_APPOINTMENT_RESCHEDULE, 'Opd Reschedule'),
+                      (OPD_APPOINTMENT_CREATE, "Opd Create"),
+                      (LAB_APPOINTMENT_CREATE, "Lab Create"),
+                      (LAB_APPOINTMENT_RESCHEDULE, "Lab Reschedule"),
+                      )
     DOCTOR_APPOINTMENT = 1
     LAB_APPOINTMENT = 2
     product_list = ["Doctor Appointment", "Lab Appointment"]
@@ -22,11 +28,10 @@ class Order(TimeStampedModel):
     appointment_id = models.PositiveSmallIntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
     action_data = JSONField(blank=True, null=True)
-    amount = models.SmallIntegerField(blank=True, null=True)
+    amount = models.FloatField(blank=True, null=True)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     error_status = models.CharField(max_length=250, verbose_name="Error", blank=True, null=True)
     is_viewable = models.BooleanField(verbose_name='Is Viewable', default=True)
-
 
     def __str__(self):
         return self.appointment_id
@@ -101,6 +106,14 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
+    def credit_schedule(self, data, amount):
+        self.balance += amount
+        action = ConsumerTransaction.RESCHEDULE_PAYMENT
+        tx_type = PgTransaction.CREDIT
+        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, tx_type)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+        self.save()
+
     def form_consumer_tx_data(self, data, amount, action, tx_type):
         consumer_tx_data = dict()
         consumer_tx_data['user'] = data['user']
@@ -121,6 +134,7 @@ class ConsumerTransaction(TimeStampedModel):
     PAYMENT = 1
     REFUND = 2
     SALE = 3
+    RESCHEDULE_PAYMENT = 4
     action_list = ["Cancellation", "Payment", "Refund", "Sale"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
@@ -132,4 +146,7 @@ class ConsumerTransaction(TimeStampedModel):
     type = models.SmallIntegerField(choices=PgTransaction.TYPE_CHOICES)
     action = models.SmallIntegerField(choices=ACTION_CHOICES)
     amount = models.FloatField(default=0)
+
+    class Meta:
+        db_table = 'consumer_transaction'
 

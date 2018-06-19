@@ -19,7 +19,7 @@ class AppNotificationViewSet(viewsets.GenericViewSet):
         viewed_time = timezone.now()
         models.AppNotification.objects.filter(user=request.user, viewed_at__isnull=True
                                               ).update(viewed_at=viewed_time)
-        queryset = self.get_queryset()
+        queryset = self.get_queryset().order_by("-created_at")
         paginated_queryset = paginate_queryset(queryset, request)
         serializer = serializers.AppNotificationSerializer(paginated_queryset, many=True)
         return Response(serializer.data)

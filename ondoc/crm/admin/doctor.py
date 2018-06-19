@@ -24,6 +24,7 @@ class AutoComplete:
     def autocomplete_view(self, request):
         return CustomAutoComplete.as_view(model_admin=self)(request)
 
+
 class DoctorQualificationForm(forms.ModelForm):
     passing_year = forms.ChoiceField(choices=college_passing_year_choices, required=False)
 
@@ -34,13 +35,32 @@ class DoctorQualificationForm(forms.ModelForm):
         return data
 
 
+class DoctorQualificationFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        doctor = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('doctor'):
+                doctor += 1
+
+        if count > 0:
+            if not doctor:
+                raise forms.ValidationError("Atleast one Qualification is required")
+
+
 class DoctorQualificationInline(admin.TabularInline):
     model = DoctorQualification
     form = DoctorQualificationForm
+    formset = DoctorQualificationFormSet
     extra = 0
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['college']
+
 
 class DoctorHospitalForm(forms.ModelForm):
     def clean(self):
@@ -51,20 +71,59 @@ class DoctorHospitalForm(forms.ModelForm):
             raise forms.ValidationError("Availability start time should be less than end time")
 
 
+class DoctorHospitalFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        hospital = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('hospital'):
+                hospital += 1
+
+        if count > 0:
+            if not hospital:
+                raise forms.ValidationError("Atleast one Hospital is required")
+
+
+
 class DoctorHospitalInline(admin.TabularInline):
     model = DoctorHospital
     form = DoctorHospitalForm
+    formset = DoctorHospitalFormSet
     extra = 0
+    # min_num = 1
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['hospital']
 
 
+class DoctorLanguageFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        language = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('language'):
+                language += 1
+
+        if count > 0:
+            if not language:
+                raise forms.ValidationError("Atleast one language is required")
+
+
 class DoctorLanguageInline(admin.TabularInline):
     model = DoctorLanguage
+    formset = DoctorLanguageFormSet
     extra = 0
     can_delete = True
     show_change_link = False
+
 
 class DoctorAwardForm(forms.ModelForm):
     year = forms.ChoiceField(choices=award_year_choices, required=False)
@@ -82,22 +141,52 @@ class DoctorAwardInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+
 class DoctorAssociationInline(admin.TabularInline):
     model = DoctorAssociation
     extra = 0
     can_delete = True
     show_change_link = False
 
+
 class DoctorExperienceForm(forms.ModelForm):
     start_year = forms.ChoiceField(required=False, choices=practicing_since_choices)
     end_year = forms.ChoiceField(required=False, choices=practicing_since_choices)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start_year")
+        end = cleaned_data.get("end_year")
+        if start and end and start >= end:
+            raise forms.ValidationError("Start Year should be less than end Year")
+
+
+
+class DoctorExperienceFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        hospital = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('hospital'):
+                hospital += 1
+
+        if count > 0:
+            if not hospital:
+                raise forms.ValidationError("Atleast one Experience is required")
+
+
 class DoctorExperienceInline(admin.TabularInline):
     model = DoctorExperience
+    formset = DoctorExperienceFormSet
     extra = 0
     can_delete = True
     show_change_link = False
     form = DoctorExperienceForm
+
 
 class DoctorMedicalServiceInline(admin.TabularInline):
     model = DoctorMedicalService
@@ -109,9 +198,27 @@ class DoctorMedicalServiceInline(admin.TabularInline):
 # class DoctorImageForm(forms.ModelForm):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
+
+class DoctorImageFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        name = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('name'):
+                name += 1
+
+        if count > 0:
+            if not name:
+                raise forms.ValidationError("Atleast one Image is required")
+
+
 class DoctorImageInline(admin.TabularInline):
     model = DoctorImage
-    #form = DoctorImageForm
+    formset = DoctorImageFormSet
     template = 'imageinline.html'
     extra = 0
     can_delete = True
@@ -146,6 +253,7 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
             for key, value in count.items():
                 if not key==DoctorDocument.GST and value<1:
                     raise forms.ValidationError(choices[key]+" is required")
+
 
 class DoctorDocumentInline(admin.TabularInline):
     formset = DoctorDocumentFormSet
@@ -203,6 +311,7 @@ class DoctorEmailForm(forms.ModelForm):
     email = forms.CharField(required=True)
     is_primary = forms.BooleanField(required=False)
 
+
 class DoctorEmailFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -220,6 +329,7 @@ class DoctorEmailFormSet(forms.BaseInlineFormSet):
                raise forms.ValidationError("One primary email is required")
             if primary>=2:
                raise forms.ValidationError("Only one email can be primary")
+
 
 class DoctorEmailInline(admin.TabularInline):
     model = DoctorEmail
@@ -239,14 +349,14 @@ class DoctorForm(FormCleanMixin):
     practicing_since = forms.ChoiceField(required=False, choices=practicing_since_choices)
     onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Doctor.ONBOARDING_STATUS)
     def validate_qc(self):
-        qc_required = {'name':'req','gender':'req','practicing_since':'req',
+        qc_required = {'name':'req', 'gender':'req','practicing_since':'req',
         'about':'req','license':'req','mobiles':'count','emails':'count',
-        'qualifications':'count','availability':'count','languages':'count',
+        'qualifications':'count', 'availability': 'count', 'languages':'count',
         'images':'count','documents':'count'}
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'-TOTAL_FORMS'])<=0:
+            if value == 'count' and int(self.data[key+'-TOTAL_FORMS']) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
     def clean_practicing_since(self):
@@ -259,7 +369,7 @@ class CityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'hospitals__city'
     def lookups(self, request, model_admin):
-        cities = set([(c['hospitals__city'].upper(),c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('','') for c in Doctor.objects.all().values('hospitals__city')])
+        cities = set([(c['hospitals__city'].upper(), c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('','') for c in Doctor.objects.all().values('hospitals__city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -298,7 +408,7 @@ class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     def onboarddoctor_admin(self, request, userid):
         host = request.get_host()
         try:
-            doctor = Doctor.objects.get(id = userid)
+            doctor = Doctor.objects.get(id=userid)
         except Exception as e:
             return HttpResponse('invalid doctor')
 
@@ -387,11 +497,14 @@ class SpecializationAdmin(AutoComplete, VersionAdmin):
 class QualificationAdmin(AutoComplete, VersionAdmin):
     search_fields = ['name']
 
+
 class MedicalServiceAdmin(VersionAdmin):
     search_fields = ['name']
 
+
 class LanguageAdmin(VersionAdmin):
     search_fields = ['name']
+
 
 class CollegeAdmin(AutoComplete, VersionAdmin):
     search_fields = ['name']

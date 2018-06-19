@@ -1,0 +1,5 @@
+{% load i18n %}
+{% load admin_urls %}
+{% if request.user.is_superuser %}
+    <li><a href='{% url opts|admin_urlname:"import" %}' class="import_link">{% trans "Import" %}</a></li>
+{% endif %}
