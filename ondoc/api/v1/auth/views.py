@@ -31,10 +31,12 @@ from ondoc.api.pagination import paginate_queryset
 
 from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterSerializer,
-                                             UpdateStatusSerializer, CreateAppointmentSerializer, AppointmentRetrieveSerializer
+                                             UpdateStatusSerializer, CreateAppointmentSerializer,
+                                             AppointmentRetrieveSerializer
                                              )
 from ondoc.diagnostic.models import (LabAppointment)
-from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer, LabAppointmentRetrieveSerializer)
+from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer, LabAppointmentRetrieveSerializer,
+                                                 LabAppointmentCreateSerializer)
 
 
 User = get_user_model()
@@ -488,7 +490,6 @@ class UserAppointmentsViewSet(OndocViewSet):
 
         return details
 
-
     def lab_appointment_list(self, request, params):
         user = request.user
         queryset = LabAppointment.objects.select_related('lab').filter(profile__user=user)
@@ -646,29 +647,37 @@ class TransactionViewSet(viewsets.GenericViewSet):
     queryset = PgTransaction.objects.none()
 
     def save(self, request):
-        LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appointment/{}"
-        OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appointment/{}"
+        LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appointment"
+        OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appointment"
         data = request.data
-        #
-        coded_response = data.get("response")
-        if isinstance(coded_response, list):
-            coded_response = coded_response[0]
-        coded_response += "=="
-        decoded_response = base64.b64decode(coded_response).decode()
-        response = json.loads(decoded_response)
+        # Commenting below for testing
+        # coded_response = data.get("response")
+        # if isinstance(coded_response, list):
+        #     coded_response = coded_response[0]
+        # coded_response += "=="
+        # decoded_response = base64.b64decode(coded_response).decode()
+        # response = json.loads(decoded_response)
 
-        # response = request.data
+        response = request.data
 
         response_data = self.form_pg_transaction_data(response)
 
         pg_tx_queryset = PgTransaction.objects.create(**response_data)
 
-        self.block_pay_schedule_transaction(response_data)
+        appointment_obj = None
+        # try:
+        appointment_obj = self.block_pay_schedule_transaction(response_data)
+        # except:
+        #     pass
 
-        if response_data["product"] == 1:
-                REDIRECT_URL = LAB_REDIRECT_URL.format(response_data["order"])
+        if response_data["product_id"] == 1:
+            if appointment_obj:
+                LAB_REDIRECT_URL += "/"+str(appointment_obj.id)
+            REDIRECT_URL = LAB_REDIRECT_URL
         else:
-                REDIRECT_URL = OPD_REDIRECT_URL.format(response_data["order"])
+            if appointment_obj:
+                OPD_REDIRECT_URL += "/"+str(appointment_obj.id)
+            REDIRECT_URL = OPD_REDIRECT_URL
 
         return Response({"url": REDIRECT_URL})
         # return HttpResponseRedirect(redirect_to=REDIRECT_URL)
@@ -709,20 +718,16 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         consumer_account.credit_payment(pg_data, tx_amount)
 
-        try:
-            if order_obj.action in [Order.OPD_APPOINTMENT_RESCHEDULE, Order.OPD_APPOINTMENT_RESCHEDULE]:
-                self.reschedule_appointment(consumer_account, pg_data, order_obj)
-            elif order_obj.action in [Order.OPD_APPOINTMENT_CREATE, Order.LAB_APPOINTMENT]:
-                self.book_appointment(consumer_account, pg_data, order_obj)
-        except:
-            pass
+        appointment_obj = None
+        # try:
+        if order_obj.action in [Order.OPD_APPOINTMENT_RESCHEDULE, Order.LAB_APPOINTMENT_RESCHEDULE]:
+            appointment_obj = self.reschedule_appointment(consumer_account, pg_data, order_obj)
+        elif order_obj.action in [Order.OPD_APPOINTMENT_CREATE, Order.LAB_APPOINTMENT_CREATE]:
+            appointment_obj = self.book_appointment(consumer_account, pg_data, order_obj)
+        # except:
+        #     pass
 
-        # if appointment_obj and consumer_account.balance >= appointment_charge:
-        #     try:
-        #         self.book_appointment_reschedule(consumer_account, pg_data)
-        #         appointment_obj.payment_confirmation(consumer_account, pg_data, appointment_charge)
-        #     except:
-        #         pass
+        return appointment_obj
 
     @transaction.atomic
     def book_appointment(self, consumer_account, pg_data, order_obj):
@@ -730,14 +735,25 @@ class TransactionViewSet(viewsets.GenericViewSet):
         appointment_obj = None
         if consumer_account.balance >= appointment_data["effective_price"]:
             if order_obj.product_id == PgTransaction.DOCTOR_APPOINTMENT:
+                appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
+                appointment_data["status"] = OpdAppointment.BOOKED
                 opd_searilizer = OpdAppointmentSerializer(data=appointment_data)
                 opd_searilizer.is_valid(raise_exception=True)
-                opd_searilizer.save()
+                appointment_obj = opd_searilizer.save()
                 # appointment_obj = OpdAppointment.objects.create(**appointment_data)
             elif order_obj.product_id == PgTransaction.LAB_APPOINTMENT:
-                appointment_obj = LabAppointment.objects.create(**appointment_data)
+
+                lab_appnt_seriailizer = LabAppointmentCreateSerializer(data=appointment_data)
+                lab_appnt_seriailizer.is_valid(raise_exception=True)
+                appointment_obj = lab_appnt_seriailizer.save()
+
+                # lab_searilizer = LabAppointmentModelSerializer(data=appointment_data)
+                # lab_searilizer.is_valid(raise_exception=True)
+                # appointment_obj = lab_searilizer.save()
+                # appointment_obj = LabAppointment.objects.create(**appointment_data)
             order_obj.appointment_id = appointment_obj.id
             order_obj.payment_status = Order.PAYMENT_ACCEPTED
+            pg_data["reference_id"] = appointment_obj.id
             order_obj.save()
 
             appointment_amount = appointment_obj.effective_price
@@ -748,6 +764,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 "reference_id": appointment_obj.id
             }
             consumer_account.debit_schedule(debit_data, appointment_amount)
+            return appointment_obj
 
     @transaction.atomic
     def reschedule_appointment(self, consumer_account, pg_data, order_obj):
@@ -774,6 +791,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 "reference_id": appointment_obj.id
             }
             consumer_account.debit_schedule(debit_data, appointment_amount)
+            return appointment_obj
 
     @transaction.atomic
     def block_schedule_transaction(self, data):
