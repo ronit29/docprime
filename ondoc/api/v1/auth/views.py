@@ -1,29 +1,23 @@
 import base64
 import json
 import random
+import datetime
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
-from django.db.models import Q
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
-import math
-import datetime
-import time
-import pytz
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
-
 from ondoc.sms.api import send_otp
-
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          UserPermission, Address, AppointmentTransaction)
-from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction
+from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -712,3 +706,23 @@ class TransactionViewSet(viewsets.GenericViewSet):
 class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
     queryset = ConsumerAccount.objects.all()
     serializer_class = serializers.ConsumerAccountModelSerializer
+
+
+class OrderHistoryViewSet(GenericViewSet):
+
+    def list(self, request):
+        orders = []
+        for order in Order.objects.filter(action_data__user=request.user.id):
+            action_data = order.action_data
+            if order.product_id == 1:
+                serializer = OpdAppointmentSerializer(data=order.action_data)
+                if not serializer.is_valid():
+                    action_data.update({
+                        "is_valid": False
+                    })
+                else:
+                    action_data.update({
+                        "is_valid": True
+                    })
+            orders.append(action_data)
+        return Response(orders)

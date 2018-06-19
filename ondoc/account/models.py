@@ -34,7 +34,7 @@ class Order(TimeStampedModel):
     is_viewable = models.BooleanField(verbose_name='Is Viewable', default=True)
 
     def __str__(self):
-        return self.appointment_id
+        return "{}".format(self.id)
 
     class Meta:
         db_table = "order"
