@@ -50,8 +50,8 @@ def otp(request):
         action = request.POST.get('_resend_otp')
         if action:
             otp = randint(200000, 900000)
-            message = 'You have initiated onboarding process for '+existing.lab.name+'. OTP is '+str(otp)
-            api.send_sms(message, '91'+str(existing.lab.primary_mobile))
+            message = 'You have initiated onboarding process on DocPrime for '+existing.lab.name+'. OTP is '+str(otp)
+            api.send_sms(message, str(existing.lab.primary_mobile))
 
             # print(otp)
             request.session['otp'] = otp

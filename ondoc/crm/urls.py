@@ -7,7 +7,7 @@ from . import views
 app_name = 'crm'
 urlpatterns = [
     # path('auth/', views.obtain_auth_token),
-    path('', views.index, name='index'),
+    # path('', views.index, name='index'),
 ]
 
 if settings.DEBUG:

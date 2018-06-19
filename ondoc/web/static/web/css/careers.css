@@ -1,0 +1,208 @@
+html, body{
+	font-family: Quicksand;
+}
+
+a, a:hover, a:active, a:visited{
+	text-decoration: none;
+}
+
+.body-wrapper{
+	min-height: 100vh;
+	padding-bottom: 56px;
+}
+
+.header-nav{
+	justify-content: space-around;
+	background-color: #62bed4;
+}
+
+.laptop-img-div{
+	position: absolute;
+	right: 0;
+	top: 57px;
+}
+
+.pages-img-div{
+	position: absolute;
+	left: -16px;
+	top: 57px;
+}
+
+.hiring-col{
+	margin-top: 40px;
+}
+
+.hiring-heading{
+	display: inline-block;
+	vertical-align: middle;
+	margin-left: 24px;
+	color: #f88e30;
+}
+
+.hiring-desc{
+	margin-top: 30px;
+}
+
+.arrow-img{
+	position: absolute;
+	right: 15px;
+	bottom: 50px;
+}
+
+.hiring-form-div{
+	padding: 30px 60px;
+	border-radius: 30px;
+  	background-color: #ffffff;
+  	box-shadow: 0px 6px 20px 0 rgba(0, 0, 0, 0.12);
+}
+
+.upload-resume-div{
+	margin-top: 40px;
+	position: relative;
+}
+
+.resume-label{
+	cursor: pointer;
+	opacity: 0.6;
+}
+
+.input-file{
+	margin-top: -30px;
+}
+
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+	margin: 0; 
+}
+
+.resume-file-name{
+    color: rgba(0, 0, 0, 0.8);
+}
+
+.resume-file-display{
+    display: none;
+}
+
+#upload-resume {
+	opacity: 0;
+	width: 100%;
+}
+
+.upload-btn{
+	margin-left: 8px;
+	padding: 6px 18px;
+	padding-top: 4px;
+	cursor: pointer;
+	display: inline-block;
+	border-radius: 12px;
+  	background-color: #00acc1;
+}
+
+.upload-text{
+	display: inline-block;
+	vertical-align: -1px;
+	margin-left: 4px;
+	font-size: 14px;
+	color: #ffffff;
+	margin-bottom: 0;
+}
+
+.submit-btn-div{
+	text-align: center;
+	margin-top: 50px;
+}
+
+.send-btn, .send-btn:hover{
+	border-radius: 12px;
+	border: none;
+	padding: 6px 30px;
+  	background-color: #00acc1;
+}
+
+.coffee-img-div{
+	position: absolute;
+	width: 80px;
+	height: 80px;
+	right: -12px;
+	bottom: -25px;
+}
+
+.coffee-img{
+	width: 100%;
+}
+
+.career-img-row{
+	margin-top: 50px;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.footer{
+	background-color: #62bed4;
+	margin-top: -56px;
+	padding-top: 12px;
+	padding-bottom: 12px;
+}
+
+.footer-row{
+	align-items: center;
+}
+
+.footer-text, .footer-text>a{
+	color: #ffffff;
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+.footer-text>span{
+	margin-left: 8px;
+	margin-right: 8px;
+}
+
+.footer-icons{
+	text-align: right;
+}
+
+.footer-icon{
+	margin-left: 4px;
+	margin-right: 4px;
+}
+
+@media(max-width: 767px){
+	.absolute-images{
+		display: none;
+	}
+	.hiring-col{
+		margin-bottom: 20px;
+	}
+}
+
+@media(max-width: 575px){
+	.body-wrapper{
+		padding-bottom: 120px;
+	}
+	.hiring-desc-div, .hiring-heading-div{
+		text-align: center;
+	}
+	.hiring-desc{
+		font-size: 22px;
+	}
+	.hiring-heading-div>img{
+		width: 45px;
+	}
+	.hiring-heading{
+		font-size: 30px;
+	}
+	.footer{
+		margin-top: -100px;
+	}
+	.footer-col, .footer-icons{
+		text-align: center;
+	}
+	.footer-icons{
+		margin-top: 20px;
+	}
+}
