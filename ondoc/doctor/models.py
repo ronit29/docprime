@@ -610,9 +610,7 @@ class   OpdAppointment(TimeStampedModel):
         return allowed
 
     def send_notification(self, database_instance):
-        if not self.id:
-            return
-        if database_instance.status == self.status:
+        if database_instance and database_instance.status == self.status:
             return
         if self.status == OpdAppointment.ACCEPTED:
             notification_models.NotificationAction.trigger(
@@ -645,8 +643,8 @@ class   OpdAppointment(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
-        self.send_notification(database_instance)
         super().save(*args, **kwargs)
+        self.send_notification(database_instance)
 
 
     class Meta:

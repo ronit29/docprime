@@ -4,6 +4,7 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
 from ondoc.doctor.models import DoctorMobile
 import datetime
 from dateutil.relativedelta import relativedelta
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
@@ -13,14 +14,18 @@ class OTPSerializer(serializers.Serializer):
 
 class OTPVerificationSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
-    otp = serializers.IntegerField(min_value=100000,max_value=999999)
+    otp = serializers.IntegerField(min_value=100000, max_value=999999)
 
     def validate(self, attrs):
 
         # if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.CONSUMER).exists():
         #     raise serializers.ValidationError('User does not exist')
 
-        if not OtpVerifications.objects.filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False).exists():
+        if (not OtpVerifications
+                .objects
+                .filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False,
+                        created_at__gte=timezone.now() - relativedelta(minutes=OtpVerifications.OTP_EXPIRY_TIME))
+                .exists()):
             raise serializers.ValidationError("Invalid OTP")
         return attrs
 
@@ -118,9 +123,16 @@ class NotificationEndpointDeleteSerializer(serializers.Serializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    GENDER_CHOICES = UserProfile.GENDER_CHOICES
+    name = serializers.CharField()
+    age = serializers.IntegerField(read_only=True)
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES)
+    email = serializers.EmailField(required=False, allow_null=True)
+
     class Meta:
         model = UserProfile
-        exclude = ('created_at', 'updated_at', )
+        fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
+                  "profile_image", "age", "user", "dob")
 
     def validate_profile_image(self, value):
         if value.image.width != value.image.height:
