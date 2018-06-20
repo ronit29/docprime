@@ -4,9 +4,8 @@ from ondoc.account import models as account_models
 from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
-from ondoc.api.v1.utils import convert_timings
+from ondoc.api.v1.utils import convert_timings, form_time_slot
 from django.db.models import Min
-from django.contrib.gis.geos import Point
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework import mixins
@@ -20,14 +19,11 @@ from django.db.models import Q
 import datetime
 from operator import itemgetter
 from itertools import groupby
-from django.contrib.gis.db.models.functions import Distance
 from ondoc.api.v1.utils import RawSql
 from django.contrib.auth import get_user_model
 from django.db.models import F
 from collections import defaultdict
 
-import json
-import copy
 User = get_user_model()
 
 
@@ -171,42 +167,30 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        time_slot_start = serializers.CreateAppointmentSerializer.form_time_slot(data.get("start_date"),
-                                                                                 data.get("start_time"))
-        # time_slot_start = data.get("time_slot_start")
-
-        doctor_hospital = models.DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
-            day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).first()
-        fees = doctor_hospital.fees
-
-        profile_detail = dict()
-        # profile_model = auth_models.UserProfile.objects.get()
+        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+        doctor_hospital = models.DoctorHospital.objects.filter(
+            doctor=data.get('doctor'), hospital=data.get('hospital'),
+            day=time_slot_start.weekday(), start__lte=time_slot_start.hour,
+            end__gte=time_slot_start.hour).first()
         profile_model = data.get("profile")
-        profile_detail["name"] = profile_model.name
-        profile_detail["gender"] = profile_model.gender
-        profile_detail["dob"] = str(profile_model.dob)
-        # profile_detail["profile_image"] = profile_model.profile_image
-
+        profile_detail = {
+            "name": profile_model.name,
+            "gender": profile_model.gender,
+            "dob": str(profile_model.dob)
+        }
         opd_data = {
             "doctor": data.get("doctor").id,
             "hospital": data.get("hospital").id,
             "profile": data.get("profile").id,
-            # "profile_detail": json.dumps(profile_detail),
             "profile_detail": profile_detail,
             "user": request.user.id,
             "booked_by": request.user.id,
-            "fees": fees,
+            "fees": doctor_hospital.fees,
             "discounted_price": doctor_hospital.discounted_price,
             "effective_price": doctor_hospital.discounted_price,
             "mrp": doctor_hospital.mrp,
             "time_slot_start": str(time_slot_start),
-            # "time_slot_end": time_slot_end,
         }
-
-
-        resp = {}
-        resp["status"] = 1
-        # resp["data"] = appointment_serializer.data
         resp = self.extract_payment_details(request, opd_data, 1)
         return Response(data=resp)
 
@@ -294,6 +278,16 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp["status"] = 1
             resp["data"] = opd_seriailizer.data
         else:
+            account_models.Order.objects.filter(
+                action_data__doctor=appointment_details.get("doctor"),
+                action_data__hospital=appointment_details.get("hospital"),
+                action_data__profile=appointment_details.get("profile"),
+                action_data__user=appointment_details.get("user"),
+                product_id=product_id,
+                is_viewable=True,
+                payment_status=account_models.Order.PAYMENT_PENDING,
+                action=account_models.Order.OPD_APPOINTMENT_CREATE,
+            ).update(is_viewable=False)
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.OPD_APPOINTMENT_CREATE,
@@ -302,6 +296,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = appointment_details.get("effective_price") - balance
+            resp["status"] = 1
             resp['pg_details'] = self.payment_details(request, appointment_details, product_id, order.id)
         return resp
 

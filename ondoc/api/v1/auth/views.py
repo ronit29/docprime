@@ -726,10 +726,11 @@ class OrderHistoryViewSet(GenericViewSet):
                     "product_id": order.product_id,
                     "time_slot_start": action_data.get("time_slot_start"),
                     "start_date": action_data.get("time_slot_start"),
-                    "start_time": parse(action_data.get("time_slot_start")).strftime("%H:%M"),
+                    "start_time": 0.0,      # not required here we are only validating fees
                     "fees": action_data.get("effective_price")
                 }
-                serializer = CreateAppointmentSerializer(data=data)
+                serializer = CreateAppointmentSerializer(data=data, context={"request": request})
+                serializer.is_valid(raise_exception=True)
                 if not serializer.is_valid():
                     data.pop("time_slot_start")
                     data.pop("start_date")
