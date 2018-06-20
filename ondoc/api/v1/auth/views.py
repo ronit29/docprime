@@ -679,6 +679,7 @@ class UserIDViewSet(viewsets.GenericViewSet):
 
 class TransactionViewSet(viewsets.GenericViewSet):
 
+    permission_classes = (IsAuthenticated,)
     serializer_class = None
     queryset = PgTransaction.objects.none()
 
@@ -694,6 +695,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         # decoded_response = base64.b64decode(coded_response).decode()
         # response = json.loads(decoded_response)
 
+        # For testing only
         response = request.data
 
         response_data = self.form_pg_transaction_data(response)
@@ -702,7 +704,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         appointment_obj = None
         # try:
-        appointment_obj = self.block_pay_schedule_transaction(response_data)
+        appointment_obj = self.block_pay_schedule_transaction(request, response_data)
         # except:
         #     pass
 
@@ -744,7 +746,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         return data
 
     @transaction.atomic
-    def block_pay_schedule_transaction(self, pg_data):
+    def block_pay_schedule_transaction(self, request, pg_data):
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=pg_data["user"])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=pg_data["user"])
@@ -759,14 +761,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
         if order_obj.action in [Order.OPD_APPOINTMENT_RESCHEDULE, Order.LAB_APPOINTMENT_RESCHEDULE]:
             appointment_obj = self.reschedule_appointment(consumer_account, pg_data, order_obj)
         elif order_obj.action in [Order.OPD_APPOINTMENT_CREATE, Order.LAB_APPOINTMENT_CREATE]:
-            appointment_obj = self.book_appointment(consumer_account, pg_data, order_obj)
+            appointment_obj = self.book_appointment(request, consumer_account, pg_data, order_obj)
         # except:
         #     pass
 
         return appointment_obj
 
     @transaction.atomic
-    def book_appointment(self, consumer_account, pg_data, order_obj):
+    def book_appointment(self, request, consumer_account, pg_data, order_obj):
         appointment_data = order_obj.action_data
         appointment_obj = None
         if consumer_account.balance >= appointment_data["effective_price"]:
@@ -778,7 +780,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 appointment_obj = opd_searilizer.save()
                 # appointment_obj = OpdAppointment.objects.create(**appointment_data)
             elif order_obj.product_id == PgTransaction.LAB_APPOINTMENT:
-                lab_appnt_seriailizer = LabAppointmentCreateSerializer(data=appointment_data)
+                lab_appnt_seriailizer = LabAppointmentCreateSerializer(data=appointment_data, context={'request': request})
                 lab_appnt_seriailizer.is_valid(raise_exception=True)
                 appointment_obj = lab_appnt_seriailizer.save()
 
