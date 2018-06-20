@@ -1,6 +1,7 @@
 import base64
 import json
 import random
+import datetime
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
@@ -8,10 +9,6 @@ from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
-import math
-import datetime
-import time
-import pytz
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
 from django.db import transaction
@@ -33,8 +30,9 @@ from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, Appointme
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer
                                              )
+from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
+                                                 LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer)
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
-from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer, LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer)
 
 
 User = get_user_model()
@@ -875,3 +873,49 @@ class TransactionViewSet(viewsets.GenericViewSet):
 class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
     queryset = ConsumerAccount.objects.all()
     serializer_class = serializers.ConsumerAccountModelSerializer
+
+
+class OrderHistoryViewSet(GenericViewSet):
+
+    def list(self, request):
+        orders = []
+        for order in Order.objects.filter(action_data__user=request.user.id, is_viewable=True,
+                                          payment_status=Order.PAYMENT_PENDING):
+            action_data = order.action_data
+            if order.product_id == Order.DOCTOR_PRODUCT_ID:
+                data = {
+                    "doctor": action_data.get("doctor"),
+                    "hospital": action_data.get("hospital"),
+                    "profile_detail": action_data.get("profile_detail"),
+                    "profile": action_data.get("profile"),
+                    "user": action_data.get("user"),
+                    "product_id": order.product_id,
+                    "time_slot_start": action_data.get("time_slot_start"),
+                    "start_date": action_data.get("time_slot_start"),
+                    "start_time": 0.0,      # not required here we are only validating fees
+                    "fees": action_data.get("effective_price")
+                }
+                serializer = CreateAppointmentSerializer(data=data, context={"request": request})
+                serializer.is_valid(raise_exception=True)
+                if not serializer.is_valid():
+                    data.pop("time_slot_start")
+                    data.pop("start_date")
+                    data.pop("start_time")
+                    data.pop("fees")
+            elif order.product_id == Order.LAB_PRODUCT_ID:
+                data = {
+                    "lab": action_data.get("lab"),
+                    "test_ids": action_data.get("test_ids"),
+                    "profile": action_data.get("profile"),
+                    "start_date": action_data.get("start_date"),
+                    "start_time": action_data.get("start_time"),
+                    "fees": action_data.get("effective_price"),
+                    "product_id": order.product_id
+                }
+                serializer = LabAppointmentCreateSerializer(data=data)
+                if not serializer.is_valid():
+                    data.pop("start_date")
+                    data.pop("start_time")
+                    data.pop("fees")
+            orders.append(data)
+        return Response(orders)
