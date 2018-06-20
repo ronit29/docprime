@@ -354,16 +354,15 @@ class LabAppointment(TimeStampedModel):
         appointment.save()
         return appointment
 
-    def action_rescheduled_patient(self, appointment, data):
-        appointment.status = self.RESCHEDULED_PATIENT
-        appointment.time_slot_start = data.get('time_slot_start')
-        appointment.agreed_price = data.get('agreed_price', appointment.agreed_price)
-        appointment.price = data.get('price', appointment.price)
-        appointment.deal_price = data.get('deal_price', appointment.deal_price)
-        appointment.effective_price = data.get('effective_price', appointment.effective_price)
+    def action_rescheduled_patient(self, data):
+        self.status = self.RESCHEDULED_PATIENT
+        self.time_slot_start = data.get('time_slot_start')
+        self.agreed_price = data.get('agreed_price', self.agreed_price)
+        self.price = data.get('price', self.price)
+        self.deal_price = data.get('deal_price', self.deal_price)
+        self.effective_price = data.get('effective_price', self.effective_price)
 
-        appointment.save()
-        return appointment
+        self.save()
 
     def action_accepted(self, appointment):
         appointment.status = self.ACCEPTED

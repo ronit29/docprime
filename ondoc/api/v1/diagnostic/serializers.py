@@ -230,7 +230,9 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             "deal_price": total_deal_price,
             "effective_price": effective_price,
             "time_slot_start": start_dt,
-            "profile_detail": profile_detail
+            "profile_detail": profile_detail,
+            "payment_status": OpdAppointment.PAYMENT_ACCEPTED,
+            "status": LabAppointment.BOOKED
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address")).first()
