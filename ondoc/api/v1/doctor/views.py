@@ -297,7 +297,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 product_id=product_id,
                 action=account_models.Order.OPD_APPOINTMENT_CREATE,
                 action_data=appointment_details,
-                amount=appointment_details.get("effective_price"),
+                amount=appointment_details.get("effective_price") - consumer_account.balance,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = appointment_details.get("effective_price") - balance

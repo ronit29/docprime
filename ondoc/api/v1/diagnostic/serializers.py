@@ -208,11 +208,13 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         self.num_appointment_validator(data)
         lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
         temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"), total_deal_price=Sum("deal_price"), total_agreed_price=Sum("agreed_price"))
-        total_deal_price = total_mrp = 0
+        total_deal_price = total_mrp = effective_price = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
             total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
             total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
+            effective_price = temp_lab_test[0].get("total_deal_price")
+            # TODO PM - call coupon function to calculate effective price
         start_dt = form_time_slot(data["start_date"], data["start_time"])
         profile_detail = {
             "name": data["profile"].name,
@@ -221,10 +223,12 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         }
         appointment_data = {
             "lab": data["lab"],
+            "user": self.context["request"].user,
             "profile": data["profile"],
             "price": total_mrp,
             "agreed_price": total_agreed,
             "deal_price": total_deal_price,
+            "effective_price": effective_price,
             "time_slot_start": start_dt,
             "profile_detail": profile_detail
         }

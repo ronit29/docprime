@@ -620,16 +620,16 @@ class OpdAppointment(TimeStampedModel):
         appointment.save()
         return appointment
 
-    def action_rescheduled_patient(self, appointment, data):
-        appointment.status = self.RESCHEDULED_PATIENT
-        appointment.time_slot_start = data.get('time_slot_start')
-        appointment.fees = data.get('fees', appointment.fees)
-        appointment.mrp = data.get('mrp', appointment.mrp)
-        appointment.discounted_price = data.get('discounted_price', appointment.discounted_price)
-        appointment.effective_price = data.get('effective_price', appointment.effective_price)
-        appointment.save()
+    def action_rescheduled_patient(self, data):
+        self.status = self.RESCHEDULED_PATIENT
+        self.time_slot_start = data.get('time_slot_start')
+        self.fees = data.get('fees', self.fees)
+        self.mrp = data.get('mrp', self.mrp)
+        self.discounted_price = data.get('discounted_price', self.discounted_price)
+        self.effective_price = data.get('effective_price', self.effective_price)
+        self.save()
 
-        return appointment
+        # return appointment
 
     def action_accepted(self, appointment):
         appointment.status = self.ACCEPTED
