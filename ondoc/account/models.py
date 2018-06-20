@@ -162,7 +162,7 @@ class ConsumerTransaction(TimeStampedModel):
     action_list = ["Cancellation", "Payment", "Refund", "Sale"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
-    product_id = models.SmallIntegerField(choices=PgTransaction.PRODUCT_IDS)
+    product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
     reference_id = models.IntegerField(blank=True, null=True)
     order_id = models.IntegerField(blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
