@@ -25,7 +25,7 @@ class Order(TimeStampedModel):
     product_list = ["Doctor Appointment", "Lab Appointment"]
     PRODUCT_IDS = list(enumerate(product_list, 1))
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
-    appointment_id = models.PositiveSmallIntegerField(blank=True, null=True)
+    reference_id = models.PositiveSmallIntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
     action_data = JSONField(blank=True, null=True)
     amount = models.FloatField(blank=True, null=True)
@@ -50,8 +50,9 @@ class PgTransaction(TimeStampedModel):
     TYPE_CHOICES = [(CREDIT, "Credit"), (DEBIT, "Debit")]
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
-    product = models.SmallIntegerField(choices=PRODUCT_IDS)
-    order = models.PositiveIntegerField()
+    product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
+    reference_id = models.PositiveIntegerField(blank=True, null=True)
+    order_id = models.PositiveIntegerField()
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
     payment_mode = models.CharField(max_length=50)
@@ -106,12 +107,21 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
+    def credit_schedule(self, data, amount):
+        self.balance += amount
+        action = ConsumerTransaction.RESCHEDULE_PAYMENT
+        tx_type = PgTransaction.CREDIT
+        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, tx_type)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+        self.save()
+
     def form_consumer_tx_data(self, data, amount, action, tx_type):
         consumer_tx_data = dict()
         consumer_tx_data['user'] = data['user']
         consumer_tx_data['product_id'] = data['product_id']
-        consumer_tx_data['reference_id'] = data['reference_id']
+        consumer_tx_data['reference_id'] = data.get('reference_id')
         consumer_tx_data['transaction_id'] = data.get('transaction_id')
+        consumer_tx_data['order_id'] = data.get('order_id')
         consumer_tx_data['type'] = tx_type
         consumer_tx_data['action'] = action
         consumer_tx_data['amount'] = amount
@@ -126,11 +136,12 @@ class ConsumerTransaction(TimeStampedModel):
     PAYMENT = 1
     REFUND = 2
     SALE = 3
+    RESCHEDULE_PAYMENT = 4
     action_list = ["Cancellation", "Payment", "Refund", "Sale"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=PgTransaction.PRODUCT_IDS)
-    reference_id = models.IntegerField()
+    reference_id = models.IntegerField(blank=True, null=True)
     order_id = models.IntegerField(blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
     # pg_transaction = models.ForeignKey(PgTransaction, blank=True, null=True, on_delete=models.SET_NULL)

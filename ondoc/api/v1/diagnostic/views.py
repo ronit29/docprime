@@ -279,11 +279,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp["status"] = 1
             resp["data"] = lab_appointment_data
         else:
+            appointment_details["effective_price"] = effective_price
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.LAB_APPOINTMENT_CREATE,
                 action_data=appointment_details,
-                amount=effective_price,
+                amount=effective_price - balance,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = effective_price - balance
@@ -324,7 +325,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         return details
 
-
     def payment_retry(self, request, pk=None):
         queryset = LabAppointment.objects.filter(pk=pk)
         payment_response = dict()
@@ -333,11 +333,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             payment_response = self.payment_details(request, serializer_data.data, 1)
         return Response(payment_response)
 
-
     def update(self, request, pk):
         data = request.data
         lab_appointment_obj = get_object_or_404(LabAppointment, pk=pk)
-        # lab_appointment_obj = LabAppointment.objects.get(pk=pk)
         serializer = LabAppointmentUpdateSerializer(lab_appointment_obj, data=data,
                                                     context={'lab_id': lab_appointment_obj.lab})
         serializer.is_valid(raise_exception=True)

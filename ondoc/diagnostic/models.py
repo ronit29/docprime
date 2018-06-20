@@ -324,6 +324,7 @@ class LabAppointment(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
     lab_test = models.ManyToManyField(AvailableLabTest)
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     profile_detail = JSONField(blank=True, null=True)
     status = models.PositiveSmallIntegerField(default=CREATED)
     price = models.FloatField(default=0)  # This is mrp
@@ -353,11 +354,14 @@ class LabAppointment(TimeStampedModel):
         appointment.save()
         return appointment
 
-    def action_rescheduled_patient(self, appointment, validated_data):
-        from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
+    def action_rescheduled_patient(self, appointment, data):
         appointment.status = self.RESCHEDULED_PATIENT
-        appointment.time_slot_start = CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
-                                                                                     validated_data.get("start_time"))
+        appointment.time_slot_start = data.get('time_slot_start')
+        appointment.agreed_price = data.get('agreed_price', appointment.agreed_price)
+        appointment.price = data.get('price', appointment.price)
+        appointment.deal_price = data.get('deal_price', appointment.deal_price)
+        appointment.effective_price = data.get('effective_price', appointment.effective_price)
+
         appointment.save()
         return appointment
 

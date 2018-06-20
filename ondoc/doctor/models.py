@@ -618,36 +618,18 @@ class OpdAppointment(TimeStampedModel):
     def action_rescheduled_doctor(self, appointment):
         appointment.status = self.RESCHEDULED_DOCTOR
         appointment.save()
-        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-        #
-        # data = dict()
-        # data["order"] = self.id
-        # data["user"] = self.user
-        # data["product"] = 1
-        #
-        # cancel_amount = self.get_cancel_amount(data)
-        # consumer_account.credit_cancellation(data, cancel_amount)
         return appointment
 
-    def action_rescheduled_patient(self, appointment, validated_data):
-        from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
-        appointment.status = self.RESCHEDULED_PATIENT
-        appointment.time_slot_start = CreateAppointmentSerializer.form_time_slot(validated_data.get("start_date"),
-                                                                                     validated_data.get("start_time"))
-        appointment.save()
+    def action_rescheduled_patient(self, data):
+        self.status = self.RESCHEDULED_PATIENT
+        self.time_slot_start = data.get('time_slot_start')
+        self.fees = data.get('fees', self.fees)
+        self.mrp = data.get('mrp', self.mrp)
+        self.discounted_price = data.get('discounted_price', self.discounted_price)
+        self.effective_price = data.get('effective_price', self.effective_price)
+        self.save()
 
-        # consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
-        # consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-        #
-        # data = dict()
-        # data["order"] = self.id
-        # data["user"] = self.user
-        # data["product"] = 1
-        #
-        # cancel_amount = self.get_cancel_amount(data)
-        # consumer_account.credit_cancellation(data, cancel_amount)
-        return appointment
+        # return appointment
 
     def action_accepted(self, appointment):
         appointment.status = self.ACCEPTED

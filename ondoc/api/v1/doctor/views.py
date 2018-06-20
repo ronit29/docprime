@@ -292,7 +292,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 product_id=product_id,
                 action=account_models.Order.OPD_APPOINTMENT_CREATE,
                 action_data=appointment_details,
-                amount=appointment_details.get("effective_price"),
+                amount=appointment_details.get("effective_price") - consumer_account.balance,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = appointment_details.get("effective_price") - balance
@@ -318,8 +318,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
             pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
             pgdata['checkSum'] = ''
-            pgdata['appointmentId'] = ""
-            pgdata['order_id'] = order_id
+            pgdata['referenceId'] = ""
+            pgdata['orderId'] = order_id
             if user_profile:
                 pgdata['name'] = user_profile.name
             else:
