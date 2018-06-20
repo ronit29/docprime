@@ -87,7 +87,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     start_time = serializers.FloatField()
     end_date = serializers.CharField(required=False)
     end_time = serializers.FloatField(required=False)
-    # time_slot_start = serializers.DateTimeField()
+    time_slot_start = serializers.DateTimeField(required=False)
     # time_slot_end = serializers.DateTimeField()
 
     def validate(self, data):
@@ -96,7 +96,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
         MAX_APPOINTMENTS_ALLOWED = 3
         MAX_FUTURE_DAY = 7
         request = self.context.get("request")
-        time_slot_start = self.form_time_slot(data.get('start_date'), data.get('start_time'))
+        time_slot_start = (self.form_time_slot(data.get('start_date'), data.get('start_time'))
+                           if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         time_slot_end = None
         if data.get('end_date') and data.get('end_time'):
