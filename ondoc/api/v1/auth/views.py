@@ -135,15 +135,12 @@ class UserViewset(GenericViewSet):
         data = serializer.validated_data
         phone_number = data['phone_number']
         user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
-        doctor_list = [user.doctor.id]
-
         if not user:
             doctor = DoctorMobile.objects.get(number=phone_number, is_primary=True).doctor
             user = User.objects.create(phone_number=data['phone_number'], is_phone_number_verified=True, user_type=User.DOCTOR)
-            doctor_list = [user.doctor.id]
             doctor.user = user
             doctor.save()
-
+        doctor_list = [user.doctor.id]
         token = Token.objects.get_or_create(user=user)
         pem_obj = DoctorPermission(doctor_list, request)
         pem_obj.create_permission()
