@@ -280,6 +280,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp["data"] = lab_appointment_data
         else:
             appointment_details["effective_price"] = effective_price
+            account_models.Order.disable_pending_orders(appointment_details, product_id,
+                                                        account_models.Order.LAB_APPOINTMENT_CREATE)
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.LAB_APPOINTMENT_CREATE,

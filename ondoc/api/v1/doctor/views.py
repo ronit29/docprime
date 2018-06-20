@@ -278,16 +278,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp["status"] = 1
             resp["data"] = opd_seriailizer.data
         else:
-            account_models.Order.objects.filter(
-                action_data__doctor=appointment_details.get("doctor"),
-                action_data__hospital=appointment_details.get("hospital"),
-                action_data__profile=appointment_details.get("profile"),
-                action_data__user=appointment_details.get("user"),
-                product_id=product_id,
-                is_viewable=True,
-                payment_status=account_models.Order.PAYMENT_PENDING,
-                action=account_models.Order.OPD_APPOINTMENT_CREATE,
-            ).update(is_viewable=False)
+            account_models.Order.disable_pending_orders(appointment_details, product_id,
+                                                        account_models.Order.OPD_APPOINTMENT_CREATE)
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.OPD_APPOINTMENT_CREATE,

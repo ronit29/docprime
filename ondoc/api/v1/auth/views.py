@@ -880,7 +880,7 @@ class OrderHistoryViewSet(GenericViewSet):
         for order in Order.objects.filter(action_data__user=request.user.id, is_viewable=True,
                                           payment_status=Order.PAYMENT_PENDING):
             action_data = order.action_data
-            if order.product_id == 1:
+            if order.product_id == Order.DOCTOR_PRODUCT_ID:
                 data = {
                     "doctor": action_data.get("doctor"),
                     "hospital": action_data.get("hospital"),
@@ -900,7 +900,7 @@ class OrderHistoryViewSet(GenericViewSet):
                     data.pop("start_date")
                     data.pop("start_time")
                     data.pop("fees")
-            elif order.product_id == 2:
+            elif order.product_id == Order.LAB_PRODUCT_ID:
                 data = {
                     "lab": action_data.get("lab"),
                     "test_ids": action_data.get("test_ids"),

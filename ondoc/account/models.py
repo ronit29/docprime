@@ -20,10 +20,9 @@ class Order(TimeStampedModel):
                       (LAB_APPOINTMENT_CREATE, "Lab Create"),
                       (LAB_APPOINTMENT_RESCHEDULE, "Lab Reschedule"),
                       )
-    DOCTOR_APPOINTMENT = 1
-    LAB_APPOINTMENT = 2
-    product_list = ["Doctor Appointment", "Lab Appointment"]
-    PRODUCT_IDS = list(enumerate(product_list, 1))
+    DOCTOR_PRODUCT_ID = 1
+    LAB_PRODUCT_ID = 2
+    PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID")]
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
     reference_id = models.PositiveSmallIntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
@@ -36,6 +35,31 @@ class Order(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.id)
 
+    @classmethod
+    def disable_pending_orders(cls, appointment_details, product_id, action):
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            Order.objects.filter(
+                action_data__doctor=appointment_details.get("doctor"),
+                action_data__hospital=appointment_details.get("hospital"),
+                action_data__profile=appointment_details.get("profile"),
+                action_data__user=appointment_details.get("user"),
+                product_id=product_id,
+                is_viewable=True,
+                payment_status=Order.PAYMENT_PENDING,
+                action=action,
+            ).update(is_viewable=False)
+        elif product_id == Order.LAB_PRODUCT_ID:
+            Order.objects.filter(
+                action_data__lab=appointment_details.get("doctor"),
+                # action_data__test_ids=appointment_details.get("test_ids"),
+                action_data__profile=appointment_details.get("profile"),
+                action_data__user=appointment_details.get("user"),
+                product_id=product_id,
+                is_viewable=True,
+                payment_status=Order.PAYMENT_PENDING,
+                action=action,
+            ).update(is_viewable=False)
+
     class Meta:
         db_table = "order"
 
@@ -43,14 +67,12 @@ class Order(TimeStampedModel):
 class PgTransaction(TimeStampedModel):
     DOCTOR_APPOINTMENT = 1
     LAB_APPOINTMENT = 2
-    product_list = ["Doctor Appointment", "Lab Appointment"]
-    PRODUCT_IDS = list(enumerate(product_list, 1))
     CREDIT = 0
     DEBIT = 1
     TYPE_CHOICES = [(CREDIT, "Credit"), (DEBIT, "Debit")]
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
-    product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
+    product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
     reference_id = models.PositiveIntegerField(blank=True, null=True)
     order_id = models.PositiveIntegerField()
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
