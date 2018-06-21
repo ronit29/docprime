@@ -512,8 +512,13 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
     # permission_classes = (IsAuthenticated, DoctorPermission,)
 
     def list(self, request, *args, **kwargs):
-        medical_conditions = models.MedicalCondition.objects.all().values("id", "name")
-        specializations = models.Specialization.objects.all().values("id", "name")
+        name = request.query_params.get("name")
+        if not name:
+            return Response({"conditions": [], "specializations": []})
+        medical_conditions = models.MedicalCondition.objects.filter(
+            name__icontains=name).values("id", "name")[:5]
+        specializations = models.Specialization.objects.filter(
+            name__icontains=name).values("id", "name")[:5]
         return Response({"conditions": medical_conditions, "specializations": specializations})
 
 
