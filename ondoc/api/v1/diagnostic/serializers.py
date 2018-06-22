@@ -11,6 +11,7 @@ from collections import OrderedDict
 import datetime
 import pytz
 import json
+import decimal
 
 utc = pytz.UTC
 User = get_user_model()
@@ -100,14 +101,26 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 class AjaxAvailableLabTestSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=False)
     mrp = serializers.DecimalField(max_digits=10, decimal_places=2)
-    agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     custom_agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
-    deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    # deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     custom_deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    # agreed_price = serializers.SerializerMethodField('get_calculated_agreed_price')
+
+    #
+    # def get_calculated_agreed_price(self, obj):
+    #     if obj.test.test_type == LabTest.RADIOLOGY:
+    #         agreed_percent = obj.lab.radiology_agreed_price_percent if obj.lab.radiology_agreed_price_percent else None
+    #     else:
+    #         agreed_percent = obj.lab.pathology_agreed_price_percent if obj.lab.pathology_agreed_price_percent else None
+    #     mrp = decimal.Decimal(obj.mrp)
+    #     if mrp:
+    #         return mrp * (agreed_percent / 100)
+    #     else:
+    #         return None
 
     class Meta:
         model = AvailableLabTest
-        fields = ('id', 'lab', 'enabled', 'test', 'mrp', 'agreed_price', 'custom_agreed_price', 'deal_price', 'custom_deal_price')
+        fields = ('id', 'lab', 'enabled', 'test', 'mrp', 'custom_agreed_price', 'custom_deal_price')
 
 
 class LabCustomSerializer(serializers.Serializer):

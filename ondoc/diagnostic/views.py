@@ -10,7 +10,7 @@ from django.http import HttpResponseRedirect
 from django_tables2 import RequestConfig
 from ondoc.api.v1.diagnostic.serializers import AjaxAvailableLabTestSerializer
 from django.contrib.admin.views.decorators import staff_member_required
-
+import decimal
 
 
 class LabTestAutocomplete(autocomplete.Select2QuerySetView):
@@ -43,16 +43,44 @@ def availablelabtestajaxsave(request):
         if serialized_data.is_valid():
             data = serialized_data.validated_data
             id = data.get('id')
+            data['agreed_price'] = get_calculated_agreed_price(data)
+            data['deal_price'] = get_calculated_deal_price(data)
             if id:
                 record = AvailableLabTest.objects.filter(id=id)
                 if record:
                     record.update(**data)
-                    return JsonResponse({'success': id})
+                    return JsonResponse({'success': id, 'agreed_price': data['agreed_price'], 'deal_price': data['deal_price']})
             else:
-                new_record = serialized_data.save()
-                return JsonResponse({'success': new_record.id})
+                new_record = AvailableLabTest.objects.create(**data)
+                return JsonResponse({'success': new_record.id, 'agreed_price': data['agreed_price'], 'deal_price': data['deal_price']})
     else:
         return JsonResponse({'error': "Invalid Request"})
+
+
+def get_calculated_agreed_price(obj):
+    if obj.get('test').test_type == LabTest.RADIOLOGY:
+        agreed_percent = obj.get('lab').radiology_agreed_price_percent if obj.get('lab').radiology_agreed_price_percent else None
+    else:
+        agreed_percent = obj.get('lab').pathology_agreed_price_percent if obj.get('lab').pathology_agreed_price_percent else None
+    mrp = decimal.Decimal(obj.get('mrp'))
+    if agreed_percent is not None:
+        price = mrp * (agreed_percent / 100)
+        return round(price, 2)
+    else:
+        return None
+
+
+def get_calculated_deal_price(obj):
+    if obj.get('test').test_type == LabTest.RADIOLOGY:
+        deal_percent = obj.get('lab').radiology_deal_price_percent if obj.get('lab').radiology_deal_price_percent else None
+    else:
+        deal_percent = obj.get('lab').pathology_deal_price_percent if obj.get('lab').pathology_deal_price_percent else None
+    mrp = decimal.Decimal(obj.get('mrp'))
+    if deal_percent is not None:
+        price = mrp * (deal_percent / 100)
+        return round(price, 2)
+    else:
+        return None
 
 
 class CheckBoxColumnWithName(tables.CheckBoxColumn):
@@ -63,9 +91,7 @@ class CheckBoxColumnWithName(tables.CheckBoxColumn):
 
 class LabTestTable(tables.Table):
     MRP_TEMPLATE = '''<input disabled id="mrp" class="mrp input-sm" maxlength="10" name="mrp" type="text" value={{ value|default_if_none:"" }} >'''
-    AGREED_TEMPLATE = '''<input disabled  class="agreed_price input-sm" maxlength="10" name="agreed_price" type="text" value={{ value|default_if_none:"" }} >'''
     CUSTOM_AGREED_TEMPLATE = '''<input disabled  class="custom_agreed_price input-sm" maxlength="10" name="custom_agreed_price" type="text" value={{ value|default_if_none:"" }} >'''
-    DEAL_TEMPLATE = '''<input disabled  class="deal_price input-sm"  maxlength="10" name="deal_price" type="text" value={{ value|default_if_none:"" }} >'''
     CUSTOM_DEAL_TEMPLATE = '''<input disabled  class="custom_deal_price input-sm"  maxlength="10" name="custom_deal_price" type="text" value={{ value|default_if_none:"" }} >'''
 
     id = tables.Column(attrs={'td': {'class': 'hidden'}, 'th': {'class': 'hidden'}},
@@ -75,9 +101,9 @@ class LabTestTable(tables.Table):
                            orderable=False)
     enabled = CheckBoxColumnWithName(verbose_name="Enabled", accessor="enabled")
     mrp = tables.TemplateColumn(MRP_TEMPLATE)
-    agreed_price = tables.TemplateColumn(AGREED_TEMPLATE)
+    agreed_price = tables.Column()
     custom_agreed_price = tables.TemplateColumn(CUSTOM_AGREED_TEMPLATE)
-    deal_price = tables.TemplateColumn(DEAL_TEMPLATE)
+    deal_price = tables.Column()
     custom_deal_price = tables.TemplateColumn(CUSTOM_DEAL_TEMPLATE)
     edit = tables.TemplateColumn('<a class="edit-row">Edit</a><a class="save-row hidden">Save</a>',
                                  verbose_name=u'Edit',
