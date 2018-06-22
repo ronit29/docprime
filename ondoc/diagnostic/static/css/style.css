@@ -1,0 +1,41 @@
+/* For Firefox */
+input[type='number'] {
+    -moz-appearance:textfield;
+}
+/* Webkit browsers like Safari and Chrome */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.form-horizontal{
+
+   border-bottom: 0.8px solid #b6b4b4;
+   padding-top: 12px;
+}
+.form-horizontal, .control-label{
+    text-align: left !important;
+}
+.panel-heading{
+   background-color:#78aec8 !important;
+}
+.test_margin{
+  margin-bottom: 20px;
+}
+.save_ajax_wrap{
+   width: 60%;
+}
+
+.remove_ajax_wrap{
+   width: 60%;
+}
+.status_error{
+  color: red;
+}
+.lab_form_submit{
+  margin-top: 35px;
+  margin-left: 15px;
+}
+.cust-input{
+    width:70%;
+}

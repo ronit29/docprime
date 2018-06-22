@@ -82,6 +82,9 @@ THIRD_PARTY_APPS = (
     'crispy_forms',
     'corsheaders',
     'import_export',
+    'dal',
+    'dal_select2',
+    'django_tables2'
 )
 
 LOCAL_APPS = (
