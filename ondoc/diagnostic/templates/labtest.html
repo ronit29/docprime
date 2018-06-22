@@ -1,0 +1,251 @@
+{% extends "admin/base_site.html" %}
+
+{% load i18n admin_urls static admin_modify %}
+{% load crispy_forms_tags %}
+{% load staticfiles %}
+{% load render_table from django_tables2 %}
+
+{% block branding %}
+    <h1 id="site-name"><a href="/admin/"> {% trans 'Ondoc CRM' %} </a></h1>
+{% endblock %}
+
+
+{% block extrahead %}{{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <script type="text/javascript" src="{% url 'admin:jsi18n' %}"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" type="text/css">
+    <link href="https://fonts.googleapis.com/css?family=Quicksand:500,700" rel="stylesheet">
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js" integrity="sha384-3ceskX3iaEnIogmQchP8opvBy3Mi7Ce34nWjpBIwVTHfGYWQS9jwHDVRnpKKHJg7" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+    {{ media }}
+
+{% endblock %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}">{% endblock %}
+
+{% block coltype %}colM{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% endblock %}
+
+{% if not is_popup %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+</div>
+{% endblock %}
+{% endif %}
+
+{% block content %}
+<div style='padding:40px 0 0 0'>
+
+     <div class="panel panel-default">
+        <div class="panel-heading">
+           Lab Tests
+        </div>
+        <div class="panel-body">
+            <form action="/labmodel_form/" method="post" id="lab_model_form" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% crispy form %}
+                <input type="hidden" value="{{ id }}" id="lab_id" name="id" class="lab_id_pk"/>
+                <!--<input type="submit" value="Submit" class="btn btn-primary lab_form_submit">-->
+                <div class="form-group">
+                    <div class="lab_form_submit">
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+     </div>
+
+     <div class="panel panel-default panel_formsets">
+         <div class="panel-heading">
+             <span>Test</span>
+         </div>
+         <div class="panel-body available_formsets">
+            {% render_table labtesttable %}
+         </div>
+         <div class="empty_form" style="display:none">
+             <table>
+               <tbody>
+                <tr class="even">
+                    <td class="hidden id"></td>
+                    <td class="enabled">
+                        <input class="enabled" type="checkbox" />
+                    </td>
+                    <td class="test"></td>
+                    <td class="mrp">
+                        <input class="mrp" type="text" name="mrp" />
+                    </td>
+                    <td class="agreed_price">
+                        <input class="agreed_price" type="text" name="agreed_price" />
+                    </td>
+                    <td class="custom_agreed_price">
+                        <input class="custom_agreed_price"  type="text" name="custom_agreed_price" >
+                    </td>
+                    <td class="deal_price">
+                        <input class="deal_price" type="text" name="deal_price" />
+                    </td>
+                    <td class="custom_deal_price">
+                        <input class="custom_deal_price"  type="text" name="custom_deal_price" >
+                    </td>
+                    <td class="edit">
+                        <a class="edit-row hidden">Edit</a><a class="save-row">Save</a>
+                    </td>
+                    <td class="hidden testid"></td>
+                </tr>
+               </tbody>
+             </table>
+                    <!--<span class="status"></span>-->
+          </div>
+     </div>
+</div>
+
+    {% block admin_change_form_document_ready %}
+         <script>
+         function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = jQuery.trim(cookies[i]);
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+          }
+          var csrftoken = getCookie('csrftoken');
+          function csrfSafeMethod(method) {
+                return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+           }
+           $.ajaxSetup({
+                beforeSend: function(xhr, settings) {
+                    if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                        xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                    }
+                }
+            });
+
+            <!--ROW EDIT-->
+            $('body').on('click','.edit-row',function(e){
+                $(this).addClass('hidden')
+                $(this).siblings('.save-row').removeClass('hidden')
+                $(this).closest('tr').find('input:disabled').removeAttr('disabled')
+            })
+
+
+            <!--ROW APPEND-->
+            jQuery('select[name=lab-lab_test]').change(function() {
+                jQuery('span.status_error').remove();
+                var selected_test_id = this.value;
+                var exists = 0;
+                jQuery('.table-container tbody tr').each(function (){
+                   var testid_td = jQuery(this).find('.testid');
+                   if(selected_test_id == testid_td.html()){
+                        exists = 1;
+                        jQuery('#div_id_lab-lab_test div.controls').after("<span class='status_error col-md-2'>LabTest Exists</span>");
+                        return false;
+                   }
+                });
+                if(exists != 1) {
+                    new_form = jQuery('div .empty_form');
+                    new_form_html = new_form.find('tbody').html();
+                    jQuery('.panel_formsets').find('.panel-body .table-container tbody').prepend(new_form_html);
+                    var test_text =  jQuery('select[name=lab-lab_test] option:selected').text()
+                    jQuery('.panel_formsets').find('.table-container tbody tr:first .test').html(test_text);
+                    jQuery('.panel_formsets').find('.table-container tbody tr:first .testid').html(selected_test_id);
+                }
+            });
+
+            <!--AGREED PRICE UPDATE-->
+            jQuery(".table-container").on("change", "input.mrp",function(){
+                 var mrp_val = jQuery(this).val();
+                 var dec = parseFloat(mrp_val).toFixed(2);
+
+                 console.log(dec);
+                 var agreed_field = jQuery(this).closest('input.agreed_price');
+             });
+
+            <!--AJAX REQUEST-->
+            jQuery(".table-container").on("click", ".save-row",function(){
+                 var ajax_submit_button = this;
+                 var tr = jQuery(this).closest('tr');
+                  tr.find('td .mrp').css('border', '1px solid #ccc');
+                  tr.find('td .agreed_price').css('border', '1px solid #ccc');
+                  tr.find('td .deal_price').css('border', '1px solid #ccc');
+                  tr.find('td .save-row').css('color', '');
+                 var lab = jQuery('input[id=lab_id]').val();
+                 var testid = tr.find('td.testid').html();
+                 var enabled = tr.find('td .enabled').is(":checked");
+                 var mrp = tr.find('td .mrp').val();
+                 var agreed_price = tr.find('td .agreed_price').val();
+                 var custom_agreed_price = tr.find('td .custom_agreed_price').val();
+                 var deal_price = tr.find('td .deal_price').val();
+                 var custom_deal_price = tr.find('td .custom_deal_price').val();
+                 var id = tr.find('td.id').html();
+                 if(typeof id == 'undefined')
+                 {
+                   id = ''
+                 }
+                 var test = null;
+                 if(agreed_price !== 'undefined' && agreed_price !== null && agreed_price !== ''){
+                    if($.isNumeric(agreed_price) == false){
+                       tr.find('td .agreed_price').css({ "border": '#FF0000 1.5px solid'});
+                        return false;
+                    }
+                 }
+                 if(custom_agreed_price !== 'undefined' && custom_agreed_price !== null && custom_agreed_price !== ''){
+                    if($.isNumeric(custom_agreed_price) == false){
+                       tr.find('td .custom_agreed_price').css({ "border": '#FF0000 1.5px solid'});
+                        return false;
+                    }
+                 }
+                 if(deal_price !== 'undefined' && deal_price !== null && deal_price !== ''){
+                    if($.isNumeric(deal_price) == false){
+                        tr.find('td .deal_price').css({ "border": '#FF0000 1.5px solid'});
+                        return false;
+                    }
+                 }
+                 if(custom_deal_price !== 'undefined' && custom_deal_price !== null && custom_deal_price !== ''){
+                    if($.isNumeric(custom_deal_price) == false){
+                        tr.find('td .custom_deal_price').css({ "border": '#FF0000 1.5px solid'});
+                        return false;
+                    }
+                 }
+
+                 if ((typeof testid !== 'undefined' && testid !== null && testid !== '') && (typeof mrp !== 'undefined' && mrp !== null && mrp !== '' && $.isNumeric(mrp)))
+                 {
+                     var dataString = 'id='+id +'&enabled='+enabled + '&lab='+lab + '&test='+testid + '&mrp='+mrp + '&agreed_price='+agreed_price + '&custom_agreed_price='+custom_agreed_price + '&deal_price='+deal_price+ '&custom_deal_price='+custom_deal_price;
+                      jQuery.ajax({
+                            data: dataString,
+                            type: "POST",
+                            url:  '/labtest_ajax/',
+                            success: function(response) {
+                                if(response['success']){
+                                   $(ajax_submit_button).addClass('hidden');
+                                   $(ajax_submit_button).siblings('.edit-row').removeClass('hidden');
+                                   $(ajax_submit_button).closest('tr').find('input').attr("disabled", true);
+                                }
+                            },
+                            error: function (request, status, error) {
+                                tr.find('td .save-row').css({ "color": '#FF0000'});
+                            }
+                       });
+                 }
+                 else{
+                      tr.find('td .mrp').css({ "border": '#FF0000 1.3px solid'});
+                      return false;
+                 }
+             });
+         </script>
+    {% endblock %}
+
+{% endblock %}
+
+

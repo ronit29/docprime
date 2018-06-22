@@ -15,3 +15,5 @@ raven==6.8.0
 django-rest-swagger
 coreapi
 pika==0.11.2
+django-autocomplete-light
+django-tables2

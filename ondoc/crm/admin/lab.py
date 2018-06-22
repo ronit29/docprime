@@ -2,7 +2,6 @@ from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirec
 from django.conf.urls import url
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats
-from django.urls import include, path, reverse
 from django.utils.safestring import mark_safe
 from django.contrib.gis import forms
 from django.contrib.gis import admin
@@ -10,10 +9,9 @@ from django.contrib.admin import SimpleListFilter
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from django.db import models
-
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
-    LabManager,LabAccreditation, LabAward, LabCertification,
+    LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, LabTestSubType, LabTestSubTypeMapping)
 from .common import *
@@ -204,6 +202,12 @@ class LabForm(FormCleanMixin):
     onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
     # agreed_rate_list = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'application/pdf'}))
 
+    class Meta:
+        model = Lab
+        exclude = ('pathology_agreed_price_percent', 'pathology_deal_price_percent', 'radiology_agreed_price_percent',
+                   'radiology_deal_price_percent', )
+
+
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
         if data == '':
@@ -235,10 +239,20 @@ class LabCityFilter(SimpleListFilter):
         if self.value():
             return queryset.filter(city__iexact=self.value()).distinct()
 
+
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_display = ('name', 'updated_at','onboarding_status','data_status', 'list_created_by', 'get_onboard_link',)
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status','onboarding_status',LabCityFilter)
+    list_filter = ('data_status', 'onboarding_status',LabCityFilter)
+
+    readonly_fields = ('lab_test_form',)
+
+    def lab_test_form(self, instance):
+        if instance.id:
+            html = "<a target='_blank' href='/labtest/%s'>View</a>" % (instance.id)
+            return mark_safe(html)
+        else:
+            return ''
 
     def get_urls(self):
         urls = super().get_urls()
@@ -357,3 +371,5 @@ class LabSubTestTypeAdmin(VersionAdmin):
 
 class AvailableLabTestAdmin(VersionAdmin):
     search_fields = ['name']
+
+

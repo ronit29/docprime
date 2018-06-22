@@ -81,11 +81,33 @@ class LabModelSerializer(serializers.ModelSerializer):
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
     test_id = serializers.ReadOnlyField(source='test.id')
+    agreed_price = serializers.SerializerMethodField()
+    deal_price = serializers.SerializerMethodField()
+
+    def get_agreed_price(self, obj):
+        agreed_price = obj.agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
+        return agreed_price
+
+    def get_deal_price(self, obj):
+        deal_price = obj.deal_price if obj.custom_deal_price is None else obj.custom_deal_price
+        return deal_price
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', )
-        # exclude = ('lab', 'agreed_price', 'deal_price')
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled')
+
+
+class AjaxAvailableLabTestSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False)
+    mrp = serializers.DecimalField(max_digits=10, decimal_places=2)
+    agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    custom_agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    custom_deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+
+    class Meta:
+        model = AvailableLabTest
+        fields = ('id', 'lab', 'enabled', 'test', 'mrp', 'agreed_price', 'custom_agreed_price', 'deal_price', 'custom_deal_price')
 
 
 class LabCustomSerializer(serializers.Serializer):

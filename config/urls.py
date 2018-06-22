@@ -19,8 +19,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.conf import settings
 
-from ondoc import web
-
 # DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 additional_urls = [
@@ -41,13 +39,9 @@ else:
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # path('',include('ondoc.crm.urls', namespace='crm')),
+    path('', include('ondoc.diagnostic.urls', namespace='diagnostic')),
     path('', include('ondoc.web.urls', namespace='web')),
     path('onboard/',include('ondoc.onboard.urls', namespace='onboard')),
-    # path('doctors/', include('ondoc.doctor.urls')),
-    # path('auth/', include('ondoc.authentication.urls'))
-    # path('api/crm/', include('ondoc.crm.urls')),
-    # path('api/auth/', include('ondoc.authentication.urls')),
 ] + additional_urls + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:
