@@ -2,7 +2,7 @@
 {% load static %}
 
     {% block title_text %}
-		HOME
+		Home
 	{% endblock %}
     {% block page_css %}
 		<link rel="stylesheet" type="text/css" href="{% static 'web/css/home_doc.css' %}" >
@@ -62,7 +62,7 @@
 			<div class="container">
 				<div class="row footer-row">
 					<div class="col-12 col-sm-6 footer-col">
-						<p class="footer-text"><a href="{% url 'web:privacy_page' %}">Terms &amp; Conditions</a><span>|</span><a href="{% url 'web:careers_page' %}">Careers</a></p>
+						<p class="footer-text"><a href="{% url 'web:privacy_page' %}">Terms &amp; Conditions</a><span>|</span><a href="{% url 'web:careers_page' %}">Careers</a><span>|</span><a href="{% url 'web:media_page' %}">Media</a></p>
 					</div>
 					<div class="col-12 col-sm-6 footer-icons">
 						<a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="{% static 'web/images/forma-1.svg' %}" class="footer-icon"></a>

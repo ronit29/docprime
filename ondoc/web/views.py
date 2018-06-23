@@ -20,6 +20,9 @@ def index(request):
 def privacy_page(request):
     return render(request, 'privacy.html')
 
+def media_page(request):
+    return render(request, 'media.html')
+
 
 def careers_page(request):
     if request.method == "POST":

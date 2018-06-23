@@ -1,0 +1,188 @@
+{% extends "web_base.html" %}
+{% load static %}
+
+    {% block title_text %}
+        Media
+    {% endblock %}
+    {% block page_css %}
+        <link rel="stylesheet" type="text/css" href="{% static 'web/css/media.css' %}" >
+    {% endblock %}
+    {% block content %}
+	<div class="body-wrapper">
+		<nav class="navbar navbar-expand-sm header-nav">
+			<a class="navbar-brand" href="/">
+                <img src="{% static 'web/images/header-logo.png' %}" alt="Logo" class="logo">
+			</a>
+		</nav>
+		<div class="container">
+			<div class="row main-row">
+				<div class="col-12 col-lg-3">
+					<div class="sticky-div">
+						<div class="list-div d-none d-lg-block">
+							<ul class="list-options">
+								<li>
+									<p class="list-options-item selected-option">All Media</p>
+								</li>
+								<!-- <li>
+									<p class="list-options-item">News from Media</p>
+								</li>
+								<li>
+									<p class="list-options-item">Press Releases</p>
+								</li>
+								<li>
+									<p class="list-options-item">TV Commercials</p>
+								</li>
+								<li>
+									<p class="list-options-item">News in Generals</p>
+								</li> -->
+							</ul>
+						</div>
+						<div class="contact-div d-none d-lg-block">
+							<div class="contact-label-div">
+								<p class="contact-label">Contact Us</p>
+							</div>
+							<div class="contact-items-div">
+								<div class="contact-item">
+									<div class="contact-subitem">
+                                        <img src="{% static 'web/images/email-icon.svg' %}" class="contact-icon">
+									</div>
+									<div class="contact-subitem">
+										<p class="contact-text">media@docprime.com</p>
+									</div>
+								</div>
+								<div class="contact-item location-item">
+									<div class="contact-subitem location-subitem">
+                                        <img src="{% static 'web/images/shape-1.svg' %}" class="contact-icon">
+
+									</div>
+									<div class="contact-subitem">
+										<p class="contact-text">Plot no</p>
+										<p class="contact-text">119, Sector 44</p>
+										<p class="contact-text">Gurgaon - 122001</p>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="col-12 col-lg-6">
+					<div class="main-div-head">
+                        <img src="{% static 'web/images/newspaper.jpg' %}" alt="Newspaper">
+
+						<span>Press Releases</span>
+					</div>
+					<div class="main-div-card">
+						<p class="card-heading">Policybazaar.com to foray into healthcare and tech services</p>
+						<p class="card-date">30 March, 2018</p>
+						
+						<p class="card-content content-shown">Policybazaar.com, India's largest insurance website and comparison portal, is planning to foray into the healthcare technology and services space</p>
+						<p class="card-content content-hidden">The new platform will provide consumers with easy, online and free access to PolicyBazaar's empanelled top-notch doctors and medical consultants.To begin with, the company intends to partner with 100 hospitals and 20,000 doctors, diagnostic centres, and clinics by the end of March 2019.The healthcare vertical also plans to offer a huge array of healthcare services, which includes in-hospital concierge services for its health insurance customers.By doing this, Policybazaar.com wants to be with its customers at the moment of truth, which is at the time of claims.
+						"Our foray into the healthcare services space is in sync with the vision of expanding the social security net of India. With this venture, we seek to fulfill the need of providing quality and affordable healthcare of the burgeoning population at large by connecting the consumers with our in-house medical practitioners. The new portal will facilitate the creation of an inclusive healthcare system, which will eventually offer customised options for in-patient department insurance based on detailed analysis undertaken after studying consumer healthcare habits and patient's interactions with the doctors," said Yashish Dahiya, co-founder and CEO, Policybazaar.com.In the long run, PolicyBazaar.com wants to offer its customers a better and personalised claim and in-hospital experience.Policybazaar is also going to work with insurers to create a new category of health insurance for Out-patient expenses (OPD) and provide free online medical consultation to consumers over phone and chat.
+						Policybazaar.com is in discussions with insurance companies to offer a first of its kind OPD insurance product.
+						The company aims to offer 5 million OPD consultations by next FY.</p>
+
+						<div class="media-icons-div">
+							<a href="http://www.india.com/news/agencies/policybazaar-com-to-foray-into-healthcare-tech-service-space-3108739/" target="_blank">
+                            <img src="{% static 'web/images/ind-blwh.png' %}">
+                            </a>
+							<a href="http://www.abplive.in/business/policybazaar-com-to-foray-into-healthcare-and-tech-services-676864" target="_blank"><img src="{% static 'web/images/abp-blwh.png' %}"></a>
+							<a href="https://health.economictimes.indiatimes.com/news/health-it/policybazaar-com-to-foray-into-healthcare-tech/63577983" target="_blank"><img src="{% static 'web/images/et-blwh.png' %}"></a>
+							<a href="https://www.outlookindia.com/newsscroll/policybazaarcom-to-foray-into-healthcare-tech-service-space/1329181" target="_blank"><img src="{% static 'web/images/out-blwh.png' %}"></a>
+							<a href="https://www.deccanchronicle.com/business/companies/020418/policybazaarcom-to-foray-into-healthcare-technology.html" target="_blank"><img src="{% static 'web/images/dc-blwh.png' %}"></a>
+							<a href="https://www.gadgetsnow.com/tech-news/policybazaar-to-enter-healthcare-tech-and-services-space/articleshow/63265798.cms" target="_blank"><img src="{% static 'web/images/gn-blwh.png' %}"></a>
+						</div>
+					</div>
+					<div class="main-div-card">
+						<p class="card-heading">New venture promoted to offer free online & over phone medical consultations</p>
+						<p class="card-date">13 June, 2018</p>
+						
+						<p class="card-content content-shown">Yashish Dahiya, Co-founder & CEO, PolicyBazaar Group of Companies said: "We will be building a team of certified and quality medical professionals to give free online consultations to customers. This shall be supported by a robust offline network</p>
+						<p class="card-content content-hidden">AI will play a key role in helping us build this in scale and efficiency.ETechAces Marketing & Consulting Pvt. (ETechAces”), which owns India’s leading insurtech brand, PolicyBazaar.com(“PolicyBazaar”) and India’s leading lending marketplace, PaisaBazaar.com (“PaisaBazaar”), has floated another farm `Docprime' for foraying into the healthcare tech and service space.As part of its plans to capture the out of pocket healthcare market in India estimated at nearly $100+bn, the new venture  will provide free online and over phone medical consultations, to begin with. It aims to provide 1 million free medical consultations by March 2019 and reach the scale of 5 million by March 2020.
+ 						Speaking on the latest venture, Yashish Dahiya, Co-founder & CEO, PolicyBazaar Group of Companies said: "We will be building a team of certified and quality medical professionals to give free online consultations to customers. This shall be supported by a robust offline network. AI will play a key role in helping us build this in scale and efficiency. Our vision is to change customer behavior in the healthcare space by making the consumer shift to online medical consultation from offline by building an easy to use, convenient and trustworthy solution. We believe that healthcare space has huge potential to disrupt, and can follow the same growth trajectory as the digital insurance space which initially faced a similar kind of consumer inertia that this space faces."
+						India has one of the lowest ratios for a doctor per 1,000 people amongst the developing countries. Having a physical interaction with a medical practitioner is not only a time-consuming process but also an expensive one, especially in the private sector. Even though government hospitals and state-run health centers offer consultations either free of cost or at subsidized pricing, it's not easy to get an access to these services.</p>
+
+						<div class="media-icons-div">
+							<a href="http://www.asiainsurancepost.com/health/policybazaars-promoter-offer-free-online-medical-consultations" target="_blank"><img src="{% static 'web/images/asinsurance-blwh.png' %}"></a>
+						</div>
+					</div>
+				</div>
+				<div class="col-lg-3 col-12">
+					<div class="sticky-div">
+						<div class="twitter-feed">
+							<a class="twitter-timeline" href="https://twitter.com/DocPrimeindia?ref_src=twsrc%5Etfw">Tweets by TwitterDev</a> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+						</div>
+						<div class="facebook-feed">
+							<iframe src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2FDocPrimeIndia&tabs=timeline&width=340&height=500&small_header=true&adapt_container_width=true&hide_cover=true&show_facepile=true&appId" width="340" height="500" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowTransparency="true" allow="encrypted-media"></iframe>
+						</div>
+					</div>
+				</div>
+				<div class="col-12 col-lg-3 d-lg-none">
+					<div class="sticky-div">
+						<div class="contact-div">
+							<div class="contact-label-div">
+								<p class="contact-label">Contact Us</p>
+							</div>
+							<div class="contact-items-div">
+								<div class="contact-item">
+									<div class="contact-subitem">
+                                        <img src="{% static 'web/images/email-icon.svg' %}" class="contact-icon">
+
+									</div>
+									<div class="contact-subitem">
+										<p class="contact-text">media@docprime.com</p>
+									</div>
+								</div>
+								<div class="contact-item location-item">
+									<div class="contact-subitem location-subitem">
+										<img src="{% static 'web/images/shape-1.svg' %}" class="contact-icon">
+									</div>
+									<div class="contact-subitem">
+										<p class="contact-text">Plot no</p>
+										<p class="contact-text">119, Sector 44</p>
+										<p class="contact-text">Gurgaon - 122001</p>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<footer class="container-fluid footer">
+		<div class="container">
+			<div class="row footer-row">
+                    <div class="col-12 col-sm-6 footer-col">
+                        <p class="footer-text"><a href="{% url 'web:privacy_page' %}">Terms &amp; Conditions</a><span>|</span><a href="{% url 'web:careers_page' %}">Careers</a><span>|</span><a href="{% url 'web:media_page' %}">Media</a></p>
+                    </div>
+                <div class="col-12 col-sm-6 footer-icons">
+                    <a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="{% static 'web/images/forma-1.svg' %}" class="footer-icon"></a>
+                    <a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img src="{% static 'web/images/forma-2.svg' %}" class="footer-icon"></a>
+                    <a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img src="{% static 'web/images/forma-3.svg' %}" class="footer-icon"></a>
+                    <a href="https://twitter.com/DocPrimeindia" target="_blank"><img src="{% static 'web/images/forma-4.svg' %}" class="footer-icon"></a>
+                    <a href="https://www.linkedin.com/company/docprime/" target="_blank"><img src="{% static 'web/images/forma-5.svg' %}" class="footer-icon"></a>
+                </div>
+			
+			</div>
+		</div>
+	</footer>
+    {% block page_script %}
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script>
+	$('.read-more').click(function(){
+		$(this).parent().next().show();
+		$(this).hide();
+		$('.media-icons-div').show();
+	});
+
+	$('.read-less').click(function(){
+		$(this).parent().hide();
+		$(this).parent().prev().children('span').show();
+		$('.media-icons-div').hide();
+	});
+</script>
+
+     {% endblock %}
+     {% endblock %}
