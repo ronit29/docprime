@@ -8,6 +8,7 @@ from django.db.models import F
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 import decimal
+import math
 
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
@@ -41,13 +42,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     agreed_rate_list = models.FileField(upload_to='lab/docs',max_length=200, null=True, blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
-    pathology_agreed_price_percent = models.DecimalField(blank=True, null=True, default=None,max_digits=7,
+    pathology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None,max_digits=7,
                                                          decimal_places=2)
-    pathology_deal_price_percent = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+    pathology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
                                                        decimal_places=2)
-    radiology_agreed_price_percent = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+    radiology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
                                                          decimal_places=2)
-    radiology_deal_price_percent = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+    radiology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
                                                        decimal_places=2)
 
     def __str__(self):
@@ -58,36 +59,44 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
 
     def save(self, *args, **kwargs):
         self.clean()
-        if self.id:
+        if self.id is not None:
             id = self.id
-            if AvailableLabTest.objects.filter(lab=id).exists():
-                path_agreed_calc = None
-                if self.pathology_agreed_price_percent:
-                    path_agreed_price_prcnt = decimal.Decimal(self.pathology_agreed_price_percent)
-                    path_agreed_calc = F('mrp') * (path_agreed_price_prcnt / 100)
+            original = Lab.objects.get(pk=id)
 
-                path_deal_calc = None
-                if self.pathology_deal_price_percent:
-                    path_deal_price_prcnt = decimal.Decimal(self.pathology_deal_price_percent)
-                    path_deal_calc = F('mrp') * (path_deal_price_prcnt / 100)
+            path_agreed_calc = None
+            if self.pathology_agreed_price_percentage:
+                path_agreed_price_prcnt = decimal.Decimal(self.pathology_agreed_price_percentage)
+                path_agreed_calc = F('mrp') * (path_agreed_price_prcnt / 100)
 
-                rad_deal_calc = None
-                if self.radiology_deal_price_percent:
-                    rad_deal_price_prcnt = decimal.Decimal(self.radiology_deal_price_percent)
-                    rad_deal_calc = F('mrp') * (rad_deal_price_prcnt / 100)
+            path_deal_calc = None
+            if self.pathology_deal_price_percentage:
+                path_deal_price_prcnt = decimal.Decimal(self.pathology_deal_price_percentage)
+                path_deal_calc = (F('mrp') * (path_deal_price_prcnt / 100))
 
-                rad_agreed_calc = None
-                if self.radiology_agreed_price_percent:
-                    rad_agreed_price_prcnt = decimal.Decimal(self.radiology_agreed_price_percent)
-                    rad_agreed_calc = F('mrp') * (rad_agreed_price_prcnt / 100)
+            rad_agreed_calc = None
+            if self.radiology_agreed_price_percentage:
+                rad_agreed_price_prcnt = decimal.Decimal(self.radiology_agreed_price_percentage)
+                rad_agreed_calc = (F('mrp') * (rad_agreed_price_prcnt / 100))
 
+
+            rad_deal_calc = None
+            if self.radiology_deal_price_percentage:
+                rad_deal_price_prcnt = decimal.Decimal(self.radiology_deal_price_percentage)
+                rad_deal_calc = (F('mrp') * (rad_deal_price_prcnt / 100))
+
+
+            if not original.pathology_agreed_price_percentage==self.pathology_agreed_price_percentage \
+                or not original.pathology_deal_price_percentage==self.pathology_deal_price_percentage:
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.PATHOLOGY).\
-                    update(agreed_price=path_agreed_calc, deal_price=path_deal_calc)
+                    update(computed_agreed_price=path_agreed_calc, computed_deal_price=path_deal_calc)
+
+            if not original.radiology_agreed_price_percentage==self.radiology_agreed_price_percentage \
+                or not original.radiology_deal_price_percentage==self.radiology_deal_price_percentage:
 
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
-                    update(agreed_price=rad_agreed_calc, deal_price=rad_deal_calc)
+                    update(computed_agreed_price=rad_agreed_calc, computed_deal_price=rad_deal_calc)
 
         return super(Lab, self).save(*args, **kwargs)
 
@@ -348,9 +357,9 @@ class AvailableLabTest(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests')
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='availablelabs')
     mrp = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
-    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    computed_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     custom_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
-    deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    computed_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     custom_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     enabled = models.BooleanField(default=False)
 

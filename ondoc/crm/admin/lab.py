@@ -36,11 +36,13 @@ class LabTestResource(resources.ModelResource):
 
     class Meta:
         model = LabTest
+        import_id_fields = ('excel_id',)
 
     def before_save_instance(self, instance, using_transactions, dry_run):
-        instance.test_type = (LabTest.RADIOLOGY if instance.test_type.strip() == 'Radiology'
-                              else LabTest.PATHOLOGY) if instance.test_type else None
-        instance.is_package = (True if instance.is_package.strip() == "Yes" else False) if instance.is_package else False
+        instance.test_type = (LabTest.RADIOLOGY if instance.test_type.strip().lower() == 'radiology'
+                              else LabTest.PATHOLOGY if instance.test_type.strip().lower() == 'pathology'
+                              else None) if instance.test_type else None
+        instance.is_package = (True if instance.is_package.strip().lower() == "yes" else False) if instance.is_package else False
         instance.excel_id = instance.excel_id.strip() if instance.excel_id else ""
         instance.sub_type = instance.sub_type.strip().lower() if instance.sub_type else ""
         instance.name = instance.name.strip() if instance.name else ""
@@ -204,8 +206,8 @@ class LabForm(FormCleanMixin):
 
     class Meta:
         model = Lab
-        exclude = ('pathology_agreed_price_percent', 'pathology_deal_price_percent', 'radiology_agreed_price_percent',
-                   'radiology_deal_price_percent', )
+        exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
+                   'radiology_deal_price_percentage', )
 
 
     def clean_operational_since(self):

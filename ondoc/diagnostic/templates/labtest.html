@@ -15,9 +15,13 @@
     <script type="text/javascript" src="{% url 'admin:jsi18n' %}"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" type="text/css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+
     <link href="https://fonts.googleapis.com/css?family=Quicksand:500,700" rel="stylesheet">
     <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js" integrity="sha384-3ceskX3iaEnIogmQchP8opvBy3Mi7Ce34nWjpBIwVTHfGYWQS9jwHDVRnpKKHJg7" crossorigin="anonymous"></script>
     <script type="text/javascript" src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-3-typeahead/4.0.2/bootstrap3-typeahead.min.js"></script>
 
     {{ media }}
 
@@ -40,9 +44,9 @@
 {% block content %}
 <div style='padding:40px 0 0 0'>
 
-     <div class="panel panel-default">
+     <div class="panel panel-primary">
         <div class="panel-heading">
-           Lab Tests
+           {{ lab.name }}
         </div>
         <div class="panel-body">
             <form action="/labmodel_form/" method="post" id="lab_model_form" enctype="multipart/form-data">
@@ -52,7 +56,7 @@
                 <!--<input type="submit" value="Submit" class="btn btn-primary lab_form_submit">-->
                 <div class="form-group">
                     <div class="lab_form_submit">
-                        <button type="submit" class="btn btn-primary">Submit</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
                     </div>
                 </div>
             </form>
@@ -60,9 +64,10 @@
         </div>
      </div>
 
-     <div class="panel panel-default panel_formsets">
+     <div class="panel panel-primary panel_formsets">
          <div class="panel-heading">
-             <span>Test</span>
+            <input type="text"  class="typeahead form-control" autocomplete="off" data-provide="typeahead" placeholder="Search For Tests">
+
          </div>
          <div class="panel-body available_formsets">
             {% render_table labtesttable %}
@@ -88,7 +93,8 @@
                         <input class="custom_deal_price input-sm"  type="text" name="custom_deal_price" >
                     </td>
                     <td class="edit">
-                        <a class="edit-row hidden">Edit</a><a class="save-row">Save</a>
+                        <button class="edit-row btn btn-danger hidden">Edit</button>
+                        <button class="save-row btn btn-primary">Save</button>
                     </td>
                     <td class="hidden testid"></td>
                 </tr>
@@ -101,6 +107,25 @@
 
     {% block admin_change_form_document_ready %}
          <script>
+
+        $('.typeahead').typeahead({
+        source: function (query, process) {
+        return $.get('/labtestauto/', { query: query }, function (data) {
+            return process(data.results);
+                });
+            },
+        displayText: function(item)
+        {            
+            return item.text
+        },
+        afterSelect: function(item)
+        {
+            appendRow(item)
+        }
+
+        });
+    
+
          function getCookie(name) {
             var cookieValue = null;
             if (document.cookie && document.cookie !== '') {
@@ -137,7 +162,7 @@
 
 
             <!--ROW APPEND-->
-            jQuery('select[name=lab-lab_test]').change(function() {
+/*            jQuery('select[name=lab-lab_test]').change(function() {
                 jQuery('span.status_error').remove();
                 var selected_test_id = this.value;
                 var exists = 0;
@@ -158,18 +183,110 @@
                     jQuery('.panel_formsets').find('.table-container tbody tr:first .testid').html(selected_test_id);
                 }
             });
+*/
+            function appendRow(test)
+            {
+                jQuery('span.status_error').remove();
+                $('tr').removeClass('danger');
+                var selected_test_id = test.id;
+                var selected_test_name = test.text;
+                var exists = 0;
+
+                var existing = $('.table-container tbody tr[data-test-id='+selected_test_id+']')
+                if (existing.length>0)
+                {
+                    existing.addClass('danger')[0].scrollIntoView()
+                }    
+/*                jQuery('.table-container tbody tr').each(function (){
+                   var testid_td = jQuery(this).find('.testid');
+                   if(selected_test_id == testid_td.html()){
+                        exists = 1;
+                        jQuery('#div_id_lab-lab_test div.controls').after("<span class='status_error col-md-2'>LabTest Exists</span>");
+                        return false;
+                   }
+                });*/
+                else {                
+                    new_form = jQuery('div .empty_form');
+                    new_form_html = new_form.find('tbody').html();
+                    elem = $(new_form_html)
+                    $(elem).find('.test').html(selected_test_name)
+                    $(elem).find('.testid').html(selected_test_id)
+                    $(elem).attr('data-test-id',selected_test_id)
+                    $(elem).find('.enabled input').prop('checked',true)
+                    jQuery('.panel_formsets').find('.panel-body .table-container tbody').prepend(elem);
+/*
+                    jQuery('.panel_formsets').find('.panel-body .table-container tbody').prepend(new_form_html);
+                    //var test_text =  jQuery('select[name=lab-lab_test] option:selected').text()
+                    jQuery('.panel_formsets').find('.table-container tbody tr:first .test').html(selected_test_name);
+                    jQuery('.panel_formsets').find('.table-container tbody tr:first .testid').html(selected_test_id);
+                    jQuery('.panel_formsets').find('.table-container tbody tr:first .enabled input').prop('checked', true);
+*/                }
+            }
 
             <!--AGREED PRICE UPDATE-->
-            jQuery(".table-container").on("change", "input.mrp",function(){
+/*            jQuery(".table-container").on("change", "input.mrp",function(){
                  var mrp_val = jQuery(this).val();
                  var dec = parseFloat(mrp_val).toFixed(2);
 
                  console.log(dec);
                  var agreed_field = jQuery(this).closest('input.agreed_price');
              });
-
+*/
             <!--AJAX REQUEST-->
-            jQuery(".table-container").on("click", ".save-row",function(){
+
+            $(".table-container").on("click", ".save-row",function(){
+                var tr = $(this).closest('tr');
+                var ajax_submit_button = this;
+
+                var lab = jQuery('input[id=lab_id]').val();
+                
+                var enabled = tr.find('td .enabled').is(":checked");
+                var mrp = tr.find('td .mrp').val();
+                //var agreed_price = tr.find('td.agreed_price').html();
+                var custom_agreed_price = tr.find('td .custom_agreed_price').val();
+                //var deal_price = tr.find('td.deal_price').html();
+                var custom_deal_price = tr.find('td .custom_deal_price').val();
+                var id = tr.attr('data-id');
+                var testid = tr.attr('data-test-id');
+                if(typeof id == 'undefined')
+                   {
+                      id = ''
+                   }
+
+
+
+                if ((typeof testid !== 'undefined' && testid !== null && testid !== '') && (typeof mrp !== 'undefined' && mrp>0 && $.isNumeric(mrp)))
+                 {
+                     $(ajax_submit_button).addClass('hidden');
+                     $(ajax_submit_button).siblings('.edit-row').removeClass('hidden');
+                     $(ajax_submit_button).closest('tr').find('input').attr("disabled", true);
+
+                     var dataString = 'id='+id +'&enabled='+enabled + '&lab='+lab + '&test='+testid + '&mrp='+mrp + '&custom_agreed_price='+custom_agreed_price + '&custom_deal_price='+custom_deal_price;
+                      jQuery.ajax({
+                            data: dataString,
+                            type: "POST",
+                            url:  '/labtest_ajax/',
+                            success: function(response) {
+                                if(response['success']){
+                                   $(tr).find('td.agreed_price').html(response['computed_agreed_price']);
+                                   $(tr).find('td.deal_price').html(response['computed_deal_price']);
+                                   $(tr).attr('data-id',response['id']); 
+                                }
+                            },
+                            error: function (request, status, error) {
+                                tr.find('td .save-row').css({ "color": '#FF0000'});
+                            }
+                       });
+                 }
+                 else{
+                      tr.find('td .mrp').css({ "border": '#FF0000 1.3px solid'});
+                      return false;
+                 }   
+
+
+            });
+
+/*            jQuery(".table-container").on("click", ".save-row",function(){
                  var ajax_submit_button = this;
                  var tr = jQuery(this).closest('tr');
                   tr.find('td .mrp').css('border', '1px solid #ccc');
@@ -231,7 +348,7 @@
                       return false;
                  }
              });
-         </script>
+*/         </script>
     {% endblock %}
 
 {% endblock %}

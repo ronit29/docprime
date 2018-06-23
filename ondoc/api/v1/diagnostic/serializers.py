@@ -86,42 +86,16 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     deal_price = serializers.SerializerMethodField()
 
     def get_agreed_price(self, obj):
-        agreed_price = obj.agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
+        agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
         return agreed_price
 
     def get_deal_price(self, obj):
-        deal_price = obj.deal_price if obj.custom_deal_price is None else obj.custom_deal_price
+        deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
         return deal_price
 
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled')
-
-
-class AjaxAvailableLabTestSerializer(serializers.ModelSerializer):
-    id = serializers.IntegerField(required=False)
-    mrp = serializers.DecimalField(max_digits=10, decimal_places=2)
-    custom_agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
-    # deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
-    custom_deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
-    # agreed_price = serializers.SerializerMethodField('get_calculated_agreed_price')
-
-    #
-    # def get_calculated_agreed_price(self, obj):
-    #     if obj.test.test_type == LabTest.RADIOLOGY:
-    #         agreed_percent = obj.lab.radiology_agreed_price_percent if obj.lab.radiology_agreed_price_percent else None
-    #     else:
-    #         agreed_percent = obj.lab.pathology_agreed_price_percent if obj.lab.pathology_agreed_price_percent else None
-    #     mrp = decimal.Decimal(obj.mrp)
-    #     if mrp:
-    #         return mrp * (agreed_percent / 100)
-    #     else:
-    #         return None
-
-    class Meta:
-        model = AvailableLabTest
-        fields = ('id', 'lab', 'enabled', 'test', 'mrp', 'custom_agreed_price', 'custom_deal_price')
-
 
 class LabCustomSerializer(serializers.Serializer):
     # lab = serializers.SerializerMethodField()
