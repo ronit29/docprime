@@ -2,6 +2,7 @@ from django.contrib.gis.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
 from ondoc.doctor.models import Hospital
+from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import F
@@ -59,46 +60,46 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
 
     def save(self, *args, **kwargs):
         self.clean()
+        
+        edit_instance = None
         if self.id is not None:
+            edit_instance = 1
+            original = Lab.objects.get(pk=self.id)
+
+        super(Lab, self).save(*args, **kwargs)
+
+        if edit_instance is not None:
             id = self.id
-            original = Lab.objects.get(pk=id)
 
-            path_agreed_calc = None
-            if self.pathology_agreed_price_percentage:
-                path_agreed_price_prcnt = decimal.Decimal(self.pathology_agreed_price_percentage)
-                path_agreed_calc = F('mrp') * (path_agreed_price_prcnt / 100)
+            path_agreed_price_prcnt = decimal.Decimal(self.pathology_agreed_price_percentage) if self.pathology_agreed_price_percentage is not None else None
 
-            path_deal_calc = None
-            if self.pathology_deal_price_percentage:
-                path_deal_price_prcnt = decimal.Decimal(self.pathology_deal_price_percentage)
-                path_deal_calc = (F('mrp') * (path_deal_price_prcnt / 100))
+            path_deal_price_prcnt = decimal.Decimal(self.pathology_deal_price_percentage) if self.pathology_deal_price_percentage is not None else None
 
-            rad_agreed_calc = None
-            if self.radiology_agreed_price_percentage:
-                rad_agreed_price_prcnt = decimal.Decimal(self.radiology_agreed_price_percentage)
-                rad_agreed_calc = (F('mrp') * (rad_agreed_price_prcnt / 100))
+            rad_agreed_price_prcnt = decimal.Decimal(self.radiology_agreed_price_percentage) if self.radiology_agreed_price_percentage is not None else None
 
-
-            rad_deal_calc = None
-            if self.radiology_deal_price_percentage:
-                rad_deal_price_prcnt = decimal.Decimal(self.radiology_deal_price_percentage)
-                rad_deal_calc = (F('mrp') * (rad_deal_price_prcnt / 100))
-
+            rad_deal_price_prcnt = decimal.Decimal(self.radiology_deal_price_percentage) if self.radiology_deal_price_percentage is not None else None
 
             if not original.pathology_agreed_price_percentage==self.pathology_agreed_price_percentage \
                 or not original.pathology_deal_price_percentage==self.pathology_deal_price_percentage:
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.PATHOLOGY).\
-                    update(computed_agreed_price=path_agreed_calc, computed_deal_price=path_deal_calc)
+                    update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), path_agreed_price_prcnt))
+
+                AvailableLabTest.objects.\
+                    filter(lab=id, test__test_type=LabTest.PATHOLOGY).\
+                    update(computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), path_deal_price_prcnt))
 
             if not original.radiology_agreed_price_percentage==self.radiology_agreed_price_percentage \
                 or not original.radiology_deal_price_percentage==self.radiology_deal_price_percentage:
 
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
-                    update(computed_agreed_price=rad_agreed_calc, computed_deal_price=rad_deal_calc)
+                    update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), rad_agreed_price_prcnt))
 
-        return super(Lab, self).save(*args, **kwargs)
+                AvailableLabTest.objects.\
+                    filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
+                    update(computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
+
 
 
 class LabCertification(TimeStampedModel):

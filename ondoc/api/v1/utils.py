@@ -4,6 +4,8 @@ from operator import itemgetter
 from itertools import groupby
 from ondoc.doctor.models import DoctorHospital
 from django.db import connection
+from django.db.models import F, Func
+
 
 
 def flatten_dict(d):
@@ -101,3 +103,10 @@ class RawSql:
             ]
         return result
 
+
+class AgreedPriceCalculate(Func):
+    function = 'labtest_agreed_price_calculate'
+
+
+class DealPriceCalculate(Func):
+    function = 'labtest_deal_price_calculate'

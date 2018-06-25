@@ -18,7 +18,7 @@ urlpatterns = [
     path('profileuserview/<int:pk>', DoctorProfileUserViewSet.as_view({'get': 'retrieve'}), name='doctor-profile-user-view'),
     path('clinic',
          DoctorHospitalView.as_view({'get': 'list'}), name='doctor-hospital'),
-    path('clinic/<int:pk>/',
+    path('clinic/<int:pk>',
          DoctorHospitalView.as_view({'get': 'retrieve'}), name='doctor-detail-hospital'),
     path('block-calender', DoctorBlockCalendarViewSet.as_view({'get': 'list'}), name='get-block-calender'),
     path('block-calender/create', DoctorBlockCalendarViewSet.as_view({'post': 'create'}), name='block-calender-create'),

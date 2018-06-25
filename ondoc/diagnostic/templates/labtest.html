@@ -84,11 +84,11 @@
                     <td class="mrp">
                         <input class="mrp input-sm" type="text" name="mrp" />
                     </td>
-                    <td class="agreed_price"></td>
+                    <td class="computed_agreed_price"></td>
                     <td class="custom_agreed_price">
                         <input class="custom_agreed_price input-sm"  type="text" name="custom_agreed_price" >
                     </td>
-                    <td class="deal_price"></td>
+                    <td class="custom_deal_price"></td>
                     <td class="custom_deal_price">
                         <input class="custom_deal_price input-sm"  type="text" name="custom_deal_price" >
                     </td>
@@ -253,8 +253,6 @@
                       id = ''
                    }
 
-
-
                 if ((typeof testid !== 'undefined' && testid !== null && testid !== '') && (typeof mrp !== 'undefined' && mrp>0 && $.isNumeric(mrp)))
                  {
                      $(ajax_submit_button).addClass('hidden');
@@ -268,9 +266,9 @@
                             url:  '/labtest_ajax/',
                             success: function(response) {
                                 if(response['success']){
-                                   $(tr).find('td.agreed_price').html(response['computed_agreed_price']);
-                                   $(tr).find('td.deal_price').html(response['computed_deal_price']);
-                                   $(tr).attr('data-id',response['id']); 
+                                   $(tr).find('td.computed_agreed_price').html(response['computed_agreed_price']);
+                                   $(tr).find('td.computed_deal_price').html(response['computed_deal_price']);
+                                   $(tr).attr('data-id',response['id']);
                                 }
                             },
                             error: function (request, status, error) {
