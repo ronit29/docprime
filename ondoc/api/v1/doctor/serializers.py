@@ -256,6 +256,8 @@ class DoctorImageSerializer(serializers.ModelSerializer):
         fields = ('name', )
 
 
+
+
 class DoctorQualificationSerializer(serializers.ModelSerializer):
     qualification = serializers.ReadOnlyField(source='qualification.name')
     specialization = serializers.ReadOnlyField(source='specialization.name')

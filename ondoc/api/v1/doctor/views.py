@@ -6,8 +6,6 @@ from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min
-from django.forms import model_to_dict
-from django.contrib.gis.geos import Point
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework import mixins
@@ -22,7 +20,6 @@ from django.db.models import Case, When
 import datetime
 from operator import itemgetter
 from itertools import groupby
-from django.contrib.gis.db.models.functions import Distance
 from ondoc.api.v1.utils import RawSql
 from django.contrib.auth import get_user_model
 from django.db.models import F
@@ -551,7 +548,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "experiences", "images", "qualifications",
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
-        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results)
+        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
         return Response({"result": response, "count": saved_search_result.result_count,
                          "search_id": saved_search_result.id})
 

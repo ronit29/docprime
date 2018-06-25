@@ -2,10 +2,11 @@ from django.utils import timezone
 from ondoc.doctor import models
 from ondoc.api.v1.utils import convert_timings
 from ondoc.api.v1.doctor import serializers
+from django.contrib.gis.geos import Point
 
 
 class DoctorSearchHelper:
-    MAX_DISTANCE = "10000000000"
+    MAX_DISTANCE = "10000000"
 
     def __init__(self, query_params):
         self.query_params = query_params
@@ -80,10 +81,34 @@ class DoctorSearchHelper:
                                                        DoctorSearchHelper.MAX_DISTANCE, rank_by)
         return query_string
 
-    def prepare_search_response(self, doctor_data, doctor_search_result):
+    def count_hospitals(self, doctor):
+        hospital_count = 0
+        prev = None
+        for dh in doctor.availability.all():
+            if dh.hospital_id != prev:
+                hospital_count += 1
+            prev = dh.hospital_id
+        return hospital_count
+
+    def get_hospital_address(self, doctor, doctor_hospital_mapping):
+        for hospital in doctor.hospitals.all():
+            if hospital.id == doctor_hospital_mapping[doctor.id]:
+                return hospital.locality
+        return ""
+
+    def get_distance(self, doctor, doctor_hospital_mapping):
+        current_location = Point(self.query_params.get("longitude"), self.query_params.get("latitude"),
+                                srid=4326)
+        for hospital in doctor.hospitals.all():
+            if hospital.id == doctor_hospital_mapping[doctor.id]:
+                return current_location.distance(hospital.location)*100*1000
+        return ""
+
+    def prepare_search_response(self, doctor_data, doctor_search_result, request):
         doctor_hospital_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         response = []
         for doctor in doctor_data:
+            hospital_address = self.get_hospital_address(doctor, doctor_hospital_mapping)
             doctor_hospitals = [doctor_hospital for doctor_hospital in doctor.availability.all() if
                                 doctor_hospital.hospital_id == doctor_hospital_mapping[doctor_hospital.doctor_id]]
             serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True)
@@ -97,18 +122,34 @@ class DoctorSearchHelper:
                     "discounted_fees": serializer.data[0]["discounted_fees"],
                     "timings": convert_timings(serializer.data, is_day_human_readable=True)
                 }]
-            temp = {
-                "id": doctor.id,
-                "name": doctor.name,
-                "experience_years": None,
-                "practicing_since": doctor.practicing_since,
-                "hospitals": hospitals,
-                "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
-                "images": serializers.DoctorImageSerializer(doctor.images.all(), many=True).data,
-                "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(),
-                                                                            many=True).data,
-                "gender": doctor.gender,
-
-            }
+                temp = {
+                    "awards": [],
+                    "doctor_id": doctor.id,
+                    "license": "",
+                    "data_status": None,
+                    "about": "",
+                    "hospital_count": self.count_hospitals(doctor),
+                    "id": doctor.id,
+                    "mobiles": [],
+                    "fees": None,
+                    "practicing_since": doctor.practicing_since,
+                    "hospital_id": None,
+                    "associations": [],
+                    "experience_years": None,
+                    "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
+                    "additional_details": None,
+                    "medical_services": [],
+                    "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(),
+                                                                                many=True).data,
+                    "hospital_address": hospital_address,
+                    "distance": self.get_distance(doctor, doctor_hospital_mapping),
+                    "name": doctor.name,
+                    "gender": doctor.gender,
+                    "hospital_name": None,
+                    "languages": [],
+                    "images": serializers.DoctorImageSerializer(doctor.images.all(), many=True,
+                                                                context={"request": request}).data,
+                    "hospitals": hospitals,
+                }
             response.append(temp)
         return response
