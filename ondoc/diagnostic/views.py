@@ -87,8 +87,9 @@ def get_computed_deal_price(obj):
         price = math.ceil(price/10.0)*10-1
         if price>mrp:
             price=mrp
-        if price<computed_agreed_price:
-            price=computed_agreed_price    
+        if computed_agreed_price is not None:
+            if price<computed_agreed_price:
+                price=computed_agreed_price
         return price
     else:
         return None
