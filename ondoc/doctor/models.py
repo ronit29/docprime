@@ -705,3 +705,12 @@ class MedicalCondition(TimeStampedModel):
 
     class Meta:
         db_table = "medical_condition"
+
+
+class DoctorSearchResult(TimeStampedModel):
+    results = JSONField()
+    result_count = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = "doctor_search_result"
+
