@@ -4,8 +4,8 @@ from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings
+from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min
-from django.contrib.gis.geos import Point
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework import mixins
@@ -16,10 +16,10 @@ from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
 from django.db.models import Q
+from django.db.models import Case, When
 import datetime
 from operator import itemgetter
 from itertools import groupby
-from django.contrib.gis.db.models.functions import Distance
 from ondoc.api.v1.utils import RawSql
 from django.contrib.auth import get_user_model
 from django.db.models import F
@@ -523,132 +523,34 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
-    # permission_classes = (IsAuthenticated, DoctorPermission,)
     queryset = models.Doctor.objects.all()
 
-    def get_filtering_params(self, data):
-        """Helper function that prepare dynamic query for filtering"""
-        HOSPITAL_TYPE_MAPPING = {hospital_type[1]: hospital_type[0] for hospital_type in
-                                 models.Hospital.HOSPITAL_TYPE_CHOICES}
-
-        filtering_params = []
-        if data.get("specialization_ids"):
-            filtering_params.append(
-                "sp.id IN({})".format(",".join(data.get("specialization_ids")))
-            )
-        if data.get("sits_at"):
-            filtering_params.append(
-                "hospital_type IN({})".format(", ".join([str(HOSPITAL_TYPE_MAPPING.get(sits_at)) for sits_at in
-                                                         data.get("sits_at")]))
-            )
-        if data.get("min_fees"):
-            filtering_params.append(
-                "fees>={}".format(str(data.get("min_fees"))))
-        if data.get("max_fees"):
-            filtering_params.append(
-                "fees<={}".format(str(data.get("max_fees"))))
-        if data.get("is_female"):
-            filtering_params.append(
-                "gender='f'"
-            )
-        if data.get("is_available"):
-            current_time = timezone.now()
-            filtering_params.append(
-                'dh.day={} and dh.end>{}'.format(str(current_time.day), str(current_time.hour))
-            )
-        if not filtering_params:
-            return "1=1"
-        return " and ".join(filtering_params)
-
     def list(self, request, *args, **kwargs):
-        MAX_DISTANCE = "10000000000"
         serializer = serializers.DoctorListSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        longitude = str(validated_data.get("longitude"))
-        latitude = str(validated_data.get("latitude"))
-        filtering_params = self.get_filtering_params(validated_data)
-        order_by_field = 'distance'
-        rank_by = "rank_distance=1"
-        if validated_data.get('sort_on'):
-            if validated_data.get('sort_on') == 'experience':
-                order_by_field = 'practicing_since'
-            if validated_data.get('sort_on') == 'fees':
-                order_by_field = "fees"
-                rank_by = "rank_fees=1"
-        query_string = 'select x.*, ' \
-                       '(select json_agg(to_json(dh.*)) from doctor_hospital dh ' \
-                       'where dh.doctor_id=x.doctor_id and dh.hospital_id = x.hospital_id) timings, ' \
-                       '(select json_agg(to_json(de.*)) ' \
-                       'from doctor_experience de where de.doctor_id=x.doctor_id) experiences, ' \
-                       '(SELECT Json_agg(To_json(doctor_images.*)) from ' \
-                       '(select di.name from doctor_image di ' \
-                       'WHERE  di.doctor_id=x.doctor_id) doctor_images) images, ' \
-                       '(SELECT count(distinct dh_subq.hospital_id) as hospital_count ' \
-                       'FROM   doctor_hospital dh_subq ' \
-                       'WHERE  dh_subq.doctor_id=x.doctor_id), ' \
-                       '((select json_agg(to_json(qualification.*)) ' \
-                       'from (select dq.passing_year as passing_year,  q.name as qualification, clg.name as college, ' \
-                       'spl.name as specialization ' \
-                       'from doctor_qualification dq ' \
-                       'left join ' \
-                       'qualification q on dq.qualification_id=q.id ' \
-                       'left join college clg  on dq.college_id = clg.id ' \
-                       'left join specialization spl on dq.specialization_id = spl.id ' \
-                       'where dq.doctor_id=x.doctor_id ) qualification)) qualifications ' \
-                       'from (select row_number() over(partition by d.id order by dh.fees asc) rank_fees, ' \
-                       'row_number() over(partition by d.id order by  st_distance(st_setsrid(st_point(%s,%s),4326), ' \
-                       'h.location) asc) rank_distance, ' \
-                       'st_distance(st_setsrid(st_point(%s,%s),4326),h.location) distance,' \
-                       'd.id doctor_id,d.name as name, d.practicing_since, dh.fees as fees,h.name as hospital_name, ' \
-                       'd.about,  d.additional_details, d.license, ' \
-                       'h.id hospital_id, ' \
-                       'h.locality as hospital_address, d.gender as gender  ' \
-                       'from doctor d inner join doctor_hospital dh on d.id = dh.doctor_id ' \
-                       'inner join hospital h on h.id = dh.hospital_id ' \
-                       'left join doctor_qualification dq on dq.doctor_id = d.id ' \
-                       'left join specialization sp on sp.id = dq.specialization_id ' \
-                       'where %s ' \
-                       'order by %s asc ' \
-                       ') x ' \
-                       'where distance < %s and %s ' % (longitude, latitude,
-                                                        longitude, latitude,
-                                                        filtering_params, order_by_field,
-                                                        MAX_DISTANCE, rank_by)
-        paginated_query_string = paginate_raw_query(request, query_string)
-        result = RawSql(paginated_query_string).fetch_all()
-        for value in result:
-            value.update({
-                "hospitals": [
-                    {
-                        "doctor": value.get("name"),
-                        "hospital_name": value.get("hospital_name"),
-                        "address": value.get("hospital_address"),
-                        "fees": value.get("fees"),
-                        "hospital_id": value.get("hospital_id"),
-                        "discounted_fees": value.get("fees"),
-                        "timings": convert_timings(timings=value.get("timings"),
-                                                   is_day_human_readable=False)
-                    }
-                ],
-                "id": value.get("doctor_id"),
-                "experiences":  [] if not value.get("experiences") else value.get("experiences"),
-                "images": [] if not value.get("images") else [
-                    {"name": "/media/{}".format(value["images"][0].get("name"))}],
-                "languages": [],
-                "mobiles": [],
-                "medical_services": [],
-                "associations": [],
-                "awards": [],
-                "experience_years": None,
-                "data_status": None
-            })
-            value.pop("timings")
-        response_data = {
-            "count": 10,
-            "result": result
-        }
-        return Response(response_data)
+        doctor_search_helper = DoctorSearchHelper(validated_data)
+        if not validated_data.get("search_id"):
+            filtering_params = doctor_search_helper.get_filtering_params()
+            order_by_field, rank_by = doctor_search_helper.get_ordering_params()
+            query_string = doctor_search_helper.prepare_raw_query(filtering_params,
+                                                                  order_by_field, rank_by)
+            doctor_search_result = RawSql(query_string).fetch_all()
+            result_count = len(doctor_search_result)
+            saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
+                                                                           result_count=result_count)
+        else:
+            saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
+        doctor_ids = paginate_queryset([data.get("doctor_id") for data in saved_search_result.results], request)
+        preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
+        doctor_data = models.Doctor.objects.filter(
+            id__in=doctor_ids).prefetch_related("hospitals", "availability", "availability__hospital",
+                                                "experiences", "images", "qualifications",
+                                                "qualifications__qualification", "qualifications__specialization",
+                                                "qualifications__college").order_by(preserved)
+        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
+        return Response({"result": response, "count": saved_search_result.result_count,
+                         "search_id": saved_search_result.id})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
