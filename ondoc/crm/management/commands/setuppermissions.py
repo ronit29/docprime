@@ -13,7 +13,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorHospital,
     HospitalCertification, College, HospitalNetworkManager,
     HospitalNetworkHelpline, HospitalNetworkEmail,
     HospitalNetworkAccreditation, HospitalNetworkAward,
-    HospitalNetworkCertification)
+    HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification,
@@ -53,7 +53,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification)
+            HospitalNetworkCertification, DoctorSpecialization)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -110,7 +110,7 @@ class Command(BaseCommand):
 
 
         content_types = ContentType.objects.get_for_models(Qualification,
-            Specialization, Language, MedicalService, College)
+            Specialization, Language, MedicalService, College, GeneralSpecialization)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -138,7 +138,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification)
+            HospitalNetworkCertification, DoctorSpecialization)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
