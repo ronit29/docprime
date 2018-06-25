@@ -34,7 +34,7 @@ class LabTestResource(resources.ModelResource):
     sample_handling_instructions = fields.Field(attribute='sample_handling_instructions',
                                                 column_name="Sample handling before pickup")
     category = fields.Field(attribute='category', column_name='Category')
-
+    home_collection_possible = fields.Field(attribute='home_collection_possible', column_name='Home Collection')
     class Meta:
         model = LabTest
         import_id_fields = ('excel_id',)
@@ -57,6 +57,7 @@ class LabTestResource(resources.ModelResource):
                                                  if instance.sample_handling_instructions else "")
         instance.sample_collection_instructions = (instance.sample_collection_instructions.strip()
                                                    if instance.sample_collection_instructions else "")
+        instance.home_collection_possible = (True if instance.home_collection_possible.strip().lower() == "yes" else False) if instance.home_collection_possible else False
         super().before_save_instance(instance, using_transactions, dry_run)
 
     # def after_save_instance(self, instance, using_transactions, dry_run):
