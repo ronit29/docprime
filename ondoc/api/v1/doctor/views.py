@@ -533,21 +533,27 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         doctor_search_helper = DoctorSearchHelper(validated_data)
-        filtering_params = doctor_search_helper.get_filtering_params()
-        order_by_field, rank_by = doctor_search_helper.get_ordering_params()
-        query_string = doctor_search_helper.prepare_raw_query(filtering_params,
-                                                              order_by_field, rank_by)
-        doctor_search_result = RawSql(query_string).fetch_all()
-        result_count = len(doctor_search_result)
-        doctor_ids = [data.get("doctor_id") for data in doctor_search_result]
+        if not validated_data.get("search_id"):
+            filtering_params = doctor_search_helper.get_filtering_params()
+            order_by_field, rank_by = doctor_search_helper.get_ordering_params()
+            query_string = doctor_search_helper.prepare_raw_query(filtering_params,
+                                                                  order_by_field, rank_by)
+            doctor_search_result = RawSql(query_string).fetch_all()
+            result_count = len(doctor_search_result)
+            saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
+                                                                           result_count=result_count)
+        else:
+            saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
+        doctor_ids = paginate_queryset([data.get("doctor_id") for data in saved_search_result.results], request)
         preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
         doctor_data = models.Doctor.objects.filter(
             id__in=doctor_ids).prefetch_related("hospitals", "availability", "availability__hospital",
                                                 "experiences", "images", "qualifications",
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
-        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result)
-        return Response({"result": response, "count": result_count})
+        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results)
+        return Response({"result": response, "count": saved_search_result.result_count,
+                         "search_id": saved_search_result.id})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):

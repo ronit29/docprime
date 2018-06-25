@@ -58,12 +58,12 @@ class DoctorSearchHelper:
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
-        query_string = "SELECT x.doctor_id, x.doctor_hospital_id, x.hospital_id " \
+        query_string = "SELECT x.doctor_id, x.hospital_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dh.doctor_id ORDER BY dh.fees ASC) rank_fees, " \
                        "Row_number() OVER( partition BY dh.doctor_id ORDER BY " \
                        "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) ASC) rank_distance, " \
                        "St_distance(St_setsrid(St_point(%s, %s), 4326), h.location) distance, d.id as doctor_id, " \
-                       "dh.id as doctor_hospital_id, dh.hospital_id as hospital_id FROM   doctor d " \
+                       "dh.hospital_id as hospital_id FROM   doctor d " \
                        "INNER JOIN doctor_hospital dh " \
                        "ON d.id = dh.doctor_id " \
                        "INNER JOIN hospital h " \

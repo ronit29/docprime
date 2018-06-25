@@ -4,7 +4,7 @@ from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital, DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
-                                 Prescription, PrescriptionFile, Specialization)
+                                 Prescription, PrescriptionFile, Specialization, DoctorSearchResult)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from django.utils import timezone
@@ -529,6 +529,7 @@ class DoctorListSerializer(serializers.Serializer):
     max_fees = serializers.IntegerField(required=False)
     is_female = serializers.BooleanField(required=False)
     is_available = serializers.BooleanField(required=False)
+    search_id = serializers.IntegerField(required=False)
 
     def validate_specialization_id(self, value):
         if not Specialization.objects.filter(id__in=value.strip()).count() == len(value.strip()):
