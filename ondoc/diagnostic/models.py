@@ -329,11 +329,12 @@ class LabTest(TimeStampedModel):
     expected_tat = models.CharField(max_length=1000, blank=True)
     category = models.CharField(max_length=100, blank=True)
     excel_id = models.CharField(max_length=100, blank=True)
-    test_sub_type = models.ManyToManyField(
-        LabTestSubType,
-        through='LabTestSubTypeMapping',
-        through_fields=("lab_test", "test_sub_type", )
-    )
+    sample_type = models.CharField(max_length=500, blank=True)
+    # test_sub_type = models.ManyToManyField(
+    #     LabTestSubType,
+    #     through='LabTestSubTypeMapping',
+    #     through_fields=("lab_test", "test_sub_type", )
+    # )
 
     def __str__(self):
         return self.name
@@ -342,15 +343,15 @@ class LabTest(TimeStampedModel):
         db_table = "lab_test"
 
 
-class LabTestSubTypeMapping(TimeStampedModel):
-    lab_test = models.ForeignKey(LabTest, on_delete=models.CASCADE)
-    test_sub_type = models.ForeignKey(LabTestSubType, on_delete=models.CASCADE)
+# class LabTestSubTypeMapping(TimeStampedModel):
+#     lab_test = models.ForeignKey(LabTest, on_delete=models.CASCADE)
+#     test_sub_type = models.ForeignKey(LabTestSubType, on_delete=models.CASCADE)
 
-    class Meta:
-        db_table = "labtest_subtype_mapping"
+#     class Meta:
+#         db_table = "labtest_subtype_mapping"
 
-    def __str__(self):
-        return "{}-{}".format(self.lab_test.id, self.test_sub_type.id)
+#     def __str__(self):
+#         return "{}-{}".format(self.lab_test.id, self.test_sub_type.id)
 
 
 class AvailableLabTest(TimeStampedModel):

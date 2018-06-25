@@ -164,6 +164,9 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        # Create Pricing Groups
+        group, created = Group.objects.get_or_create(name=constants['LAB_PRICING_GROUP_NAME'])
+        group.permissions.clear()
 
 
         self.stdout.write('Successfully created groups and permissions')
