@@ -5,7 +5,7 @@ from django.contrib.gis import admin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
-                                     LabTestSubType, AvailableLabTest, LabAppointment)
+                                      AvailableLabTest, LabAppointment)
 from ondoc.lead.models import HospitalLead, DoctorLead
 from ondoc.notification import models as notifcation_model
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
@@ -13,7 +13,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
-from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, LabSubTestTypeAdmin, AvailableLabTestAdmin
+from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -57,7 +57,7 @@ admin.site.register(LabNetwork, LabNetworkAdmin)
 
 admin.site.register(LabTest, LabTestAdmin)
 admin.site.register(LabTestType, LabTestTypeAdmin)
-admin.site.register(LabTestSubType, LabSubTestTypeAdmin)
+#admin.site.register(LabTestSubType, LabSubTestTypeAdmin)
 admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
