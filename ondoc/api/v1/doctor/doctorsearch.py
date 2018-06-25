@@ -6,7 +6,7 @@ from django.contrib.gis.geos import Point
 
 
 class DoctorSearchHelper:
-    MAX_DISTANCE = "10000000"
+    MAX_DISTANCE = "10000"
 
     def __init__(self, query_params):
         self.query_params = query_params
@@ -41,6 +41,13 @@ class DoctorSearchHelper:
             filtering_params.append(
                 'dh.day={} and dh.end>{}'.format(str(current_time.day), str(current_time.hour))
             )
+        if self.query_params.get("doctor_name"):
+            filtering_params.append(
+                "d.name ilike '%{}%'".format(self.query_params.get("doctor_name")))
+        if self.query_params.get("hospital_name"):
+            filtering_params.append(
+                "h.name ilike '%{}%'".format(self.query_params.get("hospital_name")))
+
         if not filtering_params:
             return "1=1"
         return " and ".join(filtering_params)

@@ -531,7 +531,9 @@ class DoctorListSerializer(serializers.Serializer):
     max_fees = serializers.IntegerField(required=False)
     is_female = serializers.BooleanField(required=False)
     is_available = serializers.BooleanField(required=False)
-    search_id = serializers.IntegerField(required=False)
+    search_id = serializers.IntegerField(required=False, allow_null=True)
+    doctor_name = serializers.CharField(required=False)
+    hospital_name = serializers.CharField(required=False)
 
     def validate_specialization_id(self, value):
         if not Specialization.objects.filter(id__in=value.strip()).count() == len(value.strip()):
