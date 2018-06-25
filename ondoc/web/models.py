@@ -31,7 +31,7 @@ class Careers(TimeStampedModel):
     QC = 6
     SUPPORT = 7
     DOCTORS = 8
-    PROFILE_TYPE_CHOICES = (("", "Select"), (PRODUCT, 'Product'), (TECHNOLOGY, 'Technology'), (SALES, 'Sales'),
+    PROFILE_TYPE_CHOICES = (("", "Select Function"), (PRODUCT, 'Product'), (TECHNOLOGY, 'Technology'), (SALES, 'Sales'),
                              (CONTENT, 'Content'), (MARKETING, 'Marketing'), (QC, 'QC'), (SUPPORT, 'Support'),
                              (DOCTORS, 'Doctors'), )
     profile_type = models.PositiveSmallIntegerField(blank=False, choices=PROFILE_TYPE_CHOICES)
