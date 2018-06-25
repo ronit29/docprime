@@ -13,14 +13,15 @@ from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, LabTestSubType, LabTestSubTypeMapping)
+    LabDoctor, LabDocument, LabTest)
 from .common import *
 
 
 class LabTestResource(resources.ModelResource):
     excel_id = fields.Field(attribute='excel_id', column_name='Test ID')
     test_type = fields.Field(attribute='test_type', column_name='Test Type')
-    sub_type = fields.Field(attribute='sub_type', column_name='Test SubType')
+    sample_type = fields.Field(attribute='sample_type', column_name='Test SubType')
+    #sub_type = fields.Field(attribute='sub_type', column_name='Test SubType')
     name = fields.Field(attribute='name', column_name="Test Name")
     is_package = fields.Field(attribute="is_package", column_name="Package (Y/N)", default="")
     why = fields.Field(attribute='why', column_name="Why This Test")
@@ -44,7 +45,7 @@ class LabTestResource(resources.ModelResource):
                               else None) if instance.test_type else None
         instance.is_package = (True if instance.is_package.strip().lower() == "yes" else False) if instance.is_package else False
         instance.excel_id = instance.excel_id.strip() if instance.excel_id else ""
-        instance.sub_type = instance.sub_type.strip().lower() if instance.sub_type else ""
+        instance.sample_type = instance.sample_type.strip().lower() if instance.sample_type else ""
         instance.name = instance.name.strip() if instance.name else ""
         instance.why = instance.why.strip() if instance.why else ""
         instance.pre_test_info = instance.pre_test_info.strip() if instance.pre_test_info else ""
@@ -58,12 +59,12 @@ class LabTestResource(resources.ModelResource):
                                                    if instance.sample_collection_instructions else "")
         super().before_save_instance(instance, using_transactions, dry_run)
 
-    def after_save_instance(self, instance, using_transactions, dry_run):
-        sub_type = instance.sub_type.strip().split(",")
-        for sub_type_name in sub_type:
-            obj, created = LabTestSubType.objects.get_or_create(name=sub_type_name.strip())
-            LabTestSubTypeMapping.objects.get_or_create(lab_test=instance,
-                                                        test_sub_type=obj)
+    # def after_save_instance(self, instance, using_transactions, dry_run):
+    #     sub_type = instance.sub_type.strip().split(",")
+    #     for sub_type_name in sub_type:
+    #         obj, created = LabTestSubType.objects.get_or_create(name=sub_type_name.strip())
+    #         LabTestSubTypeMapping.objects.get_or_create(lab_test=instance,
+    #                                                     test_sub_type=obj)
 
 
 class LabTimingForm(forms.ModelForm):
@@ -367,11 +368,10 @@ class LabTestTypeAdmin(VersionAdmin):
     search_fields = ['name']
 
 
-class LabSubTestTypeAdmin(VersionAdmin):
-    search_fields = ['name']
+# class LabSubTestTypeAdmin(VersionAdmin):
+#     search_fields = ['name']
 
 
 class AvailableLabTestAdmin(VersionAdmin):
     search_fields = ['name']
-
 

@@ -135,7 +135,7 @@ class LabTestTable(tables.Table):
         attrs = {'class':'table table-condensed table-striped'}
 
 
-@user_passes_test(lambda u: u.groups.filter(name='qc_group').exists() or u.is_superuser,login_url='/admin/')
+@user_passes_test(lambda u: u.groups.filter(name='lab_pricing_team').exists() or u.is_superuser,login_url='/admin/')
 def labtestformset(request, pk):
     if not pk:
         return render(request, 'access_denied.html')
