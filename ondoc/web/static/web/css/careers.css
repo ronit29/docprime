@@ -13,7 +13,7 @@ a, a:hover, a:active, a:visited{
 
 .header-nav{
 	justify-content: space-around;
-	background-color: #62bed4;
+	background-color: #f78631;
 }
 
 .laptop-img-div{
@@ -78,14 +78,6 @@ input[type=number]::-webkit-outer-spin-button {
 	margin: 0; 
 }
 
-.resume-file-name{
-    color: rgba(0, 0, 0, 0.8);
-}
-
-.resume-file-display{
-    display: none;
-}
-
 #upload-resume {
 	opacity: 0;
 	width: 100%;
@@ -98,7 +90,7 @@ input[type=number]::-webkit-outer-spin-button {
 	cursor: pointer;
 	display: inline-block;
 	border-radius: 12px;
-  	background-color: #00acc1;
+  	background-color: #f78631;
 }
 
 .upload-text{
@@ -119,7 +111,7 @@ input[type=number]::-webkit-outer-spin-button {
 	border-radius: 12px;
 	border: none;
 	padding: 6px 30px;
-  	background-color: #00acc1;
+  	background-color: #f78631;
 }
 
 .coffee-img-div{
@@ -141,7 +133,7 @@ input[type=number]::-webkit-outer-spin-button {
 }
 
 .footer{
-	background-color: #62bed4;
+	background-color: #f78631;
 	margin-top: -56px;
 	padding-top: 12px;
 	padding-bottom: 12px;
