@@ -13,7 +13,7 @@ from django.shortcuts import render
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
-    DoctorEmail, College)
+    DoctorEmail, College, DoctorSpecialization, GeneralSpecialization)
 from .filters import RelatedDropdownFilter
 
 from .common import *
@@ -376,6 +376,15 @@ class CityFilter(SimpleListFilter):
         if self.value():
             return queryset.filter(hospitals__city__iexact=self.value()).distinct()
 
+class DoctorSpecializationInline(admin.TabularInline):
+    model = DoctorSpecialization
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    min_num = 1
+    autocomplete_fields = ['specialization']
+
+
 
 class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     list_display = ('name', 'updated_at','data_status','onboarding_status','list_created_by','get_onboard_link')
@@ -385,6 +394,7 @@ class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     inlines = [
         DoctorMobileInline,
         DoctorEmailInline,
+        DoctorSpecializationInline,
         DoctorQualificationInline,
         DoctorHospitalInline,
         DoctorLanguageInline,
@@ -491,6 +501,10 @@ class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
 
 
 class SpecializationAdmin(AutoComplete, VersionAdmin):
+    search_fields = ['name']
+
+
+class GeneralSpecializationAdmin(AutoComplete, VersionAdmin):
     search_fields = ['name']
 
 
