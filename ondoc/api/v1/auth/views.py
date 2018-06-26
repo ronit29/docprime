@@ -236,6 +236,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
     def update(self, request, *args, **kwargs):
         return super().update(request, partial=True, *args, **kwargs)
 
+    def upload(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = serializers.UploadProfilePictureSerializer(instance, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
 
 class UserPermissionViewSet(mixins.CreateModelMixin,
                             mixins.ListModelMixin,

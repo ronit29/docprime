@@ -17,6 +17,7 @@ urlpatterns = [
     path('userprofile', UserProfileViewSet.as_view({'get': 'list'}), name='user-profile-list'),
     path('userprofile/add', UserProfileViewSet.as_view({'post': 'create'}), name='user-profile-add'),
     path('userprofile/<int:pk>/edit', UserProfileViewSet.as_view({'post': 'update'}), name='user-profile-edit'),
+    path('userprofile/<int:pk>/upload', UserProfileViewSet.as_view({'post': 'upload'}), name='user-profile-upload'),
     path('userprofile/<int:pk>', UserProfileViewSet.as_view({'get': 'retrieve'}), name='user-profile-retrieve'),
     path('createpermission', UserPermissionViewSet.as_view({'get': 'list'}), name='user-profile-retrieve'),
     path('appointment', UserAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),

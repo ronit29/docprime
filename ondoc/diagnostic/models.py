@@ -331,6 +331,7 @@ class LabTest(TimeStampedModel):
     category = models.CharField(max_length=100, blank=True)
     excel_id = models.CharField(max_length=100, blank=True)
     sample_type = models.CharField(max_length=500, blank=True)
+    home_collection_possible = models.BooleanField(default=False, verbose_name= 'Can sample be home collected for this test?')
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',

@@ -6,7 +6,7 @@ from django.contrib.gis.geos import Point
 
 
 class DoctorSearchHelper:
-    MAX_DISTANCE = "10000"
+    MAX_DISTANCE = "20000"
 
     def __init__(self, query_params):
         self.query_params = query_params
@@ -119,44 +119,34 @@ class DoctorSearchHelper:
             doctor_hospitals = [doctor_hospital for doctor_hospital in doctor.availability.all() if
                                 doctor_hospital.hospital_id == doctor_hospital_mapping[doctor_hospital.doctor_id]]
             serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True)
+
             if not serializer.data:
                 hospitals = []
             else:
                 hospitals = [{
                     "hospital_name": serializer.data[0]["hospital_name"],
+                    "address": serializer.data[0]["address"],
+                    "doctor": serializer.data[0]["doctor"],
                     "hospital_id": serializer.data[0]['hospital_id'],
                     "fees": serializer.data[0]["fees"],
                     "discounted_fees": serializer.data[0]["discounted_fees"],
                     "timings": convert_timings(serializer.data, is_day_human_readable=True)
                 }]
-                temp = {
-                    "awards": [],
-                    "doctor_id": doctor.id,
-                    "license": "",
-                    "data_status": None,
-                    "about": "",
-                    "hospital_count": self.count_hospitals(doctor),
-                    "id": doctor.id,
-                    "mobiles": [],
-                    "fees": None,
-                    "practicing_since": doctor.practicing_since,
-                    "hospital_id": None,
-                    "associations": [],
-                    "experience_years": None,
-                    "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
-                    "additional_details": None,
-                    "medical_services": [],
-                    "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(),
-                                                                                many=True).data,
-                    "hospital_address": hospital_address,
-                    "distance": self.get_distance(doctor, doctor_hospital_mapping),
-                    "name": doctor.name,
-                    "gender": doctor.gender,
-                    "hospital_name": None,
-                    "languages": [],
-                    "images": serializers.DoctorImageSerializer(doctor.images.all(), many=True,
-                                                                context={"request": request}).data,
-                    "hospitals": hospitals,
-                }
+            temp = {
+                "doctor_id": doctor.id,
+                "hospital_count": self.count_hospitals(doctor),
+                "id": doctor.id,
+                "practicing_since": doctor.practicing_since,
+                "experience_years": None,
+                "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
+                "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(),
+                                                                            many=True).data,
+                "distance": self.get_distance(doctor, doctor_hospital_mapping),
+                "name": doctor.name,
+                "gender": doctor.gender,
+                "images": serializers.DoctorImageSerializer(doctor.images.all(), many=True,
+                                                            context={"request": request}).data,
+                "hospitals": hospitals,
+            }
             response.append(temp)
         return response
