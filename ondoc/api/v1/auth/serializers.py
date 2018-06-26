@@ -128,16 +128,20 @@ class UserProfileSerializer(serializers.ModelSerializer):
     age = serializers.IntegerField(read_only=True)
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     email = serializers.EmailField(required=False, allow_null=True)
+    profile_image = serializers.FileField(read_only=True)
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
                   "profile_image", "age", "user", "dob")
 
-    def validate_profile_image(self, value):
-        if value.image.width != value.image.height:
-            raise serializers.ValidationError("Image should be square")
-        return value
+
+class UploadProfilePictureSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UserProfile
+        fields = ("profile_image", 'id')
+
 
 class UserPermissionSerializer(serializers.ModelSerializer):
 
