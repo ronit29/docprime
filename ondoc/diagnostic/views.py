@@ -1,7 +1,8 @@
 from django.shortcuts import render, redirect, HttpResponse
+from django.shortcuts import render_to_response
 from django.utils.safestring import mark_safe
 from .models import Lab, LabTest, AvailableLabTest
-from .forms import LabForm
+from .forms import LabForm, LabMapForm
 from dal import autocomplete
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
@@ -149,3 +150,17 @@ def labtestformset(request, pk):
     # RequestConfig(request, paginate={"per_page": 10}).configure(table)
     RequestConfig(request).configure(table)
     return render(request, 'labtest.html', {'labtesttable': table, 'form': form, 'id': pk, 'request': request,'lab':existing})
+
+
+def lab_map_view(request):
+    labs = Lab.objects.all()
+    form = LabMapForm()
+    if request.GET:
+        filtering_params = {key: True if value == "on" else value for key, value in request.GET.items()}
+        labs = Lab.objects.filter(**filtering_params)
+        form = LabMapForm(request.GET)
+    lab_locations = [{"id": lab.id, "longitude": lab.location.x, "latitude": lab.location.y,
+                      "name": lab.name} for lab in labs if lab.location]
+    return render_to_response('lab_map.html', {'labs': lab_locations, "form": form})
+
+
