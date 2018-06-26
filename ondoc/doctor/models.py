@@ -251,6 +251,27 @@ class DoctorQualification(TimeStampedModel):
         db_table = "doctor_qualification"
         unique_together = (("doctor", "qualification", "specialization", "college"))
 
+class GeneralSpecialization(TimeStampedModel, UniqueNameModel):
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "general_specialization"
+
+
+class DoctorSpecialization(TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, related_name="doctorspecializations", on_delete=models.CASCADE)
+    specialization = models.ForeignKey(GeneralSpecialization, on_delete=models.CASCADE, blank=False, null=False)
+
+    def __str__(self):
+       return self.doctor.name + " (" + self.specialization.name + ")"
+
+    class Meta:
+        db_table = "doctor_specialization"
+        unique_together = ("doctor", "specialization")
+
 
 class DoctorHospital(TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
