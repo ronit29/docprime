@@ -9,11 +9,13 @@ from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
 from django.shortcuts import render
+from import_export.admin import ImportExportMixin
+from import_export import resources
 
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
-    DoctorEmail, College, DoctorSpecialization, GeneralSpecialization)
+    DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language)
 from .filters import RelatedDropdownFilter
 
 from .common import *
@@ -499,26 +501,70 @@ class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     class Media:
         js = ('js/admin/ondoc.js',)
 
+class SpecializationResource(resources.ModelResource):
 
-class SpecializationAdmin(AutoComplete, VersionAdmin):
+    class Meta:
+        model = Specialization
+        fields = ('name','human_readable_name')
+
+
+class CollegeResource(resources.ModelResource):
+
+    class Meta:
+        model = College
+        fields = ('name')
+
+
+class LanguageResource(resources.ModelResource):
+
+    class Meta:
+        model = Language
+        fields = ('name')
+
+
+class QualificationResource(resources.ModelResource):
+
+    class Meta:
+        model = Qualification
+        fields = ('name')
+
+
+class GeneralSpecializationResource(resources.ModelResource):
+
+    class Meta:
+        model = GeneralSpecialization
+        fields = ('name')
+
+
+class SpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
+    resource_class = SpecializationResource
+    change_list_template = 'superuser_import_export.html'
 
 
-class GeneralSpecializationAdmin(AutoComplete, VersionAdmin):
+class GeneralSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
+    resource_class = GeneralSpecializationResource
+    change_list_template = 'superuser_import_export.html'
 
 
-class QualificationAdmin(AutoComplete, VersionAdmin):
+class QualificationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
+    resource_class = QualificationResource
+    change_list_template = 'superuser_import_export.html'
 
 
 class MedicalServiceAdmin(VersionAdmin):
     search_fields = ['name']
 
 
-class LanguageAdmin(VersionAdmin):
+class LanguageAdmin(ImportExportMixin, VersionAdmin):
     search_fields = ['name']
+    resource_class = LanguageResource
+    change_list_template = 'superuser_import_export.html'
 
 
-class CollegeAdmin(AutoComplete, VersionAdmin):
+class CollegeAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
+    resource_class = CollegeResource
+    change_list_template = 'superuser_import_export.html'
