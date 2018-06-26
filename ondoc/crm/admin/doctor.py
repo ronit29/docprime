@@ -354,7 +354,7 @@ class DoctorForm(FormCleanMixin):
         qc_required = {'name':'req', 'gender':'req','practicing_since':'req',
         'about':'req','license':'req','mobiles':'count','emails':'count',
         'qualifications':'count', 'availability': 'count', 'languages':'count',
-        'images':'count','documents':'count'}
+        'images':'count','documents':'count','doctorspecializations':'count'}
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
@@ -383,7 +383,8 @@ class DoctorSpecializationInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-    min_num = 1
+    min_num = 0
+    max_num = 4
     autocomplete_fields = ['specialization']
 
 
