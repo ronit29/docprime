@@ -99,7 +99,8 @@ class UserViewset(GenericViewSet):
         response = {
             "login":1,
             "token" : str(token[0]),
-            "user_exists": user_exists,
+            "user_exists" : user_exists,
+            "user_id" : user.id
         }
         return Response(response)        
 
