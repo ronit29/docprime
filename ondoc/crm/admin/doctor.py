@@ -69,9 +69,13 @@ class DoctorHospitalForm(forms.ModelForm):
         cleaned_data = super().clean()
         start = cleaned_data.get("start")
         end = cleaned_data.get("end")
+        fees = cleaned_data.get("fees")
+        mrp = cleaned_data.get("mrp")
+
         if start and end and start>=end:
             raise forms.ValidationError("Availability start time should be less than end time")
-
+        if mrp < fees:
+            raise forms.ValidationError("MRP cannot be less than fees")
 
 class DoctorHospitalFormSet(forms.BaseInlineFormSet):
     def clean(self):
@@ -90,7 +94,6 @@ class DoctorHospitalFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Hospital is required")
 
 
-
 class DoctorHospitalInline(admin.TabularInline):
     model = DoctorHospital
     form = DoctorHospitalForm
@@ -100,6 +103,7 @@ class DoctorHospitalInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['hospital']
+    readonly_fields = ['deal_price']
 
 
 class DoctorLanguageFormSet(forms.BaseInlineFormSet):
