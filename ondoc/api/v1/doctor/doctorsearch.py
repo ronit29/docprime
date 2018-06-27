@@ -4,7 +4,7 @@ from django.utils import timezone
 from ondoc.doctor import models
 from ondoc.api.v1.utils import convert_timings
 from ondoc.api.v1.doctor import serializers
-
+from datetime import datetime
 
 class DoctorSearchHelper:
     MAX_DISTANCE = "20000"
@@ -38,9 +38,10 @@ class DoctorSearchHelper:
                 "gender='f'"
             )
         if self.query_params.get("is_available"):
-            current_time = timezone.now()
+            current_time = datetime.now()
+            current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2)
             filtering_params.append(
-                'dh.day={} and dh.end>{}'.format(str(current_time.day), str(current_time.hour))
+                'dh.day={} and dh.end>={}'.format(str(current_time.isoweekday()), str(current_hour))
             )
         if self.query_params.get("doctor_name"):
             filtering_params.append(
