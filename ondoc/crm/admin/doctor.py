@@ -510,35 +510,35 @@ class SpecializationResource(resources.ModelResource):
 
     class Meta:
         model = Specialization
-        fields = ('name','human_readable_name')
+        fields = ('id','name','human_readable_name')
 
 
 class CollegeResource(resources.ModelResource):
 
     class Meta:
         model = College
-        fields = ('name')
+        fields = ('id','name')
 
 
 class LanguageResource(resources.ModelResource):
 
     class Meta:
         model = Language
-        fields = ('name')
+        fields = ('id','name')
 
 
 class QualificationResource(resources.ModelResource):
 
     class Meta:
         model = Qualification
-        fields = ('name')
+        fields = ('id','name')
 
 
 class GeneralSpecializationResource(resources.ModelResource):
 
     class Meta:
         model = GeneralSpecialization
-        fields = ('name')
+        fields = ('id','name')
 
 
 class SpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
