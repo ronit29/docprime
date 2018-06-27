@@ -223,6 +223,9 @@ MAP_WIDGETS = {
     ),
     "GOOGLE_MAP_API_KEY": "AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA"
 }
+
+GOOGLE_MAPS_API_KEY = 'AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA'
+
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
 SMS_AUTH_KEY = env('SMS_AUTH_KEY')
 

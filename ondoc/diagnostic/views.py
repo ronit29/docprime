@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, HttpResponse
 from django.shortcuts import render_to_response
 from django.utils.safestring import mark_safe
+from django.conf import settings
 from .models import Lab, LabTest, AvailableLabTest
 from .forms import LabForm, LabMapForm
 from dal import autocomplete
@@ -163,6 +164,8 @@ def lab_map_view(request):
         form = LabMapForm(request.GET)
     lab_locations = [{"id": lab.id, "longitude": lab.location.x, "latitude": lab.location.y,
                       "name": lab.name} for lab in labs if lab.location]
-    return render_to_response('lab_map.html', {'labs': lab_locations, "form": form})
+    return render_to_response('lab_map.html',
+                              {'labs': lab_locations, "form": form,
+                               'google_map_key': settings.GOOGLE_MAPS_API_KEY})
 
 
