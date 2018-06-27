@@ -154,7 +154,7 @@ def labtestformset(request, pk):
     return render(request, 'labtest.html', {'labtesttable': table, 'form': form, 'id': pk, 'request': request,'lab':existing})
 
 
-@login_required(login_url='/admin/')
+@user_passes_test(lambda u: u.groups.filter(name='qc_team').exists() or u.is_superuser,login_url='/admin/')
 def lab_map_view(request):
     labs = Lab.objects.all()
     form = LabMapForm()

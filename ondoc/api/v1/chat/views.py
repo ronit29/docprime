@@ -1,5 +1,6 @@
 from ondoc.chat import models
 from ondoc.doctor import models as doc_models
+from ondoc.api.v1.doctor import serializers as doc_serializers
 from rest_framework import mixins, viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
@@ -24,6 +25,7 @@ class DoctorsListViewSet(viewsets.GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = doc_models.Doctor.objects.all().order_by('id')[:20]
-        serializer = serializers.DoctorListSerializer(queryset, many=True)
+        # serializer = serializers.DoctorListSerializer(queryset, many=True)
+        serializer = doc_serializers.DoctorProfileSerializer(queryset, many=True, context={"request": request})
 
         return Response(serializer.data)

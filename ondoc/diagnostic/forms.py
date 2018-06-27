@@ -87,5 +87,4 @@ class LabMapForm(forms.ModelForm):
         model = Lab
         fields = ("is_insurance_enabled", "is_retail_enabled",
                   "is_ppc_pathology_enabled", "is_ppc_radiology_enabled",
-                  "onboarding_status", )
-
+                   )
