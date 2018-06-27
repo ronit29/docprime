@@ -27,7 +27,7 @@ class Order(TimeStampedModel):
     reference_id = models.PositiveSmallIntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
     action_data = JSONField(blank=True, null=True)
-    amount = models.FloatField(blank=True, null=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     error_status = models.CharField(max_length=250, verbose_name="Error", blank=True, null=True)
     is_viewable = models.BooleanField(verbose_name='Is Viewable', default=True)
@@ -50,7 +50,7 @@ class Order(TimeStampedModel):
             ).update(is_viewable=False)
         elif product_id == Order.LAB_PRODUCT_ID:
             Order.objects.filter(
-                action_data__lab=appointment_details.get("doctor"),
+                action_data__lab=appointment_details.get("lab"),
                 # action_data__test_ids=appointment_details.get("test_ids"),
                 action_data__profile=appointment_details.get("profile"),
                 action_data__user=appointment_details.get("user"),
@@ -95,7 +95,7 @@ class PgTransaction(TimeStampedModel):
 
 class ConsumerAccount(TimeStampedModel):
     user = models.ForeignKey(User, unique=True, on_delete=models.DO_NOTHING)
-    balance = models.FloatField(default=0)
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def credit_payment(self, data, amount):
         self.balance += amount
@@ -169,7 +169,7 @@ class ConsumerTransaction(TimeStampedModel):
     # pg_transaction = models.ForeignKey(PgTransaction, blank=True, null=True, on_delete=models.SET_NULL)
     type = models.SmallIntegerField(choices=PgTransaction.TYPE_CHOICES)
     action = models.SmallIntegerField(choices=ACTION_CHOICES)
-    amount = models.FloatField(default=0)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     class Meta:
         db_table = 'consumer_transaction'

@@ -5,6 +5,7 @@ from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot
+from ondoc.api.v1 import insurance as insurance_utility
 from django.db.models import Min
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
@@ -16,13 +17,15 @@ from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
 from django.db.models import Q
-import datetime
 from operator import itemgetter
 from itertools import groupby
 from ondoc.api.v1.utils import RawSql
 from django.contrib.auth import get_user_model
 from django.db.models import F
 from collections import defaultdict
+import datetime
+import random
+import copy
 
 User = get_user_model()
 
@@ -158,8 +161,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if request.user.user_type == User.DOCTOR and perm_data.write_permission:
                 otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
                 otp_valid_serializer.is_valid(raise_exception=True)
-                updated_opd_appointment = opd_appointment.action_completed(opd_appointment)
-        opd_appointment_serializer = serializers.OpdAppointmentSerializer(updated_opd_appointment, context={'request': request})
+                opd_appointment.action_completed()
+        opd_appointment_serializer = serializers.OpdAppointmentSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
     @transaction.atomic
@@ -178,6 +181,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "gender": profile_model.gender,
             "dob": str(profile_model.dob)
         }
+        req_data = request.data
+        if req_data.get("payment_type") == models.OpdAppointment.INSURANCE:
+            effective_price = doctor_hospital.discounted_price
+        else:
+            # TODO PM - Logic for coupon
+            effective_price = doctor_hospital.discounted_price
+
         opd_data = {
             "doctor": data.get("doctor").id,
             "hospital": data.get("hospital").id,
@@ -187,9 +197,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "booked_by": request.user.id,
             "fees": doctor_hospital.fees,
             "discounted_price": doctor_hospital.discounted_price,
-            "effective_price": doctor_hospital.discounted_price,
+            "effective_price": effective_price,
             "mrp": doctor_hospital.mrp,
             "time_slot_start": str(time_slot_start),
+            "payment_type": request.data.get("payment_type")
         }
         resp = self.extract_payment_details(request, opd_data, 1)
         return Response(data=resp)
@@ -265,25 +276,45 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
         resp = {}
-        opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details, context={"request": request})
-        opd_seriailizer.is_valid(raise_exception=True)
-        if balance >= appointment_details.get("effective_price"):
+
+        insured_cod_flag = self.is_insured_cod(appointment_details)
+
+        if insured_cod_flag or balance >= appointment_details.get("effective_price"):
+            appointment_details["payment_status"] = models.OpdAppointment.PAYMENT_ACCEPTED
+            appointment_details["status"] = models.OpdAppointment.BOOKED
+            otp = random.randint(1000, 9999)
+            appointment_details["otp"] = otp
+            opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details,
+                                                                   context={"request": request})
+
+            opd_seriailizer.is_valid(raise_exception=True)
             opd_seriailizer.save()
             user_account_data = {
                 "user": user,
                 "product_id": product_id,
                 "reference_id": opd_seriailizer.data.get("id")
             }
-            consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
+            if not insured_cod_flag:
+                consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
             resp["status"] = 1
             resp["data"] = opd_seriailizer.data
         else:
+            opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details,
+                                                                   context={"request": request})
+            opd_seriailizer.is_valid(raise_exception=True)
             account_models.Order.disable_pending_orders(appointment_details, product_id,
                                                         account_models.Order.OPD_APPOINTMENT_CREATE)
+
+            temp_app_details = copy.deepcopy(appointment_details)
+            temp_app_details["discounted_price"] = str(appointment_details["discounted_price"])
+            temp_app_details["fees"] = str(appointment_details["fees"])
+            temp_app_details["effective_price"] = str(appointment_details["effective_price"])
+            temp_app_details["mrp"] = str(appointment_details["mrp"])
+
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.OPD_APPOINTMENT_CREATE,
-                action_data=appointment_details,
+                action_data=temp_app_details,
                 amount=appointment_details.get("effective_price") - consumer_account.balance,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
@@ -325,6 +356,18 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             details['required'] = False
 
         return details
+
+    def is_insured_cod(self, app_details):
+        return False
+        if insurance_utility.lab_is_insured(app_details):
+            app_details["payment_type"] = doctor_model.OpdAppointment.INSURANCE
+            app_details["effective_price"] = 0
+            return True
+        elif app_details["payment_type"] == doctor_model.OpdAppointment.COD:
+            app_details["effective_price"] = 0
+            return True
+        else:
+            return False
 
 
 class DoctorProfileView(viewsets.GenericViewSet):

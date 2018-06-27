@@ -245,6 +245,12 @@ class UserPermission(TimeStampedModel):
     def __str__(self):
         return str(self.user.email)
 
+    @classmethod
+    def doc_hospital_admin(cls, appoint_obj):
+        from ondoc.payout.models import Outstanding
+        return appoint_obj.doctor, Outstanding.DOCTOR_LEVEL
+        # TODO PM - Logic to get admin for a particular Doctor and Hospital appointment
+
 
 class AppointmentTransaction(TimeStampedModel):
     appointment = models.PositiveIntegerField(blank=True, null=True)

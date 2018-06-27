@@ -34,6 +34,8 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer)
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
 
+import decimal
+import copy
 
 User = get_user_model()
 
@@ -134,15 +136,13 @@ class UserViewset(GenericViewSet):
         data = serializer.validated_data
         phone_number = data['phone_number']
         user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
-        doctor_list = [user.doctor.id]
 
         if not user:
             doctor = DoctorMobile.objects.get(number=phone_number, is_primary=True).doctor
             user = User.objects.create(phone_number=data['phone_number'], is_phone_number_verified=True, user_type=User.DOCTOR)
-            doctor_list = [user.doctor.id]
             doctor.user = user
             doctor.save()
-
+        doctor_list = [user.doctor.id]
         token = Token.objects.get_or_create(user=user)
         pem_obj = DoctorPermission(doctor_list, request)
         pem_obj.create_permission()
@@ -150,8 +150,8 @@ class UserViewset(GenericViewSet):
         expire_otp(data['phone_number'])
 
         response = {
-            "login":1,
-            "token" : str(token[0])
+            "login": 1,
+            "token": str(token[0])
         }
         return Response(response)
 
@@ -373,8 +373,8 @@ class UserAppointmentsViewSet(OndocViewSet):
             return Response(response)
 
     def lab_appointment_update(self, request, lab_appointment, validated_data):
+        resp = {}
         if validated_data.get('status'):
-            resp = {}
             if validated_data['status'] == LabAppointment.CANCELED:
                 updated_lab_appointment = lab_appointment.action_cancelled(lab_appointment)
                 resp = LabAppointmentRetrieveSerializer(updated_lab_appointment, context={"request": request}).data
@@ -401,15 +401,16 @@ class UserAppointmentsViewSet(OndocViewSet):
                     new_appointment['agreed_price'] = temp_lab_test[0].get("total_agreed_price", 0)
                     new_appointment['price'] = temp_lab_test[0].get("total_mrp")
                     new_appointment['time_slot_start'] = time_slot_start
-                    resp = self.extract_payment_details(request, lab_appointment, new_appointment, 2)
+                    resp = self.extract_payment_details(request, lab_appointment, new_appointment,
+                                                        account_models.Order.LAB_PRODUCT_ID)
         return resp
 
     def doctor_appointment_update(self, request, opd_appointment, validated_data):
         if validated_data.get('status'):
             resp = {}
             if validated_data['status'] == OpdAppointment.CANCELED:
-                updated_opd_appointment = opd_appointment.action_cancelled(opd_appointment)
-                resp = AppointmentRetrieveSerializer(updated_opd_appointment, context={"request": request}).data
+                opd_appointment.action_cancelled()
+                resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = CreateAppointmentSerializer.form_time_slot(
@@ -433,7 +434,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                         new_appointment['fees'] = doctor_hospital.fees
                         new_appointment['mrp'] = doctor_hospital.mrp
                         new_appointment['time_slot_start'] = time_slot_start
-                        resp = self.extract_payment_details(request, opd_appointment, new_appointment, 1)
+                        resp = self.extract_payment_details(request, opd_appointment, new_appointment,
+                                                            account_models.Order.DOCTOR_PRODUCT_ID)
             return resp
 
     def get_appointment_coupon_price(self, discounted_price, effective_price):
@@ -463,10 +465,10 @@ class UserAppointmentsViewSet(OndocViewSet):
                     consumer_account.debit_schedule(user_account_data, debit_balance)
 
             # Update appointment
-            if product_id == 1:
+            if product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                 appointment_details.action_rescheduled_patient(new_appointment_details)
                 appointment_serializer = AppointmentRetrieveSerializer(appointment_details, context={"request": request})
-            if product_id == 2:
+            if product_id == account_models.Order.LAB_PRODUCT_ID:
                 appointment_details.action_rescheduled_patient(new_appointment_details)
                 appointment_serializer = LabAppointmentRetrieveSerializer(appointment_details, context={"request": request})
             return appointment_serializer.data
@@ -474,14 +476,23 @@ class UserAppointmentsViewSet(OndocViewSet):
             balance = consumer_account.balance + appointment_details.effective_price
             new_appointment_details['time_slot_start'] = str(new_appointment_details['time_slot_start'])
             action = ''
-            if product_id == 1:
+            temp_app_details = copy.deepcopy(appointment_details)
+            if product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                 action = account_models.Order.OPD_APPOINTMENT_RESCHEDULE
-            if product_id == 2:
+                temp_app_details["discounted_price"] = str(appointment_details["discounted_price"])
+                temp_app_details["fees"] = str(appointment_details["fees"])
+                temp_app_details["effective_price"] = str(appointment_details["effective_price"])
+                temp_app_details["mrp"] = str(appointment_details["mrp"])
+            elif product_id == account_models.Order.LAB_PRODUCT_ID:
+                temp_app_details["price"] = str(appointment_details["price"])
+                temp_app_details["agreed_price"] = str(appointment_details["agreed_price"])
+                temp_app_details["deal_price"] = str(appointment_details["deal_price"])
+                temp_app_details["effective_price"] = str(appointment_details["effective_price"])
                 action = account_models.Order.LAB_APPOINTMENT_RESCHEDULE
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=action,
-                action_data=new_appointment_details,
+                action_data=temp_app_details,
                 amount=new_appointment_details.get('effective_price') - balance,
                 reference_id=appointment_details.id,
                 payment_status=account_models.Order.PAYMENT_PENDING
@@ -701,16 +712,16 @@ class TransactionViewSet(viewsets.GenericViewSet):
         pg_tx_queryset = PgTransaction.objects.create(**response_data)
 
         appointment_obj = None
-        # try:
-        appointment_obj = self.block_pay_schedule_transaction(request, response_data)
-        # except:
-        #     pass
+        try:
+            appointment_obj = self.block_pay_schedule_transaction(request, response_data)
+        except:
+            pass
 
-        if response_data["product_id"] == 1:
+        if response_data["product_id"] == account_models.Order.LAB_PRODUCT_ID:
             if appointment_obj:
                 LAB_REDIRECT_URL += "/"+str(appointment_obj.id)
             REDIRECT_URL = LAB_REDIRECT_URL
-        else:
+        elif response_data["product_id"] == account_models.Order.DOCTOR_PRODUCT_ID:
             if appointment_obj:
                 OPD_REDIRECT_URL += "/"+str(appointment_obj.id)
             REDIRECT_URL = OPD_REDIRECT_URL
@@ -755,13 +766,13 @@ class TransactionViewSet(viewsets.GenericViewSet):
         consumer_account.credit_payment(pg_data, tx_amount)
 
         appointment_obj = None
-        # try:
-        if order_obj.action in [Order.OPD_APPOINTMENT_RESCHEDULE, Order.LAB_APPOINTMENT_RESCHEDULE]:
-            appointment_obj = self.reschedule_appointment(consumer_account, pg_data, order_obj)
-        elif order_obj.action in [Order.OPD_APPOINTMENT_CREATE, Order.LAB_APPOINTMENT_CREATE]:
-            appointment_obj = self.book_appointment(request, consumer_account, pg_data, order_obj)
-        # except:
-        #     pass
+        try:
+            if order_obj.action in [Order.OPD_APPOINTMENT_RESCHEDULE, Order.LAB_APPOINTMENT_RESCHEDULE]:
+                appointment_obj = self.reschedule_appointment(consumer_account, pg_data, order_obj)
+            elif order_obj.action in [Order.OPD_APPOINTMENT_CREATE, Order.LAB_APPOINTMENT_CREATE]:
+                appointment_obj = self.book_appointment(request, consumer_account, pg_data, order_obj)
+        except:
+            pass
 
         return appointment_obj
 
@@ -769,23 +780,21 @@ class TransactionViewSet(viewsets.GenericViewSet):
     def book_appointment(self, request, consumer_account, pg_data, order_obj):
         appointment_data = order_obj.action_data
         appointment_obj = None
-        if consumer_account.balance >= appointment_data["effective_price"]:
-            if order_obj.product_id == PgTransaction.DOCTOR_APPOINTMENT:
-                appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
-                appointment_data["status"] = OpdAppointment.BOOKED
-                opd_searilizer = OpdAppointmentSerializer(data=appointment_data)
-                opd_searilizer.is_valid(raise_exception=True)
-                appointment_obj = opd_searilizer.save()
-                # appointment_obj = OpdAppointment.objects.create(**appointment_data)
-            elif order_obj.product_id == PgTransaction.LAB_APPOINTMENT:
-                lab_appnt_seriailizer = LabAppointmentCreateSerializer(data=appointment_data, context={'request': request})
-                lab_appnt_seriailizer.is_valid(raise_exception=True)
-                appointment_obj = lab_appnt_seriailizer.save()
+        temp_effective_price = decimal.Decimal(appointment_data["effective_price"])
+        if consumer_account.balance >= temp_effective_price:
+            otp = random.randint(1000, 9999)
+            appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
+            appointment_data["status"] = OpdAppointment.BOOKED
+            appointment_data["otp"] = otp
 
-                # lab_searilizer = LabAppointmentModelSerializer(data=appointment_data)
-                # lab_searilizer.is_valid(raise_exception=True)
-                # appointment_obj = lab_searilizer.save()
-                # appointment_obj = LabAppointment.objects.create(**appointment_data)
+            if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
+                opd_serializer = OpdAppointmentSerializer(data=appointment_data)
+                opd_serializer.is_valid(raise_exception=True)
+                appointment_obj = opd_serializer.save()
+            elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
+                lab_serializer = LabAppointmentModelSerializer(data=appointment_data)
+                lab_serializer.is_valid(raise_exception=True)
+                appointment_obj = lab_serializer.save()
             order_obj.appointment_id = appointment_obj.id
             order_obj.payment_status = Order.PAYMENT_ACCEPTED
             pg_data["reference_id"] = appointment_obj.id
@@ -807,8 +816,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
         appointment_obj = None
         if order_obj.product_id == PgTransaction.DOCTOR_APPOINTMENT:
             appointment_obj = OpdAppointment.objects.get(pk=order_obj.reference_id)
+            opd_serializer = OpdAppointmentSerializer(data=new_appointment_data)
+            opd_serializer.is_valid(raise_exception=True)
+            new_appointment_data = opd_serializer.validated_data
         elif order_obj.product_id == PgTransaction.LAB_APPOINTMENT:
             appointment_obj = LabAppointment.objects.get(pk=order_obj.reference_id)
+            lab_serializer = LabAppointmentModelSerializer(data=new_appointment_data)
+            lab_serializer.is_valid(raise_exception=True)
+            new_appointment_data = lab_serializer.validated_data
 
         if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
             debit_amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
@@ -850,14 +865,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         return 0
 
-    # def get_cancel_amount(self, data):
-    #     consumer_tx = ConsumerTransaction.objects.filter(user=data["user"],
-    #                                                      product=data["product"],
-    #                                                      order=data["order"],
-    #                                                      type=PgTransaction.DEBIT,
-    #                                                      action=ConsumerTransaction.SALE).order_by("created_at").last()
-    #     return consumer_tx.amount
-    #
     def get_appointment_amount(self, data):
         amount = 0
         if data["product"] == 2:

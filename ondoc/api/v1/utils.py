@@ -121,3 +121,14 @@ def form_time_slot(date_str, time):
     dt_field = pytz.timezone(defined_timezone).localize(dt_field)
     # dt_field = pytz.utc.localize(dt_field)
     return dt_field
+
+
+def get_previous_month_year():
+    now = timezone.now()
+    curr_month, curr_year = now.month, now.year
+    prev_month = curr_month - 1
+    prev_year = curr_year
+    if curr_month == 1:
+        prev_month = 12
+        prev_year = curr_year - 1
+    return prev_month, prev_year

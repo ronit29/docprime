@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from collections import OrderedDict
 import datetime
 import pytz
-import json
+import random
 
 utc = pytz.UTC
 User = get_user_model()
@@ -190,6 +190,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     end_time = serializers.FloatField(required=False)
     is_home_pickup = serializers.BooleanField(default=False)
     address = serializers.IntegerField(required=False, allow_null=True)
+    payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
 
     def validate(self, data):
 
@@ -221,6 +222,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             "gender": data["profile"].gender,
             "dob": str(data["profile"].dob),
         }
+        otp = random.randint(1000, 9999)
         appointment_data = {
             "lab": data["lab"],
             "user": self.context["request"].user,
@@ -232,7 +234,9 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             "time_slot_start": start_dt,
             "profile_detail": profile_detail,
             "payment_status": OpdAppointment.PAYMENT_ACCEPTED,
-            "status": LabAppointment.BOOKED
+            "status": LabAppointment.BOOKED,
+            "payment_type": data["payment_type"],
+            "otp": otp
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address")).first()
