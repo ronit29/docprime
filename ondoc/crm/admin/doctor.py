@@ -9,11 +9,13 @@ from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
 from django.shortcuts import render
+from import_export.admin import ImportExportMixin
+from import_export import resources
 
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
-    DoctorEmail, College, DoctorSpecialization, GeneralSpecialization)
+    DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language)
 from .filters import RelatedDropdownFilter
 
 from .common import *
@@ -67,9 +69,13 @@ class DoctorHospitalForm(forms.ModelForm):
         cleaned_data = super().clean()
         start = cleaned_data.get("start")
         end = cleaned_data.get("end")
+        fees = cleaned_data.get("fees")
+        mrp = cleaned_data.get("mrp")
+
         if start and end and start>=end:
             raise forms.ValidationError("Availability start time should be less than end time")
-
+        if mrp < fees:
+            raise forms.ValidationError("MRP cannot be less than fees")
 
 class DoctorHospitalFormSet(forms.BaseInlineFormSet):
     def clean(self):
@@ -88,7 +94,6 @@ class DoctorHospitalFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Hospital is required")
 
 
-
 class DoctorHospitalInline(admin.TabularInline):
     model = DoctorHospital
     form = DoctorHospitalForm
@@ -98,6 +103,7 @@ class DoctorHospitalInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['hospital']
+    readonly_fields = ['deal_price']
 
 
 class DoctorLanguageFormSet(forms.BaseInlineFormSet):
@@ -352,7 +358,7 @@ class DoctorForm(FormCleanMixin):
         qc_required = {'name':'req', 'gender':'req','practicing_since':'req',
         'about':'req','license':'req','mobiles':'count','emails':'count',
         'qualifications':'count', 'availability': 'count', 'languages':'count',
-        'images':'count','documents':'count'}
+        'images':'count','documents':'count','doctorspecializations':'count'}
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
@@ -381,7 +387,8 @@ class DoctorSpecializationInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-    min_num = 1
+    min_num = 0
+    max_num = 4
     autocomplete_fields = ['specialization']
 
 
@@ -499,26 +506,70 @@ class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     class Media:
         js = ('js/admin/ondoc.js',)
 
+class SpecializationResource(resources.ModelResource):
 
-class SpecializationAdmin(AutoComplete, VersionAdmin):
+    class Meta:
+        model = Specialization
+        fields = ('name','human_readable_name')
+
+
+class CollegeResource(resources.ModelResource):
+
+    class Meta:
+        model = College
+        fields = ('name')
+
+
+class LanguageResource(resources.ModelResource):
+
+    class Meta:
+        model = Language
+        fields = ('name')
+
+
+class QualificationResource(resources.ModelResource):
+
+    class Meta:
+        model = Qualification
+        fields = ('name')
+
+
+class GeneralSpecializationResource(resources.ModelResource):
+
+    class Meta:
+        model = GeneralSpecialization
+        fields = ('name')
+
+
+class SpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
+    resource_class = SpecializationResource
+    change_list_template = 'superuser_import_export.html'
 
 
-class GeneralSpecializationAdmin(AutoComplete, VersionAdmin):
+class GeneralSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
+    resource_class = GeneralSpecializationResource
+    change_list_template = 'superuser_import_export.html'
 
 
-class QualificationAdmin(AutoComplete, VersionAdmin):
+class QualificationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
+    resource_class = QualificationResource
+    change_list_template = 'superuser_import_export.html'
 
 
 class MedicalServiceAdmin(VersionAdmin):
     search_fields = ['name']
 
 
-class LanguageAdmin(VersionAdmin):
+class LanguageAdmin(ImportExportMixin, VersionAdmin):
     search_fields = ['name']
+    resource_class = LanguageResource
+    change_list_template = 'superuser_import_export.html'
 
 
-class CollegeAdmin(AutoComplete, VersionAdmin):
+class CollegeAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
+    resource_class = CollegeResource
+    change_list_template = 'superuser_import_export.html'

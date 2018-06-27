@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
 from ondoc.notification import models as notification_models
-
+import math
 
 class Migration(migrations.Migration):
 
@@ -299,7 +299,10 @@ class DoctorHospital(TimeStampedModel):
     start = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
     end = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
-
+    deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
+    mrp = models.PositiveSmallIntegerField(blank=False, null=True)
+    followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
+    followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
     def __str__(self):
         return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
 
@@ -309,6 +312,17 @@ class DoctorHospital(TimeStampedModel):
     class Meta:
         db_table = "doctor_hospital"
         unique_together = (("start", "end", "day", "hospital", "doctor"))
+
+    def save(self, *args, **kwargs):
+        if self.mrp!=None:
+            deal_price = math.ceil(self.fees + (self.mrp - self.fees)*.1)
+            deal_price = math.ceil(deal_price/10)*10
+            if deal_price>self.mrp:
+                deal_price = self.mrp
+            if deal_price<self.fees:
+                deal_price = self.fees
+            self.deal_price = deal_price
+        super().save(*args, **kwargs)
 
 
 class DoctorImage(TimeStampedModel, Image):

@@ -80,3 +80,12 @@ class LabForm(forms.ModelForm):
         fields = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                   'radiology_agreed_price_percentage', 'radiology_deal_price_percentage')
 
+
+class LabMapForm(forms.ModelForm):
+
+    class Meta:
+        model = Lab
+        fields = ("is_insurance_enabled", "is_retail_enabled",
+                  "is_ppc_pathology_enabled", "is_ppc_radiology_enabled",
+                  "onboarding_status", )
+

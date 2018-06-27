@@ -10,6 +10,7 @@ urlpatterns = [
     path('labtest/<int:pk>', views.labtestformset, name='labtest'),
     url(r'^labtest_ajax/', views.availablelabtestajaxsave, name='labtest_ajax'),
     url(r'^labmodel_form/', views.labajaxmodelsave, name='labajaxmodelsave'),
+    url(r'^labmapview', views.lab_map_view, name='lab-map-view'),
     url(
         r'^labtestauto/$',
         views.LabTestAutocomplete.as_view(),
