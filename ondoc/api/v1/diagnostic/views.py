@@ -3,9 +3,15 @@ from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSe
                           LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
                           PromotedLabsSerializer, CommonConditionsSerializer, TimeSlotSerializer,
                           SearchLabListSerializer)
+from ondoc.api.v1.auth.serializers import AddressSerializer
+
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest)
+from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
+from ondoc.doctor import models as doctor_model
+from ondoc.api.v1 import insurance as insurance_utility
+from ondoc.api.v1.utils import form_time_slot
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -15,7 +21,6 @@ from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 
 from django_filters.rest_framework import DjangoFilterBackend
-from django_filters import filters
 
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.db.models.functions import Distance
@@ -27,6 +32,7 @@ from django.http import Http404
 from rest_framework import status
 from collections import OrderedDict
 from django.utils import timezone
+import random
 import copy
 
 
@@ -168,12 +174,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             if min_distance:
                 queryset = queryset.filter(lab__location__distance_gte=(pnt, min_distance))
 
-        if min_price:
-            queryset = queryset.filter(mrp__gte=min_price)
-
-        if max_price:
-            queryset = queryset.filter(mrp__lte=max_price)
-
         if ids:
             queryset = (
                 queryset.values('lab').annotate(price=Sum('mrp'), count=Count('id'),
@@ -184,6 +184,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 queryset.values('lab').annotate(count=Count('id'),
                                                 distance=Max(Distance('lab__location', pnt)),
                                                 name=Max('lab__name')).filter(count__gte=len(ids)))
+
+        if min_price:
+            queryset = queryset.filter(price__gte=min_price)
+
+        if max_price:
+            queryset = queryset.filter(price__lte=max_price)
 
         queryset = self.apply_custom_filters(queryset, parameters)
         return queryset
@@ -204,10 +210,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         ids, id_details = self.extract_lab_ids(queryset)
         labs = Lab.objects.prefetch_related('lab_image').filter(id__in=ids)
         resp_queryset = list()
+        temp_var = dict()
         for obj in labs:
-            temp_var = id_details[obj.id]
-            temp_var['lab'] = obj
-            resp_queryset.append(temp_var)
+            # temp_var = id_details[obj.id]
+            temp_var[obj.id] = obj
+            # resp_queryset.append(temp_var)
+
+        for row in queryset:
+            row["lab"] = temp_var[row["lab"]]
+            resp_queryset.append(row)
 
         return resp_queryset
 
@@ -245,17 +256,154 @@ class LabAppointmentView(mixins.CreateModelMixin,
     @transaction.atomic
     def create(self, request, **kwargs):
         serializer = LabAppointmentCreateSerializer(data=request.data)
-
         serializer.is_valid(raise_exception=True)
 
-        lab_appointment_queryset = serializer.save()
-        appointment_serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
-        resp = {}
-        resp["status"] = 1
-        resp["data"] = appointment_serializer.data
-        resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 2)
+        appointment_data = self.form_lab_app_data(request, serializer.validated_data)
+        resp = self.extract_payment_details(request, appointment_data, account_models.Order.LAB_PRODUCT_ID)
         return Response(data=resp)
 
+    def form_lab_app_data(self, request, data):
+        lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
+        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
+                                                                 total_deal_price=Sum("deal_price"),
+                                                                 total_agreed_price=Sum("agreed_price"))
+        total_agreed = total_deal_price = total_mrp = effective_price = 0
+        if temp_lab_test:
+            total_mrp = temp_lab_test[0].get("total_mrp", 0)
+            total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
+            total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
+            effective_price = temp_lab_test[0].get("total_deal_price")
+            # TODO PM - call coupon function to calculate effective price
+        start_dt = form_time_slot(data["start_date"], data["start_time"])
+        profile_detail = {
+            "name": data["profile"].name,
+            "gender": data["profile"].gender,
+            "dob": str(data["profile"].dob),
+        }
+        # otp = random.randint(1000, 9999)
+        appointment_data = {
+            "lab": data["lab"].id,
+            "user": request.user.id,
+            "profile": data["profile"].id,
+            "price": total_mrp,
+            "agreed_price": total_agreed,
+            "deal_price": total_deal_price,
+            "effective_price": effective_price,
+            "time_slot_start": str(start_dt),
+            "profile_detail": profile_detail,
+            # "payment_status": OpdAppointment.PAYMENT_ACCEPTED,
+            "status": LabAppointment.BOOKED,
+            "payment_type": data["payment_type"],
+            # "test_ids": data["test_ids"]
+            "lab_test": [x["id"] for x in lab_test_queryset.values("id")]
+            # "otp": otp
+        }
+        if data.get("is_home_pickup") is True:
+            address = Address.objects.filter(pk=data.get("address")).first()
+            address_serialzer = AddressSerializer(address)
+            appointment_data.update({
+                "address": address_serialzer.data,
+                "is_home_pickup": True
+            })
+
+        return appointment_data
+
+    def extract_payment_details(self, request, appointment_details, product_id):
+        remaining_amount = 0
+        user = request.user
+        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+        balance = consumer_account.balance
+        resp = {}
+        effective_price = appointment_details["effective_price"]
+
+        insured_cod_flag = self.is_insured_cod(appointment_details)
+
+        if insured_cod_flag or balance >= effective_price:
+            otp = random.randint(1000, 9999)
+            appointment_details["otp"] = otp
+            appointment_details["payment_status"] = doctor_model.OpdAppointment.PAYMENT_ACCEPTED
+            appointment_details["status"] = doctor_model.OpdAppointment.BOOKED
+            lab_serializer = LabAppointmentModelSerializer(data=appointment_details)
+            lab_serializer.is_valid(raise_exception=True)
+            lab_appointment = lab_serializer.save()
+
+            user_account_data = {
+                "user": user,
+                "product_id": product_id,
+                "reference_id": lab_appointment.id
+            }
+            lab_appointment_data = LabAppointmentModelSerializer(lab_appointment).data
+            if not insured_cod_flag:
+                consumer_account.debit_schedule(user_account_data, effective_price)
+            resp["status"] = 1
+            resp["data"] = lab_appointment_data
+        else:
+            appointment_details["effective_price"] = effective_price
+            account_models.Order.disable_pending_orders(appointment_details, product_id,
+                                                        account_models.Order.LAB_APPOINTMENT_CREATE)
+            temp_appointment_details = copy.deepcopy(appointment_details)
+            temp_appointment_details["price"] = str(appointment_details["price"])
+            temp_appointment_details["agreed_price"] = str(appointment_details["agreed_price"])
+            temp_appointment_details["deal_price"] = str(appointment_details["deal_price"])
+            temp_appointment_details["effective_price"] = str(appointment_details["effective_price"])
+
+            order = account_models.Order.objects.create(
+                product_id=product_id,
+                action=account_models.Order.LAB_APPOINTMENT_CREATE,
+                action_data=temp_appointment_details,
+                amount=effective_price - balance,
+                payment_status=account_models.Order.PAYMENT_PENDING
+            )
+            appointment_details["payable_amount"] = effective_price - balance
+            resp['pg_details'] = self.get_payment_details(request, appointment_details, product_id, order.id)
+        return resp
+
+    def get_payment_details(self, request, appointment_details, product_id, order_id):
+        details = dict()
+        pgdata = dict()
+        if appointment_details["payable_amount"] != 0:
+            user = request.user
+            user_profile = user.profiles.filter(is_default_user=True).first()
+            pgdata['custId'] = user.id
+            pgdata['mobile'] = user.phone_number
+            pgdata['email'] = user.email
+            if not user.email:
+                pgdata['email'] = "dummy_appointment@policybazaar.com"
+
+            pgdata['productId'] = product_id
+            base_url = (
+                "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+            pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+            pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+            pgdata['checkSum'] = ''
+            pgdata['appointmentId'] = ""
+            pgdata['order_id'] = order_id
+            if user_profile:
+                pgdata['name'] = user_profile.name
+            else:
+                pgdata['name'] = "DummyName"
+            pgdata['txAmount'] = appointment_details['payable_amount']
+
+        if pgdata:
+            details['required'] = True
+            details['pgdata'] = pgdata
+        else:
+            details['required'] = False
+
+        return details
+
+    def is_insured_cod(self, app_details):
+        return False
+        if insurance_utility.lab_is_insured(app_details):
+            app_details["payment_type"] = doctor_model.OpdAppointment.INSURANCE
+            app_details["effective_price"] = 0
+            return True
+        elif app_details["payment_type"] == doctor_model.OpdAppointment.COD:
+            app_details["effective_price"] = 0
+            return True
+        else:
+            return False
 
     def payment_retry(self, request, pk=None):
         queryset = LabAppointment.objects.filter(pk=pk)
@@ -265,11 +413,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             payment_response = self.payment_details(request, serializer_data.data, 1)
         return Response(payment_response)
 
-
     def update(self, request, pk):
         data = request.data
         lab_appointment_obj = get_object_or_404(LabAppointment, pk=pk)
-        # lab_appointment_obj = LabAppointment.objects.get(pk=pk)
         serializer = LabAppointmentUpdateSerializer(lab_appointment_obj, data=data,
                                                     context={'lab_id': lab_appointment_obj.lab})
         serializer.is_valid(raise_exception=True)
@@ -284,35 +430,35 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
         return Response(serializer.data)
 
-    def payment_details(self, request, appointment_details, product_id):
-        details = dict()
-        pgdata = dict()
-        user = request.user
-        user_profile = user.profiles.filter(is_default_user=True).first()
-        pgdata['custId'] = user.id
-        pgdata['mobile'] = user.phone_number
-        pgdata['email'] = user.email
-        if not user.email:
-            pgdata['email'] = "dummy_appointment@policybazaar.com"
-        base_url = (
-            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
-        pgdata['productId'] = product_id
-        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['checkSum'] = ''
-        pgdata['appointmentId'] = appointment_details['id']
-        if user_profile:
-            pgdata['name'] = user_profile.name
-        else:
-            pgdata['name'] = "DummyName"
-        pgdata['txAmount'] = appointment_details['price']
-
-        if pgdata:
-            details['required'] = True
-            details['pgdata'] = pgdata
-        else:
-            details['required'] = False
-        return details
+    # def payment_details(self, request, appointment_details, product_id):
+    #     details = dict()
+    #     pgdata = dict()
+    #     user = request.user
+    #     user_profile = user.profiles.filter(is_default_user=True).first()
+    #     pgdata['custId'] = user.id
+    #     pgdata['mobile'] = user.phone_number
+    #     pgdata['email'] = user.email
+    #     if not user.email:
+    #         pgdata['email'] = "dummy_appointment@policybazaar.com"
+    #     base_url = (
+    #         "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+    #     pgdata['productId'] = product_id
+    #     pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+    #     pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+    #     pgdata['checkSum'] = ''
+    #     pgdata['appointmentId'] = appointment_details['id']
+    #     if user_profile:
+    #         pgdata['name'] = user_profile.name
+    #     else:
+    #         pgdata['name'] = "DummyName"
+    #     pgdata['txAmount'] = appointment_details['price']
+    #
+    #     if pgdata:
+    #         details['required'] = True
+    #         details['pgdata'] = pgdata
+    #     else:
+    #         details['required'] = False
+    #     return details
 
 
 class LabTimingListView(mixins.ListModelMixin,

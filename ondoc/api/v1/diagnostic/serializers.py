@@ -4,6 +4,7 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
+from ondoc.api.v1.utils import form_time_slot
 from ondoc.doctor.models import OpdAppointment
 from django.db.models import Count, Sum
 from django.contrib.auth import get_user_model
@@ -12,6 +13,7 @@ import datetime
 import pytz
 import json
 import decimal
+import random
 
 utc = pytz.UTC
 User = get_user_model()
@@ -198,6 +200,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     end_time = serializers.FloatField(required=False)
     is_home_pickup = serializers.BooleanField(default=False)
     address = serializers.IntegerField(required=False, allow_null=True)
+    payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
 
     def validate(self, data):
 
@@ -215,42 +218,46 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     def create(self, data):
 
         self.num_appointment_validator(data)
-
-        appointment_data = dict()
-        appointment_data['lab'] = data["lab"]
-        # appointment_data['lab'] = Lab.objects.get(pk=data["lab"])
-        appointment_data['profile'] = data["profile"]
-        # appointment_data['profile'] = UserProfile.objects.get(pk=data["profile"])
-
         lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
-        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"), total_deal_price=Sum("deal_price"))
-
-        total_deal_price = total_mrp = 0
+        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"), total_deal_price=Sum("deal_price"), total_agreed_price=Sum("agreed_price"))
+        total_deal_price = total_mrp = effective_price = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
+            total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
             total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
-
-        appointment_data['price'] = total_mrp
-        start_dt = CreateAppointmentSerializer.form_time_slot(data["start_date"], data["start_time"])
-        appointment_data['time_slot_start'] = start_dt
-        # appointment_data['time_slot_end'] = data["end_time"]
-        profile_detail = dict()
-        profile_model = appointment_data["profile"]
-        profile_detail["name"] = profile_model.name
-        profile_detail["gender"] = profile_model.gender
-        profile_detail["dob"] = str(profile_model.dob)
-        # profile_detail["profile_image"] = profile_model.profile_image
-        appointment_data['profile_detail'] = json.dumps(profile_detail)
-
+            effective_price = temp_lab_test[0].get("total_deal_price")
+            # TODO PM - call coupon function to calculate effective price
+        start_dt = form_time_slot(data["start_date"], data["start_time"])
+        profile_detail = {
+            "name": data["profile"].name,
+            "gender": data["profile"].gender,
+            "dob": str(data["profile"].dob),
+        }
+        otp = random.randint(1000, 9999)
+        appointment_data = {
+            "lab": data["lab"],
+            "user": self.context["request"].user,
+            "profile": data["profile"],
+            "price": total_mrp,
+            "agreed_price": total_agreed,
+            "deal_price": total_deal_price,
+            "effective_price": effective_price,
+            "time_slot_start": start_dt,
+            "profile_detail": profile_detail,
+            "payment_status": OpdAppointment.PAYMENT_ACCEPTED,
+            "status": LabAppointment.BOOKED,
+            "payment_type": data["payment_type"],
+            "otp": otp
+        }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address")).first()
             address_serialzer = AddressSerializer(address)
-            appointment_data['address'] = address_serialzer.data
-            appointment_data['is_home_pickup'] = True
-
+            appointment_data.update({
+                "address": address_serialzer.data,
+                "is_home_pickup": True
+            })
         queryset = LabAppointment.objects.create(**appointment_data)
         queryset.lab_test.add(*lab_test_queryset)
-
         return queryset
 
     def update(self, instance, data):
@@ -262,7 +269,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                                      LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
         count = (LabAppointment.objects.filter(lab=data['lab'],
                                                profile=data['profile'],
-                                               status__in=ACTIVE_APPOINTMENT_STATUS).exists())
+                                               status__in=ACTIVE_APPOINTMENT_STATUS).count())
         if count >= 2:
             raise serializers.ValidationError("More than 2 appointment with the lab")
 

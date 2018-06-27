@@ -5,8 +5,10 @@ from itertools import groupby
 from ondoc.doctor.models import DoctorHospital
 from django.db import connection
 from django.db.models import F, Func
-
-
+from django.utils import timezone
+import math
+import datetime
+import pytz
 
 def flatten_dict(d):
     def items():
@@ -110,3 +112,32 @@ class AgreedPriceCalculate(Func):
 
 class DealPriceCalculate(Func):
     function = 'labtest_deal_price_calculate'
+
+
+def form_time_slot(date_str, time):
+    date, temp = date_str.split("T")
+    date_str = str(date)
+    min, hour = math.modf(time)
+    min *= 60
+    if min < 10:
+        min = "0" + str(int(min))
+    else:
+        min = str(int(min))
+    time_str = str(int(hour))+":"+str(min)
+    date_time_field = str(date_str) + "T" + time_str
+    dt_field = datetime.datetime.strptime(date_time_field, "%Y-%m-%dT%H:%M")
+    defined_timezone = str(timezone.get_default_timezone())
+    dt_field = pytz.timezone(defined_timezone).localize(dt_field)
+    # dt_field = pytz.utc.localize(dt_field)
+    return dt_field
+
+
+def get_previous_month_year():
+    now = timezone.now()
+    curr_month, curr_year = now.month, now.year
+    prev_month = curr_month - 1
+    prev_year = curr_year
+    if curr_month == 1:
+        prev_month = 12
+        prev_year = curr_year - 1
+    return prev_month, prev_year

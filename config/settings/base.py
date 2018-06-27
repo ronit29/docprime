@@ -96,6 +96,10 @@ LOCAL_APPS = (
     'ondoc.lead',
     'ondoc.chat',
     'ondoc.notification',
+    'ondoc.account',
+    'ondoc.insurance',
+    'ondoc.coupon',
+    'ondoc.payout',
     'ondoc.web',
 )
 

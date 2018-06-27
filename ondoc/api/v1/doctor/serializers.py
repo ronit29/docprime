@@ -1,10 +1,11 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q
-from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, UserProfile, DoctorHospital, DoctorAssociation,
+from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult)
+from ondoc.authentication.models import UserProfile
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from django.utils import timezone
@@ -87,7 +88,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     start_time = serializers.FloatField()
     end_date = serializers.CharField(required=False)
     end_time = serializers.FloatField(required=False)
-    # time_slot_start = serializers.DateTimeField()
+    time_slot_start = serializers.DateTimeField(required=False)
     # time_slot_end = serializers.DateTimeField()
 
     def validate(self, data):
@@ -96,7 +97,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
         MAX_APPOINTMENTS_ALLOWED = 3
         MAX_FUTURE_DAY = 7
         request = self.context.get("request")
-        time_slot_start = self.form_time_slot(data.get('start_date'), data.get('start_time'))
+        time_slot_start = (self.form_time_slot(data.get('start_date'), data.get('start_time'))
+                           if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         time_slot_end = None
         if data.get('end_date') and data.get('end_time'):
@@ -254,8 +256,6 @@ class DoctorImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorImage
         fields = ('name', )
-
-
 
 
 class DoctorQualificationSerializer(serializers.ModelSerializer):
