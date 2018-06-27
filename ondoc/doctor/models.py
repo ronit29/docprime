@@ -69,6 +69,7 @@ class Hospital(TimeStampedModel, CreatedByModel, QCModel):
     hospital_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=HOSPITAL_TYPE_CHOICES)
     network_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Non Network Hospital"), (2,"Network Hospital")])
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL)
+    is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
 
     def __str__(self):
         return self.name
@@ -473,6 +474,7 @@ class HospitalNetwork(TimeStampedModel, CreatedByModel, QCModel):
     state = models.CharField(max_length=100)
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
+    is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
@@ -734,12 +736,28 @@ class PrescriptionFile(TimeStampedModel):
 
 class MedicalCondition(TimeStampedModel):
     name = models.CharField(max_length=100, verbose_name="Name")
+    specialization = models.ManyToManyField(
+        Specialization,
+        through='MedicalConditionSpecialization',
+        through_fields=('medical_condition', 'specialization'),
+    )
 
     def __str__(self):
         return "{}".format(self.name)
 
     class Meta:
         db_table = "medical_condition"
+
+
+class MedicalConditionSpecialization(TimeStampedModel):
+    medical_condition = models.ForeignKey(MedicalCondition, on_delete=models.CASCADE)
+    specialization = models.ForeignKey(Specialization, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.medical_condition.name + " " + self.specialization.name
+
+    class Meta:
+        db_table = "medical_condition_specialization"
 
 
 class DoctorSearchResult(TimeStampedModel):

@@ -13,7 +13,7 @@ from import_export.admin import ImportExportMixin
 from import_export import resources
 
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
-    DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
+    DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience, MedicalConditionSpecialization,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
     DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language)
 from .filters import RelatedDropdownFilter
@@ -382,6 +382,7 @@ class CityFilter(SimpleListFilter):
         if self.value():
             return queryset.filter(hospitals__city__iexact=self.value()).distinct()
 
+
 class DoctorSpecializationInline(admin.TabularInline):
     model = DoctorSpecialization
     extra = 0
@@ -390,7 +391,6 @@ class DoctorSpecializationInline(admin.TabularInline):
     min_num = 0
     max_num = 4
     autocomplete_fields = ['specialization']
-
 
 
 class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
@@ -573,3 +573,21 @@ class CollegeAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
     resource_class = CollegeResource
     change_list_template = 'superuser_import_export.html'
+
+
+class MedicalConditionSpecializationInline(admin.TabularInline):
+    model = MedicalConditionSpecialization
+    extra = 0
+    can_delete = True
+    min_num = 0
+    autocomplete_fields = ['specialization']
+
+
+class MedicalConditionAdmin(VersionAdmin):
+    list_display = ('name', 'updated_at',)
+    date_hierarchy = 'created_at'
+    inlines = [
+        MedicalConditionSpecializationInline
+    ]
+    search_fields = ['name']
+
