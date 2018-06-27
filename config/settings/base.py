@@ -96,6 +96,7 @@ LOCAL_APPS = (
     'ondoc.account',
     'ondoc.insurance',
     'ondoc.coupon',
+    'ondoc.payout'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
