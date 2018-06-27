@@ -24,6 +24,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
     is_ppc_pathology_enabled = models.BooleanField(verbose_name= 'Enabled for Pathology Pre Policy Checkup', default=False)
     is_ppc_radiology_enabled = models.BooleanField(verbose_name= 'Enabled for Radiology Pre Policy Checkup', default=False)
+    is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
     onboarding_status = models.PositiveSmallIntegerField(default=NOT_ONBOARDED, choices=ONBOARDING_STATUS)
     primary_email = models.EmailField(max_length=100, blank=True)
     primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
@@ -201,6 +202,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     state = models.CharField(max_length=100)
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
+    is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
