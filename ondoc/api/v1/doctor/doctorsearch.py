@@ -1,8 +1,9 @@
+from django.contrib.staticfiles.templatetags.staticfiles import static
+from django.contrib.gis.geos import Point
 from django.utils import timezone
 from ondoc.doctor import models
 from ondoc.api.v1.utils import convert_timings
 from ondoc.api.v1.doctor import serializers
-from django.contrib.gis.geos import Point
 
 
 class DoctorSearchHelper:
@@ -147,6 +148,10 @@ class DoctorSearchHelper:
                 "images": serializers.DoctorImageSerializer(doctor.images.all(), many=True,
                                                             context={"request": request}).data,
                 "hospitals": hospitals,
+                "thumbnail": (
+                    request.build_absolute_uri(
+                        static('doctor_images/no_image.png')) if not doctor.images.all() else request.build_absolute_uri(
+                        doctor.images.all()[0].name.url))
             }
             response.append(temp)
         return response

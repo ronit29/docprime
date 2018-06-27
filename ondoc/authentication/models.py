@@ -128,6 +128,7 @@ class CreatedByModel(models.Model):
     class Meta:
         abstract = True
 
+
 class UserProfile(TimeStampedModel, Image):
     MALE = 'm'
     FEMALE = 'f'

@@ -6,6 +6,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.contrib.staticfiles.templatetags.staticfiles import static
 User = get_user_model()
 
 
@@ -128,13 +129,21 @@ class UserProfileSerializer(serializers.ModelSerializer):
     age = serializers.IntegerField(read_only=True)
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     email = serializers.EmailField(required=False, allow_null=True)
-    profile_image = serializers.FileField(read_only=True)
+    profile_image = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
                   "profile_image", "age", "user", "dob")
 
+    def get_profile_image(self, obj):
+        request = self.context.get('request')
+        if obj.profile_image:
+            photo_url = obj.profile_image.url
+            return request.build_absolute_uri(photo_url)
+        else:
+            url = static('doctor_images/no_image.png')
+            return request.build_absolute_uri(url)
 
 class UploadProfilePictureSerializer(serializers.ModelSerializer):
 
