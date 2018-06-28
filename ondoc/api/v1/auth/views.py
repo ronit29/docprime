@@ -530,18 +530,20 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
                                               transaction_status=response.get("txStatus"),
                                               status_code=response.get("statusCode"),
                                               transaction_details=response)
-        if response.get("statusCode") == 1 and response.get("productId") == 2:
+        if response.get("statusCode") == 1 and response.get("productId") == 1:
             opd_appointment = OpdAppointment.objects.filter(pk=response.get("appointmentId")).first()
             if opd_appointment:
                 otp = random.randint(1000, 9999)
                 opd_appointment.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+                opd_appointment.status = OpdAppointment.BOOKED
                 opd_appointment.otp = otp
                 opd_appointment.save()
-        elif response.get("statusCode") == 1 and response.get("productId") == 1:
+        elif response.get("statusCode") == 1 and response.get("productId") == 2:
             lab_appointment = LabAppointment.objects.filter(pk=response.get("appointmentId")).first()
             if lab_appointment:
                 otp = random.randint(1000, 9999)
                 lab_appointment.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+                lab_appointment.status = LabAppointment.BOOKED
                 lab_appointment.otp = otp
                 lab_appointment.save()
         if response.get("productId") == 1:
