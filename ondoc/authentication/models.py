@@ -255,12 +255,12 @@ class UserPermission(TimeStampedModel):
             for permission in get_permissions:
                 if permission.hospital_network_id:
                     if permission.hospital_network.is_billing_enabled:
-                        access_list.append({'user': user.id, 'admin_level': Outstanding.HOSPITAL_NETWORK_LEVEL})
+                        access_list.append({'admin_id': permission.hospital_network_id, 'admin_level': Outstanding.HOSPITAL_NETWORK_LEVEL})
                 elif permission.hospital_id:
                     if permission.hospital.is_billing_enabled:
-                        access_list.append({'user': user.id, 'admin_level': Outstanding.HOSPITAL_LEVEL})
+                        access_list.append({'admin_id': permission.hospital_id, 'admin_level': Outstanding.HOSPITAL_LEVEL})
                 else:
-                    access_list.append({'user': user.id, 'admin_level': Outstanding.DOCTOR_LEVEL})
+                    access_list.append({'user': permission.doctor_id, 'admin_level': Outstanding.DOCTOR_LEVEL})
         return access_list
         # TODO PM - Logic to get admin for a particular User
 
@@ -312,10 +312,10 @@ class LabUserPermission(TimeStampedModel):
             for permission in get_permissions:
                 if permission.lab_network_id:
                     if permission.lab_network.is_billing_enabled:
-                        access_list.append({'user': user.id, 'admin_level': Outstanding.LAB_NETWORK_LEVEL})
+                        access_list.append({'admin_id': permission.lab_network_id, 'admin_level': Outstanding.LAB_NETWORK_LEVEL})
                 elif permission.lab_id:
                     if permission.lab.is_billing_enabled:
-                        access_list.append({'user': user.id, 'admin_level': Outstanding.LAB_LEVEL})
+                        access_list.append({'admin_id': permission.lab_id, 'admin_level': Outstanding.LAB_LEVEL})
         return access_list
         # TODO PM - Logic to get admin for a particular User
 
