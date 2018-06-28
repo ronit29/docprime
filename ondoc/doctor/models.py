@@ -637,7 +637,7 @@ class   OpdAppointment(TimeStampedModel):
                         allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
                     elif self.status == self.ACCEPTED:
                         allowed = [self.RESCHEDULED_DOCTOR, self.COMPLETED]
-                    elif self.status == self.RESCHEDULED_DOCTOR:
+                    elif self.status == self.RESCHEDULED_PATIENT:
                         allowed = [self.ACCEPTED]
 
         elif user_type == User.CONSUMER and current_datetime<self.time_slot_start+timedelta(hours=6):
