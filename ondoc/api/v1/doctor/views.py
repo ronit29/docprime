@@ -468,7 +468,7 @@ class PrescriptionFileViewset(OndocViewSet):
         if not appointment:
             return Response(status=400)
         queryset = self.get_queryset().filter(prescription__appointment=appointment)
-        serializer = serializers.PrescriptionFileSerializer(queryset, many=True)
+        serializer = serializers.PrescriptionFileSerializer(queryset, many=True, context={"request": request})
         return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
@@ -485,7 +485,8 @@ class PrescriptionFileViewset(OndocViewSet):
             "prescription": prescription.id,
             "file": validated_data.get('file')
         }
-        prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data)
+        prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data,
+                                                                              context={"request": request})
         prescription_file_serializer.is_valid(raise_exception=True)
         prescription_file_serializer.save()
         return Response(prescription_file_serializer.data)
