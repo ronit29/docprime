@@ -1,10 +1,10 @@
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.gis.geos import Point
-from django.utils import timezone
 from ondoc.doctor import models
 from ondoc.api.v1.utils import convert_timings
 from ondoc.api.v1.doctor import serializers
 from datetime import datetime
+
 
 class DoctorSearchHelper:
     MAX_DISTANCE = "20000"
@@ -99,12 +99,6 @@ class DoctorSearchHelper:
             prev = dh.hospital_id
         return hospital_count
 
-    def get_hospital_address(self, doctor, doctor_hospital_mapping):
-        for hospital in doctor.hospitals.all():
-            if hospital.id == doctor_hospital_mapping[doctor.id]:
-                return hospital.locality
-        return ""
-
     def get_distance(self, doctor, doctor_hospital_mapping):
         current_location = Point(self.query_params.get("longitude"), self.query_params.get("latitude"),
                                 srid=4326)
@@ -117,7 +111,6 @@ class DoctorSearchHelper:
         doctor_hospital_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         response = []
         for doctor in doctor_data:
-            hospital_address = self.get_hospital_address(doctor, doctor_hospital_mapping)
             doctor_hospitals = [doctor_hospital for doctor_hospital in doctor.availability.all() if
                                 doctor_hospital.hospital_id == doctor_hospital_mapping[doctor_hospital.doctor_id]]
             serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True)
