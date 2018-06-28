@@ -722,21 +722,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
         self.save()
         if self.payment_type != self.INSURANCE:
             payout_model.Outstanding.create_outstanding(self)
-        # DocAppointmentPayout.objects.create(
-        #     doctor=self.doctor,
-        #     hospital=self.hospital,
-        #     appointment=self,
-        #     user=self.user,
-        #     amount=self.fees
-        # )
-        # DocAppointmentInvoice.objects.create(
-        #     doctor=self.doctor,
-        #     hospital=self.hospital,
-        #     appointment=self,
-        #     profile=self.profile,
-        #     user=self.user,
-        #     amount=(self.effective_price - self.fees)
-        # )
 
     def get_cancel_amount(self, data):
         consumer_tx = (account_model.ConsumerTransaction.objects.filter(user=data["user"],

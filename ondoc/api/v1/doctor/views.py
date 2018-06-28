@@ -155,6 +155,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             payment_response = self.extract_payment_details(request, serializer_data.data, 1)
         return Response(payment_response)
 
+    @transaction.atomic
     def complete(self, request):
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

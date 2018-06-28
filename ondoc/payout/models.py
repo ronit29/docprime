@@ -1,5 +1,6 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
+from ondoc.api.v1.utils import get_previous_month_year
 
 from django.utils import timezone
 
@@ -30,15 +31,61 @@ class Outstanding(auth_model.TimeStampedModel):
         obj, out_level = auth_model.UserPermission.doc_hospital_admin(app_obj)
         now = timezone.now()
         present_month, present_year = now.month, now.year
-        out_obj = Outstanding.objects.get(net_hos_doc_id=obj.id, outstanding_level=out_level,
+        out_obj = None
+        try:
+            out_obj = Outstanding.objects.get(net_hos_doc_id=obj.id, outstanding_level=out_level,
                                           outstanding_month=present_month, outstanding_year=present_year)
+        except:
+            pass
         app_outstanding_fees = app_obj.doc_payout_amount()
-        if out_obj.exist():
+        if out_obj:
             out_obj.current_month_outstanding += app_outstanding_fees
             out_obj.save()
         else:
+            month, year = get_previous_month_year(present_month, present_year)
+            prev_out_obj = None
+            try:
+                prev_out_obj = Outstanding.objects.get(net_hos_doc_id=obj.id, outstanding_level=out_level,
+                                                   outstanding_month=month, outstanding_year=year)
+            except:
+                pass
+            previous_month_outstanding = 0
+            if prev_out_obj:
+                previous_month_outstanding = (prev_out_obj.current_month_outstanding +
+                                              prev_out_obj.previous_month_outstanding - prev_out_obj.paid_by_pb +
+                                              prev_out_obj.paid_to_pb)
 
-            pass
+            outstanding_data = {
+                "net_hos_doc_id": obj.id,
+                "outstanding_level": out_level,
+                "current_month_outstanding": app_outstanding_fees,
+                "previous_month_outstanding": previous_month_outstanding,
+                "paid_by_pb": 0,
+                "paid_to_pb": 0,
+                "outstanding_month": present_month,
+                "outstanding_year": present_year
+            }
+            Outstanding.objects.create(**outstanding_data)
+
+    @classmethod
+    def get_month_billing(cls, prev_obj, present_obj):
+        prev_out = prev_payed_by_pb = prev_payed_to_pb = 0
+        if prev_obj is not None:
+            prev_out = prev_obj.current_month_outstanding
+            prev_payed_by_pb = prev_obj.paid_by_pb
+            prev_payed_to_pb = prev_obj.paid_to_pb
+        total_out = (present_obj.current_month_outstanding + present_obj.previous_month_outstanding -
+                     present_obj.paid_by_pb + present_obj.paid_to_pb)
+        resp_data = {
+            "previous_outstanding": prev_out,
+            "previous_payed_by_pb": prev_payed_by_pb,
+            "previous_payed_to_pb": prev_payed_to_pb,
+            "current_outstanding": present_obj.current_month_outstanding,
+            "total_outstanding": total_out,
+            "current_month": present_obj.outstanding_month,
+            "current_year": present_obj.outstanding_year,
+        }
+        return resp_data
 
 
 class Payout(auth_model.TimeStampedModel):

@@ -2,7 +2,6 @@ from rest_framework.views import exception_handler
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
-from ondoc.doctor.models import DoctorHospital
 from django.db import connection
 from django.db.models import F, Func
 from django.utils import timezone
@@ -21,6 +20,7 @@ def flatten_dict(d):
 
     return dict(items())
 
+
 def first_error_only(d):
     code_mapping = {'min_value':'invalid', 'max_value':'invalid','invalid_choice':'invalid', 'null':'required'}
 
@@ -32,8 +32,10 @@ def first_error_only(d):
 
     return new_dict
 
+
 def formatted_errors(dic):
     return first_error_only(flatten_dict(dic))
+
 
 def custom_exception_handler(exc, context):
     # Call REST framework's default exception handler first,
@@ -65,6 +67,7 @@ def group_consecutive_numbers(data):
 
 
 def convert_timings(timings, is_day_human_readable=True):
+    from ondoc.doctor.models import DoctorHospital
     if not is_day_human_readable:
         DAY_MAPPING = {value[0]: (value[0], value[1][:3]) for value in DoctorHospital.DAY_CHOICES}
     else:
@@ -132,9 +135,11 @@ def form_time_slot(date_str, time):
     return dt_field
 
 
-def get_previous_month_year():
-    now = timezone.now()
-    curr_month, curr_year = now.month, now.year
+def get_previous_month_year(month, year):
+    # now = timezone.now()
+    # curr_month, curr_year = now.month, now.year
+    curr_month = month
+    curr_year = year
     prev_month = curr_month - 1
     prev_year = curr_year
     if curr_month == 1:
