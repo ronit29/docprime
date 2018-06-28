@@ -223,7 +223,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         # appointment_data['profile'] = UserProfile.objects.get(pk=data["profile"])
 
         lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
-        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"), total_deal_price=Sum("deal_price"))
+        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"), total_deal_price=Sum("computed_deal_price"))
 
         total_deal_price = total_mrp = 0
         if temp_lab_test:
