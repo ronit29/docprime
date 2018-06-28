@@ -24,10 +24,5 @@ class Migration(migrations.Migration):
             model_name='doctorhospital',
             name='followup_duration',
             field=models.PositiveSmallIntegerField(null=True),
-        ),
-        migrations.AddField(
-            model_name='doctorhospital',
-            name='mrp',
-            field=models.PositiveSmallIntegerField(null=True),
-        ),
+        )
     ]
