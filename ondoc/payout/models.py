@@ -27,17 +27,18 @@ class Outstanding(auth_model.TimeStampedModel):
         unique_together = ("net_hos_doc_id", "outstanding_level", "outstanding_month", "outstanding_year")
 
     @classmethod
-    def create_outstanding(cls, app_obj):
-        obj, out_level = auth_model.UserPermission.doc_hospital_admin(app_obj)
+    def create_outstanding(cls, obj, out_level, app_outstanding_fees):
+        # obj, out_level = auth_model.UserPermission.doc_hospital_admin(app_obj)
         now = timezone.now()
         present_month, present_year = now.month, now.year
         out_obj = None
         try:
             out_obj = Outstanding.objects.get(net_hos_doc_id=obj.id, outstanding_level=out_level,
-                                          outstanding_month=present_month, outstanding_year=present_year)
+                                              outstanding_month=present_month, outstanding_year=present_year)
         except:
             pass
-        app_outstanding_fees = app_obj.doc_payout_amount()
+        # if out_level ==
+        # app_outstanding_fees = app_obj.doc_payout_amount()
         if out_obj:
             out_obj.current_month_outstanding += app_outstanding_fees
             out_obj.save()
@@ -46,7 +47,7 @@ class Outstanding(auth_model.TimeStampedModel):
             prev_out_obj = None
             try:
                 prev_out_obj = Outstanding.objects.get(net_hos_doc_id=obj.id, outstanding_level=out_level,
-                                                   outstanding_month=month, outstanding_year=year)
+                                                       outstanding_month=month, outstanding_year=year)
             except:
                 pass
             previous_month_outstanding = 0

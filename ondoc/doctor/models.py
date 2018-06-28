@@ -721,7 +721,17 @@ class OpdAppointment(auth_model.TimeStampedModel):
         self.status = self.COMPLETED
         self.save()
         if self.payment_type != self.INSURANCE:
-            payout_model.Outstanding.create_outstanding(self)
+            admin_obj, out_level = self.get_billable_admin_level()
+            app_outstanding_fees = self.doc_payout_amount()
+            payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+
+    def get_billable_admin_level(self):
+        if self.hospital.network and self.hospital.network.is_billing_enabled:
+            return self.hospital.network, payout_model.Outstanding.HOSPITAL_NETWORK_LEVEL
+        elif self.hospital.is_billing_enabled:
+            return self.hospital, payout_model.Outstanding.HOSPITAL_LEVEL
+        else:
+            return self.doctor, payout_model.Outstanding.DOCTOR_LEVEL
 
     def get_cancel_amount(self, data):
         consumer_tx = (account_model.ConsumerTransaction.objects.filter(user=data["user"],

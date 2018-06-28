@@ -248,12 +248,6 @@ class UserPermission(TimeStampedModel):
         return str(self.user.email)
 
     @classmethod
-    def doc_hospital_admin(cls, appoint_obj):
-        from ondoc.payout.models import Outstanding
-        return appoint_obj.doctor, Outstanding.DOCTOR_LEVEL
-        # TODO PM - Logic to get admin for a particular Doctor and Hospital appointment
-
-    @classmethod
     def get_user_admin_obj(cls, user):
         from ondoc.payout.models import Outstanding
         return user.doctor, Outstanding.DOCTOR_LEVEL

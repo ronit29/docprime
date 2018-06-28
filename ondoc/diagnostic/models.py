@@ -9,8 +9,10 @@ from datetime import timedelta
 from django.db.models import F
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
+from ondoc.payout import models as payout_model
 import decimal
 import math
+import os
 from ondoc.insurance import models as insurance_model
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
@@ -464,21 +466,28 @@ class LabAppointment(TimeStampedModel):
     def action_completed(self):
         self.status = self.COMPLETED
         self.save()
-        #
-        # LabAppointmentPayout.objects.create({
-        #     "lab": self.lab,
-        #     "appointment": self,
-        #     "user": self.user,
-        #     "amount": self.agreed_price
-        # })
-        #
-        # LabAppointmentInvoice.objects.create({
-        #     "lab": self.lab,
-        #     "appointment": self,
-        #     "profile": self.profile,
-        #     "user": self.user,
-        #     "amount": (self.effective_price - self.agreed_price)
-        # })
+        if self.payment_type != OpdAppointment.INSURANCE:
+            admin_obj, out_level = self.get_billable_admin_level()
+            app_outstanding_fees = self.lab_payout_amount()
+            payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+
+        # if self.payment_type != self.INSURANCE:
+        #     payout_model.Outstanding.create_outstanding(self)
+
+    def get_billable_admin_level(self):
+        if self.lab.network and self.lab.network.is_billing_enabled:
+            return self.lab.network, payout_model.Outstanding.LAB_NETWORK_LEVEL
+        else:
+            return self.lab, payout_model.Outstanding.LAB_LEVEL
+
+    def lab_payout_amount(self):
+        amount = 0
+        if self.payment_type == OpdAppointment.COD:
+            amount = (-1)*(self.effective_price - self.agreed_price)
+        elif self.payment_type == OpdAppointment.PREPAID:
+            amount = self.agreed_price
+
+        return amount
 
     def __str__(self):
         return self.profile.name + ', ' + self.lab.name
