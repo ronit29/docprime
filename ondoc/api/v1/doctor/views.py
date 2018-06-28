@@ -115,7 +115,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         elif range=='upcoming':
             today = datetime.date.today()
             queryset = queryset.filter(
-                status__in=[models.OpdAppointment.CREATED, models.OpdAppointment.RESCHEDULED_PATIENT,
+                status__in=[models.OpdAppointment.BOOKED, models.OpdAppointment.RESCHEDULED_PATIENT,
                             models.OpdAppointment.RESCHEDULED_DOCTOR, models.OpdAppointment.ACCEPTED],
                 time_slot_start__date__gte=today).order_by('time_slot_start')
         elif range =='pending':
