@@ -766,4 +766,3 @@ class DoctorSearchResult(TimeStampedModel):
 
     class Meta:
         db_table = "doctor_search_result"
-

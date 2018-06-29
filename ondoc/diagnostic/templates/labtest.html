@@ -49,7 +49,7 @@
            {{ lab.name }}
         </div>
         <div class="panel-body">
-            <form action="/labmodel_form/" method="post" id="lab_model_form" enctype="multipart/form-data">
+            <form action="/admin/labpricing/save/" method="post" id="lab_model_form" enctype="multipart/form-data">
                 {% csrf_token %}
                 {% crispy form %}
                 <input type="hidden" value="{{ id }}" id="lab_id" name="id" class="lab_id_pk"/>
@@ -263,7 +263,7 @@
                       jQuery.ajax({
                             data: dataString,
                             type: "POST",
-                            url:  '/labtest_ajax/',
+                            url:  '/admin/ajax/labtest/save/',
                             success: function(response) {
                                 if(response['success']){
                                    $(tr).find('td.computed_agreed_price').html(response['computed_agreed_price']);

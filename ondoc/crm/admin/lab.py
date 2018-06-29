@@ -249,15 +249,6 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status',LabCityFilter)
 
-    readonly_fields = ('lab_test_form',)
-
-    def lab_test_form(self, instance):
-        if instance.id:
-            html = "<a target='_blank' href='/labtest/%s'>View</a>" % (instance.id)
-            return mark_safe(html)
-        else:
-            return ''
-
     def get_urls(self):
         urls = super().get_urls()
         my_urls = [
@@ -354,8 +345,6 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     class Media:
         js = ('js/admin/ondoc.js',)
 
-    # extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&callback=initGoogleMap']
-    # extra_js = ['https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&libraries=places&callback=initMap']
 
 
 class LabTestAdmin(ImportMixin, VersionAdmin):

@@ -3,6 +3,11 @@ table>tbody>tr>td
     line-height: 25px !important;
 }
 
+h1
+{
+    font-size: 20px;
+}
+
 /*
 input[type='number'] {
     -moz-appearance:textfield;
