@@ -135,19 +135,20 @@ class EmailNotification(TimeStampedModel):
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
             html_body = render_to_string("email/appointment_booked_patient/body.html", context=context)
             email_subject = render_to_string("email/appointment_booked_patient/subject.txt", context=context)
-        email_noti = EmailNotification.objects.create(
-            user=user,
-            email=email,
-            notification_type=notification_type,
-            content=html_body,
-            email_subject=email_subject
-        )
-        message = {
-            "data": model_to_dict(email_noti),
-            "type": "email"
-        }
-        message = json.dumps(message)
-        publish_message(message)
+        if email and user:
+            email_noti = EmailNotification.objects.create(
+                user=user,
+                email=email,
+                notification_type=notification_type,
+                content=html_body,
+                email_subject=email_subject
+            )
+            message = {
+                "data": model_to_dict(email_noti),
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
 
 
 
@@ -168,18 +169,19 @@ class SmsNotification(TimeStampedModel):
             html_body = render_to_string("sms/appointment_accepted.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
             html_body = render_to_string("sms/appointment_booked_patient.txt", context=context)
-        sms_noti = SmsNotification.objects.create(
-            user=user,
-            phone_number=phone_number,
-            notification_type=notification_type,
-            content=html_body
-        )
-        message = {
-            "data": model_to_dict(sms_noti),
-            "type": "sms"
-        }
-        message = json.dumps(message)
-        publish_message(message)
+        if phone_number and user:
+            sms_noti = SmsNotification.objects.create(
+                user=user,
+                phone_number=phone_number,
+                notification_type=notification_type,
+                content=html_body
+            )
+            message = {
+                "data": model_to_dict(sms_noti),
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
 
 
 class AppNotification(TimeStampedModel):
