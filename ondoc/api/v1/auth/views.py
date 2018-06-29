@@ -336,11 +336,11 @@ class UserAppointmentsViewSet(OndocViewSet):
         input_serializer.is_valid(raise_exception=True)
         appointment_type = input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
-            queryset = LabAppointment.objects.filter(pk=pk)
+            queryset = LabAppointment.objects.filter(pk=pk, profile__user=user)
             serializer = LabAppointmentRetrieveSerializer(queryset, many=True,context={"request": request})
             return Response(serializer.data)
         elif appointment_type == 'doctor':
-            queryset = OpdAppointment.objects.filter(pk=pk)
+            queryset = OpdAppointment.objects.filter(pk=pk, user=user)
             serializer = AppointmentRetrieveSerializer(queryset, many=True,context={"request": request})
             return Response(serializer.data)
         else:
