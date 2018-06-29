@@ -522,6 +522,11 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             name__icontains=name).values("id", "name")[:5]
         return Response({"conditions": medical_conditions, "specializations": specializations})
 
+    def common_conditions(self, request):
+        medical_conditions = models.MedicalCondition.objects.values("id", "name")[:10]
+        specializations = models.Specialization.objects.values("id", "name")[:10]
+        return Response({"conditions": medical_conditions, "specializations": specializations})
+
 
 class DoctorListViewSet(viewsets.GenericViewSet):
     queryset = models.Doctor.objects.all()
