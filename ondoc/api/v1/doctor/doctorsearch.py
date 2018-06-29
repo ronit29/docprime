@@ -118,13 +118,14 @@ class DoctorSearchHelper:
             if not serializer.data:
                 hospitals = []
             else:
+                fees = min([data.get("fees") for data in serializer.data if data.get("fees")])
                 hospitals = [{
                     "hospital_name": serializer.data[0]["hospital_name"],
                     "address": serializer.data[0]["address"],
                     "doctor": serializer.data[0]["doctor"],
                     "hospital_id": serializer.data[0]['hospital_id'],
-                    "fees": serializer.data[0]["fees"],
-                    "discounted_fees": serializer.data[0]["discounted_fees"],
+                    "fees": fees,
+                    "discounted_fees": fees,
                     "timings": convert_timings(serializer.data, is_day_human_readable=True)
                 }]
             temp = {

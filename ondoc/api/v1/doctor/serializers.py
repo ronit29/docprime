@@ -91,7 +91,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     # time_slot_end = serializers.DateTimeField()
 
     def validate(self, data):
-        ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.CREATED, OpdAppointment.ACCEPTED,
+        ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.BOOKED, OpdAppointment.ACCEPTED,
                                      OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.RESCHEDULED_DOCTOR]
         MAX_APPOINTMENTS_ALLOWED = 3
         MAX_FUTURE_DAY = 7
