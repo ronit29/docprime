@@ -88,7 +88,7 @@
                     <td class="custom_agreed_price">
                         <input class="custom_agreed_price input-sm"  type="text" name="custom_agreed_price" >
                     </td>
-                    <td class="custom_deal_price"></td>
+                    <td class="computed_deal_price"></td>
                     <td class="custom_deal_price">
                         <input class="custom_deal_price input-sm"  type="text" name="custom_deal_price" >
                     </td>
@@ -110,10 +110,14 @@
 
         $('.typeahead').typeahead({
         source: function (query, process) {
-        return $.get('/labtestauto/', { query: query }, function (data) {
+        return $.get('/admin/labtestauto/', { query: query }, function (data) {
             return process(data.results);
                 });
             },
+        matcher : function(item)
+            {
+                return true;
+            },    
         displayText: function(item)
         {            
             return item.text

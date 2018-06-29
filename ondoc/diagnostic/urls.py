@@ -12,7 +12,7 @@ urlpatterns = [
     url(r'^admin/labpricing/save', views.labajaxmodelsave, name='labajaxmodelsave'),
     url(r'^admin/labmapview', views.lab_map_view, name='lab-map-view'),
     url(
-        r'^labtestauto/$',
+        r'^admin/labtestauto/$',
         views.LabTestAutocomplete.as_view(),
         name="labtestauto",
     ),

@@ -19,11 +19,14 @@ from django.contrib.auth.decorators import user_passes_test
 
 class LabTestAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
+
+        query = self.request.GET.get('query')
+        print(query)
         if not self.request.user:
             return LabTest.objects.none()
         qs = LabTest.objects.all()
-        if self.q:
-            qs = qs.filter(name__istartswith=self.q)
+        if query:
+            qs = qs.filter(name__istartswith=query)
         return qs
 
 

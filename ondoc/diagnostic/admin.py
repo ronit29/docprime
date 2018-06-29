@@ -25,12 +25,11 @@ class LabTestPricingAdmin(admin.ModelAdmin):
             return render(request, 'access_denied.html')
 
         existing = None
-        print(object_id)
         existing = Lab.objects.get(pk=object_id)
         if not existing:
             return render(request, 'access_denied.html')
         form = LabTestPricingForm(instance=existing, prefix="lab")
-        table = LabTestTable(AvailableLabTest.objects.filter(lab=object_id).order_by('-updated_at'))
+        table = LabTestTable(AvailableLabTest.objects.filter(lab=object_id).prefetch_related('lab','test').order_by('-updated_at'))
 
         RequestConfig(request).configure(table)
 
