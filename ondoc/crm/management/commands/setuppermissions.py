@@ -23,7 +23,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabTestType, LabService,
     LabDoctorAvailability,LabDoctor,LabDocument)
 
-
+from ondoc.diagnostic.models import LabPricing
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
@@ -167,6 +167,14 @@ class Command(BaseCommand):
         # Create Pricing Groups
         group, created = Group.objects.get_or_create(name=constants['LAB_PRICING_GROUP_NAME'])
         group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(LabPricing, for_concrete_models = False)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.get_or_create(
+                content_type=ct, codename='change_' + ct.model)
+
+            group.permissions.add(*permissions)
 
 
         self.stdout.write('Successfully created groups and permissions')
