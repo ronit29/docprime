@@ -118,7 +118,7 @@ class DoctorSearchHelper:
             if not serializer.data:
                 hospitals = []
             else:
-                fees = min([data.get("fees") for data in serializer.data])
+                fees = min([data.get("fees") for data in serializer.data if data.get("fees")])
                 hospitals = [{
                     "hospital_name": serializer.data[0]["hospital_name"],
                     "address": serializer.data[0]["address"],
