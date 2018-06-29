@@ -229,7 +229,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
-        serializer = serializers.UserProfileSerializer(data=data)
+        serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -239,7 +239,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
     def upload(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = serializers.UploadProfilePictureSerializer(instance, data=request.data)
+        serializer = serializers.UploadProfilePictureSerializer(instance, data=request.data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)

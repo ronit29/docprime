@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
                 BEGIN 
                 deal_price = ceil(ceil(mrp*percent/100)/10)*10- 1;
                 if deal_price>mrp then 
-                agreed_price=mrp;
+                deal_price=mrp;
                 end if;
                 if deal_price<agreed_price then 
                 deal_price=agreed_price;
