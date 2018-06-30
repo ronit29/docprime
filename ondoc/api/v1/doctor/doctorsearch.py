@@ -122,7 +122,7 @@ class DoctorSearchHelper:
         for doctor in doctor_data:
             doctor_hospitals = [doctor_hospital for doctor_hospital in doctor.availability.all() if
                                 doctor_hospital.hospital_id == doctor_hospital_mapping[doctor_hospital.doctor_id]]
-            serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True)
+            serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True, context={"request": request})
             filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
             min_fees = min([data.get("fees") for data in serializer.data if data.get("fees")])
             if not serializer.data:
