@@ -134,6 +134,7 @@ class DoctorSearchHelper:
                     "doctor": serializer.data[0]["doctor"],
                     "hospital_id": serializer.data[0]['hospital_id'],
                     "fees": fees,
+                    "min_fees": min([data.get("fees") for data in serializer.data if data.get("fees")]),
                     "discounted_fees": fees,
                     "timings": convert_timings(serializer.data, is_day_human_readable=True)
                 }]
