@@ -174,6 +174,10 @@ class Command(BaseCommand):
             permissions = Permission.objects.get_or_create(
                 content_type=ct, codename='change_' + ct.model)
 
+            permissions = Permission.objects.filter(
+                content_type=ct, codename='change_' + ct.model)
+
+
             group.permissions.add(*permissions)
 
 
