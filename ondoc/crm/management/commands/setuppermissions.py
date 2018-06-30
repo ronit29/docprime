@@ -13,7 +13,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorHospital,
     HospitalCertification, College, HospitalNetworkManager,
     HospitalNetworkHelpline, HospitalNetworkEmail,
     HospitalNetworkAccreditation, HospitalNetworkAward,
-    HospitalNetworkCertification)
+    HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification,
@@ -23,7 +23,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabTestType, LabService,
     LabDoctorAvailability,LabDoctor,LabDocument)
 
-
+from ondoc.diagnostic.models import LabPricing
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
@@ -53,7 +53,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification)
+            HospitalNetworkCertification, DoctorSpecialization)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -110,7 +110,7 @@ class Command(BaseCommand):
 
 
         content_types = ContentType.objects.get_for_models(Qualification,
-            Specialization, Language, MedicalService, College)
+            Specialization, Language, MedicalService, College, GeneralSpecialization)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -138,7 +138,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification)
+            HospitalNetworkCertification, DoctorSpecialization)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -164,6 +164,21 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        # Create Pricing Groups
+        group, created = Group.objects.get_or_create(name=constants['LAB_PRICING_GROUP_NAME'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(LabPricing, for_concrete_models = False)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.get_or_create(
+                content_type=ct, codename='change_' + ct.model)
+
+            permissions = Permission.objects.filter(
+                content_type=ct, codename='change_' + ct.model)
+
+
+            group.permissions.add(*permissions)
 
 
         self.stdout.write('Successfully created groups and permissions')

@@ -5,10 +5,11 @@ import raven
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com'])
+ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com', 'docprime.com'])
 DATABASES['default']['ATOMIC_REQUESTS'] = True  # noqa F405
 DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)  # noqa F405
 
+EMAIL_BACKEND = 'ondoc.sendemail.backends.backend.SMTPEmailBackend'
 
 # SECURITY
 # ------------------------------------------------------------------------------
@@ -106,3 +107,8 @@ RAVEN_CONFIG = {
     #'release': raven.fetch_git_sha(os.path.abspath(os.pardir)),
 
 }
+
+EMAIL_HOST = env('EMAIL_HOST')
+EMAIL_PORT = env('EMAIL_PORT')
+EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')

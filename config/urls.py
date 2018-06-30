@@ -19,27 +19,29 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.conf import settings
 
-from ondoc import crm
-
 # DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 additional_urls = [
-    path('doctors/', include('ondoc.doctor.urls')),
-    path('auth/', include('ondoc.authentication.urls')),
-    path('diagnostic/', include('ondoc.diagnostic.urls'))
+    # path('doctors/', include('ondoc.doctor.urls')),
+    # path('auth/', include('ondoc.authentication.urls')),
+    # path('diagnostic/', include('ondoc.diagnostic.urls')),
+    path('api/', include('ondoc.api.urls'))
     ]
 
 if not settings.DEBUG:
     additional_urls = []
+else:
+    from rest_framework_swagger.views import get_swagger_view
+    schema_view = get_swagger_view(title='DocPrime API')
+
+    additional_urls += [path('api-docs', schema_view)]
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('',include('ondoc.crm.urls', namespace='crm')),
+    path('', include('ondoc.diagnostic.urls', namespace='diagnostic')),
+    path('', include('ondoc.web.urls', namespace='web')),
     path('onboard/',include('ondoc.onboard.urls', namespace='onboard')),
-    # path('doctors/', include('ondoc.doctor.urls')),
-    # path('auth/', include('ondoc.authentication.urls'))
-    # path('api/crm/', include('ondoc.crm.urls')),
-    # path('api/auth/', include('ondoc.authentication.urls')),
 ] + additional_urls + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:

@@ -1,10 +1,11 @@
 from django.contrib.gis import forms
 from django.contrib.gis import admin
+from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from django.db import models
 
-from ondoc.diagnostic.models import (LabNetworkCertification,
+from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
     LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
     LabNetworkHelpline, LabNetworkManager)
 from .common import *
@@ -66,7 +67,7 @@ class LabNetworkManagerInline(admin.TabularInline):
 
 
 
-class LabNetworkForm(forms.ModelForm):
+class LabNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
 
@@ -82,29 +83,6 @@ class LabNetworkForm(forms.ModelForm):
             if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
-    def clean(self):
-        if not self.request.user.is_superuser:
-            if self.instance.data_status == 3:
-                raise forms.ValidationError("Cannot update QC approved Lab Network")
-            if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-                if self.instance.data_status == 2 :
-                    raise forms.ValidationError("Cannot update Lab Network  submitted for QC approval")
-                if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
-                    raise forms.ValidationError("Cannot modify Lab Network added by other users")
-
-            if '_submit_for_qc' in self.data:
-                self.validate_qc()
-
-            if '_qc_approve' in self.data:
-                self.validate_qc()
-
-            if '_mark_in_progress' in self.data:
-                if self.instance.data_status == 3:
-                    raise forms.ValidationError("Cannot reject QC approved data")
-
-
-        return super(LabNetworkForm, self).clean()
-
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
@@ -118,9 +96,21 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
-    list_display = ('name', 'updated_at', 'data_status', 'created_by')
+    list_display = ('name', 'updated_at', 'data_status', 'list_created_by')
     list_filter = ('data_status',)
     search_fields = ['name']
+    readonly_fields = ('associated_labs',)
+
+    def associated_labs(self, instance):
+        if instance.id:
+            html = "<ul style='margin-left:0px !important'>"
+            for lab in Lab.objects.filter(network=instance.id).distinct():
+                html += "<li><a target='_blank' href='/admin/diagnostic/lab/%s/change'>%s</a></li>" % (lab.id, lab.name)
+            html += "</ul>"
+            return mark_safe(html)
+        else:
+            return ''
+
     inlines = [LabNetworkManagerInline,
         LabNetworkHelplineInline,
         LabNetworkEmailInline,

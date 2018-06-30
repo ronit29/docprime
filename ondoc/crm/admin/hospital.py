@@ -1,12 +1,16 @@
-from django.contrib.gis import forms
 from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
 from django.db.models import Q
-
-from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,
-    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork)
+from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,Doctor,
+    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
 from .common import *
 from ondoc.crm.constants import constants
+from django.utils.safestring import mark_safe
+from django.contrib.admin import SimpleListFilter
+from ondoc.authentication.models import GenericAdmin
+from django.contrib.contenttypes.admin import GenericTabularInline
+
+
 
 class HospitalImageInline(admin.TabularInline):
     model = HospitalImage
@@ -16,6 +20,13 @@ class HospitalImageInline(admin.TabularInline):
     show_change_link = False
     max_num = 5
 
+
+# class DcotorInline(admin.TabularInline):
+#     model = DoctorHospital
+#     # template = 'imageinline.html'
+#     extra = 0
+#     can_delete = False
+#     show_change_link = False
 
 class HospitalDocumentInline(admin.TabularInline):
     model = HospitalDocument
@@ -64,7 +75,15 @@ class HospitalSpecialityInline(admin.TabularInline):
 #     show_change_link = False
 
 
-class HospitalForm(forms.ModelForm):
+class GenericAdminInline(GenericTabularInline):
+    model = GenericAdmin
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+
+
+class HospitalForm(FormCleanMixin):
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
 
     def clean_location(self):
@@ -92,36 +111,31 @@ class HospitalForm(forms.ModelForm):
         if self.cleaned_data['network_type']==2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
 
-    def clean(self):
-        if not self.request.user.is_superuser:
-            if self.instance.data_status == 3:
-                raise forms.ValidationError("Cannot update QC approved hospital")
-            if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-                if self.instance.data_status == 2:
-                    raise forms.ValidationError("Cannot update Hospital submitted for QC approval")
-                if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
-                    raise forms.ValidationError("Cannot modify Hospital added by other users")
 
+class HospCityFilter(SimpleListFilter):
+    title = 'city'
+    parameter_name = 'city'
+    def lookups(self, request, model_admin):
+        cities = set([(c['city'].upper(),c['city'].upper()) if(c.get('city')) else ('','') for c in Hospital.objects.all().values('city')])
+        return cities
 
-            if '_submit_for_qc' in self.data:
-                self.validate_qc()
-                if self.instance.network and self.instance.network.data_status <2:
-                    raise forms.ValidationError("Cannot submit for QC without submitting associated Hospital Network: " + self.instance.network.name)
-
-            if '_qc_approve' in self.data:
-                self.validate_qc()
-                if self.instance.network and  self.instance.network.data_status < 3:
-                    raise forms.ValidationError("Cannot approve QC check without approving associated Hospital Network: " + self.instance.network.name)
-
-            if '_mark_in_progress' in self.data:
-                if self.instance.data_status == 3:
-                    raise forms.ValidationError("Cannot reject QC approved data")
-
-        return super(HospitalForm, self).clean()
-
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(city__iexact=self.value()).distinct()
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
-    list_filter = ('data_status',)
+    list_filter = ('data_status', HospCityFilter)
+    readonly_fields = ('associated_doctors',)
+
+    def associated_doctors(self, instance):
+        if instance.id:
+            html = "<ul style='margin-left:0px !important'>"
+            for doc in Doctor.objects.filter(hospitals=instance.id).distinct():
+                html += "<li><a target='_blank' href='/admin/doctor/doctor/%s/change'>%s</a></li>"% (doc.id, doc.name)
+            html += "</ul>"
+            return mark_safe(html)
+        else:
+            return ''
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
@@ -145,11 +159,10 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(HospitalAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
-        form.base_fields['network'].queryset = HospitalNetwork.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
-
+        form.base_fields['network'].queryset = HospitalNetwork.objects.filter(Q(data_status=2) | Q(data_status = 3) | Q(created_by = request.user))
         return form
 
-    list_display = ('name', 'updated_at', 'data_status', 'created_by')
+    list_display = ('name', 'updated_at', 'data_status', 'list_created_by')
     form = HospitalForm
     search_fields = ['name']
     inlines = [
@@ -159,7 +172,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalAccreditationInline,
         HospitalImageInline,
         HospitalDocumentInline,
-        HospitalCertificationInline]
+        HospitalCertificationInline,
+        GenericAdminInline]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'

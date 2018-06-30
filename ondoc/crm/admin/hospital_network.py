@@ -1,10 +1,13 @@
 from django.contrib.gis import admin
 from django.contrib.gis import forms
 from django.db import models
+from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
+from ondoc.authentication.models import GenericAdmin
+from django.contrib.contenttypes.admin import GenericTabularInline
 
-from ondoc.doctor.models import (HospitalNetworkManager, HospitalNetwork,
+from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
     HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
     HospitalNetworkAward, HospitalNetworkCertification)
 
@@ -65,7 +68,16 @@ class HospitalNetworkManagerInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
-class HospitalNetworkForm(forms.ModelForm):
+
+class GenericAdminInline(GenericTabularInline):
+    model = GenericAdmin
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+
+
+class HospitalNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
 
@@ -81,29 +93,6 @@ class HospitalNetworkForm(forms.ModelForm):
             if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
-    def clean(self):
-        if not self.request.user.is_superuser:
-            if self.instance.data_status == 3:
-                raise forms.ValidationError("Cannot update QC approved Hospital Network")
-            if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-                if self.instance.data_status == 2:
-                    raise forms.ValidationError("Cannot update Hospital Network  submitted for QC approval")
-                if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
-                    raise forms.ValidationError("Cannot modify Hospital Network added by other users")
-
-            if '_submit_for_qc' in self.data:
-                self.validate_qc()
-
-            if '_qc_approve' in self.data:
-                self.validate_qc()
-
-            if '_mark_in_progress' in self.data:
-                if self.instance.data_status == 3:
-                    raise forms.ValidationError("Cannot reject QC approved data")
-
-
-        return super(HospitalNetworkForm, self).clean()
-
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
@@ -118,16 +107,29 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
-    list_display = ('name', 'updated_at', 'data_status', 'created_by')
+    list_display = ('name', 'updated_at', 'data_status', 'list_created_by')
     list_filter = ('data_status',)
     search_fields = ['name']
+    readonly_fields = ('associated_hospitals',)
     inlines = [
         HospitalNetworkManagerInline,
         HospitalNetworkHelplineInline,
         HospitalNetworkEmailInline,
         HospitalNetworkAccreditationInline,
         HospitalNetworkAwardInline,
-        HospitalNetworkCertificationInline]
+        HospitalNetworkCertificationInline,
+        GenericAdminInline]
+
+
+    def associated_hospitals(self, instance):
+        if instance.id:
+            html = "<ul style='margin-left:0px !important'>"
+            for hosp in Hospital.objects.filter(network=instance.id).distinct():
+                html += "<li><a target='_blank' href='/admin/doctor/hospital/%s/change'>%s</a></li>"% (hosp.id, hosp.name)
+            html += "</ul>"
+            return mark_safe(html)
+        else:
+            return ''
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

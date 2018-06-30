@@ -9,9 +9,12 @@ ALLOWED_HOSTS = ['*']
 GOOGLE_MAPS_API_KEY = 'AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA'
 
 TEMPLATES[0]['OPTIONS']['debug'] = DEBUG
+# SECURE_SSL_REDIRECT=True
+# SESSION_COOKIE_SECURE=True
+# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# INSTALLED_APPS += ('debug_toolbar',)
-# MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
+INSTALLED_APPS += ('debug_toolbar',)
+MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
 
 # DEBUG_TOOLBAR_CONFIG = {
 #     'DISABLE_PANELS': [
@@ -24,8 +27,8 @@ INTERNAL_IPS = ['127.0.0.1']
 
 SMS_BACKEND = 'ondoc.sms.backends.backend.ConsoleSmsBackend'
 # SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
-
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'ondoc.sendemail.backends.backend.ConsoleEmailBackend'
+#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 #EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 # EMAIL_HOST = 'localhost'
 # EMAIL_PORT = 1025
@@ -47,4 +50,15 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 #             'propagate': True,
 #         },
 #     },
+# }
+INSTALLED_APPS += ('django_extensions',)
+INSTALLED_APPS += ('rest_framework_swagger',)
+
+SWAGGER_SETTINGS = {
+    'USE_SESSION_AUTH': True,
+}
+
+# RABBITMQ_CONNECTION_SETTINGS = {
+#     'CONNECTION_URL': 'amqp://guest:guest@localhost:5672/%2F',
+#     'NOTIFICATION_QUEUE': 'notifications'
 # }

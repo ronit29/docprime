@@ -1,0 +1,150 @@
+html, body{
+	font-family: Quicksand;
+}
+
+a, a:hover, a:active, a:visited{
+	text-decoration: none;
+}
+
+.body-wrapper{
+	min-height: 100vh;
+	padding-bottom: 56px;
+}
+
+.header-nav{
+	justify-content: space-around;
+	background-color: #f78631;
+}
+
+.heading-div{
+	text-align: center;
+	margin-top: 60px;
+}
+
+.heading{
+	color: #f88e30;
+}
+
+.privacy-desc-div{
+	margin-top: 40px;
+	text-align: center;
+}
+
+.privacy-desc-heading{
+	font-size: 20px;
+	color: #000000;
+}
+
+.privacy-desc{
+	text-align: justify;
+}
+
+.privacy-desc-subheading{
+	text-align: left;
+	font-size: 18px;
+	font-weight: 600;
+}
+
+.privacy-list-group, .privacy-order-list{
+	text-align: justify;
+}
+
+.privacy-list-group { 
+    counter-increment: lists;
+    counter-reset: items;
+    list-style-type: none;
+}
+
+.privacy-list-group > li::before {
+    content: counters(lists, "", decimal) "." counters(items, "", decimal) " ";
+    counter-increment: items;
+    position:absolute;
+    left: 15px;
+}
+
+.privacy-order-list{
+	list-style-type: lower-alpha;
+}
+
+.privacy-list-item>span{
+	font-weight: 700;
+	font-size: 18px;
+}
+
+.privacy-list-item>.decimal-list{
+	font-weight: unset;
+	font-size: 16px;
+	margin-right: 8px;
+}
+
+.privacy-order-item>span{
+	font-weight: 700;
+	font-size: 18px;
+	text-decoration: underline;
+}
+
+.sub-list{
+	margin: 20px 0;
+	list-style-type: lower-roman;
+	text-align: justify;
+}
+
+.grey-logo-div{
+	margin: 90px auto;
+	text-align: center;
+}
+
+.rights-text{
+	margin-bottom: 0;
+	margin-top: 16px;
+	color: #757575;
+}
+
+.footer{
+	background-color: #f78631;
+	margin-top: -56px;
+	padding-top: 12px;
+	padding-bottom: 12px;
+}
+
+.footer-row{
+	align-items: center;
+}
+
+.footer-text, .footer-text>a{
+	color: #ffffff;
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+.footer-text>span{
+	margin-left: 8px;
+	margin-right: 8px;
+}
+
+.footer-icons{
+	text-align: right;
+}
+
+.footer-icon{
+	margin-left: 4px;
+	margin-right: 4px;
+}
+
+@media(max-width: 575px){
+	.body-wrapper{
+		padding-bottom: 100px;
+	}
+	.nav-divider{
+		display: none;
+	}
+	.footer{
+		margin-top: -100px;
+	}
+	.footer-col, .footer-icons{
+		text-align: center;
+	}
+	.footer-icons{
+		margin-top: 20px;
+	}
+}

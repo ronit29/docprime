@@ -1,0 +1,1 @@
+Your appointment has been booked with Dr. {{doctor_name}}.

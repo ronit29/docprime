@@ -8,6 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('doctor', '0005_auto_20180426_1634'),
+        ('authentication', '0002_userprofile'),
     ]
 
     operations = [

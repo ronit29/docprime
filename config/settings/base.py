@@ -22,7 +22,7 @@ env = environ.Env()
 READ_DOT_ENV_FILE = env.bool('DJANGO_READ_DOT_ENV_FILE', default=True)
 
 if READ_DOT_ENV_FILE:
-    if(env('DJANGO_SETTINGS_MODULE')=='config.settings.production'):
+    if(env('DJANGO_SETTINGS_MODULE')=='config.settings.production' or env('DJANGO_SETTINGS_MODULE')=='config.settings.staging'):
         env.read_env(str(ROOT_DIR.path('.env')))
     if(env('DJANGO_SETTINGS_MODULE')=='config.settings.local'):
         env.read_env(str(ROOT_DIR.path('.env.local')))
@@ -80,7 +80,11 @@ THIRD_PARTY_APPS = (
     'rest_framework',
     'rest_framework.authtoken',
     'crispy_forms',
-    'corsheaders'
+    'corsheaders',
+    'import_export',
+    'dal',
+    'dal_select2',
+    'django_tables2'
 )
 
 LOCAL_APPS = (
@@ -88,7 +92,15 @@ LOCAL_APPS = (
     'ondoc.authentication',
     'ondoc.doctor',
     'ondoc.diagnostic',
-    'ondoc.onboard'
+    'ondoc.onboard',
+    'ondoc.lead',
+    'ondoc.chat',
+    'ondoc.notification',
+    'ondoc.account',
+    'ondoc.insurance',
+    'ondoc.coupon',
+    'ondoc.payout',
+    'ondoc.web',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -196,11 +208,14 @@ TEMPLATES = [
 
 REST_FRAMEWORK = {
 'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
 'PAGE_SIZE': 10,
 'DEFAULT_AUTHENTICATION_CLASSES': (
-#'rest_framework.authentication.TokenAuthentication',
-'ondoc.authentication.auth.CustomAuthentication',
-)
+    'rest_framework.authentication.SessionAuthentication',
+    'rest_framework.authentication.TokenAuthentication',
+#'ondoc.authentication.auth.CustomAuthentication',
+),
+'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler'
 }
 
 MAP_WIDGETS = {
@@ -212,10 +227,13 @@ MAP_WIDGETS = {
     ),
     "GOOGLE_MAP_API_KEY": "AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA"
 }
+
+GOOGLE_MAPS_API_KEY = 'AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA'
+
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
 SMS_AUTH_KEY = env('SMS_AUTH_KEY')
-EMAIL_HOST = 'smtpbp.falconide.com'
-EMAIL_PORT = 25
-EMAIL_HOST_USER = env('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
-#EMAIL_USE_TLS = True
+
+RABBITMQ_CONNECTION_SETTINGS = {
+    'CONNECTION_URL': env('RABBITMQ_CONNECTION_URL'),
+    'NOTIFICATION_QUEUE': env('RABBITMQ_NOTIFICATION_QUEUE')
+}

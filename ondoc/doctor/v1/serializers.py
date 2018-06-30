@@ -203,6 +203,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'time_slot_start', 'fees', 'time_slot_end', 'status', 'doctor_name', 'hospital_name', 'patient_name', 'patient_dob', 'patient_gender', 'patient_image')
 
+
 class HospitalSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
