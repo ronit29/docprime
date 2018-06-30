@@ -14,6 +14,7 @@ from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
+from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime
 from functools import reduce
 from operator import or_
@@ -83,6 +84,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                              (2, "Network Hospital")])
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name="assoc_hospitals")
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
+
+    hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
 
     def __str__(self):
         return self.name

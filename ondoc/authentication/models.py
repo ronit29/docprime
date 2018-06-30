@@ -3,7 +3,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import JSONField
-
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 class Image(models.Model):
     # name = models.ImageField(height_field='height', width_field='width')
@@ -86,6 +87,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         if self.email:
             self.email = self.email.lower()
         return super().save(*args, **kwargs)
+
 
     class Meta:
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
@@ -220,16 +222,16 @@ class Address(TimeStampedModel):
 
 
 class UserPermission(TimeStampedModel):
-    from ondoc.doctor.models import Hospital, HospitalNetwork, Doctor
     APPOINTMENT = 'appointment'
     BILLINNG = 'billing'
     type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'), )
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    hospital_network = models.ForeignKey(HospitalNetwork, null=True, blank=True, on_delete=models.CASCADE,
+    hospital_network = models.ForeignKey("doctor.HospitalNetwork", null=True, blank=True,
+                                         on_delete=models.CASCADE,
                                          related_name='network_admins')
-    hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.CASCADE,
+    hospital = models.ForeignKey("doctor.Hospital", null=True, blank=True,on_delete=models.CASCADE,
                                  related_name='hospital_admins')
-    doctor = models.ForeignKey(Doctor, null=True, blank=True, on_delete=models.CASCADE,
+    doctor = models.ForeignKey("doctor.Doctor", null=True, blank=True, on_delete=models.CASCADE,
                                related_name='doc_permission')
 
     permission_type = models.CharField(max_length=20, choices=type_choices, default=APPOINTMENT)
@@ -242,7 +244,7 @@ class UserPermission(TimeStampedModel):
         db_table = 'user_permission'
 
     def __str__(self):
-        return str(self.user.username) + "-" + str(self.user.phone_number) + "-" + str(self.user.email)
+        return str(self.user.email)
 
     @classmethod
     def get_user_admin_obj(cls, user):
@@ -300,14 +302,13 @@ class AppointmentTransaction(TimeStampedModel):
 
 
 class LabUserPermission(TimeStampedModel):
-    from ondoc.diagnostic.models import LabNetwork, Lab
     APPOINTMENT = 'appointment'
     BILLINNG = 'billing'
     type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'), )
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    lab_network = models.ForeignKey(LabNetwork, null=True, blank=True, on_delete=models.CASCADE,
+    lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True, on_delete=models.CASCADE,
                                          related_name='lab_network_admins')
-    lab = models.ForeignKey(Lab, null=True, blank=True, on_delete=models.CASCADE,
+    lab = models.ForeignKey("diagnostic.Lab", null=True, blank=True, on_delete=models.CASCADE,
                                  related_name='lab_admins')
     permission_type = models.CharField(max_length=20, choices=type_choices, default=APPOINTMENT)
 
@@ -332,10 +333,23 @@ class LabUserPermission(TimeStampedModel):
             for permission in get_permissions:
                 if permission.lab_network_id:
                     if permission.lab_network.is_billing_enabled:
-                        access_list.append({'user': user.id, 'admin_level': Outstanding.LAB_NETWORK_LEVEL})
+                        access_list.append({'admin_id': permission.lab_network_id, 'admin_level': Outstanding.LAB_NETWORK_LEVEL})
                 elif permission.lab_id:
                     if permission.lab.is_billing_enabled:
-                        access_list.append({'user': user.id, 'admin_level': Outstanding.LAB_LEVEL})
+                        access_list.append({'admin_id': permission.lab_id, 'admin_level': Outstanding.LAB_LEVEL})
         return access_list
         # TODO PM - Logic to get admin for a particular User
 
+
+class GenericAdmin(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.CharField(max_length=10)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    class Meta:
+        db_table = 'generic_admin'
+
+    def __str__(self):
+        return "{}:{}".format(self.phone_number, self.object_id)
