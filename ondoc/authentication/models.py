@@ -87,7 +87,6 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.email = self.email.lower()
         return super().save(*args, **kwargs)
 
-
     class Meta:
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
         db_table = "auth_user"
@@ -243,26 +242,47 @@ class UserPermission(TimeStampedModel):
         db_table = 'user_permission'
 
     def __str__(self):
-        return str(self.user.email)
+        return str(self.user.username) + "-" + str(self.user.phone_number) + "-" + str(self.user.email)
 
     @classmethod
     def get_user_admin_obj(cls, user):
         from ondoc.payout.models import Outstanding
         access_list = []
-        get_permissions = UserPermission.objects.select_related('hospital_network', 'hospital').filter(user_id=user.id,
-                                                        write_permission=True, permission_type=UserPermission.BILLINNG)
+        get_permissions = (UserPermission.objects.select_related('hospital_network', 'hospital').
+                           filter(user_id=user.id, write_permission=True, permission_type=UserPermission.BILLINNG))
         if get_permissions:
             for permission in get_permissions:
                 if permission.hospital_network_id:
                     if permission.hospital_network.is_billing_enabled:
-                        access_list.append({'user': user.id, 'admin_level': Outstanding.HOSPITAL_NETWORK_LEVEL})
+                        access_list.append({'admin_obj': permission.hospital_network, 'admin_level': Outstanding.HOSPITAL_NETWORK_LEVEL})
                 elif permission.hospital_id:
                     if permission.hospital.is_billing_enabled:
-                        access_list.append({'user': user.id, 'admin_level': Outstanding.HOSPITAL_LEVEL})
+                        access_list.append({'admin_obj': permission.hospital, 'admin_level': Outstanding.HOSPITAL_LEVEL})
                 else:
-                    access_list.append({'user': user.id, 'admin_level': Outstanding.DOCTOR_LEVEL})
+                    access_list.append({'admin_obj': permission.doctor, 'admin_level': Outstanding.DOCTOR_LEVEL})
         return access_list
         # TODO PM - Logic to get admin for a particular User
+
+    @classmethod
+    def get_billable_doctor_hospital(cls, user):
+        permission_data = (UserPermission.objects.
+                           filter(user=user, permission_type=cls.BILLINNG, write_permission=True).
+                           values('hospital_network', 'hospital', 'hospital__doctor',
+                                  'hospital_network__assoc_hospitals__doctor',
+                                  'hospital_network__assoc_hospitals'))
+        doc_hospital = list()
+        for data in permission_data:
+            if data.get("hospital_network"):
+                doc_hospital.append({
+                    "doctor": data.get("hospital_network__assoc_hospitals__doctor"),
+                    "hospital": data.get("hospital_network__assoc_hospitals")
+                })
+            elif data.get("hospital"):
+                doc_hospital.append({
+                    "doctor": data.get("hospital__doctor"),
+                    "hospital": data.get("hospital")
+                })
+        return doc_hospital
 
 
 class AppointmentTransaction(TimeStampedModel):

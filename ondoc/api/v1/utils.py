@@ -8,6 +8,7 @@ from django.utils import timezone
 import math
 import datetime
 import pytz
+import calendar
 
 def flatten_dict(d):
     def items():
@@ -136,13 +137,27 @@ def form_time_slot(date_str, time):
 
 
 def get_previous_month_year(month, year):
-    # now = timezone.now()
-    # curr_month, curr_year = now.month, now.year
-    curr_month = month
-    curr_year = year
-    prev_month = curr_month - 1
-    prev_year = curr_year
-    if curr_month == 1:
-        prev_month = 12
-        prev_year = curr_year - 1
-    return prev_month, prev_year
+    dt = "01" + str(month) + str(year)
+    dt = datetime.datetime.strptime(dt, "%d%m%Y")
+    prev_dt = dt - datetime.timedelta(days=1)
+    return prev_dt.month, prev_dt.year
+
+
+def get_start_end_datetime(month, year, local_dt=None):
+    now = timezone.now()
+    if local_dt is not None:
+        local_dt = timezone.localtime(now)
+    else:
+        dt = "01" + str(month) + str(year)
+        dt = datetime.datetime.strptime(dt, "%d%m%Y")
+        local_timezone = timezone.get_default_timezone().__str__()
+        dt = pytz.timezone(local_timezone).localize(dt)
+        local_dt = timezone.localtime(dt)
+    start_dt = local_dt.replace(hour=0, minute=0, second=0, microsecond=0, day=1)
+    end_dt = get_last_date_time(local_dt)
+    return start_dt, end_dt
+
+
+def get_last_date_time(dt):
+    t, last_date = calendar.monthrange(dt.year, dt.month)
+    return dt.replace(hour=23, minute=59, second=59, microsecond=0, day=last_date)
