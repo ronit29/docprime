@@ -74,7 +74,7 @@ class DoctorHospitalForm(forms.ModelForm):
 
         if start and end and start>=end:
             raise forms.ValidationError("Availability start time should be less than end time")
-        if mrp < fees:
+        if mrp and mrp < fees:
             raise forms.ValidationError("MRP cannot be less than fees")
 
 class DoctorHospitalFormSet(forms.BaseInlineFormSet):

@@ -542,3 +542,9 @@ class LabOnboardingToken(TimeStampedModel):
 
     class Meta:
         db_table = "lab_onboarding_token"
+
+# Used to display pricing in admin
+class LabPricing(Lab):
+    class Meta:
+        proxy = True
+        default_permissions = []

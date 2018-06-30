@@ -49,7 +49,7 @@
            {{ lab.name }}
         </div>
         <div class="panel-body">
-            <form action="/labmodel_form/" method="post" id="lab_model_form" enctype="multipart/form-data">
+            <form action="/admin/labpricing/save/" method="post" id="lab_model_form" enctype="multipart/form-data">
                 {% csrf_token %}
                 {% crispy form %}
                 <input type="hidden" value="{{ id }}" id="lab_id" name="id" class="lab_id_pk"/>
@@ -88,7 +88,7 @@
                     <td class="custom_agreed_price">
                         <input class="custom_agreed_price input-sm"  type="text" name="custom_agreed_price" >
                     </td>
-                    <td class="custom_deal_price"></td>
+                    <td class="computed_deal_price"></td>
                     <td class="custom_deal_price">
                         <input class="custom_deal_price input-sm"  type="text" name="custom_deal_price" >
                     </td>
@@ -110,10 +110,14 @@
 
         $('.typeahead').typeahead({
         source: function (query, process) {
-        return $.get('/labtestauto/', { query: query }, function (data) {
+        return $.get('/admin/labtestauto/', { query: query }, function (data) {
             return process(data.results);
                 });
             },
+        matcher : function(item)
+            {
+                return true;
+            },    
         displayText: function(item)
         {            
             return item.text
@@ -263,7 +267,7 @@
                       jQuery.ajax({
                             data: dataString,
                             type: "POST",
-                            url:  '/labtest_ajax/',
+                            url:  '/admin/ajax/labtest/save/',
                             success: function(response) {
                                 if(response['success']){
                                    $(tr).find('td.computed_agreed_price').html(response['computed_agreed_price']);
