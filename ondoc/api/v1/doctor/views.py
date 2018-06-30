@@ -325,12 +325,13 @@ class DoctorProfileView(viewsets.GenericViewSet):
         hospital_queryset = doctor.hospitals.distinct()
         hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True)
         clinic_queryset = doctor.availability.order_by('hospital_id', 'fees').distinct('hospital_id')
-        clininc_serializer = serializers.DoctorHospitalSerializer(clinic_queryset, many=True)
+        clinic_serializer = serializers.DoctorHospitalSerializer(clinic_queryset, many=True,
+                                                                 context={"request": request})
 
         temp_data = serializer.data
         temp_data["count"] = appointment_count
         temp_data['hospitals'] = hospital_serializer.data
-        temp_data['clinic'] = clininc_serializer.data
+        temp_data['clinic'] = clinic_serializer.data
         return Response(temp_data)
 
 
