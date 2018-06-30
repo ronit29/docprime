@@ -282,14 +282,17 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     hospital_name = serializers.ReadOnlyField(source='hospital.name')
     address = serializers.ReadOnlyField(source='hospital.locality')
     hospital_id = serializers.ReadOnlyField(source='hospital.pk')
+    hospital_thumbnail = serializers.SerializerMethodField()
     day = serializers.SerializerMethodField()
     discounted_fees = serializers.IntegerField(read_only=True, allow_null=True)
 
+    def get_hospital_thumbnail(self, instance):
+        request = self.context.get("request")
+        return request.build_absolute_uri(instance.hospital.get_thumbnail())
 
     def get_day(self, attrs):
         day  = attrs.day
         return dict(DoctorHospital.DAY_CHOICES).get(day)
-
 
     def create(self, validated_data):
         return DoctorHospital.objects.create(**validated_data)
@@ -303,7 +306,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorHospital
         fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'fees',
-                  'discounted_fees', )
+                  'discounted_fees', 'hospital_thumbnail', )
 
 
 class DoctorEmailSerializer(serializers.ModelSerializer):

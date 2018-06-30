@@ -2,6 +2,7 @@ from django.contrib.gis.db import models
 from django.db import migrations
 from django.db.models import Count
 from django.contrib.postgres.operations import CreateExtension
+from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
@@ -76,6 +77,10 @@ class Hospital(TimeStampedModel, CreatedByModel, QCModel):
 
     class Meta:
         db_table = "hospital"
+
+    def get_thumbnail(self):
+        return static("hospital_images/hospital_default.png")
+
 
 
 class HospitalAward(TimeStampedModel):
