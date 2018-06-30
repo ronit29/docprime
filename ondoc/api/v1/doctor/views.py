@@ -438,7 +438,7 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
         }
         doctor_leave_serializer = serializers.DoctorLeaveSerializer(data=doctor_leave_data)
         doctor_leave_serializer.is_valid(raise_exception=True)
-        self.get_queryset().update(deleted_at=timezone.now())
+        # self.get_queryset().update(deleted_at=timezone.now())        Now user can apply more than one leave
         doctor_leave_serializer.save()
         return Response(doctor_leave_serializer.data)
 
@@ -575,6 +575,8 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                                                      "qualifications__specialization")
                            .filter(pk=validated_data.get('doctor_id').id))
         doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
+        doctor_leave_serializer = serializers.DoctorLeaveSerializer(
+            models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True), many=True)
 
         timeslots = dict()
         obj = TimeSlotExtraction()
@@ -601,4 +603,5 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         #         timeslots[i]['timing'][1] = temp_list
         #         temp_list = [[k, v] for k, v in timeslots[i]['timing'][2].items()]
         #         timeslots[i]['timing'][2] = temp_list
-        return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data})
+        return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
+                         "doctor_leaves": doctor_leave_serializer.data})
