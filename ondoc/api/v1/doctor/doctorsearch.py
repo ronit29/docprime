@@ -123,25 +123,26 @@ class DoctorSearchHelper:
             doctor_hospitals = [doctor_hospital for doctor_hospital in doctor.availability.all() if
                                 doctor_hospital.hospital_id == doctor_hospital_mapping[doctor_hospital.doctor_id]]
             serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True)
-
+            filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
+            min_fees = min([data.get("fees") for data in serializer.data if data.get("fees")])
             if not serializer.data:
                 hospitals = []
             else:
-                fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
+                # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
                 hospitals = [{
                     "hospital_name": serializer.data[0]["hospital_name"],
                     "address": serializer.data[0]["address"],
                     "doctor": serializer.data[0]["doctor"],
                     "hospital_id": serializer.data[0]['hospital_id'],
-                    "fees": fees,
-                    "min_fees": min([data.get("fees") for data in serializer.data if data.get("fees")]),
-                    "discounted_fees": fees,
+                    "fees": min_fees,
+                    "discounted_fees": min_fees,
                     "timings": convert_timings(serializer.data, is_day_human_readable=True)
                 }]
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
+                "fees": filtered_fees,
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
                 "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
