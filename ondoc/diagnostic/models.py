@@ -1,4 +1,5 @@
 from django.contrib.gis.db import models
+from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
 from ondoc.doctor.models import Hospital
@@ -58,6 +59,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
 
     class Meta:
         db_table = "lab"
+
+    def get_thumbnail(self):
+        all_images = self.lab_image.all()
+        if all_images:
+            return all_images[0].name.url
+        return static('lab_images/lab_default.png')
 
     def save(self, *args, **kwargs):
         self.clean()

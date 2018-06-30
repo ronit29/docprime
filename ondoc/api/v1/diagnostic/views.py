@@ -85,7 +85,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         count = queryset.count()
         paginated_queryset = paginate_queryset(queryset, request)
         response_queryset = self.form_lab_whole_data(paginated_queryset)
-        serializer = LabCustomSerializer(response_queryset, many=True)
+        serializer = LabCustomSerializer(response_queryset, many=True,
+                                         context={"request": request})
         return Response({"result": serializer.data,
                          "count": count})
 
@@ -99,7 +100,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_queryset = queryset[0].lab
         day_now = timezone.now().weekday()
         timing_queryset = lab_queryset.labtiming_set.filter(day=day_now)
-        lab_serializer = LabModelSerializer(lab_queryset)
+        lab_serializer = LabModelSerializer(lab_queryset, context={"request": request})
         temp_data = dict()
         temp_data['lab'] = lab_serializer.data
         temp_data['tests'] = test_serializer.data
