@@ -1,23 +1,28 @@
 from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User, UserPermission
 from ondoc.doctor.models import Hospital
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
+from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import F
+from django.db.models import F, Sum, When, Case, Q
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
+from ondoc.payout import models as payout_model
+from ondoc.api.v1.utils import get_start_end_datetime
 import decimal
 import math
-
+import os
+from ondoc.insurance import models as insurance_model
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
-    ONBOARDING_STATUS = [(NOT_ONBOARDED, "Not Onboarded"), (REQUEST_SENT, "Onboarding Request Sent"), (ONBOARDED, "Onboarded")]
+    ONBOARDING_STATUS = [(NOT_ONBOARDED, "Not Onboarded"), (REQUEST_SENT, "Onboarding Request Sent"),
+                         (ONBOARDED, "Onboarded")]
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
     license = models.CharField(max_length=200, blank=True)
@@ -150,7 +155,8 @@ class LabManager(TimeStampedModel):
     number = models.BigIntegerField()
     email = models.EmailField(max_length=100, blank=True)
     details = models.CharField(max_length=200, blank=True)
-    contact_type = models.PositiveSmallIntegerField(choices=[(1, "Other"), (2, "Single Point of Contact"), (3, "Manager"), (4, "Owner")])
+    contact_type = models.PositiveSmallIntegerField(
+        choices=[(1, "Other"), (2, "Single Point of Contact"), (3, "Manager"), (4, "Owner")])
 
     def __str__(self):
         return self.lab.name + " (" + self.name + ")"
@@ -170,28 +176,30 @@ class LabImage(TimeStampedModel, Image):
 class LabTiming(TimeStampedModel):
 
     TIME_CHOICES = [(7.0, "7 AM"), (7.5, "7:30 AM"),
-    (8.0, "8 AM"), (8.5, "8:30 AM"),
-    (9.0, "9 AM"), (9.5, "9:30 AM"),
-    (10.0, "10 AM"), (10.5, "10:30 AM"),
-    (11.0, "11 AM"), (11.5, "11:30 AM"),
-    (12.0, "12 PM"), (12.5, "12:30 PM"),
-    (13.0, "1 PM"), (13.5, "1:30 PM"),
-    (14.0, "2 PM"), (14.5, "2:30 PM"),
-    (15.0, "3 PM"), (15.5, "3:30 PM"),
-    (16.0, "4 PM"), (16.5, "4:30 PM"),
-    (17.0, "5 PM"), (17.5, "5:30 PM"),
-    (18.0, "6 PM"), (18.5, "6:30 PM"),
-    (19.0, "7 PM"), (19.5, "7:30 PM"),
-    (20.0, "8 PM"), (20.5, "8:30 PM"),
-    (21.0, "9 PM"), (21.5, "9:30 PM"),
-    (22.0, "10 PM"), (22.5, "10:30 PM")]
+                    (8.0, "8 AM"), (8.5, "8:30 AM"),
+                    (9.0, "9 AM"), (9.5, "9:30 AM"),
+                    (10.0, "10 AM"), (10.5, "10:30 AM"),
+                    (11.0, "11 AM"), (11.5, "11:30 AM"),
+                    (12.0, "12 PM"), (12.5, "12:30 PM"),
+                    (13.0, "1 PM"), (13.5, "1:30 PM"),
+                    (14.0, "2 PM"), (14.5, "2:30 PM"),
+                    (15.0, "3 PM"), (15.5, "3:30 PM"),
+                    (16.0, "4 PM"), (16.5, "4:30 PM"),
+                    (17.0, "5 PM"), (17.5, "5:30 PM"),
+                    (18.0, "6 PM"), (18.5, "6:30 PM"),
+                    (19.0, "7 PM"), (19.5, "7:30 PM"),
+                    (20.0, "8 PM"), (20.5, "8:30 PM"),
+                    (21.0, "9 PM"), (21.5, "9:30 PM"),
+                    (22.0, "10 PM"), (22.5, "10:30 PM")]
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
 
     pickup_flag = models.BooleanField(default=False)
-    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
-    start = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
-    end = models.DecimalField(max_digits=3,decimal_places=1, choices = TIME_CHOICES)
+    day = models.PositiveSmallIntegerField(blank=False, null=False,
+                                           choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"),
+                                                    (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
+    start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
 
     class Meta:
         db_table = "lab_timing"
@@ -258,7 +266,8 @@ class LabNetworkManager(TimeStampedModel):
     number = models.BigIntegerField()
     email = models.EmailField(max_length=100, blank=True)
     details = models.CharField(max_length=200, blank=True)
-    contact_type = models.PositiveSmallIntegerField(choices=[(1, "Other"), (2, "Single Point of Contact"), (3, "Manager")])
+    contact_type = models.PositiveSmallIntegerField(
+        choices=[(1, "Other"), (2, "Single Point of Contact"), (3, "Manager")])
 
     def __str__(self):
         return self.name
@@ -382,7 +391,7 @@ class AvailableLabTest(TimeStampedModel):
         return self.test.test_type
 
     def __str__(self):
-        return self.test.name+', '+self.lab.name
+        return self.test.name + ', ' + self.lab.name
 
     class Meta:
         db_table = "available_lab_test"
@@ -394,23 +403,28 @@ class LabAppointment(TimeStampedModel):
     RESCHEDULED_LAB = 3
     RESCHEDULED_PATIENT = 4
     ACCEPTED = 5
-
-    # RESCHEDULED_BY_USER = 4
-    # REJECTED = 4
     CANCELED = 6
     COMPLETED = 7
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
     lab_test = models.ManyToManyField(AvailableLabTest)
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     profile_detail = JSONField(blank=True, null=True)
     status = models.PositiveSmallIntegerField(default=CREATED)
-    price = models.PositiveSmallIntegerField()
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # This is mrp
+    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    effective_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
     otp = models.PositiveIntegerField(blank=True, null=True)
     payment_status = models.PositiveIntegerField(choices=OpdAppointment.PAYMENT_STATUS_CHOICES,
                                                  default=OpdAppointment.PAYMENT_PENDING)
+
+    payment_type = models.PositiveSmallIntegerField(choices=OpdAppointment.PAY_CHOICES, default=OpdAppointment.PREPAID)
+    insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
+                                  on_delete=models.DO_NOTHING)
     is_home_pickup = models.BooleanField(default=False)
     address = JSONField(blank=True, null=True)
 
@@ -423,8 +437,123 @@ class LabAppointment(TimeStampedModel):
 
         return allowed
 
+    def action_rescheduled_lab(self):
+        self.status = self.RESCHEDULED_LAB
+        self.save()
+        return self
+
+    def action_rescheduled_patient(self, data):
+        self.status = self.RESCHEDULED_PATIENT
+        self.time_slot_start = data.get('time_slot_start')
+        self.agreed_price = data.get('agreed_price', self.agreed_price)
+        self.price = data.get('price', self.price)
+        self.deal_price = data.get('deal_price', self.deal_price)
+        self.effective_price = data.get('effective_price', self.effective_price)
+
+        self.save()
+
+    def action_accepted(self):
+        self.status = self.ACCEPTED
+        self.save()
+
+    def action_cancelled(self):
+        self.status = self.CANCELED
+        self.save()
+
+        consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
+        consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
+
+        data = dict()
+        data["reference_id"] = self.id
+        data["user"] = self.user
+        data["product_id"] = 1
+
+        cancel_amount = self.get_cancel_amount(data)
+        consumer_account.credit_cancellation(data, cancel_amount)
+
+    def action_completed(self):
+        self.status = self.COMPLETED
+        self.save()
+        if self.payment_type != OpdAppointment.INSURANCE:
+            admin_obj, out_level = self.get_billable_admin_level()
+            app_outstanding_fees = self.lab_payout_amount()
+            payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+
+        # if self.payment_type != self.INSURANCE:
+        #     payout_model.Outstanding.create_outstanding(self)
+
+    def get_billable_admin_level(self):
+        if self.lab.network and self.lab.network.is_billing_enabled:
+            return self.lab.network, payout_model.Outstanding.LAB_NETWORK_LEVEL
+        else:
+            return self.lab, payout_model.Outstanding.LAB_LEVEL
+
+    def lab_payout_amount(self):
+        amount = 0
+        if self.payment_type == OpdAppointment.COD:
+            amount = (-1)*(self.effective_price - self.agreed_price)
+        elif self.payment_type == OpdAppointment.PREPAID:
+            amount = self.agreed_price
+
+        return amount
+
+    @classmethod
+    def get_billing_summary(cls, user, req_data):
+        month = req_data.get("month")
+        year = req_data.get("year")
+        payment_type = req_data.get("payment_type")
+        start_date_time, end_date_time = get_start_end_datetime(month, year)
+        lab_data = UserPermission.get_billable_doctor_hospital(user)
+        lab_list = list()
+        for data in lab_data:
+            if data.get("lab"):
+                lab_list.append(data["lab"])
+        if payment_type in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+            payment_type = [OpdAppointment.COD, OpdAppointment.PREPAID]
+        elif payment_type in [OpdAppointment.INSURANCE]:
+            payment_type = [OpdAppointment.INSURANCE]
+        queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+                                                  time_slot_start__gte=start_date_time,
+                                                  time_slot_start__lte=end_date_time,
+                                                  payment_type__in=payment_type,
+                                                  lab__in=lab_list))
+        if payment_type != OpdAppointment.INSURANCE:
+            tcp_condition = Case(When(payment_type=OpdAppointment.COD, then=F("effective_price")),
+                                 When(~Q(payment_type=OpdAppointment.COD), then=0))
+            tcs_condition = Case(When(payment_type=OpdAppointment.COD, then=F("agreed_price")),
+                                  When(~Q(payment_type=OpdAppointment.COD), then=0))
+            tpf_condition = Case(When(payment_type=OpdAppointment.PREPAID, then=F("agreed_price")),
+                                 When(~Q(payment_type=OpdAppointment.PREPAID), then=0))
+            queryset = queryset.values("lab").annotate(total_cash_payment=Sum(tcp_condition),
+                                                       total_cash_share=Sum(tcs_condition),
+                                                       total_online_payout=Sum(tpf_condition))
+
+        return queryset
+
+    @classmethod
+    def get_billing_appointment(cls, user, req_data):
+        month = req_data.get("month")
+        year = req_data.get("year")
+        payment_type = req_data.get("payment_type")
+        start_date_time, end_date_time = get_start_end_datetime(month, year)
+        lab_data = UserPermission.get_billable_doctor_hospital(user)
+        lab_list = list()
+        for data in lab_data:
+            if data.get("lab"):
+                lab_list.append(data["lab"])
+        if payment_type in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+            payment_type = [OpdAppointment.COD, OpdAppointment.PREPAID]
+        elif payment_type in [OpdAppointment.INSURANCE]:
+            payment_type = [OpdAppointment.INSURANCE]
+        queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+                                                  time_slot_start__gte=start_date_time,
+                                                  time_slot_start__lte=end_date_time,
+                                                  payment_type__in=payment_type,
+                                                  lab__in=lab_list))
+        return queryset
+
     def __str__(self):
-        return self.profile.name+', '+self.lab.name
+        return self.profile.name + ', ' + self.lab.name
 
     class Meta:
         db_table = "lab_appointment"
@@ -454,20 +583,6 @@ class PromotedLab(TimeStampedModel):
     class Meta:
         db_table = "promoted_lab"
 
-# class RadiologyTest(TimeStampedModel):
-#     name = models.CharField(max_length=200)
-#     test_type = models.ForeignKey(RadiologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_type')
-#     test_sub_type = models.ForeignKey(RadiologyTestType, blank=True, null=True, on_delete=models.SET_NULL, related_name='test_sub_type')
-#     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
-#     why = models.CharField(max_length=1000, blank=True)
-#     pre_test_info = models.CharField(max_length=1000, blank=True)
-
-#     def __str__(self):
-#         return self.name
-
-#     class Meta:
-#         db_table = "radiology_test"
-
 
 class LabService(TimeStampedModel):
     PATHOLOGY = 1
@@ -484,10 +599,10 @@ class LabService(TimeStampedModel):
 
 
 class LabDoctorAvailability(TimeStampedModel):
-    SLOT_CHOICES = [("m","Morning"), ("e","Evening")]
+    SLOT_CHOICES = [("m", "Morning"), ("e", "Evening")]
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
-    is_male_available = models.BooleanField(verbose_name= 'Male', default=False)
-    is_female_available = models.BooleanField(verbose_name= 'Female', default=False)
+    is_male_available = models.BooleanField(verbose_name='Male', default=False)
+    is_female_available = models.BooleanField(verbose_name='Female', default=False)
     slot = models.CharField(blank=False, max_length=2, choices=SLOT_CHOICES)
 
     def __str__(self):
@@ -515,10 +630,12 @@ class LabDocument(TimeStampedModel):
     REGISTRATION = 4
     CHEQUE = 5
     LOGO = 6
-    CHOICES = [(PAN, "PAN Card"), (ADDRESS,"Address Proof"), (GST,"GST Certificate"), (REGISTRATION,"Registration Certificate"),(CHEQUE,"Cancel Cheque Copy"),(LOGO,"LOGO")]
+    CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
+               (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO")]
     lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
-    name = models.FileField(upload_to='lab/images', validators=[FileExtensionValidator(allowed_extensions=['pdf','jfif','jpg','jpeg','png'])])
+    name = models.FileField(upload_to='lab/images', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
     def extension(self):
         name, extension = os.path.splitext(self.name.name)
@@ -526,7 +643,6 @@ class LabDocument(TimeStampedModel):
 
     def is_pdf(self):
         return self.name.name.endswith('.pdf')
-
 
     # def __str__(self):
         # return self.name
@@ -543,7 +659,8 @@ class LabOnboardingToken(TimeStampedModel):
     lab = models.ForeignKey(Lab, null=True, on_delete=models.SET_NULL)
     token = models.CharField(max_length=100)
     email = models.EmailField(max_length=100, blank=True)
-    mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    mobile = models.BigIntegerField(blank=True, null=True,
+                                    validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     verified_token = models.CharField(max_length=100, null=True)
     status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=GENERATED)
 

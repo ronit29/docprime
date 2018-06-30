@@ -1,11 +1,14 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
+from ondoc.account import models as account_models
 from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
-from ondoc.api.v1.utils import convert_timings
+from ondoc.api.v1.utils import convert_timings, form_time_slot
+from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min
+from django.contrib.gis.geos import Point
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework import mixins
@@ -20,10 +23,14 @@ from django.db.models import Case, When
 import datetime
 from operator import itemgetter
 from itertools import groupby
+from django.contrib.gis.db.models.functions import Distance
 from ondoc.api.v1.utils import RawSql
 from django.contrib.auth import get_user_model
 from django.db.models import F
 from collections import defaultdict
+import datetime
+import random
+import copy
 
 import json
 User = get_user_model()
@@ -140,16 +147,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         else:
             return Response([])
 
-
     def payment_retry(self, request, pk=None):
         queryset = models.OpdAppointment.objects.filter(pk=pk)
         payment_response = dict()
         if queryset:
             serializer_data = serializers.OpdAppointmentSerializer(queryset.first(), context={'request':request})
-            payment_response = self.payment_details(request, serializer_data.data, 1)
+            payment_response = self.extract_payment_details(request, serializer_data.data, 1)
         return Response(payment_response)
 
-
+    @transaction.atomic
     def complete(self, request):
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -162,8 +168,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if request.user.user_type == User.DOCTOR and perm_data.write_permission:
                 otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
                 otp_valid_serializer.is_valid(raise_exception=True)
-                opd_appointment.status = models.OpdAppointment.COMPLETED
-                opd_appointment.save()
+                opd_appointment.action_completed()
         opd_appointment_serializer = serializers.OpdAppointmentSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
@@ -173,41 +178,39 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        time_slot_start = serializers.CreateAppointmentSerializer.form_time_slot(data.get("start_date"),
-                                                                                 data.get("start_time"))
-        # time_slot_start = data.get("time_slot_start")
-
-        doctor_hospital = models.DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
-            day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).first()
-        fees = doctor_hospital.fees
-
-        profile_detail = dict()
-        # profile_model = auth_models.UserProfile.objects.get()
+        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+        doctor_hospital = models.DoctorHospital.objects.filter(
+            doctor=data.get('doctor'), hospital=data.get('hospital'),
+            day=time_slot_start.weekday(), start__lte=time_slot_start.hour,
+            end__gte=time_slot_start.hour).first()
         profile_model = data.get("profile")
-        profile_detail["name"] = profile_model.name
-        profile_detail["gender"] = profile_model.gender
-        profile_detail["dob"] = str(profile_model.dob)
-        # profile_detail["profile_image"] = profile_model.profile_image
+        profile_detail = {
+            "name": profile_model.name,
+            "gender": profile_model.gender,
+            "dob": str(profile_model.dob)
+        }
+        req_data = request.data
+        if req_data.get("payment_type") == models.OpdAppointment.INSURANCE:
+            effective_price = doctor_hospital.discounted_price
+        else:
+            # TODO PM - Logic for coupon
+            effective_price = doctor_hospital.discounted_price
 
-        data = {
+        opd_data = {
             "doctor": data.get("doctor").id,
             "hospital": data.get("hospital").id,
             "profile": data.get("profile").id,
-            "profile_detail": json.dumps(profile_detail),
+            "profile_detail": profile_detail,
             "user": request.user.id,
             "booked_by": request.user.id,
-            "fees": fees,
-            "time_slot_start": time_slot_start,
-            #"time_slot_end": time_slot_end,
+            "fees": doctor_hospital.fees,
+            "discounted_price": doctor_hospital.discounted_price,
+            "effective_price": effective_price,
+            "mrp": doctor_hospital.mrp,
+            "time_slot_start": str(time_slot_start),
+            "payment_type": request.data.get("payment_type")
         }
-
-        appointment_serializer = serializers.OpdAppointmentSerializer(data=data, context={'request':request})
-        appointment_serializer.is_valid(raise_exception=True)
-        appointment_serializer.save()
-        resp = {}
-        resp["status"] = 1
-        resp["data"] = appointment_serializer.data
-        resp["payment_details"] = self.payment_details(request, appointment_serializer.data, 1)
+        resp = self.extract_payment_details(request, opd_data, 1)
         return Response(data=resp)
 
 
@@ -225,9 +228,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             return Response(resp, status=status.HTTP_400_BAD_REQUEST)
 
         if request.user.user_type == User.DOCTOR:
-            updated_opd_appointment = self.doctor_update(opd_appointment, validated_data)
-        elif request.user.user_type == User.CONSUMER:
-            updated_opd_appointment = self.consumer_update(opd_appointment, validated_data)
+            req_status = validated_data.get('status')
+            if req_status == models.OpdAppointment.RESCHEDULED_DOCTOR:
+                updated_opd_appointment = opd_appointment.action_rescheduled_doctor(opd_appointment)
+            elif req_status == models.OpdAppointment.ACCEPTED:
+                updated_opd_appointment = opd_appointment.action_accepted(opd_appointment)
 
         opd_appointment_serializer = serializers.OpdAppointmentSerializer(updated_opd_appointment, context={'request':request})
         response = {
@@ -236,20 +241,18 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         }
         return Response(response)
 
-    def doctor_update(self, opd_appointment, validated_data):
-        status = validated_data.get('status')
-        opd_appointment.status = validated_data.get('status')
+    # def doctor_update(self, opd_appointment, validated_data):
+    #     opd_appointment.status = validated_data.get('status')
+    #     opd_appointment.save()
+    #     return opd_appointment
 
-        opd_appointment.save()
-        return opd_appointment
-
-    def consumer_update(self, opd_appointment, validated_data):
-        opd_appointment.status = validated_data.get('status')
-        if validated_data.get('status') == models.OpdAppointment.RESCHEDULED_PATIENT:
-            opd_appointment.time_slot_start = validated_data.get("time_slot_start")
-            opd_appointment.time_slot_end = validated_data.get("time_slot_end")
-        opd_appointment.save()
-        return opd_appointment
+    # def consumer_update(self, opd_appointment, validated_data):
+    #     opd_appointment.status = validated_data.get('status')
+    #     if validated_data.get('status') == models.OpdAppointment.RESCHEDULED_PATIENT:
+    #         opd_appointment.time_slot_start = validated_data.get("time_slot_start")
+    #         opd_appointment.time_slot_end = validated_data.get("time_slot_end")
+    #     opd_appointment.save()
+    #     return opd_appointment
 
     def extract_appointment_ids(self, appointment_data):
         id_dict = defaultdict(dict)
@@ -274,29 +277,86 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             whole_queryset.append(temp)
         return whole_queryset
 
-    def payment_details(self, request, appointment_details, product_id):
+    @transaction.atomic
+    def extract_payment_details(self, request, appointment_details, product_id):
+        remaining_amount = 0
+        user = request.user
+        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+        balance = consumer_account.balance
+        resp = {}
+
+        insured_cod_flag = self.is_insured_cod(appointment_details)
+
+        if insured_cod_flag or balance >= appointment_details.get("effective_price"):
+            appointment_details["payment_status"] = models.OpdAppointment.PAYMENT_ACCEPTED
+            appointment_details["status"] = models.OpdAppointment.BOOKED
+            otp = random.randint(1000, 9999)
+            appointment_details["otp"] = otp
+            opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details,
+                                                                   context={"request": request})
+
+            opd_seriailizer.is_valid(raise_exception=True)
+            opd_seriailizer.save()
+            user_account_data = {
+                "user": user,
+                "product_id": product_id,
+                "reference_id": opd_seriailizer.data.get("id")
+            }
+            if not insured_cod_flag:
+                consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
+            resp["status"] = 1
+            resp["data"] = opd_seriailizer.data
+        else:
+            opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details,
+                                                                   context={"request": request})
+            opd_seriailizer.is_valid(raise_exception=True)
+            account_models.Order.disable_pending_orders(appointment_details, product_id,
+                                                        account_models.Order.OPD_APPOINTMENT_CREATE)
+
+            temp_app_details = copy.deepcopy(appointment_details)
+            temp_app_details["discounted_price"] = str(appointment_details["discounted_price"])
+            temp_app_details["fees"] = str(appointment_details["fees"])
+            temp_app_details["effective_price"] = str(appointment_details["effective_price"])
+            temp_app_details["mrp"] = str(appointment_details["mrp"])
+
+            order = account_models.Order.objects.create(
+                product_id=product_id,
+                action=account_models.Order.OPD_APPOINTMENT_CREATE,
+                action_data=temp_app_details,
+                amount=appointment_details.get("effective_price") - consumer_account.balance,
+                payment_status=account_models.Order.PAYMENT_PENDING
+            )
+            appointment_details["payable_amount"] = appointment_details.get("effective_price") - balance
+            resp["status"] = 1
+            resp['pg_details'] = self.payment_details(request, appointment_details, product_id, order.id)
+        return resp
+
+    def payment_details(self, request, appointment_details, product_id, order_id):
         details = dict()
         pgdata = dict()
-        user = request.user
-        user_profile = user.profiles.filter(is_default_user=True).first()
-        pgdata['custId'] = user.id
-        pgdata['mobile'] = user.phone_number
-        pgdata['email'] = user.email
-        if not user.email:
-            pgdata['email'] = "dummy_appointment@policybazaar.com"
+        if appointment_details["payable_amount"] != 0:
+            user = request.user
+            user_profile = user.profiles.filter(is_default_user=True).first()
+            pgdata['custId'] = user.id
+            pgdata['mobile'] = user.phone_number
+            pgdata['email'] = user.email
+            if not user.email:
+                pgdata['email'] = "dummy_appointment@policybazaar.com"
 
-        pgdata['productId'] = product_id
-        base_url = (
-            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
-        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['checkSum'] = ''
-        pgdata['appointmentId'] = appointment_details['id']
-        if user_profile:
-            pgdata['name'] = user_profile.name
-        else:
-            pgdata['name'] = "DummyName"
-        pgdata['txAmount'] = appointment_details['fees']
+            pgdata['productId'] = product_id
+            base_url = (
+                "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+            pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+            pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+            pgdata['checkSum'] = ''
+            pgdata['referenceId'] = ""
+            pgdata['orderId'] = order_id
+            if user_profile:
+                pgdata['name'] = user_profile.name
+            else:
+                pgdata['name'] = "DummyName"
+            pgdata['txAmount'] = appointment_details['payable_amount']
 
         if pgdata:
             details['required'] = True
@@ -305,6 +365,18 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             details['required'] = False
 
         return details
+
+    def is_insured_cod(self, app_details):
+        return False
+        if insurance_utility.lab_is_insured(app_details):
+            app_details["payment_type"] = doctor_model.OpdAppointment.INSURANCE
+            app_details["effective_price"] = 0
+            return True
+        elif app_details["payment_type"] == doctor_model.OpdAppointment.COD:
+            app_details["effective_price"] = 0
+            return True
+        else:
+            return False
 
 
 class DoctorProfileView(viewsets.GenericViewSet):
@@ -316,12 +388,9 @@ class DoctorProfileView(viewsets.GenericViewSet):
                                                          context={"request": request})
 
         now = datetime.datetime.now()
-        today = datetime.date.today()
         appointment_count = models.OpdAppointment.objects.filter(Q(doctor=request.user.doctor.id),
                                                                  ~Q(status=models.OpdAppointment.CANCELED),
-                                                                 ~Q(status=models.OpdAppointment.COMPLETED),
-                                                                 ~Q(status=models.OpdAppointment.CREATED),
-                                                                 Q(time_slot_start__date=today)).count()
+                                                                 Q(time_slot_start__gte=now)).count()
         hospital_queryset = doctor.hospitals.distinct()
         hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True)
         clinic_queryset = doctor.availability.order_by('hospital_id', 'fees').distinct('hospital_id')

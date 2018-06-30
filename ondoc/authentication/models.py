@@ -1,9 +1,11 @@
 from django.conf import settings
 from django.db import models
+from django.db.models import Q, Prefetch
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import JSONField
-# from ondoc.doctor.models import OpdAppointment
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 
 class Image(models.Model):
@@ -18,7 +20,7 @@ class QCModel(models.Model):
     IN_PROGRESS = 1
     SUBMITTED_FOR_QC = 2
     QC_APPROVED = 3
-    DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"),(SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved")]
+    DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"), (SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved")]
     data_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=DATA_STATUS_CHOICES)
 
     class Meta:
@@ -26,7 +28,6 @@ class QCModel(models.Model):
 
 class CustomUserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
-
     use_in_migrations = True
 
     def _create_user(self, email, password, **extra_fields):
@@ -93,6 +94,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
         db_table = "auth_user"
 
+
 class StaffProfile(models.Model):
     name = models.CharField(max_length=100, blank=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -122,6 +124,7 @@ class TimeStampedModel(models.Model):
     class Meta:
         abstract = True
 
+
 class CreatedByModel(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, editable=False, on_delete=models.SET_NULL)
 
@@ -150,6 +153,7 @@ class UserProfile(TimeStampedModel, Image):
 
     class Meta:
         db_table = "user_profile"
+
 
 class OtpVerifications(TimeStampedModel):
     OTP_EXPIRY_TIME = 60  # In minutes
@@ -222,17 +226,16 @@ class Address(TimeStampedModel):
 
 
 class UserPermission(TimeStampedModel):
-    from ondoc.doctor.models import Hospital, HospitalNetwork, Doctor
     APPOINTMENT = 'appointment'
-    type_choices = ((APPOINTMENT, 'Appointment'), )
+    BILLINNG = 'billing'
+    type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'), )
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    hospital_network = models.ForeignKey(HospitalNetwork, null=True, blank=True, on_delete=models.CASCADE,
-
-
+    hospital_network = models.ForeignKey("doctor.HospitalNetwork", null=True, blank=True,
+                                         on_delete=models.CASCADE,
                                          related_name='network_admins')
-    hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.CASCADE,
+    hospital = models.ForeignKey("doctor.Hospital", null=True, blank=True,on_delete=models.CASCADE,
                                  related_name='hospital_admins')
-    doctor = models.ForeignKey(Doctor, null=True, blank=True, on_delete=models.CASCADE,
+    doctor = models.ForeignKey("doctor.Doctor", null=True, blank=True, on_delete=models.CASCADE,
                                related_name='doc_permission')
 
     permission_type = models.CharField(max_length=20, choices=type_choices, default=APPOINTMENT)
@@ -247,6 +250,98 @@ class UserPermission(TimeStampedModel):
     def __str__(self):
         return str(self.user.email)
 
+    @classmethod
+    def get_user_admin_obj(cls, user):
+        from ondoc.payout.models import Outstanding
+        access_list = []
+        get_permissions = (UserPermission.objects.select_related('hospital_network', 'hospital').
+                           filter(user_id=user.id, write_permission=True, permission_type=UserPermission.BILLINNG))
+        if get_permissions:
+            for permission in get_permissions:
+                if permission.hospital_network_id:
+                    if permission.hospital_network.is_billing_enabled:
+                        access_list.append({'admin_obj': permission.hospital_network, 'admin_level': Outstanding.HOSPITAL_NETWORK_LEVEL})
+                elif permission.hospital_id:
+                    if permission.hospital.is_billing_enabled:
+                        access_list.append({'admin_obj': permission.hospital, 'admin_level': Outstanding.HOSPITAL_LEVEL})
+                else:
+                    access_list.append({'admin_obj': permission.doctor, 'admin_level': Outstanding.DOCTOR_LEVEL})
+        return access_list
+        # TODO PM - Logic to get admin for a particular User
+
+    @classmethod
+    def create_permission(cls, user):
+        from ondoc.doctor.models import HospitalNetwork, Hospital, DoctorHospital
+        admin_queryset = GenericAdmin.objects.filter(user=user)
+        UserPermission.objects.filter(user=user).delete()
+        user_permissions_list =[]
+        networks = []
+        hospitals = []
+        for admin in admin_queryset.select_related('content_type').all():
+            content = admin.content_type
+            if content.model == "hospitalnetwork":
+                networks.append(admin.object_id)
+            elif content.model == 'hospital':
+                hospitals.append(admin.object_id)
+
+        if networks:
+            netwkork_data = HospitalNetwork.objects.filter(id__in=networks).prefetch_related(Prefetch("assoc_hospitals"), Prefetch("assoc_hospitals__assoc_doctors"))
+            for network in netwkork_data:
+                if hasattr(network, 'assoc_hospitals'):
+                    for hospital in network.assoc_hospitals.all():
+                        if hasattr(hospital, 'assoc_doctors'):
+                            for doctor in hospital.assoc_doctors.all():
+                                user_permissions_list.append(cls.get_permission(user, doctor, hospital, network))
+                        else:
+                            user_permissions_list.append(cls.get_permission(user, None, hospital, network))
+                else:
+                    user_permissions_list.append(cls.get_permission(user, None, None, network))
+        if hospitals:
+            hospital_data = Hospital.objects.filter(id__in=hospitals).prefetch_related(Prefetch("assoc_doctors"))
+            for hospital in hospital_data:
+                if hasattr(hospital, 'assoc_doctors'):
+                    for doctor in hospital.assoc_doctors.all():
+                        user_permissions_list.append(cls.get_permission(user, doctor, hospital, None))
+                else:
+                    user_permissions_list.append(cls.get_permission(user, None, hospital, None))
+
+        doctor_hospital_data = DoctorHospital.objects.filter(Q(hospital__network__isnull=False,
+                                                               hospital__network__generic_hospital_network_admins__isnull=True) |
+                                                             Q(hospital__network__isnull=True,
+                                                               hospital__generic_hospital_admins__isnull=True))
+        if doctor_hospital_data:
+            for doctor_hospital in doctor_hospital_data:
+                user_permissions_list.append(cls.get_permission(doctor_hospital.doctor.user, doctor_hospital.doctor, doctor_hospital.hospital, None))
+
+        if user_permissions_list:
+            UserPermission.objects.bulk_create(user_permissions_list)
+
+
+    @staticmethod
+    def get_permission(user, doctor, hospital, hospital_network):
+        return UserPermission(user=user, doctor=doctor, hospital_network=hospital_network, hospital=hospital,
+                       permission_type=UserPermission.APPOINTMENT, write_permission=True, read_permission=False)
+
+    def get_billable_doctor_hospital(cls, user):
+        permission_data = (UserPermission.objects.
+                           filter(user=user, permission_type=cls.BILLINNG, write_permission=True).
+                           values('hospital_network', 'hospital', 'hospital__doctor',
+                                  'hospital_network__assoc_hospitals__doctor',
+                                  'hospital_network__assoc_hospitals'))
+        doc_hospital = list()
+        for data in permission_data:
+            if data.get("hospital_network"):
+                doc_hospital.append({
+                    "doctor": data.get("hospital_network__assoc_hospitals__doctor"),
+                    "hospital": data.get("hospital_network__assoc_hospitals")
+                })
+            elif data.get("hospital"):
+                doc_hospital.append({
+                    "doctor": data.get("hospital__doctor"),
+                    "hospital": data.get("hospital")
+                })
+        return doc_hospital
+
 
 class AppointmentTransaction(TimeStampedModel):
     appointment = models.PositiveIntegerField(blank=True, null=True)
@@ -260,3 +355,74 @@ class AppointmentTransaction(TimeStampedModel):
 
     def __str__(self):
         return "{}-{}".format(self.id, self.appointment)
+
+
+class LabUserPermission(TimeStampedModel):
+    APPOINTMENT = 'appointment'
+    BILLINNG = 'billing'
+    type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'), )
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True, on_delete=models.CASCADE,
+                                         related_name='lab_network_admins')
+    lab = models.ForeignKey("diagnostic.Lab", null=True, blank=True, on_delete=models.CASCADE,
+                                 related_name='lab_admins')
+    permission_type = models.CharField(max_length=20, choices=type_choices, default=APPOINTMENT)
+
+    read_permission = models.BooleanField(default=False)
+    write_permission = models.BooleanField(default=False)
+    delete_permission = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'lab_user_permission'
+
+    def __str__(self):
+        return str(self.user.email)
+
+
+    @classmethod
+    def get_lab_user_admin_obj(cls, user):
+        from ondoc.payout.models import Outstanding
+        access_list = []
+        get_permissions = LabUserPermission.objects.select_related('lab_network', 'lab').filter(user_id=user.id,
+                                                        write_permission=True, permission_type=UserPermission.BILLINNG)
+        if get_permissions:
+            for permission in get_permissions:
+                if permission.lab_network_id:
+                    if permission.lab_network.is_billing_enabled:
+                        access_list.append({'admin_id': permission.lab_network_id, 'admin_level': Outstanding.LAB_NETWORK_LEVEL})
+                elif permission.lab_id:
+                    if permission.lab.is_billing_enabled:
+                        access_list.append({'admin_id': permission.lab_id, 'admin_level': Outstanding.LAB_LEVEL})
+        return access_list
+        # TODO PM - Logic to get admin for a particular User
+
+
+class GenericAdmin(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.CharField(max_length=10)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    class Meta:
+        db_table = 'generic_admin'
+
+    def __str__(self):
+        return "{}:{}".format(self.phone_number, self.content_object)
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        user = User.objects.filter(phone_number=self.phone_number, user_type=User.DOCTOR).first()
+        super(GenericAdmin, self).save(*args, **kwargs)
+        if user is not None:
+            self.update_user_admin(self.phone_number, user)
+
+    @classmethod
+    def update_user_admin(cls, phone_number, user):
+        GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True).update(user=user)
+        cls.update_user_permissions(user)
+
+    @classmethod
+    def update_user_permissions(cls, user):
+        UserPermission.create_permission(user)
+

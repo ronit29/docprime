@@ -2,11 +2,13 @@ from rest_framework.views import exception_handler
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
-from ondoc.doctor.models import DoctorHospital
 from django.db import connection
 from django.db.models import F, Func
-
-
+from django.utils import timezone
+import math
+import datetime
+import pytz
+import calendar
 
 def flatten_dict(d):
     def items():
@@ -19,6 +21,7 @@ def flatten_dict(d):
 
     return dict(items())
 
+
 def first_error_only(d):
     code_mapping = {'min_value':'invalid', 'max_value':'invalid','invalid_choice':'invalid', 'null':'required'}
 
@@ -30,8 +33,10 @@ def first_error_only(d):
 
     return new_dict
 
+
 def formatted_errors(dic):
     return first_error_only(flatten_dict(dic))
+
 
 def custom_exception_handler(exc, context):
     # Call REST framework's default exception handler first,
@@ -63,6 +68,7 @@ def group_consecutive_numbers(data):
 
 
 def convert_timings(timings, is_day_human_readable=True):
+    from ondoc.doctor.models import DoctorHospital
     if not is_day_human_readable:
         DAY_MAPPING = {value[0]: (value[0], value[1][:3]) for value in DoctorHospital.DAY_CHOICES}
     else:
@@ -110,3 +116,48 @@ class AgreedPriceCalculate(Func):
 
 class DealPriceCalculate(Func):
     function = 'labtest_deal_price_calculate'
+
+
+def form_time_slot(date_str, time):
+    date, temp = date_str.split("T")
+    date_str = str(date)
+    min, hour = math.modf(time)
+    min *= 60
+    if min < 10:
+        min = "0" + str(int(min))
+    else:
+        min = str(int(min))
+    time_str = str(int(hour))+":"+str(min)
+    date_time_field = str(date_str) + "T" + time_str
+    dt_field = datetime.datetime.strptime(date_time_field, "%Y-%m-%dT%H:%M")
+    defined_timezone = str(timezone.get_default_timezone())
+    dt_field = pytz.timezone(defined_timezone).localize(dt_field)
+    # dt_field = pytz.utc.localize(dt_field)
+    return dt_field
+
+
+def get_previous_month_year(month, year):
+    dt = "01" + str(month) + str(year)
+    dt = datetime.datetime.strptime(dt, "%d%m%Y")
+    prev_dt = dt - datetime.timedelta(days=1)
+    return prev_dt.month, prev_dt.year
+
+
+def get_start_end_datetime(month, year, local_dt=None):
+    now = timezone.now()
+    if local_dt is not None:
+        local_dt = timezone.localtime(now)
+    else:
+        dt = "01" + str(month) + str(year)
+        dt = datetime.datetime.strptime(dt, "%d%m%Y")
+        local_timezone = timezone.get_default_timezone().__str__()
+        dt = pytz.timezone(local_timezone).localize(dt)
+        local_dt = timezone.localtime(dt)
+    start_dt = local_dt.replace(hour=0, minute=0, second=0, microsecond=0, day=1)
+    end_dt = get_last_date_time(local_dt)
+    return start_dt, end_dt
+
+
+def get_last_date_time(dt):
+    t, last_date = calendar.monthrange(dt.year, dt.month)
+    return dt.replace(hour=23, minute=59, second=59, microsecond=0, day=last_date)

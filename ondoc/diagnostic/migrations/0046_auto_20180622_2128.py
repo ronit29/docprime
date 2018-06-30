@@ -7,6 +7,8 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('diagnostic', '0045_availablelabtest_enabled'),
+        ('diagnostic', '0041_auto_20180621_2129'),
+        #('diagnostic', '0044_auto_20180625_1414'),
     ]
 
     operations = [

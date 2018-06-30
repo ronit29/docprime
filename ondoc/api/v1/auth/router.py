@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet, NotificationViewSet,
-                    UserProfileViewSet,UserPermissionViewSet, UserAppointmentsViewSet, AddressViewsSet,
-                    AppointmentTransactionViewSet, UserIDViewSet)
+                    UserProfileViewSet, UserAppointmentsViewSet, AddressViewsSet,
+                    TransactionViewSet, UserIDViewSet, OrderHistoryViewSet)
 
 urlpatterns = [
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
@@ -19,7 +19,7 @@ urlpatterns = [
     path('userprofile/<int:pk>/edit', UserProfileViewSet.as_view({'post': 'update'}), name='user-profile-edit'),
     path('userprofile/<int:pk>/upload', UserProfileViewSet.as_view({'post': 'upload'}), name='user-profile-upload'),
     path('userprofile/<int:pk>', UserProfileViewSet.as_view({'get': 'retrieve'}), name='user-profile-retrieve'),
-    path('createpermission', UserPermissionViewSet.as_view({'get': 'list'}), name='user-profile-retrieve'),
+    # path('createpermission', UserPermissionViewSet.as_view({'get': 'list'}), name='user-profile-retrieve'),
     path('appointment', UserAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
     path('appointment/<int:pk>', UserAppointmentsViewSet.as_view({'get': 'retrieve'}), name='appointment-detail'),
     path('appointment/<int:pk>/update', UserAppointmentsViewSet.as_view({'post': 'update'}), name='appointment-update'),
@@ -30,8 +30,9 @@ urlpatterns = [
     path('address', AddressViewsSet.as_view({"get": "list"}), name='address-list'),
     path('userid', UserIDViewSet.as_view({'get': 'retrieve'}),
          name='get-user-id'),
-    path('transaction/save', AppointmentTransactionViewSet.as_view({'post': 'save'}),
+    path('transaction/save', TransactionViewSet.as_view({'post': 'save'}),
          name='appointment-transaction-save'),
+    path('orderhistory', OrderHistoryViewSet.as_view({"get": "list"}), name="order-history"),
 
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
