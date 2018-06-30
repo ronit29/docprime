@@ -68,11 +68,12 @@ class DoctorSearchHelper:
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
-        query_string = "SELECT x.doctor_id, x.hospital_id " \
+        query_string = "SELECT x.doctor_id, x.hospital_id, doctor_hospital_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dh.doctor_id ORDER BY dh.fees ASC) rank_fees, " \
                        "Row_number() OVER( partition BY dh.doctor_id ORDER BY " \
                        "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) ASC) rank_distance, " \
                        "St_distance(St_setsrid(St_point(%s, %s), 4326), h.location) distance, d.id as doctor_id, " \
+                       "dh.id as doctor_hospital_id,  " \
                        "dh.hospital_id as hospital_id FROM   doctor d " \
                        "INNER JOIN doctor_hospital dh " \
                        "ON d.id = dh.doctor_id " \
@@ -107,33 +108,44 @@ class DoctorSearchHelper:
                 return current_location.distance(hospital.location)*100*1000
         return ""
 
+    def get_doctor_fees(self, doctor, doctor_availability_mapping):
+        for doctor_hospital in doctor.availability.all():
+            if doctor_hospital.id == doctor_availability_mapping[doctor.id]:
+                return doctor_hospital.fees
+        return None
+
     def prepare_search_response(self, doctor_data, doctor_search_result, request):
         doctor_hospital_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
+        doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_hospital_id") for data in
+                                       doctor_search_result}
         response = []
         for doctor in doctor_data:
             doctor_hospitals = [doctor_hospital for doctor_hospital in doctor.availability.all() if
                                 doctor_hospital.hospital_id == doctor_hospital_mapping[doctor_hospital.doctor_id]]
             serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True)
-
+            filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
+            min_fees = min([data.get("fees") for data in serializer.data if data.get("fees")])
             if not serializer.data:
                 hospitals = []
             else:
-                fees = min([data.get("fees") for data in serializer.data if data.get("fees")])
+                # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
                 hospitals = [{
                     "hospital_name": serializer.data[0]["hospital_name"],
                     "address": serializer.data[0]["address"],
                     "doctor": serializer.data[0]["doctor"],
                     "hospital_id": serializer.data[0]['hospital_id'],
-                    "fees": fees,
-                    "discounted_fees": fees,
+                    "fees": min_fees,
+                    "discounted_fees": min_fees,
                     "timings": convert_timings(serializer.data, is_day_human_readable=True)
                 }]
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
+                "fees": filtered_fees,
+                "discounted_fees": filtered_fees,
                 "practicing_since": doctor.practicing_since,
-                "experience_years": None,
+                "experience_years": doctor.experience_years(),
                 "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(),
                                                                             many=True).data,
