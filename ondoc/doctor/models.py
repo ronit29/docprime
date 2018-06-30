@@ -7,6 +7,7 @@ from django.contrib.postgres.fields import JSONField
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
+from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
 from django.conf import settings
 from datetime import datetime, timedelta
 from django.utils import timezone
@@ -683,8 +684,20 @@ class   OpdAppointment(TimeStampedModel):
                 notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED,
             )
 
+    def is_doctor_available(self):
+        if DoctorLeave.objects.filter(start_date__lte=self.time_slot_start.date(),
+                                      end_date__gte=self.time_slot_start.date(),
+                                      start_time__lte=self.time_slot_start.time(),
+                                      end_time__gte=self.time_slot_start.time(),
+                                      doctor=self.doctor,
+                                      deleted_at__isnull=True).exists():
+            return False
+        return True
+
     def save(self, *args, **kwargs):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
+        if not self.is_doctor_available():
+            raise RestFrameworkValidationError("Doctor is on leave.")
         super().save(*args, **kwargs)
         self.send_notification(database_instance)
 
