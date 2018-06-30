@@ -143,6 +143,7 @@ class DoctorSearchHelper:
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
                 "fees": filtered_fees,
+                "discounted_fees": filtered_fees,
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
                 "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
