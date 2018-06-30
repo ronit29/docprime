@@ -10,7 +10,7 @@ from django.utils.safestring import mark_safe
 from django.conf.urls import url
 from django.shortcuts import render
 from import_export.admin import ImportExportMixin
-from import_export import resources
+from import_export import fields, resources
 
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience, MedicalConditionSpecialization,
@@ -393,7 +393,25 @@ class DoctorSpecializationInline(admin.TabularInline):
     autocomplete_fields = ['specialization']
 
 
-class DoctorAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
+class DoctorResource(resources.ModelResource):
+    city = fields.Field()
+    class Meta:
+        model = Doctor
+        fields = ('id', 'name', 'city','gender', 'onboarding_status', 'data_status')
+        export_order = ('id', 'name', 'city', 'gender', 'onboarding_status', 'data_status')
+
+    def dehydrate_data_status(self, doctor):
+        return dict(Doctor.DATA_STATUS_CHOICES)[doctor.data_status]
+    def dehydrate_onboarding_status(self, doctor):
+        return dict(Doctor.ONBOARDING_STATUS)[doctor.onboarding_status]
+    def dehydrate_city(self, doctor):
+        return ','.join([str(h.city) for h in doctor.hospitals.distinct('city')])
+
+
+class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
+    resource_class = DoctorResource
+    change_list_template = 'superuser_import_export.html'
+
     list_display = ('name', 'updated_at','data_status','onboarding_status','list_created_by','get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = ('data_status','onboarding_status',CityFilter,)
