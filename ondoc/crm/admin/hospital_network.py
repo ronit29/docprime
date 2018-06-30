@@ -4,6 +4,8 @@ from django.db import models
 from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
+from ondoc.authentication.models import GenericAdmin
+from django.contrib.contenttypes.admin import GenericTabularInline
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
     HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
@@ -66,6 +68,15 @@ class HospitalNetworkManagerInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+
+class GenericAdminInline(GenericTabularInline):
+    model = GenericAdmin
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+
+
 class HospitalNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
@@ -106,7 +117,8 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkEmailInline,
         HospitalNetworkAccreditationInline,
         HospitalNetworkAwardInline,
-        HospitalNetworkCertificationInline]
+        HospitalNetworkCertificationInline,
+        GenericAdminInline]
 
 
     def associated_hospitals(self, instance):

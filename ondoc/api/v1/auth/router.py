@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet, NotificationViewSet,
-                    UserProfileViewSet,UserPermissionViewSet, UserAppointmentsViewSet, AddressViewsSet,
+                    UserProfileViewSet, UserAppointmentsViewSet, AddressViewsSet,
                     TransactionViewSet, UserIDViewSet, OrderHistoryViewSet)
 
 urlpatterns = [
@@ -19,7 +19,7 @@ urlpatterns = [
     path('userprofile/<int:pk>/edit', UserProfileViewSet.as_view({'post': 'update'}), name='user-profile-edit'),
     path('userprofile/<int:pk>/upload', UserProfileViewSet.as_view({'post': 'upload'}), name='user-profile-upload'),
     path('userprofile/<int:pk>', UserProfileViewSet.as_view({'get': 'retrieve'}), name='user-profile-retrieve'),
-    path('createpermission', UserPermissionViewSet.as_view({'get': 'list'}), name='user-profile-retrieve'),
+    # path('createpermission', UserPermissionViewSet.as_view({'get': 'list'}), name='user-profile-retrieve'),
     path('appointment', UserAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
     path('appointment/<int:pk>', UserAppointmentsViewSet.as_view({'get': 'retrieve'}), name='appointment-detail'),
     path('appointment/<int:pk>/update', UserAppointmentsViewSet.as_view({'post': 'update'}), name='appointment-update'),

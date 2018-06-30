@@ -80,10 +80,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     network_type = models.PositiveSmallIntegerField(blank=True, null=True,
                                                     choices=[("", "Select"), (1, "Non Network Hospital"),
                                                              (2, "Network Hospital")])
-    network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL)
+    network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='assoc_hospitals')
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
 
-    hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
+    generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
 
     def __str__(self):
         return self.name
@@ -202,6 +202,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel):
         Hospital,
         through='DoctorHospital',
         through_fields=('doctor', 'hospital'),
+        related_name='assoc_doctors',
     )
 
     def __str__(self):
@@ -500,6 +501,8 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
+    generic_hospital_network_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
+
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
@@ -667,9 +670,9 @@ class OpdAppointment(auth_model.TimeStampedModel):
         current_datetime = timezone.now()
 
         if user_type == auth_model.User.DOCTOR and self.time_slot_start > current_datetime:
-            perm_queryset = UserPermission.objects.filter(doctor=self.doctor, hospital=self.hospital).first()
+            perm_queryset = UserPermission.objects.filter(doctor=self.doctor, hospital=self.hospital, user=self.doctor.user).first()
             if perm_queryset:
-                if not perm_queryset.read_permission:
+                if perm_queryset.write_permission:
                     if self.status == self.BOOKED:
                         allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
                     elif self.status == self.ACCEPTED:

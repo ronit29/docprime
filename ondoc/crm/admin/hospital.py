@@ -7,6 +7,9 @@ from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
+from ondoc.authentication.models import GenericAdmin
+from django.contrib.contenttypes.admin import GenericTabularInline
+
 
 
 class HospitalImageInline(admin.TabularInline):
@@ -72,6 +75,14 @@ class HospitalSpecialityInline(admin.TabularInline):
 #     show_change_link = False
 
 
+class GenericAdminInline(GenericTabularInline):
+    model = GenericAdmin
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+
+
 class HospitalForm(FormCleanMixin):
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
 
@@ -113,7 +124,7 @@ class HospCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
-    list_filter = ('data_status',HospCityFilter)
+    list_filter = ('data_status', HospCityFilter)
     readonly_fields = ('associated_doctors',)
 
     def associated_doctors(self, instance):
@@ -148,7 +159,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(HospitalAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
-        form.base_fields['network'].queryset = HospitalNetwork.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
+        form.base_fields['network'].queryset = HospitalNetwork.objects.filter(Q(data_status=2) | Q(data_status = 3) | Q(created_by = request.user))
         return form
 
     list_display = ('name', 'updated_at', 'data_status', 'list_created_by')
@@ -161,7 +172,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalAccreditationInline,
         HospitalImageInline,
         HospitalDocumentInline,
-        HospitalCertificationInline]
+        HospitalCertificationInline,
+        GenericAdminInline]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'

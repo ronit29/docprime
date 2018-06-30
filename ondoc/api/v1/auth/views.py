@@ -5,25 +5,23 @@ import datetime
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
-from django.db.models import Q
+from django.db.models import F, When
 from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
-import math
 import datetime
-import pytz
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
-from django.db.models import Count, Sum, Max, Q
+from django.db.models import Count, Sum, Max, Q, Prefetch
 from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         UserPermission, Address, AppointmentTransaction)
+                                         UserPermission, Address, AppointmentTransaction, GenericAdmin)
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -62,6 +60,13 @@ class LoginOTP(GenericViewSet):
         data = serializer.validated_data
 
         phone_number = data['phone_number']
+        #
+        # user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
+        # admin_queryset = GenericAdmin.objects.filter(user=user.id)
+        # pem_obj = DoctorPermission(admin_queryset, request)
+        # pem_obj.create_permission()
+
+
         send_otp("otp sent {}", phone_number)
 
         req_type = request.query_params.get('type')
@@ -148,11 +153,10 @@ class UserViewset(GenericViewSet):
             user = User.objects.create(phone_number=data['phone_number'], is_phone_number_verified=True, user_type=User.DOCTOR)
             doctor.user = user
             doctor.save()
-        doctor_list = [user.doctor.id]
-        token = Token.objects.get_or_create(user=user)
-        pem_obj = DoctorPermission(doctor_list, request)
-        pem_obj.create_permission()
 
+        GenericAdmin.update_user_admin(phone_number, user)
+
+        token = Token.objects.get_or_create(user=user)
         expire_otp(data['phone_number'])
 
         response = {
@@ -251,61 +255,19 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer.save()
         return Response(serializer.data)
 
-
-class UserPermissionViewSet(mixins.CreateModelMixin,
-                            mixins.ListModelMixin,
-                            GenericViewSet):
-    queryset = DoctorHospital.objects.all()
-    # serializer_class = serializers.UserPermissionSerializer
-
-    def list(self, request, *args, **kwargs):
-        params = request.query_params
-        doctor_list = params['doctor_id'].split(",")
-        dp_obj = DoctorPermission(doctor_list, request)
-        permission_data = dp_obj.create_permission()
-        return Response(permission_data)
-
-
-class DoctorPermission(object):
-
-    def __init__(self, doctor_list, request):
-        self.doctor_list = doctor_list
-        self.request = request
-
-    def create_permission(self):
-        hospital_queryset = (DoctorHospital.objects.
-                             prefetch_related('hospital__hospital_admins', 'doctor', 'doctor__user').
-                             filter(doctor__in=self.doctor_list))
-        permission_data = self.form_data(hospital_queryset)
-        serializer = serializers.UserPermissionSerializer(data=permission_data, many=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        return serializer.data
-
-    @staticmethod
-    def form_data(hospital_queryset):
-        permission_data = list()
-        for data in hospital_queryset:
-            permission_dict = dict()
-            permission_dict['user'] = data.doctor.user.id
-            permission_dict['doctor'] = data.doctor.id
-            permission_dict['hospital_network'] = None
-            permission_dict['hospital'] = data.hospital.id
-            permission_dict['permission_type'] = UserPermission.APPOINTMENT
-            hospital_admins = data.hospital.hospital_admins.all()
-            flag = False
-            for admin in hospital_admins:
-                if admin.permission_type == UserPermission.APPOINTMENT and admin.write_permission:
-                    flag = True
-                    break
-            # if flag:
-            #     permission_dict['read_permission'] = True
-            # else:
-            permission_dict['write_permission'] = True
-
-            permission_data.append(permission_dict)
-        return permission_data
+#
+# class UserPermissionViewSet(mixins.CreateModelMixin,
+#                             mixins.ListModelMixin,
+#                             GenericViewSet):
+#     queryset = DoctorHospital.objects.all()
+#     # serializer_class = serializers.UserPermissionSerializer
+#
+#     def list(self, request, *args, **kwargs):
+#         params = request.query_params
+#         doctor_list = params['doctor_id'].split(",")
+#         dp_obj = DoctorPermission(doctor_list, request)
+#         permission_data = dp_obj.create_permission()
+#         return Response({'data':permission_data})
 
 
 class OndocViewSet(mixins.CreateModelMixin,
