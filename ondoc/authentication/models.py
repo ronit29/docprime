@@ -254,18 +254,18 @@ class UserPermission(TimeStampedModel):
     def get_user_admin_obj(cls, user):
         from ondoc.payout.models import Outstanding
         access_list = []
-        get_permissions = UserPermission.objects.select_related('hospital_network', 'hospital').filter(user_id=user.id,
-                                                        write_permission=True, permission_type=UserPermission.BILLINNG)
+        get_permissions = (UserPermission.objects.select_related('hospital_network', 'hospital').
+                           filter(user_id=user.id, write_permission=True, permission_type=UserPermission.BILLINNG))
         if get_permissions:
             for permission in get_permissions:
                 if permission.hospital_network_id:
                     if permission.hospital_network.is_billing_enabled:
-                        access_list.append({'admin_id': permission.hospital_network_id, 'admin_level': Outstanding.HOSPITAL_NETWORK_LEVEL})
+                        access_list.append({'admin_obj': permission.hospital_network, 'admin_level': Outstanding.HOSPITAL_NETWORK_LEVEL})
                 elif permission.hospital_id:
                     if permission.hospital.is_billing_enabled:
-                        access_list.append({'admin_id': permission.hospital_id, 'admin_level': Outstanding.HOSPITAL_LEVEL})
+                        access_list.append({'admin_obj': permission.hospital, 'admin_level': Outstanding.HOSPITAL_LEVEL})
                 else:
-                    access_list.append({'user': permission.doctor_id, 'admin_level': Outstanding.DOCTOR_LEVEL})
+                    access_list.append({'admin_obj': permission.doctor, 'admin_level': Outstanding.DOCTOR_LEVEL})
         return access_list
         # TODO PM - Logic to get admin for a particular User
 
@@ -321,6 +321,26 @@ class UserPermission(TimeStampedModel):
     def get_permission(user, doctor, hospital, hospital_network):
         return UserPermission(user=user, doctor=doctor, hospital_network=hospital_network, hospital=hospital,
                        permission_type=UserPermission.APPOINTMENT, write_permission=True, read_permission=False)
+
+    def get_billable_doctor_hospital(cls, user):
+        permission_data = (UserPermission.objects.
+                           filter(user=user, permission_type=cls.BILLINNG, write_permission=True).
+                           values('hospital_network', 'hospital', 'hospital__doctor',
+                                  'hospital_network__assoc_hospitals__doctor',
+                                  'hospital_network__assoc_hospitals'))
+        doc_hospital = list()
+        for data in permission_data:
+            if data.get("hospital_network"):
+                doc_hospital.append({
+                    "doctor": data.get("hospital_network__assoc_hospitals__doctor"),
+                    "hospital": data.get("hospital_network__assoc_hospitals")
+                })
+            elif data.get("hospital"):
+                doc_hospital.append({
+                    "doctor": data.get("hospital__doctor"),
+                    "hospital": data.get("hospital")
+                })
+        return doc_hospital
 
 
 class AppointmentTransaction(TimeStampedModel):

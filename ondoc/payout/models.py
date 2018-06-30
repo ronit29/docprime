@@ -37,7 +37,6 @@ class Outstanding(auth_model.TimeStampedModel):
                                               outstanding_month=present_month, outstanding_year=present_year)
         except:
             pass
-        # if out_level ==
         # app_outstanding_fees = app_obj.doc_payout_amount()
         if out_obj:
             out_obj.current_month_outstanding += app_outstanding_fees

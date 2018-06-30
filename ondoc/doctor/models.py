@@ -1,6 +1,6 @@
 from django.contrib.gis.db import models
-from django.db import migrations
-from django.db.models import Count
+from django.db import migrations, transaction
+from django.db.models import Count, Sum, When, Case, Q, F
 from django.contrib.postgres.operations import CreateExtension
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
@@ -15,9 +15,11 @@ from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from django.contrib.contenttypes.fields import GenericRelation
+from ondoc.api.v1.utils import get_start_end_datetime
+from functools import reduce
+from operator import or_
 import math
 import random
-from django.db import transaction
 import os
 
 
@@ -81,6 +83,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                     choices=[("", "Select"), (1, "Non Network Hospital"),
                                                              (2, "Network Hospital")])
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='assoc_hospitals')
+
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
 
     generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
@@ -274,6 +277,7 @@ class DoctorQualification(auth_model.TimeStampedModel):
         db_table = "doctor_qualification"
         unique_together = (("doctor", "qualification", "specialization", "college"),)
 
+
 class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel):
     name = models.CharField(max_length=200)
 
@@ -326,6 +330,7 @@ class DoctorHospital(auth_model.TimeStampedModel):
     mrp = models.PositiveSmallIntegerField(blank=False, null=True)
     followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
+
     def __str__(self):
         return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
 
@@ -800,6 +805,63 @@ class OpdAppointment(auth_model.TimeStampedModel):
             amount = self.fees
 
         return amount
+
+    @classmethod
+    def get_billing_summary(cls, user, req_data):
+        month = req_data.get("month")
+        year = req_data.get("year")
+        payment_type = req_data.get("payment_type")
+        start_date_time, end_date_time = get_start_end_datetime(month, year)
+        doc_hospital = auth_model.UserPermission.get_billable_doctor_hospital(user)
+        q = list()
+        for data in doc_hospital:
+            d = data["doctor"]
+            h = data["hospital"]
+            q.append((Q(doctor=d) & Q(hospital=h)))
+        if payment_type in [cls.COD, cls.PREPAID]:
+            payment_type = [cls.COD, cls.PREPAID]
+        elif payment_type in [cls.INSURANCE]:
+            payment_type = [cls.INSURANCE]
+        queryset = (OpdAppointment.objects.filter(reduce(or_, q)).
+                    filter(status=OpdAppointment.COMPLETED,
+                           time_slot_start__gte=start_date_time,
+                           time_slot_start__lte=end_date_time,
+                           payment_type__in=payment_type))
+        if payment_type != cls.INSURANCE:
+            tcp_condition = Case(When(payment_type=cls.COD, then=F("effective_price")),
+                                 When(~Q(payment_type=cls.COD), then=0))
+            tdcs_condition = Case(When(payment_type=cls.COD, then=F("fees")),
+                                  When(~Q(payment_type=cls.COD), then=0))
+            tpf_condition = Case(When(payment_type=cls.PREPAID, then=F("fees")),
+                                 When(~Q(payment_type=cls.PREPAID), then=0))
+            queryset = queryset.values("doctor", "hospital").annotate(total_cash_payment=Sum(tcp_condition),
+                                                                      total_cash_share=Sum(tdcs_condition),
+                                                                      total_online_payout=Sum(tpf_condition))
+
+        return queryset
+
+    @classmethod
+    def get_billing_appointment(cls, user, req_data):
+        month = req_data.get("month")
+        year = req_data.get("year")
+        payment_type = req_data.get("payment_type")
+        start_date_time, end_date_time = get_start_end_datetime(month, year)
+        doc_hospital = auth_model.UserPermission.get_billable_doctor_hospital(user)
+        q = list()
+        for data in doc_hospital:
+            d = data["doctor"]
+            h = data["hospital"]
+            q.append((Q(doctor=d) & Q(hospital=h)))
+        if payment_type in [cls.COD, cls.PREPAID]:
+            payment_type = [cls.COD, cls.PREPAID]
+        elif payment_type in [cls.INSURANCE]:
+            payment_type = [cls.INSURANCE]
+        queryset = (OpdAppointment.objects.filter(reduce(or_, q)).
+                    filter(status=OpdAppointment.COMPLETED,
+                           time_slot_start__gte=start_date_time,
+                           time_slot_start__lte=end_date_time,
+                           payment_type__in=payment_type))
+        return queryset
 
     class Meta:
         db_table = "opd_appointment"

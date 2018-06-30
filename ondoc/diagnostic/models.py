@@ -1,15 +1,16 @@
 from django.contrib.gis.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User, UserPermission
 from ondoc.doctor.models import Hospital
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import F
+from django.db.models import F, Sum, When, Case, Q
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 from ondoc.payout import models as payout_model
+from ondoc.api.v1.utils import get_start_end_datetime
 import decimal
 import math
 import os
@@ -488,6 +489,61 @@ class LabAppointment(TimeStampedModel):
             amount = self.agreed_price
 
         return amount
+
+    @classmethod
+    def get_billing_summary(cls, user, req_data):
+        month = req_data.get("month")
+        year = req_data.get("year")
+        payment_type = req_data.get("payment_type")
+        start_date_time, end_date_time = get_start_end_datetime(month, year)
+        lab_data = UserPermission.get_billable_doctor_hospital(user)
+        lab_list = list()
+        for data in lab_data:
+            if data.get("lab"):
+                lab_list.append(data["lab"])
+        if payment_type in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+            payment_type = [OpdAppointment.COD, OpdAppointment.PREPAID]
+        elif payment_type in [OpdAppointment.INSURANCE]:
+            payment_type = [OpdAppointment.INSURANCE]
+        queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+                                                  time_slot_start__gte=start_date_time,
+                                                  time_slot_start__lte=end_date_time,
+                                                  payment_type__in=payment_type,
+                                                  lab__in=lab_list))
+        if payment_type != OpdAppointment.INSURANCE:
+            tcp_condition = Case(When(payment_type=OpdAppointment.COD, then=F("effective_price")),
+                                 When(~Q(payment_type=OpdAppointment.COD), then=0))
+            tcs_condition = Case(When(payment_type=OpdAppointment.COD, then=F("agreed_price")),
+                                  When(~Q(payment_type=OpdAppointment.COD), then=0))
+            tpf_condition = Case(When(payment_type=OpdAppointment.PREPAID, then=F("agreed_price")),
+                                 When(~Q(payment_type=OpdAppointment.PREPAID), then=0))
+            queryset = queryset.values("lab").annotate(total_cash_payment=Sum(tcp_condition),
+                                                       total_cash_share=Sum(tcs_condition),
+                                                       total_online_payout=Sum(tpf_condition))
+
+        return queryset
+
+    @classmethod
+    def get_billing_appointment(cls, user, req_data):
+        month = req_data.get("month")
+        year = req_data.get("year")
+        payment_type = req_data.get("payment_type")
+        start_date_time, end_date_time = get_start_end_datetime(month, year)
+        lab_data = UserPermission.get_billable_doctor_hospital(user)
+        lab_list = list()
+        for data in lab_data:
+            if data.get("lab"):
+                lab_list.append(data["lab"])
+        if payment_type in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+            payment_type = [OpdAppointment.COD, OpdAppointment.PREPAID]
+        elif payment_type in [OpdAppointment.INSURANCE]:
+            payment_type = [OpdAppointment.INSURANCE]
+        queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+                                                  time_slot_start__gte=start_date_time,
+                                                  time_slot_start__lte=end_date_time,
+                                                  payment_type__in=payment_type,
+                                                  lab__in=lab_list))
+        return queryset
 
     def __str__(self):
         return self.profile.name + ', ' + self.lab.name
