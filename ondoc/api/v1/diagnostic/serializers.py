@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage)
+from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
@@ -48,6 +49,11 @@ class LabModelSerializer(serializers.ModelSerializer):
     long = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     lab_image = LabImageModelSerializer(many=True)
+    lab_thumbnail = serializers.SerializerMethodField()
+
+    def get_lab_thumbnail(self, obj):
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.get_thumbnail())
 
     def get_lat(self,obj):
         if obj.location:

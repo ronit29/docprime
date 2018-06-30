@@ -85,7 +85,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         count = queryset.count()
         paginated_queryset = paginate_queryset(queryset, request)
         response_queryset = self.form_lab_whole_data(paginated_queryset)
-        serializer = LabCustomSerializer(response_queryset, many=True)
+        serializer = LabCustomSerializer(response_queryset, many=True,
+                                         context={"request": request})
         return Response({"result": serializer.data,
                          "count": count})
 
