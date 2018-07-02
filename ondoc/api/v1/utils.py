@@ -1,4 +1,5 @@
 from rest_framework.views import exception_handler
+from rest_framework import permissions
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
@@ -9,6 +10,9 @@ import math
 import datetime
 import pytz
 import calendar
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
 
 def flatten_dict(d):
     def items():
@@ -161,3 +165,21 @@ def get_start_end_datetime(month, year, local_dt=None):
 def get_last_date_time(dt):
     t, last_date = calendar.monthrange(dt.year, dt.month)
     return dt.replace(hour=23, minute=59, second=59, microsecond=0, day=last_date)
+
+
+class IsConsumer(permissions.BasePermission):
+    message = 'Consumer is allowed to perform action only.'
+
+    def has_permission(self, request, view):
+        if request.user.user_type == User.CONSUMER:
+            return True
+        return False
+
+
+class IsDoctor(permissions.BasePermission):
+    message = 'Doctor is allowed to perform action only.'
+
+    def has_permission(self, request, view):
+        if request.user.user_type == User.DOCTOR:
+            return True
+        return False
