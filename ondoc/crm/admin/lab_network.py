@@ -9,6 +9,9 @@ from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
     LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
     LabNetworkHelpline, LabNetworkManager)
 from .common import *
+from ondoc.authentication.models import GenericAdmin
+from django.contrib.contenttypes.admin import GenericTabularInline
+
 
 
 class LabNetworkCertificationInline(admin.TabularInline):
@@ -52,6 +55,15 @@ class LabNetworkHelplineInline(admin.TabularInline):
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
+
+
+class GenericAdminInline(GenericTabularInline):
+    model = GenericAdmin
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+    verbose_name_plural = "Admins"
 
 
 
@@ -116,7 +128,8 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         LabNetworkEmailInline,
         LabNetworkAccreditationInline,
         LabNetworkAwardInline,
-        LabNetworkCertificationInline]
+        LabNetworkCertificationInline,
+        GenericAdminInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

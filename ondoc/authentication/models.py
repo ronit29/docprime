@@ -273,7 +273,9 @@ class UserPermission(TimeStampedModel):
     def create_permission(cls, user):
         from ondoc.doctor.models import HospitalNetwork, Hospital, DoctorHospital
         admin_queryset = GenericAdmin.objects.filter(user=user)
-        UserPermission.objects.filter(user=user).delete()
+        doctor_hospital_users = list(DoctorHospital.objects.values_list('doctor__user__id', flat=True))
+        delete_user_list = doctor_hospital_users+[user.id]
+        UserPermission.objects.filter(user__id__in=delete_user_list).delete()
         user_permissions_list =[]
         networks = []
         hospitals = []
@@ -309,6 +311,7 @@ class UserPermission(TimeStampedModel):
                                                                hospital__network__generic_hospital_network_admins__isnull=True) |
                                                              Q(hospital__network__isnull=True,
                                                                hospital__generic_hospital_admins__isnull=True))
+
         if doctor_hospital_data:
             for doctor_hospital in doctor_hospital_data:
                 user_permissions_list.append(cls.get_permission(doctor_hospital.doctor.user, doctor_hospital.doctor, doctor_hospital.hospital, None))
@@ -379,6 +382,43 @@ class LabUserPermission(TimeStampedModel):
         return str(self.user.email)
 
 
+
+    @classmethod
+    def create_permission(cls, user):
+        from ondoc.diagnostic.models import LabNetwork, Lab
+        admin_queryset = GenericAdmin.objects.filter(user=user)
+        LabUserPermission.objects.filter(user=user).delete()
+        lab_permissions_list =[]
+        networks = []
+        labs = []
+        for admin in admin_queryset.select_related('content_type').all():
+            content = admin.content_type
+            if content.model == "labnetwork":
+                networks.append(admin.object_id)
+            elif content.model == 'lab':
+                labs.append(admin.object_id)
+
+        if networks:
+            netwkork_data = LabNetwork.objects.filter(id__in=networks).prefetch_related(Prefetch("assoc_labs"))
+            for network in netwkork_data:
+                if hasattr(network, 'assoc_labs'):
+                    for lab in network.assoc_labs.all():
+                        lab_permissions_list.append(cls.get_permission(user, lab, network))
+                else:
+                    lab_permissions_list.append(cls.get_permission(user, None, network))
+        if labs:
+            lab_data = Lab.objects.filter(id__in=labs)
+            for lab in lab_data:
+                lab_permissions_list.append(cls.get_permission(user, lab, None))
+
+        if lab_permissions_list:
+            LabUserPermission.objects.bulk_create(lab_permissions_list)
+
+    @staticmethod
+    def get_permission(user, lab, lab_network):
+        return LabUserPermission(user=user, lab_network=lab_network, lab=lab,
+                              permission_type=LabUserPermission.APPOINTMENT, write_permission=True, read_permission=False)
+
     @classmethod
     def get_lab_user_admin_obj(cls, user):
         from ondoc.payout.models import Outstanding
@@ -395,6 +435,7 @@ class LabUserPermission(TimeStampedModel):
                         access_list.append({'admin_id': permission.lab_id, 'admin_level': Outstanding.LAB_LEVEL})
         return access_list
         # TODO PM - Logic to get admin for a particular User
+
 
 
 class GenericAdmin(TimeStampedModel):
@@ -414,12 +455,18 @@ class GenericAdmin(TimeStampedModel):
         self.clean()
         user = User.objects.filter(phone_number=self.phone_number, user_type=User.DOCTOR).first()
         super(GenericAdmin, self).save(*args, **kwargs)
-        if user is not None:
-            self.update_user_admin(self.phone_number, user)
+        self.update_user_admin(self.phone_number, user)
+
+    def delete(self, *args, **kwargs):
+        self.clean()
+        user = User.objects.filter(phone_number=self.phone_number, user_type=User.DOCTOR).first()
+        super(GenericAdmin, self).delete(*args, **kwargs)
+        self.update_user_permissions(user)
 
     @classmethod
     def update_user_admin(cls, phone_number, user):
-        GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True).update(user=user)
+        if user is not None:
+            GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True).update(user=user)
         cls.update_user_permissions(user)
 
     @classmethod
