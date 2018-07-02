@@ -7,7 +7,7 @@ from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
 from ondoc.api.v1.utils import form_time_slot
 from ondoc.doctor.models import OpdAppointment
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, When, Case, Q, F
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
 import datetime
@@ -222,10 +222,16 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         return data
 
     def create(self, data):
+        deal_price_calculation= Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
+                                     When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
+        agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
+                                      When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
 
         self.num_appointment_validator(data)
         lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
-        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"), total_deal_price=Sum("deal_price"), total_agreed_price=Sum("agreed_price"))
+        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
+                                                                 total_deal_price=Sum(deal_price_calculation),
+                                                                 total_agreed_price=Sum(agreed_price_calculation))
         total_deal_price = total_mrp = effective_price = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
