@@ -1,6 +1,6 @@
 from django.contrib.gis.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User, UserPermission
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User, UserPermission, GenericAdmin
 from ondoc.doctor.models import Hospital
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from ondoc.account import models as account_model
@@ -15,6 +15,8 @@ import decimal
 import math
 import os
 from ondoc.insurance import models as insurance_model
+from django.contrib.contenttypes.fields import GenericRelation
+
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel):
     NOT_ONBOARDED = 1
@@ -57,6 +59,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
                                                          decimal_places=2)
     radiology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
                                                        decimal_places=2)
+    generic_lab_admins = GenericRelation(GenericAdmin, related_query_name='manageable_labs')
+
 
     def __str__(self):
         return self.name
@@ -211,6 +215,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
+    generic_lab_network_admins = GenericRelation(GenericAdmin, related_query_name='manageable_lab_networks')
 
     def __str__(self):
         return self.name + " (" + self.city + ")"

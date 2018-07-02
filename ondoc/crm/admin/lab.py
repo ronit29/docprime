@@ -15,6 +15,8 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest)
 from .common import *
+from ondoc.authentication.models import GenericAdmin
+from django.contrib.contenttypes.admin import GenericTabularInline
 
 
 class LabTestResource(resources.ModelResource):
@@ -124,12 +126,14 @@ class LabAwardInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+
 class LabServiceInline(admin.TabularInline):
     model = LabService
     #form = LabAwardForm
     extra = 0
     can_delete = True
     show_change_link = False
+
 
 class LabDoctorInline(admin.TabularInline):
     model = LabDoctor
@@ -181,6 +185,7 @@ class LabDocumentInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+
 class LabDoctorAvailabilityInline(admin.TabularInline):
     model = LabDoctorAvailability
     #form = LabAwardForm
@@ -188,6 +193,14 @@ class LabDoctorAvailabilityInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+
+class GenericAdminInline(GenericTabularInline):
+    model = GenericAdmin
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+    verbose_name_plural = "Admins"
 
 
 class LabCertificationInline(admin.TabularInline):
@@ -346,7 +359,7 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     form = LabForm
     search_fields = ['name']
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline]
+        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, GenericAdminInline]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'

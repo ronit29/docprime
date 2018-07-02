@@ -75,6 +75,7 @@ class GenericAdminInline(GenericTabularInline):
     can_delete = True
     show_change_link = False
     readonly_fields = ['user']
+    verbose_name_plural = "Admins"
 
 
 class HospitalNetworkForm(FormCleanMixin):
