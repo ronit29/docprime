@@ -2,7 +2,7 @@ from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSe
                           LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
                           LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
                           PromotedLabsSerializer, CommonConditionsSerializer, TimeSlotSerializer,
-                          SearchLabListSerializer)
+                          SearchLabListSerializer, LabProfileSerializer)
 from ondoc.api.v1.auth.serializers import AddressSerializer
 
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
@@ -104,7 +104,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_queryset = queryset[0].lab
         day_now = timezone.now().weekday()
         timing_queryset = lab_queryset.labtiming_set.filter(day=day_now)
-        lab_serializer = LabModelSerializer(lab_queryset, context={"request": request})
+        lab_serializer = LabProfileSerializer(lab_queryset, context={"request": request})
         temp_data = dict()
         temp_data['lab'] = lab_serializer.data
         temp_data['tests'] = test_serializer.data
@@ -112,7 +112,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data['lab_timing'] = self.get_lab_timing(timing_queryset)
 
         return Response(temp_data)
-        # return Response(serializer.data)
 
     def get_lab_timing(self, queryset):
         temp_str = ''

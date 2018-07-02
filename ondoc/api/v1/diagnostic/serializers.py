@@ -55,6 +55,8 @@ class LabModelSerializer(serializers.ModelSerializer):
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
+        if not request:
+            raise ValueError("request is not passed in serializer.")
         return request.build_absolute_uri(obj.get_thumbnail())
 
     def get_lat(self,obj):
@@ -83,9 +85,16 @@ class LabModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lab
-        # fields = '__all__'
-        exclude = ('created_at', 'updated_at', 'location', 'location_error', )
+        fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
+                  'sublocality', 'city', 'state', 'country', 'always_open', )
 
+
+class LabProfileSerializer(LabModelSerializer):
+
+    class Meta:
+        model = Lab
+        fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
+                  'sublocality', 'city', 'state', 'country', 'about', 'always_open', 'building', )
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
