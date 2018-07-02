@@ -63,12 +63,10 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         name = request.query_params.get('name')
-        test_queryset = LabTest.objects.all()
-        lab_queryset = Lab.objects.all()
         temp_data = dict()
         if name:
-            test_queryset = test_queryset.filter(name__icontains=name)
-            lab_queryset = lab_queryset.filter(name__icontains=name)
+            test_queryset = LabTest.objects.filter(name__icontains=name)
+            lab_queryset = Lab.objects.filter(name__icontains=name)
             test_serializer = LabTestListSerializer(test_queryset, many=True)
             lab_serializer = LabListSerializer(lab_queryset, many=True)
             temp_data['tests'] = test_serializer.data
