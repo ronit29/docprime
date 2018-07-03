@@ -401,30 +401,30 @@ class LabAppointmentView(mixins.CreateModelMixin,
         else:
             return False
 
-    def payment_retry(self, request, pk=None):
-        queryset = LabAppointment.objects.filter(pk=pk)
-        payment_response = dict()
-        if queryset:
-            serializer_data = LabAppointmentModelSerializer(queryset.first(), context={'request':request})
-            payment_response = self.payment_details(request, serializer_data.data, 1)
-        return Response(payment_response)
+    # def payment_retry(self, request, pk=None):
+    #     queryset = LabAppointment.objects.filter(pk=pk)
+    #     payment_response = dict()
+    #     if queryset:
+    #         serializer_data = LabAppointmentModelSerializer(queryset.first(), context={'request':request})
+    #         payment_response = self.payment_details(request, serializer_data.data, 1)
+    #     return Response(payment_response)
 
-    def update(self, request, pk):
-        data = request.data
-        lab_appointment_obj = get_object_or_404(LabAppointment, pk=pk)
-        serializer = LabAppointmentUpdateSerializer(lab_appointment_obj, data=data,
-                                                    context={'lab_id': lab_appointment_obj.lab})
-        serializer.is_valid(raise_exception=True)
-        # allowed = lab_appointment_obj.allowed_action(request.user.user_type)
-        allowed = lab_appointment_obj.allowed_action(3)
-        if data.get('status') not in allowed:
-            resp = dict()
-            resp['allowed'] = allowed
-            return Response(resp, status=status.HTTP_400_BAD_REQUEST)
-
-        lab_appointment_queryset = serializer.save()
-        serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
-        return Response(serializer.data)
+    # def update(self, request, pk):
+    #     data = request.data
+    #     lab_appointment_obj = get_object_or_404(LabAppointment, pk=pk)
+    #     serializer = LabAppointmentUpdateSerializer(lab_appointment_obj, data=data,
+    #                                                 context={'lab_id': lab_appointment_obj.lab})
+    #     serializer.is_valid(raise_exception=True)
+    #     # allowed = lab_appointment_obj.allowed_action(request.user.user_type)
+    #     allowed = lab_appointment_obj.allowed_action(3)
+    #     if data.get('status') not in allowed:
+    #         resp = dict()
+    #         resp['allowed'] = allowed
+    #         return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+    #
+    #     lab_appointment_queryset = serializer.save()
+    #     serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
+    #     return Response(serializer.data)
 
     # def payment_details(self, request, appointment_details, product_id):
     #     details = dict()
