@@ -147,10 +147,17 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
     type = serializers.ReadOnlyField(default="lab")
     lab_name = serializers.ReadOnlyField(source="lab.name")
+    lab_image = LabImageModelSerializer(many=True, source='lab.lab_image')
+    lab_thumbnail = serializers.SerializerMethodField()
+
+    def get_lab_thumbnail(self, obj):
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.lab.get_thumbnail())
 
     class Meta:
         model = LabAppointment
-        fields = '__all__'
+        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', )
 
 
 class LabAppointmentUpdateSerializer(serializers.Serializer):
@@ -408,6 +415,11 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
         user_type = ''
         if self.context.get('request'):
             user_type = self.context['request'].user.user_type
-            return LabAppointment.allowed_action(obj,user_type)
+            return LabAppointment.allowed_action(obj, user_type)
         else:
             return []
+
+    class Meta:
+        model = LabAppointment
+        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab')

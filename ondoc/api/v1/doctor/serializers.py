@@ -28,9 +28,9 @@ class CommaSepratedToListField(CharField):
         return list(map(self.typecast_to, value.strip(",").split(",")))
 
 
-
 class OTPSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField()
+
 
 class AppointmentFilterSerializer(serializers.Serializer):
     CHOICES = ['all', 'previous', 'upcoming', 'pending']
@@ -39,12 +39,12 @@ class AppointmentFilterSerializer(serializers.Serializer):
     hospital_id = serializers.IntegerField(required=False)
     profile_id = serializers.IntegerField(required=False)
 
-class OpdAppointmentSerializer(serializers.ModelSerializer):
 
+class OpdAppointmentSerializer(serializers.ModelSerializer):
     doctor_name = serializers.ReadOnlyField(source='doctor.name')
     hospital_name = serializers.ReadOnlyField(source='hospital.name')
     patient_name = serializers.ReadOnlyField(source='profile.name')
-    patient_dob = serializers.ReadOnlyField(source='profile.dob')
+    # patient_dob = serializers.ReadOnlyField(source='profile.dob')
     patient_gender = serializers.ReadOnlyField(source='profile.gender'),
     patient_image = serializers.SerializerMethodField()
     thumbnail = serializers.SerializerMethodField()
@@ -57,7 +57,8 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OpdAppointment
-        exclude = ('created_at', 'updated_at',)
+        fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'thumbnail', 'type',
+                  'allowed_action', 'effective_price', 'discounted_price', 'status', 'time_slot_start', 'time_slot_end')
 
     def get_patient_image(self, obj):
         if obj.profile.profile_image:
@@ -575,11 +576,13 @@ class DoctorTimeSlotSerializer(serializers.Serializer):
         model = Doctor
         fields = ('id', 'images', 'qualifications', )
 
+
 class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
     class Meta:
         model = Doctor
         fields = ('id', 'name', 'gender', 'images','about', 'practicing_since',
                  'qualifications', 'mobiles',)
+
 
 class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
@@ -589,7 +592,14 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_allowed_action(self,obj):
         request = self.context.get('request')
-        return OpdAppointment.allowed_action(obj,request.user.user_type)
+        return OpdAppointment.allowed_action(obj, request.user.user_type, request)
+
+    class Meta:
+        model = OpdAppointment
+        fields = ('id', 'patient_image', 'thumbnail', 'type', 'profile',
+                  'allowed_action', 'effective_price', 'discounted_price', 'status', 'time_slot_start', 'time_slot_end',
+                  'doctor', 'hospital', 'allowed_action')
+
 
 
 

@@ -146,7 +146,7 @@ class UserProfile(TimeStampedModel, Image):
     is_default_user = models.BooleanField(default=False)
     dob = models.DateField(blank=True, null=True)
     
-    profile_image = models.ImageField(upload_to='users/images' ,height_field='height', width_field='width',blank=True, null=True)
+    profile_image = models.ImageField(upload_to='users/images', height_field='height', width_field='width', blank=True, null=True)
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
@@ -289,9 +289,9 @@ class UserPermission(TimeStampedModel):
         if networks:
             netwkork_data = HospitalNetwork.objects.filter(id__in=networks).prefetch_related(Prefetch("assoc_hospitals"), Prefetch("assoc_hospitals__assoc_doctors"))
             for network in netwkork_data:
-                if hasattr(network, 'assoc_hospitals'):
+                if network.assoc_hospitals.first() is not None:
                     for hospital in network.assoc_hospitals.all():
-                        if hasattr(hospital, 'assoc_doctors'):
+                        if hospital.assoc_doctors.first() is not None:
                             for doctor in hospital.assoc_doctors.all():
                                 user_permissions_list.append(cls.get_permission(user, doctor, hospital, network))
                         else:
@@ -301,16 +301,17 @@ class UserPermission(TimeStampedModel):
         if hospitals:
             hospital_data = Hospital.objects.filter(id__in=hospitals).prefetch_related(Prefetch("assoc_doctors"))
             for hospital in hospital_data:
-                if hasattr(hospital, 'assoc_doctors'):
+                if hospital.assoc_doctors.first() is not None:
                     for doctor in hospital.assoc_doctors.all():
                         user_permissions_list.append(cls.get_permission(user, doctor, hospital, None))
                 else:
                     user_permissions_list.append(cls.get_permission(user, None, hospital, None))
 
-        doctor_hospital_data = DoctorHospital.objects.filter(Q(hospital__network__isnull=False,
+        doctor_hospital_data = DoctorHospital.objects.filter(Q(doctor__user__isnull=False),
+                                                             (Q(hospital__network__isnull=False,
                                                                hospital__network__generic_hospital_network_admins__isnull=True) |
                                                              Q(hospital__network__isnull=True,
-                                                               hospital__generic_hospital_admins__isnull=True))
+                                                               hospital__generic_hospital_admins__isnull=True)))
 
         if doctor_hospital_data:
             for doctor_hospital in doctor_hospital_data:
