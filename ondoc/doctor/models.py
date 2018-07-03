@@ -644,8 +644,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     PREPAID = 1
     COD = 2
     INSURANCE = 3
-    pay_list = ["Prepaid", "COD", "Insurance"]
-    PAY_CHOICES = list(enumerate(pay_list, 1))
+    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, "COD"), (INSURANCE, "Insurance"))
 
 
     # PATIENT_SHOW = 1
@@ -660,7 +659,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     fees = models.DecimalField(max_digits=10, decimal_places=2)
     effective_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
     mrp = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
-    discounted_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, default=None, null=False)
+    deal_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, default=None, null=False)
     status = models.PositiveSmallIntegerField(default=CREATED)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     otp = models.PositiveIntegerField(blank=True, null=True)

@@ -60,7 +60,7 @@ class NotificationAction:
                 "image_url": ""
             }
             NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             context = {
                 "patient_name": instance.profile.name,
                 "doctor_name": instance.doctor.name,
@@ -72,7 +72,7 @@ class NotificationAction:
                 "image_url": ""
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
             context = {
                 "patient_name": instance.profile.name,
                 "doctor_name": instance.doctor.name,
@@ -84,7 +84,7 @@ class NotificationAction:
                 "image_url": ""
             }
             NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
-        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.DOCTOR:
             context = {
                 "patient_name": instance.profile.name,
                 "doctor_name": instance.doctor.name,
