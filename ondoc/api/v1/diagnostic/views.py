@@ -186,10 +186,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                 distance=Max(Distance('lab__location', pnt)),
                                                 name=Max('lab__name')).filter(count__gte=len(ids)))
 
-        if min_price:
+        if min_price and ids:
             queryset = queryset.filter(price__gte=min_price)
 
-        if max_price:
+        if max_price and ids:
             queryset = queryset.filter(price__lte=max_price)
 
         queryset = self.apply_custom_filters(queryset, parameters)
@@ -199,7 +199,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def apply_custom_filters(queryset, parameters):
         order_by = parameters.get("order_by")
         if order_by is not None:
-            if order_by == "price" and parameters.get('ids'):
+            if order_by == "fees" and parameters.get('ids'):
                 queryset = queryset.order_by("price")
             elif order_by == 'distance':
                 queryset = queryset.order_by("distance")
