@@ -2,7 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          UserPermission, Address)
 from ondoc.doctor.models import DoctorMobile
-from ondoc.account.models import ConsumerAccount
+from ondoc.account.models import ConsumerAccount, Order
 import datetime
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
@@ -183,3 +183,22 @@ class ConsumerAccountModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConsumerAccount
         fields = "__all__"
+
+
+class TransactionSerializer(serializers.Serializer):
+    customerId = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    productId = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
+    orderNo = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all(), required=False)
+    referenceId = serializers.CharField(max_length=200, required=False)
+    paymentMode = serializers.CharField(max_length=200, required=False)
+    responseCode = serializers.CharField(max_length=200)
+    bankTxId = serializers.CharField(max_length=200, required=False)
+    txDate = serializers.CharField(max_length=20)
+    bankName = serializers.CharField(max_length=200, required=False)
+    currency = serializers.CharField(max_length=200)
+    statusCode = serializers.CharField(max_length=200)
+    pgGatewayName = serializers.CharField(max_length=20, required=False)
+    txStatus = serializers.CharField(max_length=200)
+    pgTxId = serializers.CharField(max_length=200)
+    pbGatewayName = serializers.CharField(max_length=200, required=False)
+

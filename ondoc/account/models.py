@@ -1,6 +1,10 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from ondoc.authentication.models import TimeStampedModel, User
+from ondoc.doctor.models import OpdAppointment
+from ondoc.diagnostic.models import LabAppointment
+from django.db import transaction
+
 # Create your models here.
 
 
@@ -59,6 +63,68 @@ class Order(TimeStampedModel):
                 payment_status=Order.PAYMENT_PENDING,
                 action=action,
             ).update(is_viewable=False)
+
+    @transaction.atomic
+    def process_payment(self, consumer_account, pg_data, appointment_data):
+        appointment_obj = None
+        if self.action == Order.OPD_APPOINTMENT_CREATE:
+            if consumer_account.balance >= appointment_data["effective_price"]:
+                appointment_obj = OpdAppointment.create_appointment(appointment_data)
+                order_dict = {
+                    "appointment_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                self.update_order(order_dict)
+                appointment_amount = appointment_obj.effective_price
+                self.debit_payment(consumer_account, pg_data, appointment_obj, appointment_amount)
+        elif self.action == Order.LAB_APPOINTMENT_CREATE:
+            if consumer_account.balance >= appointment_data["effective_price"]:
+                appointment_obj = LabAppointment.create_appointment(appointment_data)
+                order_dict = {
+                    "appointment_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                self.update_order(order_dict)
+                appointment_amount = appointment_obj.effective_price
+                self.debit_payment(consumer_account, pg_data, appointment_obj, appointment_amount)
+        elif self.action == Order.OPD_APPOINTMENT_RESCHEDULE:
+            new_appointment_data = appointment_data
+            appointment_obj = OpdAppointment.objects.get(pk=self.reference_id)
+            if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
+                debit_amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
+                appointment_obj.action_rescheduled_patient(new_appointment_data)
+                order_dict = {
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                self.update_order(order_dict)
+                self.debit_payment(consumer_account, pg_data, appointment_obj, debit_amount)
+        elif self.action == Order.LAB_APPOINTMENT_RESCHEDULE:
+            new_appointment_data = appointment_data
+            appointment_obj = LabAppointment.objects.get(pk=self.reference_id)
+            if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
+                debit_amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
+                appointment_obj.action_rescheduled_patient(new_appointment_data)
+                order_dict = {
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                self.update_order(order_dict)
+                self.debit_payment(consumer_account, pg_data, appointment_obj, debit_amount)
+        return appointment_obj
+
+    def update_order(self, data):
+        self.appointment_id = data.get("appointment_id", self.appointment_id)
+        self.payment_status = data.get("payment_status", self.payment_status)
+        self.save()
+
+    @staticmethod
+    def debit_payment(self, consumer_account, pg_data, app_obj, amount):
+        debit_data = {
+            "user": pg_data.get("user"),
+            "product_id": pg_data.get("product_id"),
+            "transaction_id": pg_data.get("transaction_id"),
+            "reference_id": app_obj.id
+        }
+        consumer_account.debit_schedule(debit_data, amount)
 
     class Meta:
         db_table = "order"

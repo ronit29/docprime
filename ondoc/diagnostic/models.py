@@ -442,6 +442,15 @@ class LabAppointment(TimeStampedModel):
 
         return allowed
 
+    @classmethod
+    def create_appointment(cls, appointment_data):
+        otp = random.randint(1000, 9999)
+        appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
+        appointment_data["status"] = OpdAppointment.BOOKED
+        appointment_data["otp"] = otp
+        app_obj = cls.objects.create(**appointment_data)
+        return app_obj
+
     def action_rescheduled_lab(self):
         self.status = self.RESCHEDULED_LAB
         self.save()
