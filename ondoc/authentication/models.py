@@ -467,7 +467,7 @@ class GenericAdmin(TimeStampedModel):
     def update_user_admin(cls, phone_number, user):
         if user is not None:
             GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True).update(user=user)
-        cls.update_user_permissions(user)
+            cls.update_user_permissions(user)
 
     @classmethod
     def update_user_permissions(cls, user):
