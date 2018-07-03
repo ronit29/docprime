@@ -23,6 +23,6 @@ urlpatterns = [
          name='payment-retry'),
     path('labtiming', LabTimingListView.as_view({'get': 'list'}),
          name='lab-timing'),
-    path('labtest/<int:lab_id>', AvailableTestViewSet.as_view({'get': 'retrive'}),
+    path('labtest/<int:lab_id>', AvailableTestViewSet.as_view({'get': 'retrieve'}),
          name='lab-available-test'),
 ]

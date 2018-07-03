@@ -307,10 +307,11 @@ class UserPermission(TimeStampedModel):
                 else:
                     user_permissions_list.append(cls.get_permission(user, None, hospital, None))
 
-        doctor_hospital_data = DoctorHospital.objects.filter(Q(hospital__network__isnull=False,
-                                                               hospital__network__generic_hospital_network_admins__isnull=True) |
-                                                             Q(hospital__network__isnull=True,
-                                                               hospital__generic_hospital_admins__isnull=True))
+        doctor_hospital_data = DoctorHospital.objects.filter(Q(doctor__user__isnull=False),
+                                                             (Q(hospital__network__isnull=False,
+                                                                hospital__network__generic_hospital_network_admins__isnull=True) |
+                                                              Q(hospital__network__isnull=True,
+                                                                hospital__generic_hospital_admins__isnull=True)))
 
         if doctor_hospital_data:
             for doctor_hospital in doctor_hospital_data:

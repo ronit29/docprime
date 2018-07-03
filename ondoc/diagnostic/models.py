@@ -442,6 +442,8 @@ class LabAppointment(TimeStampedModel):
 
         return allowed
 
+    # def is_booking_allowed(self):
+
     def action_rescheduled_lab(self):
         self.status = self.RESCHEDULED_LAB
         self.save()

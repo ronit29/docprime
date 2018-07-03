@@ -27,7 +27,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
 from django.db import transaction
-from django.db.models import Count, Sum, Max
+from django.db.models import Count, Sum, Max, When, Case, F
 from django.http import Http404
 from rest_framework import status
 from collections import OrderedDict
@@ -261,10 +261,14 @@ class LabAppointmentView(mixins.CreateModelMixin,
         return Response(data=resp)
 
     def form_lab_app_data(self, request, data):
+        deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
+                                      When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
+        agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
+                                        When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
         lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
         temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
-                                                                 total_deal_price=Sum("deal_price"),
-                                                                 total_agreed_price=Sum("agreed_price"))
+                                                                 total_deal_price=Sum(deal_price_calculation),
+                                                                 total_agreed_price=Sum(agreed_price_calculation))
         total_agreed = total_deal_price = total_mrp = effective_price = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
@@ -490,7 +494,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
     queryset = AvailableLabTest.objects.all()
     serializer_class = AvailableLabTestSerializer
 
-    def retrive(self, request, lab_id):
+    def retrieve(self, request, lab_id):
         params = request.query_params
         queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
 
