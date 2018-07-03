@@ -248,7 +248,7 @@ class UserPermission(TimeStampedModel):
         db_table = 'user_permission'
 
     def __str__(self):
-        return str(self.user.email)
+        return str(self.user.phone_number)
 
     @classmethod
     def get_user_admin_obj(cls, user):
@@ -472,4 +472,3 @@ class GenericAdmin(TimeStampedModel):
     @classmethod
     def update_user_permissions(cls, user):
         UserPermission.create_permission(user)
-

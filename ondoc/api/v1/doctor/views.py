@@ -190,11 +190,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "dob": str(profile_model.dob)
         }
         req_data = request.data
-        if req_data.get("payment_type") == models.OpdAppointment.INSURANCE:
-            effective_price = doctor_hospital.discounted_price
+        if data.get("payment_type") == models.OpdAppointment.INSURANCE:
+            effective_price = doctor_hospital.fees
+        elif data.get("payment_type") == models.OpdAppointment.COD:
+            effective_price = doctor_hospital.deal_price
         else:
             # TODO PM - Logic for coupon
-            effective_price = doctor_hospital.discounted_price
+            effective_price = doctor_hospital.deal_price
 
         opd_data = {
             "doctor": data.get("doctor").id,
@@ -204,11 +206,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "user": request.user.id,
             "booked_by": request.user.id,
             "fees": doctor_hospital.fees,
-            "discounted_price": doctor_hospital.discounted_price,
+            "deal_price": doctor_hospital.deal_price,
             "effective_price": effective_price,
             "mrp": doctor_hospital.mrp,
             "time_slot_start": str(time_slot_start),
-            "payment_type": request.data.get("payment_type")
+            "payment_type": data.get("payment_type")
         }
         resp = self.extract_payment_details(request, opd_data, 1)
         return Response(data=resp)
@@ -286,28 +288,21 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         balance = consumer_account.balance
         resp = {}
 
-        insured_cod_flag = self.is_insured_cod(appointment_details)
+        #insured_cod_flag = self.is_insured_cod(appointment_details)
+        can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
+        if can_use_insurance:
+            appointment_details['effective_price'] = appointment_details['fees']
+            appointment_details['payment_type'] = models.OpdAppointment.INSURANCE
+        elif appointment_details['payment_type'] == models.OpdAppointment.INSURANCE:
+            resp['status'] = 0
+            resp['message'] = insurance_fail_message
+            return resp
 
-        if insured_cod_flag or balance >= appointment_details.get("effective_price"):
-            appointment_details["payment_status"] = models.OpdAppointment.PAYMENT_ACCEPTED
-            appointment_details["status"] = models.OpdAppointment.BOOKED
-            otp = random.randint(1000, 9999)
-            appointment_details["otp"] = otp
-            opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details,
-                                                                   context={"request": request})
 
-            opd_seriailizer.is_valid(raise_exception=True)
-            opd_seriailizer.save()
-            user_account_data = {
-                "user": user,
-                "product_id": product_id,
-                "reference_id": opd_seriailizer.data.get("id")
-            }
-            if not insured_cod_flag:
-                consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
-            resp["status"] = 1
-            resp["data"] = opd_seriailizer.data
-        else:
+
+        if appointment_details['payment_type'] == models.OpdAppointment.PREPAID and \
+            balance < appointment_details.get("effective_price"):
+            # create order
             opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details,
                                                                    context={"request": request})
             opd_seriailizer.is_valid(raise_exception=True)
@@ -315,56 +310,77 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                         account_models.Order.OPD_APPOINTMENT_CREATE)
 
             temp_app_details = copy.deepcopy(appointment_details)
-            temp_app_details["discounted_price"] = str(appointment_details["discounted_price"])
+            temp_app_details["deal_price"] = str(appointment_details["deal_price"])
             temp_app_details["fees"] = str(appointment_details["fees"])
             temp_app_details["effective_price"] = str(appointment_details["effective_price"])
             temp_app_details["mrp"] = str(appointment_details["mrp"])
+
+            payable_amount = appointment_details.get("effective_price") - balance
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.OPD_APPOINTMENT_CREATE,
                 action_data=temp_app_details,
-                amount=appointment_details.get("effective_price") - consumer_account.balance,
+                amount=payable_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
-            appointment_details["payable_amount"] = appointment_details.get("effective_price") - balance
+            appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
             resp['pg_details'] = self.payment_details(request, appointment_details, product_id, order.id)
+
+        else:
+            # create appointment
+            appointment_details["payment_status"] = models.OpdAppointment.PAYMENT_ACCEPTED
+            appointment_details["status"] = models.OpdAppointment.BOOKED
+            otp = random.randint(1000, 9999)
+            appointment_details["otp"] = otp
+            opd_serializer = serializers.OpdAppointmentSerializer(data=appointment_details,
+                                                                   context={"request": request})
+            opd_serializer.is_valid(raise_exception=True)
+            opd_serializer.save()
+
+            if appointment_details["payment_type"] == models.OpdAppointment.PREPAID:
+                user_account_data = {
+                    "user": user,
+                    "product_id": product_id,
+                    "reference_id": opd_serializer.data.get("id")
+                }
+                consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
+
+            resp["status"] = 1
+            resp["data"] = opd_serializer.data
         return resp
 
     def payment_details(self, request, appointment_details, product_id, order_id):
         details = dict()
         pgdata = dict()
-        if appointment_details["payable_amount"] != 0:
-            user = request.user
-            user_profile = user.profiles.filter(is_default_user=True).first()
-            pgdata['custId'] = user.id
-            pgdata['mobile'] = user.phone_number
-            pgdata['email'] = user.email
-            if not user.email:
-                pgdata['email'] = "dummy_appointment@policybazaar.com"
 
-            pgdata['productId'] = product_id
-            base_url = (
-                "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
-            pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-            pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-            pgdata['checkSum'] = ''
-            pgdata['referenceId'] = ""
-            pgdata['orderId'] = order_id
-            if user_profile:
-                pgdata['name'] = user_profile.name
-            else:
-                pgdata['name'] = "DummyName"
-            pgdata['txAmount'] = appointment_details['payable_amount']
+        user = request.user
+        user_profile = user.profiles.get(pk=appointment_details['profile'])
+        pgdata['custId'] = user.id
+        pgdata['mobile'] = user.phone_number
+        pgdata['email'] = user.email
+        if not user.email:
+            pgdata['email'] = "dummyemail@docprime.com"
 
-        if pgdata:
-            details['required'] = True
-            details['pgdata'] = pgdata
-        else:
-            details['required'] = False
+        pgdata['productId'] = product_id
+        base_url = (
+            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['checkSum'] = ''
+        pgdata['referenceId'] = ""
+        pgdata['orderId'] = order_id
+        pgdata['name'] = user_profile.name
+        pgdata['txAmount'] = appointment_details['payable_amount']
+        details['pgdata'] = pgdata
 
         return details
+
+    def can_use_insurance(self, appointment_details):
+        # Check if appointment can be covered under insurance
+        # also return a valid message         
+        return False, 'Not covered under insurance'
 
     def is_insured_cod(self, app_details):
         return False
