@@ -232,9 +232,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if request.user.user_type == User.DOCTOR:
             req_status = validated_data.get('status')
             if req_status == models.OpdAppointment.RESCHEDULED_DOCTOR:
-                updated_opd_appointment = opd_appointment.action_rescheduled_doctor(opd_appointment)
+                updated_opd_appointment = opd_appointment.action_rescheduled_doctor()
             elif req_status == models.OpdAppointment.ACCEPTED:
-                updated_opd_appointment = opd_appointment.action_accepted(opd_appointment)
+                updated_opd_appointment = opd_appointment.action_accepted()
 
         opd_appointment_serializer = serializers.OpdAppointmentSerializer(updated_opd_appointment, context={'request':request})
         response = {
@@ -298,14 +298,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp['message'] = insurance_fail_message
             return resp
 
-
-
         if appointment_details['payment_type'] == models.OpdAppointment.PREPAID and \
             balance < appointment_details.get("effective_price"):
             # create order
-            opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details,
-                                                                   context={"request": request})
-            opd_seriailizer.is_valid(raise_exception=True)
+            # opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details,
+            #                                                        context={"request": request})
+            # opd_seriailizer.is_valid(raise_exception=True)
             account_models.Order.disable_pending_orders(appointment_details, product_id,
                                                         account_models.Order.OPD_APPOINTMENT_CREATE)
 
@@ -326,7 +324,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             )
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
-            resp['pg_details'] = self.payment_details(request, appointment_details, product_id, order.id)
+            resp['data'], resp["payment_required"] = self.payment_details(request, appointment_details, product_id, order.id)
 
         else:
             # create appointment
@@ -334,10 +332,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             appointment_details["status"] = models.OpdAppointment.BOOKED
             otp = random.randint(1000, 9999)
             appointment_details["otp"] = otp
-            opd_serializer = serializers.OpdAppointmentSerializer(data=appointment_details,
-                                                                   context={"request": request})
-            opd_serializer.is_valid(raise_exception=True)
-            opd_serializer.save()
+            # opd_serializer = serializers.OpdAppointmentSerializer(data=appointment_details,
+            #                                                        context={"request": request})
+            # opd_serializer.is_valid(raise_exception=True)
+            # opd_serializer.save()
+            opd_obj = models.OpdAppointment.objects.create(**appointment_details)
+            opd_serializer = serializers.OpdAppointmentSerializer(opd_obj)
 
             if appointment_details["payment_type"] == models.OpdAppointment.PREPAID:
                 user_account_data = {
@@ -346,14 +346,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     "reference_id": opd_serializer.data.get("id")
                 }
                 consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
-
             resp["status"] = 1
             resp["data"] = opd_serializer.data
         return resp
 
     def payment_details(self, request, appointment_details, product_id, order_id):
-        details = dict()
         pgdata = dict()
+        payment_required = True
 
         user = request.user
         user_profile = user.profiles.get(pk=appointment_details['profile'])
@@ -373,9 +372,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         pgdata['orderId'] = order_id
         pgdata['name'] = user_profile.name
         pgdata['txAmount'] = appointment_details['payable_amount']
-        details['pgdata'] = pgdata
 
-        return details
+        return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
         # Check if appointment can be covered under insurance
