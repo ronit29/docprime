@@ -246,16 +246,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = LabAppointmentModelSerializer(queryset, many=True)
         return Response(serializer.data)
 
-    # def retrieve(self, request, app_id, **kwargs):
-    #     queryset = LabAppointment.objects.get(pk=app_id)
-    #     serializer = LabAppointmentModelSerializer(queryset)
-    #     return Response(serializer.data)
-
     @transaction.atomic
     def create(self, request, **kwargs):
-        serializer = LabAppointmentCreateSerializer(data=request.data)
+        serializer = LabAppointmentCreateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
-
         appointment_data = self.form_lab_app_data(request, serializer.validated_data)
         resp = self.extract_payment_details(request, appointment_data, account_models.Order.LAB_PRODUCT_ID)
         return Response(data=resp)

@@ -900,7 +900,7 @@ class OrderHistoryViewSet(GenericViewSet):
                     "fees": action_data.get("effective_price"),
                     "product_id": order.product_id
                 }
-                serializer = LabAppointmentCreateSerializer(data=data)
+                serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
                 if not serializer.is_valid():
                     data.pop("start_date")
                     data.pop("start_time")

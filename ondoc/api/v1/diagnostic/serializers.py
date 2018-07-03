@@ -218,16 +218,13 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
 
     def validate(self, data):
-
+        request = self.context.get("request")
         if data.get("is_home_pickup") is True and (not data.get("address")):
             raise serializers.ValidationError("Address required for home pickup")
-
+        if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
+            raise serializers.ValidationError("Invalid profile id")
         self.test_lab_id_validator(data)
-
-        # self.profile_validator(data)
-
         self.time_slot_validator(data)
-
         return data
 
     def create(self, data):
