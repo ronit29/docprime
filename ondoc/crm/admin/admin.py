@@ -20,7 +20,7 @@ from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
 
-from ondoc.web.models import OnlineLeads, Careers
+from ondoc.web.models import OnlineLead, Career
 from django.contrib.auth import get_user_model
 User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
@@ -32,8 +32,6 @@ admin.site.site_title = 'Ondoc CRM'
 admin.site.site_url = None
 admin.site.index_title = 'CRM Administration'
 
-admin.site.register(Careers)
-admin.site.register(OnlineLeads)
 
 
 admin.site.register(OtpVerifications)

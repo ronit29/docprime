@@ -25,6 +25,8 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
 
 from ondoc.diagnostic.models import LabPricing
 
+from ondoc.web.models import Career, OnlineLead
+
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
 
@@ -177,6 +179,30 @@ class Command(BaseCommand):
             permissions = Permission.objects.filter(
                 content_type=ct, codename='change_' + ct.model)
 
+
+            group.permissions.add(*permissions)
+
+
+        # Create careers Groups
+        group, created = Group.objects.get_or_create(name=constants['CAREERS_MANAGEMENT_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Career)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                content_type=ct, codename='change_' + ct.model)
+
+            group.permissions.add(*permissions)
+
+
+        # Create careers Groups
+        group, created = Group.objects.get_or_create(name=constants['ONLINE_LEADS_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(OnlineLead)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                content_type=ct, codename='change_' + ct.model)
 
             group.permissions.add(*permissions)
 
