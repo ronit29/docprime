@@ -63,22 +63,8 @@ class OndocViewSet(mixins.CreateModelMixin,
 
 
 class DoctorAppointmentsViewSet(OndocViewSet):
-#     filter_backends = (DjangoFilterBackend)
     permission_classes = (IsAuthenticated,)
-#     #queryset = OpdAppointment.objects.all()
     serializer_class = serializers.OpdAppointmentSerializer
-#     filter_fields = ('hospital','profile','')
-
-#     # def list (self, request):
-#     #     return super().list()
-
-#     def get_queryset(self):
-
-#         user = self.request.user
-#         if user.user_type== User.DOCTOR:
-#             return OpdAppointment.objects.all(doctor=user.doctor)
-#         elif user.user_type== User.CONSUMER:
-#             return OpdAppointment.objects.all(user=user)
 
     def get_queryset(self):
 
@@ -87,7 +73,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             return models.OpdAppointment.objects.filter(doctor=user.doctor)
         elif user.user_type == User.CONSUMER:
             return models.OpdAppointment.objects.filter(user=user)
-    # queryset = auth_models.UserPermission.objects.all()
 
     def list(self, request):
 
@@ -117,15 +102,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if hospital_id:
             queryset = queryset.filter(hospital_id=hospital_id)
 
-        if range=='previous':
+        if range == 'previous':
             queryset = queryset.filter(status__in = [models.OpdAppointment.COMPLETED,models.OpdAppointment.CANCELED]).order_by('-time_slot_start')
-        elif range=='upcoming':
+        elif range == 'upcoming':
             today = datetime.date.today()
             queryset = queryset.filter(
                 status__in=[models.OpdAppointment.BOOKED, models.OpdAppointment.RESCHEDULED_PATIENT,
                             models.OpdAppointment.RESCHEDULED_DOCTOR, models.OpdAppointment.ACCEPTED],
                 time_slot_start__date__gte=today).order_by('time_slot_start')
-        elif range =='pending':
+        elif range == 'pending':
             queryset = queryset.filter(time_slot_start__gt=timezone.now(), status__in = [models.OpdAppointment.BOOKED,
                                                                                          models.OpdAppointment.RESCHEDULED_PATIENT
                                                                                          ]).order_by('time_slot_start')
@@ -215,7 +200,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         resp = self.extract_payment_details(request, opd_data, 1)
         return Response(data=resp)
 
-
     def update(self, request, pk=None):
         opd_appointment = get_object_or_404(models.OpdAppointment, pk=pk)
         serializer = serializers.UpdateStatusSerializer(data=request.data,
@@ -242,19 +226,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "data": opd_appointment_serializer.data
         }
         return Response(response)
-
-    # def doctor_update(self, opd_appointment, validated_data):
-    #     opd_appointment.status = validated_data.get('status')
-    #     opd_appointment.save()
-    #     return opd_appointment
-
-    # def consumer_update(self, opd_appointment, validated_data):
-    #     opd_appointment.status = validated_data.get('status')
-    #     if validated_data.get('status') == models.OpdAppointment.RESCHEDULED_PATIENT:
-    #         opd_appointment.time_slot_start = validated_data.get("time_slot_start")
-    #         opd_appointment.time_slot_end = validated_data.get("time_slot_end")
-    #     opd_appointment.save()
-    #     return opd_appointment
 
     def extract_appointment_ids(self, appointment_data):
         id_dict = defaultdict(dict)
