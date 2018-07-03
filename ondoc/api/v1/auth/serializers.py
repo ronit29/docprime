@@ -161,10 +161,12 @@ class UserPermissionSerializer(serializers.ModelSerializer):
 
 
 class AddressSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True)
 
     class Meta:
         model = Address
-        fields = "__all__"
+        fields = ('id', 'type', 'place_id', 'address', 'land_mark', 'pincode',
+                  'phone_number', 'is_default', 'profile', 'user')
 
     def validate(self, attrs):
         request = self.context.get("request")

@@ -570,7 +570,7 @@ class AddressViewsSet(viewsets.ModelViewSet):
         return Address.objects.filter(user=request.user)
 
     def create(self, request, *args, **kwargs):
-        data = dict(request.data)
+        data = {key: value for key, value in request.data.items()}
         data["user"] = request.user.id
         # Added recently
         if 'is_default' not in data:
@@ -579,18 +579,22 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
         serializer = serializers.AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        if not Address.objects.filter(**data).exists():
+            serializer.save()
+        else:
+            address = Address.objects.filter(**data).first()
+            serializer = serializers.AddressSerializer(address)
         return Response(serializer.data)
 
     def update(self, request, pk=None):
-        data = request.data
+        data = {key: value for key, value in request.data.items()}
         data['user'] = request.user.id
-        queryset = get_object_or_404(Address, pk=pk)
+        address = self.get_queryset().filter(pk=pk).first()
         if data.get("is_default"):
             add_default_qs = Address.objects.filter(user=request.user.id, is_default=True)
             if add_default_qs:
                 add_default_qs.update(is_default=False)
-        serializer = serializers.AddressSerializer(queryset, data=data, context={"request": request})
+        serializer = serializers.AddressSerializer(address, data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
