@@ -339,7 +339,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             if not insured_cod_flag:
                 consumer_account.debit_schedule(user_account_data, effective_price)
             resp["status"] = 1
-            resp["data"] = lab_appointment_data
+            resp["data"] = {"id": lab_appointment_data.get("id"), "type": lab_appointment_data.get("type")}
         else:
             appointment_details["effective_price"] = effective_price
             account_models.Order.disable_pending_orders(appointment_details, product_id,
