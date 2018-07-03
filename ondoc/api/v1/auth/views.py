@@ -34,7 +34,7 @@ from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, Appointme
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer)
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
-
+from ondoc.api.v1.utils import IsConsumer
 import decimal
 import copy
 
@@ -281,7 +281,7 @@ class OndocViewSet(mixins.CreateModelMixin,
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsConsumer, )
     def get_queryset(self):
         user = self.request.user
         return OpdAppointment.objects.filter(user=user)
@@ -305,12 +305,12 @@ class UserAppointmentsViewSet(OndocViewSet):
         input_serializer.is_valid(raise_exception=True)
         appointment_type = input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
-            queryset = LabAppointment.objects.filter(pk=pk, profile__user=user)
-            serializer = LabAppointmentRetrieveSerializer(queryset, many=True,context={"request": request})
+            queryset = LabAppointment.objects.filter(pk=pk, user=user)
+            serializer = LabAppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             return Response(serializer.data)
         elif appointment_type == 'doctor':
             queryset = OpdAppointment.objects.filter(pk=pk, user=user)
-            serializer = AppointmentRetrieveSerializer(queryset, many=True,context={"request": request})
+            serializer = AppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             return Response(serializer.data)
         else:
             return Response({'Error':'Invalid Request Type'})
@@ -516,7 +516,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     def lab_appointment_list(self, request, params):
         user = request.user
-        queryset = LabAppointment.objects.select_related('lab').filter(profile__user=user)
+        queryset = LabAppointment.objects.select_related('lab').filter(user=user)
         if queryset and params.get('profile_id'):
             queryset = queryset.filter(profile=params['profile_id'])
         queryset = paginate_queryset(queryset, request, 20)
@@ -546,7 +546,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
         elif range == 'upcoming':
             queryset = queryset.filter(
-                status__in=[OpdAppointment.CREATED, OpdAppointment.RESCHEDULED_DOCTOR,
+                status__in=[OpdAppointment.BOOKED, OpdAppointment.RESCHEDULED_DOCTOR,
                             OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.ACCEPTED],
                 time_slot_start__gt=timezone.now()).order_by('time_slot_start')
         elif range == 'pending':
