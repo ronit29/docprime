@@ -248,7 +248,7 @@ class UserPermission(TimeStampedModel):
         db_table = 'user_permission'
 
     def __str__(self):
-        return str(self.user.email)
+        return str(self.user.phone_number)
 
     @classmethod
     def get_user_admin_obj(cls, user):
@@ -307,10 +307,11 @@ class UserPermission(TimeStampedModel):
                 else:
                     user_permissions_list.append(cls.get_permission(user, None, hospital, None))
 
-        doctor_hospital_data = DoctorHospital.objects.filter(Q(hospital__network__isnull=False,
+        doctor_hospital_data = DoctorHospital.objects.filter(Q(doctor__user__isnull=False),
+                                                             (Q(hospital__network__isnull=False,
                                                                hospital__network__generic_hospital_network_admins__isnull=True) |
                                                              Q(hospital__network__isnull=True,
-                                                               hospital__generic_hospital_admins__isnull=True))
+                                                               hospital__generic_hospital_admins__isnull=True)))
 
         if doctor_hospital_data:
             for doctor_hospital in doctor_hospital_data:
@@ -472,4 +473,3 @@ class GenericAdmin(TimeStampedModel):
     @classmethod
     def update_user_permissions(cls, user):
         UserPermission.create_permission(user)
-
