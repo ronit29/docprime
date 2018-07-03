@@ -17,7 +17,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
     DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language)
 from .filters import RelatedDropdownFilter
-
+from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
@@ -412,9 +412,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
 
-    list_display = ('name', 'updated_at','data_status','onboarding_status','list_created_by','get_onboard_link')
+    list_display = ('name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link')
     date_hierarchy = 'created_at'
-    list_filter = ('data_status','onboarding_status',CityFilter,)
+    list_filter = ('data_status','onboarding_status', CityFilter,)
     form = DoctorForm
     inlines = [
         DoctorMobileInline,
@@ -485,6 +485,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(DoctorAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
+        form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
+        if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+            form.base_fields['assigned_to'].disabled = True
         return form
 
     def save_formset(self, request, form, formset, change):
@@ -501,6 +504,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user
+        if not obj.assigned_to:
+            obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
             obj.data_status = 2
         if '_qc_approve' in request.POST:
