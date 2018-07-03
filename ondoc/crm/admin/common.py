@@ -23,8 +23,9 @@ def award_year_choices_no_blank():
 
 class QCPemAdmin(admin.ModelAdmin):
     change_form_template = 'custom_change_form.html'
+
     def list_created_by(self, obj):
-        field =  ''
+        field = ''
         try:
             field = obj.created_by.staffprofile.name
         except ObjectDoesNotExist:
@@ -32,6 +33,17 @@ class QCPemAdmin(admin.ModelAdmin):
         return field
     list_created_by.admin_order_field = 'created_by'
     list_created_by.short_description = "Created By"
+
+    def list_assigned_to(self, obj):
+        field = ''
+        if obj.assigned_to is not None:
+            try:
+                field = obj.assigned_to.staffprofile.name
+            except ObjectDoesNotExist:
+                field = obj.assigned_to.email if obj.assigned_to.email is not None else obj.assigned_to.phone_number
+        return field
+    list_assigned_to.admin_order_field = 'assigned_to'
+    list_assigned_to.short_description = "Assigned To"
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -41,11 +53,12 @@ class QCPemAdmin(admin.ModelAdmin):
         if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
             final_qs = qs.filter(created_by=request.user)
         if final_qs:
-            final_qs = final_qs.prefetch_related('created_by','created_by__staffprofile')
+            final_qs = final_qs.prefetch_related('created_by', 'assigned_to', 'assigned_to__staffprofile', 'created_by__staffprofile')
         return final_qs
 
     class Meta:
         abstract = True
+
 
 class FormCleanMixin(forms.ModelForm):
    def clean(self):
@@ -88,7 +101,6 @@ class FormCleanMixin(forms.ModelForm):
 class ActionAdmin(admin.ModelAdmin):
 
     # actions = ['submit_for_qc','qc_approve', 'mark_in_progress']
-
 
     def get_actions(self, request):
         actions = super().get_actions(request)
