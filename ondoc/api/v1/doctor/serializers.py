@@ -53,7 +53,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
     def get_allowed_action(self, obj):
         request = self.context.get('request')
-        return OpdAppointment.allowed_action(obj, request.user.user_type, request)
+        return OpdAppointment.allowed_action(request.user.user_type, request)
 
     class Meta:
         model = OpdAppointment
@@ -89,14 +89,16 @@ class CreateAppointmentSerializer(serializers.Serializer):
     start_time = serializers.FloatField()
     end_date = serializers.CharField(required=False)
     end_time = serializers.FloatField(required=False)
-    time_slot_start = serializers.DateTimeField(required=False)
+    time_slot_start = serializers.DateTimeField(required=False)    
+    payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
+
     # time_slot_end = serializers.DateTimeField()
 
     def validate(self, data):
         ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.BOOKED, OpdAppointment.ACCEPTED,
                                      OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.RESCHEDULED_DOCTOR]
         MAX_APPOINTMENTS_ALLOWED = 3
-        MAX_FUTURE_DAY = 7
+        MAX_FUTURE_DAY = 40
         request = self.context.get("request")
         time_slot_start = (self.form_time_slot(data.get('start_date'), data.get('start_time'))
                            if not data.get("time_slot_start") else data.get("time_slot_start"))
@@ -120,10 +122,10 @@ class CreateAppointmentSerializer(serializers.Serializer):
 
         if not DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
             day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).exists():
-            raise serializers.ValidationError("Invalid slot")
+            raise serializers.ValidationError("Invalid Time slot")
 
         if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor = data.get('doctor')).exists():
-            raise serializers.ValidationError('Cannot book appointment with same doctor again')
+            raise serializers.ValidationError('A previous appointment with this doctor already exists. Cancel it before booking new Appointment.')
 
         if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile = data.get('profile')).count()>=MAX_APPOINTMENTS_ALLOWED:
             raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
@@ -592,13 +594,14 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_allowed_action(self,obj):
         request = self.context.get('request')
-        return OpdAppointment.allowed_action(obj, request.user.user_type, request)
+        return OpdAppointment.allowed_action(request.user.user_type, request)
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'thumbnail', 'type', 'profile',
                   'allowed_action', 'effective_price', 'discounted_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action')
+
 
 
 

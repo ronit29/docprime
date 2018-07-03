@@ -1,5 +1,5 @@
 from django.forms import ModelForm, TextInput, EmailInput, FileInput, Select
-from .models import OnlineLeads, Careers
+from .models import OnlineLead, Career
 from django import forms
 import os
 
@@ -7,7 +7,7 @@ import os
 class OnlineLeadsForm(ModelForm):
 
     class Meta:
-        model = OnlineLeads
+        model = OnlineLead
         widgets = {
             'member_type': Select(attrs={'class': 'form-control', 'id': 'select-profession'}),
             'name': TextInput(attrs={'placeholder': 'Name', 'class': 'form-control', 'id': 'name'}),
@@ -34,7 +34,7 @@ class CareersForm(ModelForm):
         return data
 
     class Meta:
-        model = Careers
+        model = Career
         widgets = {
             'profile_type': Select(attrs={'class': 'form-control'}),
             'name': TextInput(attrs={'placeholder': 'Your Name', 'class': 'form-control', 'id': 'name'}),
