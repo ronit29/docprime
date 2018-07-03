@@ -41,6 +41,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('ondoc.diagnostic.urls', namespace='diagnostic')),
     path('', include('ondoc.web.urls', namespace='web')),
+    path('api/v1/matrix/', include('ondoc.matrix.urls', namespace='matrix')),
     path('onboard/',include('ondoc.onboard.urls', namespace='onboard')),
 ] + additional_urls + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
