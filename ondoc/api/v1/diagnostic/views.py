@@ -421,8 +421,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = diagnostic_serializer.LabAppointmentUpdateSerializer(lab_appointment_obj, data=data,
                                                     context={'lab_id': lab_appointment_obj.lab})
         serializer.is_valid(raise_exception=True)
-        # allowed = lab_appointment_obj.allowed_action(request.user.user_type)
-        allowed = lab_appointment_obj.allowed_action(3)
+        allowed = lab_appointment_obj.allowed_action(request.user.user_type)
+        # allowed = lab_appointment_obj.allowed_action(3)
         if data.get('status') not in allowed:
             resp = dict()
             resp['allowed'] = allowed

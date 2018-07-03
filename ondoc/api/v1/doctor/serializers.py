@@ -591,7 +591,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_allowed_action(self,obj):
         request = self.context.get('request')
-        return OpdAppointment.allowed_action(obj,request.user.user_type)
+        return OpdAppointment.allowed_action(request.user.user_type, request)
 
 
 

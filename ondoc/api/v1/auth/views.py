@@ -338,7 +338,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             return Response(response)
         elif appointment_type == 'doctor':
             opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
-            allowed = opd_appointment.allowed_action(request.user.user_type)
+            allowed = opd_appointment.allowed_action(request.user.user_type, request)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
                 resp = {}
