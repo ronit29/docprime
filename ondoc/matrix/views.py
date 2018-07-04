@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404
 from ondoc.doctor.models import Doctor
 from ondoc.diagnostic.models import Lab
 from ondoc.authentication.models import StaffProfile
+from ondoc.api.v1.utils import IsMatrixUser
 
 
 class MatrixLead(GenericViewSet):
@@ -15,6 +16,7 @@ class MatrixLead(GenericViewSet):
         (DOCTOR, 'doctor'),
     )
     queryset = Doctor.objects.none()
+    permission_classes = (IsMatrixUser,)
 
     def create(self, request, *args, **kwargs):
 

@@ -11,6 +11,7 @@ import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
+from django.conf import settings
 User = get_user_model()
 
 
@@ -183,3 +184,16 @@ class IsDoctor(permissions.BasePermission):
         if request.user.user_type == User.DOCTOR:
             return True
         return False
+
+
+class IsMatrixUser(permissions.BasePermission):
+    message = 'Only Matrix User is allowed to Perform Action.'
+
+    def has_permission(self, request, view):
+        token = request.META.get('HTTP_MATRIX_AUTHORIZATION', None)
+        if token is not None:
+            if token == settings.MATRIX_AUTH_TOKEN:
+                return True
+        return False
+
+
