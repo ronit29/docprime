@@ -1,12 +1,41 @@
 import json
-from import_export import resources
-from import_export.admin import ImportMixin, base_formats
+from import_export import resources, fields
+from import_export.admin import ImportMixin, base_formats, ImportExportMixin
 from ondoc.lead import models
 from ondoc.doctor.models import MedicalService, Specialization
 from reversion.admin import admin
 from django.utils.html import format_html_join
 from django.utils.safestring import mark_safe
 from django.contrib.admin.templatetags.admin_modify import register, submit_row as original_submit_row
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models.manager import Manager
+
+
+class JsonExportField(fields.Field):
+    def get_value(self, obj):
+        """
+        Returns the value of the object's attribute.
+        """
+        if self.attribute is None:
+            return None
+
+        attrs = self.attribute.split('__')
+        # value = obj
+        try:
+            value = getattr(obj, attrs[0], None)
+        except (ValueError, ObjectDoesNotExist):
+            return None
+
+        for attr in attrs[1:]:
+            try:
+                value = value.get(attr, None)
+            except (ValueError, ObjectDoesNotExist):
+                return None
+            if value is None:
+                return None
+        if isinstance(value, dict):
+            return ",".join(value.values())
+        return value
 
 
 @register.inclusion_tag('admin/submit_line.html', takes_context=True)
@@ -59,6 +88,19 @@ class DoctorLeadResource(resources.ModelResource):
                 doctor_lead=instance,
                 hospital_lead=clinic
             )
+
+
+class DoctorLeadExportResource(resources.ModelResource):
+    name = JsonExportField(attribute="json__Name", column_name="Name")
+    specializations = JsonExportField(attribute="json__Specializations", column_name="Speciality")
+    address = JsonExportField(attribute="json__GoogleAddress", column_name="Google Address")
+    google_address = JsonExportField(attribute="json__Address", column_name="Address")
+    city = fields.Field(attribute="city", column_name="City")
+
+    class Meta:
+        model = models.DoctorLead
+        fields = ('name', 'city', 'specializations', 'address', 'google_address', )
+        export_order = ('specializations', 'name',  'address', 'city', 'google_address', )
 
 
 class DoctorHospitalInline(admin.StackedInline):
@@ -194,16 +236,20 @@ class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
     about.short_description = "About"
 
 
-class DoctorLeadAdmin(ImportMixin, admin.ModelAdmin):
+class DoctorLeadAdmin(ImportExportMixin, admin.ModelAdmin):
     inlines = [DoctorHospitalInline, ]
     formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = ['city', ]
     list_display = ('city', 'lab', "name")
     readonly_fields = ("doctor", "name", "city", "lab",  "services",
                        "specializations", "education", "experience",
-                       "awards", "about", )
+                       "awards", "about", "address", "google_address", )
     exclude = ('json', 'source_id',)
     resource_class = DoctorLeadResource
+    export_resource_class = DoctorLeadExportResource
+
+    def get_export_resource_class(self):
+        return self.export_resource_class
 
     def save_model(self, request, obj, form, change):
         obj.convert_lead(request.user)
@@ -318,3 +364,14 @@ class DoctorLeadAdmin(ImportMixin, admin.ModelAdmin):
         data = instance.json
         if data:
             return data.get("About")
+
+    def address(self, instance):
+        data = instance.json
+        if data:
+            return data.get("Address")
+
+    def google_address(self, instance):
+        data = instance.json
+        if data:
+            return data.get("GoogleAddress")
+
