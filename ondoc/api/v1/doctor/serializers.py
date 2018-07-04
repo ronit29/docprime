@@ -53,12 +53,12 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
     def get_allowed_action(self, obj):
         request = self.context.get('request')
-        return OpdAppointment.allowed_action(request.user.user_type, request)
+        return obj.allowed_action(request.user.user_type, request)
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'thumbnail', 'type',
-                  'allowed_action', 'effective_price', 'discounted_price', 'status', 'time_slot_start', 'time_slot_end')
+                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end')
 
     def get_patient_image(self, obj):
         if obj.profile.profile_image:
@@ -199,13 +199,7 @@ class UpdateStatusSerializer(serializers.Serializer):
     time_slot_end = serializers.DateTimeField(required=False)
     start_date = serializers.CharField(required=False)
     start_time = serializers.FloatField(required=False)
-    # def validate(self, data):
-    #     request = self.context.get("request")
-    #     user_type = request.user.user_type
-    #     opd_appointment = self.context.get("opd_appointment")
-    #     current_datetime = timezone.now()
-    #     # Validate Doctor Choices
-    #     status = data.get('status')
+
         
 
         # if user_type == User.DOCTOR:
@@ -592,14 +586,10 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     doctor = AppointmentRetrieveDoctorSerializer()
     allowed_action = serializers.SerializerMethodField()
 
-    def get_allowed_action(self,obj):
-        request = self.context.get('request')
-        return OpdAppointment.allowed_action(request.user.user_type, request)
-
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'thumbnail', 'type', 'profile',
-                  'allowed_action', 'effective_price', 'discounted_price', 'status', 'time_slot_start', 'time_slot_end',
+                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action')
 
 

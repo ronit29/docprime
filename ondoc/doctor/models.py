@@ -706,7 +706,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         self.time_slot_start = data.get('time_slot_start')
         self.fees = data.get('fees', self.fees)
         self.mrp = data.get('mrp', self.mrp)
-        self.discounted_price = data.get('discounted_price', self.discounted_price)
+        self.deal_price = data.get('deal_price', self.deal_price)
         self.effective_price = data.get('effective_price', self.effective_price)
         self.save()
 
