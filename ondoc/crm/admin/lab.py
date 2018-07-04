@@ -376,5 +376,5 @@ class LabTestTypeAdmin(VersionAdmin):
 
 
 class AvailableLabTestAdmin(VersionAdmin):
-    search_fields = ['name']
+    search_fields = ['test__name']
 
