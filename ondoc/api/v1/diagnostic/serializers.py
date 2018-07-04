@@ -155,6 +155,7 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
 
 
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
+    LAB_TYPE = 'lab'
     type = serializers.ReadOnlyField(default="lab")
     lab_name = serializers.ReadOnlyField(source="lab.name")
     lab_image = LabImageModelSerializer(many=True, source='lab.lab_image', read_only=True)
@@ -166,8 +167,23 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LabAppointment
-        fields = ('id', 'lab', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
+        fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', )
+
+
+class LabAppTransactionModelSerializer(serializers.Serializer):
+    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
+    price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    deal_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    time_slot_start = serializers.DateTimeField()
+    profile_detail = serializers.JSONField()
+    status = serializers.IntegerField()
+    payment_type = serializers.IntegerField()
+    lab_test = serializers.ListField(child=serializers.IntegerField())
 
 
 class LabAppointmentUpdateSerializer(serializers.Serializer):

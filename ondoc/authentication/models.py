@@ -273,9 +273,9 @@ class UserPermission(TimeStampedModel):
     def create_permission(cls, user):
         from ondoc.doctor.models import HospitalNetwork, Hospital, DoctorHospital
         admin_queryset = GenericAdmin.objects.filter(user=user)
-        doctor_hospital_users = list(DoctorHospital.objects.values_list('doctor__user__id', flat=True))
-        delete_user_list = doctor_hospital_users+[user.id]
-        UserPermission.objects.filter(user__id__in=delete_user_list).delete()
+        # doctor_hospital_users = list(DoctorHospital.objects.values_list('doctor__user__id', flat=True))
+        # delete_user_list = doctor_hospital_users+[user.id]
+        UserPermission.objects.filter(user=user).delete()
         user_permissions_list =[]
         networks = []
         hospitals = []

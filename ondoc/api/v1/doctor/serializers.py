@@ -41,6 +41,7 @@ class AppointmentFilterSerializer(serializers.Serializer):
 
 
 class OpdAppointmentSerializer(serializers.ModelSerializer):
+    DOCTOR_TYPE = 'doctor'
     doctor_name = serializers.ReadOnlyField(source='doctor.name')
     hospital_name = serializers.ReadOnlyField(source='hospital.name')
     patient_name = serializers.ReadOnlyField(source='profile.name')
@@ -74,6 +75,21 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         else:
             url = static('doctor_images/no_image.png')
             return request.build_absolute_uri(url)
+
+
+class OpdAppTransactionModelSerializer(serializers.Serializer):
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
+    profile_detail = serializers.JSONField()
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    booked_by = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    fees = serializers.DecimalField(max_digits=10, decimal_places=2)
+    mrp = serializers.DecimalField(max_digits=10, decimal_places=2)
+    deal_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    time_slot_start = serializers.DateTimeField()
+    payment_type = serializers.IntegerField()
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
