@@ -716,10 +716,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         resp_serializer.is_valid(raise_exception=True)
         response = resp_serializer.validated_data
         # user = User.objects.get(pk=response.get("customerId"))
-        user = get_object_or_404(User, pk=response.get("customerId"))
-        data['user'] = user
+        # user = get_object_or_404(User, pk=response.get("customerId"))
+        data['user'] = response.get("customerId")
         data['product_id'] = response.get('productId')
-        data['order_id'] = response.get('orderNo')
+        data['order_id'] = response.get('orderNo').id
         data['reference_id'] = response.get('referenceId')
         data['type'] = PgTransaction.CREDIT
 
@@ -753,19 +753,15 @@ class TransactionViewSet(viewsets.GenericViewSet):
         try:
             appointment_data = order_obj.action_data
             if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                serializer = OpdAppointmentSerializer(appointment_obj)
-                appointment_data = serializer.data
+                serializer = OpdAppointmentSerializer(data=appointment_data)
+                serializer.is_valid()
+                appointment_data = serializer.validated_data
             elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                serializer = LabAppointmentModelSerializer(appointment_obj)
+                serializer = LabAppointmentModelSerializer(data=appointment_data)
+                serializer.is_valid()
                 appointment_data = serializer.data
 
-            appointment_obj = order_obj.process_payment(consumer_account, pg_data, appointment_data)
-
-
-            # if order_obj.action in [Order.OPD_APPOINTMENT_RESCHEDULE, Order.LAB_APPOINTMENT_RESCHEDULE]:
-            #     appointment_obj = self.reschedule_appointment(consumer_account, pg_data, order_obj)
-            # elif order_obj.action in [Order.OPD_APPOINTMENT_CREATE, Order.LAB_APPOINTMENT_CREATE]:
-            #     appointment_obj = self.book_appointment(request, consumer_account, pg_data, order_obj)
+            appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
         except:
             pass
 

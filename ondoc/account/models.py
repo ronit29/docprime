@@ -1,8 +1,8 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from ondoc.authentication.models import TimeStampedModel, User
-from ondoc.doctor.models import OpdAppointment
-from ondoc.diagnostic.models import LabAppointment
+# from ondoc.doctor.models import OpdAppointment
+# from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
 
 # Create your models here.
@@ -65,13 +65,15 @@ class Order(TimeStampedModel):
             ).update(is_viewable=False)
 
     @transaction.atomic
-    def process_payment(self, consumer_account, pg_data, appointment_data):
+    def process_order(self, consumer_account, pg_data, appointment_data):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
         appointment_obj = None
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if consumer_account.balance >= appointment_data["effective_price"]:
                 appointment_obj = OpdAppointment.create_appointment(appointment_data)
                 order_dict = {
-                    "appointment_id": appointment_obj.id,
+                    "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
                 self.update_order(order_dict)
@@ -81,7 +83,7 @@ class Order(TimeStampedModel):
             if consumer_account.balance >= appointment_data["effective_price"]:
                 appointment_obj = LabAppointment.create_appointment(appointment_data)
                 order_dict = {
-                    "appointment_id": appointment_obj.id,
+                    "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
                 self.update_order(order_dict)
@@ -112,11 +114,10 @@ class Order(TimeStampedModel):
         return appointment_obj
 
     def update_order(self, data):
-        self.appointment_id = data.get("appointment_id", self.appointment_id)
+        self.reference_id = data.get("reference_id", self.reference_id)
         self.payment_status = data.get("payment_status", self.payment_status)
         self.save()
 
-    @staticmethod
     def debit_payment(self, consumer_account, pg_data, app_obj, amount):
         debit_data = {
             "user": pg_data.get("user"),
