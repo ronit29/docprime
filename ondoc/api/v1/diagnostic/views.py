@@ -321,7 +321,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
             appointment_details["otp"] = otp
             appointment_details["payment_status"] = doctor_model.OpdAppointment.PAYMENT_ACCEPTED
             appointment_details["status"] = doctor_model.OpdAppointment.BOOKED
-            lab_serializer = diagnostic_serializer.LabAppointmentModelSerializer(data=appointment_details)
+            lab_serializer = diagnostic_serializer.LabAppointmentModelSerializer(data=appointment_details,
+                                                                                 context={"request": request})
             lab_serializer.is_valid(raise_exception=True)
             lab_appointment = lab_serializer.save()
 
@@ -330,7 +331,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 "product_id": product_id,
                 "reference_id": lab_appointment.id
             }
-            lab_appointment_data = diagnostic_serializer.LabAppointmentModelSerializer(lab_appointment).data
+            lab_appointment_data = diagnostic_serializer.LabAppointmentModelSerializer(lab_appointment, context={
+                "request": request}).data
             if not insured_cod_flag:
                 consumer_account.debit_schedule(user_account_data, effective_price)
             resp["status"] = 1

@@ -42,7 +42,8 @@ class LabTestSerializer(serializers.ModelSerializer):
 class LabImageModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabImage
-        exclude = ('created_at', 'updated_at',)
+        fields = ('name', )
+        # exclude = ('created_at', 'updated_at',)
 
 
 class LabModelSerializer(serializers.ModelSerializer):
@@ -156,7 +157,7 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
     type = serializers.ReadOnlyField(default="lab")
     lab_name = serializers.ReadOnlyField(source="lab.name")
-    lab_image = LabImageModelSerializer(many=True, source='lab.lab_image')
+    lab_image = LabImageModelSerializer(many=True, source='lab.lab_image', read_only=True)
     lab_thumbnail = serializers.SerializerMethodField()
 
     def get_lab_thumbnail(self, obj):
@@ -165,7 +166,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LabAppointment
-        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
+        fields = ('id', 'lab', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', )
 
 

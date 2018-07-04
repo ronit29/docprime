@@ -774,9 +774,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 serializer.is_valid()
                 appointment_data = serializer.validated_data
             elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                serializer = LabAppointmentModelSerializer(data=appointment_data)
+                serializer = LabAppointmentModelSerializer(data=appointment_data, context={"request": request})
                 serializer.is_valid()
-                appointment_data = serializer.data
+                appointment_data = serializer.validated_data
 
             appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
         except:
