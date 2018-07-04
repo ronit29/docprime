@@ -868,6 +868,7 @@ class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
 
 
 class OrderHistoryViewSet(GenericViewSet):
+    permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
         orders = []
