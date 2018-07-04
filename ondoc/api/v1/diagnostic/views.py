@@ -279,21 +279,18 @@ class LabAppointmentView(mixins.CreateModelMixin,
         }
         # otp = random.randint(1000, 9999)
         appointment_data = {
-            "lab": data["lab"].id,
-            "user": request.user.id,
-            "profile": data["profile"].id,
+            "lab": data["lab"],
+            "user": request.user,
+            "profile": data["profile"],
             "price": total_mrp,
             "agreed_price": total_agreed,
             "deal_price": total_deal_price,
             "effective_price": effective_price,
-            "time_slot_start": str(start_dt),
+            "time_slot_start": start_dt,
             "profile_detail": profile_detail,
-            # "payment_status": OpdAppointment.PAYMENT_ACCEPTED,
             "status": LabAppointment.BOOKED,
             "payment_type": data["payment_type"],
-            # "test_ids": data["test_ids"]
             "lab_test": [x["id"] for x in lab_test_queryset.values("id")]
-            # "otp": otp
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address")).first()
@@ -317,35 +314,26 @@ class LabAppointmentView(mixins.CreateModelMixin,
         insured_cod_flag = self.is_insured_cod(appointment_details)
 
         if insured_cod_flag or balance >= effective_price:
-            otp = random.randint(1000, 9999)
-            appointment_details["otp"] = otp
-            appointment_details["payment_status"] = doctor_model.OpdAppointment.PAYMENT_ACCEPTED
-            appointment_details["status"] = doctor_model.OpdAppointment.BOOKED
-            lab_serializer = diagnostic_serializer.LabAppointmentModelSerializer(data=appointment_details,
-                                                                                 context={"request": request})
-            lab_serializer.is_valid(raise_exception=True)
-            lab_appointment = lab_serializer.save()
+            lab_appointment = LabAppointment.create_appointment(appointment_details)
 
             user_account_data = {
                 "user": user,
                 "product_id": product_id,
                 "reference_id": lab_appointment.id
             }
-            lab_appointment_data = diagnostic_serializer.LabAppointmentModelSerializer(lab_appointment, context={
-                "request": request}).data
+
             if not insured_cod_flag:
                 consumer_account.debit_schedule(user_account_data, effective_price)
+
             resp["status"] = 1
-            resp["data"] = {"id": lab_appointment_data.get("id"), "type": lab_appointment_data.get("type")}
+            resp["payment_required"] = False
+            resp["data"] = {"id": lab_appointment.id, "type": diagnostic_serializer.LabAppointmentModelSerializer.LAB_TYPE}
         else:
             appointment_details["effective_price"] = effective_price
-            account_models.Order.disable_pending_orders(appointment_details, product_id,
-                                                        account_models.Order.LAB_APPOINTMENT_CREATE)
             temp_appointment_details = copy.deepcopy(appointment_details)
-            temp_appointment_details["price"] = str(appointment_details["price"])
-            temp_appointment_details["agreed_price"] = str(appointment_details["agreed_price"])
-            temp_appointment_details["deal_price"] = str(appointment_details["deal_price"])
-            temp_appointment_details["effective_price"] = str(appointment_details["effective_price"])
+            self.json_transform(temp_appointment_details)
+            account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
+                                                        account_models.Order.LAB_APPOINTMENT_CREATE)
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -359,38 +347,36 @@ class LabAppointmentView(mixins.CreateModelMixin,
         return resp
 
     def get_payment_details(self, request, appointment_details, product_id, order_id):
-        details = dict()
         pgdata = dict()
-        if appointment_details["payable_amount"] != 0:
-            user = request.user
-            user_profile = user.profiles.filter(is_default_user=True).first()
-            pgdata['custId'] = user.id
-            pgdata['mobile'] = user.phone_number
-            pgdata['email'] = user.email
-            if not user.email:
-                pgdata['email'] = "dummy_appointment@policybazaar.com"
+        user = request.user
+        pgdata['custId'] = user.id
+        pgdata['mobile'] = user.phone_number
+        pgdata['email'] = user.email
+        if not user.email:
+            pgdata['email'] = "dummy_appointment@policybazaar.com"
 
-            pgdata['productId'] = product_id
-            base_url = (
-                "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
-            pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-            pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-            pgdata['checkSum'] = ''
-            pgdata['appointmentId'] = ""
-            pgdata['order_id'] = order_id
-            if user_profile:
-                pgdata['name'] = user_profile.name
-            else:
-                pgdata['name'] = "DummyName"
-            pgdata['txAmount'] = appointment_details['payable_amount']
+        pgdata['productId'] = product_id
+        base_url = (
+            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['checkSum'] = ''
+        pgdata['appointmentId'] = ""
+        pgdata['order_id'] = order_id
+        pgdata['name'] = appointment_details["profile"].name
+        pgdata['txAmount'] = appointment_details['payable_amount']
 
-        if pgdata:
-            details['required'] = True
-            details['pgdata'] = pgdata
-        else:
-            details['required'] = False
+        return pgdata,
 
-        return details
+    def json_transform(self, app_data):
+        app_data["price"] = str(app_data["price"])
+        app_data["agreed_price"] = str(app_data["agreed_price"])
+        app_data["deal_price"] = str(app_data["deal_price"])
+        app_data["effective_price"] = str(app_data["effective_price"])
+        app_data["time_slot_start"] = str(app_data["time_slot_start"])
+        app_data["lab"] = app_data["lab"].id
+        app_data["user"] = app_data["user"].id
+        app_data["profile"] = app_data["profile"].id
 
     def is_insured_cod(self, app_details):
         return False

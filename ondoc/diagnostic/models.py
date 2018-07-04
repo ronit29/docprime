@@ -449,7 +449,9 @@ class LabAppointment(TimeStampedModel):
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
+        lab_ids = appointment_data.pop("lab_test")
         app_obj = cls.objects.create(**appointment_data)
+        app_obj.lab_test.add(*lab_ids)
         return app_obj
 
     def action_rescheduled_lab(self):

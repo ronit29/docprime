@@ -184,17 +184,17 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             effective_price = doctor_hospital.deal_price
 
         opd_data = {
-            "doctor": data.get("doctor").id,
-            "hospital": data.get("hospital").id,
-            "profile": data.get("profile").id,
+            "doctor": data.get("doctor"),
+            "hospital": data.get("hospital"),
+            "profile": data.get("profile"),
             "profile_detail": profile_detail,
-            "user": request.user.id,
-            "booked_by": request.user.id,
+            "user": request.user,
+            "booked_by": request.user,
             "fees": doctor_hospital.fees,
             "deal_price": doctor_hospital.deal_price,
             "effective_price": effective_price,
             "mrp": doctor_hospital.mrp,
-            "time_slot_start": str(time_slot_start),
+            "time_slot_start": time_slot_start,
             "payment_type": data.get("payment_type")
         }
         resp = self.extract_payment_details(request, opd_data, 1)
@@ -259,7 +259,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         balance = consumer_account.balance
         resp = {}
 
-        #insured_cod_flag = self.is_insured_cod(appointment_details)
         can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
         if can_use_insurance:
             appointment_details['effective_price'] = appointment_details['fees']
@@ -271,18 +270,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if appointment_details['payment_type'] == models.OpdAppointment.PREPAID and \
             balance < appointment_details.get("effective_price"):
-            # create order
-            # opd_seriailizer = serializers.OpdAppointmentSerializer(data=appointment_details,
-            #                                                        context={"request": request})
-            # opd_seriailizer.is_valid(raise_exception=True)
-            account_models.Order.disable_pending_orders(appointment_details, product_id,
-                                                        account_models.Order.OPD_APPOINTMENT_CREATE)
 
             temp_app_details = copy.deepcopy(appointment_details)
-            temp_app_details["deal_price"] = str(appointment_details["deal_price"])
-            temp_app_details["fees"] = str(appointment_details["fees"])
-            temp_app_details["effective_price"] = str(appointment_details["effective_price"])
-            temp_app_details["mrp"] = str(appointment_details["mrp"])
+            self.json_transform(temp_app_details)
+
+            account_models.Order.disable_pending_orders(temp_app_details, product_id,
+                                                        account_models.Order.OPD_APPOINTMENT_CREATE)
 
             payable_amount = appointment_details.get("effective_price") - balance
 
@@ -298,35 +291,38 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp['data'], resp["payment_required"] = self.payment_details(request, appointment_details, product_id, order.id)
 
         else:
-            # create appointment
-            appointment_details["payment_status"] = models.OpdAppointment.PAYMENT_ACCEPTED
-            appointment_details["status"] = models.OpdAppointment.BOOKED
-            otp = random.randint(1000, 9999)
-            appointment_details["otp"] = otp
-            # opd_serializer = serializers.OpdAppointmentSerializer(data=appointment_details,
-            #                                                        context={"request": request})
-            # opd_serializer.is_valid(raise_exception=True)
-            # opd_serializer.save()
-            opd_obj = models.OpdAppointment.objects.create(**appointment_details)
-            opd_serializer = serializers.OpdAppointmentSerializer(opd_obj)
+            opd_obj = models.OpdAppointment.create_appointment(appointment_details)
 
             if appointment_details["payment_type"] == models.OpdAppointment.PREPAID:
                 user_account_data = {
                     "user": user,
                     "product_id": product_id,
-                    "reference_id": opd_serializer.data.get("id")
+                    "reference_id": opd_obj.id
                 }
                 consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
             resp["status"] = 1
-            resp["data"] = opd_serializer.data
+            resp["payment_required"] = False
+            resp["data"] = {"id": opd_obj.id, "type": serializers.OpdAppointmentSerializer.DOCTOR_TYPE}
         return resp
+
+    def json_transform(self, app_data):
+        app_data["deal_price"] = str(app_data["deal_price"])
+        app_data["fees"] = str(app_data["fees"])
+        app_data["effective_price"] = str(app_data["effective_price"])
+        app_data["mrp"] = str(app_data["mrp"])
+        app_data["time_slot_start"] = str(app_data["time_slot_start"])
+        app_data["doctor"] = app_data["doctor"].id
+        app_data["hospital"] = app_data["hospital"].id
+        app_data["profile"] = app_data["profile"].id
+        app_data["user"] = app_data["user"].id
+        app_data["booked_by"] = app_data["booked_by"].id
 
     def payment_details(self, request, appointment_details, product_id, order_id):
         pgdata = dict()
         payment_required = True
 
         user = request.user
-        user_profile = user.profiles.get(pk=appointment_details['profile'])
+        # user_profile = user.profiles.get(pk=appointment_details['profile'].id)
         pgdata['custId'] = user.id
         pgdata['mobile'] = user.phone_number
         pgdata['email'] = user.email
@@ -341,7 +337,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         pgdata['checkSum'] = ''
         pgdata['referenceId'] = ""
         pgdata['orderId'] = order_id
-        pgdata['name'] = user_profile.name
+        pgdata['name'] = appointment_details['profile'].name
         pgdata['txAmount'] = appointment_details['payable_amount']
 
         return pgdata, payment_required
