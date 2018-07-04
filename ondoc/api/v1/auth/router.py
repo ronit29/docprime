@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet, NotificationViewSet,
+from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     UserProfileViewSet, UserAppointmentsViewSet, AddressViewsSet,
                     TransactionViewSet, UserIDViewSet, OrderHistoryViewSet)
 
@@ -13,7 +13,7 @@ urlpatterns = [
          NotificationEndpointViewSet.as_view({'post': 'save'}), name='notification-endpoint-save'),
     path('notification/endpoint/delete',
          NotificationEndpointViewSet.as_view({'post': 'delete'}), name='notification-endpoint-delete'),
-    path('notification', NotificationViewSet.as_view({'get': 'list'}), name='notification-list'),
+    # path('notification', NotificationViewSet.as_view({'get': 'list'}), name='notification-list'),
     path('userprofile', UserProfileViewSet.as_view({'get': 'list'}), name='user-profile-list'),
     path('userprofile/add', UserProfileViewSet.as_view({'post': 'create'}), name='user-profile-add'),
     path('userprofile/<int:pk>/edit', UserProfileViewSet.as_view({'post': 'update'}), name='user-profile-edit'),

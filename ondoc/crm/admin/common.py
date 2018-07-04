@@ -24,11 +24,12 @@ def award_year_choices_no_blank():
 class QCPemAdmin(admin.ModelAdmin):
     change_form_template = 'custom_change_form.html'
     def list_created_by(self, obj):
-        field =  ''
-        try:
-            field = obj.created_by.staffprofile.name
-        except ObjectDoesNotExist:
-            field = obj.created_by.email if obj.created_by.email is not None else obj.created_by.phone_number
+        field = ''
+        if obj.created_by is not None:
+            try:
+                field = obj.created_by.staffprofile.name
+            except ObjectDoesNotExist:
+                field = obj.created_by.email if obj.created_by.email is not None else obj.created_by.phone_number
         return field
     list_created_by.admin_order_field = 'created_by'
     list_created_by.short_description = "Created By"

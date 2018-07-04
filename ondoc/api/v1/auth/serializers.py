@@ -14,6 +14,7 @@ User = get_user_model()
 class OTPSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
 
+
 class OTPVerificationSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000, max_value=999999)
@@ -30,6 +31,7 @@ class OTPVerificationSerializer(serializers.Serializer):
                 .exists()):
             raise serializers.ValidationError("Invalid OTP")
         return attrs
+
 
 class DoctorLoginSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
@@ -58,7 +60,6 @@ class DoctorLoginSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    # profile = UserProfileSerializer(required=True)
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
 
@@ -82,29 +83,27 @@ class UserSerializer(serializers.ModelSerializer):
         validated_data.pop('otp')
         validated_data['user_type'] = User.CONSUMER
         validated_data['is_phone_number_verified'] = True
-
         user = User.objects.create(**validated_data)
-        # profile = UserProfile.objects.create(user=user, **profile_data)
 
         return user
 
     class Meta:
         model = User
         fields = ('phone_number', 'otp')
-        # fields = ('phone_number', 'profile', 'otp')
 
 
-class NotificationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Notification
-        fields = '__all__'
+# class NotificationSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Notification
+#         fields = '__all__'
 
 
 class NotificationEndpointSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NotificationEndpoint
-        fields = '__all__'
+        # fields = '__all__'
+        fields = ('user', 'device_id', 'token', )
 
 
 class NotificationEndpointSaveSerializer(serializers.Serializer):
@@ -146,6 +145,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             url = static('doctor_images/no_image.png')
             return request.build_absolute_uri(url)
 
+
 class UploadProfilePictureSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -176,7 +176,6 @@ class AddressSerializer(serializers.ModelSerializer):
 
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
-    # id = serializers.IntegerField(required=True)
 
 
 class ConsumerAccountModelSerializer(serializers.ModelSerializer):
