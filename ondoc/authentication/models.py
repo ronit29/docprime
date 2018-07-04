@@ -146,7 +146,7 @@ class UserProfile(TimeStampedModel, Image):
     is_default_user = models.BooleanField(default=False)
     dob = models.DateField(blank=True, null=True)
     
-    profile_image = models.ImageField(upload_to='users/images' ,height_field='height', width_field='width',blank=True, null=True)
+    profile_image = models.ImageField(upload_to='users/images', height_field='height', width_field='width', blank=True, null=True)
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
@@ -248,7 +248,7 @@ class UserPermission(TimeStampedModel):
         db_table = 'user_permission'
 
     def __str__(self):
-        return str(self.user.phone_number)
+        return str(self.user.email)
 
     @classmethod
     def get_user_admin_obj(cls, user):
@@ -289,9 +289,9 @@ class UserPermission(TimeStampedModel):
         if networks:
             netwkork_data = HospitalNetwork.objects.filter(id__in=networks).prefetch_related(Prefetch("assoc_hospitals"), Prefetch("assoc_hospitals__assoc_doctors"))
             for network in netwkork_data:
-                if hasattr(network, 'assoc_hospitals'):
+                if network.assoc_hospitals.first() is not None:
                     for hospital in network.assoc_hospitals.all():
-                        if hasattr(hospital, 'assoc_doctors'):
+                        if hospital.assoc_doctors.first() is not None:
                             for doctor in hospital.assoc_doctors.all():
                                 user_permissions_list.append(cls.get_permission(user, doctor, hospital, network))
                         else:
@@ -301,7 +301,7 @@ class UserPermission(TimeStampedModel):
         if hospitals:
             hospital_data = Hospital.objects.filter(id__in=hospitals).prefetch_related(Prefetch("assoc_doctors"))
             for hospital in hospital_data:
-                if hasattr(hospital, 'assoc_doctors'):
+                if hospital.assoc_doctors.first() is not None:
                     for doctor in hospital.assoc_doctors.all():
                         user_permissions_list.append(cls.get_permission(user, doctor, hospital, None))
                 else:
@@ -326,22 +326,23 @@ class UserPermission(TimeStampedModel):
         return UserPermission(user=user, doctor=doctor, hospital_network=hospital_network, hospital=hospital,
                        permission_type=UserPermission.APPOINTMENT, write_permission=True, read_permission=False)
 
+    @classmethod
     def get_billable_doctor_hospital(cls, user):
         permission_data = (UserPermission.objects.
                            filter(user=user, permission_type=cls.BILLINNG, write_permission=True).
-                           values('hospital_network', 'hospital', 'hospital__doctor',
-                                  'hospital_network__assoc_hospitals__doctor',
+                           values('hospital_network', 'hospital', 'hospital__assoc_doctors',
+                                  'hospital_network__assoc_hospitals__assoc_doctors',
                                   'hospital_network__assoc_hospitals'))
         doc_hospital = list()
         for data in permission_data:
             if data.get("hospital_network"):
                 doc_hospital.append({
-                    "doctor": data.get("hospital_network__assoc_hospitals__doctor"),
+                    "doctor": data.get("hospital_network__assoc_hospitals__assoc_doctors"),
                     "hospital": data.get("hospital_network__assoc_hospitals")
                 })
             elif data.get("hospital"):
                 doc_hospital.append({
-                    "doctor": data.get("hospital__doctor"),
+                    "doctor": data.get("hospital__assoc_doctors"),
                     "hospital": data.get("hospital")
                 })
         return doc_hospital
@@ -473,3 +474,4 @@ class GenericAdmin(TimeStampedModel):
     @classmethod
     def update_user_permissions(cls, user):
         UserPermission.create_permission(user)
+

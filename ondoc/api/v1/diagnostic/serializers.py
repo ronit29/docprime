@@ -42,7 +42,8 @@ class LabTestSerializer(serializers.ModelSerializer):
 class LabImageModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabImage
-        exclude = ('created_at', 'updated_at',)
+        fields = ('name', )
+        # exclude = ('created_at', 'updated_at',)
 
 
 class LabModelSerializer(serializers.ModelSerializer):
@@ -55,6 +56,8 @@ class LabModelSerializer(serializers.ModelSerializer):
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
+        if not request:
+            raise ValueError("request is not passed in serializer.")
         return request.build_absolute_uri(obj.get_thumbnail())
 
     def get_lat(self,obj):
@@ -83,9 +86,16 @@ class LabModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lab
-        # fields = '__all__'
-        exclude = ('created_at', 'updated_at', 'location', 'location_error', )
+        fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
+                  'sublocality', 'city', 'state', 'country', 'always_open', )
 
+
+class LabProfileSerializer(LabModelSerializer):
+
+    class Meta:
+        model = Lab
+        fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
+                  'sublocality', 'city', 'state', 'country', 'about', 'always_open', 'building', )
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -147,10 +157,17 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
     type = serializers.ReadOnlyField(default="lab")
     lab_name = serializers.ReadOnlyField(source="lab.name")
+    lab_image = LabImageModelSerializer(many=True, source='lab.lab_image', read_only=True)
+    lab_thumbnail = serializers.SerializerMethodField()
+
+    def get_lab_thumbnail(self, obj):
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.lab.get_thumbnail())
 
     class Meta:
         model = LabAppointment
-        fields = '__all__'
+        fields = ('id', 'lab', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', )
 
 
 class LabAppointmentUpdateSerializer(serializers.Serializer):
@@ -209,16 +226,13 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
 
     def validate(self, data):
-
+        request = self.context.get("request")
         if data.get("is_home_pickup") is True and (not data.get("address")):
             raise serializers.ValidationError("Address required for home pickup")
-
+        if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
+            raise serializers.ValidationError("Invalid profile id")
         self.test_lab_id_validator(data)
-
-        # self.profile_validator(data)
-
         self.time_slot_validator(data)
-
         return data
 
     def create(self, data):
@@ -408,6 +422,11 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
         user_type = ''
         if self.context.get('request'):
             user_type = self.context['request'].user.user_type
-            return LabAppointment.allowed_action(obj,user_type)
+            return LabAppointment.allowed_action(obj, user_type)
         else:
             return []
+
+    class Meta:
+        model = LabAppointment
+        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab')
