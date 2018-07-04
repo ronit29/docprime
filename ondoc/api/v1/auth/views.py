@@ -281,7 +281,7 @@ class OndocViewSet(mixins.CreateModelMixin,
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
-    permission_classes = (IsConsumer, )
+    permission_classes = (IsAuthenticated, IsConsumer, )
     def get_queryset(self):
         user = self.request.user
         return OpdAppointment.objects.filter(user=user)
