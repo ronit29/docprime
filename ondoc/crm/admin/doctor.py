@@ -433,6 +433,17 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
     search_fields = ['name']
 
+    readonly_fields = ('lead_url',)
+
+    def lead_url(self, instance):
+        if instance.id:
+            ref_id = instance.matrix_reference_id
+            if ref_id is not None:
+                html ='''<a href='/admin/lead/doctorlead/%s/change/' target=_blank>Lead Page</a>'''%(ref_id)
+                return mark_safe(html)
+        else:
+            return mark_safe('''<span></span>''')
+
     def get_urls(self):
         urls = super().get_urls()
         my_urls = [
