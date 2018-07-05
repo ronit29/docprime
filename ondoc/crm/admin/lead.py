@@ -99,8 +99,8 @@ class DoctorLeadExportResource(resources.ModelResource):
 
     class Meta:
         model = models.DoctorLead
-        fields = ('name', 'city', 'specializations', 'address', 'google_address', )
-        export_order = ('specializations', 'name',  'address', 'city', 'google_address', )
+        fields = ('id', 'name', 'city', 'specializations', 'address', 'google_address', )
+        export_order = ('id', 'specializations', 'name',  'address', 'city', 'google_address', )
 
 
 class DoctorHospitalInline(admin.StackedInline):
