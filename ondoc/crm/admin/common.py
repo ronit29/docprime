@@ -23,7 +23,6 @@ def award_year_choices_no_blank():
 
 class QCPemAdmin(admin.ModelAdmin):
     change_form_template = 'custom_change_form.html'
-
     def list_created_by(self, obj):
         field =  ''
         if obj.created_by is not None:
@@ -102,6 +101,7 @@ class FormCleanMixin(forms.ModelForm):
 class ActionAdmin(admin.ModelAdmin):
 
     # actions = ['submit_for_qc','qc_approve', 'mark_in_progress']
+
 
     def get_actions(self, request):
         actions = super().get_actions(request)

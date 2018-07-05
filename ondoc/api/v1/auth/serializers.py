@@ -2,7 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          UserPermission, Address)
 from ondoc.doctor.models import DoctorMobile
-from ondoc.account.models import ConsumerAccount
+from ondoc.account.models import ConsumerAccount, Order
 import datetime
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
@@ -13,6 +13,7 @@ User = get_user_model()
 
 class OTPSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
+
 
 class OTPVerificationSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
@@ -30,6 +31,7 @@ class OTPVerificationSerializer(serializers.Serializer):
                 .exists()):
             raise serializers.ValidationError("Invalid OTP")
         return attrs
+
 
 class DoctorLoginSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
@@ -58,7 +60,6 @@ class DoctorLoginSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    # profile = UserProfileSerializer(required=True)
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
 
@@ -82,29 +83,27 @@ class UserSerializer(serializers.ModelSerializer):
         validated_data.pop('otp')
         validated_data['user_type'] = User.CONSUMER
         validated_data['is_phone_number_verified'] = True
-
         user = User.objects.create(**validated_data)
-        # profile = UserProfile.objects.create(user=user, **profile_data)
 
         return user
 
     class Meta:
         model = User
         fields = ('phone_number', 'otp')
-        # fields = ('phone_number', 'profile', 'otp')
 
 
-class NotificationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Notification
-        fields = '__all__'
+# class NotificationSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Notification
+#         fields = '__all__'
 
 
 class NotificationEndpointSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NotificationEndpoint
-        fields = '__all__'
+        # fields = '__all__'
+        fields = ('user', 'device_id', 'token', )
 
 
 class NotificationEndpointSaveSerializer(serializers.Serializer):
@@ -146,6 +145,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             url = static('doctor_images/no_image.png')
             return request.build_absolute_uri(url)
 
+
 class UploadProfilePictureSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -164,22 +164,51 @@ class AddressSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Address
-        fields = "__all__"
+        fields = ('id', 'type', 'place_id', 'address', 'land_mark', 'pincode',
+                  'phone_number', 'is_default', 'profile')
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        if not request:
+            raise ValueError("Request is None.")
+        validated_data['user'] = request.user
+        if 'is_default' not in request.data:
+            if not Address.objects.filter(user=request.user.id).exists():
+                validated_data['is_default'] = True
+        return super().create(validated_data)
 
     def validate(self, attrs):
         request = self.context.get("request")
-        if attrs.get("user") != request.user:
-            raise serializers.ValidationError("User is not correct.")
+        # if attrs.get("user") != request.user:
+        #     raise serializers.ValidationError("User is not correct.")
         if attrs.get("profile") and not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
 
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
-    # id = serializers.IntegerField(required=True)
 
 
 class ConsumerAccountModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConsumerAccount
         fields = "__all__"
+
+
+class TransactionSerializer(serializers.Serializer):
+    productId = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
+    referenceId = serializers.IntegerField(required=False)
+    orderNo = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all(), required=False)
+    paymentMode = serializers.CharField(max_length=200, required=False)
+
+    responseCode = serializers.CharField(max_length=200)
+    bankTxId = serializers.CharField(max_length=200, allow_blank=True, required=False)
+    txDate = serializers.CharField(max_length=100)
+    bankName = serializers.CharField(max_length=200, required=False)
+    currency = serializers.CharField(max_length=200)
+    statusCode = serializers.IntegerField()
+    pgGatewayName = serializers.CharField(max_length=20, required=False)
+    txStatus = serializers.CharField(max_length=200)
+    pgTxId = serializers.CharField(max_length=200)
+    pbGatewayName = serializers.CharField(max_length=200, required=False)
+

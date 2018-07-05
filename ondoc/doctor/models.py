@@ -12,7 +12,8 @@ from django.conf import settings
 from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.account import models as account_model
+from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction
+# from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
@@ -651,8 +652,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     COD = 2
     INSURANCE = 3
     PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, "COD"), (INSURANCE, "Insurance"))
-
-
+    ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_DOCTOR]
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
@@ -698,9 +698,18 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
         elif user_type == auth_model.User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT]
+                allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
 
         return allowed
+
+    @classmethod
+    def create_appointment(cls, appointment_data):
+        otp = random.randint(1000, 9999)
+        appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
+        appointment_data["status"] = OpdAppointment.BOOKED
+        appointment_data["otp"] = otp
+        app_obj = cls.objects.create(**appointment_data)
+        return app_obj
 
     @transaction.atomic
     def action_rescheduled_doctor(self):
@@ -712,7 +721,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         self.time_slot_start = data.get('time_slot_start')
         self.fees = data.get('fees', self.fees)
         self.mrp = data.get('mrp', self.mrp)
-        self.discounted_price = data.get('discounted_price', self.discounted_price)
+        self.deal_price = data.get('deal_price', self.deal_price)
         self.effective_price = data.get('effective_price', self.effective_price)
         self.save()
 
@@ -728,13 +737,13 @@ class OpdAppointment(auth_model.TimeStampedModel):
         self.status = self.CANCELED
         self.save()
 
-        consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
-        consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
+        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
 
         data = dict()
         data["reference_id"] = self.id
         data["user"] = self.user
-        data["product_id"] = account_model.Order.DOCTOR_PRODUCT_ID
+        data["product_id"] = Order.DOCTOR_PRODUCT_ID
 
         cancel_amount = self.effective_price
         consumer_account.credit_cancellation(data, cancel_amount)
@@ -756,11 +765,11 @@ class OpdAppointment(auth_model.TimeStampedModel):
             return self.doctor, payout_model.Outstanding.DOCTOR_LEVEL
 
     def get_cancel_amount(self, data):
-        consumer_tx = (account_model.ConsumerTransaction.objects.filter(user=data["user"],
+        consumer_tx = (ConsumerTransaction.objects.filter(user=data["user"],
                                                                         product=data["product"],
                                                                         order=data["order"],
-                                                                        type=account_model.PgTransaction.DEBIT,
-                                                                        action=account_model.ConsumerTransaction.SALE).
+                                                                        type=PgTransaction.DEBIT,
+                                                                        action=ConsumerTransaction.SALE).
                        order_by("created_at").last())
         return consumer_tx.amount
 

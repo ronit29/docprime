@@ -12,7 +12,7 @@ from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot
+from ondoc.api.v1.utils import form_time_slot, IsConsumer
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -28,7 +28,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
 from django.db import transaction
-from django.db.models import Count, Sum, Max
+from django.db.models import Count, Sum, Max, When, Case, F
 from django.http import Http404
 from rest_framework import status
 from collections import OrderedDict
@@ -64,12 +64,10 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         name = request.query_params.get('name')
-        test_queryset = LabTest.objects.all()
-        lab_queryset = Lab.objects.all()
         temp_data = dict()
         if name:
-            test_queryset = test_queryset.filter(name__icontains=name)
-            lab_queryset = lab_queryset.filter(name__icontains=name)
+            test_queryset = LabTest.objects.filter(name__icontains=name)
+            lab_queryset = Lab.objects.filter(name__icontains=name)
             test_serializer = diagnostic_serializer.LabTestListSerializer(test_queryset, many=True)
             lab_serializer = diagnostic_serializer.LabListSerializer(lab_queryset, many=True)
             temp_data['tests'] = test_serializer.data
@@ -115,7 +113,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data['lab_timing'] = self.get_lab_timing(timing_queryset)
 
         return Response(temp_data)
-        # return Response(serializer.data)
 
     def get_lab_timing(self, queryset):
         temp_str = ''
@@ -240,7 +237,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     queryset = LabAppointment.objects.all()
     serializer_class = diagnostic_serializer.LabAppointmentModelSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, IsConsumer, )
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
 
@@ -250,25 +247,23 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = diagnostic_serializer.LabAppointmentModelSerializer(queryset, many=True)
         return Response(serializer.data)
 
-    # def retrieve(self, request, app_id, **kwargs):
-    #     queryset = LabAppointment.objects.get(pk=app_id)
-    #     serializer = LabAppointmentModelSerializer(queryset)
-    #     return Response(serializer.data)
-
     @transaction.atomic
     def create(self, request, **kwargs):
-        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=request.data)
+        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
-
         appointment_data = self.form_lab_app_data(request, serializer.validated_data)
         resp = self.extract_payment_details(request, appointment_data, account_models.Order.LAB_PRODUCT_ID)
         return Response(data=resp)
 
     def form_lab_app_data(self, request, data):
+        deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
+                                      When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
+        agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
+                                        When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
         lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
         temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
-                                                                 total_deal_price=Sum("deal_price"),
-                                                                 total_agreed_price=Sum("agreed_price"))
+                                                                 total_deal_price=Sum(deal_price_calculation),
+                                                                 total_agreed_price=Sum(agreed_price_calculation))
         total_agreed = total_deal_price = total_mrp = effective_price = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
@@ -284,21 +279,18 @@ class LabAppointmentView(mixins.CreateModelMixin,
         }
         # otp = random.randint(1000, 9999)
         appointment_data = {
-            "lab": data["lab"].id,
-            "user": request.user.id,
-            "profile": data["profile"].id,
+            "lab": data["lab"],
+            "user": request.user,
+            "profile": data["profile"],
             "price": total_mrp,
             "agreed_price": total_agreed,
             "deal_price": total_deal_price,
             "effective_price": effective_price,
-            "time_slot_start": str(start_dt),
+            "time_slot_start": start_dt,
             "profile_detail": profile_detail,
-            # "payment_status": OpdAppointment.PAYMENT_ACCEPTED,
             "status": LabAppointment.BOOKED,
             "payment_type": data["payment_type"],
-            # "test_ids": data["test_ids"]
             "lab_test": [x["id"] for x in lab_test_queryset.values("id")]
-            # "otp": otp
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address")).first()
@@ -322,33 +314,26 @@ class LabAppointmentView(mixins.CreateModelMixin,
         insured_cod_flag = self.is_insured_cod(appointment_details)
 
         if insured_cod_flag or balance >= effective_price:
-            otp = random.randint(1000, 9999)
-            appointment_details["otp"] = otp
-            appointment_details["payment_status"] = doctor_model.OpdAppointment.PAYMENT_ACCEPTED
-            appointment_details["status"] = doctor_model.OpdAppointment.BOOKED
-            lab_serializer = diagnostic_serializer.LabAppointmentModelSerializer(data=appointment_details)
-            lab_serializer.is_valid(raise_exception=True)
-            lab_appointment = lab_serializer.save()
+            lab_appointment = LabAppointment.create_appointment(appointment_details)
 
             user_account_data = {
                 "user": user,
                 "product_id": product_id,
                 "reference_id": lab_appointment.id
             }
-            lab_appointment_data = diagnostic_serializer.LabAppointmentModelSerializer(lab_appointment).data
+
             if not insured_cod_flag:
                 consumer_account.debit_schedule(user_account_data, effective_price)
+
             resp["status"] = 1
-            resp["data"] = lab_appointment_data
+            resp["payment_required"] = False
+            resp["data"] = {"id": lab_appointment.id, "type": diagnostic_serializer.LabAppointmentModelSerializer.LAB_TYPE}
         else:
             appointment_details["effective_price"] = effective_price
-            account_models.Order.disable_pending_orders(appointment_details, product_id,
-                                                        account_models.Order.LAB_APPOINTMENT_CREATE)
             temp_appointment_details = copy.deepcopy(appointment_details)
-            temp_appointment_details["price"] = str(appointment_details["price"])
-            temp_appointment_details["agreed_price"] = str(appointment_details["agreed_price"])
-            temp_appointment_details["deal_price"] = str(appointment_details["deal_price"])
-            temp_appointment_details["effective_price"] = str(appointment_details["effective_price"])
+            self.json_transform(temp_appointment_details)
+            account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
+                                                        account_models.Order.LAB_APPOINTMENT_CREATE)
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -358,42 +343,42 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = effective_price - balance
-            resp['pg_details'] = self.get_payment_details(request, appointment_details, product_id, order.id)
+            resp["status"] = 1
+            resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id, order.id)
         return resp
 
     def get_payment_details(self, request, appointment_details, product_id, order_id):
-        details = dict()
         pgdata = dict()
-        if appointment_details["payable_amount"] != 0:
-            user = request.user
-            user_profile = user.profiles.filter(is_default_user=True).first()
-            pgdata['custId'] = user.id
-            pgdata['mobile'] = user.phone_number
-            pgdata['email'] = user.email
-            if not user.email:
-                pgdata['email'] = "dummy_appointment@policybazaar.com"
+        payment_required = True
+        user = request.user
+        pgdata['custId'] = user.id
+        pgdata['mobile'] = user.phone_number
+        pgdata['email'] = user.email
+        if not user.email:
+            pgdata['email'] = "dummy_appointment@policybazaar.com"
 
-            pgdata['productId'] = product_id
-            base_url = (
-                "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
-            pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-            pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-            pgdata['checkSum'] = ''
-            pgdata['appointmentId'] = ""
-            pgdata['order_id'] = order_id
-            if user_profile:
-                pgdata['name'] = user_profile.name
-            else:
-                pgdata['name'] = "DummyName"
-            pgdata['txAmount'] = appointment_details['payable_amount']
+        pgdata['productId'] = product_id
+        base_url = (
+            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['checkSum'] = ''
+        pgdata['appointmentId'] = ""
+        pgdata['orderId'] = order_id
+        pgdata['name'] = appointment_details["profile"].name
+        pgdata['txAmount'] = appointment_details['payable_amount']
 
-        if pgdata:
-            details['required'] = True
-            details['pgdata'] = pgdata
-        else:
-            details['required'] = False
+        return pgdata, payment_required
 
-        return details
+    def json_transform(self, app_data):
+        app_data["price"] = str(app_data["price"])
+        app_data["agreed_price"] = str(app_data["agreed_price"])
+        app_data["deal_price"] = str(app_data["deal_price"])
+        app_data["effective_price"] = str(app_data["effective_price"])
+        app_data["time_slot_start"] = str(app_data["time_slot_start"])
+        app_data["lab"] = app_data["lab"].id
+        app_data["user"] = app_data["user"].id
+        app_data["profile"] = app_data["profile"].id
 
     def is_insured_cod(self, app_details):
         return False
@@ -407,30 +392,30 @@ class LabAppointmentView(mixins.CreateModelMixin,
         else:
             return False
 
-    def payment_retry(self, request, pk=None):
-        queryset = LabAppointment.objects.filter(pk=pk)
-        payment_response = dict()
-        if queryset:
-            serializer_data = diagnostic_serializer.LabAppointmentModelSerializer(queryset.first(), context={'request':request})
-            payment_response = self.payment_details(request, serializer_data.data, 1)
-        return Response(payment_response)
+    # def payment_retry(self, request, pk=None):
+    #     queryset = LabAppointment.objects.filter(pk=pk)
+    #     payment_response = dict()
+    #     if queryset:
+    #         serializer_data = LabAppointmentModelSerializer(queryset.first(), context={'request':request})
+    #         payment_response = self.payment_details(request, serializer_data.data, 1)
+    #     return Response(payment_response)
 
-    def update(self, request, pk):
-        data = request.data
-        lab_appointment_obj = get_object_or_404(LabAppointment, pk=pk)
-        serializer = diagnostic_serializer.LabAppointmentUpdateSerializer(lab_appointment_obj, data=data,
-                                                    context={'lab_id': lab_appointment_obj.lab})
-        serializer.is_valid(raise_exception=True)
-        # allowed = lab_appointment_obj.allowed_action(request.user.user_type)
-        allowed = lab_appointment_obj.allowed_action(3)
-        if data.get('status') not in allowed:
-            resp = dict()
-            resp['allowed'] = allowed
-            return Response(resp, status=status.HTTP_400_BAD_REQUEST)
-
-        lab_appointment_queryset = serializer.save()
-        serializer = diagnostic_serializer.LabAppointmentModelSerializer(lab_appointment_queryset)
-        return Response(serializer.data)
+    # def update(self, request, pk):
+    #     data = request.data
+    #     lab_appointment_obj = get_object_or_404(LabAppointment, pk=pk)
+    #     serializer = LabAppointmentUpdateSerializer(lab_appointment_obj, data=data,
+    #                                                 context={'lab_id': lab_appointment_obj.lab})
+    #     serializer.is_valid(raise_exception=True)
+    #     # allowed = lab_appointment_obj.allowed_action(request.user.user_type)
+    #     allowed = lab_appointment_obj.allowed_action(3)
+    #     if data.get('status') not in allowed:
+    #         resp = dict()
+    #         resp['allowed'] = allowed
+    #         return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+    #
+    #     lab_appointment_queryset = serializer.save()
+    #     serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
+    #     return Response(serializer.data)
 
     # def payment_details(self, request, appointment_details, product_id):
     #     details = dict()
@@ -494,7 +479,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
     queryset = AvailableLabTest.objects.all()
     serializer_class = diagnostic_serializer.AvailableLabTestSerializer
 
-    def retrive(self, request, lab_id):
+    def retrieve(self, request, lab_id):
         params = request.query_params
         queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
 

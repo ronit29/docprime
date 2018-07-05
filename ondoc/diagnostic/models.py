@@ -14,6 +14,7 @@ from ondoc.payout import models as payout_model
 from ondoc.api.v1.utils import get_start_end_datetime
 import decimal
 import math
+import random
 import os
 from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -414,6 +415,7 @@ class LabAppointment(TimeStampedModel):
     ACCEPTED = 5
     CANCELED = 6
     COMPLETED = 7
+    ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_LAB]
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
     lab_test = models.ManyToManyField(AvailableLabTest)
@@ -445,6 +447,17 @@ class LabAppointment(TimeStampedModel):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
 
         return allowed
+
+    @classmethod
+    def create_appointment(cls, appointment_data):
+        otp = random.randint(1000, 9999)
+        appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
+        appointment_data["status"] = OpdAppointment.BOOKED
+        appointment_data["otp"] = otp
+        lab_ids = appointment_data.pop("lab_test")
+        app_obj = cls.objects.create(**appointment_data)
+        app_obj.lab_test.add(*lab_ids)
+        return app_obj
 
     def action_rescheduled_lab(self):
         self.status = self.RESCHEDULED_LAB

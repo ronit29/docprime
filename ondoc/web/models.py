@@ -3,7 +3,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, FileExt
 from ondoc.authentication.models import TimeStampedModel
 
 
-class OnlineLeads(TimeStampedModel):
+class OnlineLead(TimeStampedModel):
     DOCTOR = 1
     DIAGNOSTICCENTER = 2
     HOSPITAL = 3
@@ -19,10 +19,10 @@ class OnlineLeads(TimeStampedModel):
         return self.name
 
     class Meta:
-        db_table = "online_leads"
+        db_table = "online_lead"
 
 
-class Careers(TimeStampedModel):
+class Career(TimeStampedModel):
     PRODUCT = 1
     TECHNOLOGY = 2
     SALES = 3
@@ -45,4 +45,4 @@ class Careers(TimeStampedModel):
         return self.name
 
     class Meta:
-        db_table = "careers"
+        db_table = "career"
