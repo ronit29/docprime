@@ -145,7 +145,7 @@ class PgTransaction(TimeStampedModel):
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
     payment_mode = models.CharField(max_length=50)
-    response_code = models.IntegerField()
+    response_code = models.CharField(max_length=50)
     bank_id = models.CharField(max_length=50)
     transaction_date = models.CharField(max_length=80)
     bank_name = models.CharField(max_length=100)

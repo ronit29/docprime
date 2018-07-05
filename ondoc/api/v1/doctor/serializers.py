@@ -77,6 +77,12 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(url)
 
 
+class OpdAppModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OpdAppointment
+        fields = '__all__'
+
+
 class OpdAppTransactionModelSerializer(serializers.Serializer):
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
