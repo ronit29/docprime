@@ -215,6 +215,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel):
         related_name='assoc_doctors',
     )
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_doctors')
+    matrix_lead_id = models.BigIntegerField(blank=True, null=True)
+    matrix_reference_id = models.BigIntegerField(blank=True, null=True)
 
     def __str__(self):
         return self.name

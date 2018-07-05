@@ -62,7 +62,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
                                                        decimal_places=2)
     generic_lab_admins = GenericRelation(GenericAdmin, related_query_name='manageable_labs')
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab')
-
+    matrix_lead_id = models.BigIntegerField(blank=True, null=True)
+    matrix_reference_id = models.BigIntegerField(blank=True, null=True)
 
 
     def __str__(self):

@@ -11,9 +11,17 @@ from ondoc.api.v1.utils import IsMatrixUser
 class MatrixLead(GenericViewSet):
     LAB = 'lab'
     DOCTOR = 'doctor'
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
     SUB_TYPES = (
         (LAB, 'lab'),
         (DOCTOR, 'doctor'),
+    )
+    GENDER_TYPES = (
+        (MALE, 'm'),
+        (FEMALE, 'f'),
+        (OTHER, 'o'),
     )
     queryset = Doctor.objects.none()
     permission_classes = (IsMatrixUser,)
