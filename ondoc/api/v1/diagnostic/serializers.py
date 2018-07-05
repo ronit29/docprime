@@ -87,7 +87,7 @@ class LabModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lab
         fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
-                  'sublocality', 'city', 'state', 'country', 'always_open', )
+                  'sublocality', 'city', 'state', 'country', 'always_open', 'about', )
 
 
 class LabProfileSerializer(LabModelSerializer):
