@@ -188,9 +188,10 @@ class ConsumerAccountModelSerializer(serializers.ModelSerializer):
 
 class TransactionSerializer(serializers.Serializer):
     productId = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
+    referenceId = serializers.IntegerField(required=False)
     orderNo = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all(), required=False)
-    referenceId = serializers.CharField(max_length=200, required=False)
     paymentMode = serializers.CharField(max_length=200, required=False)
+
     responseCode = serializers.CharField(max_length=200)
     bankTxId = serializers.CharField(max_length=200, allow_blank=True, required=False)
     txDate = serializers.CharField(max_length=100)

@@ -186,6 +186,12 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     lab_test = serializers.ListField(child=serializers.IntegerField())
 
 
+class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LabAppointment
+        fields = '__all__'
+
+
 class LabAppointmentUpdateSerializer(serializers.Serializer):
     appointment_status = [LabAppointment.CREATED, LabAppointment.ACCEPTED, LabAppointment.RESCHEDULED_LAB,
                           LabAppointment.CANCELED, LabAppointment.RESCHEDULED_PATIENT, LabAppointment.COMPLETED,

@@ -343,11 +343,13 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = effective_price - balance
-            resp['pg_details'] = self.get_payment_details(request, appointment_details, product_id, order.id)
+            resp["status"] = 1
+            resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id, order.id)
         return resp
 
     def get_payment_details(self, request, appointment_details, product_id, order_id):
         pgdata = dict()
+        payment_required = True
         user = request.user
         pgdata['custId'] = user.id
         pgdata['mobile'] = user.phone_number
@@ -366,7 +368,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['name'] = appointment_details["profile"].name
         pgdata['txAmount'] = appointment_details['payable_amount']
 
-        return pgdata,
+        return pgdata, payment_required
 
     def json_transform(self, app_data):
         app_data["price"] = str(app_data["price"])
