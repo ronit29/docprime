@@ -25,10 +25,12 @@ class MatrixLead(GenericViewSet):
        serializer = MatrixLeadDataSerializer(data=request.data)
        serializer.is_valid(raise_exception=True)
        data = serializer.validated_data
-       staff_profile = StaffProfile.objects.filter(employee_id=data.get('agent_employee_id')).first()
+       staff_profile = StaffProfile.objects.filter(employee_id__iexact=data.get('agent_employee_id'))
 
-       if staff_profile is None:
+       if not staff_profile.exists():
            return Response(status=status.HTTP_400_BAD_REQUEST, data={'status': 'Error', 'message': 'StaffProfile Not Found'})
+
+       staff_profile = staff_profile.first()
 
        if data.get('sub_product') == MatrixLead.DOCTOR:
            create_lead = Doctor.objects.create(name=data.get('name'), gender=data.get('gender'), created_by=staff_profile.user,
