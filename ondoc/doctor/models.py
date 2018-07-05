@@ -693,7 +693,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
         elif user_type == auth_model.User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT]
+                allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
 
         return allowed
 
