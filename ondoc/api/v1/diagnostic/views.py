@@ -364,7 +364,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['checkSum'] = ''
         pgdata['appointmentId'] = ""
-        pgdata['order_id'] = order_id
+        pgdata['orderId'] = order_id
         pgdata['name'] = appointment_details["profile"].name
         pgdata['txAmount'] = appointment_details['payable_amount']
 
