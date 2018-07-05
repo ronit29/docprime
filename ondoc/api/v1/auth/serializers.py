@@ -196,7 +196,6 @@ class ConsumerAccountModelSerializer(serializers.ModelSerializer):
 
 
 class TransactionSerializer(serializers.Serializer):
-    customerId = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     productId = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
     orderNo = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all(), required=False)
     referenceId = serializers.CharField(max_length=200, required=False)

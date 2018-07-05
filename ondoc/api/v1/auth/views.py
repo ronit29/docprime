@@ -29,10 +29,12 @@ from ondoc.api.pagination import paginate_queryset
 from ondoc.api.v1 import utils
 from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterSerializer,
-                                             UpdateStatusSerializer, CreateAppointmentSerializer,AppointmentRetrieveSerializer
+                                             UpdateStatusSerializer, CreateAppointmentSerializer,
+                                             AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer
                                              )
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
-                                                 LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer)
+                                                 LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
+                                                 LabAppTransactionModelSerializer)
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
 from ondoc.api.v1.utils import IsConsumer
 import decimal
@@ -680,7 +682,6 @@ class UserIDViewSet(viewsets.GenericViewSet):
 
 class TransactionViewSet(viewsets.GenericViewSet):
 
-    permission_classes = (IsAuthenticated,)
     serializer_class = serializers.TransactionSerializer
     queryset = PgTransaction.objects.none()
 
@@ -699,13 +700,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
         # For testing only
         response = request.data
 
-        response_data = self.form_pg_transaction_data(response)
+        order_obj = Order.objects.get(pk=response.get("orderNo"))
+        response_data = self.form_pg_transaction_data(response, order_obj)
 
         pg_tx_queryset = PgTransaction.objects.create(**response_data)
 
         appointment_obj = None
         try:
-            appointment_obj = self.block_pay_schedule_transaction(request, response_data)
+            appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
         except:
             pass
 
@@ -721,14 +723,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
         return Response({"url": REDIRECT_URL})
         # return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 
-    def form_pg_transaction_data(self, response):
+    def form_pg_transaction_data(self, response, order_obj):
         data = dict()
         resp_serializer = serializers.TransactionSerializer(data = response)
         resp_serializer.is_valid(raise_exception=True)
         response = resp_serializer.validated_data
-        # user = User.objects.get(pk=response.get("customerId"))
-        # user = get_object_or_404(User, pk=response.get("customerId"))
-        data['user'] = response.get("customerId")
+        # user = User.objects.get(pk=order_obj.action_data.get("user"))
+        user = get_object_or_404(User, pk=order_obj.action_data.get("user"))
+        data['user'] = user
         data['product_id'] = response.get('productId')
         data['order_id'] = response.get('orderNo').id
         data['reference_id'] = response.get('referenceId')
@@ -750,12 +752,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
         return data
 
     @transaction.atomic
-    def block_pay_schedule_transaction(self, request, pg_data):
+    def block_pay_schedule_transaction(self, pg_data, order_obj):
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=pg_data["user"])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=pg_data["user"])
 
-        order_obj = Order.objects.get(pk=pg_data["order_id"])
         tx_amount = order_obj.amount
 
         consumer_account.credit_payment(pg_data, tx_amount)
@@ -764,11 +765,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
         try:
             appointment_data = order_obj.action_data
             if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                serializer = OpdAppointmentSerializer(data=appointment_data)
+                serializer = OpdAppTransactionModelSerializer(data=appointment_data)
                 serializer.is_valid()
                 appointment_data = serializer.validated_data
             elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                serializer = LabAppointmentModelSerializer(data=appointment_data, context={"request": request})
+                serializer = LabAppTransactionModelSerializer(data=appointment_data)
                 serializer.is_valid()
                 appointment_data = serializer.validated_data
 
@@ -778,72 +779,72 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         return appointment_obj
 
-    @transaction.atomic
-    def book_appointment(self, request, consumer_account, pg_data, order_obj):
-        appointment_data = order_obj.action_data
-        appointment_obj = None
-        temp_effective_price = decimal.Decimal(appointment_data["effective_price"])
-        if consumer_account.balance >= temp_effective_price:
-            if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                appointment_obj = OpdAppointment.create_appointment(appointment_data)
-            elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                appointment_obj = LabAppointment.create_appointment(appointment_data)
-
-            order_obj.appointment_id = appointment_obj.id
-            order_obj.payment_status = Order.PAYMENT_ACCEPTED
-            pg_data["reference_id"] = appointment_obj.id
-            order_obj.save()
-
-            appointment_amount = appointment_obj.effective_price
-            debit_data = {
-                "user": pg_data.get("user"),
-                "product_id": pg_data.get("product_id"),
-                "transaction_id": pg_data.get("transaction_id"),
-                "reference_id": appointment_obj.id
-            }
-            consumer_account.debit_schedule(debit_data, appointment_amount)
-            return appointment_obj
-
-    @transaction.atomic
-    def reschedule_appointment(self, consumer_account, pg_data, order_obj):
-        new_appointment_data = order_obj.action_data
-        appointment_obj = None
-        if order_obj.product_id == PgTransaction.DOCTOR_APPOINTMENT:
-            appointment_obj = OpdAppointment.objects.get(pk=order_obj.reference_id)
-            opd_serializer = OpdAppointmentSerializer(data=new_appointment_data)
-            opd_serializer.is_valid(raise_exception=True)
-            new_appointment_data = opd_serializer.validated_data
-        elif order_obj.product_id == PgTransaction.LAB_APPOINTMENT:
-            appointment_obj = LabAppointment.objects.get(pk=order_obj.reference_id)
-            lab_serializer = LabAppointmentModelSerializer(data=new_appointment_data)
-            lab_serializer.is_valid(raise_exception=True)
-            new_appointment_data = lab_serializer.validated_data
-
-        if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
-            debit_amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
-            appointment_obj.action_rescheduled_patient(new_appointment_data)
-            order_obj.payment_status = Order.PAYMENT_ACCEPTED
-            order_obj.save()
-
-            debit_data = {
-                "user": pg_data.get("user"),
-                "product_id": pg_data.get("product_id"),
-                "transaction_id": pg_data.get("transaction_id"),
-                "reference_id": appointment_obj.id
-            }
-            consumer_account.debit_schedule(debit_data, debit_amount)
-
-
-        # if consumer_account.balance >= new_appointment_data["effective_price"]:
-        #     if order_obj.product_id == PgTransaction.DOCTOR_APPOINTMENT:
-        #         appointment_obj = OpdAppointment.objects.get(pk=order_obj.reference_id)
-        #         # new_appointment_data[""]
-        #         appointment_obj.action_rescheduled_patient(new_appointment_data)
-        #
-        #     elif order_obj.product_id == PgTransaction.LAB_APPOINTMENT:
-        #         appointment_obj = LabAppointment.objects.get(pk=order_obj.reference_id)
-        #         appointment_obj.action_rescheduled_patient(new_appointment_data)
-            return appointment_obj
+    # @transaction.atomic
+    # def book_appointment(self, request, consumer_account, pg_data, order_obj):
+    #     appointment_data = order_obj.action_data
+    #     appointment_obj = None
+    #     temp_effective_price = decimal.Decimal(appointment_data["effective_price"])
+    #     if consumer_account.balance >= temp_effective_price:
+    #         if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
+    #             appointment_obj = OpdAppointment.create_appointment(appointment_data)
+    #         elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
+    #             appointment_obj = LabAppointment.create_appointment(appointment_data)
+    #
+    #         order_obj.appointment_id = appointment_obj.id
+    #         order_obj.payment_status = Order.PAYMENT_ACCEPTED
+    #         pg_data["reference_id"] = appointment_obj.id
+    #         order_obj.save()
+    #
+    #         appointment_amount = appointment_obj.effective_price
+    #         debit_data = {
+    #             "user": pg_data.get("user"),
+    #             "product_id": pg_data.get("product_id"),
+    #             "transaction_id": pg_data.get("transaction_id"),
+    #             "reference_id": appointment_obj.id
+    #         }
+    #         consumer_account.debit_schedule(debit_data, appointment_amount)
+    #         return appointment_obj
+    #
+    # @transaction.atomic
+    # def reschedule_appointment(self, consumer_account, pg_data, order_obj):
+    #     new_appointment_data = order_obj.action_data
+    #     appointment_obj = None
+    #     if order_obj.product_id == PgTransaction.DOCTOR_APPOINTMENT:
+    #         appointment_obj = OpdAppointment.objects.get(pk=order_obj.reference_id)
+    #         opd_serializer = OpdAppointmentSerializer(data=new_appointment_data)
+    #         opd_serializer.is_valid(raise_exception=True)
+    #         new_appointment_data = opd_serializer.validated_data
+    #     elif order_obj.product_id == PgTransaction.LAB_APPOINTMENT:
+    #         appointment_obj = LabAppointment.objects.get(pk=order_obj.reference_id)
+    #         lab_serializer = LabAppointmentModelSerializer(data=new_appointment_data)
+    #         lab_serializer.is_valid(raise_exception=True)
+    #         new_appointment_data = lab_serializer.validated_data
+    #
+    #     if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
+    #         debit_amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
+    #         appointment_obj.action_rescheduled_patient(new_appointment_data)
+    #         order_obj.payment_status = Order.PAYMENT_ACCEPTED
+    #         order_obj.save()
+    #
+    #         debit_data = {
+    #             "user": pg_data.get("user"),
+    #             "product_id": pg_data.get("product_id"),
+    #             "transaction_id": pg_data.get("transaction_id"),
+    #             "reference_id": appointment_obj.id
+    #         }
+    #         consumer_account.debit_schedule(debit_data, debit_amount)
+    #
+    #
+    #     # if consumer_account.balance >= new_appointment_data["effective_price"]:
+    #     #     if order_obj.product_id == PgTransaction.DOCTOR_APPOINTMENT:
+    #     #         appointment_obj = OpdAppointment.objects.get(pk=order_obj.reference_id)
+    #     #         # new_appointment_data[""]
+    #     #         appointment_obj.action_rescheduled_patient(new_appointment_data)
+    #     #
+    #     #     elif order_obj.product_id == PgTransaction.LAB_APPOINTMENT:
+    #     #         appointment_obj = LabAppointment.objects.get(pk=order_obj.reference_id)
+    #     #         appointment_obj.action_rescheduled_patient(new_appointment_data)
+    #         return appointment_obj
 
     @transaction.atomic
     def block_schedule_transaction(self, data):
