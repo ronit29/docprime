@@ -583,19 +583,13 @@ class AddressViewsSet(viewsets.ModelViewSet):
         return Address.objects.filter(user=request.user)
 
     def create(self, request, *args, **kwargs):
-        data = {key: value for key, value in request.data.items()}
-        data["user"] = request.user.id
-        # Added recently
-        if 'is_default' not in data:
-            if not Address.objects.filter(user=request.user.id).exists():
-                data['is_default'] = True
-
+        data = request.data
         serializer = serializers.AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        if not Address.objects.filter(**data).exists():
+        if not Address.objects.filter(user=request.user).filter(**serializer.validated_data).exists():
             serializer.save()
         else:
-            address = Address.objects.filter(**data).first()
+            address = Address.objects.filter(user=request.user).filter(**serializer.validated_data).first()
             serializer = serializers.AddressSerializer(address)
         return Response(serializer.data)
 

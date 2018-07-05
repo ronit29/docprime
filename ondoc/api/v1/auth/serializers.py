@@ -161,17 +161,26 @@ class UserPermissionSerializer(serializers.ModelSerializer):
 
 
 class AddressSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True)
 
     class Meta:
         model = Address
         fields = ('id', 'type', 'place_id', 'address', 'land_mark', 'pincode',
-                  'phone_number', 'is_default', 'profile', 'user')
+                  'phone_number', 'is_default', 'profile')
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        if not request:
+            raise ValueError("Request is None.")
+        validated_data['user'] = request.user
+        if 'is_default' not in request.data:
+            if not Address.objects.filter(user=request.user.id).exists():
+                validated_data['is_default'] = True
+        return super().create(validated_data)
 
     def validate(self, attrs):
         request = self.context.get("request")
-        if attrs.get("user") != request.user:
-            raise serializers.ValidationError("User is not correct.")
+        # if attrs.get("user") != request.user:
+        #     raise serializers.ValidationError("User is not correct.")
         if attrs.get("profile") and not UserProfile.objects.filter(user=request.user, id=attrs.get("profile").id).exists():
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
