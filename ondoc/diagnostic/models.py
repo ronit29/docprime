@@ -411,6 +411,7 @@ class LabAppointment(TimeStampedModel):
     ACCEPTED = 5
     CANCELED = 6
     COMPLETED = 7
+    ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_LAB]
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
     lab_test = models.ManyToManyField(AvailableLabTest)

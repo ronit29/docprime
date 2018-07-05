@@ -526,6 +526,12 @@ class UserAppointmentsViewSet(OndocViewSet):
         queryset = LabAppointment.objects.select_related('lab').filter(user=user)
         if queryset and params.get('profile_id'):
             queryset = queryset.filter(profile=params['profile_id'])
+        range = params.get('range')
+        if range and range == 'upcoming':
+            queryset = queryset.filter(time_slot_start__gte=timezone.now(),
+                                       status__in=LabAppointment.ACTIVE_APPOINTMENT_STATUS).order_by('time_slot_start')
+        else:
+            queryset = queryset.order_by('-time_slot_start')
         queryset = paginate_queryset(queryset, request, 20)
         serializer = LabAppointmentModelSerializer(queryset, many=True, context={"request": request})
         return serializer
@@ -553,8 +559,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
         elif range == 'upcoming':
             queryset = queryset.filter(
-                status__in=[OpdAppointment.BOOKED, OpdAppointment.RESCHEDULED_DOCTOR,
-                            OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.ACCEPTED],
+                status__in=OpdAppointment.ACTIVE_APPOINTMENT_STATUS,
                 time_slot_start__gt=timezone.now()).order_by('time_slot_start')
         elif range == 'pending':
             queryset = queryset.filter(time_slot_start__gt=timezone.now(),
