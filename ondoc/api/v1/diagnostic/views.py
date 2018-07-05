@@ -309,44 +309,54 @@ class LabAppointmentView(mixins.CreateModelMixin,
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
         resp = {}
-        effective_price = appointment_details["effective_price"]
 
-        insured_cod_flag = self.is_insured_cod(appointment_details)
+        can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
 
-        if insured_cod_flag or balance >= effective_price:
-            lab_appointment = LabAppointment.create_appointment(appointment_details)
+        if can_use_insurance:
+            appointment_details['effective_price'] = appointment_details['agreed_price']
+            appointment_details['payment_type'] = doctor_model.OpdAppointment.INSURANCE
+        elif appointment_details['payment_type'] == doctor_model.OpdAppointment.INSURANCE:
+            resp['status'] = 0
+            resp['message'] = insurance_fail_message
+            return resp
 
-            user_account_data = {
-                "user": user,
-                "product_id": product_id,
-                "reference_id": lab_appointment.id
-            }
-
-            if not insured_cod_flag:
-                consumer_account.debit_schedule(user_account_data, effective_price)
-
-            resp["status"] = 1
-            resp["payment_required"] = False
-            resp["data"] = {"id": lab_appointment.id, "type": diagnostic_serializer.LabAppointmentModelSerializer.LAB_TYPE}
-        else:
-            appointment_details["effective_price"] = effective_price
+        if appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and \
+                balance < appointment_details.get("effective_price"):
             temp_appointment_details = copy.deepcopy(appointment_details)
             self.json_transform(temp_appointment_details)
+
             account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
                                                         account_models.Order.LAB_APPOINTMENT_CREATE)
+
+            payable_amount = appointment_details.get("effective_price") - balance
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.LAB_APPOINTMENT_CREATE,
                 action_data=temp_appointment_details,
-                amount=effective_price - balance,
+                amount=payable_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
-            appointment_details["payable_amount"] = effective_price - balance
+            appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
-            resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id, order.id)
-        return resp
+            resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id,
+                                                                              order.id)
+        else:
 
+            lab_appointment = LabAppointment.create_appointment(appointment_details)
+            if appointment_details["payment_type"] == doctor_model.OpdAppointment.PREPAID:
+                user_account_data = {
+                    "user": user,
+                    "product_id": product_id,
+                    "reference_id": lab_appointment.id
+                }
+                consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
+            resp["status"] = 1
+            resp["payment_required"] = False
+            resp["data"] = {"id": lab_appointment.id,
+                            "type": diagnostic_serializer.LabAppointmentModelSerializer.LAB_TYPE}
+        return resp
+    
     def get_payment_details(self, request, appointment_details, product_id, order_id):
         pgdata = dict()
         payment_required = True
@@ -379,6 +389,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
         app_data["lab"] = app_data["lab"].id
         app_data["user"] = app_data["user"].id
         app_data["profile"] = app_data["profile"].id
+
+    def can_use_insurance(self, appointment_details):
+        # Check if appointment can be covered under insurance
+        # also return a valid message
+        return False, 'Not covered under insurance'
 
     def is_insured_cod(self, app_details):
         return False

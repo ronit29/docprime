@@ -2,7 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          UserPermission, Address)
 from ondoc.doctor.models import DoctorMobile
-from ondoc.account.models import ConsumerAccount, Order
+from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
@@ -212,3 +212,10 @@ class TransactionSerializer(serializers.Serializer):
     pgTxId = serializers.CharField(max_length=200)
     pbGatewayName = serializers.CharField(max_length=200, required=False)
 
+
+class UserTransactionModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ConsumerTransaction
+        fields = ('type', 'action', 'amount', 'product_id', 'reference_id', 'order_id')
+        # fields = '__all__'

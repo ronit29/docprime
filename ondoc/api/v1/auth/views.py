@@ -699,7 +699,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         appointment_obj = None
 
         if int(response.get('statusCode')) == 1:
-            order_obj = Order.objects.get(pk=response.get("orderNo"))
+            order_obj = Order.objects.filter(pk=response.get("orderNo")).first()
+            if not order_obj:
+                pass
+
             response_data = self.form_pg_transaction_data(response, order_obj)
 
             pg_tx_queryset = PgTransaction.objects.create(**response_data)
@@ -801,6 +804,23 @@ class TransactionViewSet(viewsets.GenericViewSet):
             amount = obj.fees
 
         return amount, obj
+
+
+class UserTransactionViewSet(viewsets.GenericViewSet):
+    serializer_class = serializers.UserTransactionModelSerializer
+    queryset = ConsumerTransaction.objects.all()
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request):
+        user = request.user
+        queryset = ConsumerTransaction.objects.filter(user=user)
+        if not queryset.exists():
+            return Response({"status": 0,
+                             "msg": "No transaction exists"
+                             })
+        queryset = paginate_queryset(queryset, request)
+        serializer = serializers.UserTransactionModelSerializer(queryset, many=True)
+        return Response(data=serializer.data)
 
 
 class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
