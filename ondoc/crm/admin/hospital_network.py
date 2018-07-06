@@ -69,7 +69,7 @@ class HospitalNetworkManagerInline(admin.TabularInline):
     show_change_link = False
 
 
-class GenericAdminInline(GenericTabularInline):
+class GenericAdminInline(admin.TabularInline):
     model = GenericAdmin
     extra = 0
     can_delete = True
@@ -93,7 +93,6 @@ class HospitalNetworkForm(FormCleanMixin):
                 raise forms.ValidationError(key+" is required for Quality Check")
             if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
-
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
@@ -120,7 +119,6 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkAwardInline,
         HospitalNetworkCertificationInline,
         GenericAdminInline]
-
 
     def associated_hospitals(self, instance):
         if instance.id:

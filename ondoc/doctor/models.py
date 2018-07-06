@@ -86,10 +86,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                     choices=[("", "Select"), (1, "Non Network Hospital"),
                                                              (2, "Network Hospital")])
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='assoc_hospitals')
-
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
-
-    generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
+    is_appointment_manager = models.BooleanField(verbose_name='Enabled for Managing Appointments', default=False)
+    # hospital_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
 
     def __str__(self):
         return self.name
@@ -99,6 +98,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def get_thumbnail(self):
         return static("hospital_images/hospital_default.png")
+
+    def save(self, *args, **kwargs):
+        super(Hospital, self).save(*args, **kwargs)
+        if self.is_appointment_manager:
+            auth_model.GenericAdmin.objects.filter(hospital=self).update(is_disabled=True)
+        else:
+            auth_model.GenericAdmin.objects.filter(hospital=self).update(is_disabled=False)
 
 
 
@@ -208,6 +214,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel):
     is_online_consultation_enabled = models.BooleanField(verbose_name='Available for Online Consultation',
                                                          default=False)
     online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
+    # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
         through='DoctorHospital',
@@ -358,6 +365,7 @@ class DoctorHospital(auth_model.TimeStampedModel):
                 deal_price = self.fees
             self.deal_price = deal_price
         super().save(*args, **kwargs)
+
 
 class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
@@ -513,8 +521,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
-    generic_hospital_network_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
-
+    # hospital_network_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
@@ -666,7 +673,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
     # patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
-    # insurance_id =
     payment_type = models.PositiveSmallIntegerField(choices=PAY_CHOICES, default=PREPAID)
     insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)

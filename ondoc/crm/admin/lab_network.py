@@ -57,14 +57,13 @@ class LabNetworkHelplineInline(admin.TabularInline):
     }
 
 
-class GenericAdminInline(GenericTabularInline):
-    model = GenericAdmin
-    extra = 0
-    can_delete = True
-    show_change_link = False
-    readonly_fields = ['user']
-    verbose_name_plural = "Admins"
-
+# class GenericAdminInline(admin.TabularInline):
+#     model = GenericAdmin
+#     extra = 0
+#     can_delete = True
+#     show_change_link = False
+#     readonly_fields = ['user']
+#     verbose_name_plural = "Admins"
 
 
 class LabNetworkManagerInline(admin.TabularInline):
@@ -76,7 +75,6 @@ class LabNetworkManagerInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-
 
 
 class LabNetworkForm(FormCleanMixin):
@@ -94,7 +92,6 @@ class LabNetworkForm(FormCleanMixin):
                 raise forms.ValidationError(key+" is required for Quality Check")
             if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
-
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
@@ -128,8 +125,7 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         LabNetworkEmailInline,
         LabNetworkAccreditationInline,
         LabNetworkAwardInline,
-        LabNetworkCertificationInline,
-        GenericAdminInline]
+        LabNetworkCertificationInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

@@ -75,13 +75,14 @@ class HospitalSpecialityInline(admin.TabularInline):
 #     show_change_link = False
 
 
-class GenericAdminInline(GenericTabularInline):
+class GenericAdminInline(admin.TabularInline):
     model = GenericAdmin
     extra = 0
     can_delete = True
     show_change_link = False
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
+    exclude = ('hospital_network', 'is_doc_admin', 'doctor')
 
 
 class HospitalForm(FormCleanMixin):
@@ -99,7 +100,6 @@ class HospitalForm(FormCleanMixin):
             return None
         return data
 
-
     def validate_qc(self):
         qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
             'registration_number':'req','building':'req','locality':'req','city':'req','state':'req',
@@ -116,6 +116,7 @@ class HospitalForm(FormCleanMixin):
 class HospCityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'city'
+
     def lookups(self, request, model_admin):
         cities = set([(c['city'].upper(),c['city'].upper()) if(c.get('city')) else ('','') for c in Hospital.objects.all().values('city')])
         return cities
@@ -149,7 +150,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
         super().save_model(request, obj, form, change)
-    #
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         parent_qs = super(QCPemAdmin, self).get_queryset(request)
