@@ -53,6 +53,7 @@ class LabModelSerializer(serializers.ModelSerializer):
     address = serializers.SerializerMethodField()
     lab_image = LabImageModelSerializer(many=True)
     lab_thumbnail = serializers.SerializerMethodField()
+    home_pickup_charges = serializers.ReadOnlyField()
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
@@ -87,7 +88,7 @@ class LabModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lab
         fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
-                  'sublocality', 'city', 'state', 'country', 'always_open', 'about', )
+                  'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges', )
 
 
 class LabProfileSerializer(LabModelSerializer):
@@ -102,6 +103,12 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     test_id = serializers.ReadOnlyField(source='test.id')
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
+    is_home_pickup_available = serializers.SerializerMethodField()
+
+    def get_is_home_pickup_available(self, obj):
+        if obj.lab.is_home_pickup_available and obj.test.home_collection_possible:
+            return True
+        return False
 
     def get_agreed_price(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
@@ -113,7 +120,8 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled')
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_pickup_available', )
+
 
 class LabCustomSerializer(serializers.Serializer):
     # lab = serializers.SerializerMethodField()

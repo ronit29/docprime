@@ -48,7 +48,8 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     # patient_dob = serializers.ReadOnlyField(source='profile.dob')
     patient_gender = serializers.ReadOnlyField(source='profile.gender'),
     patient_image = serializers.SerializerMethodField()
-    thumbnail = serializers.SerializerMethodField()
+    patient_thumbnail = serializers.SerializerMethodField()
+    doctor_thumbnail = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='doctor')
     allowed_action = serializers.SerializerMethodField()
 
@@ -58,8 +59,9 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OpdAppointment
-        fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'thumbnail', 'type',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end')
+        fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
+                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail')
 
     def get_patient_image(self, obj):
         if obj.profile.profile_image:
@@ -67,7 +69,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         else:
             return ""
 
-    def get_thumbnail(self, obj):
+    def get_patient_thumbnail(self, obj):
         request = self.context.get('request')
         if obj.profile.profile_image:
             photo_url = obj.profile.profile_image.url
@@ -75,6 +77,18 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         else:
             url = static('doctor_images/no_image.png')
             return request.build_absolute_uri(url)
+
+    def get_doctor_thumbnail(self, obj):
+        request = self.context.get('request')
+        if obj.doctor.images.all():
+            photo_url = obj.doctor.images.all()[0].name.url
+            return request.build_absolute_uri(photo_url)
+        else:
+            url = static('doctor_images/no_image.png')
+            return request.build_absolute_uri(url)
+
+
+
 
 
 class OpdAppModelSerializer(serializers.ModelSerializer):
@@ -610,11 +624,6 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     class Meta:
         model = OpdAppointment
-        fields = ('id', 'patient_image', 'thumbnail', 'type', 'profile',
+        fields = ('id', 'patient_image', 'type', 'profile',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action')
-
-
-
-
-
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', )

@@ -99,6 +99,7 @@ class StaffProfile(models.Model):
     name = models.CharField(max_length=100, blank=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     #user = models.OneToOneField(User, on_delete=models.CASCADE)
+    employee_id = models.CharField(max_length=10, blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -383,8 +384,6 @@ class LabUserPermission(TimeStampedModel):
     def __str__(self):
         return str(self.user.email)
 
-
-
     @classmethod
     def create_permission(cls, user):
         from ondoc.diagnostic.models import LabNetwork, Lab
@@ -439,39 +438,69 @@ class LabUserPermission(TimeStampedModel):
         # TODO PM - Logic to get admin for a particular User
 
 
-
 class GenericAdmin(TimeStampedModel):
+    APPOINTMENT = 1
+    BILLINNG = 2
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey('content_type', 'object_id')
+    type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
+    hospital_network = models.ForeignKey("doctor.HospitalNetwork", null=True, blank=True,
+                                         on_delete=models.CASCADE,
+                                         related_name='manageable_hospital_networks')
+    hospital = models.ForeignKey("doctor.Hospital", null=True, blank=True, on_delete=models.CASCADE,
+                                 related_name='manageable_hospitals')
+    doctor = models.ForeignKey("doctor.Doctor", null=True, blank=True, on_delete=models.CASCADE,
+                               related_name='manageable_doctors')
+    permission_type = models.PositiveSmallIntegerField(max_length=20, choices=type_choices, default=APPOINTMENT)
+    is_doc_admin = models.BooleanField(default=False)
+    is_disabled = models.BooleanField(default=False)
+    super_user_permission = models.BooleanField(default=False)
+    read_permission = models.BooleanField(default=False)
+    write_permission = models.BooleanField(default=False)
+    # delete_permission = models.BooleanField(default=False)
+    # content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    # object_id = models.PositiveIntegerField()
+    # content_object = GenericForeignKey('content_type', 'object_id')
 
     class Meta:
         db_table = 'generic_admin'
 
     def __str__(self):
-        return "{}:{}".format(self.phone_number, self.content_object)
+        return "{}:{}".format(self.phone_number, self.hospital)
 
     def save(self, *args, **kwargs):
         self.clean()
-        user = User.objects.filter(phone_number=self.phone_number, user_type=User.DOCTOR).first()
+        user = User.objects.filter(phone_number=self.phone_number).first()
+        if user is not None:
+            self.user = user
         super(GenericAdmin, self).save(*args, **kwargs)
-        self.update_user_admin(self.phone_number, user)
 
     def delete(self, *args, **kwargs):
         self.clean()
-        user = User.objects.filter(phone_number=self.phone_number, user_type=User.DOCTOR).first()
         super(GenericAdmin, self).delete(*args, **kwargs)
-        self.update_user_permissions(user)
 
     @classmethod
     def update_user_admin(cls, phone_number, user):
         if user is not None:
             GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True).update(user=user)
-            cls.update_user_permissions(user)
 
-    @classmethod
-    def update_user_permissions(cls, user):
-        UserPermission.create_permission(user)
+    @staticmethod
+    def create_permission_object(user, doctor, phone_number, hospital_network, hospital, permission_type,
+                                 is_doc_admin, is_disabled, super_user_permission, write_permission):
+        return GenericAdmin(user=user,
+                            doctor=doctor,
+                            phone_number=phone_number,
+                            hospital_network=hospital_network,
+                            hospital=hospital,
+                            permission_type=permission_type,
+                            is_doc_admin=is_doc_admin,
+                            is_disabled=is_disabled,
+                            super_user_permission=super_user_permission,
+                            write_permission=write_permission,
+                            )
+
+
+
+
 

@@ -5,19 +5,20 @@ from django.core.exceptions import FieldDoesNotExist
 import datetime
 from django.forms.models import BaseFormSet
 from django.db.models import Q
+from django.urls import resolve
 from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
 from django.shortcuts import render
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
-
+from ondoc.authentication.models import GenericAdmin
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience, MedicalConditionSpecialization,
-    DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
+    DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
     DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language)
 from .filters import RelatedDropdownFilter
-
+from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
@@ -77,6 +78,8 @@ class DoctorHospitalForm(forms.ModelForm):
         if mrp and mrp < fees:
             raise forms.ValidationError("MRP cannot be less than fees")
 
+
+
 class DoctorHospitalFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -93,6 +96,75 @@ class DoctorHospitalFormSet(forms.BaseInlineFormSet):
             if not hospital:
                 raise forms.ValidationError("Atleast one Hospital is required")
 
+    def save(self, commit=True):
+        super().save()
+        form_change = False
+        for form in self.forms:
+            if form.has_changed():
+                form_change = True
+                break
+        if form_change or len(self.new_objects) > 0 or len(self.deleted_objects) > 0:
+            doc_admin_users = GenericAdmin.objects.filter(Q(doctor=self.cleaned_data[0]['doctor'], is_doc_admin=True),
+                                                          ~Q(user=self.cleaned_data[0]['doctor'].user))
+            doc_admin_usr_list = []
+            delete_doc_admin_usr_list = [self.cleaned_data[0]['doctor'].user.id]
+            if doc_admin_users.exists():
+                for doc_admin_usr in doc_admin_users.all():
+                    doc_admin_usr_list.append(doc_admin_usr.user)
+                    delete_doc_admin_usr_list.append(doc_admin_usr.user.id)
+            delete_doc_admin_usr_list.append(self.cleaned_data[0]['doctor'].user.id)
+            GenericAdmin.objects.filter(doctor=self.cleaned_data[0]['doctor'],
+                                        user__id__in=delete_doc_admin_usr_list).delete()
+            doctor_super_admins = []
+            deleted_hospital_list = []
+            unique_hospitals_list = []
+
+            deleted_objects = self.deleted_objects
+            if deleted_objects:
+                for deleted_hospital in deleted_objects:
+                    deleted_hospital_list.append(deleted_hospital.hospital.id)
+
+            for row in self.cleaned_data:
+                if row.get('doctor').user is not None:
+                    if row['hospital'].id in deleted_hospital_list:
+                        deleted_hospital_list.remove(row['hospital'].id)
+                        continue
+                    else:
+                        if row['hospital'].id not in unique_hospitals_list:
+                            if row['hospital'].is_appointment_manager == False:
+                                is_disabled = False
+                            else:
+                                is_disabled = True
+                            doctor_super_admins.append(GenericAdmin.
+                                                       create_permission_object(user=row['doctor'].user,
+                                                                                doctor=row['doctor'],
+                                                                                phone_number=row['doctor'].user.phone_number,
+                                                                                hospital_network=None,
+                                                                                hospital=row['hospital'],
+                                                                                permission_type=GenericAdmin.APPOINTMENT,
+                                                                                is_doc_admin=True,
+                                                                                is_disabled=is_disabled,
+                                                                                super_user_permission=True,
+                                                                                write_permission=True))
+
+                            if doc_admin_usr_list:
+                                for doc_admin_user in doc_admin_usr_list:
+                                    doctor_super_admins.append(GenericAdmin.
+                                                               create_permission_object(user=doc_admin_user,
+                                                                                        doctor=row['doctor'],
+                                                                                        phone_number=doc_admin_usr.phone_number,
+                                                                                        hospital_network=None,
+                                                                                        hospital=row['hospital'],
+                                                                                        permission_type=GenericAdmin.APPOINTMENT,
+                                                                                        is_doc_admin=True,
+                                                                                        is_disabled=is_disabled,
+                                                                                        super_user_permission=False,
+                                                                                        write_permission=True))
+                            unique_hospitals_list.append(row['hospital'].id)
+
+            if doctor_super_admins:
+                GenericAdmin.objects.bulk_create(doctor_super_admins)
+
 
 class DoctorHospitalInline(admin.TabularInline):
     model = DoctorHospital
@@ -104,6 +176,9 @@ class DoctorHospitalInline(admin.TabularInline):
     show_change_link = False
     autocomplete_fields = ['hospital']
     readonly_fields = ['deal_price']
+
+    def get_queryset(self, request):
+        return super(DoctorHospitalInline, self).get_queryset(request).select_related('doctor', 'hospital')
 
 
 class DoctorLanguageFormSet(forms.BaseInlineFormSet):
@@ -165,7 +240,6 @@ class DoctorExperienceForm(forms.ModelForm):
         end = cleaned_data.get("end_year")
         if start and end and start >= end:
             raise forms.ValidationError("Start Year should be less than end Year")
-
 
 
 class DoctorExperienceFormSet(forms.BaseInlineFormSet):
@@ -235,6 +309,7 @@ class DoctorImageInline(admin.TabularInline):
     # name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
     # class Meta:
     #     Model = DoctorDocument
+
 
 class DoctorDocumentFormSet(forms.BaseInlineFormSet):
     def clean(self):
@@ -371,9 +446,11 @@ class DoctorForm(FormCleanMixin):
             return None
         return data
 
+
 class CityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'hospitals__city'
+
     def lookups(self, request, model_admin):
         cities = set([(c['hospitals__city'].upper(), c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('','') for c in Doctor.objects.all().values('hospitals__city')])
         return cities
@@ -391,6 +468,39 @@ class DoctorSpecializationInline(admin.TabularInline):
     min_num = 0
     max_num = 4
     autocomplete_fields = ['specialization']
+
+
+class GenericAdminForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super(GenericAdminForm, self).__init__(*args, **kwargs)
+        resolved = resolve(self.request.path_info)
+        if resolved.kwargs:
+            self.parent = Doctor.objects.get(pk=resolved.kwargs['object_id'])
+        try:
+            self.fields['hospital'].queryset = Hospital.objects.filter(assoc_doctors=self.parent,
+                                                                       is_appointment_manager=False)
+        except:
+            self.fields['hospital'].queryset = Hospital.objects.filter(is_appointment_manager=False)
+
+
+class GenericAdminInline(admin.TabularInline):
+    model = GenericAdmin
+    extra = 0
+    # form = GenericAdminForm
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+    exclude = ('hospital_network', 'super_user_permission')
+    verbose_name_plural = "Admins"
+
+    def get_queryset(self, request):
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj=obj, **kwargs)
+        self.form.request = request
+        return formset
 
 
 class DoctorResource(resources.ModelResource):
@@ -412,9 +522,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
 
-    list_display = ('name', 'updated_at','data_status','onboarding_status','list_created_by','get_onboard_link')
+    list_display = ('name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link')
     date_hierarchy = 'created_at'
-    list_filter = ('data_status','onboarding_status',CityFilter,)
+    list_filter = ('data_status','onboarding_status', CityFilter,)
     form = DoctorForm
     inlines = [
         DoctorMobileInline,
@@ -428,10 +538,22 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         DoctorExperienceInline,
         DoctorMedicalServiceInline,
         DoctorImageInline,
-        DoctorDocumentInline
+        DoctorDocumentInline,
+        GenericAdminInline
     ]
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
     search_fields = ['name']
+
+    readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id')
+
+    def lead_url(self, instance):
+        if instance.id:
+            ref_id = instance.matrix_reference_id
+            if ref_id is not None:
+                html ='''<a href='/admin/lead/doctorlead/%s/change/' target=_blank>Lead Page</a>'''%(ref_id)
+                return mark_safe(html)
+        else:
+            return mark_safe('''<span></span>''')
 
     def get_urls(self):
         urls = super().get_urls()
@@ -485,6 +607,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(DoctorAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
+        form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
+        if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+            form.base_fields['assigned_to'].disabled = True
         return form
 
     def save_formset(self, request, form, formset, change):
@@ -501,6 +626,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user
+        if not obj.assigned_to:
+            obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
             obj.data_status = 2
         if '_qc_approve' in request.POST:

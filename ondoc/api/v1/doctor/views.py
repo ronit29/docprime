@@ -86,6 +86,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         ids, id_dict = self.extract_appointment_ids(user_permission)
 
         queryset = models.OpdAppointment.objects.filter(id__in=ids)
+        queryset = models.OpdAppointment.objects.filter()
 
         if not queryset:
             return Response([])
@@ -633,7 +634,8 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         obj = TimeSlotExtraction()
 
         for data in queryset:
-            obj.form_time_slots(data.day, data.start, data.end, data.fees, True)
+            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+                                data.deal_price, data.mrp, True)
 
         # resp_dict = obj.get_timing()
         timeslots = obj.get_timing_list()

@@ -9,7 +9,7 @@ from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
     LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
     LabNetworkHelpline, LabNetworkManager)
 from .common import *
-from ondoc.authentication.models import GenericAdmin
+from ondoc.authentication.models import GenericAdmin, User
 from django.contrib.contenttypes.admin import GenericTabularInline
 
 
@@ -57,14 +57,13 @@ class LabNetworkHelplineInline(admin.TabularInline):
     }
 
 
-class GenericAdminInline(GenericTabularInline):
-    model = GenericAdmin
-    extra = 0
-    can_delete = True
-    show_change_link = False
-    readonly_fields = ['user']
-    verbose_name_plural = "Admins"
-
+# class GenericAdminInline(admin.TabularInline):
+#     model = GenericAdmin
+#     extra = 0
+#     can_delete = True
+#     show_change_link = False
+#     readonly_fields = ['user']
+#     verbose_name_plural = "Admins"
 
 
 class LabNetworkManagerInline(admin.TabularInline):
@@ -76,7 +75,6 @@ class LabNetworkManagerInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-
 
 
 class LabNetworkForm(FormCleanMixin):
@@ -95,7 +93,6 @@ class LabNetworkForm(FormCleanMixin):
             if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
-
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
         if data == '':
@@ -108,7 +105,7 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
-    list_display = ('name', 'updated_at', 'data_status', 'list_created_by')
+    list_display = ('name', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
     list_filter = ('data_status',)
     search_fields = ['name']
     readonly_fields = ('associated_labs',)
@@ -128,8 +125,7 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         LabNetworkEmailInline,
         LabNetworkAccreditationInline,
         LabNetworkAwardInline,
-        LabNetworkCertificationInline,
-        GenericAdminInline]
+        LabNetworkCertificationInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -142,6 +138,8 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user
+        if not obj.assigned_to:
+            obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
             obj.data_status = 2
         if '_qc_approve' in request.POST:
@@ -154,4 +152,7 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(LabNetworkAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
+        form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
+        if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+            form.base_fields['assigned_to'].disabled = True
         return form

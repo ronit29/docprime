@@ -87,10 +87,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                     choices=[("", "Select"), (1, "Non Network Hospital"),
                                                              (2, "Network Hospital")])
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='assoc_hospitals')
-
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
+    is_appointment_manager = models.BooleanField(verbose_name='Enabled for Managing Appointments', default=False)
 
-    generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
+
+    # generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
+    assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
 
     def __str__(self):
         return self.name
@@ -100,6 +102,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def get_thumbnail(self):
         return static("hospital_images/hospital_default.png")
+
+    def save(self, *args, **kwargs):
+        super(Hospital, self).save(*args, **kwargs)
+        if self.is_appointment_manager:
+            auth_model.GenericAdmin.objects.filter(hospital=self).update(is_disabled=True)
+        else:
+            auth_model.GenericAdmin.objects.filter(hospital=self).update(is_disabled=False)
 
 
 
@@ -188,7 +197,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel):
                          (ONBOARDED, "Onboarded")]
 
     name = models.CharField(max_length=200)
-    gender = models.CharField(max_length=2, default=None, blank=True,
+    gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=[("", "Select"), ("m", "Male"), ("f", "Female"), ("o", "Other")])
     practicing_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
@@ -209,12 +218,16 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel):
     is_online_consultation_enabled = models.BooleanField(verbose_name='Available for Online Consultation',
                                                          default=False)
     online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
+    # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
         through='DoctorHospital',
         through_fields=('doctor', 'hospital'),
         related_name='assoc_doctors',
     )
+    assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_doctors')
+    matrix_lead_id = models.BigIntegerField(blank=True, null=True)
+    matrix_reference_id = models.BigIntegerField(blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -359,6 +372,7 @@ class DoctorHospital(auth_model.TimeStampedModel):
                 deal_price = self.fees
             self.deal_price = deal_price
         super().save(*args, **kwargs)
+
 
 class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
@@ -514,8 +528,9 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
-    generic_hospital_network_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
 
+    # generic_hospital_network_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
+    assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital_networks')
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
@@ -667,7 +682,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
     # patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
-    # insurance_id =
     payment_type = models.PositiveSmallIntegerField(choices=PAY_CHOICES, default=PREPAID)
     insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
@@ -775,6 +789,8 @@ class OpdAppointment(auth_model.TimeStampedModel):
     def send_notification(self, database_instance):
         if database_instance and database_instance.status == self.status:
             return
+        if (not self.user) or (not self.doctor):
+            return
         if self.status == OpdAppointment.ACCEPTED:
             notification_models.NotificationAction.trigger(
                 instance=self,
@@ -782,6 +798,8 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 notification_type=notification_models.NotificationAction.APPOINTMENT_ACCEPTED,
             )
         elif self.status == OpdAppointment.RESCHEDULED_PATIENT:
+            if not self.doctor.user:
+                return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.doctor.user,
@@ -792,12 +810,16 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 user=self.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
             )
+            if not self.doctor.user:
+                return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.doctor.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
             )
         elif self.status == OpdAppointment.CANCELED:
+            if not self.doctor.user:
+                return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.doctor.user,

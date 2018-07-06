@@ -4,7 +4,7 @@ from django.db import models
 from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
-from ondoc.authentication.models import GenericAdmin
+from ondoc.authentication.models import GenericAdmin, User
 from django.contrib.contenttypes.admin import GenericTabularInline
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
@@ -69,7 +69,7 @@ class HospitalNetworkManagerInline(admin.TabularInline):
     show_change_link = False
 
 
-class GenericAdminInline(GenericTabularInline):
+class GenericAdminInline(admin.TabularInline):
     model = GenericAdmin
     extra = 0
     can_delete = True
@@ -94,7 +94,6 @@ class HospitalNetworkForm(FormCleanMixin):
             if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
-
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
         if data == '':
@@ -108,7 +107,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
-    list_display = ('name', 'updated_at', 'data_status', 'list_created_by')
+    list_display = ('name', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
     list_filter = ('data_status',)
     search_fields = ['name']
     readonly_fields = ('associated_hospitals',)
@@ -120,7 +119,6 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkAwardInline,
         HospitalNetworkCertificationInline,
         GenericAdminInline]
-
 
     def associated_hospitals(self, instance):
         if instance.id:
@@ -143,6 +141,8 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user
+        if not obj.assigned_to:
+            obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
             obj.data_status = 2
         if '_qc_approve' in request.POST:
@@ -155,4 +155,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(HospitalNetworkAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
+        form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
+        if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+            form.base_fields['assigned_to'].disabled = True
         return form

@@ -62,7 +62,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
                                                          decimal_places=2)
     radiology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
                                                        decimal_places=2)
-    generic_lab_admins = GenericRelation(GenericAdmin, related_query_name='manageable_labs')
+
+    # generic_lab_admins = GenericRelation(GenericAdmin, related_query_name='manageable_labs')
+    assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab')
+    matrix_lead_id = models.BigIntegerField(blank=True, null=True)
+    matrix_reference_id = models.BigIntegerField(blank=True, null=True)
+    is_home_pickup_available = models.BigIntegerField(null=True, blank=True)
+    home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
 
 
     def __str__(self):
@@ -224,7 +231,10 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
-    generic_lab_network_admins = GenericRelation(GenericAdmin, related_query_name='manageable_lab_networks')
+
+    # generic_lab_network_admins = GenericRelation(GenericAdmin, related_query_name='manageable_lab_networks')
+    assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab_networks')
+
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
