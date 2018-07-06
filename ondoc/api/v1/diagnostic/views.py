@@ -96,10 +96,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          "count": count})
 
     def retrieve(self, request, lab_id):
-        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
+        test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
+        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id, test__in=test_ids)
 
         if len(queryset) == 0:
-            raise Http404("No labs available")
+            return Response([])
 
         test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
         lab_queryset = queryset[0].lab

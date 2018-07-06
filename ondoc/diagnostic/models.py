@@ -65,6 +65,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab')
     matrix_lead_id = models.BigIntegerField(blank=True, null=True)
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
+    is_home_pickup_available = models.BigIntegerField(null=True, blank=True)
+    home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
 
     def __str__(self):
