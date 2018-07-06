@@ -7,7 +7,7 @@ from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
-from ondoc.authentication.models import GenericAdmin
+from ondoc.authentication.models import GenericAdmin, User
 from django.contrib.contenttypes.admin import GenericTabularInline
 
 
@@ -143,6 +143,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user
+        if not obj.assigned_to:
+            obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
             obj.data_status = 2
         if '_qc_approve' in request.POST:
@@ -162,10 +164,13 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super(HospitalAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
-        form.base_fields['network'].queryset = HospitalNetwork.objects.filter(Q(data_status=2) | Q(data_status = 3) | Q(created_by = request.user))
+        form.base_fields['network'].queryset = HospitalNetwork.objects.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user))
+        form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
+        if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+            form.base_fields['assigned_to'].disabled = True
         return form
 
-    list_display = ('name', 'updated_at', 'data_status', 'list_created_by')
+    list_display = ('name', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
     form = HospitalForm
     search_fields = ['name']
     inlines = [

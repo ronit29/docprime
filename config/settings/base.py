@@ -101,6 +101,7 @@ LOCAL_APPS = (
     'ondoc.coupon',
     'ondoc.payout',
     'ondoc.web',
+    'ondoc.matrix',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -207,17 +208,17 @@ TEMPLATES = [
 ]
 
 REST_FRAMEWORK = {
-'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
-'PAGE_SIZE': 10,
-'DEFAULT_AUTHENTICATION_CLASSES': (
-    'rest_framework.authentication.SessionAuthentication',
-    'rest_framework.authentication.TokenAuthentication',
-#'ondoc.authentication.auth.CustomAuthentication',
-),
-'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler'
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
+    'PAGE_SIZE': 10,
+    'COERCE_DECIMAL_TO_STRING': False,
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+        # 'ondoc.authentication.auth.CustomAuthentication',
+    ),
+    'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler'
 }
-
 MAP_WIDGETS = {
     "GooglePointFieldWidget": (
         ("zoom", 15),
@@ -237,3 +238,5 @@ RABBITMQ_CONNECTION_SETTINGS = {
     'CONNECTION_URL': env('RABBITMQ_CONNECTION_URL'),
     'NOTIFICATION_QUEUE': env('RABBITMQ_NOTIFICATION_QUEUE')
 }
+
+MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
