@@ -156,7 +156,7 @@ class UserViewset(GenericViewSet):
             doctor.user = user
             doctor.save()
 
-        GenericAdmin.update_user_admin(phone_number, user)
+        GenericAdmin.update_user_admin(phone_number)
 
         token = Token.objects.get_or_create(user=user)
         expire_otp(data['phone_number'])

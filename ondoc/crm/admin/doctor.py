@@ -487,7 +487,7 @@ class GenericAdminForm(forms.ModelForm):
 class GenericAdminInline(admin.TabularInline):
     model = GenericAdmin
     extra = 0
-    # form = GenericAdminForm
+    form = GenericAdminForm
     can_delete = True
     show_change_link = False
     readonly_fields = ['user']

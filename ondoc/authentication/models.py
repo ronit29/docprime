@@ -481,8 +481,9 @@ class GenericAdmin(TimeStampedModel):
         super(GenericAdmin, self).delete(*args, **kwargs)
 
     @classmethod
-    def update_user_admin(cls, phone_number, user):
-        if user is not None:
+    def update_user_admin(cls, phone_number):
+        user = User.objects.filter(phone_number=phone_number)
+        if user.first() is not None:
             GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True).update(user=user)
 
     @staticmethod
