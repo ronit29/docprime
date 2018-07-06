@@ -233,7 +233,7 @@ class UserPermission(TimeStampedModel):
     hospital_network = models.ForeignKey("doctor.HospitalNetwork", null=True, blank=True,
                                          on_delete=models.CASCADE,
                                          related_name='network_admins')
-    hospital = models.ForeignKey("doctor.Hospital", null=True, blank=True,on_delete=models.CASCADE,
+    hospital = models.ForeignKey("doctor.Hospital", null=True, blank=True, on_delete=models.CASCADE,
                                  related_name='hospital_admins')
     doctor = models.ForeignKey("doctor.Doctor", null=True, blank=True, on_delete=models.CASCADE,
                                related_name='doc_permission')
@@ -254,7 +254,7 @@ class UserPermission(TimeStampedModel):
     def get_user_admin_obj(cls, user):
         from ondoc.payout.models import Outstanding
         access_list = []
-        get_permissions = (UserPermission.objects.select_related('hospital_network', 'hospital').
+        get_permissions = (UserPermission.objects.select_related('hospital_network', 'hospital', 'doctor').
                            filter(user_id=user.id, write_permission=True, permission_type=UserPermission.BILLINNG))
         if get_permissions:
             for permission in get_permissions:

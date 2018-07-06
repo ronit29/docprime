@@ -351,7 +351,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         resp = {}
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELED:
-                updated_lab_appointment = lab_appointment.action_cancelled(lab_appointment)
+                updated_lab_appointment = lab_appointment.action_cancelled(request.data.get("refund"))
                 resp = LabAppointmentRetrieveSerializer(updated_lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
@@ -388,7 +388,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         if validated_data.get('status'):
             resp = {}
             if validated_data['status'] == OpdAppointment.CANCELED:
-                opd_appointment.action_cancelled()
+                opd_appointment.action_cancelled(request.data.get("refund"))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
@@ -452,7 +452,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 appointment_serializer = LabAppRescheduleModelSerializer(appointment_details, context={"request": request})
             resp['status'] = 1
             resp['data'] = appointment_serializer.data
-            resp['required_payment'] = False
+            resp['payment_required'] = False
             return resp
         else:
             balance = consumer_account.balance + appointment_details.effective_price
@@ -490,11 +490,11 @@ class UserAppointmentsViewSet(OndocViewSet):
             )
             new_appointment_details["payable_amount"] = new_appointment_details.get('effective_price') - balance
             resp['status'] = 1
-            resp['data'], resp['required_payment'] = self.payment_details(request, new_appointment_details, product_id, order.id)
+            resp['data'], resp['payment_required'] = self.payment_details(request, new_appointment_details, product_id, order.id)
             return resp
 
     def payment_details(self, request, appointment_details, product_id, order_id):
-        required_payment = True
+        payment_required = True
         pgdata = dict()
         user = request.user
         user_profile = user.profiles.filter(is_default_user=True).first()
@@ -518,8 +518,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             pgdata['name'] = "DummyName"
         pgdata['txAmount'] = appointment_details['payable_amount']
 
-
-        return pgdata, required_payment
+        return pgdata, payment_required
 
     def lab_appointment_list(self, request, params):
         user = request.user
