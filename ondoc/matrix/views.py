@@ -58,7 +58,7 @@ class MatrixLead(GenericViewSet):
        elif data.get('sub_product') == MatrixLead.LAB:
            create_lead = Lab.objects.create(name=data.get('name'), city=data.get('city'), assigned_to=staff_profile.user,
                                              onboarding_status=Lab.NOT_ONBOARDED, created_by=staff_profile.user,
-                                            primary_mobile=data.get('phone_number'), matrix_reference_id = data.get('matrix_reference_id'))
+                                            primary_mobile=data.get('phone_number'), matrix_lead_id = data.get('matrix_lead_id'), matrix_reference_id = data.get('matrix_reference_id'))
            change_url = "/admin/diagnostic/lab/%s/change/"% (create_lead.id)
 
        if create_lead:
