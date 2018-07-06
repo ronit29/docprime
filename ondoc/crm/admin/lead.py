@@ -70,15 +70,15 @@ class DoctorLeadResource(resources.ModelResource):
         # exclude = ('json', )
 
     def before_save_instance(self, instance, using_transactions, dry_run):
-        if dry_run:
-            return True
+        # if dry_run:
+        #     return True
         if isinstance(instance.json, str):
             instance.json = json.loads(instance.json)
         super().before_save_instance(instance, using_transactions, dry_run)
 
     def after_save_instance(self, instance, using_transactions, dry_run):
-        if dry_run:
-            return
+        # if dry_run:
+        #     return
         data = instance.json
         clinic_urls = list(
             map(lambda x: data.get("LinkedClinics").get(x)[2].get("Clinic URL"), data.get("LinkedClinics")))
