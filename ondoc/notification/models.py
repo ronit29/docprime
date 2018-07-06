@@ -37,11 +37,12 @@ class NotificationAction:
     def trigger(cls, instance, user, notification_type):
         context = {}
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+            doctor_name = instance.doctor.name if instance.doctor.name else ""
             context = {
-                "doctor_name": instance.doctor.name,
+                "doctor_name": doctor_name,
                 "id": instance.id,
                 "title": "Appointment Accepted",
-                "body": "Your appointment with Dr. {} has been accepted.".format(instance.doctor.name),
+                "body": "Your appointment with Dr. {} has been accepted.".format(doctor_name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -49,11 +50,12 @@ class NotificationAction:
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT:
+            patient_name = instance.profile.name if instance.profile.name else ""
             context = {
-                "patient_name": instance.profile.name,
+                "patient_name": patient_name,
                 "id": instance.id,
                 "title": "Appointment Rescheduled",
-                "body": "Patient {} has rescheduled the appointment.".format(instance.profile.name),
+                "body": "Patient {} has rescheduled the appointment.".format(patient_name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -61,11 +63,13 @@ class NotificationAction:
             }
             NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            doctor_name = instance.doctor.name if instance.doctor.name else ""
             context = {
-                "patient_name": instance.profile.name,
-                "doctor_name": instance.doctor.name,
+                "patient_name": patient_name,
+                "doctor_name": doctor_name,
                 "title": "Appointment booked",
-                "body": "Your appointment with Dr. {} has been booked.".format(instance.doctor.name),
+                "body": "Your appointment with Dr. {} has been booked.".format(doctor_name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -73,11 +77,13 @@ class NotificationAction:
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            doctor_name = instance.doctor.name if instance.doctor.name else ""
             context = {
-                "patient_name": instance.profile.name,
-                "doctor_name": instance.doctor.name,
+                "patient_name": patient_name,
+                "doctor_name": doctor_name,
                 "title": "Appointment Booked",
-                "body": "Patient {} has booked an appointment with you".format(instance.profile.name),
+                "body": "Patient {} has booked an appointment with you".format(patient_name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -85,11 +91,13 @@ class NotificationAction:
             }
             NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.DOCTOR:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            doctor_name = instance.doctor.name if instance.doctor.name else ""
             context = {
-                "patient_name": instance.profile.name,
-                "doctor_name": instance.doctor.name,
+                "patient_name": patient_name,
+                "doctor_name": doctor_name,
                 "title": "Appointment Cancelled",
-                "body": "Patient {} has cancelled the appointment.".format(instance.profile.name),
+                "body": "Patient {} has cancelled the appointment.".format(patient_name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,

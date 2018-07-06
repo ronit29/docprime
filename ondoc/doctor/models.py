@@ -776,6 +776,8 @@ class OpdAppointment(auth_model.TimeStampedModel):
     def send_notification(self, database_instance):
         if database_instance and database_instance.status == self.status:
             return
+        if (not self.user) or (not self.doctor):
+            return
         if self.status == OpdAppointment.ACCEPTED:
             notification_models.NotificationAction.trigger(
                 instance=self,
@@ -783,6 +785,8 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 notification_type=notification_models.NotificationAction.APPOINTMENT_ACCEPTED,
             )
         elif self.status == OpdAppointment.RESCHEDULED_PATIENT:
+            if not self.doctor.user:
+                return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.doctor.user,
@@ -793,12 +797,16 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 user=self.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
             )
+            if not self.doctor.user:
+                return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.doctor.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
             )
         elif self.status == OpdAppointment.CANCELED:
+            if not self.doctor.user:
+                return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.doctor.user,
