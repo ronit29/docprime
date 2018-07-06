@@ -99,6 +99,7 @@ class StaffProfile(models.Model):
     name = models.CharField(max_length=100, blank=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     #user = models.OneToOneField(User, on_delete=models.CASCADE)
+    employee_id = models.CharField(max_length=10, blank=True, null=True)
 
     def __str__(self):
         return self.name
