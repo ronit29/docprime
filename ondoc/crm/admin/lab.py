@@ -15,7 +15,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest)
 from .common import *
-from ondoc.authentication.models import GenericAdmin
+from ondoc.authentication.models import GenericAdmin, User
 from django.contrib.contenttypes.admin import GenericTabularInline
 
 
@@ -258,9 +258,20 @@ class LabCityFilter(SimpleListFilter):
 
 
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
-    list_display = ('name', 'updated_at','onboarding_status','data_status', 'list_created_by', 'get_onboard_link',)
+    list_display = ('name', 'updated_at', 'onboarding_status','data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status', 'onboarding_status',LabCityFilter)
+    list_filter = ('data_status', 'onboarding_status', LabCityFilter)
+
+    readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id')
+
+    def lead_url(self, instance):
+        if instance.id:
+            ref_id = instance.matrix_reference_id
+            if ref_id is not None:
+                html ='''<a href='/admin/lead/doctorlead/%s/change/' target=_blank>Lead Page</a>'''%(ref_id)
+                return mark_safe(html)
+        else:
+            return mark_safe('''<span></span>''')
 
     def get_urls(self):
         urls = super().get_urls()
@@ -329,6 +340,8 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user
+        if not obj.assigned_to:
+            obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
             obj.data_status = 2
         if '_qc_approve' in request.POST:
@@ -345,6 +358,9 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         form.request = request
         form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
         form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
+        form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
+        if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+            form.base_fields['assigned_to'].disabled = True
         return form
 
     form = LabForm
