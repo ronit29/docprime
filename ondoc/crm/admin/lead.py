@@ -166,7 +166,7 @@ class DoctorHospitalInline(admin.StackedInline):
 
 class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
-    search_fields = ['city', ]
+    search_fields = ['city','name']
     list_display = ('city', 'lab', 'name', )
     readonly_fields = ('hospital', 'name', 'lab', "timings", "services", 'city', "address", 'about',)
     exclude = ('source_id', "json", )
@@ -236,7 +236,7 @@ class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
 class DoctorLeadAdmin(ImportExportMixin, admin.ModelAdmin):
     inlines = [DoctorHospitalInline, ]
     formats = (base_formats.XLS, base_formats.XLSX,)
-    search_fields = ['city', ]
+    search_fields = ['city','name' ]
     list_display = ('city', 'lab', "name")
     readonly_fields = ("doctor", "name", "city", "lab",  "services",
                        "specializations", "education", "experience",
