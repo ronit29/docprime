@@ -262,6 +262,17 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', LabCityFilter)
 
+    readonly_fields = ('lead_url',)
+
+    def lead_url(self, instance):
+        if instance.id:
+            ref_id = instance.matrix_reference_id
+            if ref_id is not None:
+                html ='''<a href='/admin/lead/doctorlead/%s/change/' target=_blank>Lead Page</a>'''%(ref_id)
+                return mark_safe(html)
+        else:
+            return mark_safe('''<span></span>''')
+
     def get_urls(self):
         urls = super().get_urls()
         my_urls = [

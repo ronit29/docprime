@@ -188,7 +188,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel):
                          (ONBOARDED, "Onboarded")]
 
     name = models.CharField(max_length=200)
-    gender = models.CharField(max_length=2, default=None, blank=True,
+    gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=[("", "Select"), ("m", "Male"), ("f", "Female"), ("o", "Other")])
     practicing_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)

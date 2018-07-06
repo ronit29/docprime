@@ -2,7 +2,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, DoctorMobile
 from ondoc.diagnostic.models import Lab
 from ondoc.authentication.models import StaffProfile
 from ondoc.api.v1.utils import IsMatrixUser
@@ -41,12 +41,24 @@ class MatrixLead(GenericViewSet):
        staff_profile = staff_profile.first()
 
        if data.get('sub_product') == MatrixLead.DOCTOR:
-           create_lead = Doctor.objects.create(name=data.get('name'), gender=data.get('gender'), created_by=staff_profile.user,
-                                               onboarding_status=Doctor.NOT_ONBOARDED, assigned_to=staff_profile.user)
-           change_url = "/admin/doctor/doctor/%s/change/"%(create_lead.id)
+           doctor_data = {"name": data.get('name'),
+                          'gender': data.get('gender'),
+                          'created_by': staff_profile.user,
+                          'onboarding_status': Doctor.NOT_ONBOARDED,
+                          'assigned_to': staff_profile.user,
+                          'matrix_reference_id': data.get('matrix_reference_id'),
+                          'matrix_lead_id': data.get('matrix_lead_id'),
+           }
+           if data.get('gender') is None:
+               doctor_data.pop('gender', None)
+           create_lead = Doctor.objects.create(**doctor_data)
+           if data.get('phone_number'):
+               DoctorMobile.objects.create(doctor=create_lead, number=data.get('phone_number'), is_primary=False)
+t            change_url = "/admin/doctor/doctor/%s/change/"%(create_lead.id)
        elif data.get('sub_product') == MatrixLead.LAB:
            create_lead = Lab.objects.create(name=data.get('name'), city=data.get('city'), assigned_to=staff_profile.user,
-                                             onboarding_status=Lab.NOT_ONBOARDED, created_by=staff_profile.user)
+                                             onboarding_status=Lab.NOT_ONBOARDED, created_by=staff_profile.user,
+                                            primary_mobile=data.get('phone_number'), matrix_reference_id = data.get('matrix_reference_id'))
            change_url = "/admin/diagnostic/lab/%s/change/"% (create_lead.id)
 
        if create_lead:
