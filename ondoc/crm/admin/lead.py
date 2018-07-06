@@ -176,10 +176,7 @@ class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
         extra_context = extra_context or {}
         extra_context['show_save_and_continue'] = False
         hospital_lead = models.HospitalLead.objects.get(pk=object_id)
-        if not hospital_lead.hospital:
-            extra_context['show_save'] = True
-        else:
-            extra_context['show_save'] = False
+        extra_context['show_save'] = False
         return super().change_view(request, object_id, extra_context=extra_context)
 
     def has_delete_permission(self, request, obj=None):
@@ -265,10 +262,7 @@ class DoctorLeadAdmin(ImportExportMixin, admin.ModelAdmin):
         extra_context = extra_context or {}
         extra_context['show_save_and_continue'] = False
         doctor_lead = models.DoctorLead.objects.get(pk=object_id)
-        if not doctor_lead.doctor:
-            extra_context['show_save'] = True
-        else:
-            extra_context['show_save'] = False
+        extra_context['show_save'] = False
         return super().change_view(request, object_id, extra_context=extra_context)
 
     def services(self, instance):
