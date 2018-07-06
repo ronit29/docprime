@@ -528,7 +528,8 @@ class TimeSlotExtraction(object):
     #     for obj in queryset:
     #         self.form_time_slots(obj.day, obj.start, obj.end, obj.)
 
-    def form_time_slots(self, day, start, end, price=None, is_available=True):
+    def form_time_slots(self, day, start, end, price=None, is_available=True,
+                        deal_price=None, mrp=None, is_doctor=False):
         start = float(start)
         end = float(end)
         # day = obj.day
@@ -554,7 +555,13 @@ class TimeSlotExtraction(object):
                 day_slot, am_pm = self.get_day_slot(temp_h)
                 time_str = self.form_time_string(temp_h, am_pm)
                 self.timing[day]['timing'][day_slot][temp_h] = time_str
-                self.price_available[day][temp_h] = {"price": price, "is_available": is_available}
+                price_available = {"price": price, "is_available": is_available}
+                if is_doctor:
+                    price_available.update({
+                        "mrp": mrp,
+                        "deal_price": deal_price
+                    })
+                self.price_available[day][temp_h] = price_available
             h += 1
 
     def get_day_slot(self, time):
@@ -603,7 +610,13 @@ class TimeSlotExtraction(object):
     def format_data(self, data, day_time, pa):
         data_list = list()
         for k, v in data.items():
-            data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_available": pa[k]["is_available"]})
+            if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
+                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                  "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                  "is_available": pa[k]["is_available"]})
+            else:
+                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                  "is_available": pa[k]["is_available"]})
         format_data = dict()
         format_data['title'] = day_time
         format_data['timing'] = data_list
