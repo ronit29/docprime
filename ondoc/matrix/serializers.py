@@ -14,7 +14,7 @@ class MatrixLeadDataSerializer(serializers.Serializer):
     city = serializers.CharField()
     agent_employee_id = serializers.CharField()
     matrix_lead_id = serializers.IntegerField()
-    matrix_reference_id = serializers.IntegerField()
+    matrix_reference_id = serializers.IntegerField(required=False)
     phone_number = serializers.IntegerField(required=False)
 
     def validate(self, attrs):

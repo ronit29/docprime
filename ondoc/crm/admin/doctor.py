@@ -433,7 +433,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
     search_fields = ['name']
 
-    readonly_fields = ('lead_url',)
+    readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id')
 
     def lead_url(self, instance):
         if instance.id:
