@@ -87,14 +87,11 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                              (2, "Network Hospital")])
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='assoc_hospitals')
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
-<<<<<<< HEAD
     is_appointment_manager = models.BooleanField(verbose_name='Enabled for Managing Appointments', default=False)
-    # hospital_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
-=======
 
-    generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
+
+    # generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
->>>>>>> f7973cdb03283f613610cd6d12f5ec200fb4ef2f
 
     def __str__(self):
         return self.name
@@ -530,14 +527,9 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
-<<<<<<< HEAD
-    # hospital_network_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
-=======
-    generic_hospital_network_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
+
+    # generic_hospital_network_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital_networks')
-
-
->>>>>>> f7973cdb03283f613610cd6d12f5ec200fb4ef2f
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
