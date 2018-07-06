@@ -86,6 +86,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         ids, id_dict = self.extract_appointment_ids(user_permission)
 
         queryset = models.OpdAppointment.objects.filter(id__in=ids)
+        queryset = models.OpdAppointment.objects.filter()
 
         if not queryset:
             return Response([])
