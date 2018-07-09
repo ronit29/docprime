@@ -359,7 +359,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                     time_slot_start = utils.form_time_slot(
                         validated_data.get("start_date"),
                         validated_data.get("start_time"))
-                    test_ids = lab_appointment.lab_test.values_list('id', flat=True)
+                    test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
                     lab_test_queryset = AvailableLabTest.objects.select_related('lab').filter(lab=lab_appointment.lab,
                                                                                               test__in=test_ids)
                     deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
