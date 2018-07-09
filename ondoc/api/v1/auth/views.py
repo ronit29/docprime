@@ -511,7 +511,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['checkSum'] = ''
         pgdata['appointmentId'] = appointment_details.get('id')
-        pgdata['order_id'] = order_id
+        pgdata['orderId'] = order_id
         if user_profile:
             pgdata['name'] = user_profile.name
         else:
