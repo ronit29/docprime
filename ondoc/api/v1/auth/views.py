@@ -450,7 +450,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 appointment_serializer = AppointmentRetrieveSerializer(appointment_details, context={"request": request})
             if product_id == account_models.Order.LAB_PRODUCT_ID:
                 appointment_details.action_rescheduled_patient(new_appointment_details)
-                appointment_serializer = LabAppRescheduleModelSerializer(appointment_details, context={"request": request})
+                appointment_serializer = LabAppointmentRetrieveSerializer(appointment_details, context={"request": request})
             resp['status'] = 1
             resp['data'] = appointment_serializer.data
             resp['required_payment'] = False
