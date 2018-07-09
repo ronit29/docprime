@@ -694,7 +694,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         current_datetime = timezone.now()
 
         if user_type == auth_model.User.DOCTOR and self.time_slot_start > current_datetime:
-            perm_queryset = UserPermission.objects.filter(doctor=self.doctor, hospital=self.hospital, user=request.user).first()
+            perm_queryset = auth_model.GenericAdmin.objects.filter(is_disabled=False, doctor=self.doctor, hospital=self.hospital, user=request.user).first()
             if perm_queryset:
                 if perm_queryset.write_permission:
                     if self.status == self.BOOKED:
