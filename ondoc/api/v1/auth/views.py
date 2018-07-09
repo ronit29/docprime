@@ -347,12 +347,13 @@ class UserAppointmentsViewSet(OndocViewSet):
             response = updated_opd_appointment
             return Response(response)
 
+    @transaction.atomic
     def lab_appointment_update(self, request, lab_appointment, validated_data):
         resp = {}
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELED:
-                updated_lab_appointment = lab_appointment.action_cancelled(lab_appointment)
-                resp = LabAppointmentRetrieveSerializer(updated_lab_appointment, context={"request": request}).data
+                lab_appointment.action_cancelled()
+                resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = utils.form_time_slot(

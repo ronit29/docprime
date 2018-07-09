@@ -492,7 +492,7 @@ class LabAppointment(TimeStampedModel):
         data["user"] = self.user
         data["product_id"] = 1
 
-        cancel_amount = self.get_cancel_amount(data)
+        cancel_amount = self.effective_price
         consumer_account.credit_cancellation(data, cancel_amount)
 
     def action_completed(self):
