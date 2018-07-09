@@ -287,7 +287,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
             "payment_type": data["payment_type"],
-            "lab_test": [x["id"] for x in lab_test_queryset.values("id")]
+            "lab_test": [x["test__id"] for x in lab_test_queryset.values("test__id")]
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address")).first()
