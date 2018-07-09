@@ -197,3 +197,15 @@ class IsMatrixUser(permissions.BasePermission):
         return False
 
 
+def opdappointment_transform(app_data):
+    """A serializer helper to serialize OpdAppointment data"""
+    app_data["deal_price"] = str(app_data["deal_price"])
+    app_data["fees"] = str(app_data["fees"])
+    app_data["effective_price"] = str(app_data["effective_price"])
+    app_data["mrp"] = str(app_data["mrp"])
+    app_data["time_slot_start"] = str(app_data["time_slot_start"])
+    app_data["doctor"] = app_data["doctor"].id
+    app_data["hospital"] = app_data["hospital"].id
+    app_data["profile"] = app_data["profile"].id
+    app_data["user"] = app_data["user"].id
+    app_data["booked_by"] = app_data["booked_by"].id
