@@ -73,15 +73,43 @@ class HospitalSpecialityInline(admin.TabularInline):
 #     extra = 0
 #     can_delete = True
 #     show_change_link = False
+class GenericAdminFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        appnt_manager_flag = self.instance.is_appointment_manager
+        if self.cleaned_data:
+            phone_number = False
+            for data in self.cleaned_data:
+                if data.get('phone_number'):
+                    phone_number = True
+                    break
+            if phone_number:
+                if not appnt_manager_flag:
+                    if not(len(self.deleted_forms) == len(self.cleaned_data)):
+                        raise forms.ValidationError(
+                            "'Enabled for Managing Appointment' should be set if a Admin is Entered.")
+            else:
+                if appnt_manager_flag:
+                    raise forms.ValidationError(
+                        "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
+        else:
+            if appnt_manager_flag:
+                raise forms.ValidationError("An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
+        if len(self.deleted_forms) == len(self.cleaned_data):
+            if appnt_manager_flag:
+                raise forms.ValidationError(
+                    "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
 
 
-class GenericAdminInline(GenericTabularInline):
+
+class GenericAdminInline(admin.TabularInline):
     model = GenericAdmin
     extra = 0
     can_delete = True
     show_change_link = False
+    formset = GenericAdminFormSet
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
+    exclude = ('hospital_network', 'is_doc_admin', 'doctor')
 
 
 class HospitalForm(FormCleanMixin):
@@ -99,7 +127,6 @@ class HospitalForm(FormCleanMixin):
             return None
         return data
 
-
     def validate_qc(self):
         qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
             'registration_number':'req','building':'req','locality':'req','city':'req','state':'req',
@@ -116,6 +143,7 @@ class HospitalForm(FormCleanMixin):
 class HospCityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'city'
+
     def lookups(self, request, model_admin):
         cities = set([(c['city'].upper(),c['city'].upper()) if(c.get('city')) else ('','') for c in Hospital.objects.all().values('city')])
         return cities

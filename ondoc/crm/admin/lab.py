@@ -194,13 +194,13 @@ class LabDoctorAvailabilityInline(admin.TabularInline):
     show_change_link = False
 
 
-class GenericAdminInline(GenericTabularInline):
-    model = GenericAdmin
-    extra = 0
-    can_delete = True
-    show_change_link = False
-    readonly_fields = ['user']
-    verbose_name_plural = "Admins"
+# class GenericAdminInline(admin.TabularInline):
+#     model = GenericAdmin
+#     extra = 0
+#     can_delete = True
+#     show_change_link = False
+#     readonly_fields = ['user']
+#     verbose_name_plural = "Admins"
 
 
 class LabCertificationInline(admin.TabularInline):
@@ -224,13 +224,11 @@ class LabForm(FormCleanMixin):
         exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
                    'radiology_deal_price_percentage', )
 
-
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
         if data == '':
             return None
         return data
-
 
     def validate_qc(self):
         qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
@@ -248,6 +246,7 @@ class LabForm(FormCleanMixin):
 class LabCityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'city'
+
     def lookups(self, request, model_admin):
         cities = set([(c['city'].upper(),c['city'].upper()) if(c.get('city')) else ('','') for c in Lab.objects.values('city')])
         return cities
@@ -258,7 +257,9 @@ class LabCityFilter(SimpleListFilter):
 
 
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
+
     list_display = ('name', 'updated_at', 'onboarding_status','data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
+
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', LabCityFilter)
 
@@ -366,14 +367,13 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     form = LabForm
     search_fields = ['name']
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, GenericAdminInline]
+        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
 
     class Media:
         js = ('js/admin/ondoc.js',)
-
 
 
 class LabTestAdmin(ImportMixin, VersionAdmin):

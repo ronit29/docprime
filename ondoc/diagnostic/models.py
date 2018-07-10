@@ -1,7 +1,8 @@
 from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User, UserPermission, GenericAdmin
+from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User,
+                                         UserPermission, GenericAdmin, LabUserPermission)
 from ondoc.doctor.models import Hospital
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from ondoc.account import models as account_model
@@ -10,7 +11,7 @@ from datetime import timedelta
 from django.db.models import F, Sum, When, Case, Q
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
-from ondoc.payout import models as payout_model
+from ondoc.payout.models import Outstanding
 from ondoc.api.v1.utils import get_start_end_datetime
 import decimal
 import math
@@ -61,12 +62,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel):
                                                          decimal_places=2)
     radiology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
                                                        decimal_places=2)
-    generic_lab_admins = GenericRelation(GenericAdmin, related_query_name='manageable_labs')
+
+    # generic_lab_admins = GenericRelation(GenericAdmin, related_query_name='manageable_labs')
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab')
     matrix_lead_id = models.BigIntegerField(blank=True, null=True)
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     is_home_pickup_available = models.BigIntegerField(null=True, blank=True)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
 
 
     def __str__(self):
@@ -228,8 +231,10 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
-    generic_lab_network_admins = GenericRelation(GenericAdmin, related_query_name='manageable_lab_networks')
+
+    # generic_lab_network_admins = GenericRelation(GenericAdmin, related_query_name='manageable_lab_networks')
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab_networks')
+
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
@@ -440,6 +445,7 @@ class LabAppointment(TimeStampedModel):
                                   on_delete=models.DO_NOTHING)
     is_home_pickup = models.BooleanField(default=False)
     address = JSONField(blank=True, null=True)
+    outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
 
     def allowed_action(self, user_type):
         allowed = []
@@ -480,7 +486,7 @@ class LabAppointment(TimeStampedModel):
         self.status = self.ACCEPTED
         self.save()
 
-    def action_cancelled(self):
+    def action_cancelled(self, refund_flag):
         self.status = self.CANCELED
         self.save()
 
@@ -494,6 +500,8 @@ class LabAppointment(TimeStampedModel):
 
         cancel_amount = self.effective_price
         consumer_account.credit_cancellation(data, cancel_amount)
+        if refund_flag:
+            consumer_account.debit_refund(data)
 
     def action_completed(self):
         self.status = self.COMPLETED
@@ -501,16 +509,16 @@ class LabAppointment(TimeStampedModel):
         if self.payment_type != OpdAppointment.INSURANCE:
             admin_obj, out_level = self.get_billable_admin_level()
             app_outstanding_fees = self.lab_payout_amount()
-            payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+            Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
 
         # if self.payment_type != self.INSURANCE:
-        #     payout_model.Outstanding.create_outstanding(self)
+        #     Outstanding.create_outstanding(self)
 
     def get_billable_admin_level(self):
         if self.lab.network and self.lab.network.is_billing_enabled:
-            return self.lab.network, payout_model.Outstanding.LAB_NETWORK_LEVEL
+            return self.lab.network, Outstanding.LAB_NETWORK_LEVEL
         else:
-            return self.lab, payout_model.Outstanding.LAB_LEVEL
+            return self.lab, Outstanding.LAB_LEVEL
 
     def lab_payout_amount(self):
         amount = 0
@@ -526,6 +534,10 @@ class LabAppointment(TimeStampedModel):
         month = req_data.get("month")
         year = req_data.get("year")
         payment_type = req_data.get("payment_type")
+        out_level = req_data.get("outstanding_level")
+        admin_id = req_data.get("admin_id")
+        out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
+                                             outstanding_month=month, outstanding_year=year)
         start_date_time, end_date_time = get_start_end_datetime(month, year)
         lab_data = UserPermission.get_billable_doctor_hospital(user)
         lab_list = list()
@@ -540,12 +552,12 @@ class LabAppointment(TimeStampedModel):
                                                   time_slot_start__gte=start_date_time,
                                                   time_slot_start__lte=end_date_time,
                                                   payment_type__in=payment_type,
-                                                  lab__in=lab_list))
+                                                  lab__in=lab_list, outstanding=out_obj))
         if payment_type != OpdAppointment.INSURANCE:
             tcp_condition = Case(When(payment_type=OpdAppointment.COD, then=F("effective_price")),
                                  When(~Q(payment_type=OpdAppointment.COD), then=0))
             tcs_condition = Case(When(payment_type=OpdAppointment.COD, then=F("agreed_price")),
-                                  When(~Q(payment_type=OpdAppointment.COD), then=0))
+                                 When(~Q(payment_type=OpdAppointment.COD), then=0))
             tpf_condition = Case(When(payment_type=OpdAppointment.PREPAID, then=F("agreed_price")),
                                  When(~Q(payment_type=OpdAppointment.PREPAID), then=0))
             queryset = queryset.values("lab").annotate(total_cash_payment=Sum(tcp_condition),
@@ -559,22 +571,54 @@ class LabAppointment(TimeStampedModel):
         month = req_data.get("month")
         year = req_data.get("year")
         payment_type = req_data.get("payment_type")
+        out_level = req_data.get("outstanding_level")
+        admin_id = req_data.get("admin_id")
         start_date_time, end_date_time = get_start_end_datetime(month, year)
-        lab_data = UserPermission.get_billable_doctor_hospital(user)
-        lab_list = list()
-        for data in lab_data:
-            if data.get("lab"):
-                lab_list.append(data["lab"])
+
+        query_filter = dict()
+        query_filter['user'] = user
+        query_filter['write_permission'] = True
+        query_filter['permission_type'] = UserPermission.BILLINNG
+        if out_level == Outstanding.LAB_NETWORK_LEVEL:
+            query_filter["lab_network"] = admin_id
+        elif out_level == Outstanding.LAB_LEVEL:
+            query_filter["lab"] = admin_id
+
+        permission = LabUserPermission.objects.filter(**query_filter).exists()
+
         if payment_type in [OpdAppointment.COD, OpdAppointment.PREPAID]:
             payment_type = [OpdAppointment.COD, OpdAppointment.PREPAID]
         elif payment_type in [OpdAppointment.INSURANCE]:
             payment_type = [OpdAppointment.INSURANCE]
-        queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
-                                                  time_slot_start__gte=start_date_time,
-                                                  time_slot_start__lte=end_date_time,
-                                                  payment_type__in=payment_type,
-                                                  lab__in=lab_list))
+
+        queryset = None
+
+        if permission:
+            out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
+                                                 outstanding_month=month, outstanding_year=year)
+
+            queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+                                                      time_slot_start__gte=start_date_time,
+                                                      time_slot_start__lte=end_date_time,
+                                                      payment_type__in=payment_type,
+                                                      outstanding=out_obj))
+
         return queryset
+        # lab_data = UserPermission.get_billable_doctor_hospital(user)
+        # lab_list = list()
+        # for data in lab_data:
+        #     if data.get("lab"):
+        #         lab_list.append(data["lab"])
+        # if payment_type in [OpdAppointment.COD, OpdAppointment.PREPAID]:
+        #     payment_type = [OpdAppointment.COD, OpdAppointment.PREPAID]
+        # elif payment_type in [OpdAppointment.INSURANCE]:
+        #     payment_type = [OpdAppointment.INSURANCE]
+        # queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+        #                                           time_slot_start__gte=start_date_time,
+        #                                           time_slot_start__lte=end_date_time,
+        #                                           payment_type__in=payment_type,
+        #                                           lab__in=lab_list))
+        # return queryset
 
     def __str__(self):
         return self.profile.name + ', ' + self.lab.name

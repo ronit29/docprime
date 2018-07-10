@@ -1,20 +1,17 @@
 from django.contrib.gis.db import models
 from django.contrib.gis import forms
 from reversion.admin import VersionAdmin
-from django.core.exceptions import FieldDoesNotExist
-import datetime
-from django.forms.models import BaseFormSet
-from django.db.models import Q
+from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned
 from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
 from django.shortcuts import render
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
-
+from ondoc.authentication.models import GenericAdmin
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience, MedicalConditionSpecialization,
-    DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
+    DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
     DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language)
 from .filters import RelatedDropdownFilter
 from ondoc.authentication.models import User
@@ -77,6 +74,7 @@ class DoctorHospitalForm(forms.ModelForm):
         if mrp and mrp < fees:
             raise forms.ValidationError("MRP cannot be less than fees")
 
+
 class DoctorHospitalFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -104,6 +102,9 @@ class DoctorHospitalInline(admin.TabularInline):
     show_change_link = False
     autocomplete_fields = ['hospital']
     readonly_fields = ['deal_price']
+
+    def get_queryset(self, request):
+        return super(DoctorHospitalInline, self).get_queryset(request).select_related('doctor', 'hospital')
 
 
 class DoctorLanguageFormSet(forms.BaseInlineFormSet):
@@ -165,7 +166,6 @@ class DoctorExperienceForm(forms.ModelForm):
         end = cleaned_data.get("end_year")
         if start and end and start >= end:
             raise forms.ValidationError("Start Year should be less than end Year")
-
 
 
 class DoctorExperienceFormSet(forms.BaseInlineFormSet):
@@ -236,6 +236,7 @@ class DoctorImageInline(admin.TabularInline):
     # class Meta:
     #     Model = DoctorDocument
 
+
 class DoctorDocumentFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -278,10 +279,7 @@ class DoctorDocumentInline(admin.TabularInline):
 class DoctorMobileForm(forms.ModelForm):
     number = forms.CharField(required=True)
     is_primary = forms.BooleanField(required=False)
-    #def is_valid(self):
-    #    pass
-    # def clean(self):
-    #    pass
+
 
 class DoctorMobileFormSet(forms.BaseInlineFormSet):
     def clean(self):
@@ -310,7 +308,7 @@ class DoctorMobileInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-    fields = ['number','is_primary']
+    fields = ['number', 'is_primary']
 
 
 class DoctorEmailForm(forms.ModelForm):
@@ -371,9 +369,11 @@ class DoctorForm(FormCleanMixin):
             return None
         return data
 
+
 class CityFilter(SimpleListFilter):
     title = 'city'
     parameter_name = 'hospitals__city'
+
     def lookups(self, request, model_admin):
         cities = set([(c['hospitals__city'].upper(), c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('','') for c in Doctor.objects.all().values('hospitals__city')])
         return cities
@@ -393,8 +393,40 @@ class DoctorSpecializationInline(admin.TabularInline):
     autocomplete_fields = ['specialization']
 
 
+class GenericAdminFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+
+
+class GenericAdminInline(admin.TabularInline):
+    model = GenericAdmin
+    extra = 0
+    formset = GenericAdminFormSet
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+    exclude = ('hospital_network', 'super_user_permission')
+    verbose_name_plural = "Admins"
+
+    def get_queryset(self, request):
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj=obj, **kwargs)
+        if not request.POST:
+            if obj is not None:
+                try:
+                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(assoc_doctors=obj,
+                                                                                            is_appointment_manager=False)
+                except MultipleObjectsReturned:
+                    pass
+
+        return formset
+
+
 class DoctorResource(resources.ModelResource):
     city = fields.Field()
+
     class Meta:
         model = Doctor
         fields = ('id', 'name', 'city','gender', 'onboarding_status', 'data_status')
@@ -428,7 +460,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         DoctorExperienceInline,
         DoctorMedicalServiceInline,
         DoctorImageInline,
-        DoctorDocumentInline
+        DoctorDocumentInline,
+        GenericAdminInline
     ]
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
     search_fields = ['name']
@@ -511,6 +544,35 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
                 pass
 
         formset.save()
+
+    def save_related(self, request, form, formsets, change):
+        super(type(self), self).save_related(request, form, formsets, change)
+        # now you have all objects in the database
+        doctor = form.instance
+        doc_hosp_form_change = False
+        gen_admin_form_change = False
+        doc_hosp_new_len = doc_hosp_del_len = gen_admin_new_len = gen_admin_del_len = 0
+        for formset in formsets:
+            if isinstance(formset, DoctorHospitalFormSet):
+                for form in formset.forms:
+                    if form.has_changed():
+                        doc_hosp_form_change = True
+                        break
+                doc_hosp_new_len = len(formset.new_objects)
+                doc_hosp_del_len = len(formset.deleted_objects)
+            if isinstance(formset, GenericAdminFormSet):
+                for form in formset.forms:
+                    if form.has_changed():
+                        gen_admin_form_change = True
+                        break
+                gen_admin_new_len = len(formset.new_objects)
+                gen_admin_del_len = len(formset.deleted_objects)
+
+        if doctor is not None:
+            if ((doc_hosp_form_change or doc_hosp_new_len>0 or doc_hosp_del_len>0) or
+                    (gen_admin_form_change or gen_admin_new_len>0 or gen_admin_del_len>0)):
+                    GenericAdmin.create_admin_permissions(doctor)
+
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
