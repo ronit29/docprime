@@ -75,18 +75,33 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             return models.OpdAppointment.objects.filter(user=user)
 
     def list(self, request):
+        user = request.user
+        # x = (models.OpdAppointment.objects.filter(doctor__generic_admin__user=user, hospital__generic_admin__user=user))
 
-        user_permission = (auth_models.UserPermission.objects.
-                           filter(user=request.user, doctor__appointments__hospital=F('hospital'),
-                                  doctor__appointments__doctor=F('doctor')).
-                           prefetch_related('doctor__appointments', 'doctor', 'hospital', 'user').
-                           values('permission_type', 'read_permission', 'write_permission', 'delete_permission',
-                                  'doctor__appointments__id'))
+        queryset = models.OpdAppointment.objects.filter(Q(doctor__manageable_doctors__user=user,
+                                                        doctor__manageable_doctors__hospital=F('hospital'),
+                                                        doctor__manageable_doctors__is_disabled=False) |
+                                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
+                                                          hospital__manageable_hospitals__user=user,
+                                                          hospital__manageable_hospitals__is_disabled=False)
+                                                        )
 
-        ids, id_dict = self.extract_appointment_ids(user_permission)
+        # queryset = models.OpdAppointment.objects.filter((Q(doctor__manageable_doctors__user=user,
+        #                                                    doctor__manageable_doctors__is_disabled=False)) |
+        #                                          (Q(hospital__manageable_hospitals__doctor__isnull=True, hospital__manageable_hospitals__user=user,
+        #                                             doctor__manageable_doctors__is_disabled=False)))
 
-        queryset = models.OpdAppointment.objects.filter(id__in=ids)
-        queryset = models.OpdAppointment.objects.filter()
+        # user_permission = (auth_models.UserPermission.objects.
+        #                    filter(user=request.user, doctor__appointments__hospital=F('hospital'),
+        #                           doctor__appointments__doctor=F('doctor')).
+        #                    prefetch_related('doctor__appointments', 'doctor', 'hospital', 'user').
+        #                    values('permission_type', 'read_permission', 'write_permission', 'delete_permission',
+        #                           'doctor__appointments__id'))
+
+        # ids, id_dict = self.extract_appointment_ids(user_permission)
+
+        # queryset = models.OpdAppointment.objects.filter(id__in=ids)
+        # queryset = models.OpdAppointment.objects.filter()
 
         if not queryset:
             return Response([])
@@ -104,7 +119,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.filter(hospital_id=hospital_id)
 
         if range == 'previous':
-            queryset = queryset.filter(status__in = [models.OpdAppointment.COMPLETED,models.OpdAppointment.CANCELED]).order_by('-time_slot_start')
+            queryset = queryset.filter(status__in=[models.OpdAppointment.COMPLETED,models.OpdAppointment.CANCELED]).order_by('-time_slot_start')
         elif range == 'upcoming':
             today = datetime.date.today()
             queryset = queryset.filter(
@@ -119,8 +134,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.order_by('-time_slot_start')
 
         queryset = paginate_queryset(queryset, request)
-        whole_queryset = self.extract_whole_queryset(queryset, id_dict)
-        serializer = serializers.OpdAppointmentSerializer(queryset, many=True, context={'request':request})
+        # whole_queryset = self.extract_whole_queryset(queryset, id_dict)
+        serializer = serializers.OpdAppointmentSerializer(queryset, many=True, context={'request': request})
         # serializer = serializers.OpdAppointmentPermissionSerializer(whole_queryset, many=True)
         return Response(serializer.data)
 
@@ -439,7 +454,8 @@ class DoctorHospitalView(mixins.ListModelMixin,
         user = request.user
         queryset = self.get_queryset().values('hospital').annotate(min_fees=Min('fees'))
 
-        serializer = serializers.DoctorHospitalListSerializer(queryset, many=True)
+        serializer = serializers.DoctorHospitalListSerializer(queryset, many=True,
+                                                              context={"request": request})
         return Response(serializer.data)
 
     def retrieve(self, request, pk):
@@ -451,7 +467,8 @@ class DoctorHospitalView(mixins.ListModelMixin,
 
         schedule_serializer = serializers.DoctorHospitalScheduleSerializer(queryset, many=True)
         hospital_queryset = queryset.first().hospital
-        hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset)
+        hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset,
+                                                                  context={"request": request})
 
         temp_data = dict()
         temp_data['hospital'] = hospital_serializer.data

@@ -432,6 +432,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 class HospitalModelSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
     lng = serializers.SerializerMethodField()
+    hospital_thumbnail = serializers.SerializerMethodField()
 
     address = serializers.SerializerMethodField()
 
@@ -463,9 +464,16 @@ class HospitalModelSerializer(serializers.ModelSerializer):
             return loc.x
         return None
 
+    def get_hospital_thumbnail(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return obj.get_thumbnail()
+        return request.build_absolute_uri(obj.get_thumbnail())
+
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'operational_since', 'lat', 'lng','address', 'registration_number','building', 'sublocality', 'locality', 'city')
+        fields = ('id', 'name', 'operational_since', 'lat', 'lng','address', 'registration_number',
+                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', )
 
 
 class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
@@ -498,7 +506,7 @@ class DoctorHospitalListSerializer(serializers.Serializer):
 
     def get_hospital(self, obj):
         queryset = Hospital.objects.get(pk=obj['hospital'])
-        serializer = HospitalModelSerializer(queryset)
+        serializer = HospitalModelSerializer(queryset, context=self.context)
         return serializer.data
 
 

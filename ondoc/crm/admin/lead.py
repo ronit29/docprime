@@ -70,15 +70,15 @@ class DoctorLeadResource(resources.ModelResource):
         # exclude = ('json', )
 
     def before_save_instance(self, instance, using_transactions, dry_run):
-        if dry_run:
-            return True
+        # if dry_run:
+        #     return True
         if isinstance(instance.json, str):
             instance.json = json.loads(instance.json)
         super().before_save_instance(instance, using_transactions, dry_run)
 
     def after_save_instance(self, instance, using_transactions, dry_run):
-        if dry_run:
-            return
+        # if dry_run:
+        #     return
         data = instance.json
         clinic_urls = list(
             map(lambda x: data.get("LinkedClinics").get(x)[2].get("Clinic URL"), data.get("LinkedClinics")))
@@ -99,8 +99,8 @@ class DoctorLeadExportResource(resources.ModelResource):
 
     class Meta:
         model = models.DoctorLead
-        fields = ('id', 'name', 'city', 'specializations', 'address', 'google_address', )
-        export_order = ('id', 'specializations', 'name',  'address', 'city', 'google_address', )
+        fields = ('id', 'source_id', 'name', 'city', 'specializations', 'address', 'google_address', )
+        export_order = ('id', 'source_id', 'specializations', 'name',  'address', 'city', 'google_address', )
 
 
 class DoctorHospitalInline(admin.StackedInline):
@@ -166,7 +166,7 @@ class DoctorHospitalInline(admin.StackedInline):
 
 class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
-    search_fields = ['city', ]
+    search_fields = ['city','lab']
     list_display = ('city', 'lab', 'name', )
     readonly_fields = ('hospital', 'name', 'lab', "timings", "services", 'city', "address", 'about',)
     exclude = ('source_id', "json", )
@@ -236,7 +236,7 @@ class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
 class DoctorLeadAdmin(ImportExportMixin, admin.ModelAdmin):
     inlines = [DoctorHospitalInline, ]
     formats = (base_formats.XLS, base_formats.XLSX,)
-    search_fields = ['city', ]
+    search_fields = ['city','lab' ]
     list_display = ('city', 'lab', "name")
     readonly_fields = ("doctor", "name", "city", "lab",  "services",
                        "specializations", "education", "experience",
