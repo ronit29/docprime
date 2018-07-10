@@ -408,6 +408,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         availability = []
         for key, group in groupby(hospitals, lambda x: x['hospital_id']):
             hospital_groups = list(group)
+            hospital_groups = sorted(hospital_groups, key=itemgetter("discounted_fees"))
             hospital = hospital_groups[0]
             timings = convert_timings(hospital_groups)
             hospital.update({

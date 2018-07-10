@@ -29,10 +29,10 @@ class DoctorSearchHelper:
             )
         if self.query_params.get("min_fees"):
             filtering_params.append(
-                "fees>={}".format(str(self.query_params.get("min_fees"))))
+                "deal_price>={}".format(str(self.query_params.get("min_fees"))))
         if self.query_params.get("max_fees"):
             filtering_params.append(
-                "fees<={}".format(str(self.query_params.get("max_fees"))))
+                "deal_price<={}".format(str(self.query_params.get("max_fees"))))
         if self.query_params.get("is_female"):
             filtering_params.append(
                 "gender='f'"
@@ -61,7 +61,7 @@ class DoctorSearchHelper:
             if self.query_params.get('sort_on') == 'experience':
                 order_by_field = 'practicing_since'
             if self.query_params.get('sort_on') == 'fees':
-                order_by_field = "fees"
+                order_by_field = "deal_price"
                 rank_by = "rank_fees=1"
         return order_by_field, rank_by
 
@@ -69,9 +69,10 @@ class DoctorSearchHelper:
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_hospital_id " \
-                       "FROM (SELECT Row_number() OVER( partition BY dh.doctor_id ORDER BY dh.fees ASC) rank_fees, " \
+                       "FROM (SELECT Row_number() OVER( partition BY dh.doctor_id " \
+                       "ORDER BY dh.deal_price ASC) rank_fees, " \
                        "Row_number() OVER( partition BY dh.doctor_id ORDER BY " \
-                       "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) ASC) rank_distance, " \
+                       "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location),dh.deal_price ASC) rank_distance, " \
                        "St_distance(St_setsrid(St_point(%s, %s), 4326), h.location) distance, d.id as doctor_id, " \
                        "dh.id as doctor_hospital_id,  " \
                        "dh.hospital_id as hospital_id FROM   doctor d " \
@@ -111,7 +112,7 @@ class DoctorSearchHelper:
     def get_doctor_fees(self, doctor, doctor_availability_mapping):
         for doctor_hospital in doctor.availability.all():
             if doctor_hospital.id == doctor_availability_mapping[doctor.id]:
-                return doctor_hospital.fees
+                return doctor_hospital.deal_price
         return None
 
     def prepare_search_response(self, doctor_data, doctor_search_result, request):
@@ -124,7 +125,7 @@ class DoctorSearchHelper:
                                 doctor_hospital.hospital_id == doctor_hospital_mapping[doctor_hospital.doctor_id]]
             serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True, context={"request": request})
             filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
-            min_fees = min([data.get("fees") for data in serializer.data if data.get("fees")])
+            min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
             if not serializer.data:
                 hospitals = []
             else:

@@ -223,65 +223,11 @@ class OTPConfirmationSerializer(serializers.Serializer):
 
 
 class UpdateStatusSerializer(serializers.Serializer):
-    # DOCTOR_ALLOWED_CHOICES = [OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]
-    # PATIENT_ALLOWED_CHOICES = [OpdAppointment.CANCELED, OpdAppointment.RESCHEDULED]
-    # STATUS_CHOICES = ((OpdAppointment.ACCEPTED, "Accepted"),
-    #                   (OpdAppointment.RESCHEDULED, "Rescheduled"),
-    #                   (OpdAppointment.REJECTED, "Rejected"))
-    # status = serializers.ChoiceField(choices=STATUS_CHOICES)
-    #patient_status = serializers.ChoiceField(choices=OpdAppointment.PATIENT_STATUS_CHOICES, required=False)
     status = serializers.IntegerField()
     time_slot_start = serializers.DateTimeField(required=False)
     time_slot_end = serializers.DateTimeField(required=False)
     start_date = serializers.CharField(required=False)
     start_time = serializers.FloatField(required=False)
-
-        
-
-        # if user_type == User.DOCTOR:
-        #     if opd_appointment.time_slot_start<current_datetime && opd_appointment.status == OpdAppointment.CREATED:
-        #        allowed = [OpdAppointment.ACCEPTED,OpdAppointment.RESCHEDULED_BY_DOCTOR]
-
-        #     elif opd_appointment.time_slot_start<current_datetime && opd_appointment.status == OpdAppointment.RESCHEDULED:
-        #        allowed = [OpdAppointment.ACCEPTED]
-
-        #     elif opd_appointment.time_slot_start<current_datetime && opd_appointment.status == OpdAppointment.ACCEPTED:
-        #        allowed = [OpdAppointment.RESCHEDULED]
-
-        # if user_type == User.CONSUMER:
-        #     if opd_appointment.status in 
-        #        allowed = [OpdAppointment.RESCHEDULED, OpdAppointment.CANCELED]
-
-        #     if opd_appointment
-        #     if opd_appointment.time_slot_start<current_datetime && opd_appointment.status [OpdAppointment.CREATED, OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED]:
-        #         allowed = [OpdAppointment.ACCEPTED,OpdAppointment.RESCHEDULED]
-
-
-        #     if status in (OpdAppointment.CREATED  )
-
-
-        # if request.user.user_type == User.DOCTOR and not (data.get('status') in self.DOCTOR_ALLOWED_CHOICES):
-        #     raise serializers.ValidationError("Not a valid status for the user.")
-        # if request.user.user_type == User.CONSUMER and (not data.get('status') in self.PATIENT_ALLOWED_CHOICES):
-        #     raise serializers.ValidationError("Not a valid status for the user.")
-        # if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.ACCEPTED and (
-        #         current_datetime > opd_appointment.time_slot_start):
-        #     raise serializers.ValidationError("Can not accept appointment after time slot has passed.")
-        # if request.user.user_type == User.DOCTOR and data.get('status') == OpdAppointment.RESCHEDULED and (
-        #         current_datetime > opd_appointment.time_slot_start):
-        #     raise serializers.ValidationError("Can not reschedule appointment after time slot has passed.")
-        # if request.user.user_type == User.CONSUMER and data.get('status') == OpdAppointment.RESCHEDULED:
-        #     if not (data.get('time_slot_start')):
-        #         raise serializers.ValidationError("time_slot_start is required.")
-        #     if not (data.get('time_slot_end')):
-        #         raise serializers.ValidationError("time_slot_end is required.")
-        #     if (not DoctorHospital
-        #             .objects.filter(doctor=opd_appointment.doctor, hospital=opd_appointment.hospital)
-        #             .filter(day=data.get('time_slot_start').weekday(), start__lte=data.get("time_slot_start").hour,
-        #                     end__gte=data.get("time_slot_end").hour).exists()):
-        #         raise serializers.ValidationError("Doctor is not available.")
-
-        # return data
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
@@ -537,7 +483,7 @@ class PrescriptionFileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PrescriptionFile
-        fields = "__all__"
+        fields = ('prescription', 'file')
 
 
 class PrescriptionFileDeleteSerializer(serializers.Serializer):
@@ -599,8 +545,12 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
     class Meta:
         model = Doctor
-        exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
-                   'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
+        # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
+        #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
+        fields = ('about', 'additional_details', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
+                  'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
+                  'thumbnail')
+
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
