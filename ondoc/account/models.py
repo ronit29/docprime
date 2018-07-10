@@ -142,6 +142,7 @@ class PgTransaction(TimeStampedModel):
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
     reference_id = models.PositiveIntegerField(blank=True, null=True)
     order_id = models.PositiveIntegerField()
+    order_no = models.PositiveIntegerField(blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
     payment_mode = models.CharField(max_length=50)
