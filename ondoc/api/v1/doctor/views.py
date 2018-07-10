@@ -454,7 +454,8 @@ class DoctorHospitalView(mixins.ListModelMixin,
         user = request.user
         queryset = self.get_queryset().values('hospital').annotate(min_fees=Min('fees'))
 
-        serializer = serializers.DoctorHospitalListSerializer(queryset, many=True)
+        serializer = serializers.DoctorHospitalListSerializer(queryset, many=True,
+                                                              context={"request": request})
         return Response(serializer.data)
 
     def retrieve(self, request, pk):
@@ -466,7 +467,8 @@ class DoctorHospitalView(mixins.ListModelMixin,
 
         schedule_serializer = serializers.DoctorHospitalScheduleSerializer(queryset, many=True)
         hospital_queryset = queryset.first().hospital
-        hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset)
+        hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset,
+                                                                  context={"request": request})
 
         temp_data = dict()
         temp_data['hospital'] = hospital_serializer.data
