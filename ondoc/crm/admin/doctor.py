@@ -1,6 +1,6 @@
 from django.contrib.gis.db import models
 from django.contrib.gis import forms
-from reversion.admin import VersionAdmin
+from reversion.admin import VersionAdmin, admin
 from django.core.exceptions import FieldDoesNotExist
 import datetime
 from django.forms.models import BaseFormSet
@@ -433,7 +433,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
     search_fields = ['name']
 
-    readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id')
+    readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id', 'about')
 
     def lead_url(self, instance):
         if instance.id:
@@ -539,6 +539,100 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     class Media:
         js = ('js/admin/ondoc.js',)
+
+
+class AboutDoctorForm(FormCleanMixin):
+    about = forms.CharField(widget=forms.Textarea, required=False)
+
+
+class ReadOnlySpecializationInline(admin.TabularInline):
+    model = DoctorSpecialization
+    can_delete = False
+    readonly_fields = ['doctor', 'specialization']
+
+    def has_add_permission(self, request):
+        return False
+
+
+class ReadOnlyDoctorQualificationInline(admin.TabularInline):
+    model = DoctorQualification
+    can_delete = False
+    readonly_fields = ['doctor', 'qualification', 'specialization', 'college', 'passing_year']
+
+    def has_add_permission(self, request):
+        return False
+
+
+class ReadOnlyDoctorHospitalInline(admin.TabularInline):
+    model = DoctorHospital
+    can_delete = False
+    readonly_fields = ['doctor', 'hospital', 'day', 'start', 'end', 'fees', 'deal_price', 'mrp',
+                       'followup_duration', 'followup_charges']
+
+    def has_add_permission(self, request):
+        return False
+
+
+class ReadOnlyDoctorLanguageInline(admin.TabularInline):
+    model = DoctorLanguage
+    can_delete = False
+    readonly_fields = ['doctor', 'language']
+
+    def has_add_permission(self, request):
+        return False
+
+
+class ReadOnlyDoctorAwardInline(admin.TabularInline):
+    model = DoctorAward
+    can_delete = False
+    readonly_fields = ['doctor', 'name', 'year']
+
+    def has_add_permission(self, request):
+        return False
+
+
+class ReadOnlyDoctorAssociationInline(admin.TabularInline):
+    model = DoctorAssociation
+    can_delete = False
+    readonly_fields = ['doctor', 'name']
+
+    def has_add_permission(self, request):
+        return False
+
+
+class ReadOnlyDoctorExperienceInline(admin.TabularInline):
+    model = DoctorExperience
+    can_delete = False
+    readonly_fields = ['doctor', 'hospital', 'start_year', 'end_year']
+
+    def has_add_permission(self, request):
+        return False
+
+
+class AboutDoctorAdmin(admin.ModelAdmin):
+    form = AboutDoctorForm
+    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code',
+               'additional_details', 'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
+               'online_consultation_fees', 'matrix_lead_id', 'matrix_reference_id', 'assigned_to', ]
+    search_fields = ['name']
+    inlines = [ReadOnlySpecializationInline,
+               ReadOnlyDoctorQualificationInline,
+               ReadOnlyDoctorHospitalInline,
+               ReadOnlyDoctorLanguageInline,
+               ReadOnlyDoctorAwardInline,
+               ReadOnlyDoctorAssociationInline,
+               ReadOnlyDoctorExperienceInline
+               ]
+    readonly_fields = ('name', 'gender', 'practicing_since', 'raw_about', 'license', 'onboarding_status')
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
+
+
 
 class SpecializationResource(resources.ModelResource):
 
