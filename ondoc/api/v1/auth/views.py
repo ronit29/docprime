@@ -727,60 +727,64 @@ class TransactionViewSet(viewsets.GenericViewSet):
         LAB_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "lab/%s/book?error_code=%s"
         OPD_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "opd/doctor/%s/%s/bookdetails?error_code=%s"
         ERROR_REDIRECT_URL = request.build_absolute_uri("/") + "error?error_code=%s"
-
-        data = request.data
-        # Commenting below for testing
-        coded_response = data.get("response")
-        if isinstance(coded_response, list):
-            coded_response = coded_response[0]
-        coded_response += "=="
-        decoded_response = base64.b64decode(coded_response).decode()
-        response = json.loads(decoded_response)
-
-        # For testing only
-        # response = request.data
-        appointment_obj = None
+        REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
 
         try:
-            pg_resp_code = int(response.get('statusCode'))
+            data = request.data
+            # Commenting below for testing
+            coded_response = data.get("response")
+            if isinstance(coded_response, list):
+                coded_response = coded_response[0]
+            coded_response += "=="
+            decoded_response = base64.b64decode(coded_response).decode()
+            response = json.loads(decoded_response)
+
+            # For testing only
+            # response = request.data
+            appointment_obj = None
+
+            try:
+                pg_resp_code = int(response.get('statusCode'))
+            except:
+                pg_resp_code = None
+
+            order_obj = Order.objects.filter(pk=response.get("orderId")).first()
+            if pg_resp_code == 1:
+                if not order_obj:
+                    REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+                else:
+                    response_data = self.form_pg_transaction_data(response, order_obj)
+                    try:
+                        pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                    except:
+                        pass
+
+                    try:
+                        appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
+                    except:
+                        pass
+
+                    if int(response_data["product_id"]) == account_models.Order.LAB_PRODUCT_ID:
+                        if appointment_obj:
+                            LAB_REDIRECT_URL += "/" + str(appointment_obj.id)
+                        REDIRECT_URL = LAB_REDIRECT_URL
+                    elif int(response_data["product_id"]) == account_models.Order.DOCTOR_PRODUCT_ID:
+                        if appointment_obj:
+                            OPD_REDIRECT_URL += "/" + str(appointment_obj.id)
+                        REDIRECT_URL = OPD_REDIRECT_URL
+            else:
+                if not order_obj:
+                    REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+                else:
+                    if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
+                        REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
+                        order_obj.action_data.get("lab"), response.get('statusCode'))
+                    elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
+                        REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
+                                                                   order_obj.action_data.get("hospital"),
+                                                                   response.get('statusCode'))
         except:
-            pg_resp_code = None
-
-        order_obj = Order.objects.filter(pk=response.get("orderId")).first()
-        if pg_resp_code == 1:
-            if not order_obj:
-                REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
-            else:
-                response_data = self.form_pg_transaction_data(response, order_obj)
-                try:
-                    pg_tx_queryset = PgTransaction.objects.create(**response_data)
-                except:
-                    pass
-
-                try:
-                    appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
-                except:
-                    pass
-
-                if int(response_data["product_id"]) == account_models.Order.LAB_PRODUCT_ID:
-                    if appointment_obj:
-                        LAB_REDIRECT_URL += "/" + str(appointment_obj.id)
-                    REDIRECT_URL = LAB_REDIRECT_URL
-                elif int(response_data["product_id"]) == account_models.Order.DOCTOR_PRODUCT_ID:
-                    if appointment_obj:
-                        OPD_REDIRECT_URL += "/" + str(appointment_obj.id)
-                    REDIRECT_URL = OPD_REDIRECT_URL
-        else:
-            if not order_obj:
-                REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
-            else:
-                if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                    REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
-                    order_obj.action_data.get("lab"), response.get('statusCode'))
-                elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                    REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
-                                                               order_obj.action_data.get("hospital"),
-                                                               response.get('statusCode'))
+            pass
 
         # return Response({"url": REDIRECT_URL})
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
