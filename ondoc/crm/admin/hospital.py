@@ -111,6 +111,9 @@ class GenericAdminInline(admin.TabularInline):
     verbose_name_plural = "Admins"
     exclude = ('hospital_network', 'is_doc_admin', 'doctor')
 
+    def get_queryset(self, request):
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital').filter(doctor=None)
+
 
 class HospitalForm(FormCleanMixin):
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
