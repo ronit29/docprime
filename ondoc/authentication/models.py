@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.db.models import Q, Prefetch
+from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import JSONField
@@ -151,6 +152,11 @@ class UserProfile(TimeStampedModel, Image):
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
+
+    def get_thumbnail(self):
+        if self.profile_image:
+            return static(self.profile_image.url)
+        return static('doctor_images/no_image.png')
 
     class Meta:
         db_table = "user_profile"
