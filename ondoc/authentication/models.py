@@ -473,28 +473,24 @@ class GenericAdmin(TimeStampedModel):
     def create_admin_billing_permissions(cls, doctor):
         from ondoc.doctor.models import DoctorMobile
         doc_user = None
-        doc_number = None
-        doc_mobile = DoctorMobile.objects.filter(doctor=doctor, is_primary=True)
-        if doc_mobile.exists():
-            doc_number = doc_mobile.first().number
+
         if doctor.user:
             doc_user = doctor.user
-        if doc_number:
-            billing_perm = GenericAdmin.objects.filter(doctor=doctor,
-                                                       phone_number=doc_number,
-                                                       permission_type=GenericAdmin.BILLINNG)
-            if not billing_perm.exists():
-                GenericAdmin.objects.create(user=doc_user,
-                                            doctor=doctor,
-                                            phone_number=doc_number,
-                                            hospital_network=None,
-                                            hospital=None,
-                                            permission_type=GenericAdmin.BILLINNG,
-                                            is_doc_admin=False,
-                                            is_disabled=False,
-                                            super_user_permission=True,
-                                            write_permission=True,
-                                            read_permission=True)
+        billing_perm = GenericAdmin.objects.filter(doctor=doctor,
+                                                   user=doc_user,
+                                                   permission_type=GenericAdmin.BILLINNG)
+        if not billing_perm.exists():
+            GenericAdmin.objects.create(user=doc_user,
+                                        doctor=doctor,
+                                        phone_number=doc_user.phone_number,
+                                        hospital_network=None,
+                                        hospital=None,
+                                        permission_type=GenericAdmin.BILLINNG,
+                                        is_doc_admin=False,
+                                        is_disabled=False,
+                                        super_user_permission=True,
+                                        write_permission=True,
+                                        read_permission=True)
 
     @classmethod
     def create_permission_object(cls, user, doctor, phone_number, hospital_network, hospital, permission_type,
