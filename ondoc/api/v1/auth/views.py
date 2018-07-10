@@ -730,15 +730,15 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         data = request.data
         # Commenting below for testing
-        # coded_response = data.get("response")
-        # if isinstance(coded_response, list):
-        #     coded_response = coded_response[0]
-        # coded_response += "=="
-        # decoded_response = base64.b64decode(coded_response).decode()
-        # response = json.loads(decoded_response)
+        coded_response = data.get("response")
+        if isinstance(coded_response, list):
+            coded_response = coded_response[0]
+        coded_response += "=="
+        decoded_response = base64.b64decode(coded_response).decode()
+        response = json.loads(decoded_response)
 
         # For testing only
-        response = request.data
+        # response = request.data
         appointment_obj = None
 
         try:
