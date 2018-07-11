@@ -13,7 +13,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorHospital,
     HospitalCertification, College, HospitalNetworkManager,
     HospitalNetworkHelpline, HospitalNetworkEmail,
     HospitalNetworkAccreditation, HospitalNetworkAward,
-    HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization)
+    HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification,
@@ -29,6 +29,7 @@ from ondoc.web.models import Career, OnlineLead
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
+
 
     def handle(self, *args, **options):
 
@@ -206,5 +207,24 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        #Create about doctor group
+        self.create_about_doctor_group()
 
         self.stdout.write('Successfully created groups and permissions')
+
+    def create_about_doctor_group(self):
+        group, created = Group.objects.get_or_create(name=constants['ABOUT_DOCTOR_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(AboutDoctor, DoctorSpecialization, DoctorQualification,
+                                                           DoctorHospital, DoctorLanguage, DoctorAward,
+                                                           DoctorAssociation, DoctorExperience,
+                                                           for_concrete_models=False)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.get_or_create(
+                content_type=ct, codename='change_' + ct.model)
+
+            permissions = Permission.objects.filter(
+                content_type=ct, codename='change_' + ct.model)
+            group.permissions.add(*permissions)

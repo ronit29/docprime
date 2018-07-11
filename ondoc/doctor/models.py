@@ -200,6 +200,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel):
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
                               choices=[("", "Select"), ("m", "Male"), ("f", "Female"), ("o", "Other")])
     practicing_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
+    raw_about = models.CharField(max_length=2000, blank=True)
     about = models.CharField(max_length=2000, blank=True)
     # primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999),
     #                                                                            MinValueValidator(1000000000)])
@@ -249,6 +250,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel):
 
     class Meta:
         db_table = "doctor"
+
+
+class AboutDoctor(Doctor):
+
+    class Meta:
+        proxy = True
+        default_permissions = []
 
 
 class Specialization(auth_model.TimeStampedModel, UniqueNameModel):

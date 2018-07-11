@@ -1,10 +1,9 @@
-from django.contrib.gis.db import models
-from django.contrib.gis import forms
 from reversion.admin import VersionAdmin
 from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned
 from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
+from django.http import HttpResponse
 from django.shortcuts import render
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
@@ -13,11 +12,11 @@ from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience, MedicalConditionSpecialization,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
     DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language)
-from .filters import RelatedDropdownFilter
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
+
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -465,7 +464,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
     search_fields = ['name']
 
-    readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id')
+    readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id', 'about')
 
     def lead_url(self, instance):
         if instance.id:
@@ -588,8 +587,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         super().save_model(request, obj, form, change)
 
     def has_change_permission(self, request, obj=None):
+        if not super().has_change_permission(request, obj):
+            return False
         if not obj:
-            # the changelist itself
             return True
 
         if request.user.is_superuser and request.user.is_staff:
@@ -600,6 +600,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     class Media:
         js = ('js/admin/ondoc.js',)
+
 
 class SpecializationResource(resources.ModelResource):
 

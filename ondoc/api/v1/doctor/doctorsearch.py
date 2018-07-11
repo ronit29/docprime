@@ -34,6 +34,7 @@ class DoctorSearchHelper:
             filtering_params.append(
                 "deal_price<={}".format(str(self.query_params.get("max_fees"))))
         if self.query_params.get("is_female"):
+            ('(\d+(-\s%)?)')
             filtering_params.append(
                 "gender='f'"
             )
