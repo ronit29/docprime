@@ -62,8 +62,11 @@ class SearchKey(models.Model):
 
     def save(self, *args, **kwargs):
         name = self.name
-        search_key = re.findall(r'[a-z0-9A-Z.]+', name)
-        self.search_key = " ".join(search_key)
+        if name:
+            search_key = re.findall(r'[a-z0-9A-Z.]+', name)
+            search_key = " ".join(search_key).lower()
+            search_key = "".join(search_key.split("."))
+            self.search_key = search_key
         super().save(*args, **kwargs)
 
 

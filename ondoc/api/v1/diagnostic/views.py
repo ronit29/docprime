@@ -35,7 +35,7 @@ from collections import OrderedDict
 from django.utils import timezone
 import random
 import copy
-
+import re
 
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
@@ -66,8 +66,11 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
         name = request.query_params.get('name')
         temp_data = dict()
         if name:
-            test_queryset = LabTest.objects.filter(name__icontains=name)
-            lab_queryset = Lab.objects.filter(name__icontains=name)
+            search_key = re.findall(r'[a-z0-9A-Z.]+', name)
+            search_key = " ".join(search_key).lower()
+            search_key = "".join(search_key.split("."))
+            test_queryset = LabTest.objects.filter(search_key__icontains=search_key)
+            lab_queryset = Lab.objects.filter(search_key__icontains=search_key)
             test_serializer = diagnostic_serializer.LabTestListSerializer(test_queryset, many=True)
             lab_serializer = diagnostic_serializer.LabListSerializer(lab_queryset, many=True)
             temp_data['tests'] = test_serializer.data

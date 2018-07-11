@@ -346,7 +346,7 @@ class LabTestSubType(TimeStampedModel):
 #         db_table = "radiology_test_type"
 
 
-class LabTest(TimeStampedModel):
+class LabTest(TimeStampedModel, SearchKey):
     RADIOLOGY = 1
     PATHOLOGY = 2
     TEST_TYPE_CHOICES = (

@@ -4,7 +4,7 @@ from ondoc.doctor import models
 from ondoc.api.v1.utils import convert_timings
 from ondoc.api.v1.doctor import serializers
 from datetime import datetime
-
+import re
 
 class DoctorSearchHelper:
     MAX_DISTANCE = "20000"
@@ -34,7 +34,6 @@ class DoctorSearchHelper:
             filtering_params.append(
                 "fees<={}".format(str(self.query_params.get("max_fees"))))
         if self.query_params.get("is_female"):
-            ('(\d+(-\s%)?)')
             filtering_params.append(
                 "gender='f'"
             )
@@ -45,11 +44,17 @@ class DoctorSearchHelper:
                 'dh.day={} and dh.end>={}'.format(str(current_time.weekday()), str(current_hour))
             )
         if self.query_params.get("doctor_name"):
+            search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
+            search_key = " ".join(search_key).lower()
+            search_key = "".join(search_key.split("."))
             filtering_params.append(
-                "d.name ilike '%{}%'".format(self.query_params.get("doctor_name")))
+                "d.search_key ilike '%{}%'".format(search_key))
         if self.query_params.get("hospital_name"):
+            search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("hospital_name"))
+            search_key = " ".join(search_key).lower()
+            search_key = "".join(search_key.split("."))
             filtering_params.append(
-                "h.name ilike '%{}%'".format(self.query_params.get("hospital_name")))
+                "h.search_key ilike '%{}%'".format(search_key))
 
         if not filtering_params:
             return "1=1"
