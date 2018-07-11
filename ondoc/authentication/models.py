@@ -90,7 +90,6 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.email = self.email.lower()
         return super().save(*args, **kwargs)
 
-
     class Meta:
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
         db_table = "auth_user"
@@ -471,17 +470,24 @@ class GenericAdmin(TimeStampedModel):
 
     @classmethod
     def create_admin_billing_permissions(cls, doctor):
+        from ondoc.doctor.models import DoctorMobile
         doc_user = None
-
+        doc_number = None
         if doctor.user:
             doc_user = doctor.user
+        doc_mobile = DoctorMobile.objects.filter(doctor=doctor, is_primary=True)
+        if doc_mobile.exists():
+            if not doc_user:
+                doc_number = doc_mobile.first().number
+            else:
+                doc_number = doc_user.phone_number
         billing_perm = GenericAdmin.objects.filter(doctor=doctor,
                                                    user=doc_user,
                                                    permission_type=GenericAdmin.BILLINNG)
         if not billing_perm.exists():
             GenericAdmin.objects.create(user=doc_user,
                                         doctor=doctor,
-                                        phone_number=doc_user.phone_number,
+                                        phone_number=doc_number,
                                         hospital_network=None,
                                         hospital=None,
                                         permission_type=GenericAdmin.BILLINNG,
