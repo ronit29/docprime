@@ -159,8 +159,6 @@ class UserViewset(GenericViewSet):
             doctor.save()
 
         GenericAdmin.update_user_admin(phone_number)
-        GenericAdmin.create_admin_billing_permissions(user.doctor)
-
         token = Token.objects.get_or_create(user=user)
         expire_otp(data['phone_number'])
 

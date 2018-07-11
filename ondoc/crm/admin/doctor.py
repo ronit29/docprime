@@ -415,10 +415,9 @@ class GenericAdminInline(admin.TabularInline):
         if not request.POST:
             if obj is not None:
                 try:
-                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(assoc_doctors=obj)
+                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(assoc_doctors=obj).distinct()
                 except MultipleObjectsReturned:
                     pass
-
         return formset
 
 
@@ -427,7 +426,7 @@ class DoctorResource(resources.ModelResource):
 
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'city','gender', 'onboarding_status', 'data_status')
+        fields = ('id', 'name', 'city', 'gender', 'onboarding_status', 'data_status')
         export_order = ('id', 'name', 'city', 'gender', 'onboarding_status', 'data_status')
 
     def dehydrate_data_status(self, doctor):
@@ -570,6 +569,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
             if ((doc_hosp_form_change or doc_hosp_new_len>0 or doc_hosp_del_len>0) or
                     (gen_admin_form_change or gen_admin_new_len>0 or gen_admin_del_len>0)):
                     GenericAdmin.create_admin_permissions(doctor)
+                    GenericAdmin.create_admin_billing_permissions(doctor)
 
 
     def save_model(self, request, obj, form, change):

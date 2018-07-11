@@ -471,7 +471,6 @@ class GenericAdmin(TimeStampedModel):
 
     @classmethod
     def create_admin_billing_permissions(cls, doctor):
-        from ondoc.doctor.models import DoctorMobile
         doc_user = None
 
         if doctor.user:
