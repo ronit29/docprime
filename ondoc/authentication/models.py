@@ -384,6 +384,8 @@ class GenericAdmin(TimeStampedModel):
         user = User.objects.filter(phone_number=self.phone_number).first()
         if user is not None:
             self.user = user
+        if self.permission_type == self.BILLINNG:
+            self.hospital = None
         super(GenericAdmin, self).save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
@@ -393,48 +395,63 @@ class GenericAdmin(TimeStampedModel):
     @classmethod
     def update_user_admin(cls, phone_number):
         user = User.objects.filter(phone_number=phone_number)
-        if user.first() is not None:
-            GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True).update(user=user)
+        if user.exists():
+            admin = GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
+            if admin.exists():
+                admin.update(user=user.first())
 
 
     @classmethod
     def create_admin_permissions(cls, doctor):
-        from ondoc.doctor.models import DoctorHospital
+        from ondoc.doctor.models import DoctorHospital, DoctorMobile
+        doc_user = None
+        doc_number = None
         doctor_admins = []
         doc_admin_usr_list = []
-
-        doc_admin_users = GenericAdmin.objects.filter(Q(doctor=doctor, is_doc_admin=True), ~Q(user=doctor.user)).distinct('user')
+        if doctor.user:
+            doc_user = doctor.user
+        doc_mobile = DoctorMobile.objects.filter(doctor=doctor, is_primary=True)
+        if doc_mobile.exists():
+            if not doc_user:
+                doc_number = doc_mobile.first().number
+            else:
+                doc_number = doc_user.phone_number
+        doc_admin_users = GenericAdmin.objects.select_related('user').filter(Q(doctor=doctor,
+                                                                               is_doc_admin=True,
+                                                                               permission_type=GenericAdmin.APPOINTMENT),
+                                                                             ~Q(user=doc_user)).distinct('user')
         doc_hosp_data = DoctorHospital.objects.select_related('doctor', 'hospital')\
-                                      .filter(doctor__user__isnull=False,
-                                              doctor=doctor,
-                                              hospital__is_appointment_manager=False)\
+                                      .filter(doctor=doctor)\
                                       .distinct('hospital')
 
-        delete_doc_admin_usr_list = [doctor.user.id]
         if doc_admin_users.exists():
             for doc_admin_usr in doc_admin_users.all():
                 doc_admin_usr_list.append(doc_admin_usr.user)
-                delete_doc_admin_usr_list.append(doc_admin_usr.user.id)
-        GenericAdmin.objects.filter(doctor=doctor, user__id__in=delete_doc_admin_usr_list).delete()
+        delete_list = GenericAdmin.objects.filter(doctor=doctor,
+                                                  is_doc_admin=True,
+                                                  permission_type=GenericAdmin.APPOINTMENT)
+        if delete_list.exists():
+            delete_list.delete()
 
         if doc_hosp_data.exists():
             for row in doc_hosp_data.all():
-                if row.hospital.is_appointment_manager == False:
+                if not row.hospital.is_appointment_manager:
                     is_disabled = False
                 else:
                     is_disabled = True
-                doctor_admins.append(cls.create_permission_object(user=doctor.user,
-                                                                  doctor=doctor,
-                                                                  phone_number=doctor.user.phone_number,
-                                                                  hospital_network=None,
-                                                                  hospital=row.hospital,
-                                                                  permission_type=GenericAdmin.APPOINTMENT,
-                                                                  is_doc_admin=True,
-                                                                  is_disabled=is_disabled,
-                                                                  super_user_permission=True,
-                                                                  write_permission=True,
-                                                                  read_permission=True,
-                                                                ))
+                if doc_number:
+                    doctor_admins.append(cls.create_permission_object(user=doc_user,
+                                                                      doctor=doctor,
+                                                                      phone_number=doc_number,
+                                                                      hospital_network=None,
+                                                                      hospital=row.hospital,
+                                                                      permission_type=GenericAdmin.APPOINTMENT,
+                                                                      is_doc_admin=True,
+                                                                      is_disabled=is_disabled,
+                                                                      super_user_permission=True,
+                                                                      write_permission=True,
+                                                                      read_permission=True,
+                                                                    ))
                 if doc_admin_usr_list:
                     for doc_admin_user in doc_admin_usr_list:
                         doctor_admins.append(cls.create_permission_object(user=doc_admin_user,
@@ -451,6 +468,29 @@ class GenericAdmin(TimeStampedModel):
 
             if doctor_admins:
                 GenericAdmin.objects.bulk_create(doctor_admins)
+
+    @classmethod
+    def create_admin_billing_permissions(cls, doctor):
+        from ondoc.doctor.models import DoctorMobile
+        doc_user = None
+
+        if doctor.user:
+            doc_user = doctor.user
+        billing_perm = GenericAdmin.objects.filter(doctor=doctor,
+                                                   user=doc_user,
+                                                   permission_type=GenericAdmin.BILLINNG)
+        if not billing_perm.exists():
+            GenericAdmin.objects.create(user=doc_user,
+                                        doctor=doctor,
+                                        phone_number=doc_user.phone_number,
+                                        hospital_network=None,
+                                        hospital=None,
+                                        permission_type=GenericAdmin.BILLINNG,
+                                        is_doc_admin=False,
+                                        is_disabled=False,
+                                        super_user_permission=True,
+                                        write_permission=True,
+                                        read_permission=True)
 
     @classmethod
     def create_permission_object(cls, user, doctor, phone_number, hospital_network, hospital, permission_type,

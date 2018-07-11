@@ -416,8 +416,7 @@ class GenericAdminInline(admin.TabularInline):
         if not request.POST:
             if obj is not None:
                 try:
-                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(assoc_doctors=obj,
-                                                                                            is_appointment_manager=False)
+                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(assoc_doctors=obj)
                 except MultipleObjectsReturned:
                     pass
 

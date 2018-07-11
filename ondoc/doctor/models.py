@@ -691,14 +691,16 @@ class OpdAppointment(auth_model.TimeStampedModel):
         return self.profile.name + " (" + self.doctor.name + ")"
 
     def allowed_action(self, user_type, request):
-        from ondoc.authentication.models import UserPermission
         allowed = []
         current_datetime = timezone.now()
 
         if user_type == auth_model.User.DOCTOR and self.time_slot_start > current_datetime:
-            perm_queryset = auth_model.GenericAdmin.objects.filter(is_disabled=False, doctor=self.doctor, hospital=self.hospital, user=request.user).first()
-            if perm_queryset:
-                if perm_queryset.write_permission or perm_queryset.super_user_permission:
+            perm_queryset = auth_model.GenericAdmin.objects.filter(is_disabled=False,
+                                                                   hospital=self.hospital,
+                                                                   user=request.user)
+            if perm_queryset.first():
+                doc_permission = perm_queryset.first()
+                if doc_permission.write_permission or doc_permission.super_user_permission:
                     if self.status == self.BOOKED:
                         allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
                     elif self.status == self.ACCEPTED:
