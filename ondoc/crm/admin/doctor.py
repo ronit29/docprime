@@ -16,8 +16,8 @@ from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience, MedicalConditionSpecialization,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken,
     DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language)
-from .filters import RelatedDropdownFilter
-from ondoc.authentication.models import User
+from .filters import RelatedDropdownFilter, DropdownFilter
+from ondoc.authentication.models import User, QCModel
 from .common import *
 from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
@@ -527,8 +527,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         super().save_model(request, obj, form, change)
 
     def has_change_permission(self, request, obj=None):
+        if not super().has_change_permission(request, obj):
+            return False
         if not obj:
-            # the changelist itself
             return True
 
         if request.user.is_superuser and request.user.is_staff:
@@ -609,8 +610,32 @@ class ReadOnlyDoctorExperienceInline(admin.TabularInline):
         return False
 
 
+class AboutListFilter(SimpleListFilter):
+
+    title = "blank"
+
+    parameter_name = 'about'
+
+    def lookups(self, request, model_admin):
+
+        return (
+            ('yes', 'Yes'),
+            ('no',  'No'),
+        )
+
+    def queryset(self, request, queryset):
+
+        if self.value() == 'yes':
+            return queryset.filter(Q(about__isnull=True) | Q(about=''))
+
+        if self.value() == 'no':
+            return queryset.filter(Q(about__isnull=False) | ~Q(about=''))
+
+
 class AboutDoctorAdmin(admin.ModelAdmin):
-    form = AboutDoctorForm
+    list_display = ('name', 'updated_at', 'data_status', 'onboarding_status', )
+    list_filter = ('data_status', 'onboarding_status', AboutListFilter, CityFilter)
+    # form = AboutDoctorForm
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code',
                'additional_details', 'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
                'online_consultation_fees', 'matrix_lead_id', 'matrix_reference_id', 'assigned_to', ]
@@ -624,6 +649,16 @@ class AboutDoctorAdmin(admin.ModelAdmin):
                ReadOnlyDoctorExperienceInline
                ]
     readonly_fields = ('name', 'gender', 'practicing_since', 'raw_about', 'license', 'onboarding_status')
+
+    def get_queryset(self, request):
+        qs = super(AboutDoctorAdmin, self).get_queryset(request)
+        return qs.filter(data_status=QCModel.SUBMITTED_FOR_QC)
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser or request.user.groups.filter(name='about_doctor_team').exists():
+            return True
+        return False
+
 
     def has_delete_permission(self, request, obj=None):
         return False
