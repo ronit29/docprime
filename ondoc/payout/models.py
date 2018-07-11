@@ -11,8 +11,9 @@ class Outstanding(auth_model.TimeStampedModel):
     DOCTOR_LEVEL = 2
     LAB_NETWORK_LEVEL = 3
     LAB_LEVEL = 4
-    level_list = ["Hospital Network Level", "Hospital Level", "Doctor Level", "Lab Network Level", "Lab Level"]
-    LEVEL_CHOICES = list(enumerate(level_list))
+    # LEVEL_CHOICES = list(enumerate(level_list))
+    LEVEL_CHOICES = [(HOSPITAL_NETWORK_LEVEL, "Hospital Network Level"), (HOSPITAL_LEVEL, "Hospital Level"),
+                     (DOCTOR_LEVEL, "Doctor Level"), (LAB_NETWORK_LEVEL, "Lab Network Level"), (LAB_LEVEL, "Lab Level")]
     net_hos_doc_id = models.IntegerField()
     outstanding_level = models.IntegerField(choices=LEVEL_CHOICES)
     current_month_outstanding = models.DecimalField(max_digits=10, decimal_places=2)
@@ -27,13 +28,13 @@ class Outstanding(auth_model.TimeStampedModel):
         unique_together = ("net_hos_doc_id", "outstanding_level", "outstanding_month", "outstanding_year")
 
     @classmethod
-    def create_outstanding(cls, obj, out_level, app_outstanding_fees):
+    def create_outstanding(cls, billing_level_obj, out_level, app_outstanding_fees):
         # obj, out_level = auth_model.UserPermission.doc_hospital_admin(app_obj)
         now = timezone.now()
         present_month, present_year = now.month, now.year
         out_obj = None
         try:
-            out_obj = Outstanding.objects.get(net_hos_doc_id=obj.id, outstanding_level=out_level,
+            out_obj = Outstanding.objects.get(net_hos_doc_id=billing_level_obj.id, outstanding_level=out_level,
                                               outstanding_month=present_month, outstanding_year=present_year)
         except:
             pass
@@ -45,7 +46,7 @@ class Outstanding(auth_model.TimeStampedModel):
             month, year = get_previous_month_year(present_month, present_year)
             prev_out_obj = None
             try:
-                prev_out_obj = Outstanding.objects.get(net_hos_doc_id=obj.id, outstanding_level=out_level,
+                prev_out_obj = Outstanding.objects.get(net_hos_doc_id=billing_level_obj.id, outstanding_level=out_level,
                                                        outstanding_month=month, outstanding_year=year)
             except:
                 pass
@@ -65,7 +66,8 @@ class Outstanding(auth_model.TimeStampedModel):
                 "outstanding_month": present_month,
                 "outstanding_year": present_year
             }
-            Outstanding.objects.create(**outstanding_data)
+            out_obj = Outstanding.objects.create(**outstanding_data)
+            return out_obj
 
     @classmethod
     def get_month_billing(cls, prev_obj, present_obj):
@@ -84,6 +86,7 @@ class Outstanding(auth_model.TimeStampedModel):
             "total_outstanding": total_out,
             "current_month": present_obj.outstanding_month,
             "current_year": present_obj.outstanding_year,
+            "outstanding_level": present_obj.outstanding_level
         }
         return resp_data
 

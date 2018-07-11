@@ -209,3 +209,17 @@ def opdappointment_transform(app_data):
     app_data["profile"] = app_data["profile"].id
     app_data["user"] = app_data["user"].id
     app_data["booked_by"] = app_data["booked_by"].id
+
+
+def labappointment_transform(app_data):
+    app_data["price"] = str(app_data["price"])
+    app_data["agreed_price"] = str(app_data["agreed_price"])
+    app_data["deal_price"] = str(app_data["deal_price"])
+    app_data["effective_price"] = str(app_data["effective_price"])
+    app_data["time_slot_start"] = str(app_data["time_slot_start"])
+    app_data["lab"] = app_data["lab"].id
+    app_data["user"] = app_data["user"].id
+    app_data["profile"] = app_data["profile"].id
+
+class ErrorCodeMapping(object):
+    IVALID_APPOINTMENT_ORDER = 1

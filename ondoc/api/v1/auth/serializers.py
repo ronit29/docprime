@@ -196,9 +196,10 @@ class ConsumerAccountModelSerializer(serializers.ModelSerializer):
 
 
 class TransactionSerializer(serializers.Serializer):
-    productId = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
-    referenceId = serializers.IntegerField(required=False)
-    orderNo = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all(), required=False)
+    # productId = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
+    # referenceId = serializers.IntegerField(required=False)
+    orderId = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all())
+    orderNo = serializers.CharField(max_length=200, required=False)
     paymentMode = serializers.CharField(max_length=200, required=False)
 
     responseCode = serializers.CharField(max_length=200)

@@ -142,6 +142,7 @@ class PgTransaction(TimeStampedModel):
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
     reference_id = models.PositiveIntegerField(blank=True, null=True)
     order_id = models.PositiveIntegerField()
+    order_no = models.PositiveIntegerField(blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
     payment_mode = models.CharField(max_length=50)
@@ -161,7 +162,7 @@ class PgTransaction(TimeStampedModel):
 
 
 class ConsumerAccount(TimeStampedModel):
-    user = models.ForeignKey(User, unique=True, on_delete=models.DO_NOTHING)
+    user = models.OneToOneField(User, on_delete=models.DO_NOTHING)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def credit_payment(self, data, amount):
@@ -180,7 +181,8 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
-    def debit_refund(self, data, amount):
+    def debit_refund(self, data):
+        amount = self.balance
         self.balance = 0
         action = ConsumerTransaction.REFUND
         tx_type = PgTransaction.DEBIT

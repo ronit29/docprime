@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction
+from ondoc.payout.models import Outstanding
 # from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
@@ -86,10 +87,11 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                     choices=[("", "Select"), (1, "Non Network Hospital"),
                                                              (2, "Network Hospital")])
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='assoc_hospitals')
-
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
+    is_appointment_manager = models.BooleanField(verbose_name='Enabled for Managing Appointments', default=False)
 
-    generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
+
+    # generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
 
     def __str__(self):
@@ -100,6 +102,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def get_thumbnail(self):
         return static("hospital_images/hospital_default.png")
+
+    def save(self, *args, **kwargs):
+        super(Hospital, self).save(*args, **kwargs)
+        if self.is_appointment_manager:
+            auth_model.GenericAdmin.objects.filter(hospital=self).update(is_disabled=True)
+        else:
+            auth_model.GenericAdmin.objects.filter(hospital=self).update(is_disabled=False)
 
 
 
@@ -210,6 +219,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel):
     is_online_consultation_enabled = models.BooleanField(verbose_name='Available for Online Consultation',
                                                          default=False)
     online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
+    # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
         through='DoctorHospital',
@@ -371,6 +381,7 @@ class DoctorHospital(auth_model.TimeStampedModel):
             self.deal_price = deal_price
         super().save(*args, **kwargs)
 
+
 class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
     name = models.ImageField(upload_to='doctor/images', height_field='height', width_field='width')
@@ -525,10 +536,9 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
-    generic_hospital_network_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
+
+    # generic_hospital_network_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital_networks')
-
-
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
@@ -680,23 +690,25 @@ class OpdAppointment(auth_model.TimeStampedModel):
     # patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
-    # insurance_id =
     payment_type = models.PositiveSmallIntegerField(choices=PAY_CHOICES, default=PREPAID)
     insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
+    outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
     def allowed_action(self, user_type, request):
-        from ondoc.authentication.models import UserPermission
         allowed = []
         current_datetime = timezone.now()
 
         if user_type == auth_model.User.DOCTOR and self.time_slot_start > current_datetime:
-            perm_queryset = UserPermission.objects.filter(doctor=self.doctor, hospital=self.hospital, user=request.user).first()
-            if perm_queryset:
-                if perm_queryset.write_permission:
+            perm_queryset = auth_model.GenericAdmin.objects.filter(is_disabled=False,
+                                                                   hospital=self.hospital,
+                                                                   user=request.user)
+            if perm_queryset.first():
+                doc_permission = perm_queryset.first()
+                if doc_permission.write_permission or doc_permission.super_user_permission:
                     if self.status == self.BOOKED:
                         allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
                     elif self.status == self.ACCEPTED:
@@ -741,7 +753,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         return self
 
     @transaction.atomic
-    def action_cancelled(self):
+    def action_cancelled(self, refund_flag):
         self.status = self.CANCELED
         self.save()
 
@@ -755,14 +767,17 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
         cancel_amount = self.effective_price
         consumer_account.credit_cancellation(data, cancel_amount)
+        if refund_flag:
+            consumer_account.debit_refund(data)
 
     def action_completed(self):
         self.status = self.COMPLETED
-        self.save()
         if self.payment_type != self.INSURANCE:
             admin_obj, out_level = self.get_billable_admin_level()
             app_outstanding_fees = self.doc_payout_amount()
-            payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+            out_obj = payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+            self.outstanding = out_obj
+        self.save()
 
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
@@ -859,22 +874,31 @@ class OpdAppointment(auth_model.TimeStampedModel):
         month = req_data.get("month")
         year = req_data.get("year")
         payment_type = req_data.get("payment_type")
+        out_level = req_data.get("outstanding_level")
+        admin_id = req_data.get("admin_id")
+        out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
+                                             outstanding_month=month, outstanding_year=year).first()
         start_date_time, end_date_time = get_start_end_datetime(month, year)
-        doc_hospital = auth_model.UserPermission.get_billable_doctor_hospital(user)
-        q = list()
-        for data in doc_hospital:
-            d = data["doctor"]
-            h = data["hospital"]
-            q.append((Q(doctor=d) & Q(hospital=h)))
+        # doc_hospital = auth_model.UserPermission.get_billable_doctor_hospital(user)
+        # q = list()
+        # for data in doc_hospital:
+        #     d = data["doctor"]
+        #     h = data["hospital"]
+        #     q.append((Q(doctor=d) & Q(hospital=h)))
         if payment_type in [cls.COD, cls.PREPAID]:
             payment_type = [cls.COD, cls.PREPAID]
         elif payment_type in [cls.INSURANCE]:
             payment_type = [cls.INSURANCE]
-        queryset = (OpdAppointment.objects.filter(reduce(or_, q)).
+        queryset = (OpdAppointment.objects.filter(outstanding=out_obj).
                     filter(status=OpdAppointment.COMPLETED,
                            time_slot_start__gte=start_date_time,
                            time_slot_start__lte=end_date_time,
                            payment_type__in=payment_type))
+        # queryset = (OpdAppointment.objects.filter(outstanding=out_obj).filter(reduce(or_, q)).
+        #             filter(status=OpdAppointment.COMPLETED,
+        #                    time_slot_start__gte=start_date_time,
+        #                    time_slot_start__lte=end_date_time,
+        #                    payment_type__in=payment_type))
         if payment_type != cls.INSURANCE:
             tcp_condition = Case(When(payment_type=cls.COD, then=F("effective_price")),
                                  When(~Q(payment_type=cls.COD), then=0))
@@ -893,23 +917,55 @@ class OpdAppointment(auth_model.TimeStampedModel):
         month = req_data.get("month")
         year = req_data.get("year")
         payment_type = req_data.get("payment_type")
+        out_level = req_data.get("outstanding_level")
+        admin_id = req_data.get("admin_id")
+
         start_date_time, end_date_time = get_start_end_datetime(month, year)
-        doc_hospital = auth_model.UserPermission.get_billable_doctor_hospital(user)
-        q = list()
-        for data in doc_hospital:
-            d = data["doctor"]
-            h = data["hospital"]
-            q.append((Q(doctor=d) & Q(hospital=h)))
+        query_filter = dict()
+        query_filter['user'] = user
+        query_filter['write_permission'] = True
+        query_filter['permission_type'] = auth_model.UserPermission.BILLINNG
+        if out_level == Outstanding.HOSPITAL_NETWORK_LEVEL:
+            query_filter["hospital_network"] = admin_id
+        elif out_level == Outstanding.HOSPITAL_LEVEL:
+            query_filter["hospital"] = admin_id
+        elif out_level == Outstanding.DOCTOR_LEVEL:
+            query_filter["doctor"] = admin_id
+
+        permission = auth_model.UserPermission.objects.filter(**query_filter).exists()
+
         if payment_type in [cls.COD, cls.PREPAID]:
             payment_type = [cls.COD, cls.PREPAID]
         elif payment_type in [cls.INSURANCE]:
             payment_type = [cls.INSURANCE]
-        queryset = (OpdAppointment.objects.filter(reduce(or_, q)).
-                    filter(status=OpdAppointment.COMPLETED,
-                           time_slot_start__gte=start_date_time,
-                           time_slot_start__lte=end_date_time,
-                           payment_type__in=payment_type))
+
+        queryset = None
+        if permission:
+            out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
+                                                 outstanding_month=month, outstanding_year=year).first()
+            queryset = (OpdAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+                                                      time_slot_start__gte=start_date_time,
+                                                      time_slot_start__lte=end_date_time,
+                                                      payment_type__in=payment_type,
+                                                      outstanding=out_obj))
+
         return queryset
+        # doc_hospital = auth_model.UserPermission.get_billable_doctor_hospital(user)
+        # q = list()
+        # for data in doc_hospital:
+        #     d = data["doctor"]
+        #     h = data["hospital"]
+        #     q.append((Q(doctor=d) & Q(hospital=h)))
+        # if payment_type in [cls.COD, cls.PREPAID]:
+        #     payment_type = [cls.COD, cls.PREPAID]
+        # elif payment_type in [cls.INSURANCE]:
+        #     payment_type = [cls.INSURANCE]
+        # queryset = (OpdAppointment.objects.filter(reduce(or_, q)).
+        #             filter(status=OpdAppointment.COMPLETED,
+        #                    time_slot_start__gte=start_date_time,
+        #                    time_slot_start__lte=end_date_time,
+        #                    payment_type__in=payment_type))
+        # return queryset
 
     class Meta:
         db_table = "opd_appointment"

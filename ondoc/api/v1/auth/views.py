@@ -36,7 +36,7 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
-from ondoc.api.v1.utils import IsConsumer
+from ondoc.api.v1.utils import IsConsumer, opdappointment_transform, labappointment_transform, ErrorCodeMapping
 import decimal
 import copy
 
@@ -105,6 +105,8 @@ class UserViewset(GenericViewSet):
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
 
+        GenericAdmin.update_user_admin(data['phone_number'])
+
         token = Token.objects.get_or_create(user=user)
 
         expire_otp(data['phone_number'])
@@ -156,7 +158,8 @@ class UserViewset(GenericViewSet):
             doctor.user = user
             doctor.save()
 
-        GenericAdmin.update_user_admin(phone_number, user)
+        GenericAdmin.update_user_admin(phone_number)
+        GenericAdmin.create_admin_billing_permissions(user.doctor)
 
         token = Token.objects.get_or_create(user=user)
         expire_otp(data['phone_number'])
@@ -374,13 +377,30 @@ class UserAppointmentsViewSet(OndocViewSet):
                     coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
                     new_deal_price = temp_lab_test[0].get("total_deal_price")
                     new_effective_price = new_deal_price - coupon_price
-                    new_appointment = dict()
-                    new_appointment['id'] = lab_appointment.id
-                    new_appointment['deal_price'] = new_deal_price
-                    new_appointment['effective_price'] = new_effective_price
-                    new_appointment['agreed_price'] = temp_lab_test[0].get("total_agreed_price", 0)
-                    new_appointment['price'] = temp_lab_test[0].get("total_mrp")
-                    new_appointment['time_slot_start'] = time_slot_start
+                    # new_appointment = dict()
+
+                    new_appointment = {
+                        "id": lab_appointment.id,
+                        "lab": lab_appointment.lab,
+                        "user": lab_appointment.user,
+                        "profile": lab_appointment.profile,
+                        "price": temp_lab_test[0].get("total_mrp"),
+                        "agreed_price": temp_lab_test[0].get("total_agreed_price", 0),
+                        "deal_price": new_deal_price,
+                        "effective_price": new_effective_price,
+                        "time_slot_start": time_slot_start,
+                        "profile_detail": lab_appointment.profile_detail,
+                        "status": lab_appointment.status,
+                        "payment_type": lab_appointment.payment_type,
+                        "lab_test": lab_appointment.lab_test
+                    }
+
+                    # new_appointment['id'] = lab_appointment.id
+                    # new_appointment['deal_price'] = new_deal_price
+                    # new_appointment['effective_price'] = new_effective_price
+                    # new_appointment['agreed_price'] = temp_lab_test[0].get("total_agreed_price", 0)
+                    # new_appointment['price'] = temp_lab_test[0].get("total_mrp")
+                    # new_appointment['time_slot_start'] = time_slot_start
                     resp = self.extract_payment_details(request, lab_appointment, new_appointment,
                                                         account_models.Order.LAB_PRODUCT_ID)
         return resp
@@ -389,7 +409,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         if validated_data.get('status'):
             resp = {}
             if validated_data['status'] == OpdAppointment.CANCELED:
-                opd_appointment.action_cancelled()
+                opd_appointment.action_cancelled(request.data.get("refund"))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
@@ -407,13 +427,33 @@ class UserAppointmentsViewSet(OndocViewSet):
                         # COUPON PROCESS to be Discussed
                         coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
                         new_appointment = dict()
-                        new_appointment['id'] = opd_appointment.id
-                        new_appointment['deal_price'] = doctor_hospital.deal_price
+
                         new_effective_price = doctor_hospital.deal_price - coupon_price
-                        new_appointment['effective_price'] = new_effective_price
-                        new_appointment['fees'] = doctor_hospital.fees
-                        new_appointment['mrp'] = doctor_hospital.mrp
-                        new_appointment['time_slot_start'] = time_slot_start
+                        new_appointment = {
+                            "id": opd_appointment.id,
+                            "doctor": opd_appointment.doctor,
+                            "hospital": opd_appointment.hospital,
+                            "profile": opd_appointment.profile,
+                            "profile_detail": opd_appointment.profile_detail,
+                            "user": opd_appointment.user,
+
+                            "booked_by": opd_appointment.booked_by,
+                            "fees": doctor_hospital.fees,
+                            "deal_price": doctor_hospital.deal_price,
+                            "effective_price": new_effective_price,
+                            "mrp": doctor_hospital.mrp,
+                            "time_slot_start": time_slot_start,
+                            "payment_type": opd_appointment.payment_type
+                        }
+
+
+                        # new_appointment['id'] = opd_appointment.id
+                        # new_appointment['deal_price'] = doctor_hospital.deal_price
+                        # new_effective_price = doctor_hospital.deal_price - coupon_price
+                        # new_appointment['effective_price'] = new_effective_price
+                        # new_appointment['fees'] = doctor_hospital.fees
+                        # new_appointment['mrp'] = doctor_hospital.mrp
+                        # new_appointment['time_slot_start'] = time_slot_start
                         resp = self.extract_payment_details(request, opd_appointment, new_appointment,
                                                             account_models.Order.DOCTOR_PRODUCT_ID)
             return resp
@@ -453,24 +493,26 @@ class UserAppointmentsViewSet(OndocViewSet):
                 appointment_serializer = LabAppointmentRetrieveSerializer(appointment_details, context={"request": request})
             resp['status'] = 1
             resp['data'] = appointment_serializer.data
-            resp['required_payment'] = False
+            resp['payment_required'] = False
             return resp
         else:
             balance = consumer_account.balance + appointment_details.effective_price
             new_appointment_details['time_slot_start'] = str(new_appointment_details['time_slot_start'])
             action = ''
-            temp_app_details = copy.deepcopy(appointment_details)
+            temp_app_details = copy.deepcopy(new_appointment_details)
             if product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                 action = account_models.Order.OPD_APPOINTMENT_RESCHEDULE
+                opdappointment_transform(temp_app_details)
                 # appointment_data = LabAppointmentModelSerializer(appointment_details, context={'request': request})
                 # temp_app_details.deal_price = str(appointment_details.deal_price)
                 # temp_app_details.fees = str(appointment_details.fees)
                 # temp_app_details.effective_price = str(appointment_details.effective_price)
                 # temp_app_details.mrp = str(appointment_details.mrp)
-                appointment_data = OpdAppModelSerializer(appointment_details, context={'request': request})
-                temp_app_details = appointment_data.data
+                # appointment_data = OpdAppModelSerializer(appointment_details, context={'request': request})
+                # temp_app_details = appointment_data.data
             elif product_id == account_models.Order.LAB_PRODUCT_ID:
                 action = Order.LAB_APPOINTMENT_RESCHEDULE
+                labappointment_transform(temp_app_details)
                 # temp_app_details.price = str(appointment_details.price)
                 # temp_app_details.agreed_price = str(appointment_details.agreed_price)
                 # temp_app_details.deal_price = str(appointment_details.deal_price)
@@ -478,8 +520,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                 # temp_app_details.time_slot_start = str(appointment_details.time_slot_start)
                 # temp_app_details.time_slot_end = str(appointment_details.time_slot_end)
                 # temp_app_details = model_to_dict(temp_app_details)
-                appointment_data = LabAppointmentModelSerializer(appointment_details, context={'request':request})
-                temp_app_details = appointment_data.data
+                # appointment_data = LabAppointmentModelSerializer(appointment_details, context={'request':request})
+                # temp_app_details = appointment_data.data
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -491,11 +533,11 @@ class UserAppointmentsViewSet(OndocViewSet):
             )
             new_appointment_details["payable_amount"] = new_appointment_details.get('effective_price') - balance
             resp['status'] = 1
-            resp['data'], resp['required_payment'] = self.payment_details(request, new_appointment_details, product_id, order.id)
+            resp['data'], resp['payment_required'] = self.payment_details(request, new_appointment_details, product_id, order.id)
             return resp
 
     def payment_details(self, request, appointment_details, product_id, order_id):
-        required_payment = True
+        payment_required = True
         pgdata = dict()
         user = request.user
         user_profile = user.profiles.filter(is_default_user=True).first()
@@ -519,8 +561,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             pgdata['name'] = "DummyName"
         pgdata['txAmount'] = appointment_details['payable_amount']
 
-
-        return pgdata, required_payment
+        return pgdata, payment_required
 
     def lab_appointment_list(self, request, params):
         user = request.user
@@ -686,41 +727,67 @@ class TransactionViewSet(viewsets.GenericViewSet):
     def save(self, request):
         LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appointment"
         OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appointment"
-        data = request.data
-        # Commenting below for testing
-        coded_response = data.get("response")
-        if isinstance(coded_response, list):
-            coded_response = coded_response[0]
-        coded_response += "=="
-        decoded_response = base64.b64decode(coded_response).decode()
-        response = json.loads(decoded_response)
+        LAB_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "lab/%s/book?error_code=%s"
+        OPD_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "opd/doctor/%s/%s/bookdetails?error_code=%s"
+        ERROR_REDIRECT_URL = request.build_absolute_uri("/") + "error?error_code=%s"
+        REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
 
-        # # For testing only
-        # response = request.data
-        appointment_obj = None
+        try:
+            data = request.data
+            # Commenting below for testing
+            coded_response = data.get("response")
+            if isinstance(coded_response, list):
+                coded_response = coded_response[0]
+            coded_response += "=="
+            decoded_response = base64.b64decode(coded_response).decode()
+            response = json.loads(decoded_response)
 
-        if int(response.get('statusCode')) == 1:
-            order_obj = Order.objects.filter(pk=response.get("orderNo")).first()
-            if not order_obj:
-                pass
-
-            response_data = self.form_pg_transaction_data(response, order_obj)
-
-            pg_tx_queryset = PgTransaction.objects.create(**response_data)
+            # For testing only
+            # response = request.data
+            appointment_obj = None
 
             try:
-                appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
+                pg_resp_code = int(response.get('statusCode'))
             except:
-                pass
+                pg_resp_code = None
 
-        if int(response["productId"]) == account_models.Order.LAB_PRODUCT_ID:
-            if appointment_obj:
-                LAB_REDIRECT_URL += "/"+str(appointment_obj.id)
-            REDIRECT_URL = LAB_REDIRECT_URL
-        elif int(response["productId"]) == account_models.Order.DOCTOR_PRODUCT_ID:
-            if appointment_obj:
-                OPD_REDIRECT_URL += "/"+str(appointment_obj.id)
-            REDIRECT_URL = OPD_REDIRECT_URL
+            order_obj = Order.objects.filter(pk=response.get("orderId")).first()
+            if pg_resp_code == 1:
+                if not order_obj:
+                    REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+                else:
+                    response_data = self.form_pg_transaction_data(response, order_obj)
+                    try:
+                        pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                    except:
+                        pass
+
+                    try:
+                        appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
+                    except:
+                        pass
+
+                    if int(response_data["product_id"]) == account_models.Order.LAB_PRODUCT_ID:
+                        if appointment_obj:
+                            LAB_REDIRECT_URL += "/" + str(appointment_obj.id)
+                        REDIRECT_URL = LAB_REDIRECT_URL
+                    elif int(response_data["product_id"]) == account_models.Order.DOCTOR_PRODUCT_ID:
+                        if appointment_obj:
+                            OPD_REDIRECT_URL += "/" + str(appointment_obj.id)
+                        REDIRECT_URL = OPD_REDIRECT_URL
+            else:
+                if not order_obj:
+                    REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+                else:
+                    if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
+                        REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
+                        order_obj.action_data.get("lab"), response.get('statusCode'))
+                    elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
+                        REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
+                                                                   order_obj.action_data.get("hospital"),
+                                                                   response.get('statusCode'))
+        except:
+            pass
 
         # return Response({"url": REDIRECT_URL})
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
@@ -733,9 +800,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         # user = User.objects.get(pk=order_obj.action_data.get("user"))
         user = get_object_or_404(User, pk=order_obj.action_data.get("user"))
         data['user'] = user
-        data['product_id'] = response.get('productId')
-        data['order_id'] = response.get('orderNo').id
-        data['reference_id'] = response.get('referenceId')
+        data['product_id'] = order_obj.product_id
+        data['order_no'] = response.get('orderNo')
+        data['order_id'] = order_obj.id
+        data['reference_id'] = order_obj.reference_id
         data['type'] = PgTransaction.CREDIT
 
         data['payment_mode'] = response.get('paymentMode')
