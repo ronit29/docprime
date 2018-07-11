@@ -485,17 +485,18 @@ class GenericAdmin(TimeStampedModel):
                                                    user=doc_user,
                                                    permission_type=GenericAdmin.BILLINNG)
         if not billing_perm.exists():
-            GenericAdmin.objects.create(user=doc_user,
-                                        doctor=doctor,
-                                        phone_number=doc_number,
-                                        hospital_network=None,
-                                        hospital=None,
-                                        permission_type=GenericAdmin.BILLINNG,
-                                        is_doc_admin=False,
-                                        is_disabled=False,
-                                        super_user_permission=True,
-                                        write_permission=True,
-                                        read_permission=True)
+            if doc_number:
+                GenericAdmin.objects.create(user=doc_user,
+                                            doctor=doctor,
+                                            phone_number=doc_number,
+                                            hospital_network=None,
+                                            hospital=None,
+                                            permission_type=GenericAdmin.BILLINNG,
+                                            is_doc_admin=False,
+                                            is_disabled=False,
+                                            super_user_permission=True,
+                                            write_permission=True,
+                                            read_permission=True)
 
     @classmethod
     def create_permission_object(cls, user, doctor, phone_number, hospital_network, hospital, permission_type,
