@@ -159,6 +159,7 @@ class HospCityFilter(SimpleListFilter):
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', HospCityFilter)
     readonly_fields = ('associated_doctors',)
+    exclude = ('search_key', )
 
     def associated_doctors(self, instance):
         if instance.id:

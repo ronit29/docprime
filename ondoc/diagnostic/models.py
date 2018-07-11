@@ -3,7 +3,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission)
-from ondoc.doctor.models import Hospital
+from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from ondoc.account import models as account_model
 from django.utils import timezone
@@ -21,7 +21,7 @@ from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
 
 
-class Lab(TimeStampedModel, CreatedByModel, QCModel):
+class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
