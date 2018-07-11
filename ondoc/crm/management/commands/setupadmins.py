@@ -34,6 +34,7 @@ class Command(BaseCommand):
         if doctors:
             for doc in doctors:
                 auth_models.GenericAdmin.create_admin_permissions(doc)
+                auth_models.GenericAdmin.create_admin_billing_permissions(doc)
             self.stdout.write('Successfully Created Admin Permissions')
         else:
             self.stdout.write('No Permissions Found')

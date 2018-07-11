@@ -569,6 +569,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
             if ((doc_hosp_form_change or doc_hosp_new_len>0 or doc_hosp_del_len>0) or
                     (gen_admin_form_change or gen_admin_new_len>0 or gen_admin_del_len>0)):
                     GenericAdmin.create_admin_permissions(doctor)
+                    GenericAdmin.create_admin_billing_permissions(doctor)
 
 
     def save_model(self, request, obj, form, change):
