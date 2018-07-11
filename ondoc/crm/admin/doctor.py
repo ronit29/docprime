@@ -416,10 +416,9 @@ class GenericAdminInline(admin.TabularInline):
         if not request.POST:
             if obj is not None:
                 try:
-                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(assoc_doctors=obj)
+                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(assoc_doctors=obj).distinct()
                 except MultipleObjectsReturned:
                     pass
-
         return formset
 
 
@@ -428,7 +427,7 @@ class DoctorResource(resources.ModelResource):
 
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'city','gender', 'onboarding_status', 'data_status')
+        fields = ('id', 'name', 'city', 'gender', 'onboarding_status', 'data_status')
         export_order = ('id', 'name', 'city', 'gender', 'onboarding_status', 'data_status')
 
     def dehydrate_data_status(self, doctor):

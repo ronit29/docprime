@@ -84,24 +84,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                         Q(hospital__manageable_hospitals__doctor__isnull=True,
                                                           hospital__manageable_hospitals__user=user,
                                                           hospital__manageable_hospitals__is_disabled=False)
-                                                        )
+                                                        ).distinct()
 
-        # queryset = models.OpdAppointment.objects.filter((Q(doctor__manageable_doctors__user=user,
-        #                                                    doctor__manageable_doctors__is_disabled=False)) |
-        #                                          (Q(hospital__manageable_hospitals__doctor__isnull=True, hospital__manageable_hospitals__user=user,
-        #                                             doctor__manageable_doctors__is_disabled=False)))
-
-        # user_permission = (auth_models.UserPermission.objects.
-        #                    filter(user=request.user, doctor__appointments__hospital=F('hospital'),
-        #                           doctor__appointments__doctor=F('doctor')).
-        #                    prefetch_related('doctor__appointments', 'doctor', 'hospital', 'user').
-        #                    values('permission_type', 'read_permission', 'write_permission', 'delete_permission',
-        #                           'doctor__appointments__id'))
-
-        # ids, id_dict = self.extract_appointment_ids(user_permission)
-
-        # queryset = models.OpdAppointment.objects.filter(id__in=ids)
-        # queryset = models.OpdAppointment.objects.filter()
 
         if not queryset:
             return Response([])
