@@ -11,7 +11,8 @@ from ondoc.lead.models import HospitalLead, DoctorLead
 from ondoc.notification import models as notifcation_model
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
-                     CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin, AboutDoctorAdmin)
+                     CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin)
+from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin

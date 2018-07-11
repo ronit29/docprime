@@ -216,7 +216,10 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['ABOUT_DOCTOR_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(AboutDoctor, for_concrete_models=False)
+        content_types = ContentType.objects.get_for_models(AboutDoctor, DoctorSpecialization, DoctorQualification,
+                                                           DoctorHospital, DoctorLanguage, DoctorAward,
+                                                           DoctorAssociation, DoctorExperience,
+                                                           for_concrete_models=False)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.get_or_create(
