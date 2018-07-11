@@ -687,3 +687,15 @@ class MedicalConditionAdmin(VersionAdmin):
     ]
     search_fields = ['name']
 
+
+class HealthTipForm(forms.ModelForm):
+    text = forms.CharField(widget=forms.Textarea)
+
+
+class HealthTipAdmin(VersionAdmin):
+    list_display = ('name', 'updated_at',)
+    date_hierarchy = 'created_at'
+    form = HealthTipForm
+    search_fields = ['name']
+
+

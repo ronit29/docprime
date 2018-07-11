@@ -1049,3 +1049,12 @@ class DoctorSearchResult(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "doctor_search_result"
+
+
+class HealthTip(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=100, verbose_name="Name")
+    text = models.CharField(max_length=1000)
+
+    class Meta:
+        db_table = "health_tip"
+

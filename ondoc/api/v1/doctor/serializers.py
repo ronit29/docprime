@@ -4,7 +4,7 @@ from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
-                                 Prescription, PrescriptionFile, Specialization, DoctorSearchResult)
+                                 Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip)
 from ondoc.authentication.models import UserProfile
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -628,10 +628,16 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
-    allowed_action = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'type', 'profile', 'otp',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', )
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',)
+
+
+class HealthTipSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = HealthTip
+        fields = ('id', 'text',)

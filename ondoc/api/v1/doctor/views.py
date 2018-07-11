@@ -157,7 +157,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         opd_appointment_serializer = serializers.OpdAppointmentSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
-
     @transaction.atomic
     def create(self, request):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
@@ -659,3 +658,12 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         #         timeslots[i]['timing'][2] = temp_list
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
                          "doctor_leaves": doctor_leave_serializer.data})
+
+
+class HealthTipView(viewsets.GenericViewSet):
+
+    queryset = models.HealthTip.objects.all()
+
+    def list(self, request):
+        serializer = serializers.HealthTipSerializer(self.queryset, many=True)
+        return Response(serializer.data)
