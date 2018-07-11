@@ -1,7 +1,7 @@
 from ondoc.authentication.models import User, QCModel
 from ondoc.doctor import models as doctor_model
 from ondoc.crm.admin.doctor import CityFilter
-from reversion.admin import admin
+from reversion.admin import admin, VersionAdmin
 from django.contrib.admin import SimpleListFilter
 from django import forms
 from django.db.models import Q
@@ -93,11 +93,11 @@ class AboutListFilter(SimpleListFilter):
             return queryset.filter(Q(about__isnull=True) | Q(about=''))
 
         if self.value() == 'no':
-            return queryset.filter(Q(about__isnull=False) | ~Q(about=''))
+            return queryset.filter(~Q(about=''))
 
 
-class AboutDoctorAdmin(admin.ModelAdmin):
-    list_display = ('name', 'updated_at', 'data_status', 'onboarding_status',)
+class AboutDoctorAdmin(VersionAdmin):
+    list_display = ('name', 'updated_at', 'data_status', 'onboarding_status', 'about')
     list_filter = ('data_status', 'onboarding_status', AboutListFilter, CityFilter)
     form = AboutDoctorForm
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code',
