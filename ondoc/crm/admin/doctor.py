@@ -346,14 +346,14 @@ class DoctorEmailInline(admin.TabularInline):
 
 class DoctorForm(FormCleanMixin):
     additional_details = forms.CharField(widget=forms.Textarea, required=False)
-    about = forms.CharField(widget=forms.Textarea, required=False)
+    raw_about = forms.CharField(widget=forms.Textarea, required=False)
     # primary_mobile = forms.CharField(required=True)
     # email = forms.EmailField(required=True)
     practicing_since = forms.ChoiceField(required=False, choices=practicing_since_choices)
     onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Doctor.ONBOARDING_STATUS)
     def validate_qc(self):
         qc_required = {'name':'req', 'gender':'req','practicing_since':'req',
-        'about':'req','license':'req','mobiles':'count','emails':'count',
+        'raw_about':'req','license':'req','mobiles':'count','emails':'count',
         'qualifications':'count', 'availability': 'count', 'languages':'count',
         'images':'count','documents':'count','doctorspecializations':'count'}
         for key,value in qc_required.items():
@@ -503,7 +503,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
         # check for errors
         errors = []
-        required = ['name','about','gender','license','practicing_since']
+        required = ['name','raw_about','gender','license','practicing_since']
         for req in required:
             if not getattr(doctor, req):
                 errors.append(req+' is required')
