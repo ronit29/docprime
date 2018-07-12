@@ -36,6 +36,7 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
+from ondoc.payout.models import Outstanding
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
 import decimal
 import copy
@@ -943,7 +944,7 @@ class OrderHistoryViewSet(GenericViewSet):
         return Response(orders)
 
 
-class HospitalDoctorPermissionViewSet(GenericViewSet):
+class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
@@ -962,3 +963,36 @@ class HospitalDoctorPermissionViewSet(GenericViewSet):
                                                                                                      'doctor')
                              )
         return Response(doc_hosp_queryset)
+
+
+class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
+    permission_classes = (IsAuthenticated, IsDoctor,)
+
+    def list(self, request):
+        data = request.query_params
+        admin_id = int(data.get("admin_id"))
+        level = int(data.get("level"))
+        user = request.user
+        resp_data = list()
+        if level == Outstanding.DOCTOR_LEVEL:
+            permission = GenericAdmin.objects.filter(user=user, doctor=admin_id, permission_type=GenericAdmin.BILLINNG,
+                                                     read_permission=True, is_disabled=False).exist()
+            if permission:
+                resp_data = DoctorHospital.objects.filter(doctor=admin_id).values('hospital', 'hospital__name')
+        elif level == Outstanding.HOSPITAL_LEVEL:
+            permission = GenericAdmin.objects.filter(user=user, hospital=admin_id, permission_type=GenericAdmin.BILLINNG,
+                                                     read_permission=True, is_disabled=False).exist()
+            if permission:
+                resp_data = DoctorHospital.objects.filter(hospital=admin_id).values('doctor', 'doctor__name')
+        elif level == Outstanding.HOSPITAL_NETWORK_LEVEL:
+            permission = GenericAdmin.objects.filter(user=user, hospital_network=admin_id, permission_type=GenericAdmin.BILLINNG,
+                                                     read_permission=True, is_disabled=False).exist()
+            if permission:
+                resp_data = DoctorHospital.objects.get(hospital__network=admin_id).values('hospital', 'doctor',
+                                                                                          'hospital_name', 'doctor_name')
+        elif level == Outstanding.LAB_LEVEL:
+            pass
+        elif level == Outstanding.LAB_NETWORK_LEVEL:
+            pass
+
+        return Response(resp_data)
