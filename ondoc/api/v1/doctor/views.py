@@ -363,25 +363,44 @@ class DoctorProfileView(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request):
-        doctor = get_object_or_404(models.Doctor, pk=request.user.doctor.id)
-        serializer = serializers.DoctorProfileSerializer(doctor, many=False,
-                                                         context={"request": request})
+        doctor = request.user.doctor
 
-        now = datetime.datetime.now()
-        appointment_count = models.OpdAppointment.objects.filter(Q(doctor=request.user.doctor.id),
-                                                                 ~Q(status=models.OpdAppointment.CANCELED),
-                                                                 Q(time_slot_start__gte=now)).count()
-        hospital_queryset = doctor.hospitals.distinct()
-        hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True)
-        clinic_queryset = doctor.availability.order_by('hospital_id', 'fees').distinct('hospital_id')
-        clinic_serializer = serializers.DoctorHospitalSerializer(clinic_queryset, many=True,
-                                                                 context={"request": request})
+        resp_data = dict()
+        if doctor:
+            doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
+                                                             context={"request": request})
+            now = datetime.datetime.now()
+            appointment_count = models.OpdAppointment.objects.filter(Q(doctor=request.user.doctor.id),
+                                                                     ~Q(status=models.OpdAppointment.CANCELED),
+                                                                     Q(time_slot_start__gte=now)).count()
+            resp_data = doc_serializer.data
+            resp_data["count"] = appointment_count
+            resp_data["is_doc"] = True
+        else:
+            resp_data["is_doc"] = False
 
-        temp_data = serializer.data
-        temp_data["count"] = appointment_count
-        temp_data['hospitals'] = hospital_serializer.data
-        temp_data['clinic'] = clinic_serializer.data
-        return Response(temp_data)
+        return Response(resp_data)
+        #
+        #
+        # doctor = get_object_or_404(models.Doctor, pk=request.user.doctor.id)
+        # serializer = serializers.DoctorProfileSerializer(doctor, many=False,
+        #                                                  context={"request": request})
+        #
+        # now = datetime.datetime.now()
+        # appointment_count = models.OpdAppointment.objects.filter(Q(doctor=request.user.doctor.id),
+        #                                                          ~Q(status=models.OpdAppointment.CANCELED),
+        #                                                          Q(time_slot_start__gte=now)).count()
+        # hospital_queryset = doctor.hospitals.distinct()
+        # hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True)
+        # clinic_queryset = doctor.availability.order_by('hospital_id', 'fees').distinct('hospital_id')
+        # clinic_serializer = serializers.DoctorHospitalSerializer(clinic_queryset, many=True,
+        #                                                          context={"request": request})
+        #
+        # temp_data = serializer.data
+        # temp_data["count"] = appointment_count
+        # temp_data['hospitals'] = hospital_serializer.data
+        # temp_data['clinic'] = clinic_serializer.data
+        # return Response(temp_data)
 
 
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
