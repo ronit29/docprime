@@ -36,7 +36,8 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
-from ondoc.api.v1.utils import IsConsumer, opdappointment_transform, labappointment_transform, ErrorCodeMapping
+from ondoc.payout.models import Outstanding
+from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
 import decimal
 import copy
 
@@ -914,10 +915,10 @@ class OrderHistoryViewSet(GenericViewSet):
                     "time_slot_start": action_data.get("time_slot_start"),
                     "start_date": action_data.get("time_slot_start"),
                     "start_time": 0.0,      # not required here we are only validating fees
-                    "fees": action_data.get("effective_price")
+                    "fees": action_data.get("effective_price"),
+                    "payment_type": action_data.get("payment_type")
                 }
                 serializer = CreateAppointmentSerializer(data=data, context={"request": request})
-                serializer.is_valid(raise_exception=True)
                 if not serializer.is_valid():
                     data.pop("time_slot_start")
                     data.pop("start_date")
@@ -926,12 +927,13 @@ class OrderHistoryViewSet(GenericViewSet):
             elif order.product_id == Order.LAB_PRODUCT_ID:
                 data = {
                     "lab": action_data.get("lab"),
-                    "test_ids": action_data.get("test_ids"),
+                    "test_ids": action_data.get("lab_test"),
                     "profile": action_data.get("profile"),
                     "start_date": action_data.get("start_date"),
                     "start_time": action_data.get("start_time"),
                     "fees": action_data.get("effective_price"),
-                    "product_id": order.product_id
+                    "product_id": order.product_id,
+                    "payment_type": action_data.get("payment_type")
                 }
                 serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
                 if not serializer.is_valid():
@@ -940,3 +942,57 @@ class OrderHistoryViewSet(GenericViewSet):
                     data.pop("fees")
             orders.append(data)
         return Response(orders)
+
+
+class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
+    permission_classes = (IsAuthenticated, IsDoctor,)
+
+    def list(self, request):
+        user = request.user
+        doc_hosp_queryset = (DoctorHospital.objects.filter(Q(doctor__manageable_doctors__user=user,
+                                                             doctor__manageable_doctors__hospital=F('hospital'),
+                                                             doctor__manageable_doctors__is_disabled=False,
+                                                             doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+                                                             doctor__manageable_doctors__write_permission=True) |
+                                                           Q(hospital__manageable_hospitals__doctor__isnull=True,
+                                                             hospital__manageable_hospitals__user=user,
+                                                             hospital__manageable_hospitals__is_disabled=False,
+                                                             doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+                                                             doctor__manageable_doctors__write_permission=True)).
+                             values('hospital', 'doctor', 'hospital__name', 'doctor__name').distinct('hospital',
+                                                                                                     'doctor')
+                             )
+        return Response(doc_hosp_queryset)
+
+
+class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
+    permission_classes = (IsAuthenticated, IsDoctor,)
+
+    def list(self, request):
+        data = request.query_params
+        admin_id = int(data.get("admin_id"))
+        level = int(data.get("level"))
+        user = request.user
+        resp_data = list()
+        if level == Outstanding.DOCTOR_LEVEL:
+            permission = GenericAdmin.objects.filter(user=user, doctor=admin_id, permission_type=GenericAdmin.BILLINNG,
+                                                     read_permission=True, is_disabled=False).exist()
+            if permission:
+                resp_data = DoctorHospital.objects.filter(doctor=admin_id).values('hospital', 'hospital__name')
+        elif level == Outstanding.HOSPITAL_LEVEL:
+            permission = GenericAdmin.objects.filter(user=user, hospital=admin_id, permission_type=GenericAdmin.BILLINNG,
+                                                     read_permission=True, is_disabled=False).exist()
+            if permission:
+                resp_data = DoctorHospital.objects.filter(hospital=admin_id).values('doctor', 'doctor__name')
+        elif level == Outstanding.HOSPITAL_NETWORK_LEVEL:
+            permission = GenericAdmin.objects.filter(user=user, hospital_network=admin_id, permission_type=GenericAdmin.BILLINNG,
+                                                     read_permission=True, is_disabled=False).exist()
+            if permission:
+                resp_data = DoctorHospital.objects.get(hospital__network=admin_id).values('hospital', 'doctor',
+                                                                                          'hospital_name', 'doctor_name')
+        elif level == Outstanding.LAB_LEVEL:
+            pass
+        elif level == Outstanding.LAB_NETWORK_LEVEL:
+            pass
+
+        return Response(resp_data)
