@@ -918,7 +918,6 @@ class OrderHistoryViewSet(GenericViewSet):
                     "payment_type": action_data.get("payment_type")
                 }
                 serializer = CreateAppointmentSerializer(data=data, context={"request": request})
-                serializer.is_valid(raise_exception=True)
                 if not serializer.is_valid():
                     data.pop("time_slot_start")
                     data.pop("start_date")
