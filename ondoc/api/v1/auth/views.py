@@ -914,10 +914,10 @@ class OrderHistoryViewSet(GenericViewSet):
                     "time_slot_start": action_data.get("time_slot_start"),
                     "start_date": action_data.get("time_slot_start"),
                     "start_time": 0.0,      # not required here we are only validating fees
-                    "fees": action_data.get("effective_price")
+                    "fees": action_data.get("effective_price"),
+                    "payment_type": action_data.get("payment_type")
                 }
                 serializer = CreateAppointmentSerializer(data=data, context={"request": request})
-                serializer.is_valid(raise_exception=True)
                 if not serializer.is_valid():
                     data.pop("time_slot_start")
                     data.pop("start_date")
@@ -926,12 +926,13 @@ class OrderHistoryViewSet(GenericViewSet):
             elif order.product_id == Order.LAB_PRODUCT_ID:
                 data = {
                     "lab": action_data.get("lab"),
-                    "test_ids": action_data.get("test_ids"),
+                    "test_ids": action_data.get("lab_test"),
                     "profile": action_data.get("profile"),
                     "start_date": action_data.get("start_date"),
                     "start_time": action_data.get("start_time"),
                     "fees": action_data.get("effective_price"),
-                    "product_id": order.product_id
+                    "product_id": order.product_id,
+                    "payment_type": action_data.get("payment_type")
                 }
                 serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
                 if not serializer.is_valid():
