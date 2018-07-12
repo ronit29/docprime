@@ -552,7 +552,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         for formset in formsets:
             if isinstance(formset, DoctorHospitalFormSet):
                 for form in formset.forms:
-                    if form.has_changed():
+                    if 'hospital' in form.changed_data:
                         doc_hosp_form_change = True
                         break
                 doc_hosp_new_len = len(formset.new_objects)

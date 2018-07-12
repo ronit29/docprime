@@ -100,7 +100,6 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
                     "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
 
 
-
 class GenericAdminInline(admin.TabularInline):
     model = GenericAdmin
     extra = 0
@@ -109,7 +108,7 @@ class GenericAdminInline(admin.TabularInline):
     formset = GenericAdminFormSet
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    exclude = ('hospital_network', 'is_doc_admin', 'doctor')
+    fields = ['phone_number', 'permission_type', 'read_permission', 'write_permission', 'user']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital').filter(doctor=None)
