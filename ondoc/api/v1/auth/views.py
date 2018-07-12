@@ -926,7 +926,7 @@ class OrderHistoryViewSet(GenericViewSet):
             elif order.product_id == Order.LAB_PRODUCT_ID:
                 data = {
                     "lab": action_data.get("lab"),
-                    "test_ids": action_data.get("test_ids"),
+                    "test_ids": action_data.get("lab_test"),
                     "profile": action_data.get("profile"),
                     "start_date": action_data.get("start_date"),
                     "start_time": action_data.get("start_time"),
