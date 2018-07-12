@@ -263,6 +263,8 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', LabCityFilter)
 
+    exclude = ('search_key', )
+
     readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id')
 
     def lead_url(self, instance):

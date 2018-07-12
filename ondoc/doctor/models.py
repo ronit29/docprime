@@ -25,6 +25,7 @@ from operator import or_
 import math
 import random
 import os
+import re
 
 
 class Migration(migrations.Migration):
@@ -52,6 +53,23 @@ class UniqueNameModel(models.Model):
         abstract = True
 
 
+class SearchKey(models.Model):
+    search_key = models.CharField(max_length=256, blank=True, null=True)
+
+    class Meta:
+        db_table = 'search_key'
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        name = self.name
+        if name:
+            search_key = re.findall(r'[a-z0-9A-Z.]+', name)
+            search_key = " ".join(search_key).lower()
+            search_key = "".join(search_key.split("."))
+            self.search_key = search_key
+        super().save(*args, **kwargs)
+
+
 class MedicalService(auth_model.TimeStampedModel, UniqueNameModel):
     name = models.CharField(max_length=500)
     description = models.CharField(max_length=500, blank=True)
@@ -63,7 +81,7 @@ class MedicalService(auth_model.TimeStampedModel, UniqueNameModel):
         db_table = "medical_service"
 
 
-class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel):
+class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey):
     PRIVATE = 1
     CLINIC = 2
     HOSPITAL = 3
@@ -189,7 +207,7 @@ class College(auth_model.TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(auth_model.TimeStampedModel, auth_model.QCModel):
+class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
