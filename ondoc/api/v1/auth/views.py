@@ -914,7 +914,8 @@ class OrderHistoryViewSet(GenericViewSet):
                     "time_slot_start": action_data.get("time_slot_start"),
                     "start_date": action_data.get("time_slot_start"),
                     "start_time": 0.0,      # not required here we are only validating fees
-                    "fees": action_data.get("effective_price")
+                    "fees": action_data.get("effective_price"),
+                    "payment_type": action_data.get("payment_type")
                 }
                 serializer = CreateAppointmentSerializer(data=data, context={"request": request})
                 serializer.is_valid(raise_exception=True)
@@ -931,7 +932,8 @@ class OrderHistoryViewSet(GenericViewSet):
                     "start_date": action_data.get("start_date"),
                     "start_time": action_data.get("start_time"),
                     "fees": action_data.get("effective_price"),
-                    "product_id": order.product_id
+                    "product_id": order.product_id,
+                    "payment_type": action_data.get("payment_type")
                 }
                 serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
                 if not serializer.is_valid():
