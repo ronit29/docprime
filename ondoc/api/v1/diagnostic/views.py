@@ -7,7 +7,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonDiagnosticCondition, CommonTest)
+                                     CommonDiagnosticCondition, CommonTest, Lab)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.doctor import models as doctor_model
@@ -97,9 +97,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id, test__in=test_ids)
-        test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
+        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs__id=lab_id, test__in=test_ids)
         lab_obj = Lab.objects.filter(id=lab_id).first()
+        test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
+                                                                           context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = lab_obj.labtiming_set.filter(day=day_now)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
@@ -146,7 +147,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         parameters = serializer.validated_data
 
-        DEFAULT_DISTANCE = 10000
+        # DEFAULT_DISTANCE = 10000
+        DEFAULT_DISTANCE = 100000000000000000
 
         default_long = 77.071848
         default_lat = 28.450367
@@ -166,20 +168,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if lat is not None and long is not None:
             point_string = 'POINT('+str(long)+' '+str(lat)+')'
             pnt = GEOSGeometry(point_string, srid=4326)
-            queryset = queryset.filter(lab__location__distance_lte=(pnt, max_distance))
+            queryset = queryset.filter(lab_pricing_group__labs__location__distance_lte=(pnt, max_distance))
             if min_distance:
-                queryset = queryset.filter(lab__location__distance_gte=(pnt, min_distance))
+                queryset = queryset.filter(lab_pricing_group__labs__location__distance_gte=(pnt, min_distance))
 
         if ids:
             queryset = (
-                queryset.values('lab').annotate(price=Sum('mrp'), count=Count('id'),
-                                                distance=Max(Distance('lab__location', pnt)),
-                                                name=Max('lab__name')).filter(count__gte=len(ids)))
+                queryset.values('lab_pricing_group__labs__id'
+                                ).annotate(price=Sum('mrp'), count=Count('id'),
+                                           distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
+                                           name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
         else:
             queryset = (
-                queryset.values('lab').annotate(count=Count('id'),
-                                                distance=Max(Distance('lab__location', pnt)),
-                                                name=Max('lab__name')).filter(count__gte=len(ids)))
+                queryset.values('lab_pricing_group__labs__id'
+                                ).annotate(count=Count('id'),
+                                           distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
+                                           name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
 
         if min_price and ids:
             queryset = queryset.filter(price__gte=min_price)
@@ -213,7 +217,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             # resp_queryset.append(temp_var)
 
         for row in queryset:
-            row["lab"] = temp_var[row["lab"]]
+            row["lab"] = temp_var[row["lab_pricing_group__labs__id"]]
             resp_queryset.append(row)
 
         return resp_queryset
@@ -222,8 +226,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         ids = list()
         temp_dict = dict()
         for obj in queryset:
-            ids.append(obj['lab'])
-            temp_dict[obj['lab']] = obj
+            ids.append(obj['lab_pricing_group__labs__id'])
+            temp_dict[obj['lab_pricing_group__labs__id']] = obj
         return ids, temp_dict
 
 
@@ -257,10 +261,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
                                       When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
         agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
                                         When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
-        lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
-        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
-                                                                 total_deal_price=Sum(deal_price_calculation),
-                                                                 total_agreed_price=Sum(agreed_price_calculation))
+        lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
+        temp_lab_test = lab_test_queryset.values('lab_pricing_group__labs').annotate(total_mrp=Sum("mrp"),
+                                                                                     total_deal_price=Sum(
+                                                                                         deal_price_calculation),
+                                                                                     total_agreed_price=Sum(
+                                                                                         agreed_price_calculation))
         total_agreed = total_deal_price = total_mrp = effective_price = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
@@ -493,17 +499,17 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
 
     def retrieve(self, request, lab_id):
         params = request.query_params
-        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
-
+        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs=lab_id)
         if not queryset:
             raise Http404("No data available")
-
+        lab_obj = Lab.objects.filter(pk=lab_id).first()
         if params.get('test_name'):
             queryset = queryset.filter(test__name__contains=params['test_name'])
 
         queryset = queryset[:20]
 
-        serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
+        serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
+                                                                      context={"lab": lab_obj})
         return Response(serializer.data)
 
 

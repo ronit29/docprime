@@ -106,7 +106,10 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     is_home_pickup_available = serializers.SerializerMethodField()
 
     def get_is_home_pickup_available(self, obj):
-        if obj.lab.is_home_pickup_available and obj.test.home_collection_possible:
+        lab = self.context.get("lab")
+        if not lab:
+            return False
+        if lab.is_home_pickup_available and obj.test.home_collection_possible:
             return True
         return False
 
