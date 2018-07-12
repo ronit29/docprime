@@ -950,10 +950,15 @@ class HospitalDoctorPermissionViewSet(GenericViewSet):
         user = request.user
         doc_hosp_queryset = (DoctorHospital.objects.filter(Q(doctor__manageable_doctors__user=user,
                                                              doctor__manageable_doctors__hospital=F('hospital'),
-                                                             doctor__manageable_doctors__is_disabled=False) |
+                                                             doctor__manageable_doctors__is_disabled=False,
+                                                             doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+                                                             doctor__manageable_doctors__write_permission=True) |
                                                            Q(hospital__manageable_hospitals__doctor__isnull=True,
                                                              hospital__manageable_hospitals__user=user,
-                                                             hospital__manageable_hospitals__is_disabled=False)).
-                             values('hospital', 'doctor', 'hospital__name', 'doctor__name').distinct('hospital', 'doctor')
+                                                             hospital__manageable_hospitals__is_disabled=False,
+                                                             doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+                                                             doctor__manageable_doctors__write_permission=True)).
+                             values('hospital', 'doctor', 'hospital__name', 'doctor__name').distinct('hospital',
+                                                                                                     'doctor')
                              )
         return Response(doc_hosp_queryset)
