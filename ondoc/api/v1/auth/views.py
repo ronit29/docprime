@@ -36,7 +36,7 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
-from ondoc.api.v1.utils import IsConsumer, opdappointment_transform, labappointment_transform, ErrorCodeMapping
+from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
 import decimal
 import copy
 
@@ -941,3 +941,19 @@ class OrderHistoryViewSet(GenericViewSet):
                     data.pop("fees")
             orders.append(data)
         return Response(orders)
+
+
+class HospitalDoctorPermissionViewSet(GenericViewSet):
+    permission_classes = (IsAuthenticated, IsDoctor,)
+
+    def list(self, request):
+        user = request.user
+        doc_hosp_queryset = (DoctorHospital.objects.filter(Q(doctor__manageable_doctors__user=user,
+                                                             doctor__manageable_doctors__hospital=F('hospital'),
+                                                             doctor__manageable_doctors__is_disabled=False) |
+                                                           Q(hospital__manageable_hospitals__doctor__isnull=True,
+                                                             hospital__manageable_hospitals__user=user,
+                                                             hospital__manageable_hospitals__is_disabled=False)).
+                             values('hospital', 'doctor', 'hospital__name', 'doctor__name').distinct('hospital', 'doctor')
+                             )
+        return Response(doc_hosp_queryset)
