@@ -6,7 +6,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment, GeneralSpecialization,
                                  MedicalCondition, AboutDoctor)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
-                                      AvailableLabTest, LabAppointment)
+                                      AvailableLabTest, LabAppointment, LabPricingGroup)
 from ondoc.lead.models import HospitalLead, DoctorLead
 from ondoc.notification import models as notifcation_model
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
@@ -40,6 +40,7 @@ admin.site.register(OpdAppointment)
 admin.site.register(UserProfile)
 
 admin.site.register(LabAppointment) #temp temp temp
+admin.site.register(LabPricingGroup)
 
 admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(AboutDoctor, AboutDoctorAdmin)

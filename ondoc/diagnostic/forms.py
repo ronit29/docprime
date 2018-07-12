@@ -1,7 +1,7 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit, Layout, Div, Fieldset, Field, ButtonHolder
 from django import forms
-from ondoc.diagnostic.models import Lab, AvailableLabTest, LabTest
+from ondoc.diagnostic.models import Lab, AvailableLabTest, LabTest, LabPricingGroup
 from ondoc.onboard.forms import CustomField
 from dal import autocomplete
 from django.urls import reverse
@@ -70,7 +70,7 @@ class LabForm(forms.ModelForm):
             )
 
     lab_test = forms.ModelChoiceField(
-        queryset=LabTest.objects.all(),
+        queryset=LabPricingGroup.objects.all(),
         required=False,
         widget=autocomplete.ModelSelect2(url='/labtestauto')
     )
