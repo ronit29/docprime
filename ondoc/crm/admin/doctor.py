@@ -460,7 +460,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         DoctorDocumentInline,
         GenericAdminInline
     ]
-    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
+    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key']
     search_fields = ['name']
 
     readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id', 'about')
