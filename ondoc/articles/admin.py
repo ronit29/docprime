@@ -1,12 +1,15 @@
 from django.contrib.gis import admin
-from .models import Article, ArticleImage
+from .models import Article, ArticleImage, ArticleCategory
 from reversion.admin import VersionAdmin
 from django.contrib.admin import ModelAdmin
 
 from django import forms
 
+
 class ArticleForm(forms.ModelForm):
     body = forms.CharField(widget=forms.Textarea, required=False)
+    category = forms.ModelMultipleChoiceField(queryset=ArticleCategory.objects.all(),widget=forms.CheckboxSelectMultiple)
+
     class Media:
         extend=False
         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'articles/js/init.js')
@@ -24,6 +27,7 @@ class ArticleAdmin(VersionAdmin):
 
         super().save_model(request, obj, form, change)
 
+
 class ArticleImageAdmin(ModelAdmin):
     fields = ['image_tag', 'height', 'width']
     readonly_fields = ['image_tag', 'height', 'width']
@@ -31,3 +35,4 @@ class ArticleImageAdmin(ModelAdmin):
 
 admin.site.register(Article, ArticleAdmin)
 admin.site.register(ArticleImage, ArticleImageAdmin)
+admin.site.register(ArticleCategory)
