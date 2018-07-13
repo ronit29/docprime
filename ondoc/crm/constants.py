@@ -1,4 +1,5 @@
 constants = {
 'QC_GROUP_NAME':'qc_group',
-'DOCTOR_NETWORK_GROUP_NAME':'doctor_network_team'
+'DOCTOR_NETWORK_GROUP_NAME':'doctor_network_team',
+'ARTICLE_TEAM': 'article_team'
 }

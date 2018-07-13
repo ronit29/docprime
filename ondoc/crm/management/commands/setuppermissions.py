@@ -23,7 +23,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabTestType, LabService,
     LabDoctorAvailability,LabDoctor,LabDocument)
 
-
+from ondoc.articles.models import Article
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
@@ -164,6 +164,18 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Article)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
 
 
         self.stdout.write('Successfully created groups and permissions')

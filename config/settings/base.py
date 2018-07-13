@@ -94,6 +94,7 @@ LOCAL_APPS = (
     'ondoc.chat',
     'ondoc.notification',
     'ondoc.web',
+    'ondoc.articles'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -204,7 +205,7 @@ REST_FRAMEWORK = {
 'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
 'PAGE_SIZE': 10,
 'DEFAULT_AUTHENTICATION_CLASSES': (
-    'rest_framework.authentication.SessionAuthentication',
+    #'rest_framework.authentication.SessionAuthentication',
     'rest_framework.authentication.TokenAuthentication',
 #'ondoc.authentication.auth.CustomAuthentication',
 ),

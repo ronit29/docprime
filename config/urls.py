@@ -15,7 +15,6 @@ Including another URLconf
 """
 from django.urls import include, path
 from django.contrib import admin
-from django.conf import settings
 from django.conf.urls.static import static
 from django.conf import settings
 
@@ -27,7 +26,8 @@ additional_urls = [
     # path('doctors/', include('ondoc.doctor.urls')),
     # path('auth/', include('ondoc.authentication.urls')),
     # path('diagnostic/', include('ondoc.diagnostic.urls')),
-    path('api/', include('ondoc.api.urls'))
+    path('api/', include('ondoc.api.urls')),
+    path('', include('ondoc.articles.urls'))
     ]
 
 if not settings.DEBUG:
