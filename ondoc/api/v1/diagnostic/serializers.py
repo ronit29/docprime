@@ -254,6 +254,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     start_date = serializers.CharField()
     start_time = serializers.FloatField()
+    time_slot_start = serializers.DateTimeField(required=False)
     end_date = serializers.CharField(required=False)
     end_time = serializers.FloatField(required=False)
     is_home_pickup = serializers.BooleanField(default=False)
@@ -352,7 +353,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
     @staticmethod
     def time_slot_validator(data):
-        start_dt = CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time'))
+        # start_dt = CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time'))
+        start_dt = (CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
         # if start_dt.hour > data['end_time']:
         #     raise serializers.ValidationError("Invalid Time Slot")
 
