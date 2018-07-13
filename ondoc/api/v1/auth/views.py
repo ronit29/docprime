@@ -968,7 +968,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
 
     def list(self, request):
         user = request.user
-        admin_obj = GenericAdmin.objects.prefetch_related('hospital', 'doctor').filter(user=14, permission_type=GenericAdmin.BILLINNG, read_permission=True)
+        admin_obj = GenericAdmin.objects.prefetch_related('hospital', 'doctor').filter(user=user, permission_type=GenericAdmin.BILLINNG, read_permission=True)
         resp_data = list()
         for data in admin_obj:
             if data.hospital:
