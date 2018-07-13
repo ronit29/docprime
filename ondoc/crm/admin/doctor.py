@@ -346,14 +346,14 @@ class DoctorEmailInline(admin.TabularInline):
 
 class DoctorForm(FormCleanMixin):
     additional_details = forms.CharField(widget=forms.Textarea, required=False)
-    about = forms.CharField(widget=forms.Textarea, required=False)
+    raw_about = forms.CharField(widget=forms.Textarea, required=False)
     # primary_mobile = forms.CharField(required=True)
     # email = forms.EmailField(required=True)
     practicing_since = forms.ChoiceField(required=False, choices=practicing_since_choices)
     onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Doctor.ONBOARDING_STATUS)
     def validate_qc(self):
         qc_required = {'name':'req', 'gender':'req','practicing_since':'req',
-        'about':'req','license':'req','mobiles':'count','emails':'count',
+        'raw_about':'req','license':'req','mobiles':'count','emails':'count',
         'qualifications':'count', 'availability': 'count', 'languages':'count',
         'images':'count','documents':'count','doctorspecializations':'count'}
         for key,value in qc_required.items():
@@ -460,7 +460,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         DoctorDocumentInline,
         GenericAdminInline
     ]
-    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code']
+    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key']
     search_fields = ['name']
 
     readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id', 'about')
@@ -503,7 +503,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
         # check for errors
         errors = []
-        required = ['name','about','gender','license','practicing_since']
+        required = ['name','raw_about','gender','license','practicing_since']
         for req in required:
             if not getattr(doctor, req):
                 errors.append(req+' is required')
@@ -552,7 +552,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         for formset in formsets:
             if isinstance(formset, DoctorHospitalFormSet):
                 for form in formset.forms:
-                    if form.has_changed():
+                    if 'hospital' in form.changed_data:
                         doc_hosp_form_change = True
                         break
                 doc_hosp_new_len = len(formset.new_objects)
@@ -686,4 +686,16 @@ class MedicalConditionAdmin(VersionAdmin):
         MedicalConditionSpecializationInline
     ]
     search_fields = ['name']
+
+
+class HealthTipForm(forms.ModelForm):
+    text = forms.CharField(widget=forms.Textarea)
+
+
+class HealthTipAdmin(VersionAdmin):
+    list_display = ('name', 'updated_at',)
+    date_hierarchy = 'created_at'
+    form = HealthTipForm
+    search_fields = ['name']
+
 

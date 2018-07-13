@@ -90,7 +90,6 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.email = self.email.lower()
         return super().save(*args, **kwargs)
 
-
     class Meta:
         unique_together = (("email", "user_type"), ("phone_number","user_type"))
         db_table = "auth_user"
@@ -419,14 +418,14 @@ class GenericAdmin(TimeStampedModel):
         doc_admin_users = GenericAdmin.objects.select_related('user').filter(Q(doctor=doctor,
                                                                                is_doc_admin=True,
                                                                                permission_type=GenericAdmin.APPOINTMENT),
-                                                                             ~Q(user=doc_user)).distinct('user')
+                                                                             ~Q(phone_number=doc_number)).distinct('user')
         doc_hosp_data = DoctorHospital.objects.select_related('doctor', 'hospital')\
                                       .filter(doctor=doctor)\
                                       .distinct('hospital')
 
         if doc_admin_users.exists():
             for doc_admin_usr in doc_admin_users.all():
-                doc_admin_usr_list.append(doc_admin_usr.user)
+                doc_admin_usr_list.append(doc_admin_usr)
         delete_list = GenericAdmin.objects.filter(doctor=doctor,
                                                   is_doc_admin=True,
                                                   permission_type=GenericAdmin.APPOINTMENT)
@@ -454,17 +453,23 @@ class GenericAdmin(TimeStampedModel):
                                                                     ))
                 if doc_admin_usr_list:
                     for doc_admin_user in doc_admin_usr_list:
-                        doctor_admins.append(cls.create_permission_object(user=doc_admin_user,
+                        duser = None
+                        if doc_admin_user.user:
+                            duser= doc_admin_user.user
+                            dphone = doc_admin_user.user.phone_number
+                        else:
+                            dphone = doc_admin_user.phone_number
+                        doctor_admins.append(cls.create_permission_object(user=duser,
                                                                           doctor=doctor,
-                                                                          phone_number=doc_admin_user.phone_number,
+                                                                          phone_number=dphone,
                                                                           hospital_network=None,
                                                                           hospital=row.hospital,
                                                                           permission_type=GenericAdmin.APPOINTMENT,
                                                                           is_doc_admin=True,
                                                                           is_disabled=is_disabled,
                                                                           super_user_permission=False,
-                                                                          write_permission=True,
-                                                                          read_permission=True))
+                                                                          write_permission=doc_admin_user.write_permission,
+                                                                          read_permission=doc_admin_user.read_permission))
 
             if doctor_admins:
                 GenericAdmin.objects.bulk_create(doctor_admins)

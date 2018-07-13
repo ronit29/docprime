@@ -116,7 +116,9 @@ class AboutDoctorAdmin(VersionAdmin):
 
     def get_queryset(self, request):
         qs = super(AboutDoctorAdmin, self).get_queryset(request)
-        return qs.filter(data_status=QCModel.SUBMITTED_FOR_QC)
+        return qs.filter(Q(data_status=QCModel.SUBMITTED_FOR_QC) | Q(data_status=QCModel.QC_APPROVED) |
+                         Q(onboarding_status=doctor_model.Doctor.ONBOARDED) |
+                         Q(onboarding_status=doctor_model.Doctor.REQUEST_SENT))
 
     def has_change_permission(self, request, obj=None):
         if request.user.is_superuser or request.user.groups.filter(name='about_doctor_team').exists():

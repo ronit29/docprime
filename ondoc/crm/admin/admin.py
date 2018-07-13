@@ -4,14 +4,14 @@ from django.contrib.gis import admin
 
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment, GeneralSpecialization,
-                                 MedicalCondition, AboutDoctor)
+                                 MedicalCondition, AboutDoctor, HealthTip)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment)
 from ondoc.lead.models import HospitalLead, DoctorLead
 from ondoc.notification import models as notifcation_model
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
-                     CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin)
+                     CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin, HealthTipAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -54,6 +54,7 @@ admin.site.register(MedicalService, MedicalServiceAdmin)
 admin.site.register(Specialization, SpecializationAdmin)
 admin.site.register(GeneralSpecialization, GeneralSpecializationAdmin)
 admin.site.register(MedicalCondition, MedicalConditionAdmin)
+admin.site.register(HealthTip, HealthTipAdmin)
 
 admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
