@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         UserPermission, Address)
+                                         UserPermission, Address, GenericAdmin)
 from ondoc.doctor.models import DoctorMobile
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime
@@ -43,8 +43,13 @@ class DoctorLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid OTP")
 
         if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.DOCTOR).exists():
+            doctor_not_exists = admin_not_exists = False
             if not DoctorMobile.objects.filter(number=attrs['phone_number'], is_primary=True).exists():
-                raise serializers.ValidationError('No doctor with given phone number found')
+                doctor_not_exists = True
+            if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
+                admin_not_exists = True
+            if doctor_not_exists and admin_not_exists:
+                raise serializers.ValidationError('No Doctor or Admin with given phone number found')
 
         return attrs        
 
