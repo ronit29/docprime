@@ -502,7 +502,10 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
             raise Http404("No data available")
 
         if params.get('test_name'):
-            queryset = queryset.filter(test__name__contains=params['test_name'])
+            search_key = re.findall(r'[a-z0-9A-Z.]+', params.get('test_name'))
+            search_key = " ".join(search_key).lower()
+            search_key = "".join(search_key.split("."))
+            queryset = queryset.filter(test__search_key__icontains=search_key)
 
         queryset = queryset[:20]
 
