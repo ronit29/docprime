@@ -4,5 +4,6 @@ constants = {
     'LAB_PRICING_GROUP_NAME': 'lab_pricing_team',
     'CAREERS_MANAGEMENT_GROUP': 'careers_management_group',
     'ONLINE_LEADS_GROUP': 'online_leads_group',
-    'ABOUT_DOCTOR_TEAM': 'about_doctor_team'
+    'ABOUT_DOCTOR_TEAM': 'about_doctor_team',
+    'ARTICLE_TEAM': 'article_team'
 }

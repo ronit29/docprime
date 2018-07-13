@@ -25,7 +25,8 @@ additional_urls = [
     # path('doctors/', include('ondoc.doctor.urls')),
     # path('auth/', include('ondoc.authentication.urls')),
     # path('diagnostic/', include('ondoc.diagnostic.urls')),
-    path('api/', include('ondoc.api.urls'))
+    path('api/', include('ondoc.api.urls')),
+    path('', include('ondoc.articles.urls'))
     ]
 
 if not settings.DEBUG:
