@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
 from django.conf import settings
-from datetime import datetime, timedelta
+from datetime import timedelta
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction
@@ -26,6 +26,7 @@ import math
 import random
 import os
 import re
+import datetime
 
 
 class Migration(migrations.Migration):
@@ -124,10 +125,11 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     def save(self, *args, **kwargs):
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
-            auth_model.GenericAdmin.objects.filter(hospital=self).update(is_disabled=True)
+            auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+                .update(is_disabled=True)
         else:
-            auth_model.GenericAdmin.objects.filter(hospital=self).update(is_disabled=False)
-
+            auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+                .update(is_disabled=False)
 
 
 class HospitalAward(auth_model.TimeStampedModel):
@@ -719,20 +721,20 @@ class OpdAppointment(auth_model.TimeStampedModel):
     def allowed_action(self, user_type, request):
         allowed = []
         current_datetime = timezone.now()
-
-        if user_type == auth_model.User.DOCTOR and self.time_slot_start > current_datetime:
+        today = datetime.date.today()
+        if user_type == auth_model.User.DOCTOR and self.time_slot_start.date() >= today:
             perm_queryset = auth_model.GenericAdmin.objects.filter(is_disabled=False,
                                                                    hospital=self.hospital,
                                                                    user=request.user)
             if perm_queryset.first():
                 doc_permission = perm_queryset.first()
                 if doc_permission.write_permission or doc_permission.super_user_permission:
-                    if self.status == self.BOOKED:
+                    if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT, self.RESCHEDULED_DOCTOR]:
                         allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
                     elif self.status == self.ACCEPTED:
                         allowed = [self.RESCHEDULED_DOCTOR, self.COMPLETED]
-                    elif self.status in [self.RESCHEDULED_PATIENT, self.RESCHEDULED_DOCTOR]:
-                        allowed = [self.ACCEPTED]
+                    # elif self.status 
+                    #     allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
 
         elif user_type == auth_model.User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):

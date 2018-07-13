@@ -383,7 +383,7 @@ class GenericAdmin(TimeStampedModel):
         user = User.objects.filter(phone_number=self.phone_number).first()
         if user is not None:
             self.user = user
-        if self.permission_type == self.BILLINNG:
+        if self.permission_type == self.BILLINNG and self.doctor is not None:
             self.hospital = None
         super(GenericAdmin, self).save(*args, **kwargs)
 

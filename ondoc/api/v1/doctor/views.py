@@ -121,7 +121,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     def retrieve(self, request, pk=None):
         user = request.user
-        queryset = models.OpdAppointment.objects.filter(pk=pk).filter(doctor=user.doctor)
+        queryset = models.OpdAppointment.objects.filter(Q(doctor__manageable_doctors__user=user,
+                                                          doctor__manageable_doctors__hospital=F('hospital'),
+                                                          doctor__manageable_doctors__is_disabled=False) |
+                                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
+                                                          hospital__manageable_hospitals__user=user,
+                                                          hospital__manageable_hospitals__is_disabled=False)
+                                                        ,Q(pk=pk)).distinct()
         if queryset:
             serializer = serializers.AppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
             return Response(serializer.data)
@@ -359,22 +365,37 @@ class DoctorProfileView(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request):
-
+        from django.contrib.staticfiles.templatetags.staticfiles import static
         resp_data = dict()
+        today = datetime.date.today()
+        queryset = models.OpdAppointment.objects.filter((Q(doctor__manageable_doctors__user=request.user,
+                                                          doctor__manageable_doctors__hospital=F('hospital'),
+                                                          doctor__manageable_doctors__is_disabled=False) |
+                                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
+                                                          hospital__manageable_hospitals__user=request.user,
+                                                          hospital__manageable_hospitals__is_disabled=False)),
+                                                        Q(status=models.OpdAppointment.ACCEPTED,
+                                                        time_slot_start__date=today)
+                                                        ).distinct().count()
         if not hasattr(request.user, 'doctor'):
             resp_data["is_doc"] = False
+            resp_data["name"] = 'Admin'
+            admin_image_url = static('doctor_images/no_image.png')
+            admin_image = ''
+            if admin_image_url:
+                admin_image = request.build_absolute_uri(admin_image_url)
+            resp_data["thumbnail"] = admin_image
         else:
             doctor = request.user.doctor
             doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
                                                                  context={"request": request})
-            now = datetime.datetime.now()
-            appointment_count = models.OpdAppointment.objects.filter(Q(doctor=doctor.id),
-                                                                     ~Q(status=models.OpdAppointment.CANCELED),
-                                                                     Q(time_slot_start__gte=now)).count()
+            appointment_count = models.OpdAppointment.objects.filter(doctor=doctor.id,
+                                                                     status=models.OpdAppointment.ACCEPTED,
+                                                                     time_slot_start__date=today).count()
             resp_data = doc_serializer.data
-            resp_data["count"] = appointment_count
             resp_data["is_doc"] = True
 
+        resp_data["count"] = queryset
         return Response(resp_data)
         #
         #
