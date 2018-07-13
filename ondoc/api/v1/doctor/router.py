@@ -9,8 +9,6 @@ urlpatterns = [
     path('appointment/<int:pk>', DoctorAppointmentsViewSet.as_view({'get': 'retrieve'}), name='get-appointment-detail'),
     path('appointment/<int:pk>/update', DoctorAppointmentsViewSet.as_view({'post': 'update'}),
          name='update-appointment-detail'),
-    path('appointment/payment/retry/<int:pk>', DoctorAppointmentsViewSet.as_view({'get': 'payment_retry'}),
-         name='payment-retry'),
     path('appointment/complete', DoctorAppointmentsViewSet.as_view({'post': 'complete'}),
          name='appointment-complete'),
     path('profile',

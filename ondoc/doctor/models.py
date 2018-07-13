@@ -750,7 +750,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
     def action_accepted(self):
         self.status = self.ACCEPTED
         self.save()
-        return self
 
     @transaction.atomic
     def action_cancelled(self, refund_flag):
@@ -924,7 +923,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         query_filter = dict()
         query_filter['user'] = user
         query_filter['write_permission'] = True
-        query_filter['permission_type'] = auth_model.UserPermission.BILLINNG
+        query_filter['permission_type'] = auth_model.GenericAdmin.BILLINNG
         if out_level == Outstanding.HOSPITAL_NETWORK_LEVEL:
             query_filter["hospital_network"] = admin_id
         elif out_level == Outstanding.HOSPITAL_LEVEL:
@@ -932,7 +931,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         elif out_level == Outstanding.DOCTOR_LEVEL:
             query_filter["doctor"] = admin_id
 
-        permission = auth_model.UserPermission.objects.filter(**query_filter).exists()
+        permission = auth_model.GenericAdmin.objects.filter(**query_filter).exists()
 
         if payment_type in [cls.COD, cls.PREPAID]:
             payment_type = [cls.COD, cls.PREPAID]

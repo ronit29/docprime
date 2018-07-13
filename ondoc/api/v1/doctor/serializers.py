@@ -284,7 +284,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorHospital
-        fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'fees',
+        fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
                   'discounted_fees', 'hospital_thumbnail', )
 
 
@@ -448,7 +448,8 @@ class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
 
 class DoctorHospitalListSerializer(serializers.Serializer):
     min_fees = serializers.IntegerField()
-    hospital = serializers.SerializerMethodField()
+    hospital = HospitalModelSerializer()
+    # hospital = serializers.SerializerMethodField()
 
     def get_hospital(self, obj):
         queryset = Hospital.objects.get(pk=obj['hospital'])
@@ -578,7 +579,6 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
-    allowed_action = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
