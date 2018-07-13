@@ -363,21 +363,21 @@ class DoctorProfileView(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request):
-        doctor = request.user.doctor
 
         resp_data = dict()
-        if doctor:
+        if not hasattr(request.user, 'doctor'):
+            resp_data["is_doc"] = False
+        else:
+            doctor = request.user.doctor
             doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
-                                                             context={"request": request})
+                                                                 context={"request": request})
             now = datetime.datetime.now()
-            appointment_count = models.OpdAppointment.objects.filter(Q(doctor=request.user.doctor.id),
+            appointment_count = models.OpdAppointment.objects.filter(Q(doctor=doctor.id),
                                                                      ~Q(status=models.OpdAppointment.CANCELED),
                                                                      Q(time_slot_start__gte=now)).count()
             resp_data = doc_serializer.data
             resp_data["count"] = appointment_count
             resp_data["is_doc"] = True
-        else:
-            resp_data["is_doc"] = False
 
         return Response(resp_data)
         #
