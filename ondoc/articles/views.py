@@ -11,4 +11,4 @@ def upload(request):
     serializer = ArticleImageSerializer(data=data)
     serializer.is_valid(raise_exception=True)
     image = serializer.save()
-    return Response({'uploaded':1, 'url':image.name.url})
+    return Response({'uploaded':1, 'url': request.build_absolute_uri(image.name.url)})

@@ -18,6 +18,7 @@ class Article(TimeStampedModel, CreatedByModel):
     url = models.CharField(blank=False, null=True, max_length=500)
     body = models.CharField(blank=False, null=False, max_length=20000)
     category = models.ManyToManyField(ArticleCategory)
+    icon = models.ImageField(upload_to='articles/icons', null=True)
 
     def __str__(self):
         return self.title
