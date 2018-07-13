@@ -23,7 +23,7 @@ class BillingViewSet(viewsets.GenericViewSet):
     def list(self, request):
         params = request.query_params
         billing_admin_id = int(params.get('admin_id')) if params.get('admin_id') is not None else None
-        level = int(params.get('outstanding_level')) if params.get('outstanding_level') is not None else None
+        level = int(params.get('level')) if params.get('level') is not None else None
         user = request.user
         user_admin_list = auth_model.GenericAdmin.get_user_admin_obj(user)
         resp_data = list()

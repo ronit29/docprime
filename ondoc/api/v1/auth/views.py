@@ -964,8 +964,30 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
 class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated, IsDoctor,)
+    # queryset = GenericAdmin.objects.all()
 
     def list(self, request):
+        user = request.user
+        admin_obj = GenericAdmin.objects.prefetch_related('hospital', 'doctor').filter(user=14, permission_type=GenericAdmin.BILLINNG, read_permission=True)
+        resp_data = list()
+        for data in admin_obj:
+            if data.hospital:
+                admin_id = data.hospital.id
+                admin_name = data.hospital.name
+                level = Outstanding.HOSPITAL_LEVEL
+            elif data.doctor:
+                admin_id = data.doctor.id
+                admin_name = data.doctor.name
+                level = Outstanding.DOCTOR_LEVEL
+            temp_dict = {
+                'admin_id': admin_id,
+                'level': level,
+                'admin_name': admin_name
+            }
+            resp_data.append(temp_dict)
+        return Response(resp_data)
+
+    def appointment_doc_hos_list(self, request):
         data = request.query_params
         admin_id = int(data.get("admin_id"))
         level = int(data.get("level"))
