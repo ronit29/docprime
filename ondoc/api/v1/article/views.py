@@ -24,6 +24,9 @@ class ArticleViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
     def retrieve(self, request, pk=None):
-        queryset = self.queryset.filter(pk=pk).first()
-        serializer = serializers.ArticleRetrieveSerializer(queryset, context={'request': request})
-        return Response(serializer.data)
+        response = {}
+        queryset = self.queryset.filter(pk=pk)
+        if queryset.exists():
+            serializer = serializers.ArticleRetrieveSerializer(queryset.first(), context={'request': request})
+            response = serializer.data
+        return Response(response)
