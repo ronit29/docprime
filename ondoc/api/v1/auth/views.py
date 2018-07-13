@@ -897,46 +897,67 @@ class OrderHistoryViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
-        orders = []
+        opd_action_data = list()
+        lab_action_data = list()
+        available_lab_test = list()
+
         for order in Order.objects.filter(action_data__user=request.user.id, is_viewable=True,
                                           payment_status=Order.PAYMENT_PENDING):
             action_data = order.action_data
             if order.product_id == Order.DOCTOR_PRODUCT_ID:
-                data = {
-                    "doctor": action_data.get("doctor"),
-                    "hospital": action_data.get("hospital"),
-                    "profile_detail": action_data.get("profile_detail"),
-                    "profile": action_data.get("profile"),
-                    "user": action_data.get("user"),
-                    "product_id": order.product_id,
-                    "time_slot_start": action_data.get("time_slot_start"),
-                    "start_date": action_data.get("time_slot_start"),
-                    "start_time": 0.0,      # not required here we are only validating fees
-                    "fees": action_data.get("effective_price"),
-                    "payment_type": action_data.get("payment_type")
-                }
-                serializer = CreateAppointmentSerializer(data=data, context={"request": request})
-                if not serializer.is_valid():
-                    data.pop("time_slot_start")
-                    data.pop("start_date")
-                    data.pop("start_time")
-                    data.pop("fees")
+                opd_action_data.append(action_data)
             elif order.product_id == Order.LAB_PRODUCT_ID:
-                data = {
-                    "lab": action_data.get("lab"),
-                    "test_ids": action_data.get("lab_test"),
-                    "profile": action_data.get("profile"),
-                    "start_date": action_data.get("start_date"),
-                    "start_time": action_data.get("start_time"),
-                    "fees": action_data.get("effective_price"),
-                    "product_id": order.product_id,
-                    "payment_type": action_data.get("payment_type")
-                }
-                serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
-                if not serializer.is_valid():
-                    data.pop("start_date")
-                    data.pop("start_time")
-                    data.pop("fees")
+                lab_action_data.append(action_data)
+                available_lab_test.extend(action_data.get("lab_test"))
+        test_ids = AvailableLabTest.objects.filter(pk__in=available_lab_test).values('id', 'test')
+
+        lab_test_map = dict()
+        for data in test_ids:
+            lab_test_map[data['id']] = data['test']
+        orders = []
+
+        for action_data in opd_action_data:
+            data = {
+                "doctor": action_data.get("doctor"),
+                "hospital": action_data.get("hospital"),
+                "profile_detail": action_data.get("profile_detail"),
+                "profile": action_data.get("profile"),
+                "user": action_data.get("user"),
+                "time_slot_start": action_data.get("time_slot_start"),
+                "start_date": action_data.get("time_slot_start"),
+                "start_time": 0.0,  # not required here we are only validating fees
+                "fees": action_data.get("effective_price"),
+                "payment_type": action_data.get("payment_type")
+            }
+            serializer = CreateAppointmentSerializer(data=data, context={"request": request})
+            if not serializer.is_valid():
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
+                data.pop("fees")
+            data["doctor_name"] = serializer.validated_data.get('doctor').name
+            data["hospital_name"] = serializer.validated_data.get('hospital').name
+            orders.append(data)
+
+        for action_data in lab_action_data:
+            data = {
+                "lab": action_data.get("lab"),
+                "test_ids": [lab_test_map[x] for x in action_data.get("lab_test")],
+                "profile": action_data.get("profile"),
+                "time_slot_start": action_data.get("time_slot_start"),
+                "start_date": action_data.get("time_slot_start"),
+                "start_time": 0.0,  # not required here we are only validating fees
+                "fees": action_data.get("effective_price"),
+                "payment_type": action_data.get("payment_type")
+            }
+            serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
+            if not serializer.is_valid(raise_exception=True):
+                data.pop("start_date")
+                data.pop("start_time")
+                data.pop("fees")
+            data["lab_name"] = serializer.validated_data.get('lab').name
+            data["test_ids_name"] = [x.name for x in serializer.validated_data.get('test_ids')]
+
             orders.append(data)
         return Response(orders)
 
