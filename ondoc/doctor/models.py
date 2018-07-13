@@ -771,7 +771,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         return self
 
     @transaction.atomic
-    def action_cancelled(self, refund_flag):
+    def action_cancelled(self, refund_flag=1):
         self.status = self.CANCELED
         self.save()
 
