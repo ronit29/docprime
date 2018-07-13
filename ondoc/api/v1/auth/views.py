@@ -61,14 +61,7 @@ class LoginOTP(GenericViewSet):
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
-
         phone_number = data['phone_number']
-        #
-        # user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
-        # admin_queryset = GenericAdmin.objects.filter(user=user.id)
-        # pem_obj = DoctorPermission(admin_queryset, request)
-        # pem_obj.create_permission()
-
 
         send_otp("otp sent {}", phone_number)
 
@@ -76,7 +69,9 @@ class LoginOTP(GenericViewSet):
 
         if req_type == 'doctor':
             if DoctorMobile.objects.filter(number=phone_number, is_primary=True).exists():
-                response['exists']=1
+                response['exists'] = 1
+            if GenericAdmin.objects.filter(phone_number=phone_number, is_disabled=False).exists():
+                response['exists'] = 1
         else:
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists']=1
@@ -154,10 +149,12 @@ class UserViewset(GenericViewSet):
         user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
 
         if not user:
-            doctor = DoctorMobile.objects.get(number=phone_number, is_primary=True).doctor
+            doctor_mobile = DoctorMobile.objects.filter(number=phone_number, is_primary=True)
             user = User.objects.create(phone_number=data['phone_number'], is_phone_number_verified=True, user_type=User.DOCTOR)
-            doctor.user = user
-            doctor.save()
+            if doctor_mobile.exists():
+                doctor = doctor_mobile.first().doctor
+                doctor.user = user
+                doctor.save()
 
         GenericAdmin.update_user_admin(phone_number)
         token = Token.objects.get_or_create(user=user)

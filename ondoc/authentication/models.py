@@ -468,8 +468,8 @@ class GenericAdmin(TimeStampedModel):
                                                                           is_doc_admin=True,
                                                                           is_disabled=is_disabled,
                                                                           super_user_permission=False,
-                                                                          write_permission=True,
-                                                                          read_permission=True))
+                                                                          write_permission=doc_admin_user.write_permission,
+                                                                          read_permission=doc_admin_user.read_permission))
 
             if doctor_admins:
                 GenericAdmin.objects.bulk_create(doctor_admins)
