@@ -12,4 +12,4 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Article
-        fields = ('title', 'url', 'body', 'icon')
+        fields = ('title', 'url', 'body', 'icon', 'id')
