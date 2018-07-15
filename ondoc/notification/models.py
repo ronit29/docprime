@@ -54,22 +54,27 @@ class NotificationAction:
             context = {
                 "patient_name": patient_name,
                 "id": instance.id,
+                "instance": instance,
                 "title": "Appointment Rescheduled",
-                "body": "Patient {} has rescheduled the appointment.".format(patient_name),
+                "body": "Reschedule request received for the appointment with Mr. {}".format(patient_name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
                 "image_url": ""
             }
-            NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
+            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
-                "title": "Appointment booked",
-                "body": "Your appointment with Dr. {} has been booked.".format(doctor_name),
+                "instance": instance,
+                "title": "Appointment Confirmed",
+                "body": "Appointment confirmed for Mr. {} at {}, {} with Dr. {}.".format(
+                    patient_name, instance.time_slot_start.strftime("%I:%M %P"),
+                    instance.time_slot_start.strftime("%d/%m/%y"), doctor_name
+                ),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -82,28 +87,52 @@ class NotificationAction:
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
-                "title": "Appointment Booked",
-                "body": "Patient {} has booked an appointment with you".format(patient_name),
+                "instance": instance,
+                "title": "Appointment Confirmed",
+                "body": "New appointment for Mr. {} at {}, {}. Please confirm.".format(
+                    patient_name, instance.time_slot_start.strftime("%I:%M %P"),
+                    instance.time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
                 "image_url": ""
             }
-            NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
+            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.DOCTOR:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
+                "instance": instance,
                 "title": "Appointment Cancelled",
-                "body": "Patient {} has cancelled the appointment.".format(patient_name),
+                "body": "Appointment with Mr. {} at {}  {} has been cancelled.".format(
+                    patient_name, instance.time_slot_start.strftime("%I:%M %P"),
+                    instance.time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
                 "image_url": ""
             }
-            NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
+            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            doctor_name = instance.doctor.name if instance.doctor.name else ""
+            context = {
+                "patient_name": patient_name,
+                "doctor_name": doctor_name,
+                "instance": instance,
+                "title": "Appointment Cancelled",
+                "body": "Appointment with Dr. {} at {} {} has been cancelled as per your request.".format(
+                    doctor_name, instance.time_slot_start.strftime("%I:%M %P"),
+                    instance.time_slot_start.strftime("%d/%m/%y")),
+                "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.OPD_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
+
 
     @classmethod
     def trigger_all(cls, user, notification_type, context=None):
@@ -140,9 +169,22 @@ class EmailNotification(TimeStampedModel):
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             html_body = render_to_string("email/appointment_accepted/body.html", context=context)
             email_subject = render_to_string("email/appointment_accepted/subject.txt", context=context)
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
             html_body = render_to_string("email/appointment_booked_patient/body.html", context=context)
             email_subject = render_to_string("email/appointment_booked_patient/subject.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
+            html_body = render_to_string("email/appointment_booked_doctor/body.html", context=context)
+            email_subject = render_to_string("email/appointment_booked_doctor/subject.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT:
+            html_body = render_to_string("email/appointment_rescheduled_patient/body.html", context=context)
+            email_subject = render_to_string("email/appointment_rescheduled_patient/subject.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
+            html_body = render_to_string("email/appointment_cancelled_doctor/body.html", context=context)
+            email_subject = render_to_string("email/appointment_cancelled_doctor/subject.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
+            html_body = render_to_string("email/appointment_cancelled_patient/body.html", context=context)
+            email_subject = render_to_string("email/appointment_cancelled_patient/subject.txt", context=context)
+
         if email and user:
             email_noti = EmailNotification.objects.create(
                 user=user,
@@ -175,8 +217,17 @@ class SmsNotification(TimeStampedModel):
     def send_notification(cls, user, phone_number, notification_type, context):
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             html_body = render_to_string("sms/appointment_accepted.txt", context=context)
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
             html_body = render_to_string("sms/appointment_booked_patient.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
+            html_body = render_to_string("sms/appointment_booked_doctor.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT:
+            html_body = render_to_string("sms/appointment_rescheduled_patient.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
+            html_body = render_to_string("sms/appointment_cancelled_doctor.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
+            html_body = render_to_string("sms/appointment_cancelled_patient.txt", context=context)
+
         if phone_number and user:
             sms_noti = SmsNotification.objects.create(
                 user=user,
@@ -204,6 +255,7 @@ class AppNotification(TimeStampedModel):
 
     @classmethod
     def send_notification(cls, user, notification_type, context):
+        context.pop("instance", None)
         app_noti = AppNotification.objects.create(
             user=user,
             notification_type=notification_type,
@@ -229,6 +281,7 @@ class PushNotification(TimeStampedModel):
 
     @classmethod
     def send_notification(cls, user, notification_type, context):
+        context.pop("instance", None)
         push_noti = PushNotification.objects.create(
             user=user,
             notification_type=notification_type,

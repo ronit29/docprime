@@ -1,1 +1,1 @@
-Appointment Rescheduled by Patient
+Appointment Reschedule (ID- {{instance.id}})

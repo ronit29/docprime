@@ -846,11 +846,16 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
             )
         elif self.status == OpdAppointment.CANCELED:
-            if not self.doctor.user:
+            if (not self.doctor.user) or (not self.user):
                 return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.doctor.user,
+                notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED,
+            )
+            notification_models.NotificationAction.trigger(
+                instance=self,
+                user=self.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED,
             )
 

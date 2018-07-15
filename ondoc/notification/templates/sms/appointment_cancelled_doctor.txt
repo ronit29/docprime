@@ -1,0 +1,1 @@
+Your appointment with Mr. {{patient_name}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} has been cancelled.

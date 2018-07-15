@@ -6,7 +6,17 @@
 </head>
 <body>
 <p>
-    Patient - {{patient_name}} has rescheduled the appointment - {{id}}.
+    Dear Dr. {{doctor_name}}
+
+    We have received a reschedule request for the appointment with Mr. {{patient_name}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.
+    We will update you once it is confirmed.
+
+Our associate might try to get in touch with you to make this as easy as possible.
+
+Regards,
+docprime
+
+This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to networkhelp@docprime.com
 </p>
 </body>
 </html>

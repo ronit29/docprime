@@ -5,7 +5,26 @@
     <title>Title</title>
 </head>
 <body>
-    <p>Your appointment has been booked with Dr. {{doctor_name}}.</p>
+    <p>
+        Dear {{patient_name}}
+
+We are pleased confirm your appointment for Mr. {{patient_name}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}
+        with Dr. {{doctor_name}}.
+
+Your appointment reference ID is {{instance.id}}
+
+
+
+
+[Summary Card]
+
+Please present this card and the unique identification code in this card at the time of your visit.
+
+Regards
+docprime
+
+This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to customerhelp@docprime.com
+    </p>
 
 </body>
 </html>
