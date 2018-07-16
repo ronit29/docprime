@@ -11,7 +11,8 @@ import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
-from django.conf import settings
+import requests
+import json
 User = get_user_model()
 
 
@@ -220,6 +221,20 @@ def labappointment_transform(app_data):
     app_data["lab"] = app_data["lab"].id
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
+
+
+def refund_curl_request(req_data):
+    token = ""
+    headers = {
+        "Authorization": token,
+        "Content-Type": "application/json"
+    }
+    url = "http://pgdev.policybazaar.com/dp/refund/refundRequested"
+    for data in req_data:
+        response = requests.post(url, data=data, headers=headers)
+        response.raise_for_status()
+        print(response.raw)
+
 
 class ErrorCodeMapping(object):
     IVALID_APPOINTMENT_ORDER = 1

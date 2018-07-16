@@ -12,7 +12,7 @@ from django.conf import settings
 from datetime import timedelta
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction
+from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund
 from ondoc.payout.models import Outstanding
 # from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
@@ -787,7 +787,8 @@ class OpdAppointment(auth_model.TimeStampedModel):
         cancel_amount = self.effective_price
         consumer_account.credit_cancellation(data, cancel_amount)
         if refund_flag:
-            consumer_account.debit_refund(data)
+            ctx_obj = consumer_account.debit_refund(data)
+            ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def action_completed(self):
         self.status = self.COMPLETED
