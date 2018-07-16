@@ -59,7 +59,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not request:
             raise ValueError("request is not passed in serializer.")
-        return request.build_absolute_uri(obj.get_thumbnail())
+        return request.build_absolute_uri(obj.get_thumbnail()) if obj.get_thumbnail else None
 
     def get_lat(self,obj):
         if obj.location:
@@ -172,7 +172,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.lab.get_thumbnail())
+        return request.build_absolute_uri(obj.lab.get_thumbnail()) if obj.lab.get_thumbnail() else None
 
     def get_patient_thumbnail(self, obj):
         request = self.context.get("request")

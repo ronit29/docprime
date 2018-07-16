@@ -163,8 +163,10 @@ class DoctorSearchHelper:
                 "hospitals": hospitals,
                 "thumbnail": (
                     request.build_absolute_uri(
-                        static('doctor_images/no_image.png')) if not doctor.images.all() else request.build_absolute_uri(
-                        doctor.images.all()[0].name.url))
+                        None if not doctor.images.all() else request.build_absolute_uri(
+                        doctor.images.all()[0].name.url)))
+                        # static('doctor_images/no_image.png')) if not doctor.images.all() else request.build_absolute_uri(
+                        # doctor.images.all()[0].name.url))
             }
             response.append(temp)
         return response
