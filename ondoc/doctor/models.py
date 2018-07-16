@@ -894,7 +894,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         month = req_data.get("month")
         year = req_data.get("year")
         payment_type = req_data.get("payment_type")
-        out_level = req_data.get("outstanding_level")
+        out_level = req_data.get("level")
         admin_id = req_data.get("admin_id")
         out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
                                              outstanding_month=month, outstanding_year=year).first()
@@ -937,7 +937,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         month = req_data.get("month")
         year = req_data.get("year")
         payment_type = req_data.get("payment_type")
-        out_level = req_data.get("outstanding_level")
+        out_level = req_data.get("level")
         admin_id = req_data.get("admin_id")
 
         start_date_time, end_date_time = get_start_end_datetime(month, year)
@@ -970,22 +970,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                                       outstanding=out_obj))
 
         return queryset
-        # doc_hospital = auth_model.UserPermission.get_billable_doctor_hospital(user)
-        # q = list()
-        # for data in doc_hospital:
-        #     d = data["doctor"]
-        #     h = data["hospital"]
-        #     q.append((Q(doctor=d) & Q(hospital=h)))
-        # if payment_type in [cls.COD, cls.PREPAID]:
-        #     payment_type = [cls.COD, cls.PREPAID]
-        # elif payment_type in [cls.INSURANCE]:
-        #     payment_type = [cls.INSURANCE]
-        # queryset = (OpdAppointment.objects.filter(reduce(or_, q)).
-        #             filter(status=OpdAppointment.COMPLETED,
-        #                    time_slot_start__gte=start_date_time,
-        #                    time_slot_start__lte=end_date_time,
-        #                    payment_type__in=payment_type))
-        # return queryset
 
     class Meta:
         db_table = "opd_appointment"

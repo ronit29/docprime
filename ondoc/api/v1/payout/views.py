@@ -84,10 +84,11 @@ class BillingViewSet(viewsets.GenericViewSet):
         serializer = BillingSummarySerializer(data=query_param)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        if valid_data.get('outstanding_level') in [Outstanding.DOCTOR_LEVEL, Outstanding.HOSPITAL_LEVEL,
+        resp_data = []
+        if valid_data.get('level') in [Outstanding.DOCTOR_LEVEL, Outstanding.HOSPITAL_LEVEL,
                                                    Outstanding.HOSPITAL_NETWORK_LEVEL]:
             resp_data = OpdAppointment.get_billing_summary(request.user, valid_data)
-        elif valid_data.get('outstanding_level') in [Outstanding.LAB_NETWORK_LEVEL, Outstanding.LAB_LEVEL]:
+        elif valid_data.get('level') in [Outstanding.LAB_NETWORK_LEVEL, Outstanding.LAB_LEVEL]:
             resp_data = LabAppointment.get_billing_summary(request.user, valid_data)
         return Response(resp_data)
 
@@ -96,12 +97,12 @@ class BillingViewSet(viewsets.GenericViewSet):
         serializer = BillingSummarySerializer(data=query_param)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        if valid_data.get('outstanding_level') in [Outstanding.DOCTOR_LEVEL, Outstanding.HOSPITAL_LEVEL,
+        if valid_data.get('level') in [Outstanding.DOCTOR_LEVEL, Outstanding.HOSPITAL_LEVEL,
                                                    Outstanding.HOSPITAL_NETWORK_LEVEL]:
             resp_queryset = OpdAppointment.get_billing_appointment(request.user, valid_data)
             resp_queryset = paginate_queryset(resp_queryset, request)
             serializer = OpdAppointmentSerializer(resp_queryset, many=True, context={"request": request})
-        elif valid_data.get('outstanding_level') in [Outstanding.LAB_NETWORK_LEVEL, Outstanding.LAB_LEVEL]:
+        elif valid_data.get('level') in [Outstanding.LAB_NETWORK_LEVEL, Outstanding.LAB_LEVEL]:
             resp_queryset = LabAppointment.get_billing_appointment(request.user, valid_data)
             resp_queryset = paginate_queryset(request, resp_queryset)
             serializer = LabAppointmentModelSerializer(resp_queryset, many=True)

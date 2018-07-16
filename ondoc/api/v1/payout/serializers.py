@@ -14,6 +14,6 @@ class OutstandingModelSerializer(serializers.ModelSerializer):
 class BillingSummarySerializer(serializers.Serializer):
     month = serializers.IntegerField(max_value=12, min_value=1)
     year = serializers.IntegerField()
-    outstanding_level = serializers.ChoiceField(choices=payout_models.Outstanding.LEVEL_CHOICES)
+    level = serializers.ChoiceField(choices=payout_models.Outstanding.LEVEL_CHOICES)
     admin_id = serializers.IntegerField()
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
