@@ -13,7 +13,7 @@ from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest)
+    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -107,6 +107,7 @@ class LabManagerInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+
 
 class LabAccreditationInline(admin.TabularInline):
     model = LabAccreditation
@@ -395,4 +396,17 @@ class LabTestTypeAdmin(VersionAdmin):
 
 class AvailableLabTestAdmin(VersionAdmin):
     search_fields = ['test__name']
+
+
+class DiagnosticConditionLabTestInline(admin.TabularInline):
+    model = DiagnosticConditionLabTest
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['lab_test']
+
+
+class CommonDiagnosticConditionAdmin(VersionAdmin):
+    search_fields = ['name']
+    inlines = [DiagnosticConditionLabTestInline]
 

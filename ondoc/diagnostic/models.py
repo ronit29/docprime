@@ -633,13 +633,29 @@ class CommonTest(TimeStampedModel):
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)
-    test = models.ManyToManyField(LabTest)
+    lab_test = models.ManyToManyField(
+        LabTest,
+        through='DiagnosticConditionLabTest',
+        through_fields=('diagnostic_condition', 'lab_test'),
+    )
+    # test = models.ManyToManyField(LabTest)
 
     def __str__(self):
         return self.name
 
     class Meta:
         db_table = "common_diagnostic_condition"
+
+
+class DiagnosticConditionLabTest(TimeStampedModel):
+    diagnostic_condition = models.ForeignKey(CommonDiagnosticCondition, on_delete=models.CASCADE)
+    lab_test = models.ForeignKey(LabTest, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.diagnostic_condition.name + " " + self.lab_test.name
+
+    class Meta:
+        db_table = "diagnostic_condition_labtest"
 
 
 class PromotedLab(TimeStampedModel):
