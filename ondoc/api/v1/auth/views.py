@@ -915,12 +915,12 @@ class OrderHistoryViewSet(GenericViewSet):
 
         doc_hosp_details = defaultdict(dict)
         if opd_action_data:
-            doc_hosp_obj = DoctorHospital.objects.prefetch_related('doctor', 'hospital').filter(doc_hosp_query)
+            doc_hosp_obj = DoctorHospital.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(doc_hosp_query)
             for data in doc_hosp_obj:
                 doc_hosp_details[data.hospital.id][data.doctor.id] = {
                     "doctor_name": data.doctor.name,
                     "hospital_name": data.hospital.name,
-                    "hospital_thumbnail": request.build_absolute_uri(data.hospital.get_thumbnail())
+                    "doctor_thumbnail": request.build_absolute_uri(data.doctor.images.first().name.url) if data.doctor.images.all().first() else None
                 }
 
         lab_name = dict()
@@ -931,14 +931,11 @@ class OrderHistoryViewSet(GenericViewSet):
             for data in test_ids:
                 lab_name[data.lab.id] = {
                     'name': data.lab.name,
-                    "lab_thumbnail": request.build_absolute_uri(data.lab.get_thumbnail())
+                    "lab_thumbnail": request.build_absolute_uri(data.lab.get_thumbnail()) if data.lab.get_thumbnail() else None
                 }
                 lab_test_map[data.id] = {"id": data.test.id,
-                                        "name": data.test.name
-                                        }
-        # if opd_action_data:
-        #     opd_app_obj = OpdAppointment.objects.filter(hospital=)
-
+                                         "name": data.test.name
+                                         }
         orders = []
 
         for action_data in opd_action_data:
@@ -947,7 +944,7 @@ class OrderHistoryViewSet(GenericViewSet):
                 "doctor_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["doctor_name"],
                 "hospital": action_data.get("hospital"),
                 "hospital_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["hospital_name"],
-                "hospitla_thumbnail": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["hospital_thumbnail"],
+                "doctor_thumbnail": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["doctor_thumbnail"],
                 "profile_detail": action_data.get("profile_detail"),
                 "profile": action_data.get("profile"),
                 "user": action_data.get("user"),
