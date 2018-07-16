@@ -584,14 +584,14 @@ class UserAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
 
         range = serializer.validated_data.get('range')
-        hospital_id = serializer.validated_data.get('hospital_id')
-        profile_id = serializer.validated_data.get('profile_id')
+        hospital = serializer.validated_data.get('hospital_id')
+        profile = serializer.validated_data.get('profile_id')
 
-        if profile_id:
-            queryset = queryset.filter(profile=profile_id)
+        if profile:
+            queryset = queryset.filter(profile=profile)
 
-        if hospital_id:
-            queryset = queryset.filter(hospital_id=hospital_id)
+        if hospital:
+            queryset = queryset.filter(hospital=hospital)
 
         if range == 'previous':
             queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')

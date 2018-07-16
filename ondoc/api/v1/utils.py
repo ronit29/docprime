@@ -210,6 +210,7 @@ def opdappointment_transform(app_data):
     app_data["profile"] = app_data["profile"].id
     app_data["user"] = app_data["user"].id
     app_data["booked_by"] = app_data["booked_by"].id
+    return app_data
 
 
 def labappointment_transform(app_data):
