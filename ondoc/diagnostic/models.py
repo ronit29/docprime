@@ -486,7 +486,7 @@ class LabAppointment(TimeStampedModel):
         self.status = self.ACCEPTED
         self.save()
 
-    def action_cancelled(self, refund_flag):
+    def action_cancelled(self, refund_flag=1):
         self.status = self.CANCELED
         self.save()
 
