@@ -17,12 +17,19 @@ class NotificationAction:
     APPOINTMENT_RESCHEDULED_BY_PATIENT = 3
     APPOINTMENT_RESCHEDULED_BY_DOCTOR = 4
     APPOINTMENT_BOOKED = 5
+
+    PRESCRIPTION_UPLOADED = 6
+    PAYMENT_PENDING = 7
+    RECEIPT = 8
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
         (APPOINTMENT_RESCHEDULED_BY_PATIENT, "Appointment Rescheduled by Patient"),
         (APPOINTMENT_RESCHEDULED_BY_DOCTOR, "Appointment Rescheduled by Doctor"),
         (APPOINTMENT_BOOKED, "Appointment Booked"),
+        (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
+        (PAYMENT_PENDING, "Payment Pending"),
+        (RECEIPT, "Receipt")
     )
 
     OPD_APPOINTMENT = "opd_appointment"
