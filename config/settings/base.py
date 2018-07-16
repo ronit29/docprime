@@ -72,7 +72,9 @@ DJANGO_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.gis',
-    'reversion'
+    'reversion',
+    'storages',
+
 )
 
 THIRD_PARTY_APPS = (
@@ -242,3 +244,18 @@ RABBITMQ_CONNECTION_SETTINGS = {
 }
 
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
+
+# Config for AWS S3 bucket
+
+# AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
+# AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
+# AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
+# AWS_QUERYSTRING_AUTH = False
+
+# AWS_S3_REGION_NAME = 'ap-south-1'
+# AWS_S3_USE_SSL = True
+# AWS_S3_OBJECT_PARAMETERS = {
+#     'CacheControl': 'max-age=86400',
+# }
+
+#DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'

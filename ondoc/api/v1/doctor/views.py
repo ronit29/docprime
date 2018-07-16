@@ -557,7 +557,7 @@ class PrescriptionFileViewset(OndocViewSet):
                                                                   'prescription_details'))
         prescription_file_data = {
             "prescription": prescription.id,
-            "file": validated_data.get('file')
+            "name": validated_data.get('name')
         }
         prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data,
                                                                               context={"request": request})
