@@ -381,8 +381,8 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         js = ('js/admin/ondoc.js',)
 
 
-class LabTestAdmin(ImportMixin, VersionAdmin):
-    change_list_template = 'change_list_import.html'
+class LabTestAdmin(ImportExportMixin, VersionAdmin):
+    change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
     search_fields = ['name']
     resource_class = LabTestResource
