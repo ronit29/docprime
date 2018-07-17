@@ -234,7 +234,9 @@ def refund_curl_request(req_data):
     for data in req_data:
         response = requests.post(url, data=data, headers=headers)
         response.raise_for_status()
-        print(response.raw)
+        print("\n\n\n")
+        print(response.status_code)
+        print("\n\n\n")
 
 
 class ErrorCodeMapping(object):

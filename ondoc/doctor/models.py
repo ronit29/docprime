@@ -120,7 +120,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         db_table = "hospital"
 
     def get_thumbnail(self):
-        return static("hospital_images/hospital_default.png")
+        return None
+        # return static("hospital_images/hospital_default.png")
 
     def save(self, *args, **kwargs):
         super(Hospital, self).save(*args, **kwargs)
@@ -942,6 +943,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
         start_date_time, end_date_time = get_start_end_datetime(month, year)
         query_filter = dict()
+        opd_filter_query = dict()
         query_filter['user'] = user
         query_filter['write_permission'] = True
         query_filter['permission_type'] = auth_model.GenericAdmin.BILLINNG
@@ -949,8 +951,12 @@ class OpdAppointment(auth_model.TimeStampedModel):
             query_filter["hospital_network"] = admin_id
         elif out_level == Outstanding.HOSPITAL_LEVEL:
             query_filter["hospital"] = admin_id
+            if req_data.get("doctor_hospital"):
+                opd_filter_query["doctor"] = req_data.get("doctor_hospital")
         elif out_level == Outstanding.DOCTOR_LEVEL:
             query_filter["doctor"] = admin_id
+            if req_data.get("doctor_hospital"):
+                opd_filter_query["hospital"] = req_data.get("doctor_hospital")
 
         permission = auth_model.GenericAdmin.objects.filter(**query_filter).exists()
 
@@ -967,7 +973,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                                       time_slot_start__gte=start_date_time,
                                                       time_slot_start__lte=end_date_time,
                                                       payment_type__in=payment_type,
-                                                      outstanding=out_obj))
+                                                      outstanding=out_obj).filter(**opd_filter_query))
 
         return queryset
 

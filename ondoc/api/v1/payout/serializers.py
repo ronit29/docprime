@@ -17,3 +17,4 @@ class BillingSummarySerializer(serializers.Serializer):
     level = serializers.ChoiceField(choices=payout_models.Outstanding.LEVEL_CHOICES)
     admin_id = serializers.IntegerField()
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
+    doctor_hospital = serializers.IntegerField(required=False)
