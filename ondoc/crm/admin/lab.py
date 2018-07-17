@@ -7,6 +7,7 @@ from django.contrib.gis import forms
 from django.contrib.gis import admin
 from django.contrib.admin import SimpleListFilter
 from reversion.admin import VersionAdmin
+from import_export.admin import ImportExportMixin
 from django.db.models import Q
 from django.db import models
 from ondoc.doctor.models import Hospital
@@ -256,12 +257,14 @@ class LabCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 
-class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
+class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
+
+    change_list_template = 'superuser_import_export.html'
 
     list_display = ('name', 'updated_at', 'onboarding_status','data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
 
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status', 'onboarding_status', LabCityFilter)
+    list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter)
 
     exclude = ('search_key', )
 

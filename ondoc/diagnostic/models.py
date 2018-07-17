@@ -82,7 +82,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         all_images = self.lab_image.all()
         if all_images:
             return all_images[0].name.url
-        return static('lab_images/lab_default.png')
+        return None
+        # return static('lab_images/lab_default.png')
 
     def save(self, *args, **kwargs):
         self.clean()
