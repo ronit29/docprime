@@ -113,7 +113,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.order_by('-time_slot_start')
 
         queryset = paginate_queryset(queryset, request)
-        serializer = serializers.OpdAppointmentSerializer(queryset, many=True, context={'request': request})
+        serializer = serializers.AppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
@@ -210,7 +210,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             elif req_status == models.OpdAppointment.ACCEPTED:
                 updated_opd_appointment = opd_appointment.action_accepted()
 
-        opd_appointment_serializer = serializers.OpdAppointmentSerializer(updated_opd_appointment, context={'request':request})
+        opd_appointment_serializer = serializers.AppointmentRetrieveSerializer(updated_opd_appointment, context={'request':request})
         response = {
             "status": 1,
             "data": opd_appointment_serializer.data

@@ -3,7 +3,7 @@ from ondoc.authentication import models as auth_model
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.api.v1.payout.serializers import BillingSummarySerializer
-from ondoc.api.v1.doctor.serializers import OpdAppointmentSerializer
+from ondoc.api.v1.doctor.serializers import AppointmentRetrieveSerializer
 from ondoc.api.v1.diagnostic.serializers import LabAppointmentModelSerializer
 from ondoc.api.v1.utils import get_previous_month_year
 from ondoc.api.pagination import paginate_queryset
@@ -101,7 +101,7 @@ class BillingViewSet(viewsets.GenericViewSet):
                                                    Outstanding.HOSPITAL_NETWORK_LEVEL]:
             resp_queryset = OpdAppointment.get_billing_appointment(request.user, valid_data)
             resp_queryset = paginate_queryset(resp_queryset, request)
-            serializer = OpdAppointmentSerializer(resp_queryset, many=True, context={"request": request})
+            serializer = AppointmentRetrieveSerializer(resp_queryset, many=True, context={"request": request})
         elif valid_data.get('level') in [Outstanding.LAB_NETWORK_LEVEL, Outstanding.LAB_LEVEL]:
             resp_queryset = LabAppointment.get_billing_appointment(request.user, valid_data)
             resp_queryset = paginate_queryset(request, resp_queryset)
