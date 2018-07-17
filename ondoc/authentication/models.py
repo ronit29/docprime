@@ -155,7 +155,8 @@ class UserProfile(TimeStampedModel, Image):
     def get_thumbnail(self):
         if self.profile_image:
             return static(self.profile_image.url)
-        return static('doctor_images/no_image.png')
+        return None
+        # return static('doctor_images/no_image.png')
 
     class Meta:
         db_table = "user_profile"

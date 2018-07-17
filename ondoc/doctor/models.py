@@ -119,7 +119,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         db_table = "hospital"
 
     def get_thumbnail(self):
-        return static("hospital_images/hospital_default.png")
+        return None
+        # return static("hospital_images/hospital_default.png")
 
     def save(self, *args, **kwargs):
         super(Hospital, self).save(*args, **kwargs)
