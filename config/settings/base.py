@@ -84,7 +84,8 @@ THIRD_PARTY_APPS = (
     'import_export',
     'dal',
     'dal_select2',
-    'django_tables2'
+    'django_tables2',
+    'anymail'
 )
 
 LOCAL_APPS = (
@@ -242,3 +243,10 @@ RABBITMQ_CONNECTION_SETTINGS = {
 }
 
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
+
+ANYMAIL = {
+    "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
+    "MAILGUN_SENDER_DOMAIN": 'mail.docprime.com',
+}
+
+DEFAULT_FROM_EMAIL = "support@docprime.com"
