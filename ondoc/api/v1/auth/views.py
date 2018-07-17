@@ -39,6 +39,7 @@ from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
 from ondoc.payout.models import Outstanding
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
 import decimal
+from collections import defaultdict
 import copy
 
 User = get_user_model()
@@ -900,64 +901,88 @@ class OrderHistoryViewSet(GenericViewSet):
         opd_action_data = list()
         lab_action_data = list()
         available_lab_test = list()
+        doc_hosp_query = Q()
 
         for order in Order.objects.filter(action_data__user=request.user.id, is_viewable=True,
                                           payment_status=Order.PAYMENT_PENDING):
             action_data = order.action_data
             if order.product_id == Order.DOCTOR_PRODUCT_ID:
                 opd_action_data.append(action_data)
+                doc_hosp_query = doc_hosp_query | (Q(doctor=action_data.get("doctor"), hospital=action_data.get("hospital")))
             elif order.product_id == Order.LAB_PRODUCT_ID:
                 lab_action_data.append(action_data)
                 available_lab_test.extend(action_data.get("lab_test"))
-        test_ids = AvailableLabTest.objects.filter(pk__in=available_lab_test).values('id', 'test')
 
+        doc_hosp_details = defaultdict(dict)
+        if opd_action_data:
+            doc_hosp_obj = DoctorHospital.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(doc_hosp_query)
+            for data in doc_hosp_obj:
+                doc_hosp_details[data.hospital.id][data.doctor.id] = {
+                    "doctor_name": data.doctor.name,
+                    "hospital_name": data.hospital.name,
+                    "doctor_thumbnail": request.build_absolute_uri(data.doctor.images.first().name.url) if data.doctor.images.all().first() else None
+                }
+
+        lab_name = dict()
         lab_test_map = dict()
-        for data in test_ids:
-            lab_test_map[data['id']] = data['test']
+        if available_lab_test:
+            test_ids = AvailableLabTest.objects.prefetch_related('lab', 'test').filter(pk__in=available_lab_test)
+            lab_test_map = dict()
+            for data in test_ids:
+                lab_name[data.lab.id] = {
+                    'name': data.lab.name,
+                    "lab_thumbnail": request.build_absolute_uri(data.lab.get_thumbnail()) if data.lab.get_thumbnail() else None
+                }
+                lab_test_map[data.id] = {"id": data.test.id,
+                                         "name": data.test.name
+                                         }
         orders = []
 
         for action_data in opd_action_data:
             data = {
                 "doctor": action_data.get("doctor"),
+                "doctor_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["doctor_name"],
                 "hospital": action_data.get("hospital"),
+                "hospital_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["hospital_name"],
+                "doctor_thumbnail": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["doctor_thumbnail"],
                 "profile_detail": action_data.get("profile_detail"),
                 "profile": action_data.get("profile"),
                 "user": action_data.get("user"),
                 "time_slot_start": action_data.get("time_slot_start"),
                 "start_date": action_data.get("time_slot_start"),
                 "start_time": 0.0,  # not required here we are only validating fees
-                "fees": action_data.get("effective_price"),
-                "payment_type": action_data.get("payment_type")
+                "payment_type": action_data.get("payment_type"),
+                "type": "opd"
             }
             serializer = CreateAppointmentSerializer(data=data, context={"request": request})
             if not serializer.is_valid():
                 data.pop("time_slot_start")
                 data.pop("start_date")
                 data.pop("start_time")
-                data.pop("fees")
-            data["doctor_name"] = serializer.validated_data.get('doctor').name
-            data["hospital_name"] = serializer.validated_data.get('hospital').name
+            valid_data = serializer.validated_data
+            # data["doctor_name"] = valid_data.get('doctor').name if valid_data.get('doctor') else None
+            # data["hospital_name"] = valid_data.get('hospital').name if valid_data.get('hospital') else None
             orders.append(data)
 
         for action_data in lab_action_data:
             data = {
                 "lab": action_data.get("lab"),
-                "test_ids": [lab_test_map[x] for x in action_data.get("lab_test")],
+                "lab_name": lab_name[action_data['lab']]["name"],
+                "test_ids": [lab_test_map[x]["id"] for x in action_data.get("lab_test")],
+                "lab_thumbnail": lab_name[action_data['lab']]["lab_thumbnail"],
                 "profile": action_data.get("profile"),
                 "time_slot_start": action_data.get("time_slot_start"),
                 "start_date": action_data.get("time_slot_start"),
                 "start_time": 0.0,  # not required here we are only validating fees
-                "fees": action_data.get("effective_price"),
-                "payment_type": action_data.get("payment_type")
+                "payment_type": action_data.get("payment_type"),
+                "type": "lab"
             }
             serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
             if not serializer.is_valid(raise_exception=True):
+                data.pop("time_slot_start")
                 data.pop("start_date")
                 data.pop("start_time")
-                data.pop("fees")
-            data["lab_name"] = serializer.validated_data.get('lab').name
-            data["test_ids_name"] = [x.name for x in serializer.validated_data.get('test_ids')]
-
+            data["test_ids"] = [lab_test_map[x] for x in action_data.get("lab_test")]
             orders.append(data)
         return Response(orders)
 
