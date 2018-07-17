@@ -797,6 +797,10 @@ class OpdAppointment(auth_model.TimeStampedModel):
             self.outstanding = out_obj
         self.save()
 
+    def generate_invoice(self):
+        pass
+
+
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
             return self.hospital.network, payout_model.Outstanding.HOSPITAL_NETWORK_LEVEL
@@ -852,6 +856,15 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 instance=self,
                 user=self.doctor.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED,
+            )
+        # The below code is only for testing
+        elif self.status == OpdAppointment.COMPLETED:
+            if not self.user:
+                return
+            notification_models.NotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.DOCTOR_INVOICE,
             )
 
     def is_doctor_available(self):
