@@ -1,68 +1,82 @@
-{% load invoice_tags %}
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-	<title>INVOICE</title>
-
+	<title>Invoice Generated</title>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Quicksand', sans-serif;">
-	<table cellpadding="0" cellspacing="0" width="100%" style="width: 100%; max-width: 700px; margin: auto;">
+<body style="margin: 0; padding: 0; width: 100%; font-family: 'Quicksand', sans-serif;">
+	<table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; margin: auto;">
 		<tbody>
 			<tr>
 				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px; background-color: #ffffff;">
+					<table style="padding: 0 15px 40px; background-color: #fafafa; width: 100%;">
 						<tbody>
 							<tr>
 								<td>
-									<h3 style="font-weight: 500;">Dr. {{doctor_name|capfirst}}</h3>
-								</td>
-								<td style="text-align: right;">
-									<h3 style="font-weight: 500;">Inovice</h3>
+									<table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px;">
+										<tbody>
+											<tr>
+												<td>
+													<img src="checked-orange.svg">
+												</td>
+												<td style="text-align: right;">
+													<img src="logo.png">
+												</td>
+											</tr>
+										</tbody>
+									</table>
 								</td>
 							</tr>
+							<tr>
+								<td>
+									<table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 16px;">
+										<tbody>
+											<tr>
+												<td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
+													Invoice Generated
+												</td>
+											</tr>
+											<tr>
+												<td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
+												invoice date
+												</td>
+											</tr>
+										</tbody>
+									</table>
+								</td>
+							</tr>
+							<tr>
 						</tbody>
 					</table>
 				</td>
 			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="padding-top: 20px; width: 100%;">
-						<tbody>
-							<tr>
-								<td>
-									<p style="margin: 0; font-size: 12px; color: #757575; font-weight: 500;">{% if instance.hospital.building %}{{instance.hospital.building}}, {% endif %}{% if instance.hospital.sublocality %}{{instance.hospital.sublocality}} {% endif %}</p>
-									<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{% if instance.hospital.locality %}{{instance.hospital.locality}}, {% endif %}{% if instance.hospital.city %}{{instance.hospital.city}}{% endif %}</p>
-									<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{% if instance.hospital.state %}{{instance.hospital.state}} {% endif %}{% if instance.hospital.pin_code %}{{instance.hospital.pin_code}}{% endif %}</p>
-								</td>
-								<!--<td style="text-align: right;">-->
-									<!--<p style="margin: 0; font-size: 12px; color: #757575; font-weight: 500;">Phone: 022-25308722/41318723</p>-->
-									<!--<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">Mob :9324136670/9167480188</p>-->
+			<!--<tr>-->
+				<!--<td>-->
+					<!--<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px; border-bottom: 1px solid #d3d3d3;">-->
+						<!--<tbody>-->
+							<!--<tr>-->
+								<!--<td style="color: #757575; font-size: 16px; font-weight: 500;">-->
+									<!--Unique Confirmation Code : <span style="color: #000000; font-weight: 600;">5453</span>-->
 								<!--</td>-->
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="color: #000000; font-size: 12px; font-weight: 500; padding-top: 4px;">-->
+									<!--Share this code with doctor at the time of your appoinment-->
+								<!--</td>-->
+							<!--</tr>-->
+						<!--</tbody>-->
+					<!--</table>-->
+				<!--</td>-->
+			<!--</tr>-->
 			<tr>
 				<td>
-					<hr style="margin: 20px 0;">
-					<table cellpadding="0" cellspacing="0" style="width: 100%;">
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
 						<tbody>
 							<tr>
-								<td>
-									<p style="margin: 0; font-size: 12px; color: #000000; font-weight: 500;">{{instance.profile.name|capfirst}} | {{instance.profile.gender|get_gender}}</p>
-									<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">Booking ID: {{instance.id}}</p>
-									<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">+91{{instance.user.phone_number}}</p>
-									<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{{instance.user.email}}</p>
-								</td>
-								<td style="text-align: right;">
-									<p style="margin: 0; font-size: 12px; color: #000000; font-weight: 500;">By: Dr. {{doctor_name|capfirst}}</p>
-									<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 500;">Registration No: <span style="font-weight: 600;">{{instance.doctor.license}}</span></p>
-									<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 500;">Date: <span style="font-weight: 600;">{{invoice.created_at|date:'M d, Y'}}</span></p>
-									<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 500;">Invoice N0: <span style="font-weight: 600;">{{invoice.id}}</span></p>
+								<td style="color: #757575; font-size: 16px; font-weight: 500;">
+									Booking ID : <span style="color: #000000; font-weight: 600;">{{instance.id}}</span>
 								</td>
 							</tr>
 						</tbody>
@@ -71,50 +85,81 @@
 			</tr>
 			<tr>
 				<td>
-					<table cellpadding="0" cellspacing="0" style="padding-top: 30px; width: 100%;">
-						<thead>
-							<tr style="background-color: #f3f3f3; ">
-								<td width="8.333%" style="width: 8.333%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">S. No.</td>
-								<td width="50%" style="width: 50%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Treatments</td>
-								<td width="16.666%" style="width: 16.666%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Unit Cost</td>
-								<td width="8.333%" style="width: 8.333%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Qty</td>
-								<td width="16.666%" style="width: 16.666%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Total Cost</td>
-							</tr>
-						</thead>
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 40px 15px 0;">
 						<tbody>
+							<!--<tr>-->
+								<!--<td style="color: #000000; font-weight: 600; font-size: 16px;">-->
+									<!--Dr. Stephny Ray-->
+								<!--</td>-->
+							<!--</tr>-->
 							<tr>
-								<td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">1</td>
-								<td width="50%" style="width: 50%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">Doctor Consultation</td>
-								<td width="16.666%" style="width: 16.666; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">{{instance.mrp}}</td>
-								<td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">1</td>
-								<td width="16.666%" style="width: 16.666; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">{{instance.mrp}}</td>
+								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+									Invoice has been generated. Please <a href="{{invoice_url}}" download>Click here </a> to download invoice.
+								</td>
 							</tr>
 							<!--<tr>-->
-								<!--<td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">2</td>-->
-								<!--<td width="50%" style="width: 50%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3; word-wrap: break-word;">Single sheet root canal treatment with microsocpe</td>-->
-								<!--<td width="16.666%" style="width: 16.666%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">80,000.00</td>-->
-								<!--<td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">2</td>-->
-								<!--<td width="16.666%" style="width: 16.666%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">1,60,000.00</td>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
+									<!--General Physician-->
+								<!--</td>-->
 							<!--</tr>-->
 						</tbody>
 					</table>
 				</td>
 			</tr>
+			<!--<tr>-->
+				<!--<td>-->
+					<!--<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">-->
+						<!--<tbody>-->
+							<!--<tr>-->
+								<!--<td style="color: #000000; font-weight: 600; font-size: 16px;">-->
+									<!--Apollo Clinic-->
+								<!--</td>-->
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">-->
+									<!--Plot Number 66, 1st Floor, Sector 12A-->
+								<!--</td>-->
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
+									<!--Gurgaon Haryana-->
+								<!--</td>-->
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
+									<!--122001-->
+								<!--</td>-->
+							<!--</tr>-->
+						<!--</tbody>-->
+					<!--</table>-->
+				<!--</td>-->
+			<!--</tr>-->
+			<!--<tr>-->
+				<!--<td>-->
+					<!--<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 20px; border-bottom: 1px solid #d3d3d3;">-->
+						<!--<tbody>-->
+							<!--<tr>-->
+								<!--<td style="color: #000000; font-weight: 600; font-size: 16px;">-->
+									<!--Clinic Visit Time-->
+								<!--</td>-->
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">-->
+									<!--18th  April &nbsp;&nbsp; | &nbsp;&nbsp; 3:30 PM-->
+								<!--</td>-->
+							<!--</tr>-->
+						<!--</tbody>-->
+					<!--</table>-->
+				<!--</td>-->
+			<!--</tr>-->
 			<tr>
 				<td>
-					<table cellpadding="0" cellspacing="0" width="100%" style="width: 100%; padding-top: 10px;">
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">
 						<tbody>
 							<tr>
-								<td width="83.333%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Total Cost :</td>
-								<td width="16.667%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{instance.mrp}}</td>
-							</tr>
-							<tr>
-								<td width="83.334%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Discount :</td>
-								<td width="16.666%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{ instance.mrp|subtract:instance.effective_price}}</td>
-							</tr>
-							<tr>
-								<td width="83.334%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Grand Total :</td>
-								<td width="16.666%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{instance.effective_price}}</td>
+								<td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;">
+									This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to customerhelp@docprime.com
+								</td>
 							</tr>
 						</tbody>
 					</table>
@@ -122,11 +167,27 @@
 			</tr>
 			<tr>
 				<td>
-					<table cellpadding="0" cellspacing="0" width="100%" style="width: 100%; padding-top: 20px;">
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; background-color: #f78631;">
 						<tbody>
 							<tr>
-								<td width="20%" style="width:20%; font-size: 14px; color: #757575; font-weight: 500;">Mode of Payment :</td>
-								<td width="80%" style="width:80%; font-size: 14px; color: #000000; font-weight: 500;">{{instance|mode_of_payment}}</td>
+								<td style="font-size: 14px; color: #fafafa; width: 60%">
+									All Rights Reserved
+								</td>
+								<td style="width: 8%; text-align: right;">
+									<a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="youtube-email.svg"></a>
+								</td>
+								<td style="width: 8%; text-align: right;">
+									<a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img src="instagram-email.svg"></a>
+								</td>
+								<td style="width: 8%; text-align: right;">
+									<a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img src="facebook-email.svg"></a>
+								</td>
+								<td style="width: 8%; text-align: right;">
+									<a href="https://twitter.com/DocPrimeindia" target="_blank"><img src="twitter-email.svg"></a>
+								</td>
+								<td style="width: 8%; text-align: right;">
+									<a href="https://www.linkedin.com/company/docprime/" target="_blank"><img src="linkedin-email.svg"></a>
+								</td>
 							</tr>
 						</tbody>
 					</table>

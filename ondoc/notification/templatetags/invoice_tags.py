@@ -9,10 +9,12 @@ register = template.Library()
 def subtract(value, arg):
     return round(value - arg, 2)
 
+
 @register.filter
-def mode_of_payment(appointment):
+def mode_of_payment(payment_type):
     payment_mode_mapping = {choice[0]: choice[1] for choice in OpdAppointment.PAY_CHOICES}
-    return payment_mode_mapping[appointment.payment_type]
+    return payment_mode_mapping[int(payment_type)]
+
 
 @register.filter
 def get_gender(gender):

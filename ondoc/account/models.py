@@ -248,4 +248,4 @@ class Invoice(TimeStampedModel):
     PRODUCT_IDS = Order.PRODUCT_IDS
     reference_id = models.PositiveIntegerField()
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
-    file = models.FileField(upload_to='doctor/documents/invoices', null=True, blank=True)
+    file = models.FileField(upload_to='invoices', null=True, blank=True)

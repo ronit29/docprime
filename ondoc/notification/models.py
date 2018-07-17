@@ -131,6 +131,23 @@ class NotificationAction:
             }
             EmailNotification.send_notification(user=user, notification_type=notification_type,
                                                 email=user.email, context=context)
+        elif notification_type == NotificationAction.LAB_INVOICE:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            lab_name = instance.lab.name if instance.lab.name else ""
+            context = {
+                "patient_name": patient_name,
+                "lab_name": lab_name,
+                "instance": instance,
+                "title": "Invoice Generated",
+                "body": "Appointment has been generated.",
+                "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.LAB_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            EmailNotification.send_notification(user=user, notification_type=notification_type,
+                                                email=user.email, context=context)
+
 
 
     @classmethod
@@ -188,8 +205,8 @@ class EmailNotification(TimeStampedModel):
             html_body = render_to_string("email/doctor_invoice/body.html", context=context)
             email_subject = render_to_string("email/doctor_invoice/subject.txt", context=context)
         elif notification_type == NotificationAction.LAB_INVOICE:
-            invoice = account_model.Invoice.objects.get_or_create(reference_id=context.get("instance").id,
-                                                                  product_id=account_model.Order.DOCTOR_PRODUCT_ID).first()
+            invoice, created = account_model.Invoice.objects.get_or_create(reference_id=context.get("instance").id,
+                                                                           product_id=account_model.Order.LAB_PRODUCT_ID)
             context.update({"invoice": invoice})
             html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
             filename = "invoice_{}.pdf".format(str(timezone.now().timestamp()))
