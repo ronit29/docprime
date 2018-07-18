@@ -84,7 +84,8 @@ THIRD_PARTY_APPS = (
     'import_export',
     'dal',
     'dal_select2',
-    'django_tables2'
+    'django_tables2',
+    'anymail'
 )
 
 LOCAL_APPS = (
@@ -191,8 +192,11 @@ TEMPLATES = [
             # https://docs.djangoproject.com/en/dev/ref/settings/#template-loaders
             # https://docs.djangoproject.com/en/dev/ref/templates/api/#loader-types
             'loaders': [
+                ('django.template.loaders.cached.Loader', [
                 'django.template.loaders.filesystem.Loader',
                 'django.template.loaders.app_directories.Loader',
+                ]),
+
             ],
             # https://docs.djangoproject.com/en/dev/ref/settings/#template-context-processors
             'context_processors': [
@@ -242,3 +246,10 @@ RABBITMQ_CONNECTION_SETTINGS = {
 }
 
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
+
+ANYMAIL = {
+    "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
+    "MAILGUN_SENDER_DOMAIN": 'mail.docprime.com',
+}
+
+DEFAULT_FROM_EMAIL = "support@docprime.com"

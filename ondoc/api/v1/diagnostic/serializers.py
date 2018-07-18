@@ -176,7 +176,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
     def get_patient_thumbnail(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.profile.get_thumbnail())
+        return request.build_absolute_uri(obj.profile.get_thumbnail()) if obj.profile.get_thumbnail() else None
 
     class Meta:
         model = LabAppointment

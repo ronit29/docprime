@@ -76,17 +76,17 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             photo_url = obj.profile.profile_image.url
             return request.build_absolute_uri(photo_url)
         else:
-            url = static('doctor_images/no_image.png')
-            return request.build_absolute_uri(url)
+            return None
 
     def get_doctor_thumbnail(self, obj):
         request = self.context.get('request')
         if obj.doctor.images.all():
             photo_url = obj.doctor.images.all()[0].name.url
-            return request.build_absolute_uri(photo_url)
+            return request.build_absolute_uri(photo_url) if photo_url else None
         else:
-            url = static('doctor_images/no_image.png')
-            return request.build_absolute_uri(url)
+            return None
+            # url = static('doctor_images/no_image.png')
+            # return request.build_absolute_uri(url)
 
 
 
@@ -268,7 +268,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     def get_hospital_thumbnail(self, instance):
         request = self.context.get("request")
-        return request.build_absolute_uri(instance.hospital.get_thumbnail())
+        return request.build_absolute_uri(instance.hospital.get_thumbnail()) if instance.hospital.get_thumbnail() else None
 
     def get_day(self, attrs):
         day  = attrs.day
@@ -353,10 +353,12 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         if obj.images.all().exists():
             image = obj.images.all().first()
             if not image.name:
-                return request.build_absolute_uri(default_image_url)
+                return None
+                # return request.build_absolute_uri(default_image_url)
             return request.build_absolute_uri(image.name.url)
         else:
-            return request.build_absolute_uri(default_image_url)
+            return None
+            # return request.build_absolute_uri(default_image_url)
 
 
     # def to_representation(self, doctor):
@@ -415,7 +417,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not request:
             return obj.get_thumbnail()
-        return request.build_absolute_uri(obj.get_thumbnail())
+        return request.build_absolute_uri(obj.get_thumbnail()) if obj.get_thumbnail() else None
 
     class Meta:
         model = Hospital

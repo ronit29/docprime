@@ -163,11 +163,7 @@ class DoctorSearchHelper:
                                                             context={"request": request}).data,
                 "hospitals": hospitals,
                 "thumbnail": (
-                        None if not doctor.images.all() else request.build_absolute_uri(
-                        doctor.images.all()[0].name.url))
-                        # request.build_absolute_uri(
-                        # static('doctor_images/no_image.png')) if not doctor.images.all() else request.build_absolute_uri(
-                        # doctor.images.all()[0].name.url))
+                    request.build_absolute_uri(doctor.images.all()[0].name.url) if doctor.images.exists() else None)
             }
             response.append(temp)
         return response
