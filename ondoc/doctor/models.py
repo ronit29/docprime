@@ -470,7 +470,7 @@ class HospitalImage(auth_model.TimeStampedModel, auth_model.Image):
 
 class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    name = models.ImageField(upload_to='hospital/documents', height_field='height', width_field='width')
+    name = models.ImageField(upload_to='hospital/documents')
 
     class Meta:
         db_table = "hospital_document"

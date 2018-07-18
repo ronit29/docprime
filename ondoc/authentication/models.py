@@ -32,7 +32,10 @@ class Image(models.Model):
 
 
     def save(self, *args, **kwargs):
-        self.has_image_changed()
+
+        if not self.has_image_changed():
+            return super().save(*args, **kwargs)
+
         if self.name:
             max_allowed = 1000
             img = Img.open(self.name)
@@ -44,8 +47,8 @@ class Image(models.Model):
 
             img = img.resize(size, Img.ANTIALIAS)
 
-            # if img.mode != 'RGB':
-            img = img.convert('RGB')
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
 
             md5_hash = hashlib.md5(img.tobytes()).hexdigest()
             #if img.multiple_chunks():
@@ -100,8 +103,8 @@ class Document(models.Model):
 
                 img = img.resize(size, Img.ANTIALIAS)
 
-            # if img.mode != 'RGB':
-            #     img = img.convert('RGB')
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
 
                 md5_hash = hashlib.md5(img.tobytes()).hexdigest()
                 #if img.multiple_chunks():
