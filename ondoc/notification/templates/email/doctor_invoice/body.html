@@ -1,4 +1,5 @@
 {% load static %}
+{% load invoice_tags %}
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -20,10 +21,10 @@
 										<tbody>
 											<tr>
 												<td>
-													<img src="{% static 'notification/images/checked-orange.svg' %}">
+													<img src="{{'notification/images/checked-orange.svg'|get_absolute_url}}">
 												</td>
 												<td style="text-align: right;">
-													<img src="{% static 'notification/images/logo.png' %}">
+													<img src="{{'notification/images/logo.png'|get_absolute_url}}">
 												</td>
 											</tr>
 										</tbody>
@@ -175,19 +176,19 @@
 									All Rights Reserved
 								</td>
 								<td style="width: 8%; text-align: right;">
-									<a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="{% static 'notification/images/youtube-email.svg' %}"></a>
+									<a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="{{'notification/images/youtube-email.svg'|get_absolute_url}}"></a>
 								</td>
 								<td style="width: 8%; text-align: right;">
-									<a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img src="{% static 'notification/images/instagram-email.svg' %}"></a>
+									<a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img src="{{'notification/images/instagram-email.svg'|get_absolute_url}}"></a>
 								</td>
 								<td style="width: 8%; text-align: right;">
-									<a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img src="{% static 'notification/images/facebook-email.svg' %}"></a>
+									<a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img src="{{'notification/images/facebook-email.svg'|get_absolute_url}}"></a>
 								</td>
 								<td style="width: 8%; text-align: right;">
-									<a href="https://twitter.com/DocPrimeindia" target="_blank"><img src="{% static 'notification/images/twitter-email.svg' %}"></a>
+									<a href="https://twitter.com/DocPrimeindia" target="_blank"><img src="{{'notification/images/twitter-email.svg'|get_absolute_url}}"></a>
 								</td>
 								<td style="width: 8%; text-align: right;">
-									<a href="https://www.linkedin.com/company/docprime/" target="_blank"><img src="{% static 'notification/images/linkedin-email.svg' %}"></a>
+									<a href="https://www.linkedin.com/company/docprime/" target="_blank"><img src="{{'notification/images/linkedin-email.svg'|get_absolute_url}}"></a>
 								</td>
 							</tr>
 						</tbody>
