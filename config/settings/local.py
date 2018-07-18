@@ -58,6 +58,8 @@ SWAGGER_SETTINGS = {
     'USE_SESSION_AUTH': True,
 }
 
+BASE_URL = 'http://localhost:8000'
+
 # RABBITMQ_CONNECTION_SETTINGS = {
 #     'CONNECTION_URL': 'amqp://guest:guest@localhost:5672/%2F',
 #     'NOTIFICATION_QUEUE': 'notifications'

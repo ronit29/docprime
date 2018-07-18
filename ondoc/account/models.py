@@ -4,6 +4,10 @@ from ondoc.authentication.models import TimeStampedModel, User
 # from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
+from django.db.models import Sum, Q, F, Max
+from datetime import datetime, timedelta
+from django.utils import timezone
+from ondoc.api.v1.utils import refund_curl_request
 
 # Create your models here.
 
@@ -145,10 +149,11 @@ class PgTransaction(TimeStampedModel):
     order_no = models.PositiveIntegerField(blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
+    amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     payment_mode = models.CharField(max_length=50)
     response_code = models.CharField(max_length=50)
     bank_id = models.CharField(max_length=50)
-    transaction_date = models.CharField(max_length=80)
+    transaction_date = models.DateTimeField(auto_now=True)
     bank_name = models.CharField(max_length=100)
     currency = models.CharField(max_length=15)
     status_code = models.IntegerField()
@@ -156,6 +161,62 @@ class PgTransaction(TimeStampedModel):
     status_type = models.CharField(max_length=50)
     transaction_id = models.CharField(max_length=100, unique=True)
     pb_gateway_name = models.CharField(max_length=100)
+
+
+    @classmethod
+    def get_transactions(cls, user, amount):
+        max_ref_date = timezone.now() - timedelta(days=ConsumerRefund.MAXREFUNDDAYS)
+        refund_queryset = (ConsumerRefund.objects.filter(user=user, pg_transaction__isnull=False, created_at__gte=max_ref_date).values('pg_transaction', 'pg_transaction__amount').
+                           annotate(total_amount=Sum('refund_amount')))
+        pg_rem_bal = dict()
+        for data in refund_queryset:
+            pg_rem_bal[data['pg_transaction']] = data['pg_transaction__amount'] - data['total_amount']
+
+        pgtx_obj = cls.objects.filter(user=user, created_at__gte=max_ref_date)
+        new_pg_obj = list()
+        for pg_data in pgtx_obj:
+            if pg_rem_bal.get(pg_data.id) is not None:
+                if pg_rem_bal[pg_data.id] > 0:
+                    pg_data.amount = pg_rem_bal[pg_data.id]
+                    new_pg_obj.append(pg_data)
+            else:
+                new_pg_obj.append(pg_data)
+
+        new_pg_obj = sorted(new_pg_obj, key=lambda k: k.amount, reverse=True)
+
+        pgtx_details = list()
+        index = 0
+        while amount > 0:
+            refund_amount = amount
+            pg_obj = None
+            if index < len(new_pg_obj):
+                pg_obj = new_pg_obj[index]
+                refund_amount = new_pg_obj[index].amount
+                if amount < new_pg_obj[index].amount:
+                    refund_amount = amount
+
+            pgtx_details.append({
+                'id': pg_obj,
+                'amount': refund_amount
+            })
+            index += 1
+            amount -= refund_amount
+        return pgtx_details
+
+    @staticmethod
+    def form_pg_refund_data(refund_data):
+        pg_data = list()
+        for data in refund_data:
+            if data.get("pg_transaction"):
+                params = {
+                    "user": data["user"].id,
+                    "orderId": data["consumer_transaction"].id,
+                    "refundAmount": str(data["refund_amount"]),
+                    "refNo": data["pg_transaction"].id,
+                    "checksum": ""
+                }
+                pg_data.append(params)
+        return pg_data
 
     class Meta:
         db_table = "pg_transaction"
@@ -187,8 +248,9 @@ class ConsumerAccount(TimeStampedModel):
         action = ConsumerTransaction.REFUND
         tx_type = PgTransaction.DEBIT
         consumer_tx_data = self.form_consumer_tx_data(data, amount, action, tx_type)
-        ConsumerTransaction.objects.create(**consumer_tx_data)
+        ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
+        return ctx_obj
 
     def debit_schedule(self, data, amount):
         self.balance -= amount
@@ -243,3 +305,54 @@ class ConsumerTransaction(TimeStampedModel):
     class Meta:
         db_table = 'consumer_transaction'
 
+
+class ConsumerRefund(TimeStampedModel):
+    PENDING = 1
+    COMPLETED = 2
+    MAXREFUNDDAYS = 60
+    state_type = [(PENDING, "Pending"), (COMPLETED, "Completed")]
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    consumer_transaction = models.ForeignKey(ConsumerTransaction, on_delete=models.DO_NOTHING)
+    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None)
+    pg_transaction = models.ForeignKey(PgTransaction, related_name='pg_refund', blank=True, null=True, on_delete=models.DO_NOTHING)
+    refund_state = models.PositiveSmallIntegerField(choices=state_type, default=PENDING)
+
+    @classmethod
+    def initiate_refund(cls, user, ctx_obj):
+        BATCH_SIZE = 100
+        pgtx_list = PgTransaction.get_transactions(user, ctx_obj.amount)
+        refund_data = list()
+        refund_obj_data = list()
+        num = 0
+        for tx in pgtx_list:
+            temp_data = {
+                'user': ctx_obj.user,
+                'consumer_transaction': ctx_obj,
+                'refund_amount': tx['amount'],
+                'pg_transaction': tx['id']
+            }
+            if num == BATCH_SIZE:
+                cls.objects.bulk_create(refund_obj_data, batch_size=BATCH_SIZE)
+                refund_obj_data = list()
+                num = 0
+            refund_data.append(temp_data)
+            refund_obj_data.append(cls(**temp_data))
+            num += 1
+        if num:
+            cls.objects.bulk_create(refund_obj_data, batch_size=BATCH_SIZE)
+
+        try:
+            pg_data = PgTransaction.form_pg_refund_data(refund_data)
+            refund_curl_request(pg_data)
+        except Exception as e:
+            print(e)
+
+    class Meta:
+        db_table = "consumer_refund"
+
+
+class Invoice(TimeStampedModel):
+    PRODUCT_IDS = Order.PRODUCT_IDS
+    reference_id = models.PositiveIntegerField()
+    product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
+    file = models.FileField(upload_to='invoices', null=True, blank=True)

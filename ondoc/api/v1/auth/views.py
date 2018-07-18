@@ -39,6 +39,7 @@ from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
 from ondoc.payout.models import Outstanding
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
 import decimal
+from collections import defaultdict
 import copy
 
 User = get_user_model()
@@ -351,7 +352,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         resp = {}
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELED:
-                lab_appointment.action_cancelled()
+                lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
@@ -405,7 +406,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         if validated_data.get('status'):
             resp = {}
             if validated_data['status'] == OpdAppointment.CANCELED:
-                opd_appointment.action_cancelled(request.data.get("refund"))
+                opd_appointment.action_cancelled(request.data.get("refund", 1))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
@@ -584,14 +585,14 @@ class UserAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
 
         range = serializer.validated_data.get('range')
-        hospital_id = serializer.validated_data.get('hospital_id')
-        profile_id = serializer.validated_data.get('profile_id')
+        hospital = serializer.validated_data.get('hospital_id')
+        profile = serializer.validated_data.get('profile_id')
 
-        if profile_id:
-            queryset = queryset.filter(profile=profile_id)
+        if profile:
+            queryset = queryset.filter(profile=profile)
 
-        if hospital_id:
-            queryset = queryset.filter(hospital_id=hospital_id)
+        if hospital:
+            queryset = queryset.filter(hospital=hospital)
 
         if range == 'previous':
             queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
@@ -897,46 +898,91 @@ class OrderHistoryViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
-        orders = []
+        opd_action_data = list()
+        lab_action_data = list()
+        available_lab_test = list()
+        doc_hosp_query = Q()
+
         for order in Order.objects.filter(action_data__user=request.user.id, is_viewable=True,
                                           payment_status=Order.PAYMENT_PENDING):
             action_data = order.action_data
             if order.product_id == Order.DOCTOR_PRODUCT_ID:
-                data = {
-                    "doctor": action_data.get("doctor"),
-                    "hospital": action_data.get("hospital"),
-                    "profile_detail": action_data.get("profile_detail"),
-                    "profile": action_data.get("profile"),
-                    "user": action_data.get("user"),
-                    "product_id": order.product_id,
-                    "time_slot_start": action_data.get("time_slot_start"),
-                    "start_date": action_data.get("time_slot_start"),
-                    "start_time": 0.0,      # not required here we are only validating fees
-                    "fees": action_data.get("effective_price"),
-                    "payment_type": action_data.get("payment_type")
-                }
-                serializer = CreateAppointmentSerializer(data=data, context={"request": request})
-                if not serializer.is_valid():
-                    data.pop("time_slot_start")
-                    data.pop("start_date")
-                    data.pop("start_time")
-                    data.pop("fees")
+                opd_action_data.append(action_data)
+                doc_hosp_query = doc_hosp_query | (Q(doctor=action_data.get("doctor"), hospital=action_data.get("hospital")))
             elif order.product_id == Order.LAB_PRODUCT_ID:
-                data = {
-                    "lab": action_data.get("lab"),
-                    "test_ids": action_data.get("lab_test"),
-                    "profile": action_data.get("profile"),
-                    "start_date": action_data.get("start_date"),
-                    "start_time": action_data.get("start_time"),
-                    "fees": action_data.get("effective_price"),
-                    "product_id": order.product_id,
-                    "payment_type": action_data.get("payment_type")
+                lab_action_data.append(action_data)
+                available_lab_test.extend(action_data.get("lab_test"))
+
+        doc_hosp_details = defaultdict(dict)
+        if opd_action_data:
+            doc_hosp_obj = DoctorHospital.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(doc_hosp_query)
+            for data in doc_hosp_obj:
+                doc_hosp_details[data.hospital.id][data.doctor.id] = {
+                    "doctor_name": data.doctor.name,
+                    "hospital_name": data.hospital.name,
+                    "doctor_thumbnail": request.build_absolute_uri(data.doctor.images.first().name.url) if data.doctor.images.all().first() else None
                 }
-                serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
-                if not serializer.is_valid():
-                    data.pop("start_date")
-                    data.pop("start_time")
-                    data.pop("fees")
+
+        lab_name = dict()
+        lab_test_map = dict()
+        if available_lab_test:
+            test_ids = AvailableLabTest.objects.prefetch_related('lab', 'test').filter(pk__in=available_lab_test)
+            lab_test_map = dict()
+            for data in test_ids:
+                lab_name[data.lab.id] = {
+                    'name': data.lab.name,
+                    "lab_thumbnail": request.build_absolute_uri(data.lab.get_thumbnail()) if data.lab.get_thumbnail() else None
+                }
+                lab_test_map[data.id] = {"id": data.test.id,
+                                         "name": data.test.name
+                                         }
+        orders = []
+
+        for action_data in opd_action_data:
+            data = {
+                "doctor": action_data.get("doctor"),
+                "doctor_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["doctor_name"],
+                "hospital": action_data.get("hospital"),
+                "hospital_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["hospital_name"],
+                "doctor_thumbnail": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["doctor_thumbnail"],
+                "profile_detail": action_data.get("profile_detail"),
+                "profile": action_data.get("profile"),
+                "user": action_data.get("user"),
+                "time_slot_start": action_data.get("time_slot_start"),
+                "start_date": action_data.get("time_slot_start"),
+                "start_time": 0.0,  # not required here we are only validating fees
+                "payment_type": action_data.get("payment_type"),
+                "type": "opd"
+            }
+            serializer = CreateAppointmentSerializer(data=data, context={"request": request})
+            if not serializer.is_valid():
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
+            valid_data = serializer.validated_data
+            # data["doctor_name"] = valid_data.get('doctor').name if valid_data.get('doctor') else None
+            # data["hospital_name"] = valid_data.get('hospital').name if valid_data.get('hospital') else None
+            orders.append(data)
+
+        for action_data in lab_action_data:
+            data = {
+                "lab": action_data.get("lab"),
+                "lab_name": lab_name[action_data['lab']]["name"],
+                "test_ids": [lab_test_map[x]["id"] for x in action_data.get("lab_test")],
+                "lab_thumbnail": lab_name[action_data['lab']]["lab_thumbnail"],
+                "profile": action_data.get("profile"),
+                "time_slot_start": action_data.get("time_slot_start"),
+                "start_date": action_data.get("time_slot_start"),
+                "start_time": 0.0,  # not required here we are only validating fees
+                "payment_type": action_data.get("payment_type"),
+                "type": "lab"
+            }
+            serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
+            if not serializer.is_valid(raise_exception=True):
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
+            data["test_ids"] = [lab_test_map[x] for x in action_data.get("lab_test")]
             orders.append(data)
         return Response(orders)
 
@@ -946,7 +992,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (DoctorHospital.objects.filter(Q(doctor__manageable_doctors__user=user,
+        doc_hosp_queryset = (DoctorHospital.objects.annotate(hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(Q(doctor__manageable_doctors__user=user,
                                                              doctor__manageable_doctors__hospital=F('hospital'),
                                                              doctor__manageable_doctors__is_disabled=False,
                                                              doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
@@ -954,10 +1000,9 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                                            Q(hospital__manageable_hospitals__doctor__isnull=True,
                                                              hospital__manageable_hospitals__user=user,
                                                              hospital__manageable_hospitals__is_disabled=False,
-                                                             doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
-                                                             doctor__manageable_doctors__write_permission=True)).
-                             values('hospital', 'doctor', 'hospital__name', 'doctor__name').distinct('hospital',
-                                                                                                     'doctor')
+                                                             hospital__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT,
+                                                             hospital__manageable_hospitals__write_permission=True)).
+                             values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
                              )
         return Response(doc_hosp_queryset)
 
@@ -966,6 +1011,74 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
+        user = request.user
+        doc_hosp_queryset = (
+            DoctorHospital.objects.filter(
+                Q(
+                  doctor__manageable_doctors__user=user,
+                  doctor__manageable_doctors__is_disabled=False,
+                  doctor__manageable_doctors__permission_type=GenericAdmin.BILLINNG,
+                  doctor__manageable_doctors__read_permission=True) |
+                Q(
+                  hospital__manageable_hospitals__user=user,
+                  hospital__manageable_hospitals__is_disabled=False,
+                  hospital__manageable_hospitals__permission_type=GenericAdmin.BILLINNG,
+                  hospital__manageable_hospitals__read_permission=True))
+                .values('hospital', 'doctor', 'hospital__manageable_hospitals__hospital', 'doctor__manageable_doctors__doctor')
+                .annotate(doc_admin_doc=F('doctor__manageable_doctors__doctor'), doc_admin_hosp=F('doctor__manageable_doctors__hospital'), hosp_admin_doc=F('hospital__manageable_hospitals__doctor'), hosp_admin_hosp=F('hospital__manageable_hospitals__hospital'), hosp_name=F('hospital__name'), doc_name=F('doctor__name'))
+            )
+
+        resp_data = defaultdict(dict)
+        for data in doc_hosp_queryset:
+            if data['doc_admin_hosp'] is None and data['doc_admin_doc'] is not None:
+                temp_tuple = (data['doc_admin_hosp'], data['doc_admin_doc'])
+                if temp_tuple not in resp_data:
+                    temp_dict = {
+                        "admin_id": data["doctor"],
+                        "level": Outstanding.DOCTOR_LEVEL,
+                        "doctor_name": data["doc_name"],
+                        "hospital_list": list()
+                    }
+                    temp_dict["hospital_list"].append({
+                        "id": data["hospital"],
+                        "name": data["hosp_name"]
+                    })
+                    resp_data[temp_tuple] = temp_dict
+                else:
+                    temp_name = {
+                        "id": data["hospital"],
+                        "name": data["hosp_name"]
+                    }
+                    if temp_name not in resp_data[temp_tuple]["hospital_list"]:
+                        resp_data[temp_tuple]["hospital_list"].append(temp_name)
+
+            if data['hosp_admin_doc'] is None and data['hosp_admin_hosp'] is not None:
+                temp_tuple = (data['hosp_admin_hosp'], data['hosp_admin_doc'])
+                if temp_tuple not in resp_data:
+                    temp_dict = {
+                        "admin_id": data["hospital"],
+                        "level": Outstanding.HOSPITAL_LEVEL,
+                        "hospital_name": data["hosp_name"],
+                        "doctor_list": list()
+                    }
+                    temp_dict["doctor_list"].append({
+                        "id": data["doctor"],
+                        "name": data["doc_name"]
+                    })
+                    resp_data[temp_tuple] = temp_dict
+                else:
+                    temp_name = {
+                        "id": data["doctor"],
+                        "name": data["doc_name"]
+                    }
+                    if temp_name not in resp_data[temp_tuple]["doctor_list"]:
+                        resp_data[temp_tuple]["doctor_list"].append(temp_name)
+
+        resp_data = [v for k,v in resp_data.items()]
+
+        return Response(resp_data)
+
+    def appointment_doc_hos_list(self, request):
         data = request.query_params
         admin_id = int(data.get("admin_id"))
         level = int(data.get("level"))

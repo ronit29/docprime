@@ -147,8 +147,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             photo_url = obj.profile_image.url
             return request.build_absolute_uri(photo_url)
         else:
-            url = static('doctor_images/no_image.png')
-            return request.build_absolute_uri(url)
+            return None
 
 
 class UploadProfilePictureSerializer(serializers.ModelSerializer):

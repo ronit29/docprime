@@ -1,4 +1,5 @@
 import json
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.forms.models import model_to_dict
@@ -7,6 +8,11 @@ from ondoc.authentication.models import NotificationEndpoint
 from .rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
+from django.utils import timezone
+from ondoc.account import models as account_model
+from django.conf import settings
+from weasyprint import HTML
+import copy
 
 User = get_user_model()
 
@@ -21,15 +27,22 @@ class NotificationAction:
     PRESCRIPTION_UPLOADED = 6
     PAYMENT_PENDING = 7
     RECEIPT = 8
+
+    DOCTOR_INVOICE = 10
+    LAB_INVOICE = 11
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
         (APPOINTMENT_RESCHEDULED_BY_PATIENT, "Appointment Rescheduled by Patient"),
         (APPOINTMENT_RESCHEDULED_BY_DOCTOR, "Appointment Rescheduled by Doctor"),
         (APPOINTMENT_BOOKED, "Appointment Booked"),
+
         (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
         (PAYMENT_PENDING, "Payment Pending"),
         (RECEIPT, "Receipt")
+        (DOCTOR_INVOICE, "Doctor Invoice"),
+        (LAB_INVOICE, "Lab Invoice"),
     )
 
     OPD_APPOINTMENT = "opd_appointment"
@@ -123,6 +136,8 @@ class NotificationAction:
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
+            NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
+        elif notification_type == NotificationAction.DOCTOR_INVOICE:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             context = {
@@ -133,12 +148,31 @@ class NotificationAction:
                 "body": "Appointment with Dr. {} at {} {} has been cancelled as per your request.".format(
                     doctor_name, instance.time_slot_start.strftime("%I:%M %P"),
                     instance.time_slot_start.strftime("%d/%m/%y")),
+                "title": "Invoice Generated",
+                "body": "Appointment has been generated.",
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
                 "image_url": ""
             }
-            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
+            EmailNotification.send_notification(user=user, notification_type=notification_type,
+                                                email=user.email, context=context)
+        elif notification_type == NotificationAction.LAB_INVOICE:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            lab_name = instance.lab.name if instance.lab.name else ""
+            context = {
+                "patient_name": patient_name,
+                "lab_name": lab_name,
+                "instance": instance,
+                "title": "Invoice Generated",
+                "body": "Appointment has been generated.",
+                "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.LAB_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            EmailNotification.send_notification(user=user, notification_type=notification_type,
+                                                email=user.email, context=context)
 
 
     @classmethod
@@ -172,7 +206,8 @@ class EmailNotification(TimeStampedModel):
         db_table = "email_notification"
 
     @classmethod
-    def send_notification(cls, user, email, notification_type, context):
+    def get_email_template(cls, user, email, notification_type, context):
+        context = copy.deepcopy(context)
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             html_body = render_to_string("email/appointment_accepted/body.html", context=context)
             email_subject = render_to_string("email/appointment_accepted/subject.txt", context=context)
@@ -192,6 +227,39 @@ class EmailNotification(TimeStampedModel):
             html_body = render_to_string("email/appointment_cancelled_patient/body.html", context=context)
             email_subject = render_to_string("email/appointment_cancelled_patient/subject.txt", context=context)
 
+        elif notification_type == NotificationAction.DOCTOR_INVOICE:
+            invoice = account_model.Invoice.objects.filter(reference_id=context.get("instance").id,
+                                                           product_id=account_model.Order.DOCTOR_PRODUCT_ID).first()
+            if not invoice:
+                invoice = account_model.Invoice(reference_id=context.get("instance").id,
+                                                product_id=account_model.Order.DOCTOR_PRODUCT_ID)
+            context.update({"invoice": invoice})
+            html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
+            filename = "invoice_{}.pdf".format(str(timezone.now().timestamp()))
+            pdf_file = HTML(string=html_body).write_pdf()
+            invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
+            invoice.save()
+            context.update({"invoice_url": settings.BASE_URL + invoice.file.url})
+            html_body = render_to_string("email/doctor_invoice/body.html", context=context)
+            email_subject = render_to_string("email/doctor_invoice/subject.txt", context=context)
+        elif notification_type == NotificationAction.LAB_INVOICE:
+            invoice, created = account_model.Invoice.objects.get_or_create(reference_id=context.get("instance").id,
+                                                                           product_id=account_model.Order.LAB_PRODUCT_ID)
+            context.update({"invoice": invoice})
+            html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
+            filename = "invoice_{}.pdf".format(str(timezone.now().timestamp()))
+            pdf_file = HTML(string=html_body).write_pdf()
+            invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
+            invoice.save()
+            context.update({"invoice_url": settings.BASE_URL + invoice.file.url})
+            html_body = render_to_string("email/lab_invoice/body.html", context=context)
+            email_subject = render_to_string("email/lab_invoice/subject.txt", context=context)
+        return html_body, email_subject
+
+
+    @classmethod
+    def send_notification(cls, user, email, notification_type, context):
+        html_body, email_subject = EmailNotification.get_email_template(user, email, notification_type, context)
         if email and user:
             email_noti = EmailNotification.objects.create(
                 user=user,
@@ -206,7 +274,6 @@ class EmailNotification(TimeStampedModel):
             }
             message = json.dumps(message)
             publish_message(message)
-
 
 
 class SmsNotification(TimeStampedModel):
@@ -266,7 +333,7 @@ class AppNotification(TimeStampedModel):
         app_noti = AppNotification.objects.create(
             user=user,
             notification_type=notification_type,
-            content=context
+            content={key: val for key, val in context.items() if key != 'instance'}
         )
         message = {
             "data": model_to_dict(app_noti),
@@ -292,7 +359,7 @@ class PushNotification(TimeStampedModel):
         push_noti = PushNotification.objects.create(
             user=user,
             notification_type=notification_type,
-            content=context
+            content={key: val for key, val in context.items() if key != 'instance'}
         )
         tokens = [token.token for token in NotificationEndpoint.objects.filter(user=user)]
         data = model_to_dict(push_noti)

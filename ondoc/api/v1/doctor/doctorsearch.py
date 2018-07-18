@@ -29,10 +29,10 @@ class DoctorSearchHelper:
             )
         if self.query_params.get("min_fees"):
             filtering_params.append(
-                "fees>={}".format(str(self.query_params.get("min_fees"))))
+                "deal_price>={}".format(str(self.query_params.get("min_fees"))))
         if self.query_params.get("max_fees"):
             filtering_params.append(
-                "fees<={}".format(str(self.query_params.get("max_fees"))))
+                "deal_price<={}".format(str(self.query_params.get("max_fees"))))
         if self.query_params.get("is_female"):
             filtering_params.append(
                 "gender='f'"
@@ -67,7 +67,7 @@ class DoctorSearchHelper:
             if self.query_params.get('sort_on') == 'experience':
                 order_by_field = 'practicing_since'
             if self.query_params.get('sort_on') == 'fees':
-                order_by_field = "fees"
+                order_by_field = "deal_price"
                 rank_by = "rank_fees=1"
         return order_by_field, rank_by
 
@@ -75,9 +75,10 @@ class DoctorSearchHelper:
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_hospital_id " \
-                       "FROM (SELECT Row_number() OVER( partition BY dh.doctor_id ORDER BY dh.fees ASC) rank_fees, " \
+                       "FROM (SELECT Row_number() OVER( partition BY dh.doctor_id " \
+                       "ORDER BY dh.deal_price ASC) rank_fees, " \
                        "Row_number() OVER( partition BY dh.doctor_id ORDER BY " \
-                       "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) ASC) rank_distance, " \
+                       "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location),dh.deal_price ASC) rank_distance, " \
                        "St_distance(St_setsrid(St_point(%s, %s), 4326), h.location) distance, d.id as doctor_id, " \
                        "dh.id as doctor_hospital_id,  " \
                        "dh.hospital_id as hospital_id FROM   doctor d " \
@@ -117,7 +118,8 @@ class DoctorSearchHelper:
     def get_doctor_fees(self, doctor, doctor_availability_mapping):
         for doctor_hospital in doctor.availability.all():
             if doctor_hospital.id == doctor_availability_mapping[doctor.id]:
-                return doctor_hospital.fees
+                return doctor_hospital.deal_price, doctor_hospital.mrp
+                # return doctor_hospital.deal_price
         return None
 
     def prepare_search_response(self, doctor_data, doctor_search_result, request):
@@ -129,8 +131,18 @@ class DoctorSearchHelper:
             doctor_hospitals = [doctor_hospital for doctor_hospital in doctor.availability.all() if
                                 doctor_hospital.hospital_id == doctor_hospital_mapping[doctor_hospital.doctor_id]]
             serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True, context={"request": request})
-            filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
-            min_fees = min([data.get("fees") for data in serializer.data if data.get("fees")])
+            filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor, doctor_availability_mapping)
+            # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
+            min_deal_price = None
+            min_price = dict()
+            for data in serializer.data:
+                if min_deal_price is None or min_deal_price > data.get("deal_price"):
+                    min_deal_price = data.get("deal_price")
+                    min_price = {
+                        "deal_price": data.get("deal_price"),
+                        "mrp": data.get("mrp")
+                    }
+            # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
             if not serializer.data:
                 hospitals = []
             else:
@@ -140,16 +152,19 @@ class DoctorSearchHelper:
                     "address": serializer.data[0]["address"],
                     "doctor": serializer.data[0]["doctor"],
                     "hospital_id": serializer.data[0]['hospital_id'],
-                    "fees": min_fees,
-                    "discounted_fees": min_fees,
+                    "mrp": min_price["mrp"],
+                    "discounted_fees": min_price["deal_price"],
                     "timings": convert_timings(serializer.data, is_day_human_readable=True)
                 }]
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
-                "fees": filtered_fees,
-                "discounted_fees": filtered_fees,
+                "deal_price": filtered_deal_price,
+                "mrp": filtered_mrp,
+                # "fees": filtered_fees,*********show mrp here
+                "discounted_fees": filtered_deal_price,
+                # "discounted_fees": filtered_fees, **********deal_price
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
                 "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
@@ -162,9 +177,7 @@ class DoctorSearchHelper:
                                                             context={"request": request}).data,
                 "hospitals": hospitals,
                 "thumbnail": (
-                    request.build_absolute_uri(
-                        static('doctor_images/no_image.png')) if not doctor.images.all() else request.build_absolute_uri(
-                        doctor.images.all()[0].name.url))
+                    request.build_absolute_uri(doctor.images.all()[0].name.url) if doctor.images.exists() else None)
             }
             response.append(temp)
         return response

@@ -59,7 +59,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not request:
             raise ValueError("request is not passed in serializer.")
-        return request.build_absolute_uri(obj.get_thumbnail())
+        return request.build_absolute_uri(obj.get_thumbnail()) if obj.get_thumbnail() else None
 
     def get_lat(self,obj):
         if obj.location:
@@ -172,11 +172,11 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.lab.get_thumbnail())
+        return request.build_absolute_uri(obj.lab.get_thumbnail()) if obj.lab.get_thumbnail() else None
 
     def get_patient_thumbnail(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.profile.get_thumbnail())
+        return request.build_absolute_uri(obj.profile.get_thumbnail()) if obj.profile.get_thumbnail() else None
 
     class Meta:
         model = LabAppointment
@@ -252,6 +252,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all())
     test_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all()))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
+    time_slot_start = serializers.DateTimeField(required=False)
     start_date = serializers.CharField()
     start_time = serializers.FloatField()
     end_date = serializers.CharField(required=False)
@@ -352,7 +353,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
     @staticmethod
     def time_slot_validator(data):
-        start_dt = CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time'))
+        start_dt = (CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
         # if start_dt.hour > data['end_time']:
         #     raise serializers.ValidationError("Invalid Time Slot")
 

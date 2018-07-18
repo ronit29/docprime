@@ -2,7 +2,7 @@ from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,Doctor,
-    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
+    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital, DoctorHospital)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -79,7 +79,7 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
         if self.cleaned_data:
             phone_number = False
             for data in self.cleaned_data:
-                if data.get('phone_number'):
+                if data.get('phone_number') and data.get('permission_type') == GenericAdmin.APPOINTMENT:
                     phone_number = True
                     break
             if phone_number:
@@ -187,9 +187,9 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         qs = super().get_queryset(request)
         parent_qs = super(QCPemAdmin, self).get_queryset(request)
         if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
-            return parent_qs.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user))
+            return parent_qs.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user)).prefetch_related('assoc_doctors')
         else:
-            return qs
+            return qs.prefetch_related('assoc_doctors')
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(HospitalAdmin, self).get_form(request, obj=obj, **kwargs)
@@ -200,7 +200,17 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             form.base_fields['assigned_to'].disabled = True
         return form
 
-    list_display = ('name', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
+    def doctor_count(self, instance):
+        if instance.id:
+            count  = len(set(instance.assoc_doctors.values_list('id', flat=True)))
+            #count = DoctorHospital.objects.filter(hospital_id=instance.id).count()
+            return count
+
+        else:
+            return ''
+
+
+    list_display = ('name', 'updated_at', 'data_status', 'doctor_count', 'list_created_by', 'list_assigned_to')
     form = HospitalForm
     search_fields = ['name']
     inlines = [

@@ -423,11 +423,12 @@ class GenericAdminInline(admin.TabularInline):
 
 class DoctorResource(resources.ModelResource):
     city = fields.Field()
-
+    specialization = fields.Field()
+    qualification = fields.Field()
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'city', 'gender', 'onboarding_status', 'data_status')
-        export_order = ('id', 'name', 'city', 'gender', 'onboarding_status', 'data_status')
+        fields = ('id', 'name', 'city', 'gender','qualification', 'specialization', 'onboarding_status', 'data_status')
+        export_order = ('id', 'name', 'city', 'gender','qualification', 'specialization', 'onboarding_status', 'data_status')
 
     def dehydrate_data_status(self, doctor):
         return dict(Doctor.DATA_STATUS_CHOICES)[doctor.data_status]
@@ -435,6 +436,10 @@ class DoctorResource(resources.ModelResource):
         return dict(Doctor.ONBOARDING_STATUS)[doctor.onboarding_status]
     def dehydrate_city(self, doctor):
         return ','.join([str(h.city) for h in doctor.hospitals.distinct('city')])
+    def dehydrate_specialization(self, doctor):
+        return ','.join([str(h.specialization) for h in doctor.qualifications.all()])
+    def dehydrate_qualification(self, doctor):
+        return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
 
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
@@ -443,7 +448,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     list_display = ('name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link')
     date_hierarchy = 'created_at'
-    list_filter = ('data_status','onboarding_status', CityFilter,)
+    list_filter = ('data_status','onboarding_status','is_insurance_enabled','doctorspecializations__specialization', CityFilter,)
     form = DoctorForm
     inlines = [
         DoctorMobileInline,
