@@ -18,3 +18,4 @@ pika==0.11.2
 django-autocomplete-light
 django-tables2
 openpyxl==2.4.9
+WeasyPrint==0.42.3
