@@ -26,9 +26,9 @@ class Image(models.Model):
 
     def has_image_changed(self):
         if not self.pk:
-            return False
+            return True
         old_value = self.__class__._default_manager.filter(pk=self.pk).values('name').get()['name']
-        return not getattr(self, 'name') == old_value
+        return not getattr(self, 'name').name == old_value
 
 
     def save(self, *args, **kwargs):
