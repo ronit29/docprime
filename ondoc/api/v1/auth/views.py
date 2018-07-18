@@ -585,14 +585,14 @@ class UserAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
 
         range = serializer.validated_data.get('range')
-        hospital_id = serializer.validated_data.get('hospital_id')
-        profile_id = serializer.validated_data.get('profile_id')
+        hospital = serializer.validated_data.get('hospital_id')
+        profile = serializer.validated_data.get('profile_id')
 
-        if profile_id:
-            queryset = queryset.filter(profile=profile_id)
+        if profile:
+            queryset = queryset.filter(profile=profile)
 
-        if hospital_id:
-            queryset = queryset.filter(hospital_id=hospital_id)
+        if hospital:
+            queryset = queryset.filter(hospital=hospital)
 
         if range == 'previous':
             queryset = queryset.filter(time_slot_start__lte=timezone.now()).order_by('-time_slot_start')
@@ -992,7 +992,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (DoctorHospital.objects.filter(Q(doctor__manageable_doctors__user=user,
+        doc_hosp_queryset = (DoctorHospital.objects.annotate(hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(Q(doctor__manageable_doctors__user=user,
                                                              doctor__manageable_doctors__hospital=F('hospital'),
                                                              doctor__manageable_doctors__is_disabled=False,
                                                              doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
@@ -1000,10 +1000,9 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                                            Q(hospital__manageable_hospitals__doctor__isnull=True,
                                                              hospital__manageable_hospitals__user=user,
                                                              hospital__manageable_hospitals__is_disabled=False,
-                                                             doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
-                                                             doctor__manageable_doctors__write_permission=True)).
-                             values('hospital', 'doctor', 'hospital__name', 'doctor__name').distinct('hospital',
-                                                                                                     'doctor')
+                                                             hospital__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT,
+                                                             hospital__manageable_hospitals__write_permission=True)).
+                             values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
                              )
         return Response(doc_hosp_queryset)
 
@@ -1012,6 +1011,74 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
+        user = request.user
+        doc_hosp_queryset = (
+            DoctorHospital.objects.filter(
+                Q(
+                  doctor__manageable_doctors__user=user,
+                  doctor__manageable_doctors__is_disabled=False,
+                  doctor__manageable_doctors__permission_type=GenericAdmin.BILLINNG,
+                  doctor__manageable_doctors__read_permission=True) |
+                Q(
+                  hospital__manageable_hospitals__user=user,
+                  hospital__manageable_hospitals__is_disabled=False,
+                  hospital__manageable_hospitals__permission_type=GenericAdmin.BILLINNG,
+                  hospital__manageable_hospitals__read_permission=True))
+                .values('hospital', 'doctor', 'hospital__manageable_hospitals__hospital', 'doctor__manageable_doctors__doctor')
+                .annotate(doc_admin_doc=F('doctor__manageable_doctors__doctor'), doc_admin_hosp=F('doctor__manageable_doctors__hospital'), hosp_admin_doc=F('hospital__manageable_hospitals__doctor'), hosp_admin_hosp=F('hospital__manageable_hospitals__hospital'), hosp_name=F('hospital__name'), doc_name=F('doctor__name'))
+            )
+
+        resp_data = defaultdict(dict)
+        for data in doc_hosp_queryset:
+            if data['doc_admin_hosp'] is None and data['doc_admin_doc'] is not None:
+                temp_tuple = (data['doc_admin_hosp'], data['doc_admin_doc'])
+                if temp_tuple not in resp_data:
+                    temp_dict = {
+                        "admin_id": data["doctor"],
+                        "level": Outstanding.DOCTOR_LEVEL,
+                        "doctor_name": data["doc_name"],
+                        "hospital_list": list()
+                    }
+                    temp_dict["hospital_list"].append({
+                        "id": data["hospital"],
+                        "name": data["hosp_name"]
+                    })
+                    resp_data[temp_tuple] = temp_dict
+                else:
+                    temp_name = {
+                        "id": data["hospital"],
+                        "name": data["hosp_name"]
+                    }
+                    if temp_name not in resp_data[temp_tuple]["hospital_list"]:
+                        resp_data[temp_tuple]["hospital_list"].append(temp_name)
+
+            if data['hosp_admin_doc'] is None and data['hosp_admin_hosp'] is not None:
+                temp_tuple = (data['hosp_admin_hosp'], data['hosp_admin_doc'])
+                if temp_tuple not in resp_data:
+                    temp_dict = {
+                        "admin_id": data["hospital"],
+                        "level": Outstanding.HOSPITAL_LEVEL,
+                        "hospital_name": data["hosp_name"],
+                        "doctor_list": list()
+                    }
+                    temp_dict["doctor_list"].append({
+                        "id": data["doctor"],
+                        "name": data["doc_name"]
+                    })
+                    resp_data[temp_tuple] = temp_dict
+                else:
+                    temp_name = {
+                        "id": data["doctor"],
+                        "name": data["doc_name"]
+                    }
+                    if temp_name not in resp_data[temp_tuple]["doctor_list"]:
+                        resp_data[temp_tuple]["doctor_list"].append(temp_name)
+
+        resp_data = [v for k,v in resp_data.items()]
+
+        return Response(resp_data)
+
+    def appointment_doc_hos_list(self, request):
         data = request.query_params
         admin_id = int(data.get("admin_id"))
         level = int(data.get("level"))

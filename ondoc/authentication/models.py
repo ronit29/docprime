@@ -257,45 +257,45 @@ class UserPermission(TimeStampedModel):
     def __str__(self):
         return str(self.user.email)
 
-    @classmethod
-    def get_user_admin_obj(cls, user):
-        from ondoc.payout.models import Outstanding
-        access_list = []
-        get_permissions = (UserPermission.objects.select_related('hospital_network', 'hospital', 'doctor').
-                           filter(user_id=user.id, write_permission=True, permission_type=UserPermission.BILLINNG))
-        if get_permissions:
-            for permission in get_permissions:
-                if permission.hospital_network_id:
-                    if permission.hospital_network.is_billing_enabled:
-                        access_list.append({'admin_obj': permission.hospital_network, 'admin_level': Outstanding.HOSPITAL_NETWORK_LEVEL})
-                elif permission.hospital_id:
-                    if permission.hospital.is_billing_enabled:
-                        access_list.append({'admin_obj': permission.hospital, 'admin_level': Outstanding.HOSPITAL_LEVEL})
-                else:
-                    access_list.append({'admin_obj': permission.doctor, 'admin_level': Outstanding.DOCTOR_LEVEL})
-        return access_list
-        # TODO PM - Logic to get admin for a particular User
-
-    @classmethod
-    def get_billable_doctor_hospital(cls, user):
-        permission_data = (UserPermission.objects.
-                           filter(user=user, permission_type=cls.BILLINNG, write_permission=True).
-                           values('hospital_network', 'hospital', 'hospital__assoc_doctors',
-                                  'hospital_network__assoc_hospitals__assoc_doctors',
-                                  'hospital_network__assoc_hospitals'))
-        doc_hospital = list()
-        for data in permission_data:
-            if data.get("hospital_network"):
-                doc_hospital.append({
-                    "doctor": data.get("hospital_network__assoc_hospitals__assoc_doctors"),
-                    "hospital": data.get("hospital_network__assoc_hospitals")
-                })
-            elif data.get("hospital"):
-                doc_hospital.append({
-                    "doctor": data.get("hospital__assoc_doctors"),
-                    "hospital": data.get("hospital")
-                })
-        return doc_hospital
+    # @classmethod
+    # def get_user_admin_obj(cls, user):
+    #     from ondoc.payout.models import Outstanding
+    #     access_list = []
+    #     get_permissions = (GenericAdmin.objects.select_related('hospital_network', 'hospital', 'doctor').
+    #                        filter(user_id=user.id, write_permission=True, permission_type=GenericAdmin.BILLINNG))
+    #     if get_permissions:
+    #         for permission in get_permissions:
+    #             if permission.hospital_network_id:
+    #                 if permission.hospital_network.is_billing_enabled:
+    #                     access_list.append({'admin_obj': permission.hospital_network, 'admin_level': Outstanding.HOSPITAL_NETWORK_LEVEL})
+    #             elif permission.hospital_id:
+    #                 if permission.hospital.is_billing_enabled:
+    #                     access_list.append({'admin_obj': permission.hospital, 'admin_level': Outstanding.HOSPITAL_LEVEL})
+    #             else:
+    #                 access_list.append({'admin_obj': permission.doctor, 'admin_level': Outstanding.DOCTOR_LEVEL})
+    #     return access_list
+    #     # TODO PM - Logic to get admin for a particular User
+    #
+    # @classmethod
+    # def get_billable_doctor_hospital(cls, user):
+    #     permission_data = (UserPermission.objects.
+    #                        filter(user=user, permission_type=cls.BILLINNG, write_permission=True).
+    #                        values('hospital_network', 'hospital', 'hospital__assoc_doctors',
+    #                               'hospital_network__assoc_hospitals__assoc_doctors',
+    #                               'hospital_network__assoc_hospitals'))
+    #     doc_hospital = list()
+    #     for data in permission_data:
+    #         if data.get("hospital_network"):
+    #             doc_hospital.append({
+    #                 "doctor": data.get("hospital_network__assoc_hospitals__assoc_doctors"),
+    #                 "hospital": data.get("hospital_network__assoc_hospitals")
+    #             })
+    #         elif data.get("hospital"):
+    #             doc_hospital.append({
+    #                 "doctor": data.get("hospital__assoc_doctors"),
+    #                 "hospital": data.get("hospital")
+    #             })
+    #     return doc_hospital
 
 
 class AppointmentTransaction(TimeStampedModel):
@@ -384,7 +384,7 @@ class GenericAdmin(TimeStampedModel):
         user = User.objects.filter(phone_number=self.phone_number).first()
         if user is not None:
             self.user = user
-        if self.permission_type == self.BILLINNG:
+        if self.permission_type == self.BILLINNG and self.doctor is not None:
             self.hospital = None
         super(GenericAdmin, self).save(*args, **kwargs)
 
@@ -520,6 +520,48 @@ class GenericAdmin(TimeStampedModel):
                             write_permission=write_permission,
                             read_permission=read_permission
                             )
+
+    @classmethod
+    def get_user_admin_obj(cls, user):
+        from ondoc.payout.models import Outstanding
+        access_list = []
+        get_permissions = (GenericAdmin.objects.select_related('hospital_network', 'hospital', 'doctor').
+                           filter(user_id=user.id, write_permission=True, permission_type=GenericAdmin.BILLINNG))
+        if get_permissions:
+            for permission in get_permissions:
+                if permission.hospital_network_id:
+                    if permission.hospital_network.is_billing_enabled:
+                        access_list.append({'admin_obj': permission.hospital_network,
+                                            'admin_level': Outstanding.HOSPITAL_NETWORK_LEVEL})
+                elif permission.hospital_id:
+                    if permission.hospital.is_billing_enabled:
+                        access_list.append(
+                            {'admin_obj': permission.hospital, 'admin_level': Outstanding.HOSPITAL_LEVEL})
+                else:
+                    access_list.append({'admin_obj': permission.doctor, 'admin_level': Outstanding.DOCTOR_LEVEL})
+        return access_list
+        # TODO PM - Logic to get admin for a particular User
+
+    @classmethod
+    def get_billable_doctor_hospital(cls, user):
+        permission_data = (GenericAdmin.objects.
+                           filter(user=user, permission_type=cls.BILLINNG, write_permission=True).
+                           values('hospital_network', 'hospital', 'hospital__assoc_doctors',
+                                  'hospital_network__assoc_hospitals__assoc_doctors',
+                                  'hospital_network__assoc_hospitals'))
+        doc_hospital = list()
+        for data in permission_data:
+            if data.get("hospital_network"):
+                doc_hospital.append({
+                    "doctor": data.get("hospital_network__assoc_hospitals__assoc_doctors"),
+                    "hospital": data.get("hospital_network__assoc_hospitals")
+                })
+            elif data.get("hospital"):
+                doc_hospital.append({
+                    "doctor": data.get("hospital__assoc_doctors"),
+                    "hospital": data.get("hospital")
+                })
+        return doc_hospital
 
 
 

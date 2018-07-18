@@ -79,7 +79,7 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
         if self.cleaned_data:
             phone_number = False
             for data in self.cleaned_data:
-                if data.get('phone_number'):
+                if data.get('phone_number') and data.get('permission_type') == GenericAdmin.APPOINTMENT:
                     phone_number = True
                     break
             if phone_number:

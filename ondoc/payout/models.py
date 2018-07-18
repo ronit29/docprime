@@ -57,7 +57,7 @@ class Outstanding(auth_model.TimeStampedModel):
                                               prev_out_obj.paid_to_pb)
 
             outstanding_data = {
-                "net_hos_doc_id": obj.id,
+                "net_hos_doc_id": billing_level_obj.id,
                 "outstanding_level": out_level,
                 "current_month_outstanding": app_outstanding_fees,
                 "previous_month_outstanding": previous_month_outstanding,
@@ -67,7 +67,7 @@ class Outstanding(auth_model.TimeStampedModel):
                 "outstanding_year": present_year
             }
             out_obj = Outstanding.objects.create(**outstanding_data)
-            return out_obj
+        return out_obj
 
     @classmethod
     def get_month_billing(cls, prev_obj, present_obj):
