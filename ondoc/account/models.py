@@ -349,3 +349,10 @@ class ConsumerRefund(TimeStampedModel):
 
     class Meta:
         db_table = "consumer_refund"
+
+
+class Invoice(TimeStampedModel):
+    PRODUCT_IDS = Order.PRODUCT_IDS
+    reference_id = models.PositiveIntegerField()
+    product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
+    file = models.FileField(upload_to='invoices', null=True, blank=True)
