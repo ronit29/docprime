@@ -118,7 +118,8 @@ class DoctorSearchHelper:
     def get_doctor_fees(self, doctor, doctor_availability_mapping):
         for doctor_hospital in doctor.availability.all():
             if doctor_hospital.id == doctor_availability_mapping[doctor.id]:
-                return doctor_hospital.deal_price
+                return doctor_hospital.deal_price, doctor_hospital.mrp
+                # return doctor_hospital.deal_price
         return None
 
     def prepare_search_response(self, doctor_data, doctor_search_result, request):
@@ -130,8 +131,18 @@ class DoctorSearchHelper:
             doctor_hospitals = [doctor_hospital for doctor_hospital in doctor.availability.all() if
                                 doctor_hospital.hospital_id == doctor_hospital_mapping[doctor_hospital.doctor_id]]
             serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True, context={"request": request})
-            filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
-            min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
+            filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor, doctor_availability_mapping)
+            # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
+            min_deal_price = None
+            min_price = dict()
+            for data in serializer.data:
+                if min_deal_price is None or min_deal_price > data.get("deal_price"):
+                    min_deal_price = data.get("deal_price")
+                    min_price = {
+                        "deal_price": data.get("deal_price"),
+                        "mrp": data.get("mrp")
+                    }
+            # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
             if not serializer.data:
                 hospitals = []
             else:
@@ -141,16 +152,19 @@ class DoctorSearchHelper:
                     "address": serializer.data[0]["address"],
                     "doctor": serializer.data[0]["doctor"],
                     "hospital_id": serializer.data[0]['hospital_id'],
-                    "fees": min_fees,
-                    "discounted_fees": min_fees,
+                    "mrp": min_price["mrp"],
+                    "discounted_fees": min_price["deal_price"],
                     "timings": convert_timings(serializer.data, is_day_human_readable=True)
                 }]
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
-                "fees": filtered_fees,
-                "discounted_fees": filtered_fees,
+                "deal_price": filtered_deal_price,
+                "mrp": filtered_mrp,
+                # "fees": filtered_fees,*********show mrp here
+                "discounted_fees": filtered_deal_price,
+                # "discounted_fees": filtered_fees, **********deal_price
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
                 "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
