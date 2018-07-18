@@ -297,8 +297,9 @@ class UserAppointmentsViewSet(OndocViewSet):
             combined_data.extend(doctor_serializer.data)
         if lab_serializer.data:
             combined_data.extend(lab_serializer.data)
-        combined_data = sorted(combined_data, key=lambda k: k['time_slot_start'])
-        combined_data = combined_data[:20]
+        combined_data = sorted(combined_data, key=lambda k: k['status'])
+        # combined_data = sorted(combined_data, key=lambda k: k['time_slot_start'])
+        combined_data = combined_data[:80]
         return Response(combined_data)
 
     def retrieve(self, request, pk=None):
@@ -571,7 +572,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                        status__in=LabAppointment.ACTIVE_APPOINTMENT_STATUS).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
-        queryset = paginate_queryset(queryset, request, 20)
+        queryset = paginate_queryset(queryset, request, 40)
         serializer = LabAppointmentModelSerializer(queryset, many=True, context={"request": request})
         return serializer
 
@@ -606,7 +607,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         else:
             queryset = queryset.order_by('-time_slot_start')
 
-        queryset = paginate_queryset(queryset, request, 20)
+        queryset = paginate_queryset(queryset, request, 40)
         serializer = OpdAppointmentSerializer(queryset, many=True,context={"request": request})
         return serializer
 
