@@ -285,8 +285,10 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorHospital
-        fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
-                  'discounted_fees', 'hospital_thumbnail', )
+        fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
+                  'discounted_fees', 'hospital_thumbnail', 'mrp', )
+        # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
+        #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
 
 class DoctorEmailSerializer(serializers.ModelSerializer):
