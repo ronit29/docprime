@@ -81,10 +81,17 @@ class Image(models.Model):
         abstract = True
 
 class Document(models.Model):
-    # name = models.ImageField(height_field='height', width_field='width')
-    # width = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
-    # height = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
+
+    def has_changed(self):
+        if not self.pk:
+            return True
+        old_value = self.__class__._default_manager.filter(pk=self.pk).values('name').get()['name']
+        return not getattr(self, 'name').name == old_value
+
     def save(self, *args, **kwargs):
+        if not self.has_changed():
+            return super().save(*args, **kwargs)
+
         if self.name:
             max_allowed = 1000
             img = None
