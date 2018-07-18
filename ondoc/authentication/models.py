@@ -110,8 +110,8 @@ class Document(models.Model):
 
                 img = img.resize(size, Img.ANTIALIAS)
 
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
 
                 md5_hash = hashlib.md5(img.tobytes()).hexdigest()
                 #if img.multiple_chunks():
