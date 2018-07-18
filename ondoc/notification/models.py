@@ -40,7 +40,7 @@ class NotificationAction:
 
         (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
         (PAYMENT_PENDING, "Payment Pending"),
-        (RECEIPT, "Receipt")
+        (RECEIPT, "Receipt"),
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
     )
