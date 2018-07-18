@@ -386,6 +386,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("start", None)
             hospital.pop("end", None)
             hospital.pop("day",  None)
+            hospital.pop("discounted_fees", None)
             availability.append(hospital)
         response_data['hospitals'] = availability
         return response_data

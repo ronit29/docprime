@@ -587,7 +587,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     class Meta:
         model = OpdAppointment
-        fields = ('id', 'patient_image', 'type', 'profile', 'otp',
+        fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',)
 

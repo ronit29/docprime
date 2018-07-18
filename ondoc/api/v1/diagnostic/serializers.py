@@ -169,6 +169,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     lab_image = LabImageModelSerializer(many=True, source='lab.lab_image', read_only=True)
     lab_thumbnail = serializers.SerializerMethodField()
     patient_thumbnail = serializers.SerializerMethodField()
+    patient_name = serializers.SerializerMethodField()
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
@@ -178,10 +179,13 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         return request.build_absolute_uri(obj.profile.get_thumbnail()) if obj.profile.get_thumbnail() else None
 
+    def get_patient_name(self, obj):
+        return obj.profile_detail.get("name")
+
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', )
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name')
 
 
 class LabAppTransactionModelSerializer(serializers.Serializer):
