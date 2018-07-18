@@ -1,11 +1,203 @@
-<!DOCTYPE html>
-<html lang="en">
+{% load static %}
+{% load invoice_tags %}
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <meta charset="UTF-8">
-    <title></title>
+	<title>Appointment Confirmed</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
 </head>
-<body>
-    <p>Your appointment has been accepted by Dr. {{doctor_name}}. Your appointment Id is -{{id}}.
-    </p>
+<body style="margin: 0; padding: 0; width: 100%; font-family: 'Quicksand', sans-serif;">
+	<table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; margin: auto;">
+		<tbody>
+			<tr>
+				<td>
+					<table style="padding: 0 15px 40px; background-color: #fafafa; width: 100%;">
+						<tbody>
+							<tr>
+								<td>
+									<table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px;">
+										<tbody>
+											<tr>
+												<td>
+													<img src="{{'notification/images/checked-orange.svg'|get_absolute_url}}">
+												</td>
+												<td style="text-align: right;">
+													<img src="{{'notification/images/logo.png'|get_absolute_url}}">
+												</td>
+											</tr>
+										</tbody>
+									</table>
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 16px;">
+										<tbody>
+											<tr>
+												<td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
+													Appointment Confirmed
+												</td>
+											</tr>
+											<tr>
+												<td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
+                                                    {{instance.updated_at|date:'M d, Y'}}
+                                                </td>
+											</tr>
+										</tbody>
+									</table>
+								</td>
+							</tr>
+							<tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px; border-bottom: 1px solid #d3d3d3;">
+						<tbody>
+							<tr>
+								<td style="color: #757575; font-size: 16px; font-weight: 500;">
+									Unique Confirmation Code : <span style="color: #000000; font-weight: 600;">{{instance.otp}}</span>
+								</td>
+							</tr>
+							<tr>
+								<td style="color: #000000; font-size: 12px; font-weight: 500; padding-top: 4px;">
+									Share this code with doctor at the time of your appoinment
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
+						<tbody>
+							<tr>
+								<td style="color: #757575; font-size: 16px; font-weight: 500;">
+									Booking ID : <span style="color: #000000; font-weight: 600;">{{instance.id}}</span>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 40px 15px 0;">
+						<tbody>
+							<tr>
+								<td style="color: #000000; font-weight: 600; font-size: 16px;">
+									Dr. {{doctor_name|capfirst}}
+								</td>
+							</tr>
+							<!--<tr>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">-->
+									<!--MBBS, MD - Genral Medicine-->
+								<!--</td>-->
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
+									<!--General Physician-->
+								<!--</td>-->
+							<!--</tr>-->
+						</tbody>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
+						<tbody>
+                            {% if instance.hospital.name %}
+							<tr>
+								<td style="color: #000000; font-weight: 600; font-size: 16px;">
+									{{instance.hospital.name|capfirst}}
+								</td>
+							</tr>
+                            {% endif %}
+							<tr>
+								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+									{% if instance.hospital.building %}{{instance.hospital.building}}, {% endif %}{% if instance.hospital.sublocality %}{{instance.hospital.sublocality}}, {% endif %}{% if instance.hospital.locality %}{{instance.hospital.locality}}{% endif %}
+								</td>
+							</tr>
+							<tr>
+								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
+									{% if instance.hospital.city %}{{instance.hospital.city}} {% endif %}{% if instance.hospital.state%}{{instance.hospital.state}}{% endif %}
+								</td>
+							</tr>
+							<tr>
+								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
+								{% if instance.hospital.city %} {{instance.hospital.pin_code}}{% endif %}
+                                </td>
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 20px; border-bottom: 1px solid #d3d3d3;">
+						<tbody>
+							<tr>
+								<td style="color: #000000; font-weight: 600; font-size: 16px;">
+									Clinic Visit Time
+								</td>
+							</tr>
+							<tr>
+								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+									{{instance.time_slot_start|date:"M d"}} &nbsp;&nbsp; | &nbsp;&nbsp; {{instance.time_slot_start|date:"h:i a"}}
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">
+						<tbody>
+							<tr>
+								<td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;">
+									This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to customerhelp@docprime.com
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; background-color: #f78631;">
+						<tbody>
+							<tr>
+								<td style="font-size: 14px; color: #fafafa; width: 60%">
+									All Rights Reserved
+								</td>
+								<td style="width: 8%; text-align: right;">
+									<a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="{{'notification/images/youtube-email.svg'|get_absolute_url}}"></a>
+								</td>
+								<td style="width: 8%; text-align: right;">
+									<a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img src="{{'notification/images/instagram-email.svg'|get_absolute_url}}"></a>
+								</td>
+								<td style="width: 8%; text-align: right;">
+									<a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img src="{{'notification/images/facebook-email.svg'|get_absolute_url}}"></a>
+								</td>
+								<td style="width: 8%; text-align: right;">
+									<a href="https://twitter.com/DocPrimeindia" target="_blank"><img src="{{'notification/images/twitter-email.svg'|get_absolute_url}}"></a>
+								</td>
+								<td style="width: 8%; text-align: right;">
+									<a href="https://www.linkedin.com/company/docprime/" target="_blank"><img src="{{'notification/images/linkedin-email.svg'|get_absolute_url}}"></a>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+		</tbody>
+	</table>
 </body>
 </html>

@@ -1,1 +1,1 @@
-Appointment Accepted
+New Appointment (ID-{{instance.id}})

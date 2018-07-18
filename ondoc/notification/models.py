@@ -57,12 +57,17 @@ class NotificationAction:
     def trigger(cls, instance, user, notification_type):
         context = {}
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+            patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             context = {
                 "doctor_name": doctor_name,
                 "id": instance.id,
-                "title": "Appointment Accepted",
-                "body": "Your appointment with Dr. {} has been accepted.".format(doctor_name),
+                "instance": instance,
+                "title": "Appointment Confirmed",
+                "body": "Appointment Confirmed for {} requested with Dr. {} at {}, {}.".format(
+                    patient_name, doctor_name, instance.time_slot_start.strftime("%I:%M %P"),
+                    instance.time_slot_start.strftime("%d/%m/%y"), doctor_name
+                ),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -136,7 +141,22 @@ class NotificationAction:
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
-            NotificationAction.trigger_push_and_inapp(user=user, notification_type=notification_type, context=context)
+            patient_name = instance.profile.name if instance.profile.name else ""
+            doctor_name = instance.doctor.name if instance.doctor.name else ""
+            context = {
+                "patient_name": patient_name,
+                "doctor_name": doctor_name,
+                "instance": instance,
+                "title": "Appointment Cancelled",
+                "body": "Appointment with Dr. {} at {}, {} has been cancelled as per your request..".format(
+                    doctor_name, instance.time_slot_start.strftime("%I:%M %P"),
+                    instance.time_slot_start.strftime("%d/%m/%y")),
+                "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.OPD_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
         elif notification_type == NotificationAction.DOCTOR_INVOICE:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
