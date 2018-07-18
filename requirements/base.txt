@@ -12,6 +12,8 @@ django-filter==1.1.0
 python-dateutil==2.7.3
 django-import-export==1.0.0
 raven==6.8.0
+boto3
+django-storages
 django-rest-swagger
 coreapi
 pika==0.11.2
