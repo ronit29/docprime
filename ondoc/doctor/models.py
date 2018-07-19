@@ -1132,3 +1132,13 @@ class HealthTip(auth_model.TimeStampedModel):
     class Meta:
         db_table = "health_tip"
 
+
+class CommonMedicalCondition(auth_model.TimeStampedModel):
+    condition = models.OneToOneField(MedicalCondition, related_name="common_condition", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return "{}".format(self.condition)
+
+    class Meta:
+        db_table = "common_medical_condition"
+
