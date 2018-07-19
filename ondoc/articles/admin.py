@@ -16,11 +16,18 @@ class ArticleForm(forms.ModelForm):
         css = {'all':('articles/css/style.css',)}
 
 
+class ArticleCategoryInline(admin.TabularInline):
+    model = Article.category.through
+
+
 class ArticleAdmin(VersionAdmin):
     form = ArticleForm
     model = Article
     list_display = ('title', 'updated_at', 'created_at', 'created_by')
     search_fields = ['title']
+    fields = ['body','title','category','url','icon_tag','icon']
+    readonly_fields = ['icon_tag']
+    #inlines = [ArticleCategoryInline]
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
