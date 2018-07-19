@@ -833,12 +833,23 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 notification_type=notification_models.NotificationAction.APPOINTMENT_ACCEPTED,
             )
         elif self.status == OpdAppointment.RESCHEDULED_PATIENT:
-            if not self.doctor.user:
+            if not self.doctor.user or not self.user:
                 return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.doctor.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
+            notification_models.NotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
+        elif self.status == OpdAppointment.RESCHEDULED_DOCTOR:
+            if not self.doctor.user or not self.user:
+                return
+            notification_models.NotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR)
         elif self.status == OpdAppointment.BOOKED:
             if not self.doctor.user:
                 return

@@ -21,7 +21,7 @@
 										<tbody>
 											<tr>
 												<td>
-													<img src="{{'notification/images/reschedule-email.svg'|get_absolute_url}}">
+													<img src="{{'notification/images/reschedule-appointment.svg'|get_absolute_url}}">
 												</td>
 												<td style="text-align: right;">
 													<img src="{{'notification/images/logo.png'|get_absolute_url}}">
@@ -42,8 +42,8 @@
 											</tr>
 											<tr>
 												<td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
-												{{instance.updated_at|date:'M d, Y'}}
-                                                </td>
+													{{instance.updated_at|date:'M d, Y'}}
+												</td>
 											</tr>
 										</tbody>
 									</table>
@@ -60,12 +60,12 @@
 						<tbody>
 							<tr>
 								<td style="color: #757575; font-size: 16px; font-weight: 500;">
-									<span style="color: #000000; font-weight: 600;">Mr {{patient_name}}</span>
+									<span style="color: #000000; font-weight: 600;">Mr {{patient_name|capfirst}}</span>
 								</td>
 							</tr>
 							<tr>
 								<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
-									We have received a reschedule request from you for the appointment with Dr. {{doctor_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} {{instance.hospital.name|capfirst}}. We will update you once it is confirmed.
+									We have received a reschedule request for the appointment from Dr. {{doctor_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} {{instance.hospital.name|capfirst}}. We will get in touch with you to resolve this as quickly as possible.
 								</td>
 							</tr>
 							<tr>
