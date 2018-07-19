@@ -80,6 +80,23 @@ class NotificationAction:
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             context = {
                 "patient_name": patient_name,
+                "doctor_name": doctor_name,
+                "id": instance.id,
+                "instance": instance,
+                "title": "Appointment Reschedule",
+                "body": "Reschedule request received for the appointment with Dr. {}".format(doctor_name),
+                "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.OPD_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.DOCTOR:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            doctor_name = instance.doctor.name if instance.doctor.name else ""
+            context = {
+                "patient_name": patient_name,
+                "doctor_name": doctor_name,
                 "id": instance.id,
                 "instance": instance,
                 "title": "Appointment Reschedule",
@@ -99,7 +116,7 @@ class NotificationAction:
                 "id": instance.id,
                 "instance": instance,
                 "title": "Appointment Reschedule",
-                "body": "Reschedule request received for the appointment from Dr. {}".format(doctor_name),
+                "body": "Reschedule request received for the appointment from Mr. {}".format(patient_name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -270,6 +287,9 @@ class EmailNotification(TimeStampedModel):
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
             html_body = render_to_string("email/appointment_rescheduled_patient_initiated_to_patient/body.html", context=context)
             email_subject = render_to_string("email/appointment_rescheduled_patient_initiated_to_patient/subject.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.DOCTOR:
+            html_body = render_to_string("email/appointment_rescheduled_patient_initiated_to_doctor/body.html", context=context)
+            email_subject = render_to_string("email/appointment_rescheduled_patient_initiated_to_doctor/subject.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user.user_type == User.CONSUMER:
             html_body = render_to_string("email/appointment_rescheduled_doctor_initiated_to_patient/body.html", context=context)
             email_subject = render_to_string("email/appointment_rescheduled_doctor_initiated_to_patient/subject.txt", context=context)
@@ -353,6 +373,8 @@ class SmsNotification(TimeStampedModel):
             html_body = render_to_string("sms/appointment_booked_doctor.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
             html_body = render_to_string("sms/appointment_rescheduled_patient_initiated_to_patient.txt", context=context)
+        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.DOCTOR:
+            html_body = render_to_string("sms/appointment_rescheduled_patient_initiated_to_doctor.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user.user_type == User.CONSUMER:
             html_body = render_to_string("sms/appointment_rescheduled_doctor_initiated_to_patient.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
