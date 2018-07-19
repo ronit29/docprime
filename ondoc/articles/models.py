@@ -17,8 +17,13 @@ class Article(TimeStampedModel, CreatedByModel):
     title = models.CharField(blank=False, null=False, max_length=500)
     url = models.CharField(blank=False, null=True, max_length=500)
     body = models.CharField(blank=False, null=False, max_length=20000)
-    category = models.ManyToManyField(ArticleCategory)
+    category = models.ManyToManyField(ArticleCategory, related_name='articles')
     icon = models.ImageField(upload_to='articles/icons', null=True)
+
+    def icon_tag(self):
+        if self.icon:
+            return mark_safe('<img src="%s" width="150" height="150" />' % (self.icon.url))
+        return ""
 
     def __str__(self):
         return self.title
