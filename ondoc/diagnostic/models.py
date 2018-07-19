@@ -1,7 +1,7 @@
 from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
-from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, QCModel, UserProfile, User,
+from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission)
 from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
@@ -712,7 +712,7 @@ class LabDoctor(TimeStampedModel):
         db_table = "lab_doctor"
 
 
-class LabDocument(TimeStampedModel):
+class LabDocument(TimeStampedModel, Document):
     PAN = 1
     ADDRESS = 2
     GST = 3

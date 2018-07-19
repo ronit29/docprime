@@ -28,6 +28,12 @@ import os
 import re
 import datetime
 
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.utils.safestring import mark_safe
+from PIL import Image as Img
+from io import BytesIO
+import hashlib
+
 
 class Migration(migrations.Migration):
 
@@ -405,13 +411,33 @@ class DoctorHospital(auth_model.TimeStampedModel):
 
 class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
-    name = models.ImageField(upload_to='doctor/images', height_field='height', width_field='width')
+    name = models.ImageField(upload_to='doctor/images',height_field='height', width_field='width')
+    cropped_image = models.ImageField(upload_to='doctor/images', height_field='height', width_field='width',
+                                      blank=True, null=True)
 
     class Meta:
         db_table = "doctor_image"
 
+    def crop_image(self):
+        if self.cropped_image:
+            return
+        if self.name:
+            img = Img.open(self.name)
+            w, h = img.size
+            if w > h:
+                cropping_area = (w / 2 - h / 2,  0, w / 2 + h / 2, h)
+            else:
+                cropping_area = (0, h / 2 - w / 2, w, h / 2 + w / 2)
+            if h != w:
+                img = img.crop(cropping_area)
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            self.cropped_image = InMemoryUploadedFile(new_image_io, None, md5_hash + ".jpg", 'image/jpeg',
+                                                      new_image_io.tell(), None)
+            self.save()
 
-class DoctorDocument(auth_model.TimeStampedModel):
+class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):
     PAN = 1
     ADDRESS = 2
     GST = 3
@@ -445,9 +471,9 @@ class HospitalImage(auth_model.TimeStampedModel, auth_model.Image):
         db_table = "hospital_image"
 
 
-class HospitalDocument(auth_model.TimeStampedModel, auth_model.Image):
+class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    name = models.ImageField(upload_to='hospital/documents', height_field='height', width_field='width')
+    name = models.ImageField(upload_to='hospital/documents')
 
     class Meta:
         db_table = "hospital_document"
@@ -1029,9 +1055,9 @@ class Prescription(auth_model.TimeStampedModel):
         db_table = "prescription"
 
 
-class PrescriptionFile(auth_model.TimeStampedModel):
+class PrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
     prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE)
-    file = models.FileField(upload_to='prescriptions', blank=False, null=False)
+    name = models.FileField(upload_to='prescriptions', blank=False, null=False)
 
     def __str__(self):
         return "{}-{}".format(self.id, self.prescription.id)
