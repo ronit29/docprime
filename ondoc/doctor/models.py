@@ -473,7 +473,8 @@ class HospitalImage(auth_model.TimeStampedModel, auth_model.Image):
 
 class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    name = models.ImageField(upload_to='hospital/documents')
+    name = models.FileField(upload_to='hospital/documents', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
     class Meta:
         db_table = "hospital_document"
@@ -1131,4 +1132,14 @@ class HealthTip(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "health_tip"
+
+
+class CommonMedicalCondition(auth_model.TimeStampedModel):
+    condition = models.OneToOneField(MedicalCondition, related_name="common_condition", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return "{}".format(self.condition)
+
+    class Meta:
+        db_table = "common_medical_condition"
 

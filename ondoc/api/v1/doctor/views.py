@@ -206,11 +206,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if request.user.user_type == User.DOCTOR:
             req_status = validated_data.get('status')
             if req_status == models.OpdAppointment.RESCHEDULED_DOCTOR:
-                updated_opd_appointment = opd_appointment.action_rescheduled_doctor()
+                opd_appointment.action_rescheduled_doctor()
             elif req_status == models.OpdAppointment.ACCEPTED:
-                updated_opd_appointment = opd_appointment.action_accepted()
+                opd_appointment.action_accepted()
 
-        opd_appointment_serializer = serializers.AppointmentRetrieveSerializer(updated_opd_appointment, context={'request':request})
+        opd_appointment_serializer = serializers.AppointmentRetrieveSerializer(opd_appointment, context={'request':request})
         response = {
             "status": 1,
             "data": opd_appointment_serializer.data
@@ -604,9 +604,11 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         return Response({"conditions": medical_conditions, "specializations": specializations})
 
     def common_conditions(self, request):
-        medical_conditions = models.MedicalCondition.objects.values("id", "name")[:10]
+        # medical_conditions = models.MedicalCondition.objects.values("id", "name")[:10]
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all()[:10]
+        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True)
         specializations = models.Specialization.objects.values("id", "name")[:10]
-        return Response({"conditions": medical_conditions, "specializations": specializations})
+        return Response({"conditions": conditions_serializer.data, "specializations": specializations})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
