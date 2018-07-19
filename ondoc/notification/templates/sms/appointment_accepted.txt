@@ -1,1 +1,1 @@
-Your appointment has been accepted by Dr. {{doctor_name}}. Your appointment Id is -{{id}}.
+Appointment Confirmed for {{patient_name}} requested with Dr. {{doctor_name}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.

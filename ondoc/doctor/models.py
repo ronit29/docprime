@@ -859,18 +859,24 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 notification_type=notification_models.NotificationAction.APPOINTMENT_ACCEPTED,
             )
         elif self.status == OpdAppointment.RESCHEDULED_PATIENT:
-            if not self.doctor.user:
+            if not self.doctor.user or not self.user:
                 return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.doctor.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
-        elif self.status == OpdAppointment.BOOKED:
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
-            )
+                notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
+        elif self.status == OpdAppointment.RESCHEDULED_DOCTOR:
+            if not self.doctor.user or not self.user:
+                return
+            notification_models.NotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR)
+        elif self.status == OpdAppointment.BOOKED:
             if not self.doctor.user:
                 return
             notification_models.NotificationAction.trigger(
@@ -879,14 +885,17 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
             )
         elif self.status == OpdAppointment.CANCELED:
-            if not self.doctor.user:
+            if (not self.doctor.user) or (not self.user):
                 return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.doctor.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED,
             )
-        # The below code is only for testing
+            notification_models.NotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED)
         elif self.status == OpdAppointment.COMPLETED:
             if not self.user:
                 return
@@ -1061,6 +1070,22 @@ class PrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
 
     def __str__(self):
         return "{}-{}".format(self.id, self.prescription.id)
+
+    def send_notification(self, database_instance):
+        appointment = self.prescription.appointment
+        if not appointment.user:
+            return
+        if not database_instance:
+            notification_models.NotificationAction.trigger(
+                instance=appointment,
+                user=appointment.user,
+                notification_type=notification_models.NotificationAction.PRESCRIPTION_UPLOADED,
+            )
+
+    def save(self, *args, **kwargs):
+        database_instance = PrescriptionFile.objects.filter(pk=self.id).first()
+        super().save(*args, **kwargs)
+        self.send_notification(database_instance)
 
     class Meta:
         db_table = "prescription_file"
