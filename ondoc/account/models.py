@@ -8,6 +8,8 @@ from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request
+import math
+
 
 # Create your models here.
 
@@ -185,7 +187,8 @@ class PgTransaction(TimeStampedModel):
                     new_pg_obj.append(pg_data)
 
             if new_pg_obj:
-                new_pg_obj = sorted(new_pg_obj, key=lambda k: k.amount, reverse=True)
+                infinte_amount = math.inf
+                new_pg_obj = sorted(new_pg_obj, key=lambda k: k.amount if k.amount else infinte_amount, reverse=True)
 
         pgtx_details = list()
         index = 0
