@@ -3,7 +3,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-	<title>Appointment Cancelled</title>
+	<title>Prescription Received</title>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
@@ -21,7 +21,7 @@
 										<tbody>
 											<tr>
 												<td>
-													<img src="{{'notification/images/cross-orange.svg'|get_absolute_url}}">
+													<img src="{{'notification/images/prescription-orange.svg'|get_absolute_url}}">
 												</td>
 												<td style="text-align: right;">
 													<img src="{{'notification/images/logo.png'|get_absolute_url}}">
@@ -37,7 +37,7 @@
 										<tbody>
 											<tr>
 												<td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
-													Appointment Cancelled
+													Prescription Received
 												</td>
 											</tr>
 											<tr>
@@ -56,16 +56,31 @@
 			</tr>
 			<tr>
 				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 70px; border-bottom: 1px solid #d3d3d3;">
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 60px; border-bottom: 1px solid #d3d3d3;">
 						<tbody>
 							<tr>
 								<td style="color: #757575; font-size: 16px; font-weight: 500;">
-									<span style="color: #000000; font-weight: 600;">Dear Dr. {{doctor_name|capfirst}}</span>
+									<span style="color: #000000; font-weight: 600;">Mr {{patient_name|capfirst}}</span>
 								</td>
 							</tr>
 							<tr>
-								<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
-									Your appointment with Mr. {{patient_name}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}  has been cancelled.
+								<td style="color: #000000; font-weight: 600; font-size: 16px; padding: 20px 15px 0;">
+									Dr. {{doctor_name|capfirst}}
+								</td>
+							</tr>
+							<tr>
+								<td style="font-size: 14px; color: #070707; font-weight: 500; padding: 2px 15px;">
+									has uploaded a prescription for your appointment dated {{instance.time_slot_start|date:"M d, Y"}}.
+								</td>
+							</tr>
+							<tr>
+								<td style="color: #757575; font-size: 16px; font-weight: 500; padding: 2px 15px;">
+									Booking ID : <span style="color: #000000; font-weight: 600;">{{instance.id}}</span>
+								</td>
+							</tr>
+							<tr>
+								<td style="color: #000000; font-size: 14px; font-weight: 500; padding: 40px 15px 0;">
+									You can view the prescription in your docprime profile.
 								</td>
 							</tr>
 						</tbody>

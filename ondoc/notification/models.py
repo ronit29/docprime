@@ -61,6 +61,7 @@ class NotificationAction:
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             context = {
                 "doctor_name": doctor_name,
+                "patient_name": patient_name,
                 "id": instance.id,
                 "instance": instance,
                 "title": "Appointment Confirmed",
@@ -165,12 +166,8 @@ class NotificationAction:
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
                 "instance": instance,
-                "title": "Appointment Cancelled",
-                "body": "Appointment with Dr. {} at {} {} has been cancelled as per your request.".format(
-                    doctor_name, instance.time_slot_start.strftime("%I:%M %P"),
-                    instance.time_slot_start.strftime("%d/%m/%y")),
                 "title": "Invoice Generated",
-                "body": "Appointment has been generated.",
+                "body": "Invoice for appointment ID-{} has been generated.".format(instance.id),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -186,7 +183,7 @@ class NotificationAction:
                 "lab_name": lab_name,
                 "instance": instance,
                 "title": "Invoice Generated",
-                "body": "Appointment has been generated.",
+                "body": "Invoice for appointment ID-{} has been generated.".format(instance.id),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
@@ -194,6 +191,22 @@ class NotificationAction:
             }
             EmailNotification.send_notification(user=user, notification_type=notification_type,
                                                 email=user.email, context=context)
+        elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            doctor_name = instance.doctor.name if instance.doctor.name else ""
+            context = {
+                "patient_name": patient_name,
+                "doctor_name": doctor_name,
+                "instance": instance,
+                "title": "Prescription Uploaded",
+                "body": "Prescription available for your appointment with Dr. {} on {}".format(
+                    doctor_name, instance.time_slot_start.strftime("%d/%m/%y")),
+                "url": "/opd/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.OPD_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
 
 
     @classmethod
@@ -247,6 +260,9 @@ class EmailNotification(TimeStampedModel):
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
             html_body = render_to_string("email/appointment_cancelled_patient/body.html", context=context)
             email_subject = render_to_string("email/appointment_cancelled_patient/subject.txt", context=context)
+        elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
+            html_body = render_to_string("email/prescription_uploaded/body.html", context=context)
+            email_subject = render_to_string("email/prescription_uploaded/subject.txt", context=context)
 
         elif notification_type == NotificationAction.DOCTOR_INVOICE:
             invoice = account_model.Invoice.objects.filter(reference_id=context.get("instance").id,
@@ -322,6 +338,8 @@ class SmsNotification(TimeStampedModel):
             html_body = render_to_string("sms/appointment_cancelled_doctor.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
             html_body = render_to_string("sms/appointment_cancelled_patient.txt", context=context)
+        elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
+            html_body = render_to_string("sms/prescription_uploaded.txt", context=context)
 
         if phone_number and user:
             sms_noti = SmsNotification.objects.create(

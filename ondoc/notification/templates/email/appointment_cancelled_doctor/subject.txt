@@ -1,1 +1,1 @@
-Appointment Cancelled (ID- {{instance.id}})
+Appointment Cancellation (ID- {{instance.id}})
