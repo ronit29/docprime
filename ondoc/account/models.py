@@ -169,20 +169,23 @@ class PgTransaction(TimeStampedModel):
         refund_queryset = (ConsumerRefund.objects.filter(user=user, pg_transaction__isnull=False, created_at__gte=max_ref_date).values('pg_transaction', 'pg_transaction__amount').
                            annotate(total_amount=Sum('refund_amount')))
         pg_rem_bal = dict()
-        for data in refund_queryset:
-            pg_rem_bal[data['pg_transaction']] = data['pg_transaction__amount'] - data['total_amount']
+        if refund_queryset:
+            for data in refund_queryset:
+                pg_rem_bal[data['pg_transaction']] = data['pg_transaction__amount'] - data['total_amount']
 
         pgtx_obj = cls.objects.filter(user=user, created_at__gte=max_ref_date)
         new_pg_obj = list()
-        for pg_data in pgtx_obj:
-            if pg_rem_bal.get(pg_data.id) is not None:
-                if pg_rem_bal[pg_data.id] > 0:
-                    pg_data.amount = pg_rem_bal[pg_data.id]
+        if pgtx_obj.exists():
+            for pg_data in pgtx_obj:
+                if pg_rem_bal.get(pg_data.id) is not None:
+                    if pg_rem_bal[pg_data.id] > 0:
+                        pg_data.amount = pg_rem_bal[pg_data.id]
+                        new_pg_obj.append(pg_data)
+                else:
                     new_pg_obj.append(pg_data)
-            else:
-                new_pg_obj.append(pg_data)
 
-        new_pg_obj = sorted(new_pg_obj, key=lambda k: k.amount, reverse=True)
+            if new_pg_obj:
+                new_pg_obj = sorted(new_pg_obj, key=lambda k: k.amount, reverse=True)
 
         pgtx_details = list()
         index = 0
