@@ -11,7 +11,7 @@ class Command(BaseCommand):
         counter = 0
         for di in DoctorImage.objects.all():
             counter+=1
-            print('images processed'+str(counter))
+            print('doctor images processed'+str(counter))
             try:
                 di.save()
             except Exception as e:
@@ -23,7 +23,7 @@ class Command(BaseCommand):
         counter = 0
         for di in DoctorDocument.objects.all():
             counter+=1
-            print('images processed'+str(counter))
+            print('doctor documents processed'+str(counter))
             try:
                 di.save()
             except Exception as e:
@@ -35,7 +35,7 @@ class Command(BaseCommand):
         counter = 0
         for li in LabImage.objects.all():
             counter+=1
-            print('images processed'+str(counter))
+            print('lab images processed'+str(counter))
             try:
                 li.save()
             except Exception as e:
@@ -47,7 +47,7 @@ class Command(BaseCommand):
         counter = 0
         for ld in LabDocument.objects.all():
             counter+=1
-            print('images processed'+str(counter))
+            print('lab document processed'+str(counter))
             try:
                 ld.save()
             except Exception as e:
@@ -59,7 +59,7 @@ class Command(BaseCommand):
         counter = 0
         for hi in HospitalImage.objects.all():
             counter+=1
-            print('images processed'+str(counter))
+            print('hospital images processed'+str(counter))
             try:
                 hi.save()
             except Exception as e:
@@ -71,7 +71,7 @@ class Command(BaseCommand):
         counter = 0
         for hd in HospitalDocument.objects.all():
             counter+=1
-            print('images processed'+str(counter))
+            print('hospital documents processed'+str(counter))
             try:
                 hd.save()
             except Exception as e:
