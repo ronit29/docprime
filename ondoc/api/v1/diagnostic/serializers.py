@@ -189,7 +189,8 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(obj.profile.get_thumbnail()) if obj.profile.get_thumbnail() else None
 
     def get_patient_name(self, obj):
-        return obj.profile_detail.get("name")
+        if obj.profile_detail:
+            return obj.profile_detail.get("name")
 
     class Meta:
         model = LabAppointment
