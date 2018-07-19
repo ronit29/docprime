@@ -3,7 +3,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-	<title>Appointment Confirmed</title>
+	<title>Invoice Generated</title>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
@@ -37,13 +37,13 @@
 										<tbody>
 											<tr>
 												<td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
-													Appointment Confirmed
+													Invoice Generated
 												</td>
 											</tr>
 											<tr>
 												<td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
-                                                    {{instance.updated_at|date:'M d, Y'}}
-                                                </td>
+												{{invoice.created_at|date:'M d, Y'}}
+												</td>
 											</tr>
 										</tbody>
 									</table>
@@ -54,24 +54,24 @@
 					</table>
 				</td>
 			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px; border-bottom: 1px solid #d3d3d3;">
-						<tbody>
-							<tr>
-								<td style="color: #757575; font-size: 16px; font-weight: 500;">
-									Unique Confirmation Code : <span style="color: #000000; font-weight: 600;">{{instance.otp}}</span>
-								</td>
-							</tr>
-							<tr>
-								<td style="color: #000000; font-size: 12px; font-weight: 500; padding-top: 4px;">
-									Share this code with doctor at the time of your appoinment
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
+			<!--<tr>-->
+				<!--<td>-->
+					<!--<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px; border-bottom: 1px solid #d3d3d3;">-->
+						<!--<tbody>-->
+							<!--<tr>-->
+								<!--<td style="color: #757575; font-size: 16px; font-weight: 500;">-->
+									<!--Unique Confirmation Code : <span style="color: #000000; font-weight: 600;">5453</span>-->
+								<!--</td>-->
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="color: #000000; font-size: 12px; font-weight: 500; padding-top: 4px;">-->
+									<!--Share this code with doctor at the time of your appoinment-->
+								<!--</td>-->
+							<!--</tr>-->
+						<!--</tbody>-->
+					<!--</table>-->
+				<!--</td>-->
+			<!--</tr>-->
 			<tr>
 				<td>
 					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
@@ -89,16 +89,16 @@
 				<td>
 					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 40px 15px 0;">
 						<tbody>
-							<tr>
-								<td style="color: #000000; font-weight: 600; font-size: 16px;">
-									Dr. {{doctor_name|capfirst}}
-								</td>
-							</tr>
 							<!--<tr>-->
-								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">-->
-									<!--MBBS, MD - Genral Medicine-->
+								<!--<td style="color: #000000; font-weight: 600; font-size: 16px;">-->
+									<!--Dr. Stephny Ray-->
 								<!--</td>-->
 							<!--</tr>-->
+							<tr>
+								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+									Invoice has been generated. Please <a href="{{invoice_url}}" download>Click here </a> to download invoice.
+								</td>
+							</tr>
 							<!--<tr>-->
 								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
 									<!--General Physician-->
@@ -108,54 +108,52 @@
 					</table>
 				</td>
 			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
-						<tbody>
-                            {% if instance.hospital.name %}
-							<tr>
-								<td style="color: #000000; font-weight: 600; font-size: 16px;">
-									{{instance.hospital.name|capfirst}}
-								</td>
-							</tr>
-                            {% endif %}
-							<tr>
-								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-									{% if instance.hospital.building %}{{instance.hospital.building}}, {% endif %}{% if instance.hospital.sublocality %}{{instance.hospital.sublocality}}, {% endif %}{% if instance.hospital.locality %}{{instance.hospital.locality}}{% endif %}
-								</td>
-							</tr>
-							<tr>
-								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
-									{% if instance.hospital.city %}{{instance.hospital.city}} {% endif %}{% if instance.hospital.state%}{{instance.hospital.state}}{% endif %}
-								</td>
-							</tr>
-							<tr>
-								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
-								{% if instance.hospital.city %} {{instance.hospital.pin_code}}{% endif %}
-                                </td>
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 20px; border-bottom: 1px solid #d3d3d3;">
-						<tbody>
-							<tr>
-								<td style="color: #000000; font-weight: 600; font-size: 16px;">
-									Clinic Visit Time
-								</td>
-							</tr>
-							<tr>
-								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-									{{instance.time_slot_start|date:"M d"}} &nbsp;&nbsp; | &nbsp;&nbsp; {{instance.time_slot_start|date:"h:i a"}}
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
+			<!--<tr>-->
+				<!--<td>-->
+					<!--<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">-->
+						<!--<tbody>-->
+							<!--<tr>-->
+								<!--<td style="color: #000000; font-weight: 600; font-size: 16px;">-->
+									<!--Apollo Clinic-->
+								<!--</td>-->
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">-->
+									<!--Plot Number 66, 1st Floor, Sector 12A-->
+								<!--</td>-->
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
+									<!--Gurgaon Haryana-->
+								<!--</td>-->
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
+									<!--122001-->
+								<!--</td>-->
+							<!--</tr>-->
+						<!--</tbody>-->
+					<!--</table>-->
+				<!--</td>-->
+			<!--</tr>-->
+			<!--<tr>-->
+				<!--<td>-->
+					<!--<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 20px; border-bottom: 1px solid #d3d3d3;">-->
+						<!--<tbody>-->
+							<!--<tr>-->
+								<!--<td style="color: #000000; font-weight: 600; font-size: 16px;">-->
+									<!--Clinic Visit Time-->
+								<!--</td>-->
+							<!--</tr>-->
+							<!--<tr>-->
+								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">-->
+									<!--18th  April &nbsp;&nbsp; | &nbsp;&nbsp; 3:30 PM-->
+								<!--</td>-->
+							<!--</tr>-->
+						<!--</tbody>-->
+					<!--</table>-->
+				<!--</td>-->
+			<!--</tr>-->
 			<tr>
 				<td>
 					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">

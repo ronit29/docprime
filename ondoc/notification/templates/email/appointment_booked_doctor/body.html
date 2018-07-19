@@ -5,6 +5,17 @@
     <title>Title</title>
 </head>
 <body>
-    <p>Patient -{{patient_name}} has booked an appointment with you.</p>
+    <div>Dear {{doctor_name}}
+        We have received a new appointment for Mr. {{patient_name}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.
+        Kindly accept the same to confirm in your docprime account or by clicking the below button.
+    </div>
+    <div>
+        [ ACCEPT ]
+        (to reschedule, kindly login to your docprime app)
+
+        Regards
+        docprime
+
+This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to networkhelp@docprime.com</div>
 </body>
 </html>

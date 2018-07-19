@@ -1,1 +1,1 @@
-Appointment Booked
+New Appointment (ID - {{instance.id}})

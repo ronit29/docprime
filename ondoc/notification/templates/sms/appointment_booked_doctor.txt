@@ -1,1 +1,2 @@
-Patient -{{patient_name}} has booked an appointment with you.
+New appointment received for Mr. {{patient_name}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}
+Kindly accept the same to confirm in your docprime account.

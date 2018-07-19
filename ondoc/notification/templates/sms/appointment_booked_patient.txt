@@ -1,1 +1,1 @@
-Your appointment has been booked with Dr. {{doctor_name}}.
+Appointment Confirmed for {{patient_name}} requested with Dr. {{docor_name}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.

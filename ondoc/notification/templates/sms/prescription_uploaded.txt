@@ -1,0 +1,1 @@
+Prescription uploaded by Dr. {{doctor_name|capfirst}} for your appointment for Mr. {{patient_name|capfirst}}.
