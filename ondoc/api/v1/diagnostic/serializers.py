@@ -147,9 +147,18 @@ class CommonTestSerializer(serializers.ModelSerializer):
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
 
+    test = serializers.SerializerMethodField()
+
+    def get_test(self, obj):
+        test_id = []
+        if obj:
+            for tst in obj.lab_test.all():
+                test_id.append(tst.id)
+        return test_id
+
     class Meta:
         model = CommonDiagnosticCondition
-        fields = ('id', 'name', )
+        fields = ('id', 'name', 'test')
 
 
 class PromotedLabsSerializer(serializers.ModelSerializer):

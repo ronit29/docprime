@@ -278,7 +278,7 @@ class CreatedByModel(models.Model):
         abstract = True
 
 
-class UserProfile(TimeStampedModel, Image):
+class UserProfile(TimeStampedModel):
     MALE = 'm'
     FEMALE = 'f'
     OTHER = 'o'
@@ -292,7 +292,7 @@ class UserProfile(TimeStampedModel, Image):
     is_default_user = models.BooleanField(default=False)
     dob = models.DateField(blank=True, null=True)
     
-    profile_image = models.ImageField(upload_to='users/images', height_field='height', width_field='width', blank=True, null=True)
+    profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
