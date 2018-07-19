@@ -252,8 +252,8 @@ class EmailNotification(TimeStampedModel):
             html_body = render_to_string("email/appointment_booked_doctor/body.html", context=context)
             email_subject = render_to_string("email/appointment_booked_doctor/subject.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT:
-            html_body = render_to_string("email/appointment_rescheduled_patient_initiated/body.html", context=context)
-            email_subject = render_to_string("email/appointment_rescheduled_patient_initiated/subject.txt", context=context)
+            html_body = render_to_string("email/appointment_rescheduled_patient_initiated_to_patient/body.html", context=context)
+            email_subject = render_to_string("email/appointment_rescheduled_patient_initiated_to_patient/subject.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
             html_body = render_to_string("email/appointment_cancelled_doctor/body.html", context=context)
             email_subject = render_to_string("email/appointment_cancelled_doctor/subject.txt", context=context)
@@ -333,7 +333,7 @@ class SmsNotification(TimeStampedModel):
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
             html_body = render_to_string("sms/appointment_booked_doctor.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT:
-            html_body = render_to_string("sms/appointment_rescheduled_patient_initiated.txt", context=context)
+            html_body = render_to_string("sms/appointment_rescheduled_patient_initiated_to_patient.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
             html_body = render_to_string("sms/appointment_cancelled_doctor.txt", context=context)
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
