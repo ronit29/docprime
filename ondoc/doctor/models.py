@@ -849,50 +849,48 @@ class OpdAppointment(auth_model.TimeStampedModel):
         return consumer_tx.amount
 
     def send_notification(self, database_instance):
+        doctor_admins = auth_model.GenericAdmin.get_appointment_admins(self)
         if database_instance and database_instance.status == self.status:
             return
-        if (not self.user) or (not self.doctor):
-            return
-        if self.status == OpdAppointment.ACCEPTED:
+        if self.user and self.status == OpdAppointment.ACCEPTED:
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_ACCEPTED,
             )
         elif self.status == OpdAppointment.RESCHEDULED_PATIENT:
-            if not self.doctor.user or not self.user:
+            for admin in doctor_admins:
+                notification_models.NotificationAction.trigger(
+                    instance=self,
+                    user=admin,
+                    notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
+            if not self.user:
                 return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.doctor.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
         elif self.status == OpdAppointment.RESCHEDULED_DOCTOR:
-            if not self.doctor.user or not self.user:
+            if not self.user:
                 return
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.user,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR)
         elif self.status == OpdAppointment.BOOKED:
-            if not self.doctor.user:
-                return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.doctor.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED,
-            )
+            for admin in doctor_admins:
+                notification_models.NotificationAction.trigger(
+                    instance=self,
+                    user=admin,
+                    notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED)
         elif self.status == OpdAppointment.CANCELED:
-            if (not self.doctor.user) or (not self.user):
+            for admin in doctor_admins:
+                notification_models.NotificationAction.trigger(
+                    instance=self,
+                    user=admin,
+                    notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED)
+            if not self.user:
                 return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.doctor.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED,
-            )
             notification_models.NotificationAction.trigger(
                 instance=self,
                 user=self.user,
