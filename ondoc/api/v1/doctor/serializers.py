@@ -4,7 +4,8 @@ from django.db.models import Q
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
-                                 Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip, CommonMedicalCondition)
+                                 Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
+                                 CommonMedicalCondition,CommonSpecialization)
 from ondoc.authentication.models import UserProfile
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -615,5 +616,17 @@ class MedicalConditionSerializer(serializers.ModelSerializer):
     class Meta:
         model = CommonMedicalCondition
         fields = ('id', 'name', 'specialization')
+
+
+class CommonSpecializationsSerializer(serializers.ModelSerializer):
+
+    id = serializers.ReadOnlyField(source='specialization.id')
+    name = serializers.ReadOnlyField(source='specialization.name')
+
+    class Meta:
+        model = CommonSpecialization
+        fields = ('id', 'name')
+
+
 
 
