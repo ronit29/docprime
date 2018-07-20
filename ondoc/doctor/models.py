@@ -757,12 +757,12 @@ class OpdAppointment(auth_model.TimeStampedModel):
             if perm_queryset.first():
                 doc_permission = perm_queryset.first()
                 if doc_permission.write_permission or doc_permission.super_user_permission:
-                    if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT, self.RESCHEDULED_DOCTOR]:
+                    if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
                         allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
                     elif self.status == self.ACCEPTED:
                         allowed = [self.RESCHEDULED_DOCTOR, self.COMPLETED]
-                    # elif self.status 
-                    #     allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
+                    elif self.status == self.RESCHEDULED_DOCTOR:
+                        allowed = [self.ACCEPTED]
 
         elif user_type == auth_model.User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
