@@ -73,11 +73,14 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             test_queryset = paginate_queryset(test_queryset, request)
             lab_queryset = Lab.objects.filter(search_key__icontains=search_key)
             lab_queryset = paginate_queryset(lab_queryset, request)
-            test_serializer = diagnostic_serializer.LabTestListSerializer(test_queryset, many=True)
-            lab_serializer = diagnostic_serializer.LabListSerializer(lab_queryset, many=True)
-            temp_data['tests'] = test_serializer.data
-            temp_data['labs'] = lab_serializer.data
+        else:
+            test_queryset = self.queryset[:20]
+            lab_queryset = Lab.objects.all()[:20]
 
+        test_serializer = diagnostic_serializer.LabTestListSerializer(test_queryset, many=True)
+        lab_serializer = diagnostic_serializer.LabListSerializer(lab_queryset, many=True)
+        temp_data['tests'] = test_serializer.data
+        temp_data['labs'] = lab_serializer.data
         return Response(temp_data)
 
 
