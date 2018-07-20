@@ -145,7 +145,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
                 otp_valid_serializer.is_valid(raise_exception=True)
                 opd_appointment.action_completed()
-        opd_appointment_serializer = serializers.OpdAppointmentSerializer(opd_appointment, context={'request': request})
+        opd_appointment_serializer = serializers.AppointmentRetrieveSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
     @transaction.atomic
@@ -604,10 +604,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         return Response({"conditions": medical_conditions, "specializations": specializations})
 
     def common_conditions(self, request):
-        # medical_conditions = models.MedicalCondition.objects.values("id", "name")[:10]
         medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all()[:10]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True)
-        # specializations = models.Specialization.objects.values("id", "name")[:10]
 
         common_specializations = models.CommonSpecialization.objects.select_related('specialization').all()[:10]
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True)
