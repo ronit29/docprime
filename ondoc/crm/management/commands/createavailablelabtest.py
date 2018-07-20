@@ -22,7 +22,6 @@ class Command(BaseCommand):
             with connection.cursor() as cursor:
                 cursor.execute(query_string)
 
-
     def handle(self, *args, **options):
         lab_id = options['lab_id']
         old_lab = diagnostic_model.Lab.objects.select_related("network").filter(id=lab_id).first()
