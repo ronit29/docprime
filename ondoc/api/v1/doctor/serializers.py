@@ -81,7 +81,8 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     def get_doctor_thumbnail(self, obj):
         request = self.context.get('request')
         if obj.doctor.images.all():
-            photo_url = obj.doctor.images.all()[0].name.url
+            photo_url = (
+                obj.doctor.images.all()[0].cropped_image.url if obj.doctor.images.all()[0].cropped_image else None)
             return request.build_absolute_uri(photo_url) if photo_url else None
         else:
             return None
@@ -354,10 +355,10 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         default_image_url = static('doctor_images/no_image.png')
         if obj.images.all().exists():
             image = obj.images.all().first()
-            if not image.name:
+            if not image.cropped_image:
                 return None
                 # return request.build_absolute_uri(default_image_url)
-            return request.build_absolute_uri(image.name.url)
+            return request.build_absolute_uri(image.cropped_image.url)
         else:
             return None
             # return request.build_absolute_uri(default_image_url)

@@ -156,6 +156,8 @@ class DoctorSearchHelper:
                     "discounted_fees": min_price["deal_price"],
                     "timings": convert_timings(serializer.data, is_day_human_readable=True)
                 }]
+            if doctor.images.exists():
+                thumbnail = (doctor.images.all()[0].cropped_image.url if doctor.images.all()[0].cropped_image else None)
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),
@@ -177,7 +179,7 @@ class DoctorSearchHelper:
                                                             context={"request": request}).data,
                 "hospitals": hospitals,
                 "thumbnail": (
-                    request.build_absolute_uri(doctor.images.all()[0].name.url) if doctor.images.exists() else None)
+                    request.build_absolute_uri(thumbnail) if thumbnail else None)
             }
             response.append(temp)
         return response
