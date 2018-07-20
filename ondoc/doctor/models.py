@@ -114,8 +114,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='assoc_hospitals')
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
     is_appointment_manager = models.BooleanField(verbose_name='Enabled for Managing Appointments', default=False)
-
-
+    is_live = models.BooleanField(verbose_name='Is Live', default=False)
     # generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
 
@@ -246,6 +245,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     is_online_consultation_enabled = models.BooleanField(verbose_name='Available for Online Consultation',
                                                          default=False)
     online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
+    is_live = models.BooleanField(verbose_name='Is Live', default=False)
     # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
@@ -1142,4 +1142,14 @@ class CommonMedicalCondition(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_medical_condition"
+
+
+class CommonSpecialization(auth_model.TimeStampedModel):
+    specialization = models.OneToOneField(Specialization, related_name="common_specialization", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return "{}".format(self.specialization)
+
+    class Meta:
+        db_table = "common_specializations"
 

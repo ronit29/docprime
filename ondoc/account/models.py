@@ -8,10 +8,6 @@ from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request
-import math
-
-
-# Create your models here.
 
 
 class Order(TimeStampedModel):
@@ -151,7 +147,7 @@ class PgTransaction(TimeStampedModel):
     order_no = models.PositiveIntegerField(blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
-    amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, default=0)
     payment_mode = models.CharField(max_length=50)
     response_code = models.CharField(max_length=50)
     bank_id = models.CharField(max_length=50)
@@ -187,8 +183,7 @@ class PgTransaction(TimeStampedModel):
                     new_pg_obj.append(pg_data)
 
             if new_pg_obj:
-                infinte_amount = math.inf
-                new_pg_obj = sorted(new_pg_obj, key=lambda k: k.amount if k.amount else infinte_amount, reverse=True)
+                new_pg_obj = sorted(new_pg_obj, key=lambda k: k.amount, reverse=True)
 
         pgtx_details = list()
         index = 0
@@ -319,7 +314,7 @@ class ConsumerRefund(TimeStampedModel):
     state_type = [(PENDING, "Pending"), (COMPLETED, "Completed")]
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     consumer_transaction = models.ForeignKey(ConsumerTransaction, on_delete=models.DO_NOTHING)
-    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None)
+    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     pg_transaction = models.ForeignKey(PgTransaction, related_name='pg_refund', blank=True, null=True, on_delete=models.DO_NOTHING)
     refund_state = models.PositiveSmallIntegerField(choices=state_type, default=PENDING)
 

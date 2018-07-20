@@ -163,7 +163,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
 
-        queryset = AvailableLabTest.objects
+        queryset = AvailableLabTest.objects.select_related('lab').filter(lab__is_live=True)
 
         if ids:
             queryset = queryset.filter(test__in=ids)
@@ -174,7 +174,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(lab__location__distance_lte=(pnt, max_distance))
             if min_distance:
                 queryset = queryset.filter(lab__location__distance_gte=(pnt, min_distance))
-
         if ids:
             queryset = (
                 queryset.values('lab').annotate(price=Sum('mrp'), count=Count('id'),
