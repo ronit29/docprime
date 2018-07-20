@@ -30,7 +30,6 @@ class Image(models.Model):
         old_value = self.__class__._default_manager.filter(pk=self.pk).values('name').get()['name']
         return not getattr(self, 'name').name == old_value
 
-
     def save(self, *args, **kwargs):
 
         if not self.has_image_changed():
@@ -707,6 +706,23 @@ class GenericAdmin(TimeStampedModel):
                     "hospital": data.get("hospital")
                 })
         return doc_hospital
+
+    @classmethod
+    def get_appointment_admins(cls, appoinment):
+        if not appoinment:
+            return []
+        admins = GenericAdmin.objects.filter(
+            Q(is_disabled=False, hospital=appoinment.hospital),
+            (Q(doctor__isnull=True) | Q(doctor__isnull=False, doctor=appoinment.doctor)))
+        admin_users= []
+        for admin in admins:
+            if admin.user:
+                admin_users.append(admin.user)
+        return admin_users
+
+
+
+
 
 
 
