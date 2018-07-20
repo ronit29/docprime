@@ -151,12 +151,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         parameters = serializer.validated_data
 
-        DEFAULT_DISTANCE = 10000
+        DEFAULT_DISTANCE = 20000
+        MAX_SEARCHABLE_DISTANCE = 50000
 
         default_long = 77.071848
         default_lat = 28.450367
         min_distance = parameters.get('min_distance')
-        max_distance = parameters.get('max_distance', DEFAULT_DISTANCE)
+        max_distance = parameters.get('max_distance')*1000 if parameters.get('max_distance') else DEFAULT_DISTANCE
+        max_distance = min(max_distance, MAX_SEARCHABLE_DISTANCE)
         long = parameters.get('long', default_long)
         lat = parameters.get('lat', default_lat)
         ids = parameters.get('ids', [])
@@ -173,6 +175,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             pnt = GEOSGeometry(point_string, srid=4326)
             queryset = queryset.filter(lab__location__distance_lte=(pnt, max_distance))
             if min_distance:
+                min_distance = min_distance*1000  # input is  coming in km
                 queryset = queryset.filter(lab__location__distance_gte=(pnt, min_distance))
 
         if ids:
