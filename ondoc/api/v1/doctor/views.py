@@ -556,7 +556,7 @@ class PrescriptionFileViewset(OndocViewSet):
                                                                       'prescription_details'))
             prescription_file_data = {
                 "prescription": prescription.id,
-                "file": validated_data.get('file')
+                "name": validated_data.get('name')
             }
             prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data,
                                                                                   context={"request": request})
@@ -607,8 +607,11 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         # medical_conditions = models.MedicalCondition.objects.values("id", "name")[:10]
         medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all()[:10]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True)
-        specializations = models.Specialization.objects.values("id", "name")[:10]
-        return Response({"conditions": conditions_serializer.data, "specializations": specializations})
+        # specializations = models.Specialization.objects.values("id", "name")[:10]
+
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all()[:10]
+        specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True)
+        return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):

@@ -4,7 +4,7 @@ from django.contrib.gis import admin
 
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment, GeneralSpecialization,
-                                 MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition)
+                                 MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition)
 from ondoc.lead.models import HospitalLead, DoctorLead
@@ -51,6 +51,7 @@ admin.site.register(User, CustomUserAdmin)
 admin.site.register(Language, LanguageAdmin)
 admin.site.register(MedicalService, MedicalServiceAdmin)
 admin.site.register(CommonMedicalCondition)
+admin.site.register(CommonSpecialization)
 admin.site.register(Specialization, SpecializationAdmin)
 admin.site.register(GeneralSpecialization, GeneralSpecializationAdmin)
 admin.site.register(MedicalCondition, MedicalConditionAdmin)
