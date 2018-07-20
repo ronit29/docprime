@@ -304,11 +304,8 @@ class EmailNotification(TimeStampedModel):
             email_subject = render_to_string("email/prescription_uploaded/subject.txt", context=context)
 
         elif notification_type == NotificationAction.DOCTOR_INVOICE:
-            invoice = account_model.Invoice.objects.filter(reference_id=context.get("instance").id,
-                                                           product_id=account_model.Order.DOCTOR_PRODUCT_ID).first()
-            if not invoice:
-                invoice = account_model.Invoice(reference_id=context.get("instance").id,
-                                                product_id=account_model.Order.DOCTOR_PRODUCT_ID)
+            invoice, created = account_model.Invoice.objects.get_or_create(reference_id=context.get("instance").id,
+                                                                           product_id=account_model.Order.DOCTOR_PRODUCT_ID)
             context.update({"invoice": invoice})
             html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
             filename = "invoice_{}.pdf".format(str(timezone.now().timestamp()))
