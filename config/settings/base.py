@@ -172,7 +172,8 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 )
 
-
+MEDIA_URL = '/media/'
+MEDIA_ROOT = str(APPS_DIR('media'))
 
 # TEMPLATES
 # ------------------------------------------------------------------------------
@@ -255,12 +256,14 @@ ANYMAIL = {
 
 DEFAULT_FROM_EMAIL = "support@docprime.com"
 
-# Config for AWS S3 bucket
-MEDIA_URL = '/media/'
-# AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
-# AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
-# AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
-# AWS_QUERYSTRING_AUTH = False
+#Config for AWS S3 bucket
+#MEDIA_URL = '/media/'
+#AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
+#AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
+#AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
+#AWS_QUERYSTRING_AUTH = False
+#S3_USE_SIGV4 = True
+#AWS_S3_REGION_NAME='ap-south-1'
 # AWS_S3_ENCRYPTION = True
 # AWS_S3_OBJECT_PARAMETERS = {
 #     'CacheControl': 'max-age=86400',
@@ -269,4 +272,4 @@ MEDIA_URL = '/media/'
 # MEDIA_URL = 'http://%s.s3.amazonaws.com/media/' % AWS_STORAGE_BUCKET_NAME
 # MEDIA_ROOT = str(APPS_DIR('media'))
 #
-# DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'
+#DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'
