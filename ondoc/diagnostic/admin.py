@@ -6,6 +6,7 @@ from .forms import LabForm as LabTestPricingForm
 from .tables import LabTestTable
 from ondoc.crm.admin.lab import LabCityFilter
 from django.shortcuts import render
+from ondoc.crm.constants import constants
 
 
 class LabPricingGroupAdmin(admin.ModelAdmin):
@@ -16,7 +17,7 @@ class LabPricingGroupAdmin(admin.ModelAdmin):
     # list_filter = ('data_status', 'onboarding_status',LabCityFilter)
 
     def has_change_permission(self, request, obj=None):
-        if super().has_change_permission(request, obj) and request.user.is_superuser or request.user.groups.filter(name='qc_group').exists():
+        if super().has_change_permission(request, obj) and request.user.is_superuser or request.user.groups.filter(name=constants['LAB_PRICING_GROUP_NAME']).exists():
             return True
         return False    
 

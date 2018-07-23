@@ -272,7 +272,12 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', LabCityFilter)
 
-    readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id')
+    # readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id')
+
+    def get_readonly_fields(self, request, obj=None):
+        if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
+            return ('lead_url','matrix_lead_id','matrix_reference_id', 'lab_pricing_group',)
+        return ('lead_url','matrix_lead_id','matrix_reference_id', )
 
     def lead_url(self, instance):
         if instance.id:
