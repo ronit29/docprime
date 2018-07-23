@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import LabOnboardingToken, Lab, AvailableLabTest, LabTestPricingGroup
+from .models import LabOnboardingToken, Lab, AvailableLabTest, LabTestPricingGroup, LabPricingGroup
 from django_tables2 import RequestConfig
 import django_tables2 as tables
 from .forms import LabForm as LabTestPricingForm
@@ -8,25 +8,27 @@ from ondoc.crm.admin.lab import LabCityFilter
 from django.shortcuts import render
 
 
-class LabTestPricingGroupAdmin(admin.ModelAdmin):
+class LabPricingGroupAdmin(admin.ModelAdmin):
     change_form_template = 'labtest.html'
+    add_form_template = 'admin/change_form.html'
     list_display = ('group_name', )
+    search_fields = ['group_name', ]
     # list_filter = ('data_status', 'onboarding_status',LabCityFilter)
 
     def has_change_permission(self, request, obj=None):
-        if request.user.is_superuser or request.user.groups.filter(name='lab_pricing_team').exists():
+        if super().has_change_permission(request, obj) and request.user.is_superuser or request.user.groups.filter(name='qc_group').exists():
             return True
         return False    
 
     def get_queryset(self, request):
-        return LabTestPricingGroup.objects.all()
+        return LabPricingGroup.objects.all()
 
     def change_view(self, request, object_id=None, extra_context=None):
         if not object_id:
             return render(request, 'access_denied.html')
 
         existing = None
-        existing = LabTestPricingGroup.objects.get(pk=object_id)
+        existing = LabPricingGroup.objects.get(pk=object_id)
         if not existing:
             return render(request, 'access_denied.html')
         form = LabTestPricingForm(instance=existing, prefix="lab")
@@ -39,4 +41,4 @@ class LabTestPricingGroupAdmin(admin.ModelAdmin):
         return super().change_view(request, object_id, extra_context=extra_context)
 
 admin.site.register(LabOnboardingToken)
-admin.site.register(LabTestPricingGroup, LabTestPricingGroupAdmin)
+admin.site.register(LabPricingGroup, LabPricingGroupAdmin)

@@ -256,8 +256,13 @@ class LabCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 
-class LabPricingGroupAdmin(VersionAdmin):
-    search_fields = ['group_name', ]
+# class LabPricingGroupAdmin(VersionAdmin):
+#     search_fields = ['group_name', ]
+#
+#     def has_change_permission(self, request, obj=None):
+#         if super().has_change_permission(request, obj) and request.user.is_superuser or request.user.groups.filter(name='qc_group').exists():
+#             return True
+#         return False
 
 
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):

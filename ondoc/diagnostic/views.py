@@ -32,13 +32,13 @@ class LabTestAutocomplete(autocomplete.Select2QuerySetView):
 def labajaxmodelsave(request):
     if request.method == "POST":
         id = request.POST.get('id')
-        model_instance = LabTestPricingGroup.objects.get(id=id)
+        model_instance = LabPricingGroup.objects.get(id=id)
         model_instance.pathology_agreed_price_percentage = decimal.Decimal(request.POST['lab-pathology_agreed_price_percentage']) if request.POST.get('lab-pathology_agreed_price_percentage') else None
         model_instance.pathology_deal_price_percentage = decimal.Decimal(request.POST['lab-pathology_deal_price_percentage']) if request.POST.get('lab-pathology_deal_price_percentage') else None
         model_instance.radiology_agreed_price_percentage = decimal.Decimal(request.POST['lab-radiology_agreed_price_percentage']) if request.POST.get('lab-radiology_agreed_price_percentage') else None
         model_instance.radiology_deal_price_percentage = decimal.Decimal(request.POST['lab-radiology_deal_price_percentage']) if request.POST.get('lab-radiology_deal_price_percentage') else None
         model_instance.save()
-        return HttpResponseRedirect('/admin/diagnostic/labtestpricinggroup/'+id+'/change/')
+        return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')
     else:
         return HttpResponseRedirect('/admin')
 
