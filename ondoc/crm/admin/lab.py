@@ -256,6 +256,10 @@ class LabCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 
+class LabPricingGroupAdmin(VersionAdmin):
+    search_fields = ['group_name', ]
+
+
 class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     list_display = ('name', 'updated_at', 'onboarding_status','data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
@@ -365,9 +369,10 @@ class LabAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         return form
 
     form = LabForm
-    search_fields = ['name']
+    search_fields = ['name', 'lab_pricing_group', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
         LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline]
+    autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'

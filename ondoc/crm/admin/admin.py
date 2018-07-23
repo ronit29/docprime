@@ -16,7 +16,7 @@ from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
-from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin
+from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, LabPricingGroupAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -40,7 +40,7 @@ admin.site.register(OpdAppointment)
 admin.site.register(UserProfile)
 
 admin.site.register(LabAppointment) #temp temp temp
-admin.site.register(LabPricingGroup)
+admin.site.register(LabPricingGroup, LabPricingGroupAdmin)
 
 admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(AboutDoctor, AboutDoctorAdmin)
