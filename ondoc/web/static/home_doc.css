@@ -152,3 +152,17 @@ input[type=number]::-webkit-outer-spin-button {
 		margin-top: 20px;
 	}
 }
+
+.city-mobile-div{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+#city{
+    margin-left: 8px;
+}
+
+#mobile, #city{
+    flex: 1;
+}
