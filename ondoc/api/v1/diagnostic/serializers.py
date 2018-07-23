@@ -153,7 +153,7 @@ class CommonConditionsSerializer(serializers.ModelSerializer):
         test_id = []
         if obj:
             for tst in obj.lab_test.all():
-                test_id.append(tst.id)
+                test_id.append({"id": tst.id, "name": tst.name})
         return test_id
 
     class Meta:
