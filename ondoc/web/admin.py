@@ -12,12 +12,12 @@ class CareerAdmin(admin.ModelAdmin):
     fields = ['name','mobile', 'email', 'profile_type', 'resume', 'created_at']
 
 class OnlineLeadAdmin(admin.ModelAdmin):
-    list_display = ('name', 'member_type', 'created_at')
+    list_display = ('name', 'member_type', 'city', 'created_at')
     # readonly_fields=('onboarding_status', )
-    list_filter = ('member_type', 'created_at')
+    list_filter = ('member_type', 'city', 'created_at')
 
-    readonly_fields = ['name', 'mobile', 'email', 'member_type', 'created_at']
-    fields = ['name','mobile', 'email', 'member_type', 'created_at']
+    readonly_fields = ['name', 'city', 'mobile', 'email', 'member_type', 'created_at']
+    fields = ['name', 'city', 'mobile', 'email', 'member_type', 'created_at']
 
 
 
