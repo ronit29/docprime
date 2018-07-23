@@ -19,7 +19,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
             if data.exists():
                 cat_data = {}
                 cat_data['title'] = category
-                cat_data['data'] = serializers.ArticleRetrieveSerializer(data.all(), many=True, context={'request': request}).data
+                cat_data['data'] = serializers.ArticleListSerializer(data.all(), many=True, context={'request': request}).data
                 resp.append(cat_data)
         return Response(resp)
 
