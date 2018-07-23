@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
+    {% if GOOGLE_ANALYTICS_PROPERTY_ID %}
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-122756975-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-122756975-1');
+    </script>
+    {% endif %}
     <title>
         {% block title_text %}
         {% endblock %}

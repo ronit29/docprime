@@ -208,6 +208,7 @@ TEMPLATES = [
                 'django.template.context_processors.static',
                 'django.template.context_processors.tz',
                 'django.contrib.messages.context_processors.messages',
+                'ondoc.web.context_processors.google_analytics',
             ],
         },
     },
