@@ -1117,15 +1117,16 @@ class OrderViewSet(GenericViewSet):
     def retrieve(self, request, pk):
         user = request.user
         order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING, action_data__user=user.id).first()
+        resp = dict()
+        resp["status"] = 0
 
         if not order_obj:
-            return Response(None)
+            return Response(resp)
 
         appointment_details = dict()
         appointment_details["payable_amount"] = order_obj.amount
         appointment_details["profile"] = UserProfile.objects.get(pk=order_obj.action_data.get("profile"))
         product_id = order_obj.product_id
-        resp = dict()
         resp["status"] = 1
         if product_id == Order.DOCTOR_PRODUCT_ID:
             app_obj = DoctorAppointmentsViewSet()
