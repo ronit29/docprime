@@ -32,9 +32,11 @@ from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, Appointme
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
                                              OpdAppModelSerializer)
+from ondoc.api.v1.doctor.views import DoctorAppointmentsViewSet
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
+from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
 from ondoc.payout.models import Outstanding
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
@@ -1107,3 +1109,30 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
             pass
 
         return Response(resp_data)
+
+
+class OrderViewSet(GenericViewSet):
+    permission_classes = (IsAuthenticated,)
+
+    def retrieve(self, request, pk):
+        user = request.user
+        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING, action_data__user=user.id).first()
+
+        if not order_obj:
+            return Response(None)
+
+        appointment_details = dict()
+        appointment_details["payable_amount"] = order_obj.amount
+        appointment_details["profile"] = UserProfile.objects.get(pk=order_obj.action_data.get("profile"))
+        product_id = order_obj.product_id
+        resp = dict()
+        resp["status"] = 1
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            app_obj = DoctorAppointmentsViewSet()
+            resp['data'], resp["payment_required"] = app_obj.payment_details(request, appointment_details, product_id,
+                                                                             order_obj.id)
+        elif product_id == Order.LAB_PRODUCT_ID:
+            app_obj = LabAppointmentView()
+            resp['data'], resp["payment_required"] = app_obj.get_payment_details(request, appointment_details,
+                                                                                 product_id, order_obj.id)
+        return Response(resp)
