@@ -158,6 +158,8 @@ class DoctorSearchHelper:
                 }]
             if doctor.images.exists():
                 thumbnail = (doctor.images.all()[0].cropped_image.url if doctor.images.all()[0].cropped_image else None)
+            else:
+                thumbnail = None
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),
