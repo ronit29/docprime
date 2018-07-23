@@ -8,6 +8,7 @@ from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request
+import math
 
 
 class Order(TimeStampedModel):
@@ -160,12 +161,13 @@ class PgTransaction(TimeStampedModel):
     transaction_id = models.CharField(max_length=100, unique=True)
     pb_gateway_name = models.CharField(max_length=100)
 
-
     @classmethod
     def get_transactions(cls, user, amount):
         max_ref_date = timezone.now() - timedelta(days=ConsumerRefund.MAXREFUNDDAYS)
-        refund_queryset = (ConsumerRefund.objects.filter(user=user, pg_transaction__isnull=False, created_at__gte=max_ref_date).values('pg_transaction', 'pg_transaction__amount').
-                           annotate(total_amount=Sum('refund_amount')))
+        refund_queryset = (
+            ConsumerRefund.objects.filter(user=user, pg_transaction__isnull=False, created_at__gte=max_ref_date).values(
+                'pg_transaction', 'pg_transaction__amount').
+            annotate(total_amount=Sum('refund_amount')))
         pg_rem_bal = dict()
         if refund_queryset:
             for data in refund_queryset:
@@ -187,21 +189,21 @@ class PgTransaction(TimeStampedModel):
 
         pgtx_details = list()
         index = 0
-        while amount > 0:
-            refund_amount = amount
-            pg_obj = None
-            if index < len(new_pg_obj):
-                pg_obj = new_pg_obj[index]
-                refund_amount = new_pg_obj[index].amount
-                if amount < new_pg_obj[index].amount:
-                    refund_amount = amount
 
-            pgtx_details.append({
-                'id': pg_obj,
-                'amount': refund_amount
-            })
+        refund_amount = amount
+        while refund_amount > 0 and index < len(new_pg_obj):
+            available_transaction = new_pg_obj[index]
+
+            refund_entry = {'id': available_transaction,
+                            'amount': math.min(available_transaction.amount, refund_amount)}
+
+            pgtx_details.append(refund_entry)
             index += 1
-            amount -= refund_amount
+            refund_amount -= refund_entry['amount']
+
+        if refund_amount > 0:
+            pgtx_details.append({'id': None, 'amount': refund_amount})
+
         return pgtx_details
 
     @staticmethod
@@ -272,7 +274,7 @@ class ConsumerAccount(TimeStampedModel):
     def form_consumer_tx_data(self, data, amount, action, tx_type):
         consumer_tx_data = dict()
         consumer_tx_data['user'] = data['user']
-        consumer_tx_data['product_id'] = data['product_id']
+        consumer_tx_data['product_id'] = data.get('product_id')
         consumer_tx_data['reference_id'] = data.get('reference_id')
         consumer_tx_data['transaction_id'] = data.get('transaction_id')
         consumer_tx_data['order_id'] = data.get('order_id')
@@ -294,7 +296,7 @@ class ConsumerTransaction(TimeStampedModel):
     action_list = ["Cancellation", "Payment", "Refund", "Sale"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
-    product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
+    product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS, blank=True, null=True)
     reference_id = models.IntegerField(blank=True, null=True)
     order_id = models.IntegerField(blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)

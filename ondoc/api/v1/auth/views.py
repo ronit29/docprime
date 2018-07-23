@@ -805,6 +805,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['order_id'] = order_obj.id
         data['reference_id'] = order_obj.reference_id
         data['type'] = PgTransaction.CREDIT
+        data['amount'] = order_obj.amount
 
         data['payment_mode'] = response.get('paymentMode')
         data['response_code'] = response.get('responseCode')
