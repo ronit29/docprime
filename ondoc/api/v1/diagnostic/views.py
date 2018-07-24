@@ -12,7 +12,7 @@ from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -328,13 +328,13 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp['message'] = insurance_fail_message
             return resp
 
+        temp_appointment_details = copy.deepcopy(appointment_details)
+        temp_appointment_details = labappointment_transform(temp_appointment_details)
+
+        account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
+                                                    account_models.Order.LAB_APPOINTMENT_CREATE)
         if appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and \
                 balance < appointment_details.get("effective_price"):
-            temp_appointment_details = copy.deepcopy(appointment_details)
-            self.json_transform(temp_appointment_details)
-
-            account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
-                                                        account_models.Order.LAB_APPOINTMENT_CREATE)
 
             payable_amount = appointment_details.get("effective_price") - balance
 
@@ -387,16 +387,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['txAmount'] = appointment_details['payable_amount']
 
         return pgdata, payment_required
-
-    def json_transform(self, app_data):
-        app_data["price"] = str(app_data["price"])
-        app_data["agreed_price"] = str(app_data["agreed_price"])
-        app_data["deal_price"] = str(app_data["deal_price"])
-        app_data["effective_price"] = str(app_data["effective_price"])
-        app_data["time_slot_start"] = str(app_data["time_slot_start"])
-        app_data["lab"] = app_data["lab"].id
-        app_data["user"] = app_data["user"].id
-        app_data["profile"] = app_data["profile"].id
 
     def can_use_insurance(self, appointment_details):
         # Check if appointment can be covered under insurance

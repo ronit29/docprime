@@ -235,14 +235,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp['message'] = insurance_fail_message
             return resp
 
+        temp_app_details = copy.deepcopy(appointment_details)
+        temp_app_details = opdappointment_transform(temp_app_details)
+
+        account_models.Order.disable_pending_orders(temp_app_details, product_id,
+                                                    account_models.Order.OPD_APPOINTMENT_CREATE)
+
         if appointment_details['payment_type'] == models.OpdAppointment.PREPAID and \
-            balance < appointment_details.get("effective_price"):
-
-            temp_app_details = copy.deepcopy(appointment_details)
-            temp_app_details = opdappointment_transform(temp_app_details)
-
-            account_models.Order.disable_pending_orders(temp_app_details, product_id,
-                                                        account_models.Order.OPD_APPOINTMENT_CREATE)
+                balance < appointment_details.get("effective_price"):
 
             payable_amount = appointment_details.get("effective_price") - balance
 
