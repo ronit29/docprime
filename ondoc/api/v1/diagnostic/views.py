@@ -37,12 +37,13 @@ import random
 import copy
 import re
 
+
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         test_queryset = CommonTest.objects.all()
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
-        lab_queryset = PromotedLab.objects.all()
+        lab_queryset = PromotedLab.objects.prefetch_related('lab_test').all()
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True)
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
