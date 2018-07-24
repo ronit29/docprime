@@ -1160,3 +1160,6 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
         if consumer_account.balance > 0:
             ctx_obj = consumer_account.debit_refund()
             ConsumerRefund.initiate_refund(user, ctx_obj)
+        resp = dict()
+        resp["status"] = 1
+        return Response(resp)
