@@ -222,6 +222,7 @@ def labappointment_transform(app_data):
     app_data["lab"] = app_data["lab"].id
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
+    return app_data
 
 
 def refund_curl_request(req_data):
