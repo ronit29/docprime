@@ -13,6 +13,7 @@ import calendar
 from django.contrib.auth import get_user_model
 import requests
 import json
+from django.conf import settings
 User = get_user_model()
 
 
