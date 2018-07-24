@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
-
+from rest_framework.authentication import TokenAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
 
 from django.contrib.gis.geos import GEOSGeometry
@@ -255,6 +255,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     queryset = LabAppointment.objects.all()
     serializer_class = diagnostic_serializer.LabAppointmentModelSerializer
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
@@ -475,6 +476,7 @@ class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
 
     # authentication_classes = (TokenAuthentication,)
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
