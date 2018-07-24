@@ -589,10 +589,11 @@ class DoctorAvailabilityTimingSerializer(serializers.Serializer):
 class DoctorTimeSlotSerializer(serializers.Serializer):
     images = DoctorImageSerializer(read_only=True, many=True)
     qualifications = DoctorQualificationSerializer(read_only=True, many=True)
+    general_specialization = DoctorSpecializationSerializer(read_only=True, many=True, source='doctorspecializations')
 
     class Meta:
         model = Doctor
-        fields = ('id', 'images', 'qualifications', )
+        fields = ('id', 'images', 'qualifications', 'general_specialization', )
 
 
 class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
