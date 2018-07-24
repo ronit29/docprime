@@ -174,6 +174,8 @@ class DoctorSearchHelper:
                 "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(),
                                                                             many=True).data,
+                "general_specialization": serializers.DoctorSpecializationSerializer(doctor.doctorspecializations.all(),
+                                                                                     many=True).data,
                 "distance": self.get_distance(doctor, doctor_hospital_mapping),
                 "name": doctor.name,
                 "gender": doctor.gender,

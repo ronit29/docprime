@@ -621,7 +621,7 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         request = self.request
-        return Address.objects.filter(user=request.user)
+        return Address.objects.filter(user=request.user).order_by('address')
 
     def create(self, request, *args, **kwargs):
         data = request.data
