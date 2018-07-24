@@ -206,7 +206,7 @@ class LabTiming(TimeStampedModel):
                     (21.0, "9 PM"), (21.5, "9:30 PM"),
                     (22.0, "10 PM"), (22.5, "10:30 PM")]
 
-    lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='lab_timings')
 
     pickup_flag = models.BooleanField(default=False)
     day = models.PositiveSmallIntegerField(blank=False, null=False,

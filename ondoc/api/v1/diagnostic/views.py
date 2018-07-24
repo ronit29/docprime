@@ -110,26 +110,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
         lab_obj = Lab.objects.filter(id=lab_id).first()
         day_now = timezone.now().weekday()
-        timing_queryset = lab_obj.labtiming_set.filter(day=day_now)
+        timing_queryset = lab_obj.lab_timings.filter(day=day_now)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
         temp_data = dict()
         temp_data['lab'] = lab_serializer.data
         temp_data['tests'] = test_serializer.data
         temp_data['lab_timing'] = ''
-        temp_data['lab_timing'] = self.get_lab_timing(timing_queryset)
+        temp_data['lab_timing'], temp_timing = self.get_lab_timing(timing_queryset)
 
         return Response(temp_data)
 
     def get_lab_timing(self, queryset):
         temp_str = ''
+        temp_list = list()
         for qdata in queryset:
             start = self.convert_time(qdata.start)
             end = self.convert_time(qdata.end)
+            temp_list.append([start, end])
             if not temp_str:
                 temp_str += start + " - " + end
             else:
                 temp_str += " | " + start + " - " + end
-        return temp_str
+        return temp_str, temp_list
 
     def convert_time(self, time):
         hour = int(time)
@@ -215,16 +217,24 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def form_lab_whole_data(self, queryset):
         ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.prefetch_related('lab_image').filter(id__in=ids)
+        labs = Lab.objects.prefetch_related('lab_image', 'lab_timings').filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
         for obj in labs:
             # temp_var = id_details[obj.id]
             temp_var[obj.id] = obj
             # resp_queryset.append(temp_var)
-
+        day_now = timezone.now().weekday()
         for row in queryset:
             row["lab"] = temp_var[row["lab"]]
+            timing_queryset = row["lab"].lab_timings.all()
+            timing_data = list()
+            for data in timing_queryset:
+                if data.day == day_now:
+                    timing_data.append(data)
+            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+            row["lab_timing"] = lab_timing
+            row["lab_timing_data"] = lab_timing_data
             resp_queryset.append(row)
 
         return resp_queryset
