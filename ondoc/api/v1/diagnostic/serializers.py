@@ -129,6 +129,8 @@ class LabCustomSerializer(serializers.Serializer):
     price = serializers.IntegerField(default=None)
     distance = serializers.IntegerField(source='distance.m')
     pickup_available = serializers.IntegerField(default=0)
+    lab_timing = serializers.CharField(max_length=200)
+    lab_timing_data = serializers.ListField()
 
     # def get_lab(self, obj):
     #     queryset = Lab.objects.get(pk=obj['lab'])

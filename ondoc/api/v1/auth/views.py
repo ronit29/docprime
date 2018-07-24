@@ -621,7 +621,7 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         request = self.request
-        return Address.objects.filter(user=request.user)
+        return Address.objects.filter(user=request.user).order_by('address')
 
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -1160,3 +1160,6 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
         if consumer_account.balance > 0:
             ctx_obj = consumer_account.debit_refund()
             ConsumerRefund.initiate_refund(user, ctx_obj)
+        resp = dict()
+        resp["status"] = 1
+        return Response(resp)

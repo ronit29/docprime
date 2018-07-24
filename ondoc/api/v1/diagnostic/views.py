@@ -12,7 +12,7 @@ from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -110,26 +110,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
         lab_obj = Lab.objects.filter(id=lab_id).first()
         day_now = timezone.now().weekday()
-        timing_queryset = lab_obj.labtiming_set.filter(day=day_now)
+        timing_queryset = lab_obj.lab_timings.filter(day=day_now)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
         temp_data = dict()
         temp_data['lab'] = lab_serializer.data
         temp_data['tests'] = test_serializer.data
         temp_data['lab_timing'] = ''
-        temp_data['lab_timing'] = self.get_lab_timing(timing_queryset)
+        temp_data['lab_timing'], temp_timing = self.get_lab_timing(timing_queryset)
 
         return Response(temp_data)
 
     def get_lab_timing(self, queryset):
         temp_str = ''
+        temp_list = list()
         for qdata in queryset:
             start = self.convert_time(qdata.start)
             end = self.convert_time(qdata.end)
+            temp_list.append([start, end])
             if not temp_str:
                 temp_str += start + " - " + end
             else:
                 temp_str += " | " + start + " - " + end
-        return temp_str
+        return temp_str, temp_list
 
     def convert_time(self, time):
         hour = int(time)
@@ -215,16 +217,24 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def form_lab_whole_data(self, queryset):
         ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.prefetch_related('lab_image').filter(id__in=ids)
+        labs = Lab.objects.prefetch_related('lab_image', 'lab_timings').filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
         for obj in labs:
             # temp_var = id_details[obj.id]
             temp_var[obj.id] = obj
             # resp_queryset.append(temp_var)
-
+        day_now = timezone.now().weekday()
         for row in queryset:
             row["lab"] = temp_var[row["lab"]]
+            timing_queryset = row["lab"].lab_timings.all()
+            timing_data = list()
+            for data in timing_queryset:
+                if data.day == day_now:
+                    timing_data.append(data)
+            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+            row["lab_timing"] = lab_timing
+            row["lab_timing_data"] = lab_timing_data
             resp_queryset.append(row)
 
         return resp_queryset
@@ -328,13 +338,13 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp['message'] = insurance_fail_message
             return resp
 
+        temp_appointment_details = copy.deepcopy(appointment_details)
+        temp_appointment_details = labappointment_transform(temp_appointment_details)
+
+        account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
+                                                    account_models.Order.LAB_APPOINTMENT_CREATE)
         if appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and \
                 balance < appointment_details.get("effective_price"):
-            temp_appointment_details = copy.deepcopy(appointment_details)
-            self.json_transform(temp_appointment_details)
-
-            account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
-                                                        account_models.Order.LAB_APPOINTMENT_CREATE)
 
             payable_amount = appointment_details.get("effective_price") - balance
 
@@ -387,16 +397,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['txAmount'] = appointment_details['payable_amount']
 
         return pgdata, payment_required
-
-    def json_transform(self, app_data):
-        app_data["price"] = str(app_data["price"])
-        app_data["agreed_price"] = str(app_data["agreed_price"])
-        app_data["deal_price"] = str(app_data["deal_price"])
-        app_data["effective_price"] = str(app_data["effective_price"])
-        app_data["time_slot_start"] = str(app_data["time_slot_start"])
-        app_data["lab"] = app_data["lab"].id
-        app_data["user"] = app_data["user"].id
-        app_data["profile"] = app_data["profile"].id
 
     def can_use_insurance(self, appointment_details):
         # Check if appointment can be covered under insurance
