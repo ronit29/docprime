@@ -165,13 +165,13 @@ class PgTransaction(TimeStampedModel):
     def get_transactions(cls, user, amount):
         max_ref_date = timezone.now() - timedelta(days=ConsumerRefund.MAXREFUNDDAYS)
         refund_queryset = (
-            ConsumerRefund.objects.filter(user=user, pg_transaction__isnull=False, created_at__gte=max_ref_date).values(
-                'pg_transaction', 'pg_transaction__amount').
-            annotate(total_amount=Sum('refund_amount')))
+            ConsumerRefund.objects.filter(user=user, pg_transaction__isnull=False).values(
+                'pg_transaction').
+            annotate(refunded_amount=Sum('refund_amount'), pg_tx_amount=Max('pg_transaction__amount')))
         pg_rem_bal = dict()
         if refund_queryset:
             for data in refund_queryset:
-                pg_rem_bal[data['pg_transaction']] = data['pg_transaction__amount'] - data['total_amount']
+                pg_rem_bal[data['pg_transaction']] = data['pg_tx_amount'] - data['refunded_amount']
 
         pgtx_obj = cls.objects.filter(user=user, created_at__gte=max_ref_date)
         new_pg_obj = list()
@@ -195,7 +195,7 @@ class PgTransaction(TimeStampedModel):
             available_transaction = new_pg_obj[index]
 
             refund_entry = {'id': available_transaction,
-                            'amount': math.min(available_transaction.amount, refund_amount)}
+                            'amount': min(available_transaction.amount, refund_amount)}
 
             pgtx_details.append(refund_entry)
             index += 1
@@ -245,12 +245,12 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
-    def debit_refund(self, data):
+    def debit_refund(self):
         amount = self.balance
         self.balance = 0
         action = ConsumerTransaction.REFUND
         tx_type = PgTransaction.DEBIT
-        consumer_tx_data = self.form_consumer_tx_data(data, amount, action, tx_type)
+        consumer_tx_data = self.form_consumer_tx_data({"user": self.user}, amount, action, tx_type)
         ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
         return ctx_obj
@@ -352,6 +352,21 @@ class ConsumerRefund(TimeStampedModel):
 
     class Meta:
         db_table = "consumer_refund"
+
+    @classmethod
+    def schedule_refund(cls, consumer_tx):
+        consumer_refund_obj = cls.objects.filter(consumer_transaction=consumer_tx)
+        refund_data = list()
+        for data in consumer_refund_obj:
+            temp_data = {
+                'user': data.user,
+                'consumer_transaction': data.consumer_transaction,
+                'refund_amount': data.refund_amount,
+                'pg_transaction': data.pg_transaction
+            }
+            refund_data.append(temp_data)
+        pg_data = PgTransaction.form_pg_refund_data(refund_data)
+        refund_curl_request(pg_data)
 
 
 class Invoice(TimeStampedModel):
