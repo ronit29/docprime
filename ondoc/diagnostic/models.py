@@ -521,7 +521,8 @@ class LabAppointment(TimeStampedModel):
         cancel_amount = self.effective_price
         consumer_account.credit_cancellation(data, cancel_amount)
         if refund_flag:
-            consumer_account.debit_refund(data)
+            ctx_obj = consumer_account.debit_refund()
+            account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def action_completed(self):
         self.status = self.COMPLETED

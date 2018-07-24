@@ -3,7 +3,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     UserProfileViewSet, UserAppointmentsViewSet, AddressViewsSet,
                     TransactionViewSet, UserTransactionViewSet, UserIDViewSet, OrderHistoryViewSet,
                     HospitalDoctorAppointmentPermissionViewSet, HospitalDoctorBillingPermissionViewSet,
-                    OrderViewSet)
+                    OrderViewSet, ConsumerAccountRefundViewSet)
 
 urlpatterns = [
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
@@ -39,7 +39,7 @@ urlpatterns = [
     path('managablehospitals', HospitalDoctorAppointmentPermissionViewSet.as_view({"get": "list"}), name="hosp-doc-appointment-permission"),
     path('managebilling', HospitalDoctorBillingPermissionViewSet.as_view({"get": "list"}), name="hosp-doc-billing-permission"),
     path('pgdata/<int:pk>', OrderViewSet.as_view({"get": "retrieve"}), name="pg-order-detail"),
-
+    path('refund', ConsumerAccountRefundViewSet.as_view({"post": "refund"}), name="consumer-refund"),
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
 ]

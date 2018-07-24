@@ -22,7 +22,7 @@ from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          UserPermission, Address, AppointmentTransaction, GenericAdmin)
-from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order
+from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -805,6 +805,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['order_id'] = order_obj.id
         data['reference_id'] = order_obj.reference_id
         data['type'] = PgTransaction.CREDIT
+        data['amount'] = order_obj.amount
 
         data['payment_mode'] = response.get('paymentMode')
         data['response_code'] = response.get('responseCode')
@@ -882,14 +883,23 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
         user = request.user
-        queryset = ConsumerTransaction.objects.filter(user=user)
-        if not queryset.exists():
+        tx_queryset = ConsumerTransaction.objects.filter(user=user)
+        consumer_account = ConsumerAccount.objects.filter(user=user).first()
+        if not tx_queryset.exists():
             return Response({"status": 0,
                              "msg": "No transaction exists"
                              })
-        queryset = paginate_queryset(queryset, request)
-        serializer = serializers.UserTransactionModelSerializer(queryset, many=True)
-        return Response(data=serializer.data)
+        if not consumer_account:
+            return Response({"status": 0,
+                             "msg": "Consumer Account does not exists"
+                             })
+
+        tx_queryset = paginate_queryset(tx_queryset, request)
+        tx_serializer = serializers.UserTransactionModelSerializer(tx_queryset, many=True)
+        resp = dict()
+        resp["user_transactions"] = tx_serializer.data
+        resp["user_wallet_balance"] = consumer_account.balance
+        return Response(data=resp)
 
 
 class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
@@ -1137,3 +1147,16 @@ class OrderViewSet(GenericViewSet):
             resp['data'], resp["payment_required"] = app_obj.get_payment_details(request, appointment_details,
                                                                                  product_id, order_obj.id)
         return Response(resp)
+
+
+class ConsumerAccountRefundViewSet(GenericViewSet):
+    permission_classes = (IsAuthenticated, IsConsumer, )
+
+    @transaction.atomic
+    def refund(self, request):
+        user = request.user
+        consumer_account = ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
+        if consumer_account.balance > 0:
+            ctx_obj = consumer_account.debit_refund()
+            ConsumerRefund.initiate_refund(user, ctx_obj)
