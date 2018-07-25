@@ -19,7 +19,7 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When
 from django.forms.models import model_to_dict
 from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
-from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
+from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          UserPermission, Address, AppointmentTransaction, GenericAdmin)
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
@@ -39,6 +39,8 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
 from ondoc.payout.models import Outstanding
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
+
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
 import decimal
 from collections import defaultdict
@@ -213,6 +215,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                          GenericViewSet):
     serializer_class = serializers.UserProfileSerializer
     queryset = UserProfile.objects.all()
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -259,20 +262,6 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer.save()
         return Response(serializer.data)
 
-#
-# class UserPermissionViewSet(mixins.CreateModelMixin,
-#                             mixins.ListModelMixin,
-#                             GenericViewSet):
-#     queryset = DoctorHospital.objects.all()
-#     # serializer_class = serializers.UserPermissionSerializer
-#
-#     def list(self, request, *args, **kwargs):
-#         params = request.query_params
-#         doctor_list = params['doctor_id'].split(",")
-#         dp_obj = DoctorPermission(doctor_list, request)
-#         permission_data = dp_obj.create_permission()
-#         return Response({'data':permission_data})
-
 
 class OndocViewSet(mixins.CreateModelMixin,
                    mixins.RetrieveModelMixin,
@@ -285,7 +274,9 @@ class OndocViewSet(mixins.CreateModelMixin,
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
+
     def get_queryset(self):
         user = self.request.user
         return OpdAppointment.objects.filter(user=user)
@@ -416,11 +407,11 @@ class UserAppointmentsViewSet(OndocViewSet):
                     time_slot_start = utils.form_time_slot(
                         validated_data.get("start_date"),
                         validated_data.get("start_time"))
-                    doctor_hospital = DoctorHospital.objects.filter(doctor=opd_appointment.doctor,
-                                                                           hospital=opd_appointment.hospital,
-                                                                           day=time_slot_start.weekday(),
-                                                                           start__lte=time_slot_start.hour,
-                                                                           end__gte=time_slot_start.hour).first()
+                    doctor_hospital = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=opd_appointment.doctor,
+                                                                        doctor_clinic__hospital=opd_appointment.hospital,
+                                                                        day=time_slot_start.weekday(),
+                                                                        start__lte=time_slot_start.hour,
+                                                                        end__gte=time_slot_start.hour).first()
                     if doctor_hospital:
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
@@ -616,6 +607,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
 class AddressViewsSet(viewsets.ModelViewSet):
     serializer_class = serializers.AddressSerializer
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -709,6 +701,7 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
 
 
 class UserIDViewSet(viewsets.GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -879,6 +872,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 class UserTransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.UserTransactionModelSerializer
     queryset = ConsumerTransaction.objects.all()
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def list(self, request):
@@ -908,6 +902,7 @@ class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
 
 
 class OrderHistoryViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
@@ -928,7 +923,7 @@ class OrderHistoryViewSet(GenericViewSet):
 
         doc_hosp_details = defaultdict(dict)
         if opd_action_data:
-            doc_hosp_obj = DoctorHospital.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(doc_hosp_query)
+            doc_hosp_obj = DoctorClinic.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(doc_hosp_query)
             for data in doc_hosp_obj:
                 doc_hosp_details[data.hospital.id][data.doctor.id] = {
                     "doctor_name": data.doctor.name,
@@ -1001,11 +996,12 @@ class OrderHistoryViewSet(GenericViewSet):
 
 
 class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (DoctorHospital.objects.annotate(hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(Q(doctor__manageable_doctors__user=user,
+        doc_hosp_queryset = (DoctorClinic.objects.annotate(hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(Q(doctor__manageable_doctors__user=user,
                                                              doctor__manageable_doctors__hospital=F('hospital'),
                                                              doctor__manageable_doctors__is_disabled=False,
                                                              doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
@@ -1021,12 +1017,13 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
 
 class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
         user = request.user
         doc_hosp_queryset = (
-            DoctorHospital.objects.filter(
+            DoctorClinic.objects.filter(
                 Q(
                   doctor__manageable_doctors__user=user,
                   doctor__manageable_doctors__is_disabled=False,
@@ -1101,17 +1098,17 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
             permission = GenericAdmin.objects.filter(user=user, doctor=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.filter(doctor=admin_id).values('hospital', 'hospital__name')
+                resp_data = DoctorClinic.objects.filter(doctor=admin_id).values('hospital', 'hospital__name')
         elif level == Outstanding.HOSPITAL_LEVEL:
             permission = GenericAdmin.objects.filter(user=user, hospital=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.filter(hospital=admin_id).values('doctor', 'doctor__name')
+                resp_data = DoctorClinic.objects.filter(hospital=admin_id).values('doctor', 'doctor__name')
         elif level == Outstanding.HOSPITAL_NETWORK_LEVEL:
             permission = GenericAdmin.objects.filter(user=user, hospital_network=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.get(hospital__network=admin_id).values('hospital', 'doctor',
+                resp_data = DoctorClinic.objects.get(hospital__network=admin_id).values('hospital', 'doctor',
                                                                                           'hospital_name', 'doctor_name')
         elif level == Outstanding.LAB_LEVEL:
             pass
@@ -1122,6 +1119,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
 
 
 class OrderViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request, pk):
@@ -1150,6 +1148,7 @@ class OrderViewSet(GenericViewSet):
 
 
 class ConsumerAccountRefundViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
 
     @transaction.atomic

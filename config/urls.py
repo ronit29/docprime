@@ -40,6 +40,7 @@ else:
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('nested_admin/', include('nested_admin.urls')),
     path('', include('ondoc.diagnostic.urls', namespace='diagnostic')),
     path('', include('ondoc.web.urls', namespace='web')),
     path('', include('ondoc.matrix.urls', namespace='matrix')),
