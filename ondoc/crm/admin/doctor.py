@@ -13,6 +13,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
     DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language,
     DoctorClinic, DoctorClinicTiming)
+
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -670,7 +671,7 @@ class GeneralSpecializationResource(resources.ModelResource):
 
     class Meta:
         model = GeneralSpecialization
-        fields = ('id','name')
+        fields = ('id', 'name')
 
 
 class SpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
@@ -744,5 +745,21 @@ class DoctorClinicAdmin(VersionAdmin):
 
     def get_queryset(self, request):
         return super(DoctorClinicAdmin, self).get_queryset(request).select_related('doctor', 'hospital')
+
+
+class DoctorMappingAdmin(VersionAdmin):
+
+    list_display = ('doctor', 'profile_to_be_shown', 'updated_at',)
+    date_hierarchy = 'created_at'
+    search_fields = ['doctor']
+    # autocomplete_fields = ['doctor', 'profile_to_be_shown']
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(DoctorMappingAdmin, self).get_form(request, obj=obj, **kwargs)
+        form.base_fields['doctor'].queryset = Doctor.objects.filter(is_internal=True)
+        form.base_fields['profile_to_be_shown'].queryset = Doctor.objects.filter(is_internal=True)
+        return form
+
+
 
 

@@ -5,5 +5,6 @@ constants = {
     'CAREERS_MANAGEMENT_GROUP': 'careers_management_group',
     'ONLINE_LEADS_GROUP': 'online_leads_group',
     'ABOUT_DOCTOR_TEAM': 'about_doctor_team',
-    'ARTICLE_TEAM': 'article_team'
+    'ARTICLE_TEAM': 'article_team',
+    'DOCTOR_MAPPING_TEAM': 'doctor_mapping_team'
 }
