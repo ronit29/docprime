@@ -249,7 +249,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
-        through='DoctorHospital',
+        through='DoctorClinic',
         through_fields=('doctor', 'hospital'),
         related_name='assoc_doctors',
     )
