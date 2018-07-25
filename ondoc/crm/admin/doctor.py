@@ -11,7 +11,8 @@ from ondoc.authentication.models import GenericAdmin
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience, MedicalConditionSpecialization,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
-    DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language, DoctorClinic)
+    DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language,
+    DoctorClinic, DoctorClinicTiming)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -104,6 +105,27 @@ class DoctorHospitalInline(admin.TabularInline):
 
     def get_queryset(self, request):
         return super(DoctorHospitalInline, self).get_queryset(request).select_related('doctor', 'hospital')
+
+
+class DoctorClinicInline(admin.TabularInline):
+    model = DoctorClinic
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['hospital']
+
+
+class DoctorClinicTimingInline(admin.TabularInline):
+    model = DoctorClinicTiming
+    # form = DoctorHospitalForm
+    # formset = DoctorHospitalFormSet
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['deal_price']
+
+    # def get_queryset(self, request):
+    #     return super(DoctorHospitalInline, self).get_queryset(request)
 
 
 class DoctorLanguageFormSet(forms.BaseInlineFormSet):
@@ -457,7 +479,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         DoctorEmailInline,
         DoctorSpecializationInline,
         DoctorQualificationInline,
-        DoctorHospitalInline,
+        # DoctorHospitalInline,
+        DoctorClinicInline,
         DoctorLanguageInline,
         DoctorAwardInline,
         DoctorAssociationInline,
@@ -711,6 +734,7 @@ class DoctorClinicAdmin(VersionAdmin):
     date_hierarchy = 'created_at'
     search_fields = ['doctor']
     autocomplete_fields = ['doctor', 'hospital']
+    inlines = [DoctorClinicTimingInline]
 
     def get_queryset(self, request):
         return super(DoctorClinicAdmin, self).get_queryset(request).select_related('doctor', 'hospital')
