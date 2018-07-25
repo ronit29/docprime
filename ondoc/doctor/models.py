@@ -357,7 +357,7 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
 
 
 class DoctorClinic(auth_model.TimeStampedModel):
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='doctor_clinics')
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
 
     class Meta:
@@ -370,7 +370,7 @@ class DoctorClinic(auth_model.TimeStampedModel):
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
-    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE)
+    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name='availability')
     day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
 
     TIME_CHOICES = [(7.0, "7:00 AM"), (7.5, "7:30 AM"),

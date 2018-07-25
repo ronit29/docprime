@@ -634,7 +634,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         doctor_ids = paginate_queryset([data.get("doctor_id") for data in saved_search_result.results], request)
         preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
         doctor_data = models.Doctor.objects.filter(
-            id__in=doctor_ids).prefetch_related("hospitals", "availability", "availability__hospital",
+            id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
+                                                "doctor_clinics__hospital",
+                                                "doctorspecializations", "doctorspecializations__specialization",
                                                 "experiences", "images", "qualifications",
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
