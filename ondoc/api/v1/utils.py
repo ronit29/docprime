@@ -11,8 +11,7 @@ import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
-import requests
-import json
+from ondoc.doctor.tasks import refund_curl_task
 from django.conf import settings
 User = get_user_model()
 
@@ -227,18 +226,8 @@ def labappointment_transform(app_data):
 
 
 def refund_curl_request(req_data):
-    token = "gFH8gPXbCWaW8WqUefmFBcyRj0XIw"
-    headers = {
-        "Authorization": token,
-        "Content-Type": "application/json"
-    }
-    url = "http://pgdev.policybazaar.com/dp/refund/refundRequested"
     for data in req_data:
-        response = requests.post(url, data=data, headers=headers)
-        response.raise_for_status()
-        print("\n\n\n")
-        print(response.status_code)
-        print("\n\n\n")
+        refund_curl_task.delay(data)
 
 
 class ErrorCodeMapping(object):
