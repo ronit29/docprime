@@ -11,7 +11,7 @@ from ondoc.authentication.models import GenericAdmin
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience, MedicalConditionSpecialization,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
-    DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language)
+    DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language, DoctorClinic)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -704,5 +704,15 @@ class HealthTipAdmin(VersionAdmin):
     date_hierarchy = 'created_at'
     form = HealthTipForm
     search_fields = ['name']
+
+
+class DoctorClinicAdmin(VersionAdmin):
+    list_display = ('doctor', 'hospital', 'updated_at')
+    date_hierarchy = 'created_at'
+    search_fields = ['doctor']
+    autocomplete_fields = ['doctor', 'hospital']
+
+    def get_queryset(self, request):
+        return super(DoctorClinicAdmin, self).get_queryset(request).select_related('doctor', 'hospital')
 
 
