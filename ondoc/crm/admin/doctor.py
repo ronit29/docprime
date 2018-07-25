@@ -17,6 +17,7 @@ from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
+import nested_admin
 
 
 class AutoComplete:
@@ -51,7 +52,7 @@ class DoctorQualificationFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Qualification is required")
 
 
-class DoctorQualificationInline(admin.TabularInline):
+class DoctorQualificationInline(nested_admin.NestedTabularInline):
     model = DoctorQualification
     form = DoctorQualificationForm
     formset = DoctorQualificationFormSet
@@ -107,15 +108,9 @@ class DoctorHospitalInline(admin.TabularInline):
         return super(DoctorHospitalInline, self).get_queryset(request).select_related('doctor', 'hospital')
 
 
-class DoctorClinicInline(admin.TabularInline):
-    model = DoctorClinic
-    extra = 0
-    can_delete = True
-    show_change_link = False
-    autocomplete_fields = ['hospital']
 
 
-class DoctorClinicTimingInline(admin.TabularInline):
+class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     model = DoctorClinicTiming
     # form = DoctorHospitalForm
     # formset = DoctorHospitalFormSet
@@ -126,6 +121,15 @@ class DoctorClinicTimingInline(admin.TabularInline):
 
     # def get_queryset(self, request):
     #     return super(DoctorHospitalInline, self).get_queryset(request)
+
+
+class DoctorClinicInline(nested_admin.NestedTabularInline):
+    model = DoctorClinic
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['hospital']
+    inlines = [DoctorClinicTimingInline]
 
 
 class DoctorLanguageFormSet(forms.BaseInlineFormSet):
@@ -145,7 +149,7 @@ class DoctorLanguageFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one language is required")
 
 
-class DoctorLanguageInline(admin.TabularInline):
+class DoctorLanguageInline(nested_admin.NestedTabularInline):
     model = DoctorLanguage
     formset = DoctorLanguageFormSet
     extra = 0
@@ -155,6 +159,7 @@ class DoctorLanguageInline(admin.TabularInline):
 
 class DoctorAwardForm(forms.ModelForm):
     year = forms.ChoiceField(choices=award_year_choices, required=False)
+
     def clean_year(self):
         data = self.cleaned_data['year']
         if data == '':
@@ -162,7 +167,7 @@ class DoctorAwardForm(forms.ModelForm):
         return data
 
 
-class DoctorAwardInline(admin.TabularInline):
+class DoctorAwardInline(nested_admin.NestedTabularInline):
     form = DoctorAwardForm
     model = DoctorAward
     extra = 0
@@ -170,7 +175,7 @@ class DoctorAwardInline(admin.TabularInline):
     show_change_link = False
 
 
-class DoctorAssociationInline(admin.TabularInline):
+class DoctorAssociationInline(nested_admin.NestedTabularInline):
     model = DoctorAssociation
     extra = 0
     can_delete = True
@@ -206,7 +211,7 @@ class DoctorExperienceFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Experience is required")
 
 
-class DoctorExperienceInline(admin.TabularInline):
+class DoctorExperienceInline(nested_admin.NestedTabularInline):
     model = DoctorExperience
     formset = DoctorExperienceFormSet
     extra = 0
@@ -215,7 +220,7 @@ class DoctorExperienceInline(admin.TabularInline):
     form = DoctorExperienceForm
 
 
-class DoctorMedicalServiceInline(admin.TabularInline):
+class DoctorMedicalServiceInline(nested_admin.NestedTabularInline):
     model = DoctorMedicalService
     extra = 0
     can_delete = True
@@ -243,7 +248,7 @@ class DoctorImageFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Image is required")
 
 
-class DoctorImageInline(admin.TabularInline):
+class DoctorImageInline(nested_admin.NestedTabularInline):
     model = DoctorImage
     formset = DoctorImageFormSet
     template = 'imageinline.html'
@@ -285,7 +290,7 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
                     raise forms.ValidationError(choices[key]+" is required")
 
 
-class DoctorDocumentInline(admin.TabularInline):
+class DoctorDocumentInline(nested_admin.NestedTabularInline):
     formset = DoctorDocumentFormSet
 
     def get_formset(self, request, obj=None, **kwargs):
@@ -324,7 +329,7 @@ class DoctorMobileFormSet(forms.BaseInlineFormSet):
                raise forms.ValidationError("Only one mobile number can be primary")
 
 
-class DoctorMobileInline(admin.TabularInline):
+class DoctorMobileInline(nested_admin.NestedTabularInline):
     model = DoctorMobile
     form = DoctorMobileForm
     formset = DoctorMobileFormSet
@@ -358,7 +363,7 @@ class DoctorEmailFormSet(forms.BaseInlineFormSet):
                raise forms.ValidationError("Only one email can be primary")
 
 
-class DoctorEmailInline(admin.TabularInline):
+class DoctorEmailInline(nested_admin.NestedTabularInline):
     model = DoctorEmail
     form = DoctorEmailForm
     formset = DoctorEmailFormSet
@@ -406,7 +411,7 @@ class CityFilter(SimpleListFilter):
             return queryset.filter(hospitals__city__iexact=self.value()).distinct()
 
 
-class DoctorSpecializationInline(admin.TabularInline):
+class DoctorSpecializationInline(nested_admin.NestedTabularInline):
     model = DoctorSpecialization
     extra = 0
     can_delete = True
@@ -421,7 +426,7 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
         super().clean()
 
 
-class GenericAdminInline(admin.TabularInline):
+class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
     formset = GenericAdminFormSet
@@ -466,7 +471,8 @@ class DoctorResource(resources.ModelResource):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
 
-class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
+class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
+# class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
 
