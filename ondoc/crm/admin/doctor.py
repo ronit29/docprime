@@ -63,7 +63,7 @@ class DoctorQualificationInline(nested_admin.NestedTabularInline):
     autocomplete_fields = ['college']
 
 
-class DoctorHospitalForm(forms.ModelForm):
+class DoctorClinicTimingForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         start = cleaned_data.get("start")
@@ -77,7 +77,7 @@ class DoctorHospitalForm(forms.ModelForm):
             raise forms.ValidationError("MRP cannot be less than fees")
 
 
-class DoctorHospitalFormSet(forms.BaseInlineFormSet):
+class DoctorClinicFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -94,43 +94,41 @@ class DoctorHospitalFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Hospital is required")
 
 
-class DoctorHospitalInline(admin.TabularInline):
-    model = DoctorHospital
-    form = DoctorHospitalForm
-    formset = DoctorHospitalFormSet
-    extra = 0
-    # min_num = 1
-    can_delete = True
-    show_change_link = False
-    autocomplete_fields = ['hospital']
-    readonly_fields = ['deal_price']
-
-    def get_queryset(self, request):
-        return super(DoctorHospitalInline, self).get_queryset(request).select_related('doctor', 'hospital')
-
-
+# class DoctorHospitalInline(admin.TabularInline):
+#     model = DoctorHospital
+#     form = DoctorHospitalForm
+#     formset = DoctorHospitalFormSet
+#     extra = 0
+#     # min_num = 1
+#     can_delete = True
+#     show_change_link = False
+#     autocomplete_fields = ['hospital']
+#     readonly_fields = ['deal_price']
+#
+#     def get_queryset(self, request):
+#         return super(DoctorHospitalInline, self).get_queryset(request).select_related('doctor', 'hospital')
 
 
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     model = DoctorClinicTiming
-    # form = DoctorHospitalForm
-    # formset = DoctorHospitalFormSet
+    form = DoctorClinicTimingForm
     extra = 0
     can_delete = True
     show_change_link = False
     readonly_fields = ['deal_price']
-
-    # def get_queryset(self, request):
-    #     return super(DoctorHospitalInline, self).get_queryset(request)
 
 
 class DoctorClinicInline(nested_admin.NestedTabularInline):
     model = DoctorClinic
     extra = 0
     can_delete = True
+    formset = DoctorClinicFormSet
     show_change_link = False
     autocomplete_fields = ['hospital']
     inlines = [DoctorClinicTimingInline]
+
+    def get_queryset(self, request):
+        return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
 
 
 class DoctorLanguageFormSet(forms.BaseInlineFormSet):
@@ -587,7 +585,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         gen_admin_form_change = False
         doc_hosp_new_len = doc_hosp_del_len = gen_admin_new_len = gen_admin_del_len = 0
         for formset in formsets:
-            if isinstance(formset, DoctorHospitalFormSet):
+            if isinstance(formset, DoctorClinicFormSet):
                 for form in formset.forms:
                     if 'hospital' in form.changed_data:
                         doc_hosp_form_change = True
