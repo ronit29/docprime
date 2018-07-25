@@ -154,8 +154,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
-        doctor_hospital = models.DoctorHospital.objects.filter(
-            doctor=data.get('doctor'), hospital=data.get('hospital'),
+        doctor_clinic_timing = models.DoctorClinicTiming.objects.filter(
+            doctor_clinic__doctor=data.get('doctor'),
+            doctor_clinic__hospital=data.get('hospital'),
             day=time_slot_start.weekday(), start__lte=time_slot_start.hour,
             end__gte=time_slot_start.hour).first()
         profile_model = data.get("profile")
@@ -166,12 +167,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         }
         req_data = request.data
         if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-            effective_price = doctor_hospital.fees
+            effective_price = doctor_clinic_timing.fees
         elif data.get("payment_type") == models.OpdAppointment.COD:
-            effective_price = doctor_hospital.deal_price
+            effective_price = doctor_clinic_timing.deal_price
         else:
             # TODO PM - Logic for coupon
-            effective_price = doctor_hospital.deal_price
+            effective_price = doctor_clinic_timing.deal_price
 
         opd_data = {
             "doctor": data.get("doctor"),
@@ -180,10 +181,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "profile_detail": profile_detail,
             "user": request.user,
             "booked_by": request.user,
-            "fees": doctor_hospital.fees,
-            "deal_price": doctor_hospital.deal_price,
+            "fees": doctor_clinic_timing.fees,
+            "deal_price": doctor_clinic_timing.deal_price,
             "effective_price": effective_price,
-            "mrp": doctor_hospital.mrp,
+            "mrp": doctor_clinic_timing.mrp,
             "time_slot_start": time_slot_start,
             "payment_type": data.get("payment_type")
         }

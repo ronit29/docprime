@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q
-from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorAssociation,
+from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming, DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
@@ -160,8 +160,10 @@ class CreateAppointmentSerializer(serializers.Serializer):
         if delta.days > MAX_FUTURE_DAY:
             raise serializers.ValidationError("Cannot book appointment more than "+str(MAX_FUTURE_DAY)+" days ahead")
 
-        if not DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
-            day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).exists():
+        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
+                                                 doctor_clinic__hospital=data.get('hospital'),
+                                                 day=time_slot_start.weekday(), start__lte=time_slot_start.hour,
+                                                 end__gte=time_slot_start.hour).exists():
             raise serializers.ValidationError("Invalid Time slot")
 
         if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
