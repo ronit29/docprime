@@ -364,6 +364,9 @@ class DoctorClinic(auth_model.TimeStampedModel):
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
 
+    def __str__(self):
+        return '{}-{}'.format(self.doctor, self.hospital)
+
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
