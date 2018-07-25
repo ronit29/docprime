@@ -22,3 +22,4 @@ django-tables2
 openpyxl==2.4.9
 django-anymail[mailgun]
 WeasyPrint==0.42.3
+django-nested-admin==3.0.21
