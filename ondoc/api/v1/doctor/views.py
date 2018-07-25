@@ -89,6 +89,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         hospital = serializer.validated_data.get('hospital_id')
         profile = serializer.validated_data.get('profile_id')
         doctor = serializer.validated_data.get('doctor_id')
+        date = serializer.validated_data.get('date')
 
         if profile:
             queryset = queryset.filter(profile=profile)
@@ -113,6 +114,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                                                          ]).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
+
+        if date:
+            queryset = queryset.filter(time_slot_start__date=date)
 
         queryset = paginate_queryset(queryset, request)
         serializer = serializers.AppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
