@@ -114,3 +114,36 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 
 GOOGLE_ANALYTICS_PROPERTY_ID = 'UA-14845987-3'
+
+
+
+AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
+AWS_QUERYSTRING_AUTH = False
+S3_USE_SIGV4 = True
+AWS_DEFAULT_ACL = "public-read"
+AWS_S3_REGION_NAME='ap-south-1'
+# AWS_S3_ENCRYPTION = True
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=86400',
+}
+AWS_S3_CUSTOM_DOMAIN = 's3.%s.amazonaws.com/%s' % (AWS_S3_REGION_NAME, AWS_STORAGE_BUCKET_NAME)
+AWS_PRELOAD_METADATA = True
+
+
+DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'
+STATICFILES_STORAGE = 'config.settings.storage_backends.StaticStorage'
+AWS_STATIC_LOCATION = 'static'
+STATIC_URL = "https://%s/%s/" % (AWS_S3_CUSTOM_DOMAIN, AWS_STATIC_LOCATION)
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': '/var/tmp/django_cache',
+    }
+}
+
+CLOUDFRONT_DOMAIN = "cdn.docprime.com"
+#CLOUDFRONT_ID = "your cloud front id"
+AWS_S3_CUSTOM_DOMAIN = "cdn.docprime.com" # to make sure the url that the files are served from this domain
