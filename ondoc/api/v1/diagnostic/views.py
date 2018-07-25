@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
-
+from rest_framework.authentication import TokenAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
 
 from django.contrib.gis.geos import GEOSGeometry
@@ -110,26 +110,43 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
         lab_obj = Lab.objects.filter(id=lab_id).first()
         day_now = timezone.now().weekday()
-        timing_queryset = lab_obj.labtiming_set.filter(day=day_now)
+        timing_queryset = lab_obj.lab_timings.filter(day=day_now)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
         temp_data = dict()
         temp_data['lab'] = lab_serializer.data
         temp_data['tests'] = test_serializer.data
         temp_data['lab_timing'] = ''
-        temp_data['lab_timing'] = self.get_lab_timing(timing_queryset)
+        temp_data['lab_timing'], temp_data["lab_timing_data"] = self.get_lab_timing(timing_queryset)
 
         return Response(temp_data)
 
     def get_lab_timing(self, queryset):
-        temp_str = ''
+        lab_timing = ''
+        lab_timing_data = list()
+        temp_list = list()
         for qdata in queryset:
-            start = self.convert_time(qdata.start)
-            end = self.convert_time(qdata.end)
-            if not temp_str:
-                temp_str += start + " - " + end
+            temp_list.append({"start": qdata.start, "end": qdata.end})
+
+        temp_list = sorted(temp_list, key=lambda k: k["start"])
+
+        index = 0
+        while index < len(temp_list):
+            temp_dict = dict()
+            x = index
+            if not lab_timing:
+                lab_timing += self.convert_time(temp_list[index]["start"]) + " - "
             else:
-                temp_str += " | " + start + " - " + end
-        return temp_str
+                lab_timing += " | " + self.convert_time(temp_list[index]["start"]) + " - "
+            temp_dict["start"] = temp_list[index]["start"]
+            while x + 1 < len(temp_list) and temp_list[x]["end"] >= temp_list[x+1]["start"]:
+                x += 1
+            index = x
+            lab_timing += self.convert_time(temp_list[index]["end"])
+            temp_dict["end"] = temp_list[index]["end"]
+            lab_timing_data.append(temp_dict)
+            index += 1
+
+        return lab_timing, lab_timing_data
 
     def convert_time(self, time):
         hour = int(time)
@@ -155,8 +172,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         parameters = serializer.validated_data
 
-        DEFAULT_DISTANCE = 20000
-        MAX_SEARCHABLE_DISTANCE = 50000
+        DEFAULT_DISTANCE = 2000000000000000
+        MAX_SEARCHABLE_DISTANCE = 5000000000000000000
 
         default_long = 77.071848
         default_lat = 28.450367
@@ -215,16 +232,25 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def form_lab_whole_data(self, queryset):
         ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.prefetch_related('lab_image').filter(id__in=ids)
+        labs = Lab.objects.prefetch_related('lab_image', 'lab_timings').filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
         for obj in labs:
             # temp_var = id_details[obj.id]
             temp_var[obj.id] = obj
             # resp_queryset.append(temp_var)
-
+        day_now = timezone.now().weekday()
         for row in queryset:
             row["lab"] = temp_var[row["lab"]]
+            timing_queryset = row["lab"].lab_timings.all()
+            timing_data = list()
+            for data in timing_queryset:
+                if data.day == day_now:
+                    timing_data.append(data)
+            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+            row["lab_timing"] = lab_timing
+            row["lab_timing_data"] = lab_timing_data
             resp_queryset.append(row)
 
         return resp_queryset
@@ -245,6 +271,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     queryset = LabAppointment.objects.all()
     serializer_class = diagnostic_serializer.LabAppointmentModelSerializer
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
@@ -465,6 +492,7 @@ class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
 
     # authentication_classes = (TokenAuthentication,)
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):

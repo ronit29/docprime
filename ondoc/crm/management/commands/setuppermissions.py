@@ -13,7 +13,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorHospital,
     HospitalCertification, College, HospitalNetworkManager,
     HospitalNetworkHelpline, HospitalNetworkEmail,
     HospitalNetworkAccreditation, HospitalNetworkAward,
-    HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor)
+    HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor, DoctorMapping)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification,
@@ -212,6 +212,7 @@ class Command(BaseCommand):
         #Create about doctor group
         self.create_about_doctor_group()
 
+        #Create Article team Group
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
 
@@ -225,6 +226,19 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        # Create Doctor Mapping team Group
+        group, created = Group.objects.get_or_create(name=constants['DOCTOR_MAPPING_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(DoctorMapping)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
 
         self.stdout.write('Successfully created groups and permissions')
 

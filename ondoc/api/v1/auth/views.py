@@ -39,6 +39,8 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
 from ondoc.payout.models import Outstanding
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
+
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
 import decimal
 from collections import defaultdict
@@ -213,6 +215,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                          GenericViewSet):
     serializer_class = serializers.UserProfileSerializer
     queryset = UserProfile.objects.all()
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -285,7 +288,9 @@ class OndocViewSet(mixins.CreateModelMixin,
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
+
     def get_queryset(self):
         user = self.request.user
         return OpdAppointment.objects.filter(user=user)
@@ -616,12 +621,13 @@ class UserAppointmentsViewSet(OndocViewSet):
 
 class AddressViewsSet(viewsets.ModelViewSet):
     serializer_class = serializers.AddressSerializer
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
     def get_queryset(self):
         request = self.request
-        return Address.objects.filter(user=request.user)
+        return Address.objects.filter(user=request.user).order_by('address')
 
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -709,6 +715,7 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
 
 
 class UserIDViewSet(viewsets.GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -879,6 +886,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 class UserTransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.UserTransactionModelSerializer
     queryset = ConsumerTransaction.objects.all()
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def list(self, request):
@@ -908,6 +916,7 @@ class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
 
 
 class OrderHistoryViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
@@ -1001,6 +1010,7 @@ class OrderHistoryViewSet(GenericViewSet):
 
 
 class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
@@ -1021,6 +1031,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
 
 class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
@@ -1122,6 +1133,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
 
 
 class OrderViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request, pk):
@@ -1150,6 +1162,7 @@ class OrderViewSet(GenericViewSet):
 
 
 class ConsumerAccountRefundViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
 
     @transaction.atomic

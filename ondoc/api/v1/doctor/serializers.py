@@ -5,7 +5,8 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
-                                 CommonMedicalCondition,CommonSpecialization)
+                                 CommonMedicalCondition,CommonSpecialization, DoctorSpecialization,
+                                 GeneralSpecialization)
 from ondoc.authentication.models import UserProfile
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -40,6 +41,7 @@ class AppointmentFilterSerializer(serializers.Serializer):
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all(), required=False)
     profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
     doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False)
+    date = serializers.DateField(required=False)
 
 
 class OpdAppointmentSerializer(serializers.ModelSerializer):
@@ -338,9 +340,25 @@ class MedicalServiceSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'description')
 
 
+class GeneralSpecializationSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = GeneralSpecialization
+        fields = ('name', )
+
+
+class DoctorSpecializationSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(read_only=True, source='specialization.name')
+
+    class Meta:
+        model = DoctorSpecialization
+        fields = ('name', )
+
+
 class DoctorProfileSerializer(serializers.ModelSerializer):
     images = DoctorImageSerializer(read_only=True, many=True)
     qualifications = DoctorQualificationSerializer(read_only=True, many=True)
+    general_specialization = DoctorSpecializationSerializer(read_only=True, many=True, source='doctorspecializations')
     languages = DoctorLanguageSerializer(read_only=True, many=True)
     availability = DoctorHospitalSerializer(read_only=True, many=True)
     emails = DoctorEmailSerializer(read_only=True, many=True)
@@ -350,6 +368,9 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     associations = DoctorAssociationSerializer(read_only=True, many=True)
     awards = DoctorAwardSerializer(read_only=True, many=True)
     thumbnail = serializers.SerializerMethodField()
+
+    # def get_general_specialization(self, obj):
+    #     return DoctorSpecializationSerializer(obj.doctorspecializations.all(), many=True).data
 
     def get_thumbnail(self, obj):
         request = self.context.get('request')
@@ -377,9 +398,9 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
         fields = (
-        'id', 'name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
-        'languages', 'qualifications', 'availability', 'mobiles', 'medical_services', 'experiences', 'associations',
-        'awards', 'appointments', 'hospitals', 'thumbnail', )
+            'id', 'name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
+            'languages', 'qualifications', 'general_specialization', 'availability', 'mobiles', 'medical_services',
+            'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail',)
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
@@ -557,7 +578,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'thumbnail')
+                  'general_specialization', 'thumbnail')
 
 
 
@@ -569,17 +590,18 @@ class DoctorAvailabilityTimingSerializer(serializers.Serializer):
 class DoctorTimeSlotSerializer(serializers.Serializer):
     images = DoctorImageSerializer(read_only=True, many=True)
     qualifications = DoctorQualificationSerializer(read_only=True, many=True)
+    general_specialization = DoctorSpecializationSerializer(read_only=True, many=True, source='doctorspecializations')
 
     class Meta:
         model = Doctor
-        fields = ('id', 'images', 'qualifications', )
+        fields = ('id', 'images', 'qualifications', 'general_specialization', )
 
 
 class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
     class Meta:
         model = Doctor
         fields = ('id', 'name', 'gender', 'images','about', 'practicing_since',
-                 'qualifications', 'mobiles',)
+                  'qualifications', 'general_specialization', 'mobiles',)
 
 
 class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
