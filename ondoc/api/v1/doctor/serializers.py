@@ -41,7 +41,7 @@ class AppointmentFilterSerializer(serializers.Serializer):
     hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all(), required=False)
     profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
     doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False)
-    date = serializers.DateField()
+    date = serializers.DateField(required=False)
 
 
 class OpdAppointmentSerializer(serializers.ModelSerializer):
