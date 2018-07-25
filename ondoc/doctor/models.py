@@ -356,6 +356,50 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
         unique_together = ("doctor", "specialization")
 
 
+class DoctorClinic(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "doctor_clinic"
+        unique_together = (('doctor', 'hospital', ),)
+
+
+class DoctorClinicTiming(auth_model.TimeStampedModel):
+    DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
+    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE)
+    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
+
+    TIME_CHOICES = [(7.0, "7:00 AM"), (7.5, "7:30 AM"),
+                    (8.0, "8:00 AM"), (8.5, "8:30 AM"),
+                    (9.0, "9:00 AM"), (9.5, "9:30 AM"),
+                    (10.0, "10:00 AM"), (10.5, "10:30 AM"),
+                    (11.0, "11:00 AM"), (11.5, "11:30 AM"),
+                    (12.0, "12:00 PM"), (12.5, "12:30 PM"),
+                    (13.0, "1:00 PM"), (13.5, "1:30 PM"),
+                    (14.0, "2:00 PM"), (14.5, "2:30 PM"),
+                    (15.0, "3:00 PM"), (15.5, "3:30 PM"),
+                    (16.0, "4:00 PM"), (16.5, "4:30 PM"),
+                    (17.0, "5:00 PM"), (17.5, "5:30 PM"),
+                    (18.0, "6:00 PM"), (18.5, "6:30 PM"),
+                    (19.0, "7:00 PM"), (19.5, "7:30 PM"),
+                    (20.0, "8:00 PM"), (20.5, "8:30 PM"),
+                    (21.0, "9:00 PM"), (21.5, "9:30 PM"),
+                    (22.0, "10:00 PM"), (22.5, "10:30 PM")]
+
+    start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    fees = models.PositiveSmallIntegerField(blank=False, null=False)
+    deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
+    mrp = models.PositiveSmallIntegerField(blank=False, null=True)
+    followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
+    followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
+
+    class Meta:
+        db_table = "doctor_clinic_timing"
+        unique_together = (("start", "end", "day", "doctor_clinic",),)
+
+
 class DoctorHospital(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
     doctor = models.ForeignKey(Doctor, related_name="availability", on_delete=models.CASCADE)
