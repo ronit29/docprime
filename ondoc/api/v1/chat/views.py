@@ -1,8 +1,9 @@
 from ondoc.chat import models
 from ondoc.doctor import models as doc_models
 from ondoc.api.v1.doctor import serializers as doc_serializers
-from rest_framework import mixins, viewsets, status
+from rest_framework import mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
@@ -20,6 +21,7 @@ class ChatSearchedItemsViewSet(viewsets.GenericViewSet):
 
 class DoctorsListViewSet(viewsets.GenericViewSet):
 
+    authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, )
     queryset = doc_models.Doctor.objects.none()
 
@@ -29,3 +31,19 @@ class DoctorsListViewSet(viewsets.GenericViewSet):
         serializer = doc_serializers.DoctorProfileSerializer(queryset, many=True, context={"request": request})
 
         return Response(serializer.data)
+
+
+class DoctorProfileViewSet(viewsets.GenericViewSet):
+
+    queryset = doc_models.DoctorMapping.objects
+
+    def retrieve(self, request, pk):
+        doctor = get_object_or_404(doc_models.Doctor, id=pk)
+        response = []
+        doc_mapping = doc_models.DoctorMapping.objects.filter(doctor=doctor)
+        if doc_mapping.exists():
+            doctor = doc_mapping.first().profile_to_be_shown
+        if doctor:
+            serializer = doc_serializers.DoctorProfileSerializer(doctor, many=False, context={"request": request})
+            response = serializer.data
+        return Response(response)
