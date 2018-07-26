@@ -39,7 +39,7 @@ class ReadOnlyDoctorHospitalInline(nested_admin.NestedTabularInline):
         return False
 
 
-class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
+class ReadOnlyDoctorClinicTimingInline(nested_admin.NestedTabularInline):
     model = doctor_model.DoctorClinicTiming
     # form = DoctorClinicTimingForm
     extra = 0
@@ -52,20 +52,20 @@ class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
         return False
 
 
-class DoctorClinicInline(nested_admin.NestedTabularInline):
+class ReadOnlyDoctorClinicInline(nested_admin.NestedTabularInline):
     model = doctor_model.DoctorClinic
     extra = 0
     can_delete = False
     show_change_link = False
     autocomplete_fields = ['hospital']
     readonly_fields = ['doctor', 'hospital']
-    inlines = [DoctorClinicTimingInline]
+    inlines = [ReadOnlyDoctorClinicTimingInline]
 
     def has_add_permission(self, request):
         return False
 
     def get_queryset(self, request):
-        return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
+        return super(ReadOnlyDoctorClinicInline, self).get_queryset(request).select_related('hospital')
 
 
 class ReadOnlyDoctorLanguageInline(nested_admin.NestedTabularInline):
@@ -140,7 +140,7 @@ class AboutDoctorAdmin(nested_admin.NestedModelAdmin):
                ReadOnlyDoctorAwardInline,
                ReadOnlyDoctorAssociationInline,
                ReadOnlyDoctorExperienceInline,
-               DoctorClinicInline
+               ReadOnlyDoctorClinicInline
                ]
     readonly_fields = ('name', 'gender', 'practicing_since', 'raw_about', 'license', 'onboarding_status')
 
