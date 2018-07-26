@@ -11,7 +11,7 @@ import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
-from ondoc.doctor.tasks import refund_curl_task
+from ondoc.account.tasks import refund_curl_task
 from django.conf import settings
 User = get_user_model()
 

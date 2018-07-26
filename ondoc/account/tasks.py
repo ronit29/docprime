@@ -7,6 +7,7 @@ from celery import task
 
 @task(bind=True, max_retries=6)
 def refund_curl_task(self, req_data):
+    print(req_data)
     try:
         token = "gFH8gPXbCWaW8WqUefmFBcyRj0XIw"
         headers = {
@@ -17,11 +18,12 @@ def refund_curl_task(self, req_data):
         response = requests.post(url, data=req_data, headers=headers)
         if response.status_code == status.HTTP_200_OK:
             print("SSSSSSSSSSSSUUUUUUUUUUUUUUUUCCCCCCCCCCCCCCCCCCEEEEEEESSSSSSSSSSSSSSSSSSSS")
-            from ondoc.account.models import ConsumerRefund
-            refund_queryset = ConsumerRefund.objects.filter(user_id=req_data["user"], consumer_transaction=req_data["orderId"], pg_transaction=req_data["refNo"]).first()
+            from .models import ConsumerRefund
+            refund_queryset = ConsumerRefund.objects.filter(user_id=req_data["user"], consumer_transaction_id=req_data["orderId"], pg_transaction_id=req_data["refNo"]).first()
             if refund_queryset:
                 refund_queryset.refund_state = ConsumerRefund.COMPLETED
                 refund_queryset.save()
+                print("Status Updated")
         else:
             countdown_time = (2 ** self.request.retries) * 60 * 10
             print(countdown_time)
