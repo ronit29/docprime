@@ -269,7 +269,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
     exclude = ('search_key', )
 
-    readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id')
+    readonly_fields = ('lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live')
 
     def lead_url(self, instance):
         if instance.id:
