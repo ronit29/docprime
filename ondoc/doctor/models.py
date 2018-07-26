@@ -246,6 +246,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
                                                          default=False)
     online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
+    is_internal = models.BooleanField(verbose_name='Is Staff Doctor', default=False)
     # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
@@ -436,6 +437,7 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
             self.cropped_image = InMemoryUploadedFile(new_image_io, None, md5_hash + ".jpg", 'image/jpeg',
                                                       new_image_io.tell(), None)
             self.save()
+
 
 class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):
     PAN = 1
@@ -1151,4 +1153,13 @@ class CommonSpecialization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_specializations"
+
+
+class DoctorMapping(auth_model.TimeStampedModel):
+
+    doctor = models.ForeignKey(Doctor, related_name='doctor_mapping', on_delete=models.CASCADE)
+    profile_to_be_shown = models.ForeignKey(Doctor, related_name='profile_to_be_shown_mapping', on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "doctor_mapping"
 

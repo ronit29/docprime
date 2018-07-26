@@ -29,7 +29,7 @@ additional_urls = [
     path('', include('ondoc.articles.urls'))
     ]
 
-if not settings.DEBUG:
+if not settings.API_ENABLED:
     additional_urls = []
 else:
     from rest_framework_swagger.views import get_swagger_view

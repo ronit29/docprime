@@ -68,6 +68,5 @@ def create_otp(phone_no, message):
     otp = randint(100000,999999)
     otpEntry = OtpVerifications(phone_number=phone_no, code=otp, country_code="+91")
     otpEntry.save()
-    print(str(otp))
     message = message.format(str(otp))
     return message

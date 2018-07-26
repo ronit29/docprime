@@ -70,6 +70,7 @@ DJANGO_APPS = (
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'collectfast',
     'django.contrib.staticfiles',
     'django.contrib.gis',
     'reversion',
@@ -220,7 +221,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
     'COERCE_DECIMAL_TO_STRING': True,
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework.authentication.SessionAuthentication',
+        #'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
         # 'ondoc.authentication.auth.CustomAuthentication',
     ),
@@ -256,6 +257,9 @@ ANYMAIL = {
 }
 
 DEFAULT_FROM_EMAIL = "support@docprime.com"
+
+API_ENABLED = env('API_ENABLED', default=False)
+
 
 #Config for AWS S3 bucket
 #MEDIA_URL = '/media/'
