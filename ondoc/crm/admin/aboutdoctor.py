@@ -29,16 +29,6 @@ class ReadOnlyDoctorQualificationInline(nested_admin.NestedTabularInline):
         return False
 
 
-class ReadOnlyDoctorHospitalInline(nested_admin.NestedTabularInline):
-    model = doctor_model.DoctorHospital
-    can_delete = False
-    readonly_fields = ['doctor', 'hospital', 'day', 'start', 'end', 'fees', 'deal_price', 'mrp',
-                       'followup_duration', 'followup_charges']
-
-    def has_add_permission(self, request):
-        return False
-
-
 class ReadOnlyDoctorClinicTimingInline(nested_admin.NestedTabularInline):
     model = doctor_model.DoctorClinicTiming
     # form = DoctorClinicTimingForm
