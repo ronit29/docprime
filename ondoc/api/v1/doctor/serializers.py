@@ -373,7 +373,8 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     #     return DoctorSpecializationSerializer(obj.doctorspecializations.all(), many=True).data
 
     def get_availability(self, obj):
-        data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj).select_related("doctor_clinic__doctor")
+        data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj).select_related("doctor_clinic__doctor",
+                                                                                           "doctor_clinic__hospital")
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
     def get_thumbnail(self, obj):
@@ -578,7 +579,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     availability = None
 
     def get_hospitals(self, obj):
-        data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj).select_related("doctor_clinic__doctor")
+        data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj).select_related("doctor_clinic__doctor",
+                                                                                           "doctor_clinic__hospital")
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
     class Meta:
