@@ -581,6 +581,8 @@ class TimeSlotExtraction(object):
         # for h in range(start, end):
             for i in range(0, num_slots):
                 temp_h = h + i * int_span
+                if temp_h > end:
+                    break
                 day_slot, am_pm = self.get_day_slot(temp_h)
                 time_str = self.form_time_string(temp_h, am_pm)
                 self.timing[day]['timing'][day_slot][temp_h] = time_str
