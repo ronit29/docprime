@@ -162,6 +162,12 @@ class CreateAppointmentSerializer(serializers.Serializer):
             raise serializers.ValidationError("Cannot book appointment more than "+str(MAX_FUTURE_DAY)+" days ahead")
 
         time_slot_hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+
+        doctor_leave = DoctorLeave.objects.filter(doctor=data.get('doctor'), start_date__lte=time_slot_start.date(), end_date__gte=time_slot_start.date(), start_time__lte=time_slot_start.time(), end_time__gte=time_slot_start.time()).exists()
+
+        if doctor_leave:
+            raise serializers.ValidationError("Doctor is on leave")
+
         if not DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
                                              day=time_slot_start.weekday(), start__lte=time_slot_hour,
                                              end__gte=time_slot_hour).exists():
