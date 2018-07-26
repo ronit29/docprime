@@ -422,21 +422,22 @@ class DoctorHospitalView(mixins.ListModelMixin,
     authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, )
 
-    queryset = models.DoctorHospital.objects.all()
+    queryset = models.DoctorClinic.objects.all()
     serializer_class = serializers.DoctorHospitalSerializer
 
     def get_queryset(self):
         user = self.request.user
         if user.user_type == User.DOCTOR:
-            return models.DoctorHospital.objects.filter(doctor=user.doctor)
+            return models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=user.doctor)
 
     def list(self, request):
         resp_data = list()
         if hasattr(request.user, 'doctor') and request.user.doctor:
-            doct_hosp_queryset = self.get_queryset().values('hospital').annotate(min_fees=Min('fees')).order_by('hospital')
+            doct_hosp_queryset = self.get_queryset().values(
+                'doctor_clinic__hospital').annotate(min_fees=Min('fees')).order_by('doctor_clinic__hospital')
             hospital_list = list()
             for data in doct_hosp_queryset:
-                hospital_list.append(data.get('hospital'))
+                hospital_list.append(data.get('doctor_clinic__hospital'))
 
             hospital_qs = models.Hospital.objects.filter(id__in=hospital_list).order_by('id')
             i = 0
