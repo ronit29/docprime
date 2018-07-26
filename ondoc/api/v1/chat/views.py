@@ -38,9 +38,11 @@ class DoctorProfileViewSet(viewsets.GenericViewSet):
     queryset = doc_models.DoctorMapping.objects
 
     def retrieve(self, request, pk):
-        doc_mapping = get_object_or_404(doc_models.DoctorMapping, doctor__id=pk)
+        doctor = get_object_or_404(doc_models.Doctor, id=pk)
         response = []
-        doctor = doc_mapping.profile_to_be_shown
+        doc_mapping = doc_models.DoctorMapping.objects.filter(doctor=doctor)
+        if doc_mapping.exists():
+            doctor = doc_mapping.first().profile_to_be_shown
         if doctor:
             serializer = doc_serializers.DoctorProfileSerializer(doctor, many=False, context={"request": request})
             response = serializer.data
