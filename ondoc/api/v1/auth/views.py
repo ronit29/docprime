@@ -926,7 +926,7 @@ class OrderHistoryViewSet(GenericViewSet):
         doc_hosp_query = Q()
 
         for order in Order.objects.filter(action_data__user=request.user.id, is_viewable=True,
-                                          payment_status=Order.PAYMENT_PENDING):
+                                          payment_status=Order.PAYMENT_PENDING).order_by('-created_at'):
             action_data = order.action_data
             if order.product_id == Order.DOCTOR_PRODUCT_ID:
                 opd_action_data.append(action_data)
