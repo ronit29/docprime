@@ -8,7 +8,7 @@ from django.shortcuts import render
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
 from ondoc.authentication.models import GenericAdmin
-from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
+from ondoc.doctor.models import (Doctor, DoctorQualification,
     DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience, MedicalConditionSpecialization,
     DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
     DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language,

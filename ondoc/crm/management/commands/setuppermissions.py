@@ -4,7 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from ondoc.crm.constants import constants
-from ondoc.doctor.models import (Doctor, Hospital, DoctorHospital,
+from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
     DoctorQualification, Qualification, Specialization, DoctorLanguage,
     DoctorAward, DoctorAssociation, DoctorExperience, DoctorMedicalService,
     DoctorImage, DoctorDocument, Language, MedicalService, HospitalNetwork,
@@ -50,8 +50,8 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-
-        content_types = ContentType.objects.get_for_models(DoctorHospital,
+        content_types = ContentType.objects.get_for_models(
+            DoctorClinic, DoctorClinicTiming,
             DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
             DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
             DoctorMobile, DoctorEmail, HospitalSpeciality,
@@ -69,7 +69,6 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-
         content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
         for cl, ct in content_types.items():
 
@@ -81,10 +80,11 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(LabTiming, LabImage,
-        LabManager,LabAccreditation, LabAward, LabCertification,
-        LabNetworkCertification, LabNetworkAward,
-        LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
-        LabNetworkManager,LabService, LabDoctorAvailability, LabDoctor, LabDocument)
+                                                           LabManager, LabAccreditation, LabAward, LabCertification,
+                                                           LabNetworkCertification, LabNetworkAward,
+                                                           LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
+                                                           LabNetworkManager, LabService, LabDoctorAvailability,
+                                                           LabDoctor, LabDocument)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -94,7 +94,6 @@ class Command(BaseCommand):
                 Q(codename='delete_' + ct.model))
 
             group.permissions.add(*permissions)
-
 
         # setup permissions for qc team
         group, created = Group.objects.get_or_create(name=constants['QC_GROUP_NAME'])
@@ -106,16 +105,14 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-
         content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-
-        content_types = ContentType.objects.get_for_models(Qualification,
-            Specialization, Language, MedicalService, College, GeneralSpecialization)
+        content_types = ContentType.objects.get_for_models(
+            Qualification, Specialization, Language, MedicalService, College, GeneralSpecialization)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -123,10 +120,9 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
-
 
         content_types = ContentType.objects.get_for_models(LabTest,
-            LabTestType, LabService)
+                                                           LabTestType, LabService)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -135,8 +131,8 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-
-        content_types = ContentType.objects.get_for_models(DoctorHospital,
+        content_types = ContentType.objects.get_for_models(
+            DoctorClinic, DoctorClinicTiming,
             DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
             DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
             DoctorMobile, DoctorEmail, HospitalSpeciality,
@@ -247,8 +243,8 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(AboutDoctor, DoctorSpecialization, DoctorQualification,
-                                                           DoctorHospital, DoctorLanguage, DoctorAward,
-                                                           DoctorAssociation, DoctorExperience,
+                                                           DoctorClinicTiming, DoctorClinic, DoctorLanguage,
+                                                           DoctorAward, DoctorAssociation, DoctorExperience,
                                                            for_concrete_models=False)
 
         for cl, ct in content_types.items():

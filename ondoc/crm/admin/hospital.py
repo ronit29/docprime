@@ -2,7 +2,7 @@ from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,Doctor,
-    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital, DoctorHospital)
+    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
