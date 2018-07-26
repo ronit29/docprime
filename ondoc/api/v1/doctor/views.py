@@ -661,8 +661,9 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        queryset = models.DoctorHospital.objects.filter(doctor=validated_data.get('doctor_id'),
-                                                        hospital=validated_data.get('hospital_id'))
+        queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
+                                                            doctor_clinic__hospital=validated_data.get(
+                                                                'hospital_id')).order_by("start")
         doctor_queryset = (models.Doctor
                            .objects.prefetch_related("qualifications__qualification",
                                                      "qualifications__specialization")
