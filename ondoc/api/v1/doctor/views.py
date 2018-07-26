@@ -428,7 +428,8 @@ class DoctorHospitalView(mixins.ListModelMixin,
     def get_queryset(self):
         user = self.request.user
         if user.user_type == User.DOCTOR:
-            return models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=user.doctor)
+            return models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=user.doctor).select_related(
+                "doctor_clinic__doctor", "doctor_clinic__hospital")
 
     def list(self, request):
         resp_data = list()
@@ -454,17 +455,18 @@ class DoctorHospitalView(mixins.ListModelMixin,
     def retrieve(self, request, pk):
         temp_data = list()
         if hasattr(request.user, 'doctor') and request.user.doctor:
-            queryset = self.get_queryset().filter(hospital=pk)
+            queryset = self.get_queryset().filter(doctor_clinic__hospital=pk)
             if queryset.count() == 0:
                 raise Http404("No Hospital matches the given query.")
 
             schedule_serializer = serializers.DoctorHospitalScheduleSerializer(queryset, many=True)
-            hospital_queryset = queryset.first().hospital
-            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset,
-                                                                      context={"request": request})
+            if queryset:
+                hospital_queryset = queryset.first().doctor_clinic.hospital
+                hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset,
+                                                                          context={"request": request})
 
             temp_data = dict()
-            temp_data['hospital'] = hospital_serializer.data
+            temp_data['hospital'] = hospital_serializer.data if queryset else []
             temp_data['schedule'] = schedule_serializer.data
 
         return Response(temp_data)

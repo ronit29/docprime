@@ -460,18 +460,18 @@ class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
 
     def get_day(self, obj):
         day = obj.day
-        return dict(DoctorHospital.DAY_CHOICES).get(day)
+        return dict(DoctorClinicTiming.DAY_CHOICES).get(day)
 
     def get_start(self, obj):
         start = obj.start
-        return dict(DoctorHospital.TIME_CHOICES).get(start)
+        return dict(DoctorClinicTiming.TIME_CHOICES).get(start)
 
     def get_end(self, obj):
         end = obj.end
-        return dict(DoctorHospital.TIME_CHOICES).get(end)
+        return dict(DoctorClinicTiming.TIME_CHOICES).get(end)
 
     class Meta:
-        model = DoctorHospital
+        model = DoctorClinicTiming
         # fields = ('id', 'day', 'start', 'end', 'fees', 'hospital')
         fields = ('day', 'start', 'end', 'fees')
 
