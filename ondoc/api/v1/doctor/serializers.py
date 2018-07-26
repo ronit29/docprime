@@ -160,8 +160,10 @@ class CreateAppointmentSerializer(serializers.Serializer):
         if delta.days > MAX_FUTURE_DAY:
             raise serializers.ValidationError("Cannot book appointment more than "+str(MAX_FUTURE_DAY)+" days ahead")
 
+        time_slot_hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         if not DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
-            day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).exists():
+                                             day=time_slot_start.weekday(), start__lte=time_slot_hour,
+                                             end__gte=time_slot_hour).exists():
             raise serializers.ValidationError("Invalid Time slot")
 
         if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
