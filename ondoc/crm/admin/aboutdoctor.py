@@ -1,17 +1,17 @@
 from ondoc.authentication.models import User, QCModel
 from ondoc.doctor import models as doctor_model
 from ondoc.crm.admin.doctor import CityFilter
-from reversion.admin import admin, VersionAdmin
 from django.contrib.admin import SimpleListFilter
 from django import forms
 from django.db.models import Q
+import nested_admin
 
 
 class AboutDoctorForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
 
 
-class ReadOnlySpecializationInline(admin.TabularInline):
+class ReadOnlySpecializationInline(nested_admin.NestedTabularInline):
     model = doctor_model.DoctorSpecialization
     can_delete = False
     readonly_fields = ['doctor', 'specialization']
@@ -20,7 +20,7 @@ class ReadOnlySpecializationInline(admin.TabularInline):
         return False
 
 
-class ReadOnlyDoctorQualificationInline(admin.TabularInline):
+class ReadOnlyDoctorQualificationInline(nested_admin.NestedTabularInline):
     model = doctor_model.DoctorQualification
     can_delete = False
     readonly_fields = ['doctor', 'qualification', 'specialization', 'college', 'passing_year']
@@ -29,7 +29,7 @@ class ReadOnlyDoctorQualificationInline(admin.TabularInline):
         return False
 
 
-class ReadOnlyDoctorHospitalInline(admin.TabularInline):
+class ReadOnlyDoctorHospitalInline(nested_admin.NestedTabularInline):
     model = doctor_model.DoctorHospital
     can_delete = False
     readonly_fields = ['doctor', 'hospital', 'day', 'start', 'end', 'fees', 'deal_price', 'mrp',
@@ -39,7 +39,36 @@ class ReadOnlyDoctorHospitalInline(admin.TabularInline):
         return False
 
 
-class ReadOnlyDoctorLanguageInline(admin.TabularInline):
+class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
+    model = doctor_model.DoctorClinicTiming
+    # form = DoctorClinicTimingForm
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    readonly_fields = ['doctor_clinic', 'day', 'start', 'end', 'fees', 'deal_price', 'mrp',
+                       'followup_duration', 'followup_charges']
+
+    def has_add_permission(self, request):
+        return False
+
+
+class DoctorClinicInline(nested_admin.NestedTabularInline):
+    model = doctor_model.DoctorClinic
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    autocomplete_fields = ['hospital']
+    readonly_fields = ['doctor', 'hospital']
+    inlines = [DoctorClinicTimingInline]
+
+    def has_add_permission(self, request):
+        return False
+
+    def get_queryset(self, request):
+        return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
+
+
+class ReadOnlyDoctorLanguageInline(nested_admin.NestedTabularInline):
     model = doctor_model.DoctorLanguage
     can_delete = False
     readonly_fields = ['doctor', 'language']
@@ -48,7 +77,7 @@ class ReadOnlyDoctorLanguageInline(admin.TabularInline):
         return False
 
 
-class ReadOnlyDoctorAwardInline(admin.TabularInline):
+class ReadOnlyDoctorAwardInline(nested_admin.NestedTabularInline):
     model = doctor_model.DoctorAward
     can_delete = False
     readonly_fields = ['doctor', 'name', 'year']
@@ -57,7 +86,7 @@ class ReadOnlyDoctorAwardInline(admin.TabularInline):
         return False
 
 
-class ReadOnlyDoctorAssociationInline(admin.TabularInline):
+class ReadOnlyDoctorAssociationInline(nested_admin.NestedTabularInline):
     model = doctor_model.DoctorAssociation
     can_delete = False
     readonly_fields = ['doctor', 'name']
@@ -66,7 +95,7 @@ class ReadOnlyDoctorAssociationInline(admin.TabularInline):
         return False
 
 
-class ReadOnlyDoctorExperienceInline(admin.TabularInline):
+class ReadOnlyDoctorExperienceInline(nested_admin.NestedTabularInline):
     model = doctor_model.DoctorExperience
     can_delete = False
     readonly_fields = ['doctor', 'hospital', 'start_year', 'end_year']
@@ -96,21 +125,22 @@ class AboutListFilter(SimpleListFilter):
             return queryset.filter(~Q(about=''))
 
 
-class AboutDoctorAdmin(VersionAdmin):
+class AboutDoctorAdmin(nested_admin.NestedModelAdmin):
     list_display = ('name', 'updated_at', 'data_status', 'onboarding_status', 'about')
     list_filter = ('data_status', 'onboarding_status', AboutListFilter, CityFilter)
     form = AboutDoctorForm
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code',
                'additional_details', 'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
-               'online_consultation_fees', 'matrix_lead_id', 'matrix_reference_id', 'assigned_to', ]
+               'online_consultation_fees', 'matrix_lead_id', 'matrix_reference_id', 'assigned_to', 'search_key',
+               'is_live', 'is_internal']
     search_fields = ['name']
     inlines = [ReadOnlySpecializationInline,
                ReadOnlyDoctorQualificationInline,
-               ReadOnlyDoctorHospitalInline,
                ReadOnlyDoctorLanguageInline,
                ReadOnlyDoctorAwardInline,
                ReadOnlyDoctorAssociationInline,
-               ReadOnlyDoctorExperienceInline
+               ReadOnlyDoctorExperienceInline,
+               DoctorClinicInline
                ]
     readonly_fields = ('name', 'gender', 'practicing_since', 'raw_about', 'license', 'onboarding_status')
 
