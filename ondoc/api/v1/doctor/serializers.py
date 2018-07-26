@@ -270,7 +270,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     hospital_thumbnail = serializers.SerializerMethodField()
     day = serializers.SerializerMethodField()
-    discounted_fees = serializers.IntegerField(read_only=True, allow_null=True)
+    discounted_fees = serializers.IntegerField(read_only=True, allow_null=True, source='deal_price')
 
     def get_hospital_thumbnail(self, instance):
         request = self.context.get("request")
@@ -572,9 +572,14 @@ class DoctorListSerializer(serializers.Serializer):
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     emails = None
     experience_years = serializers.IntegerField(allow_null=True)
-    hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
+    # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
+    hospitals = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
     availability = None
+
+    def get_hospitals(self, obj):
+        data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj).select_related("doctor_clinic__doctor")
+        return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
     class Meta:
         model = Doctor

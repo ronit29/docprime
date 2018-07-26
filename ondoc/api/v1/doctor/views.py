@@ -402,9 +402,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
     def retrieve(self, request, pk):
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
-                                    'availability__hospital',
+                                    'doctor_clinics__hospital',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
+                                    'doctorspecializations__specialization'
                                     )
                   .filter(pk=pk).first())
         if not doctor:
