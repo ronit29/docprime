@@ -2,10 +2,10 @@ from django.shortcuts import render, redirect, HttpResponse
 from django.views import View
 from collections import OrderedDict
 
-from .forms import  DoctorHospitalFormSet, DoctorLanguageFormSet, DoctorAwardFormSet, \
+from .forms import  DoctorClinicFormSet, DoctorLanguageFormSet, DoctorAwardFormSet, \
                      DoctorAssociationFormSet, DoctorExperienceFormSet, DoctorForm, \
                      DoctorMobileFormSet, DoctorQualificationFormSet, DoctorServiceFormSet, \
-                     DoctorEmailFormSet, BaseDoctorMobileFormSet, BaseDoctorEmailFormSet
+                     DoctorEmailFormSet, DoctorClinicTimingFormSet, BaseDoctorEmailFormSet
 
 
 # import models here
@@ -63,13 +63,17 @@ class DoctorOnboard(View):
         # Gather all forms
         doctor_form = DoctorForm(instance = existing.doctor, prefix = "doctor")
 
+        hospitaltiming_formset = {}
+        for timing in existing.doctor.doctor_clinics.all():
+            hospitaltiming_formset[timing.id] = DoctorClinicTimingFormSet(instance=timing, prefix='doctorclinictiming')
+
         # GAther the formsets
         #email_formset = DoctorEmailFormSet(instance = existing.doctor, formset = BaseDoctorEmailFormSet, prefix = 'doctoremail')
         email_formset = DoctorEmailFormSet(instance = existing.doctor, prefix = 'doctoremail')
         #mobile_formset = DoctorMobileFormSet(instance = existing.doctor, formset = BaseDoctorMobileFormSet, prefix = 'doctormobile')
         mobile_formset = DoctorMobileFormSet(instance = existing.doctor, prefix = 'doctormobile')
-        qualification_formset = DoctorQualificationFormSet(instance = existing.doctor, prefix = 'doctorqualification')
-        hospital_formset = DoctorHospitalFormSet(instance = existing.doctor, prefix = 'doctorhospital')
+        qualification_formset = DoctorQualificationFormSet(instance=existing.doctor, prefix = 'doctorqualification')
+        hospital_formset = DoctorClinicFormSet(instance=existing.doctor, prefix='doctorclinic')
         language_formset = DoctorLanguageFormSet(instance = existing.doctor, prefix = 'doctorlanguage')
         award_formset = DoctorAwardFormSet(instance = existing.doctor, prefix = 'doctoraward')
         association_formset = DoctorAssociationFormSet(instance = existing.doctor, prefix = 'doctorassociation')
@@ -83,6 +87,7 @@ class DoctorOnboard(View):
             'mobile_formset': mobile_formset,
             'qualification_formset': qualification_formset,
             'hospital_formset': hospital_formset,
+            'hospitaltiming_formset': hospitaltiming_formset,
             'language_formset': language_formset,
             'award_formset': award_formset,
             'association_formset': association_formset,
@@ -102,6 +107,10 @@ class DoctorOnboard(View):
 
         doctor_obj = instance
 
+        hospitaltiming_formset = {}
+        for timing in doctor_obj.doctor_clinics.all():
+            hospitaltiming_formset[timing.id] = DoctorClinicTimingFormSet(instance=timing, prefix='doctorclinictiming')
+
         doctor_form = DoctorForm(request.POST, instance = instance, prefix = "doctor")
 
         mobile_formset = DoctorMobileFormSet(data=request.POST, instance = doctor_obj, prefix = "doctormobile")
@@ -109,8 +118,8 @@ class DoctorOnboard(View):
 
         qualification_formset = DoctorQualificationFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorqualification')
 
-        hospital_formset = DoctorHospitalFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorhospital')
-        language_formset = DoctorLanguageFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorlanguage')
+        hospital_formset = DoctorClinicFormSet(instance=doctor_obj, prefix='doctorclinic')
+        language_formset = DoctorLanguageFormSet(data=request.POST, instance=doctor_obj, prefix = 'doctorlanguage')
         award_formset = DoctorAwardFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctoraward')
         association_formset = DoctorAssociationFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorassociation')
         experience_formset = DoctorExperienceFormSet(data=request.POST, instance = doctor_obj, prefix = 'doctorexperience')
@@ -136,8 +145,8 @@ class DoctorOnboard(View):
             x.min_num = min_num
             x.validate_min = validate_min
 
-        if not all([doctor_form.is_valid(), mobile_formset.is_valid(), email_formset.is_valid(), qualification_formset.is_valid(),
-            hospital_formset.is_valid(), language_formset.is_valid(), award_formset.is_valid(),
+        if not all([doctor_form.is_valid(), mobile_formset.is_valid(), email_formset.is_valid(), qualification_formset.is_valid()
+                       , language_formset.is_valid(), award_formset.is_valid(),
             association_formset.is_valid(), experience_formset.is_valid()]):
 
             doc_images = DoctorImage.objects.filter(doctor=doctor_obj)
@@ -155,6 +164,7 @@ class DoctorOnboard(View):
                 'email_formset': email_formset,
                 'qualification_formset': qualification_formset,
                 'hospital_formset': hospital_formset,
+                'hospitaltiming_formset': hospitaltiming_formset,
                 'language_formset': language_formset,
                 'award_formset': award_formset,
                 'association_formset': association_formset,
@@ -172,7 +182,7 @@ class DoctorOnboard(View):
         mobile_formset.save()
         email_formset.save()
         qualification_formset.save()
-        hospital_formset.save()
+        # hospital_formset.save()
         language_formset.save()
         award_formset.save()
         association_formset.save()
