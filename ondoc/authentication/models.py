@@ -298,7 +298,7 @@ class UserProfile(TimeStampedModel):
 
     def get_thumbnail(self):
         if self.profile_image:
-            return static(self.profile_image.url)
+            return self.profile_image.url
         return None
         # return static('doctor_images/no_image.png')
 
