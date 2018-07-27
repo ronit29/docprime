@@ -67,9 +67,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         user = self.request.user
         if user.user_type == User.DOCTOR:
-            return models.OpdAppointment.objects.filter(doctor=user.doctor)
+            return models.OpdAppointment.objects.filter(doctor=user.doctor, doctor__is_live=True, hospital__is_live=True)
         elif user.user_type == User.CONSUMER:
-            return models.OpdAppointment.objects.filter(user=user)
+            return models.OpdAppointment.objects.filter(user=user, doctor__is_live=True, hospital__is_live=True)
 
     def list(self, request):
         user = request.user
