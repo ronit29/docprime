@@ -88,7 +88,8 @@ class LabModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lab
         fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
-                  'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges', )
+                  'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
+                  'is_home_collection_enabled', )
 
 
 class LabProfileSerializer(LabModelSerializer):
@@ -201,7 +202,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
 
 class LabAppTransactionModelSerializer(serializers.Serializer):
-    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all())
+    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     price = serializers.DecimalField(max_digits=10, decimal_places=2)
@@ -265,7 +266,7 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
 
 
 class LabAppointmentCreateSerializer(serializers.Serializer):
-    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all())
+    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
     test_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all()))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     time_slot_start = serializers.DateTimeField(required=False)
