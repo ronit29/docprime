@@ -277,6 +277,18 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     hospital_thumbnail = serializers.SerializerMethodField()
     day = serializers.SerializerMethodField()
     discounted_fees = serializers.IntegerField(read_only=True, allow_null=True)
+    lat = serializers.SerializerMethodField(read_only=True)
+    long = serializers.SerializerMethodField(read_only=True)
+
+    def get_lat(self, obj):
+        if obj.hospital.location:
+            return obj.hospital.location.y
+        return None
+
+    def get_long(self, obj):
+        if obj.hospital.location:
+            return obj.hospital.location.x
+        return None
 
     def get_hospital_thumbnail(self, instance):
         request = self.context.get("request")
@@ -298,7 +310,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorHospital
         fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
-                  'discounted_fees', 'hospital_thumbnail', 'mrp', )
+                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id', )
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -454,7 +466,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'operational_since', 'lat', 'lng','address', 'registration_number',
+        fields = ('id', 'name', 'operational_since', 'lat', 'lng', 'address', 'registration_number',
                   'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', )
 
 
