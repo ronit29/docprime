@@ -223,11 +223,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("order_by")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by("price")
+                queryset = queryset.order_by("price", "distance")
             elif order_by == 'distance':
                 queryset = queryset.order_by("distance")
             elif order_by == 'name':
                 queryset = queryset.order_by("name")
+            else:
+                queryset = queryset.order_by("distance")
+        else:
+            queryset = queryset.order_by("distance")
         return queryset
 
     def form_lab_whole_data(self, queryset):
@@ -322,6 +326,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             "deal_price": total_deal_price,
             "effective_price": effective_price,
             "time_slot_start": start_dt,
+            "is_home_pickup": data["is_home_pickup"],
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
             "payment_type": data["payment_type"],
@@ -432,61 +437,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
         else:
             return False
 
-    # def payment_retry(self, request, pk=None):
-    #     queryset = LabAppointment.objects.filter(pk=pk)
-    #     payment_response = dict()
-    #     if queryset:
-    #         serializer_data = LabAppointmentModelSerializer(queryset.first(), context={'request':request})
-    #         payment_response = self.payment_details(request, serializer_data.data, 1)
-    #     return Response(payment_response)
-
-    # def update(self, request, pk):
-    #     data = request.data
-    #     lab_appointment_obj = get_object_or_404(LabAppointment, pk=pk)
-    #     serializer = LabAppointmentUpdateSerializer(lab_appointment_obj, data=data,
-    #                                                 context={'lab_id': lab_appointment_obj.lab})
-    #     serializer.is_valid(raise_exception=True)
-    #     # allowed = lab_appointment_obj.allowed_action(request.user.user_type)
-    #     allowed = lab_appointment_obj.allowed_action(3)
-    #     if data.get('status') not in allowed:
-    #         resp = dict()
-    #         resp['allowed'] = allowed
-    #         return Response(resp, status=status.HTTP_400_BAD_REQUEST)
-    #
-    #     lab_appointment_queryset = serializer.save()
-    #     serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
-    #     return Response(serializer.data)
-
-    # def payment_details(self, request, appointment_details, product_id):
-    #     details = dict()
-    #     pgdata = dict()
-    #     user = request.user
-    #     user_profile = user.profiles.filter(is_default_user=True).first()
-    #     pgdata['custId'] = user.id
-    #     pgdata['mobile'] = user.phone_number
-    #     pgdata['email'] = user.email
-    #     if not user.email:
-    #         pgdata['email'] = "dummy_appointment@policybazaar.com"
-    #     base_url = (
-    #         "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
-    #     pgdata['productId'] = product_id
-    #     pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-    #     pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-    #     pgdata['checkSum'] = ''
-    #     pgdata['appointmentId'] = appointment_details['id']
-    #     if user_profile:
-    #         pgdata['name'] = user_profile.name
-    #     else:
-    #         pgdata['name'] = "DummyName"
-    #     pgdata['txAmount'] = appointment_details['price']
-    #
-    #     if pgdata:
-    #         details['required'] = True
-    #         details['pgdata'] = pgdata
-    #     else:
-    #         details['required'] = False
-    #     return details
-
 
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
@@ -498,19 +448,23 @@ class LabTimingListView(mixins.ListModelMixin,
     def list(self, request, *args, **kwargs):
         params = request.query_params
 
-        flag = True if int(params.get('pickup', 0)) else False
-        queryset = LabTiming.objects.filter(lab=params.get('lab'), pickup_flag=flag)
-        if not queryset:
+        for_home_pickup = True if int(params.get('pickup', 0)) else False
+        lab = params.get('lab')
+        lab_queryset = Lab.objects.filter(pk=lab).prefetch_related('lab_timings').first()
+        if not lab_queryset or (for_home_pickup and not lab_queryset.is_home_pickup_available):
             return Response([])
 
         obj = TimeSlotExtraction()
 
-        for data in queryset:
-            obj.form_time_slots(data.day, data.start, data.end, None, True)
+        if not for_home_pickup and lab_queryset.always_open:
+            for day in range(0, 7):
+                obj.form_time_slots(day, 0.0, 23.45, None, True)
+        else:
+            lab_timing_queryset = lab_queryset.lab_timings.all()
+            for data in lab_timing_queryset:
+                obj.form_time_slots(data.day, data.start, data.end, None, True)
 
-        # resp_dict = obj.get_timing()
         resp_list = obj.get_timing_list()
-
         return Response(resp_list)
 
 
