@@ -16,6 +16,9 @@ from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
+from django.utils.html import format_html_join
+from django.template.loader import render_to_string
+
 
 
 class AutoComplete:
@@ -421,6 +424,18 @@ class GenericAdminInline(admin.TabularInline):
                 except MultipleObjectsReturned:
                     pass
         return formset
+
+
+class DoctorImageAdmin(admin.ModelAdmin):
+    model = DoctorImage
+    readonly_fields = ('crop_image', 'doctor' )
+    # fields = ('original_image', 'cropped_image')
+
+    def crop_image(self, instance):
+        return render_to_string('doctor/crop_doctor_image.html', context={"instance": instance})
+
+
+
 
 
 class DoctorResource(resources.ModelResource):

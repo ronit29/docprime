@@ -1,0 +1,76 @@
+<!--<!doctype html>-->
+<!--<html lang="en">-->
+<!--<head>-->
+
+<!--<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.2/croppie.min.css" />-->
+<!--<script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.2/croppie.min.js"></script>-->
+
+<!--<title>Cropping image for </title>-->
+<!--</head>-->
+<!--<body>-->
+
+<script type="text/javascript">
+
+    function loadCSS(filename){
+
+       var file = document.createElement("link");
+       file.setAttribute("rel", "stylesheet");
+       file.setAttribute("type", "text/css");
+       file.setAttribute("href", filename);
+       document.head.appendChild(file);
+
+    }
+    loadCSS("https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.2/croppie.min.css");
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.2/croppie.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<center>
+<div id='resizer-demo'></div>
+<button type="button" id='crop_it' onclick='myFunction()'>Crop</button>
+<div id='msg'>You can also use CTRL + mouse-wheel to zoom. {{ instance.name.url }}</div>
+<br><br><br>
+</center>
+<script>
+var el = document.getElementById('resizer-demo');
+var resize = new Croppie(el, {
+    viewport: { width: 300, height: 300, type: 'square' },
+    boundary: { width: 400, height: 400 },
+    showZoomer: true,
+    enableResize: false,
+    enableOrientation: true,
+    mouseWheelZoom: 'ctrl'
+});
+resize.bind({
+    url: "{{ instance.name.url }}",
+});
+
+// on button click
+function myFunction(){
+
+    document.getElementById('msg').innerHTML = 'You clicked!';
+    resize.result('html').then(function(data) {
+
+    document.getElementById('msg').innerHTML = data.outerHTML;
+    
+
+    // find x,y,h,w
+
+    <!--$.post('url_to_crop_image', { x: "", y : "", w : "", h : ""},-->
+        <!--function(returnedData){-->
+            <!--console.log(returnedData);-->
+        <!--}).fail(function(){-->
+            <!--alert("Something went wrong.")-->
+    <!--});-->
+
+  });
+
+}
+
+
+
+
+
+</script>
+<!--</body>-->
+<!--</html>-->

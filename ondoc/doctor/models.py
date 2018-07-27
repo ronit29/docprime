@@ -412,9 +412,15 @@ class DoctorHospital(auth_model.TimeStampedModel):
 
 class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
-    name = models.ImageField(upload_to='doctor/images',height_field='height', width_field='width')
+    name = models.ImageField('Original Image Name',upload_to='doctor/images',height_field='height', width_field='width')
     cropped_image = models.ImageField(upload_to='doctor/images', height_field='height', width_field='width',
                                       blank=True, null=True)
+
+    def __str__(self):
+        return '{}'.format(self.doctor)
+
+    def original_image(self):
+        return mark_safe('<a href="{0}" target="_blank">Crop</a><br><br><img src="{0}"/>'.format(self.name.url))
 
     class Meta:
         db_table = "doctor_image"
