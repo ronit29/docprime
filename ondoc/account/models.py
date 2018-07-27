@@ -148,7 +148,7 @@ class PgTransaction(TimeStampedModel):
     order_no = models.PositiveIntegerField(blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
-    amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, default=0)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_mode = models.CharField(max_length=50)
     response_code = models.CharField(max_length=50)
     bank_id = models.CharField(max_length=50)
