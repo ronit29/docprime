@@ -73,13 +73,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     def list(self, request):
         user = request.user
-        queryset = models.OpdAppointment.objects.filter(Q(doctor__manageable_doctors__user=user,
-                                                        doctor__manageable_doctors__hospital=F('hospital'),
-                                                        doctor__manageable_doctors__is_disabled=False) |
-                                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
-                                                          hospital__manageable_hospitals__user=user,
-                                                          hospital__manageable_hospitals__is_disabled=False)
-                                                        ).distinct()
+        queryset = models.OpdAppointment.objects.filter(hospital__is_live=True, doctor__is_live=True).filter(
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital=F('hospital'),
+              doctor__manageable_doctors__is_disabled=False) |
+            Q(hospital__manageable_hospitals__doctor__isnull=True,
+              hospital__manageable_hospitals__user=user,
+              hospital__manageable_hospitals__is_disabled=False)
+            ).distinct()
         if not queryset:
             return Response([])
         serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
@@ -124,13 +125,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     def retrieve(self, request, pk=None):
         user = request.user
-        queryset = models.OpdAppointment.objects.filter(Q(doctor__manageable_doctors__user=user,
-                                                          doctor__manageable_doctors__hospital=F('hospital'),
-                                                          doctor__manageable_doctors__is_disabled=False) |
-                                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
-                                                          hospital__manageable_hospitals__user=user,
-                                                          hospital__manageable_hospitals__is_disabled=False),
-                                                        Q(pk=pk)).distinct()
+        queryset = models.OpdAppointment.objects.filter(hospital__is_live=True, doctor__is_live=True).filter(
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital=F('hospital'),
+              doctor__manageable_doctors__is_disabled=False) |
+            Q(hospital__manageable_hospitals__doctor__isnull=True,
+              hospital__manageable_hospitals__user=user,
+              hospital__manageable_hospitals__is_disabled=False),
+            Q(pk=pk)).distinct()
         if queryset:
             serializer = serializers.AppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
             return Response(serializer.data)
@@ -142,8 +144,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('id'))
-        permission_queryset = (auth_models.UserPermission.objects.filter(doctor=opd_appointment.doctor.id).
+        qfilter = dict()
+        qfilter["pk"] = validated_data.get('id')
+        qfilter["doctor__is_live"] = True
+        qfilter["hospital__is_live"] = True
+        opd_appointment = get_object_or_404(models.OpdAppointment, **qfilter)
+        permission_queryset = (auth_models.GenericAdmin.objects.filter(doctor=opd_appointment.doctor.id).
                                filter(hospital=opd_appointment.hospital_id))
         if permission_queryset:
             perm_data = permission_queryset.first()
@@ -162,6 +168,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
         doctor_hospital = models.DoctorHospital.objects.filter(
             doctor=data.get('doctor'), hospital=data.get('hospital'),
+            doctor__is_live=True, hospital__is_live=True,
             day=time_slot_start.weekday(), start__lte=time_slot_start.hour,
             end__gte=time_slot_start.hour).first()
         profile_model = data.get("profile")
@@ -197,7 +204,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return Response(data=resp)
 
     def update(self, request, pk=None):
-        opd_appointment = get_object_or_404(models.OpdAppointment, pk=pk)
+        qfilter = dict()
+        qfilter["pk"] = pk
+        qfilter["doctor__is_live"] = True
+        qfilter["hospital__is_live"] = True
+        opd_appointment = get_object_or_404(models.OpdAppointment, **qfilter)
         serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
@@ -349,15 +360,16 @@ class DoctorProfileView(viewsets.GenericViewSet):
         from django.contrib.staticfiles.templatetags.staticfiles import static
         resp_data = dict()
         today = datetime.date.today()
-        queryset = models.OpdAppointment.objects.filter((Q(doctor__manageable_doctors__user=request.user,
-                                                           doctor__manageable_doctors__hospital=F('hospital'),
-                                                           doctor__manageable_doctors__is_disabled=False) |
-                                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
-                                                          hospital__manageable_hospitals__user=request.user,
-                                                          hospital__manageable_hospitals__is_disabled=False)),
-                                                        Q(status=models.OpdAppointment.ACCEPTED,
-                                                        time_slot_start__date=today)
-                                                        ).distinct().count()
+        queryset = models.OpdAppointment.objects.filter(doctor__is_live=True, hospital__is_live=True).filter(
+            (Q(doctor__manageable_doctors__user=request.user,
+               doctor__manageable_doctors__hospital=F('hospital'),
+               doctor__manageable_doctors__is_disabled=False) |
+             Q(hospital__manageable_hospitals__doctor__isnull=True,
+               hospital__manageable_hospitals__user=request.user,
+               hospital__manageable_hospitals__is_disabled=False)),
+            Q(status=models.OpdAppointment.ACCEPTED,
+              time_slot_start__date=today)
+            ).distinct().count()
         if hasattr(request.user, 'doctor') and request.user.doctor:
             doctor = request.user.doctor
             doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
@@ -405,7 +417,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'qualifications__qualification',
                                     'qualifications__specialization',
                                     )
-                  .filter(pk=pk).first())
+                  .filter(pk=pk, is_live=True).first())
         if not doctor:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
@@ -421,13 +433,13 @@ class DoctorHospitalView(mixins.ListModelMixin,
     authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, )
 
-    queryset = models.DoctorHospital.objects.all()
+    queryset = models.DoctorHospital.objects.filter(doctor__is_live=True, hospital__is_live=True)
     serializer_class = serializers.DoctorHospitalSerializer
 
     def get_queryset(self):
         user = self.request.user
         if user.user_type == User.DOCTOR:
-            return models.DoctorHospital.objects.filter(doctor=user.doctor)
+            return models.DoctorHospital.objects.filter(doctor=user.doctor, doctor__is_live=True, hospital__is_live=True)
 
     def list(self, request):
         resp_data = list()
@@ -478,7 +490,7 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return models.DoctorLeave.objects.filter(doctor=user.doctor.id, deleted_at__isnull=True)
+        return models.DoctorLeave.objects.filter(doctor=user.doctor.id, deleted_at__isnull=True, doctor__is_live=True)
 
     def list(self, request, *args, **kwargs):
         if not request.user.doctor:
@@ -511,7 +523,7 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
         if not hasattr(request.user, 'doctor') or not request.user.doctor:
             return Response([])
         current_time = timezone.now()
-        doctor_leave = models.DoctorLeave.objects.get(pk=pk)
+        doctor_leave = models.DoctorLeave.objects.get(pk=pk, doctor__is_live=True)
         doctor_leave.deleted_at = current_time
         doctor_leave.save()
         return Response({
@@ -528,18 +540,23 @@ class PrescriptionFileViewset(OndocViewSet):
         request = self.request
         if request.user.user_type == User.DOCTOR:
             user = request.user
-            return (models.PrescriptionFile.objects.filter(Q(prescription__appointment__doctor__manageable_doctors__user=user,
-                                                             prescription__appointment__doctor__manageable_doctors__hospital=F('prescription__appointment__hospital'),
-                                                             prescription__appointment__doctor__manageable_doctors__permission_type=auth_models.GenericAdmin.APPOINTMENT,
-                                                             prescription__appointment__doctor__manageable_doctors__is_disabled=False) |
-                                                           Q(prescription__appointment__hospital__manageable_hospitals__user=user,
-                                                             prescription__appointment__hospital__manageable_hospitals__doctor__isnull=True,
-                                                             prescription__appointment__hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT,
-                                                             prescription__appointment__hospital__manageable_hospitals__is_disabled=False)).
+            return (models.PrescriptionFile.objects.filter(prescription__appointment__doctor__is_live=True,
+                                                           prescription__appointment__hospital__is_live=True).filter(
+                Q(prescription__appointment__doctor__manageable_doctors__user=user,
+                  prescription__appointment__doctor__manageable_doctors__hospital=F(
+                      'prescription__appointment__hospital'),
+                  prescription__appointment__doctor__manageable_doctors__permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                  prescription__appointment__doctor__manageable_doctors__is_disabled=False) |
+                Q(prescription__appointment__hospital__manageable_hospitals__user=user,
+                  prescription__appointment__hospital__manageable_hospitals__doctor__isnull=True,
+                  prescription__appointment__hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                  prescription__appointment__hospital__manageable_hospitals__is_disabled=False)).
                     distinct())
             # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
         elif request.user.user_type == User.CONSUMER:
-            return models.PrescriptionFile.objects.filter(prescription__appointment__user=request.user)
+            return models.PrescriptionFile.objects.filter(prescription__appointment__user=request.user,
+                                                          prescription__appointment__doctor__is_live=True,
+                                                          prescription__appointment__hospital__is_live=True)
         else:
             return models.PrescriptionFile.objects.none()
 
@@ -557,7 +574,9 @@ class PrescriptionFileViewset(OndocViewSet):
         validated_data = serializer.validated_data
         resp_data = list()
         if self.prescription_permission(request.user, validated_data.get('appointment')):
-            if models.Prescription.objects.filter(appointment=validated_data.get('appointment')).exists():
+            if models.Prescription.objects.filter(appointment=validated_data.get('appointment'),
+                                                  appointment__doctor__is_live=True,
+                                                  appointment__hospital__is_live=True).exists():
                 prescription = models.Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
             else:
                 prescription = models.Prescription.objects.create(appointment=validated_data.get('appointment'),
@@ -675,25 +694,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
                                 data.deal_price, data.mrp, True)
 
-        # resp_dict = obj.get_timing()
         timeslots = obj.get_timing_list()
-
-
-
-
-        # for i in range(0, 7):
-        #     timeslots[i] = dict()
-        # timeslot_serializer = TimeSlotSerializer(queryset, context={'timing': timeslots}, many=True)
-        # data = timeslot_serializer.data
-        # for i in range(7):
-        #     if timeslots[i].get('timing'):
-        #         temp_list = list()
-        #         temp_list = [[k, v] for k, v in timeslots[i]['timing'][0].items()]
-        #         timeslots[i]['timing'][0] = temp_list
-        #         temp_list = [[k, v] for k, v in timeslots[i]['timing'][1].items()]
-        #         timeslots[i]['timing'][1] = temp_list
-        #         temp_list = [[k, v] for k, v in timeslots[i]['timing'][2].items()]
-        #         timeslots[i]['timing'][2] = temp_list
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
                          "doctor_leaves": doctor_leave_serializer.data})
 

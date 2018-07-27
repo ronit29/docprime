@@ -38,9 +38,9 @@ class AppointmentFilterSerializer(serializers.Serializer):
     CHOICES = ['all', 'previous', 'upcoming', 'pending']
 
     range = serializers.ChoiceField(choices=CHOICES, required=False)
-    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all(), required=False)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
     profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
-    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False)
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
     date = serializers.DateField(required=False)
 
 
@@ -103,8 +103,8 @@ class OpdAppModelSerializer(serializers.ModelSerializer):
 
 
 class OpdAppTransactionModelSerializer(serializers.Serializer):
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     profile_detail = serializers.JSONField()
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
@@ -123,8 +123,8 @@ class OpdAppointmentPermissionSerializer(serializers.Serializer):
 
 
 class CreateAppointmentSerializer(serializers.Serializer):
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     start_date = serializers.CharField()
     start_time = serializers.FloatField()
@@ -201,8 +201,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
 
 
 class SetAppointmentSerializer(serializers.Serializer):
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     time_slot_start = serializers.DateTimeField()
     time_slot_end = serializers.DateTimeField()
@@ -524,24 +524,26 @@ class PrescriptionFileSerializer(serializers.ModelSerializer):
 
 
 class PrescriptionFileDeleteSerializer(serializers.Serializer):
-    appointment = serializers.PrimaryKeyRelatedField(queryset=OpdAppointment.objects.all())
+    appointment = serializers.PrimaryKeyRelatedField(
+        queryset=OpdAppointment.objects.filter(doctor__is_live=True, hospital__is_live=True))
     id = serializers.IntegerField()
 
     def validate_appointment(self, value):
         request = self.context.get('request')
-        if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
+        if not OpdAppointment.objects.filter(doctor=request.user.doctor, doctor__is_live=True, hospital__is_live=True).exists():
             raise serializers.ValidationError("Appointment is not correct.")
         return value
 
 
 class PrescriptionSerializer(serializers.Serializer):
-    appointment = serializers.PrimaryKeyRelatedField(queryset=OpdAppointment.objects.all())
+    appointment = serializers.PrimaryKeyRelatedField(
+        queryset=OpdAppointment.objects.filter(doctor__is_live=True, hospital__is_live=True))
     prescription_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
     name = serializers.FileField()
 
     def validate_appointment(self, value):
         request = self.context.get('request')
-        if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
+        if not OpdAppointment.objects.filter(doctor=request.user.doctor, doctor__is_live=True, hospital__is_live=True).exists():
             raise serializers.ValidationError("Appointment is not correct.")
         return value
 
@@ -591,8 +593,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
-    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
-    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
 
 
 class DoctorTimeSlotSerializer(serializers.Serializer):

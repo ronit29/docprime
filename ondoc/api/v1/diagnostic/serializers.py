@@ -371,7 +371,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
         lab_queryset = data['lab']
 
-        if data["is_home_pickup"] and not lab_queryset.is_home_pickup_available:
+        if data["is_home_pickup"] and not lab_queryset.is_home_collection_enabled:
             raise serializers.ValidationError("Home Pickup is disabled for the lab")
 
         if not data["is_home_pickup"] and lab_queryset.always_open:
