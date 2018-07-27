@@ -245,6 +245,10 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 data['dob'] = data['dob'].date()
             except:
                 return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'age': {'code': 'required', 'message': 'This field is required.'}},
+                            status=status.HTTP_400_BAD_REQUEST)
+
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
