@@ -88,7 +88,8 @@ class LabModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lab
         fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
-                  'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges', )
+                  'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
+                  'is_home_collection_enabled', )
 
 
 class LabProfileSerializer(LabModelSerializer):
@@ -201,7 +202,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
 
 class LabAppTransactionModelSerializer(serializers.Serializer):
-    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all())
+    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     price = serializers.DecimalField(max_digits=10, decimal_places=2)
@@ -265,7 +266,7 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
 
 
 class LabAppointmentCreateSerializer(serializers.Serializer):
-    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all())
+    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
     test_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all()))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     time_slot_start = serializers.DateTimeField(required=False)
@@ -361,23 +362,23 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         if len(avail_test_queryset) != len(data['test_ids']):
             raise serializers.ValidationError("Test Ids or lab Id is incorrect")
 
-    # @staticmethod
-    # def profile_validator(data):
-    #     profile_queryset = UserProfile.objects.filter(pk=data['profile'].id)
-    #     if not profile_queryset:
-    #         raise serializers.ValidationError("Profile Id is incorrect")
-
     @staticmethod
     def time_slot_validator(data):
         start_dt = (CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
-        # if start_dt.hour > data['end_time']:
-        #     raise serializers.ValidationError("Invalid Time Slot")
 
         day_of_week = start_dt.weekday()
-        start_hour = start_dt.hour
-        # end_hour = int(data['end_time'])
-        # end_hour = data['end_time'].hour
-        lab_timing_queryset = LabTiming.objects.filter(lab=data['lab'], day=day_of_week, start__lte=start_hour)
+        start_hour = round(float(start_dt.hour) + (float(start_dt.minute) * 1 / 60), 2)
+
+        lab_queryset = data['lab']
+
+        if data["is_home_pickup"] and not lab_queryset.is_home_collection_enabled:
+            raise serializers.ValidationError("Home Pickup is disabled for the lab")
+
+        if not data["is_home_pickup"] and lab_queryset.always_open:
+            return
+
+        lab_timing_queryset = lab_queryset.lab_timings.filter(day=day_of_week, start__lte=start_hour, end__gte=start_hour, for_home_pickup=data["is_home_pickup"]).exists()
+
         if not lab_timing_queryset:
             raise serializers.ValidationError("No time slot available")
 

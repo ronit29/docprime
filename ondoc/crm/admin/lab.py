@@ -269,7 +269,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
     exclude = ('search_key', )
 
-    readonly_fields = ('lead_url','matrix_lead_id','matrix_reference_id')
+    readonly_fields = ('lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live')
 
     def lead_url(self, instance):
         if instance.id:
@@ -317,12 +317,14 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         if not lab_obj.locality and not lab_obj.sublocality:
             errors.append('locality or sublocality is required')
 
-        length_required = ['labservice', 'labdoctoravailability', 'labmanager', 'labtiming', 'labaccreditation']
+        length_required = ['labservice', 'labdoctoravailability', 'labmanager', 'labaccreditation']
         if lab_obj.labservice_set.filter(service = LabService.RADIOLOGY).exists():
             length_required.append('labdoctor')
         for req in length_required:
             if not len(getattr(lab_obj, req+'_set').all()):
                 errors.append(req + ' is required')
+        if not lab_obj.lab_timings.exists():
+            errors.append('Lab Timings is required')
 
         #if not lab_obj.lab_services_set:
             # errors.append('lab services are required')

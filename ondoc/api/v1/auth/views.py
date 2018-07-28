@@ -19,9 +19,9 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When
 from django.forms.models import model_to_dict
 from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
-from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
+from ondoc.doctor.models import DoctorMobile, DoctorHospital
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         UserPermission, Address, AppointmentTransaction, GenericAdmin)
+                                         Address, AppointmentTransaction, GenericAdmin)
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -67,17 +67,20 @@ class LoginOTP(GenericViewSet):
 
         data = serializer.validated_data
         phone_number = data['phone_number']
-
-        send_otp("otp sent {}", phone_number)
-
         req_type = request.query_params.get('type')
 
         if req_type == 'doctor':
+            otp = False
             if DoctorMobile.objects.filter(number=phone_number, is_primary=True).exists():
+                otp = True
                 response['exists'] = 1
             if GenericAdmin.objects.filter(phone_number=phone_number, is_disabled=False).exists():
+                otp = True
                 response['exists'] = 1
+            if otp == True:
+                send_otp("otp sent {}", phone_number)
         else:
+            send_otp("otp sent {}", phone_number)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists']=1
 
@@ -245,6 +248,10 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 data['dob'] = data['dob'].date()
             except:
                 return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'age': {'code': 'required', 'message': 'This field is required.'}},
+                            status=status.HTTP_400_BAD_REQUEST)
+
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
@@ -261,20 +268,6 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
-
-#
-# class UserPermissionViewSet(mixins.CreateModelMixin,
-#                             mixins.ListModelMixin,
-#                             GenericViewSet):
-#     queryset = DoctorHospital.objects.all()
-#     # serializer_class = serializers.UserPermissionSerializer
-#
-#     def list(self, request, *args, **kwargs):
-#         params = request.query_params
-#         doctor_list = params['doctor_id'].split(",")
-#         dp_obj = DoctorPermission(doctor_list, request)
-#         permission_data = dp_obj.create_permission()
-#         return Response({'data':permission_data})
 
 
 class OndocViewSet(mixins.CreateModelMixin,
@@ -367,6 +360,13 @@ class UserAppointmentsViewSet(OndocViewSet):
                     time_slot_start = utils.form_time_slot(
                         validated_data.get("start_date"),
                         validated_data.get("start_time"))
+                    if lab_appointment.time_slot_start == time_slot_start:
+                        resp = {
+                            "status": 0,
+                            "msg": "Cannot Reschedule for same timeslot"
+                        }
+                        return resp
+
                     test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
                     lab_test_queryset = AvailableLabTest.objects.select_related('lab').filter(lab=lab_appointment.lab,
                                                                                               test__in=test_ids)
@@ -400,12 +400,6 @@ class UserAppointmentsViewSet(OndocViewSet):
                         "lab_test": lab_appointment.lab_test
                     }
 
-                    # new_appointment['id'] = lab_appointment.id
-                    # new_appointment['deal_price'] = new_deal_price
-                    # new_appointment['effective_price'] = new_effective_price
-                    # new_appointment['agreed_price'] = temp_lab_test[0].get("total_agreed_price", 0)
-                    # new_appointment['price'] = temp_lab_test[0].get("total_mrp")
-                    # new_appointment['time_slot_start'] = time_slot_start
                     resp = self.extract_payment_details(request, lab_appointment, new_appointment,
                                                         account_models.Order.LAB_PRODUCT_ID)
         return resp
@@ -421,11 +415,19 @@ class UserAppointmentsViewSet(OndocViewSet):
                     time_slot_start = utils.form_time_slot(
                         validated_data.get("start_date"),
                         validated_data.get("start_time"))
-                    doctor_hospital = DoctorHospital.objects.filter(doctor=opd_appointment.doctor,
-                                                                           hospital=opd_appointment.hospital,
-                                                                           day=time_slot_start.weekday(),
-                                                                           start__lte=time_slot_start.hour,
-                                                                           end__gte=time_slot_start.hour).first()
+                    if opd_appointment.time_slot_start == time_slot_start:
+                        resp = {
+                            "status": 0,
+                            "msg": "Cannot Reschedule for same timeslot"
+                        }
+                        return resp
+                    doctor_hospital = DoctorHospital.objects.filter(doctor__is_live=True,
+                                                                    hospital__is_live=True).filter(
+                        doctor=opd_appointment.doctor,
+                        hospital=opd_appointment.hospital,
+                        day=time_slot_start.weekday(),
+                        start__lte=time_slot_start.hour,
+                        end__gte=time_slot_start.hour).first()
                     if doctor_hospital:
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
@@ -450,17 +452,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "time_slot_start": time_slot_start,
                             "payment_type": opd_appointment.payment_type
                         }
-
-
-                        # new_appointment['id'] = opd_appointment.id
-                        # new_appointment['deal_price'] = doctor_hospital.deal_price
-                        # new_effective_price = doctor_hospital.deal_price - coupon_price
-                        # new_appointment['effective_price'] = new_effective_price
-                        # new_appointment['fees'] = doctor_hospital.fees
-                        # new_appointment['mrp'] = doctor_hospital.mrp
-                        # new_appointment['time_slot_start'] = time_slot_start
                         resp = self.extract_payment_details(request, opd_appointment, new_appointment,
                                                             account_models.Order.DOCTOR_PRODUCT_ID)
+
             return resp
 
     def get_appointment_coupon_price(self, discounted_price, effective_price):
@@ -926,7 +920,7 @@ class OrderHistoryViewSet(GenericViewSet):
         doc_hosp_query = Q()
 
         for order in Order.objects.filter(action_data__user=request.user.id, is_viewable=True,
-                                          payment_status=Order.PAYMENT_PENDING):
+                                          payment_status=Order.PAYMENT_PENDING).order_by('-created_at'):
             action_data = order.action_data
             if order.product_id == Order.DOCTOR_PRODUCT_ID:
                 opd_action_data.append(action_data)
@@ -937,7 +931,8 @@ class OrderHistoryViewSet(GenericViewSet):
 
         doc_hosp_details = defaultdict(dict)
         if opd_action_data:
-            doc_hosp_obj = DoctorHospital.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(doc_hosp_query)
+            doc_hosp_obj = DoctorHospital.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(
+                doctor__is_live=True, hospital__is_live=True).filter(doc_hosp_query)
             for data in doc_hosp_obj:
                 doc_hosp_details[data.hospital.id][data.doctor.id] = {
                     "doctor_name": data.doctor.name,
@@ -1015,16 +1010,18 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (DoctorHospital.objects.annotate(hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(Q(doctor__manageable_doctors__user=user,
-                                                             doctor__manageable_doctors__hospital=F('hospital'),
-                                                             doctor__manageable_doctors__is_disabled=False,
-                                                             doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
-                                                             doctor__manageable_doctors__write_permission=True) |
-                                                           Q(hospital__manageable_hospitals__doctor__isnull=True,
-                                                             hospital__manageable_hospitals__user=user,
-                                                             hospital__manageable_hospitals__is_disabled=False,
-                                                             hospital__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT,
-                                                             hospital__manageable_hospitals__write_permission=True)).
+        doc_hosp_queryset = (DoctorHospital.objects.filter(doctor__is_live=True, hospital__is_live=True).annotate(
+            hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital=F('hospital'),
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+              doctor__manageable_doctors__write_permission=True) |
+            Q(hospital__manageable_hospitals__doctor__isnull=True,
+              hospital__manageable_hospitals__user=user,
+              hospital__manageable_hospitals__is_disabled=False,
+              hospital__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT,
+              hospital__manageable_hospitals__write_permission=True)).
                              values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
                              )
         return Response(doc_hosp_queryset)

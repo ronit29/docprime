@@ -69,6 +69,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     matrix_lead_id = models.BigIntegerField(blank=True, null=True)
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     is_home_pickup_available = models.BigIntegerField(null=True, blank=True)
+    is_home_collection_enabled = models.BooleanField(default=False)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
 
@@ -79,9 +80,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         db_table = "lab"
 
     def get_thumbnail(self):
-        all_images = self.lab_image.all()
-        if all_images:
-            return all_images[0].name.url
+        all_documents = self.lab_documents.all()
+        for document in all_documents:
+            if document.document_type == LabDocument.LOGO:
+                return document.name.url
         return None
         # return static('lab_images/lab_default.png')
 
@@ -208,7 +210,7 @@ class LabTiming(TimeStampedModel):
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='lab_timings')
 
-    pickup_flag = models.BooleanField(default=False)
+    for_home_pickup = models.BooleanField(default=False)
     day = models.PositiveSmallIntegerField(blank=False, null=False,
                                            choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"),
                                                     (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
@@ -737,7 +739,8 @@ class LabDocument(TimeStampedModel, Document):
     LOGO = 6
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
                (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO")]
-    lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
+    lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE,
+                            related_name='lab_documents')
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.FileField(upload_to='lab/images', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])

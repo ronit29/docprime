@@ -6,10 +6,10 @@
 </head>
 <body>
     <p>
-        Dear {{patient_name}}
+        Dear {{patient_name|capfirst}}
 
-We are pleased confirm your appointment for Mr. {{patient_name}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}
-        with Dr. {{doctor_name}}.
+We are pleased confirm your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}
+        with Dr. {{doctor_name|capfirst}}.
 
 Your appointment reference ID is {{instance.id}}
 
