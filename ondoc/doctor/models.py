@@ -1047,6 +1047,16 @@ class DoctorLeave(auth_model.TimeStampedModel):
     def __str__(self):
         return self.doctor.name + "(" + str(self.start_time) + "," + str(self.end_date) + str(self.start_date)
 
+    def start_time_in_float(self):
+        start_time = self.start_time
+        start_time = round(float(start_time.hour) + (float(start_time.minute) * 1 / 60), 2)
+        return start_time
+
+    def end_time_in_float(self):
+        end_time = self.end_time
+        end_time = round(float(end_time.hour) + (float(end_time.minute) * 1 / 60), 2)
+        return end_time
+
     class Meta:
         db_table = "doctor_leave"
 
