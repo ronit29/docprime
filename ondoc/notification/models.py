@@ -5,6 +5,7 @@ from django.contrib.postgres.fields import JSONField
 from django.forms.models import model_to_dict
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.authentication.models import NotificationEndpoint
+from ondoc.authentication.models import UserProfile
 from .rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
@@ -250,6 +251,15 @@ class NotificationAction:
         if user.user_type == User.CONSUMER:
             email = instance.profile.email
             phone_number = instance.profile.phone_number
+
+            # send notification to default profile also
+            default_user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
+            if default_user_profile and (default_user_profile.id != instance.profile.id) and default_user_profile.email:
+                EmailNotification.send_notification(user=user, notification_type=notification_type,
+                                                    email=default_user_profile.email, context=context)
+            if default_user_profile and (default_user_profile.id != instance.profile.id) and default_user_profile.phone_number:
+                SmsNotification.send_notification(user=user, phone_number=default_user_profile.phone_number,
+                                                  notification_type=notification_type, context=context)
         else:
             email = user.email
             phone_number = user.phone_number
