@@ -43,7 +43,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
     def list(self, request, *args, **kwargs):
         test_queryset = CommonTest.objects.all()
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
-        lab_queryset = PromotedLab.objects.prefetch_related('lab_test').all()
+        lab_queryset = PromotedLab.objects.filter(lab__is_live=True)
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True)
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
@@ -72,11 +72,11 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             search_key = "".join(search_key.split("."))
             test_queryset = LabTest.objects.filter(search_key__icontains=search_key)
             test_queryset = paginate_queryset(test_queryset, request)
-            lab_queryset = Lab.objects.filter(search_key__icontains=search_key)
+            lab_queryset = Lab.objects.filter(search_key__icontains=search_key, is_live=True)
             lab_queryset = paginate_queryset(lab_queryset, request)
         else:
             test_queryset = self.queryset[:20]
-            lab_queryset = Lab.objects.all()[:20]
+            lab_queryset = Lab.objects.filter(is_live=True)[:20]
 
         test_serializer = diagnostic_serializer.LabTestListSerializer(test_queryset, many=True)
         lab_serializer = diagnostic_serializer.LabListSerializer(lab_queryset, many=True)
@@ -106,11 +106,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id, test__in=test_ids)
+        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id, test__in=test_ids, lab__is_live=True)
+        if not queryset.exists():
+            return Response([])
         test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
-        lab_obj = Lab.objects.filter(id=lab_id).first()
+        lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
         day_now = timezone.now().weekday()
-        timing_queryset = lab_obj.lab_timings.filter(day=day_now)
+        timing_queryset = list()
+        if lab_obj:
+            timing_queryset = lab_obj.lab_timings.filter(day=day_now)
         lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
         temp_data = dict()
         temp_data['lab'] = lab_serializer.data
@@ -240,9 +244,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         resp_queryset = list()
         temp_var = dict()
         for obj in labs:
-            # temp_var = id_details[obj.id]
             temp_var[obj.id] = obj
-            # resp_queryset.append(temp_var)
         day_now = timezone.now().weekday()
         for row in queryset:
             row["lab"] = temp_var[row["lab"]]
@@ -308,7 +310,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
             total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
             total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
-            effective_price = temp_lab_test[0].get("total_deal_price")
+            effective_price = total_deal_price
+            if data["is_home_pickup"] and data["lab"].is_home_collection_enabled:
+                effective_price += data["lab"].home_pickup_charges
             # TODO PM - call coupon function to calculate effective price
         start_dt = form_time_slot(data["start_date"], data["start_time"])
         profile_detail = {
@@ -450,7 +454,7 @@ class LabTimingListView(mixins.ListModelMixin,
 
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
-        lab_queryset = Lab.objects.filter(pk=lab).prefetch_related('lab_timings').first()
+        lab_queryset = Lab.objects.filter(pk=lab, is_live=True).prefetch_related('lab_timings').first()
         if not lab_queryset or (for_home_pickup and not lab_queryset.is_home_pickup_available):
             return Response([])
 
@@ -471,12 +475,12 @@ class LabTimingListView(mixins.ListModelMixin,
 class AvailableTestViewSet(mixins.RetrieveModelMixin,
                            viewsets.GenericViewSet):
 
-    queryset = AvailableLabTest.objects.all()
+    queryset = AvailableLabTest.objects.filter(lab__is_live=True).all()
     serializer_class = diagnostic_serializer.AvailableLabTestSerializer
 
     def retrieve(self, request, lab_id):
         params = request.query_params
-        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
+        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id, lab__is_live=True)
 
         if not queryset:
             raise Http404("No data available")
@@ -505,11 +509,6 @@ class TimeSlotExtraction(object):
         for i in range(7):
             self.timing[i] = dict()
             self.price_available[i] = dict()
-        # self.extract_time_slot(queryset)
-
-    # def extract_time_slot(self, queryset):
-    #     for obj in queryset:
-    #         self.form_time_slots(obj.day, obj.start, obj.end, obj.)
 
     def form_time_slots(self, day, start, end, price=None, is_available=True,
                         deal_price=None, mrp=None, is_doctor=False):
