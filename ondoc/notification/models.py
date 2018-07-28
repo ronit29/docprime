@@ -244,10 +244,21 @@ class NotificationAction:
 
     @classmethod
     def trigger_all(cls, user, notification_type, context=None):
-        EmailNotification.send_notification(user=user, notification_type=notification_type,
-                                            email=user.email, context=context)
-        SmsNotification.send_notification(user=user, phone_number=user.phone_number,
-                                          notification_type=notification_type, context=context)
+        if not context.get('instance'):
+            return
+        instance = context.get('instance')
+        if user.user_type == User.CONSUMER:
+            email = instance.profile.email
+            phone_number = instance.profile.phone_number
+        else:
+            email = user.email
+            phone_number = user.phone_number
+        if email:
+            EmailNotification.send_notification(user=user, notification_type=notification_type,
+                                                email=email, context=context)
+        if phone_number:
+            SmsNotification.send_notification(user=user, phone_number=phone_number,
+                                              notification_type=notification_type, context=context)
         AppNotification.send_notification(user=user, notification_type=notification_type,
                                           context=context)
         PushNotification.send_notification(user=user, notification_type=notification_type,
