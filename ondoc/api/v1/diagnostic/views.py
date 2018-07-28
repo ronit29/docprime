@@ -106,7 +106,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id, test__in=test_ids, lab__is_live=True)
+        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id, lab__is_live=True)
+        if test_ids:
+            queryset = queryset.filter(test__in=test_ids)
         if not queryset.exists():
             return Response([])
         test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
