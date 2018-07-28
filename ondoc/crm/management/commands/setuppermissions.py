@@ -212,6 +212,9 @@ class Command(BaseCommand):
         #Create about doctor group
         self.create_about_doctor_group()
 
+        #Create doctor image cropping team
+        self.create_cropping_group()
+
         #Create Article team Group
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
@@ -257,4 +260,19 @@ class Command(BaseCommand):
 
             permissions = Permission.objects.filter(
                 content_type=ct, codename='change_' + ct.model)
+            group.permissions.add(*permissions)
+
+    def create_cropping_group(self):
+        # Create Cropping team Group
+        group, created = Group.objects.get_or_create(name=constants['DOCTOR_IMAGE_CROPPING_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(DoctorImage)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
             group.permissions.add(*permissions)
