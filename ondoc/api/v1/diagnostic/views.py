@@ -106,22 +106,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id, lab__is_live=True)
-        if test_ids:
-            queryset = queryset.filter(test__in=test_ids)
-        if not queryset.exists():
-            return Response([])
+        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id, lab__is_live=True, test__in=test_ids)
         test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
         lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
         day_now = timezone.now().weekday()
         timing_queryset = list()
+        lab_serializable_data = list()
         if lab_obj:
             timing_queryset = lab_obj.lab_timings.filter(day=day_now)
-        lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
+            lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
+            lab_serializable_data = lab_serializer.data
         temp_data = dict()
-        temp_data['lab'] = lab_serializer.data
+        temp_data['lab'] = lab_serializable_data
         temp_data['tests'] = test_serializer.data
-        temp_data['lab_timing'] = ''
         temp_data['lab_timing'], temp_data["lab_timing_data"] = self.get_lab_timing(timing_queryset)
 
         return Response(temp_data)

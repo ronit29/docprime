@@ -940,7 +940,7 @@ class OrderHistoryViewSet(GenericViewSet):
         lab_name = dict()
         lab_test_map = dict()
         if available_lab_test:
-            test_ids = AvailableLabTest.objects.prefetch_related('lab', 'test').filter(pk__in=available_lab_test)
+            test_ids = AvailableLabTest.objects.prefetch_related('lab', 'test').filter(pk__in=available_lab_test, lab__is_live=True)
             lab_test_map = dict()
             for data in test_ids:
                 lab_name[data.lab.id] = {
@@ -953,6 +953,8 @@ class OrderHistoryViewSet(GenericViewSet):
         orders = []
 
         for action_data in opd_action_data:
+            if action_data["hospital"] not in doc_hosp_details or action_data["doctor"] not in doc_hosp_details[action_data["hospital"]]:
+                continue
             data = {
                 "doctor": action_data.get("doctor"),
                 "doctor_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["doctor_name"],
@@ -973,12 +975,11 @@ class OrderHistoryViewSet(GenericViewSet):
                 data.pop("time_slot_start")
                 data.pop("start_date")
                 data.pop("start_time")
-            valid_data = serializer.validated_data
-            # data["doctor_name"] = valid_data.get('doctor').name if valid_data.get('doctor') else None
-            # data["hospital_name"] = valid_data.get('hospital').name if valid_data.get('hospital') else None
             orders.append(data)
 
         for action_data in lab_action_data:
+            if action_data['lab'] not in lab_name:
+                continue
             data = {
                 "lab": action_data.get("lab"),
                 "lab_name": lab_name[action_data['lab']]["name"],
