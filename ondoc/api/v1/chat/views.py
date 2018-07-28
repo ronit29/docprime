@@ -58,16 +58,17 @@ class UserProfileViewSet(viewsets.GenericViewSet):
     authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, )
 
-    def retrieve(self, request, pk):
+    def retrieve(self, request):
+        user_id = request.user.id
+        chat_domain = settings.CHAT_API_URL
         try:
-            chat_domain = settings.CHAT_API_URL
-            chat_api_url = '%s/api/v1/livechat/healthservices/getProfileChats/%s'%(chat_domain, pk)
+            chat_api_url = '%s/api/v1/livechat/healthservices/getProfileChats/%s'%(chat_domain, user_id)
             chat_api_request = requests.get(chat_api_url)
         except:
             return Response([])
         try:
-            chat_room_url = '%s/api/v1/livechat/healthservices/getRooms/%s'%(chat_domain, pk)
-            chat_room_request =requests.get(chat_room_url)
+            chat_room_url = '%s/api/v1/livechat/healthservices/getRooms/%s'%(chat_domain, user_id)
+            chat_room_request = requests.get(chat_room_url)
         except:
             return Response([])
         if chat_api_request.status_code == 200 and chat_room_request.status_code == 200:
@@ -95,9 +96,9 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                             response['symptoms'] = chat_data['params'].get('Symptoms', None)
                             selected_profile = chat_data['params'].get('selectedProfile', None)
                             if selected_profile:
-                                user_id = selected_profile.get('id')
+                                user_profile_id = selected_profile.get('id')
                                 for usr in UserProfiles:
-                                    if usr.id == user_id:
+                                    if usr.id == user_profile_id:
                                         response['user_name'] = usr.name
 
                     response_data.append(response)
