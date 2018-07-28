@@ -1,12 +1,19 @@
-# from django.shortcuts import render
-from django.shortcuts import render, get_object_or_404
-from .models import Doctor, DoctorImage
+from django.shortcuts import get_object_or_404
+from .models import DoctorImage
+from django.http import JsonResponse
+import base64
+from django.core.files.base import ContentFile
 
 
-# Create your views here.
-def crop_doctor_image(request, doctor_id, image_id):
-    required_doctor = get_object_or_404(Doctor, pk=doctor_id)
-    required_doctor_image = get_object_or_404(required_doctor.images, pk=image_id)
-
-    return render(request, 'doctor/crop_doctor_image.html', {'doctor_image': required_doctor_image})
+def crop_doctor_image(request):
+    if request.method == "POST":
+        doctor_image_id = request.POST.get('image_id')
+        doctor_image = get_object_or_404(DoctorImage, pk=doctor_image_id)
+        image_data = request.POST['data']
+        format, imgstr = image_data.split(';base64,')
+        data = ContentFile(base64.b64decode(imgstr))
+        doctor_image.save_to_cropped_image(data)
+        return JsonResponse({'success': 1})
+    else:
+        return JsonResponse({'success': 0})
 

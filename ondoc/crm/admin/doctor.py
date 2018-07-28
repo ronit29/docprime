@@ -428,8 +428,8 @@ class GenericAdminInline(admin.TabularInline):
 
 class DoctorImageAdmin(admin.ModelAdmin):
     model = DoctorImage
-    readonly_fields = ('crop_image', 'doctor' )
-    # fields = ('original_image', 'cropped_image')
+    readonly_fields = ('original_image', 'cropped_img', 'crop_image', 'doctor',)
+    fields = ('original_image', 'cropped_img', 'crop_image', 'doctor')
 
     def crop_image(self, instance):
         return render_to_string('doctor/crop_doctor_image.html', context={"instance": instance})
