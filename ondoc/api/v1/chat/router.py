@@ -5,5 +5,5 @@ urlpatterns = [
     path('chatsearcheditems', ChatSearchedItemsViewSet.as_view({'get': 'list'}), name='searched-items'),
     path('doctors', DoctorsListViewSet.as_view({'get': 'list'}), name='searched-items'),
     path('doctor/profile/<int:pk>', DoctorProfileViewSet.as_view({'get': 'retrieve'}), name='doctor-profile'),
-    path('user/profile/<int:pk>', UserProfileViewSet.as_view({'get': 'retrieve'}), name='user-profile'),
+    path('user/profile', UserProfileViewSet.as_view({'get': 'retrieve'}), name='user-profile'),
 ]
