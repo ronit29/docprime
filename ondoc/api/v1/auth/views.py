@@ -887,20 +887,20 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
         user = request.user
         tx_queryset = ConsumerTransaction.objects.filter(user=user)
         consumer_account = ConsumerAccount.objects.filter(user=user).first()
-        if not tx_queryset.exists():
-            return Response({"status": 0,
-                             "msg": "No transaction exists"
-                             })
-        if not consumer_account:
-            return Response({"status": 0,
-                             "msg": "Consumer Account does not exists"
-                             })
 
-        tx_queryset = paginate_queryset(tx_queryset, request)
-        tx_serializer = serializers.UserTransactionModelSerializer(tx_queryset, many=True)
+        tx_serializable_data = list()
+        consumer_balance = 0
+        if tx_queryset.exists():
+            tx_queryset = paginate_queryset(tx_queryset, request)
+            tx_serializer = serializers.UserTransactionModelSerializer(tx_queryset, many=True)
+            tx_serializable_data = tx_serializer.data
+
+        if consumer_account:
+            consumer_balance = consumer_account.balance
+
         resp = dict()
-        resp["user_transactions"] = tx_serializer.data
-        resp["user_wallet_balance"] = consumer_account.balance
+        resp["user_transactions"] = tx_serializable_data
+        resp["user_wallet_balance"] = consumer_balance
         return Response(data=resp)
 
 
