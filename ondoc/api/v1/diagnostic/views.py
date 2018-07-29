@@ -86,12 +86,9 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
 
 
 class LabList(viewsets.ReadOnlyModelViewSet):
-    # queryset = self.form_queryset()
     queryset = AvailableLabTest.objects.all()
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
-    # filter_backends = (DjangoFilterBackend, )
-    # filter_fields = ('name', 'deal_price', )
 
     def list(self, request, **kwargs):
         parameters = request.query_params
@@ -175,8 +172,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         parameters = serializer.validated_data
 
-        DEFAULT_DISTANCE = 2000000000000000
-        MAX_SEARCHABLE_DISTANCE = 5000000000000000000
+        DEFAULT_DISTANCE = 20000
+        MAX_SEARCHABLE_DISTANCE = 50000
 
         default_long = 77.071848
         default_lat = 28.450367
