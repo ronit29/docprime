@@ -39,7 +39,7 @@ class DoctorSearchHelper:
             )
         if self.query_params.get("is_available"):
             current_time = datetime.now()
-            current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2)
+            current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2) + .75
             filtering_params.append(
                 'dh.day={} and dh.end>={}'.format(str(current_time.weekday()), str(current_hour))
             )
