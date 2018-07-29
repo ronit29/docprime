@@ -9,9 +9,12 @@ from import_export.admin import ImportExportMixin
 from import_export import fields, resources
 from ondoc.authentication.models import GenericAdmin
 from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
-    DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience, MedicalConditionSpecialization,
-    DoctorMedicalService, DoctorImage, DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
-    DoctorEmail, College, DoctorSpecialization, GeneralSpecialization, Specialization, Qualification, Language, DoctorMapping)
+                                 DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
+                                 MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
+                                 DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
+                                 DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
+                                 Specialization, Qualification, Language,
+                                 DoctorMapping, HospitalDocument, HospitalNetworkDocument)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -68,7 +71,7 @@ class DoctorHospitalForm(forms.ModelForm):
         fees = cleaned_data.get("fees")
         mrp = cleaned_data.get("mrp")
 
-        if start and end and start>=end:
+        if start and end and start >= end:
             raise forms.ValidationError("Availability start time should be less than end time")
         if mrp and mrp < fees:
             raise forms.ValidationError("MRP cannot be less than fees")
@@ -133,6 +136,7 @@ class DoctorLanguageInline(admin.TabularInline):
 
 class DoctorAwardForm(forms.ModelForm):
     year = forms.ChoiceField(choices=award_year_choices, required=False)
+
     def clean_year(self):
         data = self.cleaned_data['year']
         if data == '':
@@ -200,6 +204,7 @@ class DoctorMedicalServiceInline(admin.TabularInline):
     show_change_link = False
     # autocomplete_fields = ['service']
 
+
 # class DoctorImageForm(forms.ModelForm):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
@@ -233,9 +238,9 @@ class DoctorImageInline(admin.TabularInline):
 
 # class DoctorDocumentForm(forms.ModelForm):
 #     pass
-    # name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
-    # class Meta:
-    #     Model = DoctorDocument
+# name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+# class Meta:
+#     Model = DoctorDocument
 
 
 class DoctorDocumentFormSet(forms.BaseInlineFormSet):
@@ -254,13 +259,38 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
                 count[value['document_type']] += 1
 
         for key, value in count.items():
-            if not key==DoctorDocument.ADDRESS and value>1:
-                raise forms.ValidationError("Only one "+choices[key]+" is allowed")
+            if not key == DoctorDocument.ADDRESS and value > 1:
+                raise forms.ValidationError("Only one " + choices[key] + " is allowed")
 
         if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
             for key, value in count.items():
-                if not key==DoctorDocument.GST and value<1:
-                    raise forms.ValidationError(choices[key]+" is required")
+                if not key == DoctorDocument.GST and value < 1:
+                    raise forms.ValidationError(choices[key] + " is required")
+
+
+class HospitalDocumentFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        choices = dict(HospitalDocument.CHOICES)
+        count = {}
+        for key, value in HospitalDocument.CHOICES:
+            count[key] = 0
+
+        for value in self.cleaned_data:
+            if value and not value['DELETE']:
+                count[value['document_type']] += 1
+
+        for key, value in count.items():
+            if not key == HospitalDocument.ADDRESS and value > 1:
+                raise forms.ValidationError("Only one " + choices[key] + " is allowed")
+
+        #if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+        #    for key, value in count.items():
+        #        if not key == HospitalDocument.GST and value < 1:
+        #            raise forms.ValidationError(choices[key] + " is required")
 
 
 class DoctorDocumentInline(admin.TabularInline):
@@ -272,6 +302,20 @@ class DoctorDocumentInline(admin.TabularInline):
         return formset
 
     model = DoctorDocument
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
+class HospitalDocumentInline(admin.TabularInline):
+    formset = HospitalDocumentFormSet
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj=obj, **kwargs)
+        formset.request = request
+        return formset
+
+    model = HospitalDocument
     extra = 0
     can_delete = True
     show_change_link = False
@@ -294,12 +338,12 @@ class DoctorMobileFormSet(forms.BaseInlineFormSet):
             count += 1
             if value.get('is_primary'):
                 primary += 1
-                
-        if count>0:
-            if primary==0: 
-               raise forms.ValidationError("One primary number is required")
-            if primary>=2:
-               raise forms.ValidationError("Only one mobile number can be primary")
+
+        if count > 0:
+            if primary == 0:
+                raise forms.ValidationError("One primary number is required")
+            if primary >= 2:
+                raise forms.ValidationError("Only one mobile number can be primary")
 
 
 class DoctorMobileInline(admin.TabularInline):
@@ -329,11 +373,11 @@ class DoctorEmailFormSet(forms.BaseInlineFormSet):
             if value.get('is_primary'):
                 primary += 1
 
-        if count>0:
-            if primary==0: 
-               raise forms.ValidationError("One primary email is required")
-            if primary>=2:
-               raise forms.ValidationError("Only one email can be primary")
+        if count > 0:
+            if primary == 0:
+                raise forms.ValidationError("One primary email is required")
+            if primary >= 2:
+                raise forms.ValidationError("Only one email can be primary")
 
 
 class DoctorEmailInline(admin.TabularInline):
@@ -343,7 +387,7 @@ class DoctorEmailInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-    fields = ['email','is_primary']
+    fields = ['email', 'is_primary']
 
 
 class DoctorForm(FormCleanMixin):
@@ -352,17 +396,18 @@ class DoctorForm(FormCleanMixin):
     # primary_mobile = forms.CharField(required=True)
     # email = forms.EmailField(required=True)
     practicing_since = forms.ChoiceField(required=False, choices=practicing_since_choices)
-    onboarding_status = forms.ChoiceField(disabled=True,required=False, choices=Doctor.ONBOARDING_STATUS)
+    onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Doctor.ONBOARDING_STATUS)
+
     def validate_qc(self):
-        qc_required = {'name':'req', 'gender':'req','practicing_since':'req',
-        'raw_about':'req','license':'req','mobiles':'count','emails':'count',
-        'qualifications':'count', 'availability': 'count', 'languages':'count',
-        'images':'count','documents':'count','doctorspecializations':'count'}
-        for key,value in qc_required.items():
-            if value=='req' and not self.cleaned_data[key]:
-                raise forms.ValidationError(key+" is required for Quality Check")
-            if value == 'count' and int(self.data[key+'-TOTAL_FORMS']) <= 0:
-                raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+        qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
+                       'raw_about': 'req', 'license': 'req', 'mobiles': 'count', 'emails': 'count',
+                       'qualifications': 'count', 'availability': 'count', 'languages': 'count',
+                       'images': 'count', 'documents': 'count', 'doctorspecializations': 'count'}
+        for key, value in qc_required.items():
+            if value == 'req' and not self.cleaned_data[key]:
+                raise forms.ValidationError(key + " is required for Quality Check")
+            if value == 'count' and int(self.data[key + '-TOTAL_FORMS']) <= 0:
+                raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
 
     def clean_practicing_since(self):
         data = self.cleaned_data['practicing_since']
@@ -376,7 +421,9 @@ class CityFilter(SimpleListFilter):
     parameter_name = 'hospitals__city'
 
     def lookups(self, request, model_admin):
-        cities = set([(c['hospitals__city'].upper(), c['hospitals__city'].upper()) if(c.get('hospitals__city')) else ('','') for c in Doctor.objects.all().values('hospitals__city')])
+        cities = set(
+            [(c['hospitals__city'].upper(), c['hospitals__city'].upper()) if (c.get('hospitals__city')) else ('', '')
+             for c in Doctor.objects.all().values('hospitals__city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -417,7 +464,8 @@ class GenericAdminInline(admin.TabularInline):
         if not request.POST:
             if obj is not None:
                 try:
-                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(assoc_doctors=obj).distinct()
+                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
+                        assoc_doctors=obj).distinct()
                 except MultipleObjectsReturned:
                     pass
         return formset
@@ -427,19 +475,25 @@ class DoctorResource(resources.ModelResource):
     city = fields.Field()
     specialization = fields.Field()
     qualification = fields.Field()
+
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'city', 'gender','qualification', 'specialization', 'onboarding_status', 'data_status')
-        export_order = ('id', 'name', 'city', 'gender','qualification', 'specialization', 'onboarding_status', 'data_status')
+        fields = ('id', 'name', 'city', 'gender', 'qualification', 'specialization', 'onboarding_status', 'data_status')
+        export_order = (
+        'id', 'name', 'city', 'gender', 'qualification', 'specialization', 'onboarding_status', 'data_status')
 
     def dehydrate_data_status(self, doctor):
         return dict(Doctor.DATA_STATUS_CHOICES)[doctor.data_status]
+
     def dehydrate_onboarding_status(self, doctor):
         return dict(Doctor.ONBOARDING_STATUS)[doctor.onboarding_status]
+
     def dehydrate_city(self, doctor):
         return ','.join([str(h.city) for h in doctor.hospitals.distinct('city')])
+
     def dehydrate_specialization(self, doctor):
         return ','.join([str(h.specialization) for h in doctor.qualifications.all()])
+
     def dehydrate_qualification(self, doctor):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
@@ -448,9 +502,11 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
 
-    list_display = ('name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link')
+    list_display = (
+    'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link')
     date_hierarchy = 'created_at'
-    list_filter = ('data_status','onboarding_status','is_insurance_enabled','doctorspecializations__specialization', CityFilter,)
+    list_filter = (
+    'data_status', 'onboarding_status', 'is_insurance_enabled', 'doctorspecializations__specialization', CityFilter,)
     form = DoctorForm
     inlines = [
         DoctorMobileInline,
@@ -470,13 +526,13 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key']
     search_fields = ['name']
 
-    readonly_fields = ('lead_url', 'matrix_lead_id','matrix_reference_id', 'about', 'is_live')
+    readonly_fields = ('lead_url', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live')
 
     def lead_url(self, instance):
         if instance.id:
             ref_id = instance.matrix_reference_id
             if ref_id is not None:
-                html ='''<a href='/admin/lead/doctorlead/%s/change/' target=_blank>Lead Page</a>'''%(ref_id)
+                html = '''<a href='/admin/lead/doctorlead/%s/change/' target=_blank>Lead Page</a>''' % (ref_id)
                 return mark_safe(html)
         else:
             return mark_safe('''<span></span>''')
@@ -484,7 +540,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def get_urls(self):
         urls = super().get_urls()
         my_urls = [
-            url('onboard_admin/(?P<userid>\d+)/', self.admin_site.admin_view(self.onboarddoctor_admin), name="onboarddoctor_admin"),
+            url('onboard_admin/(?P<userid>\d+)/', self.admin_site.admin_view(self.onboarddoctor_admin),
+                name="onboarddoctor_admin"),
         ]
         return my_urls + urls
 
@@ -497,27 +554,26 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
         count = 0
         try:
-            count = DoctorOnboardingToken.objects.filter(doctor = doctor).count()
+            count = DoctorOnboardingToken.objects.filter(doctor=doctor).count()
         except Exception as e:
             pass
             # last_token = None
 
-        #last_url = None
-        #created_at = ""
+        # last_url = None
+        # created_at = ""
         # if last_token:
         #     last_url = host+'/onboard/lab?token='+str(last_token.token)
         #     created_at = last_token.created_at
 
         # check for errors
         errors = []
-        required = ['name','raw_about','gender','license','practicing_since']
+        required = ['name', 'raw_about', 'gender', 'license', 'practicing_since']
         for req in required:
             if not getattr(doctor, req):
-                errors.append(req+' is required')
+                errors.append(req + ' is required')
 
-        
-        length_required = ['mobiles','emails','qualifications','hospitals',
-             'languages','experiences','images']
+        length_required = ['mobiles', 'emails', 'qualifications', 'hospitals',
+                           'languages', 'experiences', 'images']
 
         for req in length_required:
             if not len(getattr(doctor, req).all()):
@@ -525,8 +581,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
         return render(request, 'onboarddoctor.html', {'doctor': doctor, 'count': count, 'errors': errors})
 
-    def get_onboard_link(self, obj = None):
-        if obj.data_status == Doctor.IN_PROGRESS and obj.onboarding_status in (Doctor.NOT_ONBOARDED, Doctor.REQUEST_SENT):
+    def get_onboard_link(self, obj=None):
+        if obj.data_status == Doctor.IN_PROGRESS and obj.onboarding_status in (
+        Doctor.NOT_ONBOARDED, Doctor.REQUEST_SENT):
             return mark_safe("<a href='/admin/doctor/doctor/onboard_admin/%s'>generate onboarding url</a>" % obj.id)
         return ""
 
@@ -534,7 +591,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         form = super(DoctorAdmin, self).get_form(request, obj=obj, **kwargs)
         form.request = request
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
-        if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+        if (not request.user.is_superuser) and (
+        not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
             form.base_fields['assigned_to'].disabled = True
         return form
 
@@ -573,11 +631,10 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
                 gen_admin_del_len = len(formset.deleted_objects)
 
         if doctor is not None:
-            if ((doc_hosp_form_change or doc_hosp_new_len>0 or doc_hosp_del_len>0) or
-                    (gen_admin_form_change or gen_admin_new_len>0 or gen_admin_del_len>0)):
-                    GenericAdmin.create_admin_permissions(doctor)
-                    GenericAdmin.create_admin_billing_permissions(doctor)
-
+            if ((doc_hosp_form_change or doc_hosp_new_len > 0 or doc_hosp_del_len > 0) or
+                    (gen_admin_form_change or gen_admin_new_len > 0 or gen_admin_del_len > 0)):
+                GenericAdmin.create_admin_permissions(doctor)
+                GenericAdmin.create_admin_billing_permissions(doctor)
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
@@ -610,35 +667,30 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
 
 class SpecializationResource(resources.ModelResource):
-
     class Meta:
         model = Specialization
-        fields = ('id','name','human_readable_name')
+        fields = ('id', 'name', 'human_readable_name')
 
 
 class CollegeResource(resources.ModelResource):
-
     class Meta:
         model = College
-        fields = ('id','name')
+        fields = ('id', 'name')
 
 
 class LanguageResource(resources.ModelResource):
-
     class Meta:
         model = Language
-        fields = ('id','name')
+        fields = ('id', 'name')
 
 
 class QualificationResource(resources.ModelResource):
-
     class Meta:
         model = Qualification
-        fields = ('id','name')
+        fields = ('id', 'name')
 
 
 class GeneralSpecializationResource(resources.ModelResource):
-
     class Meta:
         model = GeneralSpecialization
         fields = ('id', 'name')
@@ -707,10 +759,10 @@ class HealthTipAdmin(VersionAdmin):
 
 
 class DoctorMappingAdmin(VersionAdmin):
-
     list_display = ('doctor', 'profile_to_be_shown', 'updated_at',)
     date_hierarchy = 'created_at'
     search_fields = ['doctor']
+
     # autocomplete_fields = ['doctor', 'profile_to_be_shown']
 
     def get_form(self, request, obj=None, **kwargs):
