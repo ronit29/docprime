@@ -343,7 +343,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             serializer = AppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             return Response(serializer.data)
         else:
-            return Response({'Error':'Invalid Request Type'})
+            return Response({'Error': 'Invalid Request Type'})
 
     def update(self, request, pk=None):
         serializer = UpdateStatusSerializer(data=request.data)
@@ -357,31 +357,37 @@ class UserAppointmentsViewSet(OndocViewSet):
             allowed = lab_appointment.allowed_action(request.user.user_type)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
-                resp = {}
+                resp = dict()
                 resp['allowed'] = allowed
                 resp['Error'] = 'Action Not Allowed'
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
-            response = self.lab_appointment_update(request, lab_appointment, validated_data)
-            return Response(response)
+            updated_lab_appointment = self.lab_appointment_update(request, lab_appointment, validated_data)
+            if updated_lab_appointment["status"] == 0:
+                return Response(updated_lab_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(updated_lab_appointment)
         elif appointment_type == 'doctor':
             opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
             allowed = opd_appointment.allowed_action(request.user.user_type, request)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
-                resp = {}
+                resp = dict()
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
-            response = updated_opd_appointment
-            return Response(response)
+            if updated_opd_appointment["status"] == 0:
+                return Response(updated_opd_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(updated_opd_appointment)
 
     @transaction.atomic
     def lab_appointment_update(self, request, lab_appointment, validated_data):
-        resp = {}
+        resp = dict()
+        resp["status"] = 1
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELED:
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
-                resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
+                resp["data"] = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = utils.form_time_slot(
@@ -433,10 +439,11 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     def doctor_appointment_update(self, request, opd_appointment, validated_data):
         if validated_data.get('status'):
-            resp = {}
+            resp = dict()
+            resp["status"] = 1
             if validated_data['status'] == OpdAppointment.CANCELED:
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
-                resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
+                resp["data"] = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = utils.form_time_slot(
@@ -526,28 +533,13 @@ class UserAppointmentsViewSet(OndocViewSet):
             new_appointment_details['time_slot_start'] = str(new_appointment_details['time_slot_start'])
             action = ''
             temp_app_details = copy.deepcopy(new_appointment_details)
+
             if product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                 action = account_models.Order.OPD_APPOINTMENT_RESCHEDULE
                 opdappointment_transform(temp_app_details)
-                # appointment_data = LabAppointmentModelSerializer(appointment_details, context={'request': request})
-                # temp_app_details.deal_price = str(appointment_details.deal_price)
-                # temp_app_details.fees = str(appointment_details.fees)
-                # temp_app_details.effective_price = str(appointment_details.effective_price)
-                # temp_app_details.mrp = str(appointment_details.mrp)
-                # appointment_data = OpdAppModelSerializer(appointment_details, context={'request': request})
-                # temp_app_details = appointment_data.data
             elif product_id == account_models.Order.LAB_PRODUCT_ID:
                 action = Order.LAB_APPOINTMENT_RESCHEDULE
                 labappointment_transform(temp_app_details)
-                # temp_app_details.price = str(appointment_details.price)
-                # temp_app_details.agreed_price = str(appointment_details.agreed_price)
-                # temp_app_details.deal_price = str(appointment_details.deal_price)
-                # temp_app_details.effective_price = str(appointment_details.effective_price)
-                # temp_app_details.time_slot_start = str(appointment_details.time_slot_start)
-                # temp_app_details.time_slot_end = str(appointment_details.time_slot_end)
-                # temp_app_details = model_to_dict(temp_app_details)
-                # appointment_data = LabAppointmentModelSerializer(appointment_details, context={'request':request})
-                # temp_app_details = appointment_data.data
 
             order = account_models.Order.objects.create(
                 product_id=product_id,

@@ -981,12 +981,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
         out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
                                              outstanding_month=month, outstanding_year=year).first()
         start_date_time, end_date_time = get_start_end_datetime(month, year)
-        # doc_hospital = auth_model.UserPermission.get_billable_doctor_hospital(user)
-        # q = list()
-        # for data in doc_hospital:
-        #     d = data["doctor"]
-        #     h = data["hospital"]
-        #     q.append((Q(doctor=d) & Q(hospital=h)))
         if payment_type in [cls.COD, cls.PREPAID]:
             payment_type = [cls.COD, cls.PREPAID]
         elif payment_type in [cls.INSURANCE]:
@@ -996,11 +990,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
                            time_slot_start__gte=start_date_time,
                            time_slot_start__lte=end_date_time,
                            payment_type__in=payment_type))
-        # queryset = (OpdAppointment.objects.filter(outstanding=out_obj).filter(reduce(or_, q)).
-        #             filter(status=OpdAppointment.COMPLETED,
-        #                    time_slot_start__gte=start_date_time,
-        #                    time_slot_start__lte=end_date_time,
-        #                    payment_type__in=payment_type))
         if payment_type != cls.INSURANCE:
             tcp_condition = Case(When(payment_type=cls.COD, then=F("effective_price")),
                                  When(~Q(payment_type=cls.COD), then=0))
