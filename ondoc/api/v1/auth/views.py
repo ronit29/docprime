@@ -9,6 +9,7 @@ from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
+from rest_framework.exceptions import ValidationError as RestValidationError
 import datetime
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
@@ -256,11 +257,37 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
+        if UserProfile.objects.filter(name=data['name'], user=request.user).exists():
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Profile with the given name already exists."
+                                   }
+            }, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
-        return super().update(request, partial=True, *args, **kwargs)
+        data = {key: value for key, value in request.data.items()}
+        if data.get('age'):
+            try:
+                age = int(request.data.get("age"))
+                data['dob'] = datetime.datetime.now() - relativedelta(years=age)
+                data['dob'] = data['dob'].date()
+            except:
+                return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj = self.get_object()
+        if data.get("name") and UserProfile.objects.exclude(id=obj.id).filter(name=data['name'],
+                                                                              user=request.user).exists():
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Profile with the given name already exists."
+                                   }
+            }, status=status.HTTP_400_BAD_REQUEST)
+        serializer = serializers.UserProfileSerializer(obj, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     def upload(self, request, *args, **kwargs):
         instance = self.get_object()
