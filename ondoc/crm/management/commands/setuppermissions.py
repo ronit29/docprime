@@ -21,7 +21,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
     LabNetworkHelpline, LabNetworkManager, LabTest,
     LabTestType, LabService,
-    LabDoctorAvailability,LabDoctor,LabDocument)
+    LabDoctorAvailability,LabDoctor,LabDocument, LabPricingGroup)
 
 from ondoc.diagnostic.models import LabPricing
 
@@ -173,15 +173,13 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['LAB_PRICING_GROUP_NAME'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(LabPricing, for_concrete_models = False)
+        content_types = ContentType.objects.get_for_models(LabPricingGroup)
 
         for cl, ct in content_types.items():
-            permissions = Permission.objects.get_or_create(
-                content_type=ct, codename='change_' + ct.model)
-
             permissions = Permission.objects.filter(
-                content_type=ct, codename='change_' + ct.model)
-
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
 

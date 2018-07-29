@@ -269,7 +269,10 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
     exclude = ('search_key', )
 
-    readonly_fields = ('lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live')
+    def get_readonly_fields(self, request, obj=None):
+        if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
+            return ('lead_url','matrix_lead_id','matrix_reference_id', 'lab_pricing_group',)
+        return ('lead_url','matrix_lead_id','matrix_reference_id', )
 
     def lead_url(self, instance):
         if instance.id:
@@ -373,9 +376,10 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         return form
 
     form = LabForm
-    search_fields = ['name']
+    search_fields = ['name', 'lab_pricing_group', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
         LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline]
+    autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
