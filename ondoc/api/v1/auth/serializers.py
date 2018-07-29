@@ -141,11 +141,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
                   "profile_image", "age", "user", "dob")
 
-    # def validate(self, attrs):
-    #     if UserProfile.objects.filter(name=attrs.get('name'), user=attrs.get('user')).exists():
-    #         raise serializers.ValidationError("Profile with the given name already exists.")
-    #     return attrs
-
     def get_profile_image(self, obj):
         request = self.context.get('request')
         if obj.profile_image:
