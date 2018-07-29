@@ -88,8 +88,9 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                     doc_id = room_data.get('user', None)
                     if doc_id:
                         for doc in Doctors:
-                            if doc.id == doc_id:
+                            if int(doc.id) == int(doc_id):
                                 response['doctor_name'] = doc.name
+                                break
                     for chat_data in chat_api_data:
                         if room_data.get('rid') == chat_data.get('_id'):
                             small_case_symptoms = chat_data['params'].get('symptoms', None)
@@ -119,9 +120,9 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                             if selected_profile:
                                 user_profile_id = selected_profile.get('id')
                                 for usr in UserProfiles:
-                                    if usr.id == user_profile_id:
+                                    if int(usr.id) == int(user_profile_id):
                                         response['user_name'] = usr.name
-
+                                        break
                     response_data.append(response)
                 return Response(response_data)
         return Response([])
