@@ -8,17 +8,18 @@ from django.shortcuts import render
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
 from ondoc.authentication.models import GenericAdmin
-from ondoc.doctor.models import (Doctor, DoctorQualification, DoctorHospital,
+from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
                                  DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
-                                 Specialization, Qualification, Language,
+                                 Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
+import nested_admin
 
 
 class AutoComplete:
@@ -53,7 +54,7 @@ class DoctorQualificationFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Qualification is required")
 
 
-class DoctorQualificationInline(admin.TabularInline):
+class DoctorQualificationInline(nested_admin.NestedTabularInline):
     model = DoctorQualification
     form = DoctorQualificationForm
     formset = DoctorQualificationFormSet
@@ -63,7 +64,7 @@ class DoctorQualificationInline(admin.TabularInline):
     autocomplete_fields = ['college']
 
 
-class DoctorHospitalForm(forms.ModelForm):
+class DoctorClinicTimingForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         start = cleaned_data.get("start")
@@ -77,7 +78,7 @@ class DoctorHospitalForm(forms.ModelForm):
             raise forms.ValidationError("MRP cannot be less than fees")
 
 
-class DoctorHospitalFormSet(forms.BaseInlineFormSet):
+class DoctorClinicFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -94,19 +95,41 @@ class DoctorHospitalFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Hospital is required")
 
 
-class DoctorHospitalInline(admin.TabularInline):
-    model = DoctorHospital
-    form = DoctorHospitalForm
-    formset = DoctorHospitalFormSet
+# class DoctorHospitalInline(admin.TabularInline):
+#     model = DoctorHospital
+#     form = DoctorHospitalForm
+#     formset = DoctorHospitalFormSet
+#     extra = 0
+#     # min_num = 1
+#     can_delete = True
+#     show_change_link = False
+#     autocomplete_fields = ['hospital']
+#     readonly_fields = ['deal_price']
+#
+#     def get_queryset(self, request):
+#         return super(DoctorHospitalInline, self).get_queryset(request).select_related('doctor', 'hospital')
+
+
+class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
+    model = DoctorClinicTiming
+    form = DoctorClinicTimingForm
     extra = 0
-    # min_num = 1
     can_delete = True
     show_change_link = False
-    autocomplete_fields = ['hospital']
     readonly_fields = ['deal_price']
 
+
+class DoctorClinicInline(nested_admin.NestedTabularInline):
+    model = DoctorClinic
+    extra = 0
+    can_delete = True
+    formset = DoctorClinicFormSet
+    show_change_link = False
+    autocomplete_fields = ['hospital']
+    inlines = [DoctorClinicTimingInline]
+
     def get_queryset(self, request):
-        return super(DoctorHospitalInline, self).get_queryset(request).select_related('doctor', 'hospital')
+        return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
 
 
 class DoctorLanguageFormSet(forms.BaseInlineFormSet):
@@ -126,7 +149,7 @@ class DoctorLanguageFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one language is required")
 
 
-class DoctorLanguageInline(admin.TabularInline):
+class DoctorLanguageInline(nested_admin.NestedTabularInline):
     model = DoctorLanguage
     formset = DoctorLanguageFormSet
     extra = 0
@@ -144,7 +167,7 @@ class DoctorAwardForm(forms.ModelForm):
         return data
 
 
-class DoctorAwardInline(admin.TabularInline):
+class DoctorAwardInline(nested_admin.NestedTabularInline):
     form = DoctorAwardForm
     model = DoctorAward
     extra = 0
@@ -152,7 +175,7 @@ class DoctorAwardInline(admin.TabularInline):
     show_change_link = False
 
 
-class DoctorAssociationInline(admin.TabularInline):
+class DoctorAssociationInline(nested_admin.NestedTabularInline):
     model = DoctorAssociation
     extra = 0
     can_delete = True
@@ -188,7 +211,7 @@ class DoctorExperienceFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Experience is required")
 
 
-class DoctorExperienceInline(admin.TabularInline):
+class DoctorExperienceInline(nested_admin.NestedTabularInline):
     model = DoctorExperience
     formset = DoctorExperienceFormSet
     extra = 0
@@ -197,7 +220,7 @@ class DoctorExperienceInline(admin.TabularInline):
     form = DoctorExperienceForm
 
 
-class DoctorMedicalServiceInline(admin.TabularInline):
+class DoctorMedicalServiceInline(nested_admin.NestedTabularInline):
     model = DoctorMedicalService
     extra = 0
     can_delete = True
@@ -226,7 +249,7 @@ class DoctorImageFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Image is required")
 
 
-class DoctorImageInline(admin.TabularInline):
+class DoctorImageInline(nested_admin.NestedTabularInline):
     model = DoctorImage
     formset = DoctorImageFormSet
     template = 'imageinline.html'
@@ -293,7 +316,7 @@ class HospitalDocumentFormSet(forms.BaseInlineFormSet):
         #            raise forms.ValidationError(choices[key] + " is required")
 
 
-class DoctorDocumentInline(admin.TabularInline):
+class DoctorDocumentInline(nested_admin.NestedTabularInline):
     formset = DoctorDocumentFormSet
 
     def get_formset(self, request, obj=None, **kwargs):
@@ -345,8 +368,7 @@ class DoctorMobileFormSet(forms.BaseInlineFormSet):
             if primary >= 2:
                 raise forms.ValidationError("Only one mobile number can be primary")
 
-
-class DoctorMobileInline(admin.TabularInline):
+class DoctorMobileInline(nested_admin.NestedTabularInline):
     model = DoctorMobile
     form = DoctorMobileForm
     formset = DoctorMobileFormSet
@@ -380,7 +402,7 @@ class DoctorEmailFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Only one email can be primary")
 
 
-class DoctorEmailInline(admin.TabularInline):
+class DoctorEmailInline(nested_admin.NestedTabularInline):
     model = DoctorEmail
     form = DoctorEmailForm
     formset = DoctorEmailFormSet
@@ -431,7 +453,7 @@ class CityFilter(SimpleListFilter):
             return queryset.filter(hospitals__city__iexact=self.value()).distinct()
 
 
-class DoctorSpecializationInline(admin.TabularInline):
+class DoctorSpecializationInline(nested_admin.NestedTabularInline):
     model = DoctorSpecialization
     extra = 0
     can_delete = True
@@ -446,7 +468,7 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
         super().clean()
 
 
-class GenericAdminInline(admin.TabularInline):
+class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
     formset = GenericAdminFormSet
@@ -498,7 +520,8 @@ class DoctorResource(resources.ModelResource):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
 
-class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
+class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
+# class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
 
@@ -513,7 +536,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         DoctorEmailInline,
         DoctorSpecializationInline,
         DoctorQualificationInline,
-        DoctorHospitalInline,
+        # DoctorHospitalInline,
+        DoctorClinicInline,
         DoctorLanguageInline,
         DoctorAwardInline,
         DoctorAssociationInline,
@@ -615,7 +639,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
         gen_admin_form_change = False
         doc_hosp_new_len = doc_hosp_del_len = gen_admin_new_len = gen_admin_del_len = 0
         for formset in formsets:
-            if isinstance(formset, DoctorHospitalFormSet):
+            if isinstance(formset, DoctorClinicFormSet):
                 for form in formset.forms:
                     if 'hospital' in form.changed_data:
                         doc_hosp_form_change = True
@@ -667,30 +691,35 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
 
 class SpecializationResource(resources.ModelResource):
+
     class Meta:
         model = Specialization
         fields = ('id', 'name', 'human_readable_name')
 
 
 class CollegeResource(resources.ModelResource):
+
     class Meta:
         model = College
         fields = ('id', 'name')
 
 
 class LanguageResource(resources.ModelResource):
+
     class Meta:
         model = Language
         fields = ('id', 'name')
 
 
 class QualificationResource(resources.ModelResource):
+
     class Meta:
         model = Qualification
         fields = ('id', 'name')
 
 
 class GeneralSpecializationResource(resources.ModelResource):
+
     class Meta:
         model = GeneralSpecialization
         fields = ('id', 'name')
@@ -758,7 +787,19 @@ class HealthTipAdmin(VersionAdmin):
     search_fields = ['name']
 
 
+class DoctorClinicAdmin(VersionAdmin):
+    list_display = ('doctor', 'hospital', 'updated_at')
+    date_hierarchy = 'created_at'
+    search_fields = ['doctor']
+    autocomplete_fields = ['doctor', 'hospital']
+    inlines = [DoctorClinicTimingInline]
+
+    def get_queryset(self, request):
+        return super(DoctorClinicAdmin, self).get_queryset(request).select_related('doctor', 'hospital')
+
+
 class DoctorMappingAdmin(VersionAdmin):
+
     list_display = ('doctor', 'profile_to_be_shown', 'updated_at',)
     date_hierarchy = 'created_at'
     search_fields = ['doctor']

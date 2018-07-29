@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.contrib.gis.geos import Point
-from ondoc.doctor.models import (Hospital,  Doctor, DoctorHospital,
+from ondoc.doctor.models import (Hospital,  Doctor, DoctorClinic,
                                  DoctorAward, DoctorQualification, DoctorExperience, DoctorMedicalService,
                                  MedicalService, Qualification, College)
 
@@ -100,7 +100,7 @@ class DoctorLead(models.Model):
             "Sun": 6,
         }
         TIME_SLOT_MAPPING = {time_slot_choice[1]: time_slot_choice[0] for time_slot_choice in
-                             DoctorHospital.TIME_CHOICES}
+                             DoctorClinic.TIME_CHOICES}
 
         doctor_hospital_values = []
         for key, value in visiting_days.items():
@@ -120,7 +120,7 @@ class DoctorLead(models.Model):
                         if (not start_time_db_value) or (not end_time_db_value):
                             continue
                         doctor_hospital_values.append(
-                            DoctorHospital(
+                            DoctorClinic(
                                 doctor=doctor,
                                 hospital=hospital,
                                 day=day,
@@ -131,7 +131,7 @@ class DoctorLead(models.Model):
                         )
 
         if doctor_hospital_values:
-            DoctorHospital.objects.bulk_create(doctor_hospital_values)
+            DoctorClinic.objects.bulk_create(doctor_hospital_values)
 
     def create_services(self, doctor):
         doctor_services = []
