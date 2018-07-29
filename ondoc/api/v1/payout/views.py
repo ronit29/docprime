@@ -98,7 +98,7 @@ class BillingViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         if valid_data.get('level') in [Outstanding.DOCTOR_LEVEL, Outstanding.HOSPITAL_LEVEL,
-                                                   Outstanding.HOSPITAL_NETWORK_LEVEL]:
+                                       Outstanding.HOSPITAL_NETWORK_LEVEL]:
             resp_queryset = OpdAppointment.get_billing_appointment(request.user, valid_data)
             resp_queryset = paginate_queryset(resp_queryset, request)
             serializer = OpdAppointmentBillingSerializer(resp_queryset, many=True, context={"request": request})
