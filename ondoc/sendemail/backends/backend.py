@@ -1,12 +1,31 @@
+import json
 from django.core.mail.backends.console import EmailBackend as Console
 from django.core.mail.backends.smtp import EmailBackend as SMTP
 from django.core.mail import send_mail, get_connection
 from django.conf import settings
+from ondoc.notification.rabbitmq_client import publish_message
 
 
-class ConsoleEmailBackend(object):
+class NodeJsEmailBackend(object):
 
     def send_email(self, subject, message, sender, to):
+        payload = {
+            "type": "email",
+            "data": {
+                "email": to,
+                "email_subject": subject,
+                "content": message
+            }
+        }
+        publish_message(json.dumps(payload))
+
+
+class ConsoleEmailBackend(NodeJsEmailBackend):
+
+    def send_email(self, subject, message, sender, to):
+        if settings.SEND_THROUGH_NODEJS_ENABLED:
+            super().send_email(subject, message, sender, to)
+            return
         send_mail(subject, message, sender, [to], fail_silently=False, connection=Console())
 
 

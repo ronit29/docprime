@@ -133,7 +133,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     name = serializers.CharField()
     age = serializers.IntegerField(read_only=True)
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
-    email = serializers.EmailField(required=False, allow_null=True)
+    email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
 
     class Meta:
@@ -141,10 +141,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
                   "profile_image", "age", "user", "dob")
 
-    def validate(self, attrs):
-        if UserProfile.objects.filter(name=attrs.get('name'), user=attrs.get('user')).exists():
-            raise serializers.ValidationError("Profile with the given name already exists.")
-        return attrs
+    # def validate(self, attrs):
+    #     if UserProfile.objects.filter(name=attrs.get('name'), user=attrs.get('user')).exists():
+    #         raise serializers.ValidationError("Profile with the given name already exists.")
+    #     return attrs
 
     def get_profile_image(self, obj):
         request = self.context.get('request')

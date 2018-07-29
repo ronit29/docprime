@@ -701,8 +701,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
 
 class HealthTipView(viewsets.GenericViewSet):
 
-    queryset = models.HealthTip.objects.all()
-
     def list(self, request):
-        serializer = serializers.HealthTipSerializer(self.queryset, many=True)
+        data = models.HealthTip.objects.all()
+        serializer = serializers.HealthTipSerializer(data, many=True)
         return Response(serializer.data)
