@@ -10,8 +10,7 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from . import serializers
 from django.conf import settings
-import requests
-import json
+import requests, re, json
 
 User = get_user_model()
 
@@ -93,7 +92,29 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                                 response['doctor_name'] = doc.name
                     for chat_data in chat_api_data:
                         if room_data.get('rid') == chat_data.get('_id'):
-                            response['symptoms'] = chat_data['params'].get('Symptoms', None)
+                            small_case_symptoms = chat_data['params'].get('symptoms', None)
+                            capital_case_symptoms = chat_data['params'].get('Symptoms', None)
+                            symptoms_list = []
+                            response['symptoms'] = None
+                            if small_case_symptoms:
+                                small_symptoms_list = re.sub(r'\s', '', small_case_symptoms).split(',')
+                                symptoms_list.extend(small_symptoms_list)
+                            if capital_case_symptoms:
+                                capital_symptoms_list = re.sub(r'\s', '', capital_case_symptoms).split(',')
+                                symptoms_list.extend(capital_symptoms_list)
+                            for key in chat_data['params'].keys():
+                                assoc_symptom = re.match('^\w+AssociatedSymptoms', key,  re.IGNORECASE)
+                                if assoc_symptom:
+                                    associated_symptom = chat_data['params'].get(assoc_symptom.group(0), None)
+                                    if associated_symptom:
+                                        if isinstance(associated_symptom, list):
+                                            symptoms_list.extend(associated_symptom)
+                                            break
+                            if symptoms_list:
+                                unique_symptoms_list = set([x.lower() for x in symptoms_list])
+                                if unique_symptoms_list:
+                                    response['symptoms'] = [x.title() for x in unique_symptoms_list]
+                                    
                             selected_profile = chat_data['params'].get('selectedProfile', None)
                             if selected_profile:
                                 user_profile_id = selected_profile.get('id')
