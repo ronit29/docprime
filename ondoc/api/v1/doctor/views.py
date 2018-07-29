@@ -120,7 +120,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.filter(time_slot_start__date=date)
 
         queryset = paginate_queryset(queryset, request)
-        serializer = serializers.AppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
+        serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
@@ -134,7 +134,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
               hospital__manageable_hospitals__is_disabled=False),
             Q(pk=pk)).distinct()
         if queryset:
-            serializer = serializers.AppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
+            serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
             return Response(serializer.data)
         else:
             return Response([])
@@ -157,7 +157,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
                 otp_valid_serializer.is_valid(raise_exception=True)
                 opd_appointment.action_completed()
-        opd_appointment_serializer = serializers.AppointmentRetrieveSerializer(opd_appointment, context={'request': request})
+        opd_appointment_serializer = serializers.DoctorAppointmentRetrieveSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
     @transaction.atomic
@@ -227,7 +227,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             elif req_status == models.OpdAppointment.ACCEPTED:
                 opd_appointment.action_accepted()
 
-        opd_appointment_serializer = serializers.AppointmentRetrieveSerializer(opd_appointment, context={'request':request})
+        opd_appointment_serializer = serializers.DoctorAppointmentRetrieveSerializer(opd_appointment, context={'request':request})
         response = {
             "status": 1,
             "data": opd_appointment_serializer.data

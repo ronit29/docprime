@@ -221,7 +221,10 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalImageInline,
         HospitalDocumentInline,
         HospitalCertificationInline,
-        GenericAdminInline]
+        GenericAdminInline,
+        HospitalDocumentInline,
+
+    ]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'

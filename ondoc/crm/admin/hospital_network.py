@@ -9,7 +9,7 @@ from django.contrib.contenttypes.admin import GenericTabularInline
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
     HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
-    HospitalNetworkAward, HospitalNetworkCertification)
+    HospitalNetworkAward, HospitalNetworkCertification, HospitalNetworkDocument)
 
 from .common import *
 
@@ -101,6 +101,46 @@ class HospitalNetworkForm(FormCleanMixin):
         return data
 
 
+class HospitalNetworkDocumentFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        choices = dict(HospitalNetworkDocument.CHOICES)
+        count = {}
+        for key, value in HospitalNetworkDocument.CHOICES:
+            count[key] = 0
+
+        for value in self.cleaned_data:
+            if value and not value['DELETE']:
+                count[value['document_type']] += 1
+
+        for key, value in count.items():
+            if not key == HospitalNetworkDocument.ADDRESS and value > 1:
+                raise forms.ValidationError("Only one " + choices[key] + " is allowed")
+
+        #if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+        #    for key, value in count.items():
+        #        if not key == HospitalNetworkDocument.GST and value < 1:
+        #            raise forms.ValidationError(choices[key] + " is required")
+
+
+class HospitalNetworkDocumentInline(admin.TabularInline):
+    formset = HospitalNetworkDocumentFormSet
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj=obj, **kwargs)
+        formset.request = request
+        return formset
+
+    model = HospitalNetworkDocument
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
+
 class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     form = HospitalNetworkForm
 
@@ -118,7 +158,9 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkAccreditationInline,
         HospitalNetworkAwardInline,
         HospitalNetworkCertificationInline,
-        GenericAdminInline]
+        HospitalNetworkDocumentInline,
+        GenericAdminInline,
+    ]
 
     def associated_hospitals(self, instance):
         if instance.id:
