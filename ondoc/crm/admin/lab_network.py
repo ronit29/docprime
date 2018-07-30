@@ -6,8 +6,8 @@ from django.db.models import Q
 from django.db import models
 
 from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
-    LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
-    LabNetworkHelpline, LabNetworkManager)
+                                     LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
+                                     LabNetworkHelpline, LabNetworkManager, LabNetworkDocument)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -100,6 +100,45 @@ class LabNetworkForm(FormCleanMixin):
         return data
 
 
+class LabNetworkDocumentFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        choices = dict(LabNetworkDocument.CHOICES)
+        count = {}
+        for key, value in LabNetworkDocument.CHOICES:
+            count[key] = 0
+
+        for value in self.cleaned_data:
+            if value and not value['DELETE']:
+                count[value['document_type']] += 1
+
+        for key, value in count.items():
+            if not key==LabNetworkDocument.ADDRESS and value>1:
+                raise forms.ValidationError("Only one "+choices[key]+" is allowed")
+
+        # if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+        #     for key, value in count.items():
+        #         if not key==LabDocument.GST and value<1:
+        #             raise forms.ValidationError(choices[key]+" is required")
+
+
+class LabNetworkDocumentInline(admin.TabularInline):
+    model = LabNetworkDocument
+    formset = LabNetworkDocumentFormSet
+    # form = LabDocumentForm
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj=obj, **kwargs)
+        formset.request = request
+        return formset
+
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
 class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     form = LabNetworkForm
     formfield_overrides = {
@@ -121,11 +160,12 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
             return ''
 
     inlines = [LabNetworkManagerInline,
-        LabNetworkHelplineInline,
-        LabNetworkEmailInline,
-        LabNetworkAccreditationInline,
-        LabNetworkAwardInline,
-        LabNetworkCertificationInline]
+               LabNetworkHelplineInline,
+               LabNetworkEmailInline,
+               LabNetworkAccreditationInline,
+               LabNetworkAwardInline,
+               LabNetworkCertificationInline,
+               LabNetworkDocumentInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
