@@ -324,8 +324,16 @@ class UserAppointmentsViewSet(OndocViewSet):
             combined_data.extend(doctor_serializer.data)
         if lab_serializer.data:
             combined_data.extend(lab_serializer.data)
-        combined_data = sorted(combined_data, key=lambda k: k['status'])
-        # combined_data = sorted(combined_data, key=lambda k: k['time_slot_start'])
+        combined_data = sorted(combined_data, key=lambda x: x['time_slot_start'], reverse=True)
+        temp_dict = dict()
+        for data in combined_data:
+            if not temp_dict.get(data["status"]):
+                temp_dict[data["status"]] = [data]
+            else:
+                temp_dict[data["status"]].append(data)
+        combined_data = list()
+        for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
+            combined_data.extend(v)
         combined_data = combined_data[:80]
         return Response(combined_data)
 
