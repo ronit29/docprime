@@ -1,7 +1,7 @@
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.gis.geos import Point
 from ondoc.doctor import models
-from ondoc.api.v1.utils import convert_timings
+from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
 from datetime import datetime
 import re
@@ -41,7 +41,7 @@ class DoctorSearchHelper:
             current_time = datetime.now()
             current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2) + .75
             filtering_params.append(
-                'dh.day={} and dh.end>={}'.format(str(current_time.weekday()), str(current_hour))
+                'dct.day={} and dct.end>={}'.format(str(current_time.weekday()), str(current_hour))
             )
         if self.query_params.get("doctor_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
@@ -74,18 +74,18 @@ class DoctorSearchHelper:
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
-        query_string = "SELECT x.doctor_id, x.hospital_id, doctor_hospital_id " \
-                       "FROM (SELECT Row_number() OVER( partition BY dh.doctor_id " \
-                       "ORDER BY dh.deal_price ASC) rank_fees, " \
-                       "Row_number() OVER( partition BY dh.doctor_id ORDER BY " \
-                       "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location),dh.deal_price ASC) rank_distance, " \
+        query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
+                       "FROM (SELECT Row_number() OVER( partition BY dct.doctor_clinic_id " \
+                       "ORDER BY dct.deal_price ASC) rank_fees, " \
+                       "Row_number() OVER( partition BY dc.doctor_id  ORDER BY " \
+                       "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location),dct.deal_price ASC) rank_distance, " \
                        "St_distance(St_setsrid(St_point(%s, %s), 4326), h.location) distance, d.id as doctor_id, " \
-                       "dh.id as doctor_hospital_id,  " \
-                       "dh.hospital_id as hospital_id FROM   doctor d " \
-                       "INNER JOIN doctor_hospital dh " \
-                       "ON d.id = dh.doctor_id " \
-                       "INNER JOIN hospital h " \
-                       "ON h.id = dh.hospital_id " \
+                       "dc.id as doctor_clinic_id,  " \
+                       "dct.id as doctor_clinic_timing_id, " \
+                       "dc.hospital_id as hospital_id FROM   doctor d " \
+                       "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
+                       "INNER JOIN hospital h ON h.id = dc.hospital_id " \
+                       "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                        "LEFT JOIN doctor_qualification dq " \
                        "ON dq.doctor_id = d.id " \
                        "LEFT JOIN specialization sp " \
@@ -99,62 +99,59 @@ class DoctorSearchHelper:
         return query_string
 
     def count_hospitals(self, doctor):
-        hospital_count = 0
-        prev = None
-        for dh in doctor.availability.all():
-            if dh.hospital_id != prev:
-                hospital_count += 1
-            prev = dh.hospital_id
-        return hospital_count
+        return len(doctor.hospitals.all())
 
-    def get_distance(self, doctor, doctor_hospital_mapping):
+    def get_distance(self, doctor, doctor_clinic_mapping):
         current_location = Point(self.query_params.get("longitude"), self.query_params.get("latitude"),
                                 srid=4326)
         for hospital in doctor.hospitals.all():
-            if hospital.id == doctor_hospital_mapping[doctor.id]:
+            if hospital.id == doctor_clinic_mapping[doctor.id]:
                 return current_location.distance(hospital.location)*100*1000
         return ""
 
-    def get_doctor_fees(self, doctor, doctor_availability_mapping):
-        for doctor_hospital in doctor.availability.all():
-            if doctor_hospital.id == doctor_availability_mapping[doctor.id]:
-                return doctor_hospital.deal_price, doctor_hospital.mrp
+    def get_doctor_fees(self, doctor_clinic, doctor_availability_mapping):
+        if not doctor_clinic:
+            return
+        for doctor_clinic_timing in doctor_clinic.availability.all():
+            if doctor_clinic_timing.id == doctor_availability_mapping[doctor_clinic.doctor.id]:
+                return doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
                 # return doctor_hospital.deal_price
         return None
 
     def prepare_search_response(self, doctor_data, doctor_search_result, request):
-        doctor_hospital_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
-        doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_hospital_id") for data in
+        doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
+        doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
         response = []
         for doctor in doctor_data:
-            doctor_hospitals = [doctor_hospital for doctor_hospital in doctor.availability.all() if
-                                doctor_hospital.hospital_id == doctor_hospital_mapping[doctor_hospital.doctor_id]]
-            serializer = serializers.DoctorHospitalSerializer(doctor_hospitals, many=True, context={"request": request})
-            filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor, doctor_availability_mapping)
+            doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
+                              doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
+            doctor_clinic = doctor_clinics[0]
+            # serializer = serializers.DoctorHospitalSerializer(doctor_clinics, many=True, context={"request": request})
+            filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
             min_deal_price = None
             min_price = dict()
-            for data in serializer.data:
-                if min_deal_price is None or min_deal_price > data.get("deal_price"):
-                    min_deal_price = data.get("deal_price")
+            for data in doctor_clinic.availability.all():
+                if min_deal_price is None or min_deal_price > data.deal_price:
+                    min_deal_price = data.deal_price
                     min_price = {
-                        "deal_price": data.get("deal_price"),
-                        "mrp": data.get("mrp")
+                        "deal_price": data.deal_price,
+                        "mrp": data.mrp
                     }
             # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
-            if not serializer.data:
+            if not doctor_clinic:
                 hospitals = []
             else:
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
                 hospitals = [{
-                    "hospital_name": serializer.data[0]["hospital_name"],
-                    "address": serializer.data[0]["address"],
-                    "doctor": serializer.data[0]["doctor"],
-                    "hospital_id": serializer.data[0]['hospital_id'],
+                    "hospital_name": doctor_clinic.hospital.name,
+                    "address": doctor_clinic.hospital.locality,
+                    "doctor": doctor.name,
+                    "hospital_id": doctor_clinic.hospital.id,
                     "mrp": min_price["mrp"],
                     "discounted_fees": min_price["deal_price"],
-                    "timings": convert_timings(serializer.data, is_day_human_readable=True)
+                    "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False)
                 }]
             if doctor.images.exists():
                 thumbnail = (doctor.images.all()[0].cropped_image.url if doctor.images.all()[0].cropped_image else None)
@@ -176,7 +173,7 @@ class DoctorSearchHelper:
                                                                             many=True).data,
                 "general_specialization": serializers.DoctorSpecializationSerializer(doctor.doctorspecializations.all(),
                                                                                      many=True).data,
-                "distance": self.get_distance(doctor, doctor_hospital_mapping),
+                "distance": self.get_distance(doctor, doctor_clinic_mapping),
                 "name": doctor.name,
                 "gender": doctor.gender,
                 "images": serializers.DoctorImageSerializer(doctor.images.all(), many=True,
