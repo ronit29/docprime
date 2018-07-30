@@ -149,7 +149,7 @@ class NotificationAction:
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
                 "instance": instance,
-                "title": "Appointment Confirmed",
+                "title": "New Appointment",
                 "body": "New appointment for Mr. {} at {}, {}. Please confirm.".format(
                     patient_name, instance.time_slot_start.strftime("%I:%M %P"),
                     instance.time_slot_start.strftime("%d/%m/%y")),

@@ -1,6 +1,6 @@
 from rest_framework import status
 from django.db.models import Q
-from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment, Hospital, UserProfile, OpdAppointment, DoctorLeave
+from ondoc.doctor.models import Doctor, Specialization, MedicalService, DoctorHospital, Symptoms, OpdAppointment, Hospital, OpdAppointment, DoctorLeave
 from .serializers import DoctorSerializer, SpecializationSerializer, MedicalServiceSerializer, \
                         DoctorApiReformData, DoctorHospitalSerializer, SymptomsSerializer, DoctorProfileSerializer, OpdAppointmentSerializer, HospitalSerializer, DoctorLeaveSerializer
 from .services import ReformScheduleService

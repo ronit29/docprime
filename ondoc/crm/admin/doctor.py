@@ -19,6 +19,9 @@ from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
+from django.utils.html import format_html_join
+from django.template.loader import render_to_string
+
 
 
 class AutoComplete:
@@ -469,6 +472,32 @@ class GenericAdminInline(admin.TabularInline):
                 except MultipleObjectsReturned:
                     pass
         return formset
+
+
+class DoctorImageAdmin(admin.ModelAdmin):
+    model = DoctorImage
+    readonly_fields = ('original_image', 'cropped_img', 'crop_image', 'doctor',)
+    fields = ('original_image', 'cropped_img', 'crop_image', 'doctor')
+
+    def has_change_permission(self, request, obj=None):
+        if not super().has_change_permission(request, obj):
+            return False
+        if not obj:
+            return True
+
+        if request.user.is_superuser and request.user.is_staff:
+            return True
+
+        if request.user.groups.filter(
+                name__in=[constants['DOCTOR_IMAGE_CROPPING_TEAM'], constants['DOCTOR_NETWORK_GROUP_NAME']]).exists():
+            return True
+        return True
+
+    def crop_image(self, instance):
+        return render_to_string('doctor/crop_doctor_image.html', context={"instance": instance})
+
+
+
 
 
 class DoctorResource(resources.ModelResource):
