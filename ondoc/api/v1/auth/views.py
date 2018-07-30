@@ -370,7 +370,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['Error'] = 'Action Not Allowed'
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_lab_appointment = self.lab_appointment_update(request, lab_appointment, validated_data)
-            if updated_lab_appointment["status"] == 0:
+            if updated_lab_appointment.get("status") and updated_lab_appointment["status"] == 0:
                 return Response(updated_lab_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_lab_appointment)
@@ -383,7 +383,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
-            if updated_opd_appointment["status"] == 0:
+            if updated_opd_appointment.get("status") and updated_opd_appointment["status"] == 0:
                 return Response(updated_opd_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_opd_appointment)
@@ -395,7 +395,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELED:
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
-                resp["data"] = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
+                resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = utils.form_time_slot(
@@ -451,7 +451,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             resp["status"] = 1
             if validated_data['status'] == OpdAppointment.CANCELED:
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
-                resp["data"] = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
+                resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = utils.form_time_slot(
