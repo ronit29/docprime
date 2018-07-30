@@ -737,8 +737,10 @@ class LabDocument(TimeStampedModel, Document):
     REGISTRATION = 4
     CHEQUE = 5
     LOGO = 6
+    EMAIL_CONFIRMATION = 9
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
-               (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO")]
+               (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO"),
+               (EMAIL_CONFIRMATION, "Email Confirmation")]
     lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE,
                             related_name='lab_documents')
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
@@ -757,6 +759,38 @@ class LabDocument(TimeStampedModel, Document):
 
     class Meta:
         db_table = "lab_document"
+
+
+class LabNetworkDocument(TimeStampedModel, Document):
+    PAN = 1
+    ADDRESS = 2
+    GST = 3
+    REGISTRATION = 4
+    CHEQUE = 5
+    LOGO = 6
+    EMAIL_CONFIRMATION = 9
+    CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
+               (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO"),
+               (EMAIL_CONFIRMATION, "Email Confirmation"),
+               ]
+    lab_network = models.ForeignKey(LabNetwork, null=True, blank=True, default=None, on_delete=models.CASCADE,
+                            related_name='lab_documents')
+    document_type = models.PositiveSmallIntegerField(choices=CHOICES)
+    name = models.FileField(upload_to='lab_network/documents', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+
+    def extension(self):
+        name, extension = os.path.splitext(self.name.name)
+        return extension
+
+    def is_pdf(self):
+        return self.name.name.endswith('.pdf')
+
+    # def __str__(self):
+        # return self.name
+
+    class Meta:
+        db_table = "lab_network_document"
 
 
 class LabOnboardingToken(TimeStampedModel):
