@@ -412,9 +412,19 @@ class DoctorHospital(auth_model.TimeStampedModel):
 
 class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
-    name = models.ImageField(upload_to='doctor/images',height_field='height', width_field='width')
+    name = models.ImageField('Original Image Name',upload_to='doctor/images',height_field='height', width_field='width')
     cropped_image = models.ImageField(upload_to='doctor/images', height_field='height', width_field='width',
                                       blank=True, null=True)
+
+
+    def __str__(self):
+        return '{}'.format(self.doctor)
+
+    def original_image(self):
+        return mark_safe('<div><img style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.name.url))
+
+    def cropped_img(self):
+        return mark_safe('<div><img style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.cropped_image.url))
 
     class Meta:
         db_table = "doctor_image"
@@ -436,6 +446,13 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
             md5_hash = hashlib.md5(img.tobytes()).hexdigest()
             self.cropped_image = InMemoryUploadedFile(new_image_io, None, md5_hash + ".jpg", 'image/jpeg',
                                                       new_image_io.tell(), None)
+            self.save()
+
+    def save_to_cropped_image(self, image_file):
+        if image_file:
+            img = Img.open(image_file)
+            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            self.cropped_image.save(md5_hash + ".jpg", image_file, save=True)
             self.save()
 
 
