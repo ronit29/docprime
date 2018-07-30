@@ -279,11 +279,15 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
 
     def validate(self, data):
+        # MAX_APPOINTMENTS_ALLOWED = 3
         request = self.context.get("request")
         if data.get("is_home_pickup") is True and (not data.get("address")):
             raise serializers.ValidationError("Address required for home pickup")
         if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
             raise serializers.ValidationError("Invalid profile id")
+        if LabAppointment.objects.filter(profile=data["profile"], lab=data[
+            "lab"]).count() >= CreateAppointmentSerializer.MAX_APPOINTMENTS_ALLOWED:
+            raise serializers.ValidationError('Max '+str(CreateAppointmentSerializer.MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
         self.test_lab_id_validator(data)
         self.time_slot_validator(data)
         return data
