@@ -134,10 +134,21 @@
 
              {{ hospital_formset.management_form|crispy }}
              {% for form in hospital_formset %}
-             <div class="form-horizontal" style='margin-bottom: 30px;'>
-                  {{ form.id }}
-                  {% crispy form %}
-             </div>  
+                 <div class="form-horizontal" style='margin-bottom: 30px;'>
+                      {{ form.id }}
+                      {% crispy form %}
+                      {% for id, timing_formset in hospitaltiming_formset.items %}
+                          {% if id == form.id.value %}
+                              {{ timing_formset.management_form|crispy }}
+                              {% for timing_form in timing_formset %}
+                                  <div class="form-horizontal">
+                                      {{ timing_form.id }}
+                                      {% crispy timing_form %}
+                                  </div>
+                              {% endfor %}
+                          {% endif %}
+                      {% endfor %}
+                 </div>
              {% endfor %}
           </div>
 

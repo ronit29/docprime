@@ -21,6 +21,31 @@ import os
 from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
 
+class LabPricingGroup(TimeStampedModel, CreatedByModel):
+    group_name = models.CharField(max_length=256)
+    pathology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                            decimal_places=2)
+    pathology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                          decimal_places=2)
+    radiology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                            decimal_places=2)
+    radiology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                          decimal_places=2)
+
+    class Meta:
+        db_table = 'lab_pricing_group'
+
+    def __str__(self):
+        return "{}".format(self.group_name)
+
+
+class LabTestPricingGroup(LabPricingGroup):
+
+    class Meta:
+        proxy = True
+        default_permissions = []
+
+
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     NOT_ONBOARDED = 1
@@ -63,6 +88,9 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                                                          decimal_places=2)
     radiology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
                                                        decimal_places=2)
+
+    lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
+                                          related_name='labs')
 
     # generic_lab_admins = GenericRelation(GenericAdmin, related_query_name='manageable_labs')
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab')
@@ -395,7 +423,7 @@ class LabTest(TimeStampedModel, SearchKey):
 
 
 class AvailableLabTest(TimeStampedModel):
-    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests')
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests', null=True, blank=True)
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='availablelabs')
     mrp = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     computed_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
@@ -403,6 +431,8 @@ class AvailableLabTest(TimeStampedModel):
     computed_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     custom_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     enabled = models.BooleanField(default=False)
+    lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
+                                          related_name='available_lab_tests')
 
     def get_testid(self):
         return self.test.id
@@ -411,9 +441,7 @@ class AvailableLabTest(TimeStampedModel):
         return self.test.test_type
 
     def __str__(self):
-
-        return "{}".format(self.id)
-        # return self.test.name + ', ' + self.lab.name
+        return "{}, {}".format(self.test.name, self.lab.name if self.lab else self.lab_pricing_group.group_name)
 
     class Meta:
         db_table = "available_lab_test"
