@@ -88,7 +88,8 @@ THIRD_PARTY_APPS = (
     'dal',
     'dal_select2',
     'django_tables2',
-    'anymail'
+    'anymail',
+    'nested_admin'
 )
 
 LOCAL_APPS = (

@@ -20,7 +20,7 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When
 from django.forms.models import model_to_dict
 from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
-from ondoc.doctor.models import DoctorMobile, DoctorHospital
+from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin)
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
@@ -463,13 +463,12 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "msg": "Cannot Reschedule for same timeslot"
                         }
                         return resp
-                    doctor_hospital = DoctorHospital.objects.filter(doctor__is_live=True,
-                                                                    hospital__is_live=True).filter(
-                        doctor=opd_appointment.doctor,
-                        hospital=opd_appointment.hospital,
-                        day=time_slot_start.weekday(),
-                        start__lte=time_slot_start.hour,
-                        end__gte=time_slot_start.hour).first()
+
+                    doctor_hospital = DoctorClinicTiming.objects.filter(doctor_clinic__doctor__is_live=True,doctor_clinic__hospital__is_live=True,doctor_clinic__doctor=opd_appointment.doctor,
+                                                                        doctor_clinic__hospital=opd_appointment.hospital,
+                                                                        day=time_slot_start.weekday(),
+                                                                        start__lte=time_slot_start.hour,
+                                                                        end__gte=time_slot_start.hour).first()
                     if doctor_hospital:
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
@@ -961,7 +960,7 @@ class OrderHistoryViewSet(GenericViewSet):
 
         doc_hosp_details = defaultdict(dict)
         if doc_hosp_query:
-            doc_hosp_obj = DoctorHospital.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(
+            doc_hosp_obj = DoctorClinic.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(
                 doctor__is_live=True, hospital__is_live=True).filter(doc_hosp_query)
             for data in doc_hosp_obj:
                 doc_hosp_details[data.hospital.id][data.doctor.id] = {
@@ -1042,7 +1041,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (DoctorHospital.objects.filter(doctor__is_live=True, hospital__is_live=True).annotate(
+        doc_hosp_queryset = (DoctorClinic.objects.filter(doctor__is_live=True, hospital__is_live=True).annotate(
             hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
@@ -1066,7 +1065,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     def list(self, request):
         user = request.user
         doc_hosp_queryset = (
-            DoctorHospital.objects.filter(
+            DoctorClinic.objects.filter(
                 Q(
                   doctor__manageable_doctors__user=user,
                   doctor__manageable_doctors__is_disabled=False,
@@ -1141,17 +1140,17 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
             permission = GenericAdmin.objects.filter(user=user, doctor=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.filter(doctor=admin_id).values('hospital', 'hospital__name')
+                resp_data = DoctorClinic.objects.filter(doctor=admin_id).values('hospital', 'hospital__name')
         elif level == Outstanding.HOSPITAL_LEVEL:
             permission = GenericAdmin.objects.filter(user=user, hospital=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.filter(hospital=admin_id).values('doctor', 'doctor__name')
+                resp_data = DoctorClinic.objects.filter(hospital=admin_id).values('doctor', 'doctor__name')
         elif level == Outstanding.HOSPITAL_NETWORK_LEVEL:
             permission = GenericAdmin.objects.filter(user=user, hospital_network=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.get(hospital__network=admin_id).values('hospital', 'doctor',
+                resp_data = DoctorClinic.objects.get(hospital__network=admin_id).values('hospital', 'doctor',
                                                                                           'hospital_name', 'doctor_name')
         elif level == Outstanding.LAB_LEVEL:
             pass
