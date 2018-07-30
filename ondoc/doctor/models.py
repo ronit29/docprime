@@ -501,7 +501,7 @@ class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
                (CHEQUE, "Cancel Cheque Copy"), (COI, "COI/Company Registration"),
                (EMAIL_CONFIRMATION, "Email Confirmation")]
 
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, related_name="hospital_documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES, default=ADDRESS)
     name = models.FileField(upload_to='hospital/documents', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
@@ -636,7 +636,7 @@ class HospitalNetworkDocument(auth_model.TimeStampedModel, auth_model.Document):
                (CHEQUE, "Cancel Cheque Copy"),(COI, "COI/Company Registration"),
                (EMAIL_CONFIRMATION, "Email Confirmation")]
 
-    hospital_network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    hospital_network = models.ForeignKey(HospitalNetwork, related_name="hospital_network_documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.FileField(upload_to='hospital_network/documents', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
