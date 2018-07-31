@@ -7,7 +7,7 @@ from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
-from ondoc.authentication.models import GenericAdmin, User
+from ondoc.authentication.models import GenericAdmin, User, QCModel
 from django.contrib.contenttypes.admin import GenericTabularInline
 
 
@@ -140,6 +140,9 @@ class HospitalForm(FormCleanMixin):
             qc_required.update({
                 'hospital_documents': 'count'
             })
+
+        if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
+            raise forms.ValidationError("Hospital Network is not QC approved.")
 
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
