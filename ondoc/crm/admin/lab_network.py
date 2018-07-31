@@ -87,10 +87,17 @@ class LabNetworkForm(FormCleanMixin):
             'country':'req','pin_code':'req','labnetworkmanager':'count',
             'labnetworkhelpline':'count','labnetworkemail':'count'}
 
+        if self.instance.is_billing_enabled:
+            qc_required.update({
+                'lab_documents': 'count'
+            })
+
         for key, value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+            if self.data.get(key+'_set-TOTAL_FORMS') and value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+                raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+            if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
     def clean_operational_since(self):

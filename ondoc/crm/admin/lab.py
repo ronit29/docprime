@@ -236,6 +236,11 @@ class LabForm(FormCleanMixin):
         qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
             'license':'req','building':'req','locality':'req','city':'req','state':'req',
             'country':'req','pin_code':'req','network_type':'req','lab_image':'count'}
+
+        if (not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
+            qc_required.update({
+                'lab_documents': 'count'
+            })
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
