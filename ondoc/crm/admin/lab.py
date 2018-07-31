@@ -16,7 +16,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User
+from ondoc.authentication.models import GenericAdmin, User, QCModel
 from django.contrib.contenttypes.admin import GenericTabularInline
 
 
@@ -237,6 +237,9 @@ class LabForm(FormCleanMixin):
         qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
             'license':'req','building':'req','locality':'req','city':'req','state':'req',
             'country':'req','pin_code':'req','network_type':'req','lab_image':'count'}
+
+        if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
+            raise forms.ValidationError("Lab Network is not QC approved.")
 
         if not self.instance.network or not self.instance.network.is_billing_enabled:
             qc_required.update({
