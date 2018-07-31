@@ -12,7 +12,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
     HospitalAccreditation, HospitalImage, HospitalDocument,
     HospitalCertification, College, HospitalNetworkManager,
     HospitalNetworkHelpline, HospitalNetworkEmail,
-    HospitalNetworkAccreditation, HospitalNetworkAward,
+    HospitalNetworkAccreditation, HospitalNetworkAward,HospitalNetworkDocument,
     HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor, DoctorMapping)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
@@ -21,7 +21,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
     LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
     LabNetworkHelpline, LabNetworkManager, LabTest,
     LabTestType, LabService,
-    LabDoctorAvailability,LabDoctor,LabDocument, LabPricingGroup)
+    LabDoctorAvailability,LabDoctor,LabDocument, LabPricingGroup, LabNetworkDocument)
 
 from ondoc.diagnostic.models import LabPricing
 
@@ -139,7 +139,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization)
+            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -154,7 +154,7 @@ class Command(BaseCommand):
         LabManager,LabAccreditation, LabAward, LabCertification,
         LabNetworkCertification, LabNetworkAward,
         LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
-        LabNetworkManager,LabService,LabDoctorAvailability,LabDoctor, LabDocument)
+        LabNetworkManager,LabService,LabDoctorAvailability,LabDoctor, LabDocument, LabNetworkDocument)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
