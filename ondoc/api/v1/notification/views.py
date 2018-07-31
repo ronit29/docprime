@@ -1,6 +1,6 @@
 from ondoc.notification import models
 from rest_framework.permissions import IsAuthenticated
-# from rest_framework.response import Response
+from rest_framework.response import Response
 from ondoc.api.pagination import paginate_queryset
 from rest_framework import viewsets
 from django.utils import timezone
@@ -25,7 +25,7 @@ class AppNotificationViewSet(viewsets.GenericViewSet):
         result["data"] = data
         result["unread_count"] = queryset.filter(read_at__isnull=True).count()
         result["unviewed_count"] = queryset.filter(viewed_at__isnull=True).count()
-        return result
+        return Response(result)
 
     def get_queryset(self):
         request = self.request
@@ -53,11 +53,14 @@ class AppNotificationViewSet(viewsets.GenericViewSet):
 
     def mark_notifications_as_read(self, request):
         read_at = timezone.now()
+        viewed_at = read_at
         required_notifications_ids = request.data.get("notificationids", None)
         if required_notifications_ids:
             required_notifications_ids = AppNotificationViewSet.get_notification_ids_list(required_notifications_ids)
+            self.get_queryset().filter(pk__in=required_notifications_ids, viewed_at__isnull=True).update(viewed_at=viewed_at)
             self.get_queryset().filter(pk__in=required_notifications_ids, read_at__isnull=True).update(read_at=read_at)
         else:
+            self.get_queryset().filter(viewed_at__isnull=True).update(viewed_at=viewed_at)
             self.get_queryset().filter(read_at__isnull=True).update(read_at=read_at)
         queryset = self.get_queryset().order_by("-created_at")
         paginated_queryset = paginate_queryset(queryset, request)
