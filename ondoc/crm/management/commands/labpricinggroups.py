@@ -17,9 +17,10 @@ class Command(BaseCommand):
                 radiology_deal_price_percentage=lab.radiology_deal_price_percentage
             )
             AvailableLabTest.objects.filter(lab=lab).update(lab_pricing_group=lab_pricing_group)
+            lab.lab_pricing_group = lab_pricing_group
+            lab.save()
 
     def handle(self, *args, **options):
         lab_ids = AvailableLabTest.objects.all().values_list("lab").distinct()
         labs = Lab.objects.filter(id__in=lab_ids)
         self.create_lab_pricing_groups(labs)
-

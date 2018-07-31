@@ -360,6 +360,8 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
 class DoctorClinic(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='doctor_clinics')
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
+    followup_charges = models.PositiveSmallIntegerField(blank=True, null=True)
 
     class Meta:
         db_table = "doctor_clinic"
@@ -396,8 +398,8 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
     deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     mrp = models.PositiveSmallIntegerField(blank=False, null=True)
-    followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
-    followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
+    # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
+    # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
     class Meta:
         db_table = "doctor_clinic_timing"

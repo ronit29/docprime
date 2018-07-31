@@ -38,6 +38,51 @@ class LabPricingGroup(TimeStampedModel, CreatedByModel):
     def __str__(self):
         return "{}".format(self.group_name)
 
+    def save(self, *args, **kwargs):
+        edit_instance = None
+        if self.id is not None:
+            edit_instance = 1
+            original = LabPricingGroup.objects.get(pk=self.id)
+
+        super(LabPricingGroup, self).save(*args, **kwargs)
+
+        if edit_instance is not None:
+            id = self.id
+
+            path_agreed_price_prcnt = decimal.Decimal(
+                self.pathology_agreed_price_percentage) if self.pathology_agreed_price_percentage is not None else None
+
+            path_deal_price_prcnt = decimal.Decimal(
+                self.pathology_deal_price_percentage) if self.pathology_deal_price_percentage is not None else None
+
+            rad_agreed_price_prcnt = decimal.Decimal(
+                self.radiology_agreed_price_percentage) if self.radiology_agreed_price_percentage is not None else None
+
+            rad_deal_price_prcnt = decimal.Decimal(
+                self.radiology_deal_price_percentage) if self.radiology_deal_price_percentage is not None else None
+
+            if not original.pathology_agreed_price_percentage == self.pathology_agreed_price_percentage \
+                    or not original.pathology_deal_price_percentage == self.pathology_deal_price_percentage:
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
+                    update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), path_agreed_price_prcnt))
+
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
+                    update(
+                    computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), path_deal_price_prcnt))
+
+            if not original.radiology_agreed_price_percentage == self.radiology_agreed_price_percentage \
+                    or not original.radiology_deal_price_percentage == self.radiology_deal_price_percentage:
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
+                    update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), rad_agreed_price_prcnt))
+
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
+                    update(
+                    computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
+
 
 class LabTestPricingGroup(LabPricingGroup):
 

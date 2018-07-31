@@ -13,7 +13,9 @@ class Command(BaseCommand):
         for doctor_hospital in doctor_hospitals:
             doctor_models.DoctorClinic.objects.get_or_create(
                 doctor=doctor_hospital.doctor,
-                hospital=doctor_hospital.hospital
+                hospital=doctor_hospital.hospital,
+                followup_duration=doctor_hospital.followup_duration,
+                followup_charges=doctor_hospital.followup_charges
             )
 
     @transaction.atomic
@@ -21,10 +23,10 @@ class Command(BaseCommand):
         current_time = timezone.now()
         for doctor_clinic in doctor_clinics:
             query_string = 'insert into doctor_clinic_timing("day","start", "end", "fees", ' \
-                           '"deal_price", "mrp", "followup_duration", "followup_charges", "doctor_clinic_id", ' \
+                           '"deal_price", "mrp", "doctor_clinic_id", ' \
                            '"created_at","updated_at") ' \
                            'select "day", "start", "end", "fees", "deal_price", "mrp", ' \
-                           '"followup_duration", "followup_charges", %s, "created_at", \'%s\' ' \
+                           '%s, "created_at", \'%s\' ' \
                            'from doctor_hospital where doctor_id = %s and hospital_id=%s ' \
                            '' % (doctor_clinic.id, current_time, doctor_clinic.doctor_id, doctor_clinic.hospital_id)
             with connection.cursor() as cursor:
