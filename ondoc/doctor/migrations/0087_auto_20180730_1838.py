@@ -10,14 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='doctorhospital',
-            name='followup_charges',
-        ),
-        migrations.RemoveField(
-            model_name='doctorhospital',
-            name='followup_duration',
-        ),
         migrations.AddField(
             model_name='doctorclinic',
             name='followup_charges',

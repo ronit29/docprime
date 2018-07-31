@@ -223,8 +223,9 @@ class LabForm(FormCleanMixin):
 
     class Meta:
         model = Lab
-        exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
-                   'radiology_deal_price_percentage', )
+        exclude=()
+        # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
+        #            'radiology_deal_price_percentage', )
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
@@ -267,12 +268,13 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter)
 
-    exclude = ('search_key', )
+    exclude = ('is_home_pickup_available','search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
+                   'radiology_deal_price_percentage', )
 
     def get_readonly_fields(self, request, obj=None):
         if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
-            return ('lead_url','matrix_lead_id','matrix_reference_id', 'lab_pricing_group',)
-        return ('lead_url','matrix_lead_id','matrix_reference_id', )
+            return ('lead_url','matrix_lead_id','matrix_reference_id', 'lab_pricing_group', 'is_live')
+        return ('lead_url','matrix_lead_id','matrix_reference_id', 'is_live')
 
     def lead_url(self, instance):
         if instance.id:
