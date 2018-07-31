@@ -1025,7 +1025,7 @@ class OrderHistoryViewSet(GenericViewSet):
                     "type": "lab"
                 }
                 serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
-                if not serializer.is_valid(raise_exception=True):
+                if not serializer.is_valid():
                     data.pop("time_slot_start")
                     data.pop("start_date")
                     data.pop("start_time")

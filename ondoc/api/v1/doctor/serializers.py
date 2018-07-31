@@ -294,12 +294,12 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     def get_lat(self, obj):
         if obj.doctor_clinic.hospital.location:
-            return obj.hospital.location.y
+            return obj.doctor_clinic.hospital.location.y
         return None
 
     def get_long(self, obj):
         if obj.doctor_clinic.hospital.location:
-            return obj.hospital.location.x
+            return obj.doctor_clinic.hospital.location.x
         return None
 
     def get_hospital_thumbnail(self, instance):

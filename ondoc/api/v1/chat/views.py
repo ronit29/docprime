@@ -120,6 +120,10 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                             selected_profile = chat_data['params'].get('selectedProfile', None)
                             if selected_profile:
                                 user_profile_id = selected_profile.get('id')
+                                try:
+                                    user_profile_id = int(user_profile_id)
+                                except:
+                                    continue
                                 for usr in UserProfiles:
                                     if int(usr.id) == int(user_profile_id):
                                         response['user_name'] = usr.name
