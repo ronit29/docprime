@@ -122,7 +122,14 @@ class UserViewset(GenericViewSet):
             "user_exists" : user_exists,
             "user_id" : user.id
         }
-        return Response(response)        
+        return Response(response)
+
+    @transaction.atomic
+    def logout(self, request):
+        required_token = request.data.get("token", None)
+        if required_token:
+            NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
+        return Response({"message": "success"})
 
     @transaction.atomic
     def register(self, request, format=None):
