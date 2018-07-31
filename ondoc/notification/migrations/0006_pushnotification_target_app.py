@@ -13,7 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='pushnotification',
             name='target_app',
-            field=models.PositiveSmallIntegerField(blank=True, choices=[(1, 'staff'), (2, 'doctor'), (3, 'user')],
-                                                   max_length=100, null=True),
+            field=models.PositiveSmallIntegerField(blank=True, choices=[(1, 'staff'), (2, 'doctor'), (3, 'user')], null=True),
         ),
     ]
