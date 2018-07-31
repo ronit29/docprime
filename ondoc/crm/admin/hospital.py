@@ -136,7 +136,7 @@ class HospitalForm(FormCleanMixin):
                        'country': 'req', 'pin_code': 'req', 'hospital_type': 'req', 'network_type': 'req',
                        'hospitalimage': 'count'}
 
-        if (not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
+        if (not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
             qc_required.update({
                 'hospital_documents': 'count'
             })

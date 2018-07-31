@@ -316,10 +316,11 @@ class HospitalDocumentFormSet(forms.BaseInlineFormSet):
             if not key == HospitalDocument.ADDRESS and value > 1:
                 raise forms.ValidationError("Only one " + choices[key] + " is allowed")
 
-        #if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
-        #    for key, value in count.items():
-        #        if not key == HospitalDocument.GST and value < 1:
-        #            raise forms.ValidationError(choices[key] + " is required")
+        if (not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
+            if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+               for key, value in count.items():
+                   if not key == HospitalDocument.GST and value < 1:
+                       raise forms.ValidationError(choices[key] + " is required")
 
 
 class DoctorDocumentInline(nested_admin.NestedTabularInline):
