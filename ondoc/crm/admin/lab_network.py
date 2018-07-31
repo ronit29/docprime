@@ -87,10 +87,17 @@ class LabNetworkForm(FormCleanMixin):
             'country':'req','pin_code':'req','labnetworkmanager':'count',
             'labnetworkhelpline':'count','labnetworkemail':'count'}
 
+        if self.instance.is_billing_enabled:
+            qc_required.update({
+                'lab_documents': 'count'
+            })
+
         for key, value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+            if self.data.get(key+'_set-TOTAL_FORMS') and value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+                raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+            if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
     def clean_operational_since(self):
@@ -119,10 +126,11 @@ class LabNetworkDocumentFormSet(forms.BaseInlineFormSet):
             if not key==LabNetworkDocument.ADDRESS and value>1:
                 raise forms.ValidationError("Only one "+choices[key]+" is allowed")
 
-        # if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
-        #     for key, value in count.items():
-        #         if not key==LabDocument.GST and value<1:
-        #             raise forms.ValidationError(choices[key]+" is required")
+        if self.instance.is_billing_enabled:
+            if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+                for key, value in count.items():
+                    if not key==LabNetworkDocument.GST and value<1:
+                        raise forms.ValidationError(choices[key]+" is required")
 
 
 class LabNetworkDocumentInline(admin.TabularInline):
