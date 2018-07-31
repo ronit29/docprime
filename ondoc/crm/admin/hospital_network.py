@@ -83,15 +83,22 @@ class HospitalNetworkForm(FormCleanMixin):
     about = forms.CharField(widget=forms.Textarea, required=False)
 
     def validate_qc(self):
-        qc_required = {'name':'req','operational_since':'req','about':'req','network_size':'req',
-            'building':'req','locality':'req','city':'req','state':'req',
-            'country':'req','pin_code':'req','hospitalnetworkmanager':'count',
-            'hospitalnetworkhelpline':'count','hospitalnetworkemail':'count'}
+        qc_required = {'name': 'req', 'operational_since': 'req', 'about': 'req', 'network_size': 'req',
+                       'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
+                       'country': 'req', 'pin_code': 'req', 'hospitalnetworkmanager': 'count',
+                       'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count'}
+
+        if self.instance.is_billing_enabled:
+            qc_required.update({
+                'hospital_network_documents': 'count'
+            })
 
         for key, value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+            if self.data.get(key+'_set-TOTAL_FORMS') and value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+                raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+            if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
     def clean_operational_since(self):

@@ -72,8 +72,8 @@ class FormCleanMixin(forms.ModelForm):
                    raise forms.ValidationError("Cannot modify Data added by other users")
            if '_submit_for_qc' in self.data:
                self.validate_qc()
-               if hasattr(self.instance,'availability') and self.instance.availability is not None:
-                   for h in self.instance.availability.all():
+               if hasattr(self.instance,'doctor_clinics') and self.instance.doctor_clinics is not None:
+                   for h in self.instance.doctor_clinics.all():
                        if (h.hospital.data_status < 2):
                            raise forms.ValidationError(
                                "Cannot submit for QC without submitting associated Hospitals: " + h.hospital.name)

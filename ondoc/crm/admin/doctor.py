@@ -5,6 +5,7 @@ from django.utils.safestring import mark_safe
 from django.conf.urls import url
 from django.http import HttpResponse
 from django.shortcuts import render
+from django.db.models import Q
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
 from ondoc.authentication.models import GenericAdmin
@@ -14,7 +15,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
-                                 DoctorMapping, HospitalDocument, HospitalNetworkDocument)
+                                 DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -287,10 +288,13 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
             if not key == DoctorDocument.ADDRESS and value > 1:
                 raise forms.ValidationError("Only one " + choices[key] + " is allowed")
 
-        if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
-            for key, value in count.items():
-                if not key == DoctorDocument.GST and value < 1:
-                    raise forms.ValidationError(choices[key] + " is required")
+        if DoctorClinic.objects.filter(
+                Q(hospital__network__is_billing_enabled=False, doctor=self.instance) |
+                Q(hospital__is_billing_enabled=False, doctor=self.instance)).exists():
+            if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+                for key, value in count.items():
+                    if not key == DoctorDocument.GST and value < 1:
+                        raise forms.ValidationError(choices[key] + " is required")
 
 
 class HospitalDocumentFormSet(forms.BaseInlineFormSet):
@@ -425,8 +429,16 @@ class DoctorForm(FormCleanMixin):
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
                        'raw_about': 'req', 'license': 'req', 'mobiles': 'count', 'emails': 'count',
-                       'qualifications': 'count', 'availability': 'count', 'languages': 'count',
-                       'images': 'count', 'documents': 'count', 'doctorspecializations': 'count'}
+                       'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
+                       'images': 'count', 'doctorspecializations': 'count'}
+
+        if DoctorClinic.objects.filter(
+                Q(hospital__network__is_billing_enabled=False, doctor=self.instance) |
+                Q(hospital__is_billing_enabled=False, doctor=self.instance)).exists():
+            qc_required.update({
+                'documents': 'count'
+            })
+
         for key, value in qc_required.items():
             if value == 'req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key + " is required for Quality Check")
