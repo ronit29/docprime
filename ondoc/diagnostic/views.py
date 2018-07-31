@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, HttpResponse
 from django.shortcuts import render_to_response
 from django.utils.safestring import mark_safe
 from django.conf import settings
-from .models import Lab, LabTest, AvailableLabTest
+from .models import Lab, LabTest, AvailableLabTest, LabPricingGroup, LabTestPricingGroup
 from .forms import LabForm, LabMapForm
 from dal import autocomplete
 from django.http import HttpResponse, JsonResponse
@@ -19,7 +19,6 @@ from django.contrib.auth.decorators import user_passes_test
 
 class LabTestAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
-
         query = self.request.GET.get('query')
         print(query)
         if not self.request.user:
@@ -33,13 +32,13 @@ class LabTestAutocomplete(autocomplete.Select2QuerySetView):
 def labajaxmodelsave(request):
     if request.method == "POST":
         id = request.POST.get('id')
-        model_instance = Lab.objects.get(id=id)
+        model_instance = LabPricingGroup.objects.get(id=id)
         model_instance.pathology_agreed_price_percentage = decimal.Decimal(request.POST['lab-pathology_agreed_price_percentage']) if request.POST.get('lab-pathology_agreed_price_percentage') else None
         model_instance.pathology_deal_price_percentage = decimal.Decimal(request.POST['lab-pathology_deal_price_percentage']) if request.POST.get('lab-pathology_deal_price_percentage') else None
         model_instance.radiology_agreed_price_percentage = decimal.Decimal(request.POST['lab-radiology_agreed_price_percentage']) if request.POST.get('lab-radiology_agreed_price_percentage') else None
         model_instance.radiology_deal_price_percentage = decimal.Decimal(request.POST['lab-radiology_deal_price_percentage']) if request.POST.get('lab-radiology_deal_price_percentage') else None
         model_instance.save()
-        return HttpResponseRedirect('/admin/diagnostic/labpricing/'+id+'/change/')
+        return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')
     else:
         return HttpResponseRedirect('/admin')
 
@@ -66,9 +65,9 @@ def availablelabtestajaxsave(request):
 
 def get_computed_agreed_price(obj):
     if obj.get('test').test_type == LabTest.RADIOLOGY:
-        agreed_percent = obj.get('lab').radiology_agreed_price_percentage if obj.get('lab').radiology_agreed_price_percentage else None
+        agreed_percent = obj.get('lab_pricing_group').radiology_agreed_price_percentage if obj.get('lab_pricing_group').radiology_agreed_price_percentage else None
     else:
-        agreed_percent = obj.get('lab').pathology_agreed_price_percentage if obj.get('lab').pathology_agreed_price_percentage else None
+        agreed_percent = obj.get('lab_pricing_group').pathology_agreed_price_percentage if obj.get('lab_pricing_group').pathology_agreed_price_percentage else None
     mrp = decimal.Decimal(obj.get('mrp'))
 
     if agreed_percent is not None:
@@ -82,9 +81,9 @@ def get_computed_agreed_price(obj):
 
 def get_computed_deal_price(obj):
     if obj.get('test').test_type == LabTest.RADIOLOGY:
-        deal_percent = obj.get('lab').radiology_deal_price_percentage if obj.get('lab').radiology_deal_price_percentage else None
+        deal_percent = obj.get('lab_pricing_group').radiology_deal_price_percentage if obj.get('lab_pricing_group').radiology_deal_price_percentage else None
     else:
-        deal_percent = obj.get('lab').pathology_deal_price_percentage if obj.get('lab').pathology_deal_price_percentage else None
+        deal_percent = obj.get('lab_pricing_group').pathology_deal_price_percentage if obj.get('lab_pricing_group').pathology_deal_price_percentage else None
     mrp = decimal.Decimal(obj.get('mrp'))
     computed_agreed_price = obj.get('computed_agreed_price')
     if deal_percent is not None:

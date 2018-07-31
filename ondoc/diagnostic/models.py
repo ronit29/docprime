@@ -21,6 +21,76 @@ import os
 from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
 
+class LabPricingGroup(TimeStampedModel, CreatedByModel):
+    group_name = models.CharField(max_length=256)
+    pathology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                            decimal_places=2)
+    pathology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                          decimal_places=2)
+    radiology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                            decimal_places=2)
+    radiology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                          decimal_places=2)
+
+    class Meta:
+        db_table = 'lab_pricing_group'
+
+    def __str__(self):
+        return "{}".format(self.group_name)
+
+    def save(self, *args, **kwargs):
+        edit_instance = None
+        if self.id is not None:
+            edit_instance = 1
+            original = LabPricingGroup.objects.get(pk=self.id)
+
+        super(LabPricingGroup, self).save(*args, **kwargs)
+
+        if edit_instance is not None:
+            id = self.id
+
+            path_agreed_price_prcnt = decimal.Decimal(
+                self.pathology_agreed_price_percentage) if self.pathology_agreed_price_percentage is not None else None
+
+            path_deal_price_prcnt = decimal.Decimal(
+                self.pathology_deal_price_percentage) if self.pathology_deal_price_percentage is not None else None
+
+            rad_agreed_price_prcnt = decimal.Decimal(
+                self.radiology_agreed_price_percentage) if self.radiology_agreed_price_percentage is not None else None
+
+            rad_deal_price_prcnt = decimal.Decimal(
+                self.radiology_deal_price_percentage) if self.radiology_deal_price_percentage is not None else None
+
+            if not original.pathology_agreed_price_percentage == self.pathology_agreed_price_percentage \
+                    or not original.pathology_deal_price_percentage == self.pathology_deal_price_percentage:
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
+                    update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), path_agreed_price_prcnt))
+
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
+                    update(
+                    computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), path_deal_price_prcnt))
+
+            if not original.radiology_agreed_price_percentage == self.radiology_agreed_price_percentage \
+                    or not original.radiology_deal_price_percentage == self.radiology_deal_price_percentage:
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
+                    update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), rad_agreed_price_prcnt))
+
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
+                    update(
+                    computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
+
+
+class LabTestPricingGroup(LabPricingGroup):
+
+    class Meta:
+        proxy = True
+        default_permissions = []
+
+
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     NOT_ONBOARDED = 1
@@ -63,6 +133,9 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                                                          decimal_places=2)
     radiology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
                                                        decimal_places=2)
+
+    lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
+                                          related_name='labs')
 
     # generic_lab_admins = GenericRelation(GenericAdmin, related_query_name='manageable_labs')
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab')
@@ -395,7 +468,7 @@ class LabTest(TimeStampedModel, SearchKey):
 
 
 class AvailableLabTest(TimeStampedModel):
-    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests')
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests', null=True, blank=True)
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='availablelabs')
     mrp = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     computed_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
@@ -403,6 +476,8 @@ class AvailableLabTest(TimeStampedModel):
     computed_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     custom_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     enabled = models.BooleanField(default=False)
+    lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
+                                          related_name='available_lab_tests')
 
     def get_testid(self):
         return self.test.id
@@ -411,9 +486,7 @@ class AvailableLabTest(TimeStampedModel):
         return self.test.test_type
 
     def __str__(self):
-
-        return "{}".format(self.id)
-        # return self.test.name + ', ' + self.lab.name
+        return "{}, {}".format(self.test.name, self.lab.name if self.lab else self.lab_pricing_group.group_name)
 
     class Meta:
         db_table = "available_lab_test"
@@ -737,8 +810,10 @@ class LabDocument(TimeStampedModel, Document):
     REGISTRATION = 4
     CHEQUE = 5
     LOGO = 6
+    EMAIL_CONFIRMATION = 9
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
-               (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO")]
+               (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO"),
+               (EMAIL_CONFIRMATION, "Email Confirmation")]
     lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE,
                             related_name='lab_documents')
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
@@ -757,6 +832,38 @@ class LabDocument(TimeStampedModel, Document):
 
     class Meta:
         db_table = "lab_document"
+
+
+class LabNetworkDocument(TimeStampedModel, Document):
+    PAN = 1
+    ADDRESS = 2
+    GST = 3
+    REGISTRATION = 4
+    CHEQUE = 5
+    LOGO = 6
+    EMAIL_CONFIRMATION = 9
+    CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
+               (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO"),
+               (EMAIL_CONFIRMATION, "Email Confirmation"),
+               ]
+    lab_network = models.ForeignKey(LabNetwork, null=True, blank=True, default=None, on_delete=models.CASCADE,
+                            related_name='lab_documents')
+    document_type = models.PositiveSmallIntegerField(choices=CHOICES)
+    name = models.FileField(upload_to='lab_network/documents', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+
+    def extension(self):
+        name, extension = os.path.splitext(self.name.name)
+        return extension
+
+    def is_pdf(self):
+        return self.name.name.endswith('.pdf')
+
+    # def __str__(self):
+        # return self.name
+
+    class Meta:
+        db_table = "lab_network_document"
 
 
 class LabOnboardingToken(TimeStampedModel):

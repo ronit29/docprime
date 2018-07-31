@@ -115,7 +115,8 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                                 unique_symptoms_list = set([x.lower() for x in symptoms_list])
                                 if unique_symptoms_list:
                                     response['symptoms'] = [x.title() for x in unique_symptoms_list]
-                                    
+                            else:
+                                continue
                             selected_profile = chat_data['params'].get('selectedProfile', None)
                             if selected_profile:
                                 user_profile_id = selected_profile.get('id')
@@ -123,6 +124,8 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                                     if int(usr.id) == int(user_profile_id):
                                         response['user_name'] = usr.name
                                         break
+                            else:
+                                continue
                     response_data.append(response)
                 return Response(response_data)
         return Response([])

@@ -117,7 +117,7 @@ class NotificationAction:
                 "id": instance.id,
                 "instance": instance,
                 "title": "Appointment Reschedule",
-                "body": "Reschedule request received for the appointment from Mr. {}".format(patient_name),
+                "body": "Reschedule request received for the appointment from Dr. {}".format(doctor_name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -149,7 +149,7 @@ class NotificationAction:
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
                 "instance": instance,
-                "title": "Appointment Confirmed",
+                "title": "New Appointment",
                 "body": "New appointment for Mr. {} at {}, {}. Please confirm.".format(
                     patient_name, instance.time_slot_start.strftime("%I:%M %P"),
                     instance.time_slot_start.strftime("%d/%m/%y")),
