@@ -403,6 +403,17 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
         db_table = "doctor_clinic_timing"
         unique_together = (("start", "end", "day", "doctor_clinic",),)
 
+    def save(self, *args, **kwargs):
+        if self.mrp!=None:
+            deal_price = math.ceil(self.fees + (self.mrp - self.fees)*.1)
+            deal_price = math.ceil(deal_price/10)*10
+            if deal_price>self.mrp:
+                deal_price = self.mrp
+            if deal_price<self.fees:
+                deal_price = self.fees
+            self.deal_price = deal_price
+        super().save(*args, **kwargs)
+
 
 class DoctorHospital(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]

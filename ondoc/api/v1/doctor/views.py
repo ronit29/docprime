@@ -144,11 +144,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        qfilter = dict()
-        qfilter["pk"] = validated_data.get('id')
-        qfilter["doctor__is_live"] = True
-        qfilter["hospital__is_live"] = True
-        opd_appointment = get_object_or_404(models.OpdAppointment, **qfilter)
+        opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('id'))
         permission_queryset = (auth_models.GenericAdmin.objects.filter(doctor=opd_appointment.doctor.id).
                                filter(hospital=opd_appointment.hospital_id))
         if permission_queryset:
@@ -205,11 +201,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return Response(data=resp)
 
     def update(self, request, pk=None):
-        qfilter = dict()
-        qfilter["pk"] = pk
-        qfilter["doctor__is_live"] = True
-        qfilter["hospital__is_live"] = True
-        opd_appointment = get_object_or_404(models.OpdAppointment, **qfilter)
+        opd_appointment = get_object_or_404(models.OpdAppointment, pk=pk)
         serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
@@ -545,8 +537,7 @@ class PrescriptionFileViewset(OndocViewSet):
         request = self.request
         if request.user.user_type == User.DOCTOR:
             user = request.user
-            return (models.PrescriptionFile.objects.filter(prescription__appointment__doctor__is_live=True,
-                                                           prescription__appointment__hospital__is_live=True).filter(
+            return (models.PrescriptionFile.objects.filter(
                 Q(prescription__appointment__doctor__manageable_doctors__user=user,
                   prescription__appointment__doctor__manageable_doctors__hospital=F(
                       'prescription__appointment__hospital'),
@@ -559,9 +550,7 @@ class PrescriptionFileViewset(OndocViewSet):
                     distinct())
             # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
         elif request.user.user_type == User.CONSUMER:
-            return models.PrescriptionFile.objects.filter(prescription__appointment__user=request.user,
-                                                          prescription__appointment__doctor__is_live=True,
-                                                          prescription__appointment__hospital__is_live=True)
+            return models.PrescriptionFile.objects.filter(prescription__appointment__user=request.user)
         else:
             return models.PrescriptionFile.objects.none()
 
@@ -579,9 +568,7 @@ class PrescriptionFileViewset(OndocViewSet):
         validated_data = serializer.validated_data
         resp_data = list()
         if self.prescription_permission(request.user, validated_data.get('appointment')):
-            if models.Prescription.objects.filter(appointment=validated_data.get('appointment'),
-                                                  appointment__doctor__is_live=True,
-                                                  appointment__hospital__is_live=True).exists():
+            if models.Prescription.objects.filter(appointment=validated_data.get('appointment')).exists():
                 prescription = models.Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
             else:
                 prescription = models.Prescription.objects.create(appointment=validated_data.get('appointment'),

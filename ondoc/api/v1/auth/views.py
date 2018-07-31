@@ -29,7 +29,7 @@ from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
 from ondoc.api.v1 import utils
 from ondoc.doctor.models import OpdAppointment
-from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterSerializer,
+from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterUserSerializer,
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
                                              OpdAppModelSerializer)
@@ -284,7 +284,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                                    "message": "Profile with the given name already exists."
                                    }
             }, status=status.HTTP_400_BAD_REQUEST)
-        serializer = serializers.UserProfileSerializer(obj, data=data, partial=True)
+        serializer = serializers.UserProfileSerializer(obj, data=data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -609,7 +609,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
         if not queryset:
             return Response([])
-        serializer = AppointmentFilterSerializer(data=request.query_params)
+        serializer = AppointmentFilterUserSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         range = serializer.validated_data.get('range')
@@ -960,8 +960,7 @@ class OrderHistoryViewSet(GenericViewSet):
 
         doc_hosp_details = defaultdict(dict)
         if doc_hosp_query:
-            doc_hosp_obj = DoctorClinic.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(
-                doctor__is_live=True, hospital__is_live=True).filter(doc_hosp_query)
+            doc_hosp_obj = DoctorClinic.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(doc_hosp_query)
             for data in doc_hosp_obj:
                 doc_hosp_details[data.hospital.id][data.doctor.id] = {
                     "doctor_name": data.doctor.name,
@@ -972,7 +971,7 @@ class OrderHistoryViewSet(GenericViewSet):
         lab_name = dict()
         lab_test_map = dict()
         if available_lab_test:
-            test_ids = AvailableLabTest.objects.prefetch_related('lab', 'test').filter(pk__in=available_lab_test, lab__is_live=True)
+            test_ids = AvailableLabTest.objects.prefetch_related('lab', 'test').filter(pk__in=available_lab_test)
             lab_test_map = dict()
             for data in test_ids:
                 lab_name[data.lab.id] = {
