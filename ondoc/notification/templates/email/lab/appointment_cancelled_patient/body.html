@@ -3,7 +3,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-	<title>Invoice Generated</title>
+	<title>Appointment Cancelled</title>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
@@ -21,7 +21,7 @@
 										<tbody>
 											<tr>
 												<td>
-													<img src="{{'notification/images/checked-orange.png'|get_absolute_url}}">
+													<img src="{{'notification/images/cancel-orange.png'|get_absolute_url}}">
 												</td>
 												<td style="text-align: right;">
 													<img src="{{'notification/images/logo.png'|get_absolute_url}}">
@@ -37,12 +37,12 @@
 										<tbody>
 											<tr>
 												<td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
-													Invoice Generated
+													Appointment Cancelled
 												</td>
 											</tr>
 											<tr>
 												<td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
-												{{invoice.created_at|date:'M d, Y'}}
+													{{instance.updated_at|date:'M d, Y'}}
 												</td>
 											</tr>
 										</tbody>
@@ -54,113 +54,31 @@
 					</table>
 				</td>
 			</tr>
-			<!--<tr>-->
-				<!--<td>-->
-					<!--<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px; border-bottom: 1px solid #d3d3d3;">-->
-						<!--<tbody>-->
-							<!--<tr>-->
-								<!--<td style="color: #757575; font-size: 16px; font-weight: 500;">-->
-									<!--Unique Confirmation Code : <span style="color: #000000; font-weight: 600;">5453</span>-->
-								<!--</td>-->
-							<!--</tr>-->
-							<!--<tr>-->
-								<!--<td style="color: #000000; font-size: 12px; font-weight: 500; padding-top: 4px;">-->
-									<!--Share this code with doctor at the time of your appoinment-->
-								<!--</td>-->
-							<!--</tr>-->
-						<!--</tbody>-->
-					<!--</table>-->
-				<!--</td>-->
-			<!--</tr>-->
 			<tr>
 				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 70px; border-bottom: 1px solid #d3d3d3;">
 						<tbody>
 							<tr>
 								<td style="color: #757575; font-size: 16px; font-weight: 500;">
-									Booking ID : <span style="color: #000000; font-weight: 600;">{{instance.id}}</span>
+									<span style="color: #000000; font-weight: 600;"> Hi {{patient_name|capfirst}}, </span>
 								</td>
 							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 40px 15px 0;">
-						<tbody>
-							<!--<tr>-->
-								<!--<td style="color: #000000; font-weight: 600; font-size: 16px;">-->
-									<!--Dr. Stephny Ray-->
-								<!--</td>-->
-							<!--</tr>-->
 							<tr>
-								<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-									Invoice has been generated. Please <a href="{{invoice_url}}" download>Click here </a> to download invoice.
+								<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
+									Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - Dr. {{lab_name|capfirst}} has been cancelled as requested by you.
 								</td>
 							</tr>
-							<!--<tr>-->
-								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
-									<!--General Physician-->
-								<!--</td>-->
-							<!--</tr>-->
 						</tbody>
 					</table>
 				</td>
 			</tr>
-			<!--<tr>-->
-				<!--<td>-->
-					<!--<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">-->
-						<!--<tbody>-->
-							<!--<tr>-->
-								<!--<td style="color: #000000; font-weight: 600; font-size: 16px;">-->
-									<!--Apollo Clinic-->
-								<!--</td>-->
-							<!--</tr>-->
-							<!--<tr>-->
-								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">-->
-									<!--Plot Number 66, 1st Floor, Sector 12A-->
-								<!--</td>-->
-							<!--</tr>-->
-							<!--<tr>-->
-								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
-									<!--Gurgaon Haryana-->
-								<!--</td>-->
-							<!--</tr>-->
-							<!--<tr>-->
-								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
-									<!--122001-->
-								<!--</td>-->
-							<!--</tr>-->
-						<!--</tbody>-->
-					<!--</table>-->
-				<!--</td>-->
-			<!--</tr>-->
-			<!--<tr>-->
-				<!--<td>-->
-					<!--<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 20px; border-bottom: 1px solid #d3d3d3;">-->
-						<!--<tbody>-->
-							<!--<tr>-->
-								<!--<td style="color: #000000; font-weight: 600; font-size: 16px;">-->
-									<!--Clinic Visit Time-->
-								<!--</td>-->
-							<!--</tr>-->
-							<!--<tr>-->
-								<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">-->
-									<!--18th  April &nbsp;&nbsp; | &nbsp;&nbsp; 3:30 PM-->
-								<!--</td>-->
-							<!--</tr>-->
-						<!--</tbody>-->
-					<!--</table>-->
-				<!--</td>-->
-			<!--</tr>-->
 			<tr>
 				<td>
 					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">
 						<tbody>
 							<tr>
 								<td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;">
-									This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to networkhelp@docprime.com
+									This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to customerhelp@docprime.com
 								</td>
 							</tr>
 						</tbody>

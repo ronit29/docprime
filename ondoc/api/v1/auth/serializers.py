@@ -108,11 +108,14 @@ class NotificationEndpointSerializer(serializers.ModelSerializer):
     class Meta:
         model = NotificationEndpoint
         # fields = '__all__'
-        fields = ('user', 'device_id', 'token', )
+        fields = ('user', 'device_id', 'platform', 'app_name', 'app_version', 'token')
 
 
 class NotificationEndpointSaveSerializer(serializers.Serializer):
     device_id = serializers.CharField(required=False)
+    platform = serializers.CharField(required=False)
+    app_name = serializers.CharField(required=False)
+    app_version = serializers.CharField(required=False)
     token = serializers.CharField()
 
 

@@ -3,7 +3,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-	<title>Appointment Reschedule</title>
+	<title>Appointment Rescheduled</title>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
@@ -21,7 +21,7 @@
 										<tbody>
 											<tr>
 												<td>
-													<img src="{{'notification/images/reschedule-email.png'|get_absolute_url}}">
+													<img src="{{'notification/images/reschedule-appointment.png'|get_absolute_url}}">
 												</td>
 												<td style="text-align: right;">
 													<img src="{{'notification/images/logo.png'|get_absolute_url}}">
@@ -37,7 +37,7 @@
 										<tbody>
 											<tr>
 												<td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
-													Appointment Reschedule
+													Appointment Rescheduled
 												</td>
 											</tr>
 											<tr>
@@ -59,18 +59,13 @@
 					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 70px; border-bottom: 1px solid #d3d3d3;">
 						<tbody>
 							<tr>
-								<td style="color: #000000; font-size: 14px;">
-									Dear
-								</td>
-							</tr>
-							<tr>
 								<td style="color: #757575; font-size: 16px; font-weight: 500;">
-									<span style="color: #000000; font-weight: 600;">Dr {{doctor_name|capfirst}},</span>
+									<span style="color: #000000; font-weight: 600;">Hi {{patient_name|capfirst}}, </span>
 								</td>
 							</tr>
 							<tr>
 								<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
-									We have received a reschedule request for the appointment with {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} at {{instance.hospital.name|capfirst}}. We will update you once it is confirmed.
+									We have received a reschedule request for the appointment from Lab - {{lab_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} . We will get in touch with you to resolve this as quickly as possible.
 								</td>
 							</tr>
 							<tr>
@@ -88,7 +83,7 @@
 						<tbody>
 							<tr>
 								<td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;">
-									This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to networkhelp@docprime.com
+									This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to customerhelp@docprime.com
 								</td>
 							</tr>
 						</tbody>

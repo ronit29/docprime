@@ -5,6 +5,7 @@ from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image
                                          UserPermission, GenericAdmin, LabUserPermission)
 from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
+from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from ondoc.account import models as account_model
 from django.utils import timezone
@@ -485,8 +486,8 @@ class AvailableLabTest(TimeStampedModel):
     def get_type(self):
         return self.test.test_type
 
-    def __str__(self):
-        return "{}, {}".format(self.test.name, self.lab.name if self.lab else self.lab_pricing_group.group_name)
+    # def __str__(self):
+    #     return "{}, {}".format(self.test.name, self.lab.name if self.lab else self.lab_pricing_group.group_name)
 
     class Meta:
         db_table = "available_lab_test"
@@ -542,11 +543,40 @@ class LabAppointment(TimeStampedModel):
         if not self.user:
             return
         if self.status == LabAppointment.COMPLETED:
-            notification_models.NotificationAction.trigger(
+            LabNotificationAction.trigger(
                 instance=self,
                 user=self.user,
                 notification_type=notification_models.NotificationAction.LAB_INVOICE,
             )
+            return
+        if self.status == LabAppointment.ACCEPTED:
+            LabNotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_ACCEPTED,
+            )
+            return
+        if self.status == LabAppointment.RESCHEDULED_PATIENT:
+            LabNotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
+            )
+            return
+        if self.status == LabAppointment.RESCHEDULED_LAB:
+            LabNotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
+            )
+            return
+        if self.status == LabAppointment.CANCELED:
+            LabNotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_CANCELLED,
+            )
+            return
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()

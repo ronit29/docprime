@@ -324,6 +324,9 @@ class NotificationEndpoint(TimeStampedModel):
     user = models.ForeignKey(User, related_name='notification_endpoints', on_delete=models.CASCADE,
                              blank=True, null=True)
     device_id = models.TextField(blank=True, null=True)
+    platform = models.TextField(blank=True, null=True)
+    app_name = models.TextField(blank=True, null=True)
+    app_version = models.TextField(blank=True, null=True)
     token = models.TextField(unique=True)
 
     class Meta:
