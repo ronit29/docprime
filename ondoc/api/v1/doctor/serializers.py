@@ -181,7 +181,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
 
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
                                                  doctor_clinic__hospital=data.get('hospital'),
-                                                 day=time_slot_start.weekday(), start__lte=time_slot_start.hour,
+                                                 day=time_slot_start.weekday(), start__lte=time_slot_hour,
                                                  end__gte=time_slot_hour).exists():
             raise serializers.ValidationError("Invalid Time slot")
 
@@ -646,6 +646,18 @@ class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
         model = Doctor
         fields = ('id', 'name', 'gender', 'images','about', 'practicing_since',
                   'qualifications', 'general_specialization', 'mobiles',)
+
+
+class OpdAppointmentBillingSerializer(OpdAppointmentSerializer):
+    profile = UserProfileSerializer()
+    hospital = HospitalModelSerializer()
+    doctor = AppointmentRetrieveDoctorSerializer()
+
+    class Meta:
+        model = OpdAppointment
+        fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
+                  'allowed_action', 'effective_price', 'fees', 'status', 'time_slot_start', 'time_slot_end',
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'payment_type')
 
 
 class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
