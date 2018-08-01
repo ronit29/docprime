@@ -791,15 +791,16 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
                 else:
                     response_data = self.form_pg_transaction_data(response, order_obj)
-                    try:
-                        pg_tx_queryset = PgTransaction.objects.create(**response_data)
-                    except:
-                        pass
+                    if PgTransaction.is_valid_hash(response):
+                        try:
+                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                        except:
+                            pass
 
-                    try:
-                        appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
-                    except:
-                        pass
+                        try:
+                            appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
+                        except:
+                            pass
 
                     if int(response_data["product_id"]) == account_models.Order.LAB_PRODUCT_ID:
                         if appointment_obj:
@@ -831,7 +832,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
         resp_serializer = serializers.TransactionSerializer(data=response)
         resp_serializer.is_valid(raise_exception=True)
         response = resp_serializer.validated_data
-        # user = User.objects.get(pk=order_obj.action_data.get("user"))
         user = get_object_or_404(User, pk=order_obj.action_data.get("user"))
         data['user'] = user
         data['product_id'] = order_obj.product_id

@@ -216,6 +216,7 @@ class TransactionSerializer(serializers.Serializer):
     txStatus = serializers.CharField(max_length=200)
     pgTxId = serializers.CharField(max_length=200)
     pbGatewayName = serializers.CharField(max_length=200, required=False)
+    hash = serializers.CharField(max_length=1000)
 
 
 class UserTransactionModelSerializer(serializers.ModelSerializer):

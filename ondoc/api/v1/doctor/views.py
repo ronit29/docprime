@@ -310,16 +310,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         }
 
-        data_to_verify = ''
-        for data in sorted(pgdata.keys()):
-            data_to_verify = data_to_verify + data + '=' + str(pgdata[data]) + ';'
-
-        encrypted_data_to_verify = settings.PG_SECRET_KEY + '|' + data_to_verify + '|' + settings.PG_CLIENT_KEY
-        # encrypted_data_to_verify = 'hello'
-        encrypted_message_object = hashlib.sha256(str(encrypted_data_to_verify).encode())
-        encrypted_message_digest = encrypted_message_object.hexdigest()
-        pgdata["hash"] = encrypted_message_digest
-
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
         return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):

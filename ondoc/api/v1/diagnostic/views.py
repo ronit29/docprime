@@ -385,6 +385,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 amount=payable_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
+
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
             resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id,
@@ -426,15 +427,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['name'] = appointment_details["profile"].name
         pgdata['txAmount'] = appointment_details['payable_amount']
 
-        data_to_verify = ''
-        for data in sorted(pgdata.keys()):
-            data_to_verify = data_to_verify + data + '=' + str(pgdata[data]) + ';'
-
-        encrypted_data_to_verify = settings.PG_SECRET_KEY + '|' + data_to_verify + '|' + settings.PG_CLIENT_KEY
-        # encrypted_data_to_verify = 'hello'
-        encrypted_message_object = hashlib.sha256(str(encrypted_data_to_verify).encode())
-        encrypted_message_digest = encrypted_message_object.hexdigest()
-        pgdata["hash"] = encrypted_message_digest
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
 
         return pgdata, payment_required
 
