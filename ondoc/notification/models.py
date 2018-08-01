@@ -444,10 +444,12 @@ class AppNotification(TimeStampedModel):
 
 
 class PushNotification(TimeStampedModel):
+    TARGET_APP_CHOICES = User.USER_TYPE_CHOICES
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     content = JSONField()
     viewed_at = models.DateTimeField(blank=True, null=True)
     read_at = models.DateTimeField(blank=True, null=True)
+    target_app = models.PositiveSmallIntegerField(choices=TARGET_APP_CHOICES, blank=True, null=True,  max_length=100)
     notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
 
     class Meta:
@@ -456,10 +458,12 @@ class PushNotification(TimeStampedModel):
     @classmethod
     def send_notification(cls, user, notification_type, context):
         context.pop("instance", None)
+        target_app = user.user_type
         push_noti = PushNotification.objects.create(
             user=user,
             notification_type=notification_type,
-            content={key: val for key, val in context.items() if key != 'instance'}
+            content={key: val for key, val in context.items() if key != 'instance'},
+            target_app=target_app
         )
         tokens = [token.token for token in NotificationEndpoint.objects.filter(user=user)]
         data = model_to_dict(push_noti)
