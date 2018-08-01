@@ -62,8 +62,6 @@ class OndocViewSet(mixins.CreateModelMixin,
 
 
 class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
 
     def complete(self, request):
         serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
