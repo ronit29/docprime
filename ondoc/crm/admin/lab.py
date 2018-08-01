@@ -387,7 +387,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         return form
 
     form = LabForm
-    search_fields = ['name', 'lab_pricing_group', ]
+    search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
         LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline]
     autocomplete_fields = ['lab_pricing_group', ]
