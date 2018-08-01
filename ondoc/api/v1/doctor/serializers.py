@@ -284,7 +284,7 @@ class DoctorLanguageSerializer(serializers.ModelSerializer):
 class DoctorHospitalSerializer(serializers.ModelSerializer):
     doctor = serializers.ReadOnlyField(source='doctor_clinic.doctor.name')
     hospital_name = serializers.ReadOnlyField(source='doctor_clinic.hospital.name')
-    address = serializers.ReadOnlyField(source='doctor_clinic.hospital.locality')
+    address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_address')
     hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     hospital_thumbnail = serializers.SerializerMethodField()
     day = serializers.SerializerMethodField()
