@@ -244,8 +244,9 @@ class LabManager(TimeStampedModel):
     number = models.BigIntegerField()
     email = models.EmailField(max_length=100, blank=True)
     details = models.CharField(max_length=200, blank=True)
+    CONTACT_TYPE_CHOICES = [(1, "Other"), (2, "Single Point of Contact"), (3, "Manager"), (4, "Owner")]
     contact_type = models.PositiveSmallIntegerField(
-        choices=[(1, "Other"), (2, "Single Point of Contact"), (3, "Manager"), (4, "Owner")])
+        choices=CONTACT_TYPE_CHOICES)
 
     def __str__(self):
         return self.lab.name + " (" + self.name + ")"
