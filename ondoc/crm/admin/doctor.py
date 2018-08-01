@@ -765,13 +765,36 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     # date_hierarchy = 'created_at'
     # list_filter = ()
     form = DoctorOpdAppointmentForm
-    fields = ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by', 'fees',
-              'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'time_slot_start',
-              'payment_type', 'admin_information')
-    # fields = fields + ('doctor', 'hospital', 'profile', 'user')
-    readonly_fields = ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by',
-                       'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                       'admin_information')
+    # fields = ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by', 'fees',
+    #           'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'time_slot_start',
+    #           'payment_type', 'admin_information')
+    # # # fields = fields + ('doctor', 'hospital', 'profile', 'user')
+    # readonly_fields = ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by',
+    #                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
+    #                    'admin_information')
+    #
+
+    def get_fields(self, request, obj=None):
+        if request.user.is_superuser and request.user.is_staff:
+            return ('doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
+                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'time_slot_start',
+                    'payment_type')
+        elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            return ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by',
+                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'time_slot_start',
+                    'payment_type', 'admin_information')
+        else:
+            return ()
+
+    def get_readonly_fields(self, request, obj=None):
+        if request.user.is_superuser and request.user.is_staff:
+            return ()
+        elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            return ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by',
+                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
+                    'admin_information')
+        else:
+            return ()
 
     def doctor_name(self, obj):
         return mark_safe('{name} (<a href="{profile_link}">Profile</a>)'.format(name=obj.doctor.name,
