@@ -183,7 +183,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     lab_thumbnail = serializers.SerializerMethodField()
     patient_thumbnail = serializers.SerializerMethodField()
     patient_name = serializers.SerializerMethodField()
-    allowed_action = serializers.SerializerMethodField
+    allowed_action = serializers.SerializerMethodField()
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
