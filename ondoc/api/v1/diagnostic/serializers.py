@@ -196,10 +196,18 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         if obj.profile_detail:
             return obj.profile_detail.get("name")
 
+    def get_allowed_action(self, obj):
+        user_type = ''
+        if self.context.get('request'):
+            user_type = self.context['request'].user.user_type
+            return obj.allowed_action(user_type)
+        else:
+            return []
+
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -509,15 +517,37 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     lab = LabModelSerializer()
     lab_test = AvailableLabTestSerializer(many=True)
 
-    def get_allowed_action(self,obj):
-        user_type = ''
-        if self.context.get('request'):
-            user_type = self.context['request'].user.user_type
-            return LabAppointment.allowed_action(obj, user_type)
-        else:
-            return []
+
+
+    class Meta:
+        model = LabAppointment
+        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp')
+
+
+class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
+    profile = UserProfileSerializer()
+    allowed_action = serializers.SerializerMethodField()
+    lab = LabModelSerializer()
+    lab_test = AvailableLabTestSerializer(many=True)
 
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab')
+
+
+class AppointmentCompleteBodySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    otp = serializers.IntegerField(max_value=9999)
+
+    def validate(self, attrs):
+        appntmnt = LabAppointment.objects.filter(id=attrs['id'])
+        if appntmnt.exists():
+            if appntmnt.first().status == LabAppointment.COMPLETED:
+                raise serializers.ValidationError("Appointment Already Completed")
+            if not appntmnt.filter(otp=attrs['otp']).exists():
+                raise serializers.ValidationError("Invalid OTP")
+        else:
+            raise serializers.ValidationError("Invalid Appointment")
+        return attrs

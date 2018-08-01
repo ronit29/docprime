@@ -1,5 +1,7 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
+from ondoc.diagnostic import models as lab_models
+from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
@@ -56,6 +58,23 @@ class OndocViewSet(mixins.CreateModelMixin,
                    mixins.ListModelMixin,
                    viewsets.GenericViewSet):
     pass
+
+
+
+class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def complete(self, request):
+        serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        lab_appointment = get_object_or_404(lab_models.LabAppointment, pk=validated_data.get('id'))
+        if request.user.user_type == User.DOCTOR:
+            lab_appointment.action_completed()
+        lab_appointment_serializer = diagnostic_serializer.DoctorLabAppointmentRetrieveSerializer(lab_appointment,
+                                                                                     context={'request': request})
+        return Response(lab_appointment_serializer.data)
 
 
 class DoctorAppointmentsViewSet(OndocViewSet):
