@@ -146,7 +146,9 @@ class DoctorSearchHelper:
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
                 hospitals = [{
                     "hospital_name": doctor_clinic.hospital.name,
-                    "address": doctor_clinic.hospital.locality,
+                    "address": ", ".join(
+                        [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
+                         value]),
                     "doctor": doctor.name,
                     "hospital_id": doctor_clinic.hospital.id,
                     "mrp": min_price["mrp"],
