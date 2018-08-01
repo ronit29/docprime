@@ -503,7 +503,7 @@ class TimeSlotExtraction(object):
     MORNING = "Morning"
     AFTERNOON = "Afternoon"
     EVENING = "Evening"
-    TIME_SPAN = 15
+    TIME_SPAN = 15  # In minutes
     timing = dict()
     price_available = dict()
 
@@ -516,39 +516,27 @@ class TimeSlotExtraction(object):
                         deal_price=None, mrp=None, is_doctor=False):
         start = float(start)
         end = float(end)
-        # day = obj.day
-        # timing = self.context['timing']
         time_span = self.TIME_SPAN
 
-        int_span = (time_span / 60)
-        # timing = dict()
+        float_span = (time_span / 60)
         if not self.timing[day].get('timing'):
             self.timing[day]['timing'] = dict()
             self.timing[day]['timing'][self.MORNING] = OrderedDict()
             self.timing[day]['timing'][self.AFTERNOON] = OrderedDict()
             self.timing[day]['timing'][self.EVENING] = OrderedDict()
-
-        num_slots = int(60 / time_span)
-        if 60 % time_span != 0:
-            num_slots += 1
-        h = start
-        while h < end:
-        # for h in range(start, end):
-            for i in range(0, num_slots):
-                temp_h = h + i * int_span
-                if temp_h > end:
-                    break
-                day_slot, am_pm = self.get_day_slot(temp_h)
-                time_str = self.form_time_string(temp_h, am_pm)
-                self.timing[day]['timing'][day_slot][temp_h] = time_str
-                price_available = {"price": price, "is_available": is_available}
-                if is_doctor:
-                    price_available.update({
-                        "mrp": mrp,
-                        "deal_price": deal_price
-                    })
-                self.price_available[day][temp_h] = price_available
-            h += 1
+        temp_start = start
+        while temp_start <= end:
+            day_slot, am_pm = self.get_day_slot(temp_start)
+            time_str = self.form_time_string(temp_start, am_pm)
+            self.timing[day]['timing'][day_slot][temp_start] = time_str
+            price_available = {"price": price, "is_available": is_available}
+            if is_doctor:
+                price_available.update({
+                    "mrp": mrp,
+                    "deal_price": deal_price
+                })
+            self.price_available[day][temp_start] = price_available
+            temp_start += float_span
 
     def get_day_slot(self, time):
         am = 'AM'
