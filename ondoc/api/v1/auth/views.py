@@ -803,12 +803,21 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                     if int(response_data["product_id"]) == account_models.Order.LAB_PRODUCT_ID:
                         if appointment_obj:
-                            LAB_REDIRECT_URL += "/" + str(appointment_obj.id)
-                        REDIRECT_URL = LAB_REDIRECT_URL
+                            REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id)
+                        elif order_obj:
+                            REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
+                                order_obj.action_data.get("lab"), response.get('statusCode'))
+                        else:
+                            REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
                     elif int(response_data["product_id"]) == account_models.Order.DOCTOR_PRODUCT_ID:
                         if appointment_obj:
-                            OPD_REDIRECT_URL += "/" + str(appointment_obj.id)
-                        REDIRECT_URL = OPD_REDIRECT_URL
+                            REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id)
+                        elif order_obj:
+                            REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
+                                                                       order_obj.action_data.get("hospital"),
+                                                                       response.get('statusCode'))
+                        else:
+                            REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
             else:
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
