@@ -30,6 +30,8 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.db.models import Count, Sum, Max, When, Case, F
 from django.http import Http404
+from django.conf import settings
+import hashlib
 from rest_framework import status
 from collections import OrderedDict
 from django.utils import timezone
@@ -383,6 +385,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 amount=payable_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
+
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
             resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id,
@@ -423,6 +426,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['orderId'] = order_id
         pgdata['name'] = appointment_details["profile"].name
         pgdata['txAmount'] = appointment_details['payable_amount']
+
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
 
         return pgdata, payment_required
 

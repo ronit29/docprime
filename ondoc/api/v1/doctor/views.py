@@ -27,9 +27,11 @@ from operator import itemgetter
 from itertools import groupby
 from ondoc.api.v1.utils import RawSql
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.db.models import F
 import datetime
 import copy
+import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 User = get_user_model()
 
@@ -62,8 +64,6 @@ class OndocViewSet(mixins.CreateModelMixin,
 
 
 class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
 
     def complete(self, request):
         serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
@@ -312,6 +312,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
         surl = base_url + '/api/v1/user/transaction/save'
         furl = base_url + '/api/v1/user/transaction/save'
+
         pgdata = {
             'custId': user.id,
             'mobile': user.phone_number,
@@ -319,31 +320,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             'productId': product_id,
             'surl': surl,
             'furl': furl,
-            'checkSum': '',
             'referenceId': '',
             'orderId': order_id,
             'name': appointment_details['profile'].name,
             'txAmount': appointment_details['payable_amount'],
-        }
-        #
-        # # user_profile = user.profiles.get(pk=appointment_details['profile'].id)
-        # pgdata['custId'] = user.id
-        # pgdata['mobile'] = user.phone_number
-        # pgdata['email'] = user.email
-        # if not user.email:
-        #     pgdata['email'] = "dummyemail@docprime.com"
-        #
-        # pgdata['productId'] = product_id
-        # base_url = (
-        #     "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
-        # pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-        # pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-        # pgdata['checkSum'] = ''
-        # pgdata['referenceId'] = ""
-        # pgdata['orderId'] = order_id
-        # pgdata['name'] = appointment_details['profile'].name
-        # pgdata['txAmount'] = appointment_details['payable_amount']
 
+        }
+
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
         return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
