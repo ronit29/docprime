@@ -102,7 +102,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.filter(doctor=doctor)
 
         if range == 'previous':
-            queryset = queryset.filter(status__in=[models.OpdAppointment.COMPLETED,models.OpdAppointment.CANCELED]).order_by('-time_slot_start')
+            queryset = queryset.filter(status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).order_by('-time_slot_start')
         elif range == 'upcoming':
             today = datetime.date.today()
             queryset = queryset.filter(

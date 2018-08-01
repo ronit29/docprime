@@ -498,16 +498,20 @@ class LabAppointment(TimeStampedModel):
     RESCHEDULED_LAB = 3
     RESCHEDULED_PATIENT = 4
     ACCEPTED = 5
-    CANCELED = 6
+    CANCELLED = 6
     COMPLETED = 7
-    ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_LAB]
+    ACTIVE_APPOINTMENT_STATUS = [(CREATED, 'Created'), (BOOKED, 'Booked'),
+                                 (RESCHEDULED_LAB, 'Rescheduled by lab'),
+                                 (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                                 (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
+                                 (COMPLETED, 'Completed')]
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
     lab_test = models.ManyToManyField(AvailableLabTest)
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     profile_detail = JSONField(blank=True, null=True)
-    status = models.PositiveSmallIntegerField(default=CREATED)
+    status = models.PositiveSmallIntegerField(default=CREATED, choices=ACTIVE_APPOINTMENT_STATUS)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # This is mrp
     agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -530,7 +534,7 @@ class LabAppointment(TimeStampedModel):
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
+                allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
 
         return allowed
 
@@ -582,7 +586,7 @@ class LabAppointment(TimeStampedModel):
         self.save()
 
     def action_cancelled(self, refund_flag=1):
-        self.status = self.CANCELED
+        self.status = self.CANCELLED
         self.save()
 
         consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)

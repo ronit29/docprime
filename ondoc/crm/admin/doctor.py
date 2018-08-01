@@ -15,7 +15,8 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
-                                 DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork)
+                                 DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
+                                 OpdAppointment)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -23,6 +24,8 @@ from ondoc.crm.constants import constants
 from django.utils.html import format_html_join
 from django.template.loader import render_to_string
 import nested_admin
+from django.contrib.admin.widgets import AdminSplitDateTime
+from ondoc.authentication import models as auth_model
 
 
 class AutoComplete:
@@ -730,6 +733,74 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     class Media:
         js = ('js/admin/ondoc.js',)
 
+
+class DoctorOpdAppointmentForm(forms.ModelForm):
+    time_slot_start = forms.SplitDateTimeField(widget=AdminSplitDateTime(), required=True)
+    RESCHEDULED_DOCTOR = OpdAppointment.RESCHEDULED_DOCTOR
+    RESCHEDULED_PATIENT = OpdAppointment.RESCHEDULED_PATIENT
+    ACCEPTED = OpdAppointment.ACCEPTED
+    CANCELLED = OpdAppointment.CANCELLED
+    APPOINTMENT_STATUS_CHOICES = [(RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
+                                  (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                                  (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled')]
+    status = forms.ChoiceField(choices=APPOINTMENT_STATUS_CHOICES)
+
+    def clean(self):
+        cleaned_data = self.cleaned_data
+        new_status = cleaned_data.get('status')
+        new_time_slot_start = cleaned_data.get('time_slot_start')
+        # validate stuff
+        if True:
+            msg = "ERROR"
+            self._errors["status"] = self.error_class([msg])
+            self._errors["time_slot_start"] = self.error_class([msg])
+            del cleaned_data['status']
+            del cleaned_data['time_slot_start']
+        return cleaned_data
+
+
+class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
+    # list_filter = ('data_status', HospCityFilter)
+    # list_display = ('doctor__name', 'hospital__name')
+    # date_hierarchy = 'created_at'
+    # list_filter = ()
+    form = DoctorOpdAppointmentForm
+    fields = ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by', 'fees',
+              'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'time_slot_start',
+              'payment_type', 'admin_information')
+    # fields = fields + ('doctor', 'hospital', 'profile', 'user')
+    readonly_fields = ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by',
+                       'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
+                       'admin_information')
+
+    def doctor_name(self, obj):
+        return mark_safe('{name} (<a href="{profile_link}">Profile</a>)'.format(name=obj.doctor.name,
+                                                                                profile_link="#"))
+
+    def hospital_name(self, obj):
+        if obj.hospital.location:
+            location_link = 'https://www.google.com/maps/search/?api=1&query={lat},{long}'.format(
+                lat=obj.hospital.location.y, long=obj.hospital.location.x)
+            return mark_safe('{name} (<a href="{location_link}">View on map</a>)'.format(name=obj.hospital.name,
+                                                                                         location_link=location_link))
+        else:
+            return obj.hospital.name
+
+    def profile_name(self, obj):
+        return obj.profile.name
+
+    def profile_number(self, obj):
+        return obj.profile.phone_number
+
+    def user_number(self, obj):
+        return obj.user.phone_number
+
+    def admin_information(self, obj):
+        doctor_admins = auth_model.GenericAdmin.get_appointment_admins(obj)
+        doctor_admins_phone_numbers = list()
+        for doctor_admin in doctor_admins:
+            doctor_admins_phone_numbers.append(doctor_admin.phone_number)
+        return mark_safe(','.join(doctor_admins_phone_numbers))
 
 class SpecializationResource(resources.ModelResource):
 

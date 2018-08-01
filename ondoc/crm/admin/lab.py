@@ -14,11 +14,11 @@ from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument)
+    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel
 from django.contrib.contenttypes.admin import GenericTabularInline
-
+from django.contrib.admin.widgets import AdminSplitDateTime
 
 class LabTestResource(resources.ModelResource):
     excel_id = fields.Field(attribute='excel_id', column_name='Test ID')
@@ -398,6 +398,66 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     class Media:
         js = ('js/admin/ondoc.js',)
 
+
+class LabAppointmentForm(forms.ModelForm):
+    time_slot_start = forms.SplitDateTimeField(widget=AdminSplitDateTime(), required=True)
+    RESCHEDULED_LAB = LabAppointment.RESCHEDULED_LAB
+    RESCHEDULED_PATIENT = LabAppointment.RESCHEDULED_PATIENT
+    ACCEPTED = LabAppointment.ACCEPTED
+    CANCELLED = LabAppointment.CANCELLED
+    APPOINTMENT_STATUS_CHOICES = [(RESCHEDULED_LAB, 'Rescheduled by Lab'),
+                                  (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                                  (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled')]
+    status = forms.ChoiceField(choices=APPOINTMENT_STATUS_CHOICES)
+
+    # def clean(self):
+    #     cleaned_data = self.cleaned_data
+    #     new_status = cleaned_data.get('status')
+    #     new_time_slot_start = cleaned_data.get('time_slot_start')
+    #     # validate stuff
+    #     if True:
+    #         msg = "ERROR"
+    #         self._errors["status"] = self.error_class([msg])
+    #         self._errors["time_slot_start"] = self.error_class([msg])
+    #         del cleaned_data['status']
+    #         del cleaned_data['time_slot_start']
+    #     return cleaned_data
+
+
+class LabAppointmentAdmin(admin.ModelAdmin):
+    form = LabAppointmentForm
+    fields = ('lab', 'managers_details','lab_test', 'profile_name', 'profile_number', 'user_number', 'status', 'time_slot_start', 'price', 'agreed_price',
+              'deal_price', 'effective_price', 'payment_status',
+              'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+    # fields = fields + ('__all__')
+    readonly_fields = ('lab', 'managers_details', 'lab_test', 'profile_name', 'profile_number', 'user_number', 'price', 'agreed_price',
+                       'deal_price', 'effective_price', 'payment_status',
+                       'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+
+    def lab_name(self, obj):
+        return mark_safe('{name} (<a href="{profile_link}">Profile</a>)'.format(name=obj.lab.name,
+                                                                                profile_link="#"))
+    def profile_name(self, obj):
+        return obj.profile.name
+
+    def profile_number(self, obj):
+        return obj.profile.phone_number
+
+    def user_number(self, obj):
+        return obj.user.phone_number
+
+    def managers_details(self, obj):
+        pass
+    #     managers = obj.lab.labmanager_set.all()
+    #
+    #     for manager in managers:
+    #
+    #         details+=manager.name
+    # number = models.BigIntegerField()
+    # email = models.EmailField(max_length=100, blank=True)
+    # details = models.CharField(max_length=200, blank=True)
+    # contact_type+
+    #
 
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
     change_list_template = 'superuser_import_export.html'
