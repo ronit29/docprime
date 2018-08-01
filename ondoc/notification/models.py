@@ -13,6 +13,9 @@ from django.utils import timezone
 from ondoc.account import models as account_model
 from django.conf import settings
 from weasyprint import HTML
+from django.conf import settings
+import pytz
+
 import copy
 
 User = get_user_model()
@@ -68,6 +71,8 @@ class NotificationAction:
 
     @classmethod
     def trigger(cls, instance, user, notification_type):
+        est = pytz.timezone(settings.TIME_ZONE)
+        time_slot_start = instance.time_slot_start.astimezone(est)
         context = {}
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             patient_name = instance.profile.name if instance.profile.name else ""
@@ -79,8 +84,8 @@ class NotificationAction:
                 "instance": instance,
                 "title": "Appointment Confirmed",
                 "body": "Appointment Confirmed for {} requested with Dr. {} at {}, {}.".format(
-                    patient_name, doctor_name, instance.time_slot_start.strftime("%I:%M %P"),
-                    instance.time_slot_start.strftime("%d/%m/%y"), doctor_name
+                    patient_name, doctor_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y"), doctor_name
                 ),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
@@ -145,8 +150,8 @@ class NotificationAction:
                 "instance": instance,
                 "title": "Appointment Confirmed",
                 "body": "Appointment confirmed for Mr. {} at {}, {} with Dr. {}.".format(
-                    patient_name, instance.time_slot_start.strftime("%I:%M %P"),
-                    instance.time_slot_start.strftime("%d/%m/%y"), doctor_name
+                    patient_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y"), doctor_name
                 ),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
@@ -163,8 +168,8 @@ class NotificationAction:
                 "instance": instance,
                 "title": "New Appointment",
                 "body": "New appointment for Mr. {} at {}, {}. Please confirm.".format(
-                    patient_name, instance.time_slot_start.strftime("%I:%M %P"),
-                    instance.time_slot_start.strftime("%d/%m/%y")),
+                    patient_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -180,8 +185,8 @@ class NotificationAction:
                 "instance": instance,
                 "title": "Appointment Cancelled",
                 "body": "Appointment with Mr. {} at {}  {} has been cancelled.".format(
-                    patient_name, instance.time_slot_start.strftime("%I:%M %P"),
-                    instance.time_slot_start.strftime("%d/%m/%y")),
+                    patient_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -197,8 +202,8 @@ class NotificationAction:
                 "instance": instance,
                 "title": "Appointment Cancelled",
                 "body": "Appointment with Dr. {} at {}, {} has been cancelled as per your request..".format(
-                    doctor_name, instance.time_slot_start.strftime("%I:%M %P"),
-                    instance.time_slot_start.strftime("%d/%m/%y")),
+                    doctor_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -231,7 +236,7 @@ class NotificationAction:
                 "instance": instance,
                 "title": "Prescription Uploaded",
                 "body": "Prescription available for your appointment with Dr. {} on {}".format(
-                    doctor_name, instance.time_slot_start.strftime("%d/%m/%y")),
+                    doctor_name, time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,

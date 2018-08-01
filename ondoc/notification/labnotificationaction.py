@@ -1,6 +1,7 @@
 from .models import NotificationAction, EmailNotification
 from django.contrib.auth import get_user_model
-
+from django.conf import settings
+import pytz
 
 User = get_user_model()
 
@@ -10,6 +11,8 @@ class LabNotificationAction(NotificationAction):
     @classmethod
     def trigger(cls, instance, user, notification_type):
         context = {}
+        est = pytz.timezone(settings.TIME_ZONE)
+        time_slot_start = instance.time_slot_start.astimezone(est)
         if notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
             patient_name = instance.profile.name.title() if instance.profile.name else ""
             lab_name = instance.lab.name.title() if instance.lab.name else ""
@@ -20,8 +23,8 @@ class LabNotificationAction(NotificationAction):
                 "instance": instance,
                 "title": "Appointment Confirmed",
                 "body": "Appointment Confirmed for {} requested with Lab - {} at {}, {}.".format(
-                    patient_name, lab_name, instance.time_slot_start.strftime("%I:%M %P"),
-                    instance.time_slot_start.strftime("%d/%m/%y"), lab_name
+                    patient_name, lab_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y"), lab_name
                 ),
                 "url": "/lab/appointment/{}".format(instance.id),
                 "action_type": notification_type,
@@ -73,8 +76,8 @@ class LabNotificationAction(NotificationAction):
                 "instance": instance,
                 "title": "Appointment Confirmed",
                 "body": "Appointment confirmed for {} at {}, {} with Lab - {}.".format(
-                    patient_name, instance.time_slot_start.strftime("%I:%M %P"),
-                    instance.time_slot_start.strftime("%d/%m/%y"), lab_name
+                    patient_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y"), lab_name
                 ),
                 "url": "/lab/appointment/{}".format(instance.id),
                 "action_type": notification_type,
@@ -92,8 +95,8 @@ class LabNotificationAction(NotificationAction):
                 "instance": instance,
                 "title": "Appointment Cancelled",
                 "body": "Appointment with Lab - {} at {}, {} has been cancelled as per your request..".format(
-                    lab_name, instance.time_slot_start.strftime("%I:%M %P"),
-                    instance.time_slot_start.strftime("%d/%m/%y")),
+                    lab_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": notification_type,
                 "action_id": instance.id,
