@@ -531,7 +531,9 @@ class LabAppointment(TimeStampedModel):
         if user_type == User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
-
+        if user_type == User.DOCTOR:
+            if self.status in [self.BOOKED]:
+                allowed = [self.COMPLETED]
         return allowed
 
     def send_notification(self, database_instance):
