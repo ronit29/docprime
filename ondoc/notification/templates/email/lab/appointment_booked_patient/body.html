@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <p>
+        Dear {{patient_name|capfirst}}
+
+We are pleased confirm your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}
+        with Dr. {{doctor_name|capfirst}}.
+
+Your appointment reference ID is {{instance.id}}
+
+
+
+
+[Summary Card]
+
+Please present this card and the unique identification code in this card at the time of your visit.
+
+Regards
+docprime
+
+This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to customerhelp@docprime.com
+    </p>
+
+</body>
+</html>
