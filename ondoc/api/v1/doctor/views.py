@@ -700,6 +700,6 @@ class HealthTipView(viewsets.GenericViewSet):
         return models.HealthTip.objects.all()
 
     def list(self, request):
-        data = models.HealthTip.objects.all()
+        data = self.get_queryset()
         serializer = serializers.HealthTipSerializer(data, many=True)
         return Response(serializer.data)
