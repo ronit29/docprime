@@ -720,5 +720,11 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
         fields = ('id', 'name')
 
 
+class ConfigGetSerializer(serializers.Serializer):
+
+    os = serializers.CharField(max_length=10)
+    ver = serializers.CharField(max_length=10)
+
+
 
 
