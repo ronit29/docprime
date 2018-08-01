@@ -426,38 +426,41 @@ class LabAppointmentForm(forms.ModelForm):
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
-    fields = ('lab', 'managers_details','lab_test', 'profile_name', 'profile_number', 'user_number', 'status', 'time_slot_start', 'price', 'agreed_price',
+    fields = ('lab', 'employees_details', 'lab_test', 'used_profile_name', 'used_profile_number', 'user_number', 'status', 'time_slot_start', 'price', 'agreed_price',
               'deal_price', 'effective_price', 'payment_status',
               'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
     # fields = fields + ('__all__')
-    readonly_fields = ('lab', 'managers_details', 'lab_test', 'profile_name', 'profile_number', 'user_number', 'price', 'agreed_price',
+    readonly_fields = ('lab', 'employees_details', 'lab_test', 'used_profile_name', 'used_profile_number', 'user_number', 'price', 'agreed_price',
                        'deal_price', 'effective_price', 'payment_status',
                        'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
 
     def lab_name(self, obj):
         return mark_safe('{name} (<a href="{profile_link}">Profile</a>)'.format(name=obj.lab.name,
                                                                                 profile_link="#"))
-    def profile_name(self, obj):
+    def used_profile_name(self, obj):
         return obj.profile.name
 
-    def profile_number(self, obj):
+    def used_profile_number(self, obj):
         return obj.profile.phone_number
+
+    def default_profile_name(self, obj):
+        pass
+
+    def default_profile_number(self, obj):
+        pass
 
     def user_number(self, obj):
         return obj.user.phone_number
 
-    def managers_details(self, obj):
-        pass
-    #     managers = obj.lab.labmanager_set.all()
-    #
-    #     for manager in managers:
-    #
-    #         details+=manager.name
-    # number = models.BigIntegerField()
-    # email = models.EmailField(max_length=100, blank=True)
-    # details = models.CharField(max_length=200, blank=True)
-    # contact_type+
-    #
+    def employees_details(self, obj):
+        managers = obj.lab.labmanager_set.all()
+        details = ''
+        for manager in managers:
+            details += 'Name : {name}<br>Phone number : {number}<br>Email : {email}<br>Type : {type}<br><br>'.format(
+                name=manager.name, number=manager.number, email=manager.email, type=dict(LabManager.CONTACT_TYPE_CHOICES)[manager.contact_type])
+            # ' , '.join([str(manager.name), str(manager.number), str(manager.email), str(manager.details)])
+            # details += '\n'
+        return mark_safe('<p>{details}</p>'.format(details=details))
 
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
     change_list_template = 'superuser_import_export.html'
