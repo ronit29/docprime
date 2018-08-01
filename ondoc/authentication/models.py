@@ -547,7 +547,7 @@ class GenericAdmin(TimeStampedModel):
 
     @classmethod
     def create_admin_permissions(cls, doctor):
-        from ondoc.doctor.models import DoctorHospital, DoctorMobile
+        from ondoc.doctor.models import DoctorClinic, DoctorMobile
         doc_user = None
         doc_number = None
         doctor_admins = []
@@ -564,7 +564,7 @@ class GenericAdmin(TimeStampedModel):
                                                                                is_doc_admin=True,
                                                                                permission_type=GenericAdmin.APPOINTMENT),
                                                                              ~Q(phone_number=doc_number)).distinct('user')
-        doc_hosp_data = DoctorHospital.objects.select_related('doctor', 'hospital')\
+        doc_hosp_data = DoctorClinic.objects.select_related('doctor', 'hospital')\
                                       .filter(doctor=doctor)\
                                       .distinct('hospital')
 

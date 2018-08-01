@@ -250,7 +250,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
-        through='DoctorHospital',
+        through='DoctorClinic',
         through_fields=('doctor', 'hospital'),
         related_name='assoc_doctors',
     )
@@ -357,6 +357,66 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
         unique_together = ("doctor", "specialization")
 
 
+class DoctorClinic(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='doctor_clinics')
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
+    followup_charges = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = "doctor_clinic"
+        unique_together = (('doctor', 'hospital', ),)
+
+    def __str__(self):
+        return '{}-{}'.format(self.doctor, self.hospital)
+
+
+class DoctorClinicTiming(auth_model.TimeStampedModel):
+    DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
+    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name='availability')
+    day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
+
+    TIME_CHOICES = [(7.0, "7:00 AM"), (7.5, "7:30 AM"),
+                    (8.0, "8:00 AM"), (8.5, "8:30 AM"),
+                    (9.0, "9:00 AM"), (9.5, "9:30 AM"),
+                    (10.0, "10:00 AM"), (10.5, "10:30 AM"),
+                    (11.0, "11:00 AM"), (11.5, "11:30 AM"),
+                    (12.0, "12:00 PM"), (12.5, "12:30 PM"),
+                    (13.0, "1:00 PM"), (13.5, "1:30 PM"),
+                    (14.0, "2:00 PM"), (14.5, "2:30 PM"),
+                    (15.0, "3:00 PM"), (15.5, "3:30 PM"),
+                    (16.0, "4:00 PM"), (16.5, "4:30 PM"),
+                    (17.0, "5:00 PM"), (17.5, "5:30 PM"),
+                    (18.0, "6:00 PM"), (18.5, "6:30 PM"),
+                    (19.0, "7:00 PM"), (19.5, "7:30 PM"),
+                    (20.0, "8:00 PM"), (20.5, "8:30 PM"),
+                    (21.0, "9:00 PM"), (21.5, "9:30 PM"),
+                    (22.0, "10:00 PM"), (22.5, "10:30 PM")]
+
+    start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    fees = models.PositiveSmallIntegerField(blank=False, null=False)
+    deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
+    mrp = models.PositiveSmallIntegerField(blank=False, null=True)
+    # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
+    # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
+
+    class Meta:
+        db_table = "doctor_clinic_timing"
+        unique_together = (("start", "end", "day", "doctor_clinic",),)
+
+    def save(self, *args, **kwargs):
+        if self.mrp!=None:
+            deal_price = math.ceil(self.fees + (self.mrp - self.fees)*.1)
+            deal_price = math.ceil(deal_price/10)*10
+            if deal_price>self.mrp:
+                deal_price = self.mrp
+            if deal_price<self.fees:
+                deal_price = self.fees
+            self.deal_price = deal_price
+        super().save(*args, **kwargs)
+
+
 class DoctorHospital(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
     doctor = models.ForeignKey(Doctor, related_name="availability", on_delete=models.CASCADE)
@@ -412,9 +472,19 @@ class DoctorHospital(auth_model.TimeStampedModel):
 
 class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
-    name = models.ImageField(upload_to='doctor/images',height_field='height', width_field='width')
+    name = models.ImageField('Original Image Name',upload_to='doctor/images',height_field='height', width_field='width')
     cropped_image = models.ImageField(upload_to='doctor/images', height_field='height', width_field='width',
                                       blank=True, null=True)
+
+
+    def __str__(self):
+        return '{}'.format(self.doctor)
+
+    def original_image(self):
+        return mark_safe('<div><img style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.name.url))
+
+    def cropped_img(self):
+        return mark_safe('<div><img style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.cropped_image.url))
 
     class Meta:
         db_table = "doctor_image"
@@ -436,6 +506,13 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
             md5_hash = hashlib.md5(img.tobytes()).hexdigest()
             self.cropped_image = InMemoryUploadedFile(new_image_io, None, md5_hash + ".jpg", 'image/jpeg',
                                                       new_image_io.tell(), None)
+            self.save()
+
+    def save_to_cropped_image(self, image_file):
+        if image_file:
+            img = Img.open(image_file)
+            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            self.cropped_image.save(md5_hash + ".jpg", image_file, save=True)
             self.save()
 
 
@@ -484,7 +561,7 @@ class HospitalDocument(auth_model.TimeStampedModel, auth_model.Document):
                (CHEQUE, "Cancel Cheque Copy"), (COI, "COI/Company Registration"),
                (EMAIL_CONFIRMATION, "Email Confirmation")]
 
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, related_name="hospital_documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES, default=ADDRESS)
     name = models.FileField(upload_to='hospital/documents', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
@@ -619,7 +696,7 @@ class HospitalNetworkDocument(auth_model.TimeStampedModel, auth_model.Document):
                (CHEQUE, "Cancel Cheque Copy"),(COI, "COI/Company Registration"),
                (EMAIL_CONFIRMATION, "Email Confirmation")]
 
-    hospital_network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    hospital_network = models.ForeignKey(HospitalNetwork, related_name="hospital_network_documents", on_delete=models.CASCADE)
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.FileField(upload_to='hospital_network/documents', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])

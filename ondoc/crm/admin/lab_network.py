@@ -6,8 +6,8 @@ from django.db.models import Q
 from django.db import models
 
 from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
-    LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
-    LabNetworkHelpline, LabNetworkManager)
+                                     LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
+                                     LabNetworkHelpline, LabNetworkManager, LabNetworkDocument)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -87,10 +87,17 @@ class LabNetworkForm(FormCleanMixin):
             'country':'req','pin_code':'req','labnetworkmanager':'count',
             'labnetworkhelpline':'count','labnetworkemail':'count'}
 
+        if self.instance.is_billing_enabled:
+            qc_required.update({
+                'lab_documents': 'count'
+            })
+
         for key, value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+            if self.data.get(key+'_set-TOTAL_FORMS') and value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+                raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+            if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
     def clean_operational_since(self):
@@ -98,6 +105,46 @@ class LabNetworkForm(FormCleanMixin):
         if data == '':
             return None
         return data
+
+
+class LabNetworkDocumentFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        choices = dict(LabNetworkDocument.CHOICES)
+        count = {}
+        for key, value in LabNetworkDocument.CHOICES:
+            count[key] = 0
+
+        for value in self.cleaned_data:
+            if value and not value['DELETE']:
+                count[value['document_type']] += 1
+
+        for key, value in count.items():
+            if not key==LabNetworkDocument.ADDRESS and value>1:
+                raise forms.ValidationError("Only one "+choices[key]+" is allowed")
+
+        if self.instance.is_billing_enabled:
+            if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+                for key, value in count.items():
+                    if not key==LabNetworkDocument.GST and value<1:
+                        raise forms.ValidationError(choices[key]+" is required")
+
+
+class LabNetworkDocumentInline(admin.TabularInline):
+    model = LabNetworkDocument
+    formset = LabNetworkDocumentFormSet
+    # form = LabDocumentForm
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj=obj, **kwargs)
+        formset.request = request
+        return formset
+
+    extra = 0
+    can_delete = True
+    show_change_link = False
 
 
 class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
@@ -121,11 +168,12 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
             return ''
 
     inlines = [LabNetworkManagerInline,
-        LabNetworkHelplineInline,
-        LabNetworkEmailInline,
-        LabNetworkAccreditationInline,
-        LabNetworkAwardInline,
-        LabNetworkCertificationInline]
+               LabNetworkHelplineInline,
+               LabNetworkEmailInline,
+               LabNetworkAccreditationInline,
+               LabNetworkAwardInline,
+               LabNetworkCertificationInline,
+               LabNetworkDocumentInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

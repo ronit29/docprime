@@ -10,6 +10,7 @@ from ondoc.doctor.models import OpdAppointment
 from django.db.models import Count, Sum, When, Case, Q, F
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
+from django.utils import timezone
 import datetime
 import pytz
 import json
@@ -307,11 +308,17 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
 
     def validate(self, data):
+        MAX_APPOINTMENTS_ALLOWED = 3
+        ACTIVE_APPOINTMENT_STATUS = [LabAppointment.BOOKED, LabAppointment.ACCEPTED,
+                                     LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
         request = self.context.get("request")
         if data.get("is_home_pickup") is True and (not data.get("address")):
             raise serializers.ValidationError("Address required for home pickup")
         if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
             raise serializers.ValidationError("Invalid profile id")
+        if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"], lab=data[
+            "lab"]).count() >= MAX_APPOINTMENTS_ALLOWED:
+            raise serializers.ValidationError('Max '+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
         self.test_lab_id_validator(data)
         self.time_slot_validator(data)
         return data
@@ -393,6 +400,9 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     @staticmethod
     def time_slot_validator(data):
         start_dt = (CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
+
+        if start_dt < timezone.now():
+            raise serializers.ValidationError("Cannot book in past")
 
         day_of_week = start_dt.weekday()
         start_hour = round(float(start_dt.hour) + (float(start_dt.minute) * 1 / 60), 2)

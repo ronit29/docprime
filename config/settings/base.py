@@ -88,7 +88,8 @@ THIRD_PARTY_APPS = (
     'dal',
     'dal_select2',
     'django_tables2',
-    'anymail'
+    'anymail',
+    'nested_admin'
 )
 
 LOCAL_APPS = (
@@ -250,7 +251,7 @@ RABBITMQ_CONNECTION_SETTINGS = {
 BASE_URL = env('BASE_URL')
 
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
-CHAT_API_URL = env('CHAT_API_URL')
+# CHAT_API_URL = env('CHAT_API_URL')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),

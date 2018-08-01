@@ -14,9 +14,9 @@ from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest)
+    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User
+from ondoc.authentication.models import GenericAdmin, User, QCModel
 from django.contrib.contenttypes.admin import GenericTabularInline
 
 
@@ -167,10 +167,11 @@ class LabDocumentFormSet(forms.BaseInlineFormSet):
             if not key==LabDocument.ADDRESS and value>1:
                 raise forms.ValidationError("Only one "+choices[key]+" is allowed")
 
-        if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
-            for key, value in count.items():
-                if not key==LabDocument.GST and value<1:
-                    raise forms.ValidationError(choices[key]+" is required")
+        if not self.instance.network or not self.instance.network.is_billing_enabled:
+            if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+                for key, value in count.items():
+                    if not key==LabDocument.GST and value<1:
+                        raise forms.ValidationError(choices[key]+" is required")
 
 
 
@@ -223,8 +224,9 @@ class LabForm(FormCleanMixin):
 
     class Meta:
         model = Lab
-        exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
-                   'radiology_deal_price_percentage', )
+        exclude=()
+        # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
+        #            'radiology_deal_price_percentage', )
 
     def clean_operational_since(self):
         data = self.cleaned_data['operational_since']
@@ -236,6 +238,14 @@ class LabForm(FormCleanMixin):
         qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
             'license':'req','building':'req','locality':'req','city':'req','state':'req',
             'country':'req','pin_code':'req','network_type':'req','lab_image':'count'}
+
+        if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
+            raise forms.ValidationError("Lab Network is not QC approved.")
+
+        if not self.instance.network or not self.instance.network.is_billing_enabled:
+            qc_required.update({
+                'lab_documents': 'count'
+            })
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
@@ -267,9 +277,13 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter)
 
-    exclude = ('search_key', )
+    exclude = ('is_home_pickup_available','search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
+                   'radiology_deal_price_percentage', )
 
-    readonly_fields = ('lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live')
+    def get_readonly_fields(self, request, obj=None):
+        if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
+            return ('lead_url','matrix_lead_id','matrix_reference_id', 'lab_pricing_group', 'is_live')
+        return ('lead_url','matrix_lead_id','matrix_reference_id', 'is_live')
 
     def lead_url(self, instance):
         if instance.id:
@@ -373,9 +387,10 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         return form
 
     form = LabForm
-    search_fields = ['name']
+    search_fields = ['name', 'lab_pricing_group', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
         LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline]
+    autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'

@@ -2,12 +2,12 @@ from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,Doctor,
-    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital, DoctorHospital)
+    HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
-from ondoc.authentication.models import GenericAdmin, User
+from ondoc.authentication.models import GenericAdmin, User, QCModel
 from django.contrib.contenttypes.admin import GenericTabularInline
 
 
@@ -130,13 +130,26 @@ class HospitalForm(FormCleanMixin):
         return data
 
     def validate_qc(self):
-        qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
-            'registration_number':'req','building':'req','locality':'req','city':'req','state':'req',
-            'country':'req','pin_code':'req','hospital_type':'req','network_type':'req','hospitalimage':'count'}
+        qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
+                       'registration_number': 'req', 'building': 'req', 'locality': 'req', 'city': 'req',
+                       'state': 'req',
+                       'country': 'req', 'pin_code': 'req', 'hospital_type': 'req', 'network_type': 'req',
+                       'hospitalimage': 'count'}
+
+        if (not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
+            qc_required.update({
+                'hospital_documents': 'count'
+            })
+
+        if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
+            raise forms.ValidationError("Hospital Network is not QC approved.")
+
         for key,value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+            if self.data.get(key+'_set-TOTAL_FORMS') and value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+                raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+            if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
         if self.cleaned_data['network_type']==2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Hospital")
@@ -222,7 +235,6 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalDocumentInline,
         HospitalCertificationInline,
         GenericAdminInline,
-        HospitalDocumentInline,
 
     ]
 

@@ -9,6 +9,7 @@ from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
+from rest_framework.exceptions import ValidationError as RestValidationError
 import datetime
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
@@ -19,7 +20,7 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When
 from django.forms.models import model_to_dict
 from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
-from ondoc.doctor.models import DoctorMobile, DoctorHospital
+from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin)
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
@@ -28,7 +29,7 @@ from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
 from ondoc.api.v1 import utils
 from ondoc.doctor.models import OpdAppointment
-from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterSerializer,
+from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterUserSerializer,
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
                                              OpdAppModelSerializer)
@@ -256,11 +257,37 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
+        if UserProfile.objects.filter(name=data['name'], user=request.user).exists():
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Profile with the given name already exists."
+                                   }
+            }, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
-        return super().update(request, partial=True, *args, **kwargs)
+        data = {key: value for key, value in request.data.items()}
+        if data.get('age'):
+            try:
+                age = int(request.data.get("age"))
+                data['dob'] = datetime.datetime.now() - relativedelta(years=age)
+                data['dob'] = data['dob'].date()
+            except:
+                return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj = self.get_object()
+        if data.get("name") and UserProfile.objects.exclude(id=obj.id).filter(name=data['name'],
+                                                                              user=request.user).exists():
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Profile with the given name already exists."
+                                   }
+            }, status=status.HTTP_400_BAD_REQUEST)
+        serializer = serializers.UserProfileSerializer(obj, data=data, partial=True, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     def upload(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -297,8 +324,16 @@ class UserAppointmentsViewSet(OndocViewSet):
             combined_data.extend(doctor_serializer.data)
         if lab_serializer.data:
             combined_data.extend(lab_serializer.data)
-        combined_data = sorted(combined_data, key=lambda k: k['status'])
-        # combined_data = sorted(combined_data, key=lambda k: k['time_slot_start'])
+        combined_data = sorted(combined_data, key=lambda x: x['time_slot_start'], reverse=True)
+        temp_dict = dict()
+        for data in combined_data:
+            if not temp_dict.get(data["status"]):
+                temp_dict[data["status"]] = [data]
+            else:
+                temp_dict[data["status"]].append(data)
+        combined_data = list()
+        for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
+            combined_data.extend(v)
         combined_data = combined_data[:80]
         return Response(combined_data)
 
@@ -335,7 +370,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['Error'] = 'Action Not Allowed'
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_lab_appointment = self.lab_appointment_update(request, lab_appointment, validated_data)
-            if updated_lab_appointment["status"] == 0:
+            if updated_lab_appointment.get("status") and updated_lab_appointment["status"] == 0:
                 return Response(updated_lab_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_lab_appointment)
@@ -348,7 +383,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
-            if updated_opd_appointment["status"] == 0:
+            if updated_opd_appointment.get("status") and updated_opd_appointment["status"] == 0:
                 return Response(updated_opd_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_opd_appointment)
@@ -360,7 +395,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELED:
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
-                resp["data"] = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
+                resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = utils.form_time_slot(
@@ -416,7 +451,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             resp["status"] = 1
             if validated_data['status'] == OpdAppointment.CANCELED:
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
-                resp["data"] = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
+                resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = utils.form_time_slot(
@@ -428,13 +463,12 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "msg": "Cannot Reschedule for same timeslot"
                         }
                         return resp
-                    doctor_hospital = DoctorHospital.objects.filter(doctor__is_live=True,
-                                                                    hospital__is_live=True).filter(
-                        doctor=opd_appointment.doctor,
-                        hospital=opd_appointment.hospital,
-                        day=time_slot_start.weekday(),
-                        start__lte=time_slot_start.hour,
-                        end__gte=time_slot_start.hour).first()
+
+                    doctor_hospital = DoctorClinicTiming.objects.filter(doctor_clinic__doctor__is_live=True,doctor_clinic__hospital__is_live=True,doctor_clinic__doctor=opd_appointment.doctor,
+                                                                        doctor_clinic__hospital=opd_appointment.hospital,
+                                                                        day=time_slot_start.weekday(),
+                                                                        start__lte=time_slot_start.hour,
+                                                                        end__gte=time_slot_start.hour).first()
                     if doctor_hospital:
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
@@ -575,7 +609,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
         if not queryset:
             return Response([])
-        serializer = AppointmentFilterSerializer(data=request.query_params)
+        serializer = AppointmentFilterUserSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         range = serializer.validated_data.get('range')
@@ -926,8 +960,7 @@ class OrderHistoryViewSet(GenericViewSet):
 
         doc_hosp_details = defaultdict(dict)
         if doc_hosp_query:
-            doc_hosp_obj = DoctorHospital.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(
-                doctor__is_live=True, hospital__is_live=True).filter(doc_hosp_query)
+            doc_hosp_obj = DoctorClinic.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(doc_hosp_query)
             for data in doc_hosp_obj:
                 doc_hosp_details[data.hospital.id][data.doctor.id] = {
                     "doctor_name": data.doctor.name,
@@ -938,7 +971,7 @@ class OrderHistoryViewSet(GenericViewSet):
         lab_name = dict()
         lab_test_map = dict()
         if available_lab_test:
-            test_ids = AvailableLabTest.objects.prefetch_related('lab', 'test').filter(pk__in=available_lab_test, lab__is_live=True)
+            test_ids = AvailableLabTest.objects.prefetch_related('lab', 'test').filter(pk__in=available_lab_test)
             lab_test_map = dict()
             for data in test_ids:
                 lab_name[data.lab.id] = {
@@ -992,7 +1025,7 @@ class OrderHistoryViewSet(GenericViewSet):
                     "type": "lab"
                 }
                 serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
-                if not serializer.is_valid(raise_exception=True):
+                if not serializer.is_valid():
                     data.pop("time_slot_start")
                     data.pop("start_date")
                     data.pop("start_time")
@@ -1007,7 +1040,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (DoctorHospital.objects.filter(doctor__is_live=True, hospital__is_live=True).annotate(
+        doc_hosp_queryset = (DoctorClinic.objects.filter(doctor__is_live=True, hospital__is_live=True).annotate(
             hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
@@ -1031,7 +1064,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     def list(self, request):
         user = request.user
         doc_hosp_queryset = (
-            DoctorHospital.objects.filter(
+            DoctorClinic.objects.filter(
                 Q(
                   doctor__manageable_doctors__user=user,
                   doctor__manageable_doctors__is_disabled=False,
@@ -1106,17 +1139,17 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
             permission = GenericAdmin.objects.filter(user=user, doctor=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.filter(doctor=admin_id).values('hospital', 'hospital__name')
+                resp_data = DoctorClinic.objects.filter(doctor=admin_id).values('hospital', 'hospital__name')
         elif level == Outstanding.HOSPITAL_LEVEL:
             permission = GenericAdmin.objects.filter(user=user, hospital=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.filter(hospital=admin_id).values('doctor', 'doctor__name')
+                resp_data = DoctorClinic.objects.filter(hospital=admin_id).values('doctor', 'doctor__name')
         elif level == Outstanding.HOSPITAL_NETWORK_LEVEL:
             permission = GenericAdmin.objects.filter(user=user, hospital_network=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.get(hospital__network=admin_id).values('hospital', 'doctor',
+                resp_data = DoctorClinic.objects.get(hospital__network=admin_id).values('hospital', 'doctor',
                                                                                           'hospital_name', 'doctor_name')
         elif level == Outstanding.LAB_LEVEL:
             pass
