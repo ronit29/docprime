@@ -195,6 +195,9 @@ class NotificationEndpointViewSet(GenericViewSet):
         notification_endpoint_data = {
             "user": request.user.id,
             "device_id": validated_data.get("device_id"),
+            "platform": validated_data.get("platform"),
+            "app_name": validated_data.get("app_name"),
+            "app_version": validated_data.get("app_version"),
             "token": validated_data.get("token")
         }
         notification_endpoint_serializer = serializers.NotificationEndpointSerializer(data=notification_endpoint_data)

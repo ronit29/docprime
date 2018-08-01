@@ -81,16 +81,19 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                 response_data = []
                 for room_data in chat_room_data:
                     response = {}
-                    response['room_id'] = room_data.get('rid', None)
+                    response['room_id'] = room_data.get('rid')
                     response['date'] = room_data.get('ts', None)
                     response['doctor_name'] = None
                     response['user_name']=  None
-                    doc_id = room_data.get('user', None)
-                    if doc_id:
-                        for doc in Doctors:
-                            if int(doc.id) == int(doc_id):
-                                response['doctor_name'] = doc.name
-                                break
+                    try:
+                        doc_id = int(room_data.get('user'))
+                        if doc_id:
+                            for doc in Doctors:
+                                if int(doc.id) == int(doc_id):
+                                    response['doctor_name'] = doc.name
+                                    break
+                    except:
+                        continue
                     for chat_data in chat_api_data:
                         if room_data.get('rid') == chat_data.get('_id'):
                             small_case_symptoms = chat_data['params'].get('symptoms', None)
@@ -120,10 +123,6 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                             selected_profile = chat_data['params'].get('selectedProfile', None)
                             if selected_profile:
                                 user_profile_id = selected_profile.get('id')
-                                try:
-                                    user_profile_id = int(user_profile_id)
-                                except:
-                                    continue
                                 for usr in UserProfiles:
                                     if int(usr.id) == int(user_profile_id):
                                         response['user_name'] = usr.name
