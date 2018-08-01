@@ -648,6 +648,18 @@ class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
                   'qualifications', 'general_specialization', 'mobiles',)
 
 
+class OpdAppointmentBillingSerializer(OpdAppointmentSerializer):
+    profile = UserProfileSerializer()
+    hospital = HospitalModelSerializer()
+    doctor = AppointmentRetrieveDoctorSerializer()
+
+    class Meta:
+        model = OpdAppointment
+        fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
+                  'allowed_action', 'effective_price', 'fees', 'status', 'time_slot_start', 'time_slot_end',
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'payment_type')
+
+
 class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
     hospital = HospitalModelSerializer()
