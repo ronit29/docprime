@@ -10,6 +10,8 @@ urlpatterns = [
     #path('otp/verify', OTP.as_view({'post': 'verify'}), name='otp-verify'),
     path('login', UserViewset.as_view({'post': 'login'}), name='user-login'),
     path('doctor/login', UserViewset.as_view({'post': 'doctor_login'}), name='doctor-login'),
+    path('logout', UserViewset.as_view({'post': 'logout'}), name='user-logout'),
+    path('doctor/logout', UserViewset.as_view({'post': 'logout'}), name='doctor-logout'),
     path('register', UserViewset.as_view({'post': 'register'}), name='user-register'),
     path('notification/endpoint/save',
          NotificationEndpointViewSet.as_view({'post': 'save'}), name='notification-endpoint-save'),
