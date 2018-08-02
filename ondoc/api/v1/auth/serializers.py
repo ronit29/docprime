@@ -104,6 +104,11 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class NotificationEndpointSerializer(serializers.ModelSerializer):
+    device_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    platform = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    app_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    app_version = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    token = serializers.CharField()
 
     class Meta:
         model = NotificationEndpoint
@@ -112,10 +117,10 @@ class NotificationEndpointSerializer(serializers.ModelSerializer):
 
 
 class NotificationEndpointSaveSerializer(serializers.Serializer):
-    device_id = serializers.CharField(required=False)
-    platform = serializers.CharField(required=False)
-    app_name = serializers.CharField(required=False)
-    app_version = serializers.CharField(required=False)
+    device_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    platform = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    app_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    app_version = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     token = serializers.CharField()
 
 

@@ -282,7 +282,7 @@ class UserProfile(TimeStampedModel):
     FEMALE = 'f'
     OTHER = 'o'
     GENDER_CHOICES = [(MALE,"Male"), (FEMALE,"Female"), (OTHER,"Other")]
-    user = models.ForeignKey(User, related_name="profiles", on_delete=models.CASCADE)
+    user = models.ForeignKey(User, related_name="profiles", on_delete=models.SET_NULL, null=True)
     name = models.CharField(max_length=100, blank=False, null=True, default=None)
     email = models.CharField(max_length=256, blank=False, null=True, default=None)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=GENDER_CHOICES)
