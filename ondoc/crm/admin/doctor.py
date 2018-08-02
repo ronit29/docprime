@@ -710,6 +710,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
+            obj.is_live = True
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 
@@ -831,7 +832,7 @@ class HealthTipAdmin(VersionAdmin):
 class DoctorClinicAdmin(VersionAdmin):
     list_display = ('doctor', 'hospital', 'updated_at')
     date_hierarchy = 'created_at'
-    search_fields = ['doctor']
+    search_fields = ['doctor__name', 'hospital__name']
     autocomplete_fields = ['doctor', 'hospital']
     inlines = [DoctorClinicTimingInline]
 
