@@ -323,7 +323,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             'referenceId': '',
             'orderId': order_id,
             'name': appointment_details['profile'].name,
-            'txAmount': appointment_details['payable_amount'],
+            'txAmount': str(appointment_details['payable_amount']),
 
         }
 
