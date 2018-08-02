@@ -240,7 +240,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     additional_details = models.CharField(max_length=2000, blank=True)
     # email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name='Email Verified', default=False)
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name="doctor", on_delete=models.CASCADE, default=None,
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name="doctor", on_delete=models.SET_NULL, default=None,
                                 blank=True, null=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="created_doctors", null=True, editable=False,
                                    on_delete=models.SET_NULL)
@@ -837,12 +837,12 @@ class OpdAppointment(auth_model.TimeStampedModel):
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
-    doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.CASCADE)
-    hospital = models.ForeignKey(Hospital, related_name="hospital_appointments", on_delete=models.CASCADE)
-    profile = models.ForeignKey(auth_model.UserProfile, related_name="appointments", on_delete=models.CASCADE)
+    doctor = models.ForeignKey(Doctor, related_name="appointments", on_delete=models.SET_NULL, null=True)
+    hospital = models.ForeignKey(Hospital, related_name="hospital_appointments", on_delete=models.SET_NULL, null=True)
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="appointments", on_delete=models.SET_NULL, null=True)
     profile_detail = JSONField(blank=True, null=True)
-    user = models.ForeignKey(auth_model.User, related_name="appointments", on_delete=models.CASCADE)
-    booked_by = models.ForeignKey(auth_model.User, related_name="booked_appointements", on_delete=models.CASCADE)
+    user = models.ForeignKey(auth_model.User, related_name="appointments", on_delete=models.SET_NULL, null=True)
+    booked_by = models.ForeignKey(auth_model.User, related_name="booked_appointements", on_delete=models.SET_NULL, null=True)
     fees = models.DecimalField(max_digits=10, decimal_places=2)
     effective_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
     mrp = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
