@@ -11,7 +11,7 @@ class Insurer(auth_model.TimeStampedModel):
 
 
 class Insurance(auth_model.TimeStampedModel):
-    insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
+    insurer = models.ForeignKey(Insurer, on_delete=models.SET_NULL, null=True)
     product_id = models.PositiveSmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
     name = models.CharField(max_length=100)
     insurance_amount = models.DecimalField(max_digits=10, decimal_places=2)
