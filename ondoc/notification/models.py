@@ -1,7 +1,7 @@
 import json
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
-from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.fields import JSONField, ArrayField
 from django.forms.models import model_to_dict
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.authentication.models import NotificationEndpoint
@@ -549,3 +549,15 @@ class PushNotification(TimeStampedModel):
         }
         message = json.dumps(message)
         publish_message(message)
+
+
+class AppointmentAlertNotification(TimeStampedModel):
+    OPS_ALERT_NOTIFICATION =
+    trigger_time = models.IntegerField(verbose_name="Trigger Time in minutes")
+    email_ids = ArrayField(models.EmailField(max_length=100), blank=True, null=True)
+    email_sub = models.TextField(blank=True, null=True, default=None)
+    email_body = models.TextField(blank=True, null=True, default=None)
+    notification_type = models.PositiveSmallIntegerField(choices=)
+
+    class Meta:
+        db_table = "appointment_alert_notification"
