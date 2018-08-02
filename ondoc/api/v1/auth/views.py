@@ -44,6 +44,7 @@ from rest_framework.authentication import TokenAuthentication, SessionAuthentica
 
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
 import decimal
+from django.conf import settings
 from collections import defaultdict
 import copy
 
@@ -587,14 +588,15 @@ class UserAppointmentsViewSet(OndocViewSet):
             "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
         pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['checkSum'] = ''
         pgdata['appointmentId'] = appointment_details.get('id')
         pgdata['orderId'] = order_id
         if user_profile:
             pgdata['name'] = user_profile.name
         else:
             pgdata['name'] = "DummyName"
-        pgdata['txAmount'] = appointment_details['payable_amount']
+        pgdata['txAmount'] = str(appointment_details['payable_amount'])
+
+        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
 
         return pgdata, payment_required
 
