@@ -39,3 +39,62 @@ CACHES = {
 CLOUDFRONT_DOMAIN = "qacdn.docprime.com"
 #CLOUDFRONT_ID = "your cloud front id"
 AWS_S3_CUSTOM_DOMAIN = "qacdn.docprime.com" # to make sure the url that the files are served from this domain
+
+RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
+
+# Sentry Configuration
+SENTRY_DSN = env('DJANGO_SENTRY_DSN')
+SENTRY_CLIENT = env('DJANGO_SENTRY_CLIENT', default='raven.contrib.django.raven_compat.DjangoClient')
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'root': {
+        'level': 'WARNING',
+        'handlers': ['sentry', ],
+    },
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s '
+                      '%(process)d %(thread)d %(message)s'
+        },
+    },
+    'handlers': {
+        'sentry': {
+            'level': 'INFO',
+            'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose'
+        }
+    },
+    'loggers': {
+        'django.db.backends': {
+            'level': 'ERROR',
+            'handlers': ['sentry', ],
+            'propagate': False,
+        },
+        'raven': {
+            'level': 'DEBUG',
+            'handlers': ['console', ],
+            'propagate': False,
+        },
+        'sentry.errors': {
+            'level': 'DEBUG',
+            'handlers': ['console', ],
+            'propagate': False,
+        },
+        'django.security.DisallowedHost': {
+            'level': 'ERROR',
+            'handlers': ['console', 'sentry', ],
+            'propagate': False,
+        },
+    },
+}
+SENTRY_CELERY_LOGLEVEL = env.int('DJANGO_SENTRY_LOG_LEVEL', logging.INFO)
+RAVEN_CONFIG = {
+    'CELERY_LOGLEVEL': env.int('DJANGO_SENTRY_LOG_LEVEL', logging.INFO),
+    'DSN': SENTRY_DSN,
+    #'release': raven.fetch_git_sha(os.path.abspath(os.pardir)),
+}
