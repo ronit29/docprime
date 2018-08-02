@@ -831,7 +831,7 @@ class HealthTipAdmin(VersionAdmin):
 class DoctorClinicAdmin(VersionAdmin):
     list_display = ('doctor', 'hospital', 'updated_at')
     date_hierarchy = 'created_at'
-    search_fields = ['doctor']
+    search_fields = ['doctor__name', 'hospital__name']
     autocomplete_fields = ['doctor', 'hospital']
     inlines = [DoctorClinicTimingInline]
 
