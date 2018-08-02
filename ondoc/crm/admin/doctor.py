@@ -1,5 +1,6 @@
 from reversion.admin import VersionAdmin
 from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned
+from django.conf import settings
 from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
@@ -735,23 +736,45 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
 
 class DoctorOpdAppointmentForm(forms.ModelForm):
-    pass
-    # def clean(self):
-    #     cleaned_data = self.cleaned_data
-    #     new_status = cleaned_data.get('status')
-    #     new_time_slot_start = cleaned_data.get('time_slot_start')
-    #     # validate stuff
-    #     if True:
-    #         msg = "ERROR"
-    #         self._errors["status"] = self.error_class([msg])
-    #         self._errors["time_slot_start"] = self.error_class([msg])
-    #         del cleaned_data['status']
-    #         del cleaned_data['time_slot_start']
-    #     return cleaned_data
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        time_slot_start = cleaned_data['time_slot_start']
+        hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute)*1/60), 2)
+        if hour not in [value[0] for value in DoctorClinicTiming.TIME_CHOICES]:
+            self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
+            self.cleaned_data.pop('time_slot_start', None)
+        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
+                                                 doctor_clinic__hospital=self.instance.hospital,
+                                                 day=time_slot_start.weekday(),
+                                                 start__lte=hour, end__gt=hour).exists():
+            raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
+        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
+                                                 doctor_clinic__hospital=self.instance.hospital, day=time_slot_start.weekday(),
+                                                 start__lte=hour, end__gt=hour, deal_price=self.instance.deal_price).exists():
+            raise forms.ValidationError("Deal price is different for this time slot.")
+        return cleaned_data
 
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        allowed_status_for_agent = [(OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                                    (OpdAppointment.RESCHEDULED_DOCTOR, 'Rescheduled by doctor'),
+                                    (OpdAppointment.ACCEPTED, 'Accepted'),
+                                    (OpdAppointment.CANCELLED, 'Cancelled')]
+        time_slots = DoctorClinicTiming.TIME_CHOICES
+
+        if db_field.name == "status" and request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            kwargs['choices'] = allowed_status_for_agent
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj=obj, **kwargs)
+        form.request = request
+        return form
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
@@ -778,8 +801,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return ()
 
     def doctor_name(self, obj):
-        return mark_safe('{name} (<a href="{profile_link}">Profile</a>)'.format(name=obj.doctor.name,
-                                                                                profile_link="#"))
+        profile_link = "opd/doctor/{}".format(obj.doctor.id)
+        return mark_safe('{name} (<a href="{consumer_app_domain}/{profile_link}">Profile</a>)'.format(
+            name=obj.doctor.name, consumer_app_domain=settings.CONSUMER_APP_DOMAIN, profile_link=profile_link))
 
     def hospital_name(self, obj):
         if obj.hospital.location:
