@@ -235,8 +235,9 @@ class PgTransaction(TimeStampedModel):
         for k in sorted(data.keys()):
             if str(data[k]):
                 data_to_verify = data_to_verify + k + '=' + str(data[k]) + ';'
-        encrypted_data_to_verify = key1 + '|' + data_to_verify + '|' + key2
+        encrypted_data_to_verify = key2 + '|' + data_to_verify + '|' + key1
         encrypted_message_object = hashlib.sha256(str(encrypted_data_to_verify).encode())
+
         encrypted_message_digest = encrypted_message_object.hexdigest()
         return encrypted_message_digest
 

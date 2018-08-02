@@ -1032,8 +1032,8 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
     def save(self, *args, **kwargs):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
-        if not self.is_doctor_available():
-            raise RestFrameworkValidationError("Doctor is on leave.")
+        # if not self.is_doctor_available():
+        #     raise RestFrameworkValidationError("Doctor is on leave.")
         super().save(*args, **kwargs)
         self.send_notification(database_instance)
 
