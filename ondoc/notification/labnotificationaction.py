@@ -97,7 +97,7 @@ class LabNotificationAction(NotificationAction):
                 "body": "Appointment with Lab - {} at {}, {} has been cancelled as per your request..".format(
                     lab_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")),
-                "url": "/opd/appointment/{}".format(instance.id),
+                "url": "/lab/appointment/{}".format(instance.id),
                 "action_type": notification_type,
                 "action_id": instance.id,
                 "image_url": ""
@@ -113,7 +113,7 @@ class LabNotificationAction(NotificationAction):
                 "instance": instance,
                 "title": "Invoice Generated",
                 "body": "Invoice for appointment ID-{} has been generated.".format(instance.id),
-                "url": "/opd/appointment/{}".format(instance.id),
+                "url": "/lab/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
                 "image_url": ""
