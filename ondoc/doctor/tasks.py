@@ -12,7 +12,7 @@ def ops_alert(self, app_id, countdown_time):
 
 
 @task(bind=True)
-def doc_appointment_cancel(self, app_id, countdown_time):
+def doc_appointment_cancel(self, app_id):
     try:
         status = [OpdAppointment.CREATED, OpdAppointment.BOOKED, ]
         opd_obj = OpdAppointment.objects.filter(pk=app_id).first()
@@ -22,4 +22,4 @@ def doc_appointment_cancel(self, app_id, countdown_time):
                 opd_obj.save()
     except Exception as e:
         print(e)
-        self.retry([app_id, countdown_time, ], countdown_time=countdown_time)
+        self.retry([app_id])
