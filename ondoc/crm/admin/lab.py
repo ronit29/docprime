@@ -1,5 +1,6 @@
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
 from django.conf.urls import url
+from django.conf import settings
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats
 from django.utils.safestring import mark_safe
@@ -400,23 +401,40 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
 
 class LabAppointmentForm(forms.ModelForm):
-    pass
-    # def clean(self):
-    #     cleaned_data = self.cleaned_data
-    #     new_status = cleaned_data.get('status')
-    #     new_time_slot_start = cleaned_data.get('time_slot_start')
-    #     # validate stuff
-    #     if True:
-    #         msg = "ERROR"
-    #         self._errors["status"] = self.error_class([msg])
-    #         self._errors["time_slot_start"] = self.error_class([msg])
-    #         del cleaned_data['status']
-    #         del cleaned_data['time_slot_start']
-    #     return cleaned_data
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        time_slot_start = cleaned_data['time_slot_start']
+        hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+        if hour not in [value[0] for value in LabTiming.TIME_CHOICES]:
+            self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
+            self.cleaned_data.pop('time_slot_start', None)
+        selected_test_ids = self.instance.lab_test.all().values_list('test',flat=True)
+        if not LabTiming.objects.filter(lab=self.instance.lab,
+                                        lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                                        day=time_slot_start.weekday(),
+                                        start__lte=hour, end__gt=hour).exists():
+            raise forms.ValidationError("This lab test is not available on selected day and time.")
+        return cleaned_data
+
 
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        allowed_status_for_agent = [(LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                                    (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
+                                    (LabAppointment.ACCEPTED, 'Accepted'),
+                                    (LabAppointment.CANCELLED, 'Cancelled')]
+        if db_field.name == "status" and request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            kwargs['choices'] = allowed_status_for_agent
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj=obj, **kwargs)
+        form.request = request
+        return form
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
@@ -443,8 +461,10 @@ class LabAppointmentAdmin(admin.ModelAdmin):
             return ()
 
     def lab_name(self, obj):
-        return mark_safe('{name} (<a href="{profile_link}">Profile</a>)'.format(name=obj.lab.name,
-                                                                                profile_link="#"))
+        profile_link = "lab/{}".format(obj.doctor.id)
+        return mark_safe('{name} (<a href="{consumer_app_domain}/{profile_link}">Profile</a>)'.format(name=obj.lab.name,
+                                                                                consumer_app_domain=settings.CONSUMER_APP_DOMAIN,
+                                                                                profile_link=profile_link))
 
     def employees_details(self, obj):
         employees = obj.lab.labmanager_set.all()
