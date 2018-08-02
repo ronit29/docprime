@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q
-from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorAssociation,
+from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming, DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
@@ -35,6 +35,16 @@ class OTPSerializer(serializers.Serializer):
 
 
 class AppointmentFilterSerializer(serializers.Serializer):
+    CHOICES = ['all', 'previous', 'upcoming', 'pending']
+
+    range = serializers.ChoiceField(choices=CHOICES, required=False)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
+    profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
+    date = serializers.DateField(required=False)
+
+
+class AppointmentFilterUserSerializer(serializers.Serializer):
     CHOICES = ['all', 'previous', 'upcoming', 'pending']
 
     range = serializers.ChoiceField(choices=CHOICES, required=False)
@@ -103,8 +113,8 @@ class OpdAppModelSerializer(serializers.ModelSerializer):
 
 
 class OpdAppTransactionModelSerializer(serializers.Serializer):
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     profile_detail = serializers.JSONField()
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
@@ -123,8 +133,8 @@ class OpdAppointmentPermissionSerializer(serializers.Serializer):
 
 
 class CreateAppointmentSerializer(serializers.Serializer):
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     start_date = serializers.CharField()
     start_time = serializers.FloatField()
@@ -161,8 +171,18 @@ class CreateAppointmentSerializer(serializers.Serializer):
         if delta.days > MAX_FUTURE_DAY:
             raise serializers.ValidationError("Cannot book appointment more than "+str(MAX_FUTURE_DAY)+" days ahead")
 
-        if not DoctorHospital.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'),
-            day=time_slot_start.weekday(),start__lte=time_slot_start.hour, end__gte=time_slot_start.hour).exists():
+        time_slot_hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+
+        doctor_leave = DoctorLeave.objects.filter(deleted_at__isnull=True, doctor=data.get('doctor'), start_date__lte=time_slot_start.date(), end_date__gte=time_slot_start.date(), start_time__lte=time_slot_start.time(), end_time__gte=time_slot_start.time()).exists()
+
+        if doctor_leave:
+            raise serializers.ValidationError("Doctor is on leave")
+
+
+        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
+                                                 doctor_clinic__hospital=data.get('hospital'),
+                                                 day=time_slot_start.weekday(), start__lte=time_slot_hour,
+                                                 end__gte=time_slot_hour).exists():
             raise serializers.ValidationError("Invalid Time slot")
 
         if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
@@ -193,8 +213,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
 
 
 class SetAppointmentSerializer(serializers.Serializer):
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     time_slot_start = serializers.DateTimeField()
     time_slot_end = serializers.DateTimeField()
@@ -262,24 +282,34 @@ class DoctorLanguageSerializer(serializers.ModelSerializer):
 
 
 class DoctorHospitalSerializer(serializers.ModelSerializer):
-    doctor = serializers.ReadOnlyField(source='doctor.name')
-    hospital_name = serializers.ReadOnlyField(source='hospital.name')
-    address = serializers.ReadOnlyField(source='hospital.locality')
-    hospital_id = serializers.ReadOnlyField(source='hospital.pk')
+    doctor = serializers.ReadOnlyField(source='doctor_clinic.doctor.name')
+    hospital_name = serializers.ReadOnlyField(source='doctor_clinic.hospital.name')
+    address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_address')
+    hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     hospital_thumbnail = serializers.SerializerMethodField()
     day = serializers.SerializerMethodField()
-    discounted_fees = serializers.IntegerField(read_only=True, allow_null=True)
+    discounted_fees = serializers.IntegerField(read_only=True, allow_null=True, source='deal_price')
+    lat = serializers.SerializerMethodField(read_only=True)
+    long = serializers.SerializerMethodField(read_only=True)
+
+    def get_lat(self, obj):
+        if obj.doctor_clinic.hospital.location:
+            return obj.doctor_clinic.hospital.location.y
+        return None
+
+    def get_long(self, obj):
+        if obj.doctor_clinic.hospital.location:
+            return obj.doctor_clinic.hospital.location.x
+        return None
 
     def get_hospital_thumbnail(self, instance):
         request = self.context.get("request")
-        return request.build_absolute_uri(instance.hospital.get_thumbnail()) if instance.hospital.get_thumbnail() else None
+        return request.build_absolute_uri(
+            instance.doctor_clinic.hospital.get_thumbnail()) if instance.doctor_clinic.hospital.get_thumbnail() else None
 
     def get_day(self, attrs):
         day  = attrs.day
-        return dict(DoctorHospital.DAY_CHOICES).get(day)
-
-    def create(self, validated_data):
-        return DoctorHospital.objects.create(**validated_data)
+        return dict(DoctorClinicTiming.DAY_CHOICES).get(day)
 
     def validate(self, data):
         data['doctor'] = self.context['doctor']
@@ -288,9 +318,9 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return data
 
     class Meta:
-        model = DoctorHospital
+        model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
-                  'discounted_fees', 'hospital_thumbnail', 'mrp', )
+                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id', )
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -360,7 +390,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     qualifications = DoctorQualificationSerializer(read_only=True, many=True)
     general_specialization = DoctorSpecializationSerializer(read_only=True, many=True, source='doctorspecializations')
     languages = DoctorLanguageSerializer(read_only=True, many=True)
-    availability = DoctorHospitalSerializer(read_only=True, many=True)
+    availability = serializers.SerializerMethodField(read_only=True)
     emails = DoctorEmailSerializer(read_only=True, many=True)
     mobiles = DoctorMobileSerializer(read_only=True, many=True)
     medical_services = MedicalServiceSerializer(read_only=True, many=True)
@@ -371,6 +401,11 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
     # def get_general_specialization(self, obj):
     #     return DoctorSpecializationSerializer(obj.doctorspecializations.all(), many=True).data
+
+    def get_availability(self, obj):
+        data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj).select_related("doctor_clinic__doctor",
+                                                                                           "doctor_clinic__hospital")
+        return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
     def get_thumbnail(self, obj):
         request = self.context.get('request')
@@ -446,7 +481,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'operational_since', 'lat', 'lng','address', 'registration_number',
+        fields = ('id', 'name', 'operational_since', 'lat', 'lng', 'address', 'registration_number',
                   'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', )
 
 
@@ -458,18 +493,18 @@ class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
 
     def get_day(self, obj):
         day = obj.day
-        return dict(DoctorHospital.DAY_CHOICES).get(day)
+        return dict(DoctorClinicTiming.DAY_CHOICES).get(day)
 
     def get_start(self, obj):
         start = obj.start
-        return dict(DoctorHospital.TIME_CHOICES).get(start)
+        return dict(DoctorClinicTiming.TIME_CHOICES).get(start)
 
     def get_end(self, obj):
         end = obj.end
-        return dict(DoctorHospital.TIME_CHOICES).get(end)
+        return dict(DoctorClinicTiming.TIME_CHOICES).get(end)
 
     class Meta:
-        model = DoctorHospital
+        model = DoctorClinicTiming
         # fields = ('id', 'day', 'start', 'end', 'fees', 'hospital')
         fields = ('day', 'start', 'end', 'fees')
 
@@ -502,6 +537,8 @@ class DoctorLeaveSerializer(serializers.ModelSerializer):
     interval = serializers.CharField(read_only=True)
     start_time = serializers.TimeField(write_only=True)
     end_time = serializers.TimeField(write_only=True)
+    leave_start_time = serializers.FloatField(read_only=True, source='start_time_in_float')
+    leave_end_time = serializers.FloatField(read_only=True, source='end_time_in_float')
 
     class Meta:
         model = DoctorLeave
@@ -516,7 +553,8 @@ class PrescriptionFileSerializer(serializers.ModelSerializer):
 
 
 class PrescriptionFileDeleteSerializer(serializers.Serializer):
-    appointment = serializers.PrimaryKeyRelatedField(queryset=OpdAppointment.objects.all())
+    appointment = serializers.PrimaryKeyRelatedField(
+        queryset=OpdAppointment.objects.all())
     id = serializers.IntegerField()
 
     def validate_appointment(self, value):
@@ -568,9 +606,15 @@ class DoctorListSerializer(serializers.Serializer):
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     emails = None
     experience_years = serializers.IntegerField(allow_null=True)
-    hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
+    # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
+    hospitals = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
     availability = None
+
+    def get_hospitals(self, obj):
+        data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj).select_related("doctor_clinic__doctor",
+                                                                                           "doctor_clinic__hospital")
+        return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
     class Meta:
         model = Doctor
@@ -578,13 +622,13 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'thumbnail')
+                  'general_specialization', 'thumbnail', 'license')
 
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
-    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
-    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
 
 
 class DoctorTimeSlotSerializer(serializers.Serializer):
@@ -604,6 +648,18 @@ class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
                   'qualifications', 'general_specialization', 'mobiles',)
 
 
+class OpdAppointmentBillingSerializer(OpdAppointmentSerializer):
+    profile = UserProfileSerializer()
+    hospital = HospitalModelSerializer()
+    doctor = AppointmentRetrieveDoctorSerializer()
+
+    class Meta:
+        model = OpdAppointment
+        fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
+                  'allowed_action', 'effective_price', 'fees', 'status', 'time_slot_start', 'time_slot_end',
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'payment_type')
+
+
 class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
     hospital = HospitalModelSerializer()
@@ -613,6 +669,19 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',)
+
+
+
+class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
+    profile = UserProfileSerializer()
+    hospital = HospitalModelSerializer()
+    doctor = AppointmentRetrieveDoctorSerializer()
+
+    class Meta:
+        model = OpdAppointment
+        fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'allowed_action', 'effective_price',
+                   'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',)
 
 
@@ -649,6 +718,12 @@ class CommonSpecializationsSerializer(serializers.ModelSerializer):
     class Meta:
         model = CommonSpecialization
         fields = ('id', 'name')
+
+
+class ConfigGetSerializer(serializers.Serializer):
+
+    os = serializers.CharField(max_length=10)
+    ver = serializers.CharField(max_length=10)
 
 
 

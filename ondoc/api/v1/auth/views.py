@@ -9,6 +9,7 @@ from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
+from rest_framework.exceptions import ValidationError as RestValidationError
 import datetime
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
@@ -19,16 +20,16 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When
 from django.forms.models import model_to_dict
 from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
-from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital
+from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         UserPermission, Address, AppointmentTransaction, GenericAdmin)
+                                         Address, AppointmentTransaction, GenericAdmin)
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
 from ondoc.api.v1 import utils
 from ondoc.doctor.models import OpdAppointment
-from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterSerializer,
+from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterUserSerializer,
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
                                              OpdAppModelSerializer)
@@ -67,17 +68,20 @@ class LoginOTP(GenericViewSet):
 
         data = serializer.validated_data
         phone_number = data['phone_number']
-
-        send_otp("otp sent {}", phone_number)
-
         req_type = request.query_params.get('type')
 
         if req_type == 'doctor':
+            otp = False
             if DoctorMobile.objects.filter(number=phone_number, is_primary=True).exists():
+                otp = True
                 response['exists'] = 1
             if GenericAdmin.objects.filter(phone_number=phone_number, is_disabled=False).exists():
+                otp = True
                 response['exists'] = 1
+            if otp == True:
+                send_otp("otp sent {}", phone_number)
         else:
+            send_otp("otp sent {}", phone_number)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists']=1
 
@@ -118,7 +122,14 @@ class UserViewset(GenericViewSet):
             "user_exists" : user_exists,
             "user_id" : user.id
         }
-        return Response(response)        
+        return Response(response)
+
+    @transaction.atomic
+    def logout(self, request):
+        required_token = request.data.get("token", None)
+        if required_token:
+            NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
+        return Response({"message": "success"})
 
     @transaction.atomic
     def register(self, request, format=None):
@@ -184,6 +195,9 @@ class NotificationEndpointViewSet(GenericViewSet):
         notification_endpoint_data = {
             "user": request.user.id,
             "device_id": validated_data.get("device_id"),
+            "platform": validated_data.get("platform"),
+            "app_name": validated_data.get("app_name"),
+            "app_version": validated_data.get("app_version"),
             "token": validated_data.get("token")
         }
         notification_endpoint_serializer = serializers.NotificationEndpointSerializer(data=notification_endpoint_data)
@@ -245,15 +259,45 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 data['dob'] = data['dob'].date()
             except:
                 return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'age': {'code': 'required', 'message': 'This field is required.'}},
+                            status=status.HTTP_400_BAD_REQUEST)
+
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
+        if UserProfile.objects.filter(name=data['name'], user=request.user).exists():
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Profile with the given name already exists."
+                                   }
+            }, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
-        return super().update(request, partial=True, *args, **kwargs)
+        data = {key: value for key, value in request.data.items()}
+        if data.get('age'):
+            try:
+                age = int(request.data.get("age"))
+                data['dob'] = datetime.datetime.now() - relativedelta(years=age)
+                data['dob'] = data['dob'].date()
+            except:
+                return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj = self.get_object()
+        if data.get("name") and UserProfile.objects.exclude(id=obj.id).filter(name=data['name'],
+                                                                              user=request.user).exists():
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Profile with the given name already exists."
+                                   }
+            }, status=status.HTTP_400_BAD_REQUEST)
+        serializer = serializers.UserProfileSerializer(obj, data=data, partial=True, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     def upload(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -261,20 +305,6 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
-
-#
-# class UserPermissionViewSet(mixins.CreateModelMixin,
-#                             mixins.ListModelMixin,
-#                             GenericViewSet):
-#     queryset = DoctorHospital.objects.all()
-#     # serializer_class = serializers.UserPermissionSerializer
-#
-#     def list(self, request, *args, **kwargs):
-#         params = request.query_params
-#         doctor_list = params['doctor_id'].split(",")
-#         dp_obj = DoctorPermission(doctor_list, request)
-#         permission_data = dp_obj.create_permission()
-#         return Response({'data':permission_data})
 
 
 class OndocViewSet(mixins.CreateModelMixin,
@@ -304,8 +334,16 @@ class UserAppointmentsViewSet(OndocViewSet):
             combined_data.extend(doctor_serializer.data)
         if lab_serializer.data:
             combined_data.extend(lab_serializer.data)
-        combined_data = sorted(combined_data, key=lambda k: k['status'])
-        # combined_data = sorted(combined_data, key=lambda k: k['time_slot_start'])
+        combined_data = sorted(combined_data, key=lambda x: x['time_slot_start'], reverse=True)
+        temp_dict = dict()
+        for data in combined_data:
+            if not temp_dict.get(data["status"]):
+                temp_dict[data["status"]] = [data]
+            else:
+                temp_dict[data["status"]].append(data)
+        combined_data = list()
+        for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
+            combined_data.extend(v)
         combined_data = combined_data[:80]
         return Response(combined_data)
 
@@ -323,7 +361,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             serializer = AppointmentRetrieveSerializer(queryset, many=True, context={"request": request})
             return Response(serializer.data)
         else:
-            return Response({'Error':'Invalid Request Type'})
+            return Response({'Error': 'Invalid Request Type'})
 
     def update(self, request, pk=None):
         serializer = UpdateStatusSerializer(data=request.data)
@@ -337,27 +375,33 @@ class UserAppointmentsViewSet(OndocViewSet):
             allowed = lab_appointment.allowed_action(request.user.user_type)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
-                resp = {}
+                resp = dict()
                 resp['allowed'] = allowed
                 resp['Error'] = 'Action Not Allowed'
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
-            response = self.lab_appointment_update(request, lab_appointment, validated_data)
-            return Response(response)
+            updated_lab_appointment = self.lab_appointment_update(request, lab_appointment, validated_data)
+            if updated_lab_appointment.get("status") and updated_lab_appointment["status"] == 0:
+                return Response(updated_lab_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(updated_lab_appointment)
         elif appointment_type == 'doctor':
             opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
             allowed = opd_appointment.allowed_action(request.user.user_type, request)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
-                resp = {}
+                resp = dict()
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
-            response = updated_opd_appointment
-            return Response(response)
+            if updated_opd_appointment.get("status") and updated_opd_appointment["status"] == 0:
+                return Response(updated_opd_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(updated_opd_appointment)
 
     @transaction.atomic
     def lab_appointment_update(self, request, lab_appointment, validated_data):
-        resp = {}
+        resp = dict()
+        resp["status"] = 1
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELED:
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
@@ -367,6 +411,13 @@ class UserAppointmentsViewSet(OndocViewSet):
                     time_slot_start = utils.form_time_slot(
                         validated_data.get("start_date"),
                         validated_data.get("start_time"))
+                    if lab_appointment.time_slot_start == time_slot_start:
+                        resp = {
+                            "status": 0,
+                            "msg": "Cannot Reschedule for same timeslot"
+                        }
+                        return resp
+
                     test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
                     lab_test_queryset = AvailableLabTest.objects.select_related('lab').filter(lab=lab_appointment.lab,
                                                                                               test__in=test_ids)
@@ -400,19 +451,14 @@ class UserAppointmentsViewSet(OndocViewSet):
                         "lab_test": lab_appointment.lab_test
                     }
 
-                    # new_appointment['id'] = lab_appointment.id
-                    # new_appointment['deal_price'] = new_deal_price
-                    # new_appointment['effective_price'] = new_effective_price
-                    # new_appointment['agreed_price'] = temp_lab_test[0].get("total_agreed_price", 0)
-                    # new_appointment['price'] = temp_lab_test[0].get("total_mrp")
-                    # new_appointment['time_slot_start'] = time_slot_start
                     resp = self.extract_payment_details(request, lab_appointment, new_appointment,
                                                         account_models.Order.LAB_PRODUCT_ID)
         return resp
 
     def doctor_appointment_update(self, request, opd_appointment, validated_data):
         if validated_data.get('status'):
-            resp = {}
+            resp = dict()
+            resp["status"] = 1
             if validated_data['status'] == OpdAppointment.CANCELED:
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
@@ -421,11 +467,18 @@ class UserAppointmentsViewSet(OndocViewSet):
                     time_slot_start = utils.form_time_slot(
                         validated_data.get("start_date"),
                         validated_data.get("start_time"))
-                    doctor_hospital = DoctorHospital.objects.filter(doctor=opd_appointment.doctor,
-                                                                           hospital=opd_appointment.hospital,
-                                                                           day=time_slot_start.weekday(),
-                                                                           start__lte=time_slot_start.hour,
-                                                                           end__gte=time_slot_start.hour).first()
+                    if opd_appointment.time_slot_start == time_slot_start:
+                        resp = {
+                            "status": 0,
+                            "msg": "Cannot Reschedule for same timeslot"
+                        }
+                        return resp
+
+                    doctor_hospital = DoctorClinicTiming.objects.filter(doctor_clinic__doctor__is_live=True,doctor_clinic__hospital__is_live=True,doctor_clinic__doctor=opd_appointment.doctor,
+                                                                        doctor_clinic__hospital=opd_appointment.hospital,
+                                                                        day=time_slot_start.weekday(),
+                                                                        start__lte=time_slot_start.hour,
+                                                                        end__gte=time_slot_start.hour).first()
                     if doctor_hospital:
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
@@ -450,17 +503,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "time_slot_start": time_slot_start,
                             "payment_type": opd_appointment.payment_type
                         }
-
-
-                        # new_appointment['id'] = opd_appointment.id
-                        # new_appointment['deal_price'] = doctor_hospital.deal_price
-                        # new_effective_price = doctor_hospital.deal_price - coupon_price
-                        # new_appointment['effective_price'] = new_effective_price
-                        # new_appointment['fees'] = doctor_hospital.fees
-                        # new_appointment['mrp'] = doctor_hospital.mrp
-                        # new_appointment['time_slot_start'] = time_slot_start
                         resp = self.extract_payment_details(request, opd_appointment, new_appointment,
                                                             account_models.Order.DOCTOR_PRODUCT_ID)
+
             return resp
 
     def get_appointment_coupon_price(self, discounted_price, effective_price):
@@ -505,28 +550,13 @@ class UserAppointmentsViewSet(OndocViewSet):
             new_appointment_details['time_slot_start'] = str(new_appointment_details['time_slot_start'])
             action = ''
             temp_app_details = copy.deepcopy(new_appointment_details)
+
             if product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                 action = account_models.Order.OPD_APPOINTMENT_RESCHEDULE
                 opdappointment_transform(temp_app_details)
-                # appointment_data = LabAppointmentModelSerializer(appointment_details, context={'request': request})
-                # temp_app_details.deal_price = str(appointment_details.deal_price)
-                # temp_app_details.fees = str(appointment_details.fees)
-                # temp_app_details.effective_price = str(appointment_details.effective_price)
-                # temp_app_details.mrp = str(appointment_details.mrp)
-                # appointment_data = OpdAppModelSerializer(appointment_details, context={'request': request})
-                # temp_app_details = appointment_data.data
             elif product_id == account_models.Order.LAB_PRODUCT_ID:
                 action = Order.LAB_APPOINTMENT_RESCHEDULE
                 labappointment_transform(temp_app_details)
-                # temp_app_details.price = str(appointment_details.price)
-                # temp_app_details.agreed_price = str(appointment_details.agreed_price)
-                # temp_app_details.deal_price = str(appointment_details.deal_price)
-                # temp_app_details.effective_price = str(appointment_details.effective_price)
-                # temp_app_details.time_slot_start = str(appointment_details.time_slot_start)
-                # temp_app_details.time_slot_end = str(appointment_details.time_slot_end)
-                # temp_app_details = model_to_dict(temp_app_details)
-                # appointment_data = LabAppointmentModelSerializer(appointment_details, context={'request':request})
-                # temp_app_details = appointment_data.data
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -589,7 +619,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
         if not queryset:
             return Response([])
-        serializer = AppointmentFilterSerializer(data=request.query_params)
+        serializer = AppointmentFilterUserSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         range = serializer.validated_data.get('range')
@@ -764,24 +794,34 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
                 else:
                     response_data = self.form_pg_transaction_data(response, order_obj)
-                    try:
-                        pg_tx_queryset = PgTransaction.objects.create(**response_data)
-                    except:
-                        pass
+                    if PgTransaction.is_valid_hash(response):
+                        try:
+                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                        except:
+                            pass
 
-                    try:
-                        appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
-                    except:
-                        pass
+                        try:
+                            appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
+                        except:
+                            pass
 
                     if int(response_data["product_id"]) == account_models.Order.LAB_PRODUCT_ID:
                         if appointment_obj:
-                            LAB_REDIRECT_URL += "/" + str(appointment_obj.id)
-                        REDIRECT_URL = LAB_REDIRECT_URL
+                            REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id)
+                        elif order_obj:
+                            REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
+                                order_obj.action_data.get("lab"), response.get('statusCode'))
+                        else:
+                            REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
                     elif int(response_data["product_id"]) == account_models.Order.DOCTOR_PRODUCT_ID:
                         if appointment_obj:
-                            OPD_REDIRECT_URL += "/" + str(appointment_obj.id)
-                        REDIRECT_URL = OPD_REDIRECT_URL
+                            REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id)
+                        elif order_obj:
+                            REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
+                                                                       order_obj.action_data.get("hospital"),
+                                                                       response.get('statusCode'))
+                        else:
+                            REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
             else:
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
@@ -804,7 +844,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
         resp_serializer = serializers.TransactionSerializer(data=response)
         resp_serializer.is_valid(raise_exception=True)
         response = resp_serializer.validated_data
-        # user = User.objects.get(pk=order_obj.action_data.get("user"))
         user = get_object_or_404(User, pk=order_obj.action_data.get("user"))
         data['user'] = user
         data['product_id'] = order_obj.product_id
@@ -893,20 +932,20 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
         user = request.user
         tx_queryset = ConsumerTransaction.objects.filter(user=user)
         consumer_account = ConsumerAccount.objects.filter(user=user).first()
-        if not tx_queryset.exists():
-            return Response({"status": 0,
-                             "msg": "No transaction exists"
-                             })
-        if not consumer_account:
-            return Response({"status": 0,
-                             "msg": "Consumer Account does not exists"
-                             })
 
-        tx_queryset = paginate_queryset(tx_queryset, request)
-        tx_serializer = serializers.UserTransactionModelSerializer(tx_queryset, many=True)
+        tx_serializable_data = list()
+        consumer_balance = 0
+        if tx_queryset.exists():
+            tx_queryset = paginate_queryset(tx_queryset, request)
+            tx_serializer = serializers.UserTransactionModelSerializer(tx_queryset, many=True)
+            tx_serializable_data = tx_serializer.data
+
+        if consumer_account:
+            consumer_balance = consumer_account.balance
+
         resp = dict()
-        resp["user_transactions"] = tx_serializer.data
-        resp["user_wallet_balance"] = consumer_account.balance
+        resp["user_transactions"] = tx_serializable_data
+        resp["user_wallet_balance"] = consumer_balance
         return Response(data=resp)
 
 
@@ -920,24 +959,27 @@ class OrderHistoryViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
-        opd_action_data = list()
-        lab_action_data = list()
+        # opd_action_data = list()
+        # lab_action_data = list()
         available_lab_test = list()
+        order_action_list = list()
         doc_hosp_query = Q()
 
         for order in Order.objects.filter(action_data__user=request.user.id, is_viewable=True,
-                                          payment_status=Order.PAYMENT_PENDING):
+                                          payment_status=Order.PAYMENT_PENDING).order_by('-created_at')[:5]:
             action_data = order.action_data
+            action_data["product_id"] = order.product_id
             if order.product_id == Order.DOCTOR_PRODUCT_ID:
-                opd_action_data.append(action_data)
+                # opd_action_data.append(action_data)
                 doc_hosp_query = doc_hosp_query | (Q(doctor=action_data.get("doctor"), hospital=action_data.get("hospital")))
             elif order.product_id == Order.LAB_PRODUCT_ID:
-                lab_action_data.append(action_data)
+                # lab_action_data.append(action_data)
                 available_lab_test.extend(action_data.get("lab_test"))
+            order_action_list.append(action_data)
 
         doc_hosp_details = defaultdict(dict)
-        if opd_action_data:
-            doc_hosp_obj = DoctorHospital.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(doc_hosp_query)
+        if doc_hosp_query:
+            doc_hosp_obj = DoctorClinic.objects.prefetch_related('doctor', 'hospital', 'doctor__images').filter(doc_hosp_query)
             for data in doc_hosp_obj:
                 doc_hosp_details[data.hospital.id][data.doctor.id] = {
                     "doctor_name": data.doctor.name,
@@ -960,52 +1002,54 @@ class OrderHistoryViewSet(GenericViewSet):
                                          }
         orders = []
 
-        for action_data in opd_action_data:
-            data = {
-                "doctor": action_data.get("doctor"),
-                "doctor_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["doctor_name"],
-                "hospital": action_data.get("hospital"),
-                "hospital_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["hospital_name"],
-                "doctor_thumbnail": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["doctor_thumbnail"],
-                "profile_detail": action_data.get("profile_detail"),
-                "profile": action_data.get("profile"),
-                "user": action_data.get("user"),
-                "time_slot_start": action_data.get("time_slot_start"),
-                "start_date": action_data.get("time_slot_start"),
-                "start_time": 0.0,  # not required here we are only validating fees
-                "payment_type": action_data.get("payment_type"),
-                "type": "opd"
-            }
-            serializer = CreateAppointmentSerializer(data=data, context={"request": request})
-            if not serializer.is_valid():
-                data.pop("time_slot_start")
-                data.pop("start_date")
-                data.pop("start_time")
-            valid_data = serializer.validated_data
-            # data["doctor_name"] = valid_data.get('doctor').name if valid_data.get('doctor') else None
-            # data["hospital_name"] = valid_data.get('hospital').name if valid_data.get('hospital') else None
-            orders.append(data)
-
-        for action_data in lab_action_data:
-            data = {
-                "lab": action_data.get("lab"),
-                "lab_name": lab_name[action_data['lab']]["name"],
-                "test_ids": [lab_test_map[x]["id"] for x in action_data.get("lab_test")],
-                "lab_thumbnail": lab_name[action_data['lab']]["lab_thumbnail"],
-                "profile": action_data.get("profile"),
-                "time_slot_start": action_data.get("time_slot_start"),
-                "start_date": action_data.get("time_slot_start"),
-                "start_time": 0.0,  # not required here we are only validating fees
-                "payment_type": action_data.get("payment_type"),
-                "type": "lab"
-            }
-            serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
-            if not serializer.is_valid(raise_exception=True):
-                data.pop("time_slot_start")
-                data.pop("start_date")
-                data.pop("start_time")
-            data["test_ids"] = [lab_test_map[x] for x in action_data.get("lab_test")]
-            orders.append(data)
+        for action_data in order_action_list:
+            if action_data["product_id"] == Order.DOCTOR_PRODUCT_ID:
+                if action_data["hospital"] not in doc_hosp_details or action_data["doctor"] not in doc_hosp_details[action_data["hospital"]]:
+                    continue
+                data = {
+                    "doctor": action_data.get("doctor"),
+                    "doctor_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["doctor_name"],
+                    "hospital": action_data.get("hospital"),
+                    "hospital_name": doc_hosp_details[action_data["hospital"]][action_data["doctor"]]["hospital_name"],
+                    "doctor_thumbnail": doc_hosp_details[action_data["hospital"]][action_data["doctor"]][
+                        "doctor_thumbnail"],
+                    "profile_detail": action_data.get("profile_detail"),
+                    "profile": action_data.get("profile"),
+                    "user": action_data.get("user"),
+                    "time_slot_start": action_data.get("time_slot_start"),
+                    "start_date": action_data.get("time_slot_start"),
+                    "start_time": 0.0,  # not required here we are only validating fees
+                    "payment_type": action_data.get("payment_type"),
+                    "type": "opd"
+                }
+                serializer = CreateAppointmentSerializer(data=data, context={"request": request})
+                if not serializer.is_valid():
+                    data.pop("time_slot_start")
+                    data.pop("start_date")
+                    data.pop("start_time")
+                orders.append(data)
+            elif action_data["product_id"] == Order.LAB_PRODUCT_ID:
+                if action_data['lab'] not in lab_name:
+                    continue
+                data = {
+                    "lab": action_data.get("lab"),
+                    "lab_name": lab_name[action_data['lab']]["name"],
+                    "test_ids": [lab_test_map[x]["id"] for x in action_data.get("lab_test")],
+                    "lab_thumbnail": lab_name[action_data['lab']]["lab_thumbnail"],
+                    "profile": action_data.get("profile"),
+                    "time_slot_start": action_data.get("time_slot_start"),
+                    "start_date": action_data.get("time_slot_start"),
+                    "start_time": 0.0,  # not required here we are only validating fees
+                    "payment_type": action_data.get("payment_type"),
+                    "type": "lab"
+                }
+                serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
+                if not serializer.is_valid():
+                    data.pop("time_slot_start")
+                    data.pop("start_date")
+                    data.pop("start_time")
+                data["test_ids"] = [lab_test_map[x] for x in action_data.get("lab_test")]
+                orders.append(data)
         return Response(orders)
 
 
@@ -1015,16 +1059,18 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (DoctorHospital.objects.annotate(hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(Q(doctor__manageable_doctors__user=user,
-                                                             doctor__manageable_doctors__hospital=F('hospital'),
-                                                             doctor__manageable_doctors__is_disabled=False,
-                                                             doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
-                                                             doctor__manageable_doctors__write_permission=True) |
-                                                           Q(hospital__manageable_hospitals__doctor__isnull=True,
-                                                             hospital__manageable_hospitals__user=user,
-                                                             hospital__manageable_hospitals__is_disabled=False,
-                                                             hospital__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT,
-                                                             hospital__manageable_hospitals__write_permission=True)).
+        doc_hosp_queryset = (DoctorClinic.objects.filter(doctor__is_live=True, hospital__is_live=True).annotate(
+            hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital=F('hospital'),
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+              doctor__manageable_doctors__write_permission=True) |
+            Q(hospital__manageable_hospitals__doctor__isnull=True,
+              hospital__manageable_hospitals__user=user,
+              hospital__manageable_hospitals__is_disabled=False,
+              hospital__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT,
+              hospital__manageable_hospitals__write_permission=True)).
                              values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
                              )
         return Response(doc_hosp_queryset)
@@ -1037,7 +1083,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     def list(self, request):
         user = request.user
         doc_hosp_queryset = (
-            DoctorHospital.objects.filter(
+            DoctorClinic.objects.filter(
                 Q(
                   doctor__manageable_doctors__user=user,
                   doctor__manageable_doctors__is_disabled=False,
@@ -1112,17 +1158,17 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
             permission = GenericAdmin.objects.filter(user=user, doctor=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.filter(doctor=admin_id).values('hospital', 'hospital__name')
+                resp_data = DoctorClinic.objects.filter(doctor=admin_id).values('hospital', 'hospital__name')
         elif level == Outstanding.HOSPITAL_LEVEL:
             permission = GenericAdmin.objects.filter(user=user, hospital=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.filter(hospital=admin_id).values('doctor', 'doctor__name')
+                resp_data = DoctorClinic.objects.filter(hospital=admin_id).values('doctor', 'doctor__name')
         elif level == Outstanding.HOSPITAL_NETWORK_LEVEL:
             permission = GenericAdmin.objects.filter(user=user, hospital_network=admin_id, permission_type=GenericAdmin.BILLINNG,
                                                      read_permission=True, is_disabled=False).exist()
             if permission:
-                resp_data = DoctorHospital.objects.get(hospital__network=admin_id).values('hospital', 'doctor',
+                resp_data = DoctorClinic.objects.get(hospital__network=admin_id).values('hospital', 'doctor',
                                                                                           'hospital_name', 'doctor_name')
         elif level == Outstanding.LAB_LEVEL:
             pass

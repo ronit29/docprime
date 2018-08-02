@@ -9,7 +9,7 @@ from django.contrib.contenttypes.admin import GenericTabularInline
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
     HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
-    HospitalNetworkAward, HospitalNetworkCertification)
+    HospitalNetworkAward, HospitalNetworkCertification, HospitalNetworkDocument)
 
 from .common import *
 
@@ -83,15 +83,22 @@ class HospitalNetworkForm(FormCleanMixin):
     about = forms.CharField(widget=forms.Textarea, required=False)
 
     def validate_qc(self):
-        qc_required = {'name':'req','operational_since':'req','about':'req','network_size':'req',
-            'building':'req','locality':'req','city':'req','state':'req',
-            'country':'req','pin_code':'req','hospitalnetworkmanager':'count',
-            'hospitalnetworkhelpline':'count','hospitalnetworkemail':'count'}
+        qc_required = {'name': 'req', 'operational_since': 'req', 'about': 'req', 'network_size': 'req',
+                       'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
+                       'country': 'req', 'pin_code': 'req', 'hospitalnetworkmanager': 'count',
+                       'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count'}
+
+        if self.instance.is_billing_enabled:
+            qc_required.update({
+                'hospital_network_documents': 'count'
+            })
 
         for key, value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
-            if value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+            if self.data.get(key+'_set-TOTAL_FORMS') and value=='count' and int(self.data[key+'_set-TOTAL_FORMS'])<=0:
+                raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
+            if self.data.get(key+'-TOTAL_FORMS') and value == 'count' and int(self.data.get(key+'-TOTAL_FORMS')) <= 0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
 
     def clean_operational_since(self):
@@ -99,6 +106,47 @@ class HospitalNetworkForm(FormCleanMixin):
         if data == '':
             return None
         return data
+
+
+class HospitalNetworkDocumentFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        choices = dict(HospitalNetworkDocument.CHOICES)
+        count = {}
+        for key, value in HospitalNetworkDocument.CHOICES:
+            count[key] = 0
+
+        for value in self.cleaned_data:
+            if value and not value['DELETE']:
+                count[value['document_type']] += 1
+
+        for key, value in count.items():
+            if not key == HospitalNetworkDocument.ADDRESS and value > 1:
+                raise forms.ValidationError("Only one " + choices[key] + " is allowed")
+
+        if self.instance.is_billing_enabled:
+            if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+               for key, value in count.items():
+                   if not key == HospitalNetworkDocument.GST and value < 1:
+                       raise forms.ValidationError(choices[key] + " is required")
+
+
+class HospitalNetworkDocumentInline(admin.TabularInline):
+    formset = HospitalNetworkDocumentFormSet
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj=obj, **kwargs)
+        formset.request = request
+        return formset
+
+    model = HospitalNetworkDocument
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
 
 
 class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
@@ -118,7 +166,9 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkAccreditationInline,
         HospitalNetworkAwardInline,
         HospitalNetworkCertificationInline,
-        GenericAdminInline]
+        HospitalNetworkDocumentInline,
+        GenericAdminInline,
+    ]
 
     def associated_hospitals(self, instance):
         if instance.id:

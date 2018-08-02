@@ -1,7 +1,7 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit, Layout, Div, Fieldset, Field
 from ondoc.diagnostic.models import Lab, LabCertification, LabAward, LabAccreditation, LabManager, LabTiming, LabService, LabDoctorAvailability, LabDoctor, LabImage, LabDocument
-from ondoc.doctor.models import (Doctor, DoctorMobile, DoctorQualification, DoctorHospital,
+from ondoc.doctor.models import (Doctor, DoctorMobile, DoctorQualification, DoctorClinicTiming, DoctorClinic,
                                 DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                 DoctorMedicalService, DoctorImage, DoctorDocument, DoctorEmail)
 
@@ -435,7 +435,30 @@ class DoctorQualificationForm(forms.ModelForm):
         fields = ('qualification', 'specialization','college','passing_year')
 
 
-class DoctorHospitalForm(forms.ModelForm):
+class DoctorClinicForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for key in self.fields.keys():
+            self.fields[key].disabled = True
+
+        self.helper = FormHelper()
+        # self.fields['start'].label = 'Open Time'
+        # self.fields['end'].label = 'Close Time'
+        self.helper.form_class = 'form-horizontal'
+        self.helper.form_tag = False
+        self.helper.layout = Layout(Div(
+                Div(CustomField('hospital', field_class='col-md-7',label_class='col-md-3'), css_class='col-md-6'),
+                # Div(CustomField('day', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-6'),
+                css_class='row'),
+        )
+
+    class Meta:
+        model = DoctorClinic
+        fields = ('id', 'hospital',)
+
+
+class DoctorClinicTimingForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -448,18 +471,18 @@ class DoctorHospitalForm(forms.ModelForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.form_tag = False
         self.helper.layout = Layout(Div(
-                Div(CustomField('hospital', field_class='col-md-7',label_class='col-md-3'), css_class='col-md-6'),
-                Div(CustomField('day', field_class='col-md-7',label_class='col-md-2'), css_class='col-md-6'),
-                css_class = 'row'),
-                Div(
-                Div(CustomField('start', field_class='col-md-6',label_class='col-md-6'), css_class='col-md-3'),
-                Div(CustomField('end', field_class='col-md-6',label_class='col-md-6'), css_class='col-md-3 col-md-offset-1'),
-                Div(CustomField('fees', field_class='col-md-6',label_class='col-md-6'), css_class='col-md-3 col-md-offset-1'),
-                css_class = 'row'))
+
+                    Div(CustomField('day', field_class='col-md-7', label_class='col-md-4'), css_class='col-md-3'),
+                    Div(CustomField('start', field_class='col-md-7', label_class='col-md-5'), css_class='col-md-3'),
+                    Div(CustomField('end', field_class='col-md-7', label_class='col-md-5'), css_class='col-md-3'),
+                    Div(CustomField('fees', field_class='col-md-7', label_class='col-md-4'), css_class='col-md-3'),
+                    css_class='row',)
+                    )
 
     class Meta:
-        model = DoctorHospital
-        fields = ('hospital', 'day', 'start', 'end', 'fees', )
+        model = DoctorClinicTiming
+        fields = ('day', 'start', 'end', 'fees')
+
 
 
 class DoctorLanguageForm(forms.ModelForm):
@@ -625,7 +648,8 @@ class BaseDoctorEmailFormSet(RequiredFormset):
 DoctorEmailFormSet = inlineformset_factory(Doctor, DoctorEmail,formset=BaseDoctorEmailFormSet, form = DoctorEmailForm,extra = 0, can_delete=False, exclude=('doctor', ))
 DoctorMobileFormSet = inlineformset_factory(Doctor, DoctorMobile,formset = BaseDoctorMobileFormSet, form = DoctorMobileForm,extra = 0, can_delete=False, exclude=('doctor', ))
 DoctorQualificationFormSet = inlineformset_factory(Doctor, DoctorQualification, form = DoctorQualificationForm,extra = 0, can_delete=True, exclude=('doctor', ))
-DoctorHospitalFormSet = inlineformset_factory(Doctor, DoctorHospital, form = DoctorHospitalForm,extra = 0, can_delete=True, exclude=('doctor', ))
+DoctorClinicFormSet = inlineformset_factory(Doctor, DoctorClinic, form = DoctorClinicForm,extra = 0, can_delete=True, exclude=('doctor', ))
+DoctorClinicTimingFormSet = inlineformset_factory(DoctorClinic, DoctorClinicTiming, form=DoctorClinicTimingForm, extra=0, can_delete=True, exclude=('doctor_clinic', ))
 DoctorLanguageFormSet = inlineformset_factory(Doctor, DoctorLanguage, form = DoctorLanguageForm,extra = 0, can_delete=True, exclude=('doctor', ))
 DoctorAwardFormSet = inlineformset_factory(Doctor, DoctorAward, form = DoctorAwardForm,extra = 0, can_delete=True, exclude=('doctor', ))
 DoctorAssociationFormSet = inlineformset_factory(Doctor, DoctorAssociation, form = DoctorAssociationForm,extra = 0, can_delete=True, exclude=('doctor', ))

@@ -30,6 +30,8 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.db.models import Count, Sum, Max, When, Case, F
 from django.http import Http404
+from django.conf import settings
+import hashlib
 from rest_framework import status
 from collections import OrderedDict
 from django.utils import timezone
@@ -43,7 +45,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
     def list(self, request, *args, **kwargs):
         test_queryset = CommonTest.objects.all()
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
-        lab_queryset = PromotedLab.objects.prefetch_related('lab_test').all()
+        lab_queryset = PromotedLab.objects.filter(lab__is_live=True)
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True)
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
@@ -72,11 +74,11 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             search_key = "".join(search_key.split("."))
             test_queryset = LabTest.objects.filter(search_key__icontains=search_key)
             test_queryset = paginate_queryset(test_queryset, request)
-            lab_queryset = Lab.objects.filter(search_key__icontains=search_key)
+            lab_queryset = Lab.objects.filter(search_key__icontains=search_key, is_live=True)
             lab_queryset = paginate_queryset(lab_queryset, request)
         else:
             test_queryset = self.queryset[:20]
-            lab_queryset = Lab.objects.all()[:20]
+            lab_queryset = Lab.objects.filter(is_live=True)[:20]
 
         test_serializer = diagnostic_serializer.LabTestListSerializer(test_queryset, many=True)
         lab_serializer = diagnostic_serializer.LabListSerializer(lab_queryset, many=True)
@@ -86,12 +88,9 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
 
 
 class LabList(viewsets.ReadOnlyModelViewSet):
-    # queryset = self.form_queryset()
     queryset = AvailableLabTest.objects.all()
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
-    # filter_backends = (DjangoFilterBackend, )
-    # filter_fields = ('name', 'deal_price', )
 
     def list(self, request, **kwargs):
         parameters = request.query_params
@@ -106,16 +105,20 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id, test__in=test_ids)
-        test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
-        lab_obj = Lab.objects.filter(id=lab_id).first()
+        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs__id=lab_id, lab_pricing_group__labs__is_live=True, test__in=test_ids)
+        lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
+        test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
+                                                                           context={"lab": lab_obj})
         day_now = timezone.now().weekday()
-        timing_queryset = lab_obj.lab_timings.filter(day=day_now)
-        lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
+        timing_queryset = list()
+        lab_serializable_data = list()
+        if lab_obj:
+            timing_queryset = lab_obj.lab_timings.filter(day=day_now)
+            lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
+            lab_serializable_data = lab_serializer.data
         temp_data = dict()
-        temp_data['lab'] = lab_serializer.data
+        temp_data['lab'] = lab_serializable_data
         temp_data['tests'] = test_serializer.data
-        temp_data['lab_timing'] = ''
         temp_data['lab_timing'], temp_data["lab_timing_data"] = self.get_lab_timing(timing_queryset)
 
         return Response(temp_data)
@@ -172,8 +175,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         parameters = serializer.validated_data
 
-        DEFAULT_DISTANCE = 2000000000000000
-        MAX_SEARCHABLE_DISTANCE = 5000000000000000000
+        DEFAULT_DISTANCE = 20000
+        MAX_SEARCHABLE_DISTANCE = 50000
 
         default_long = 77.071848
         default_lat = 28.450367
@@ -186,7 +189,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
 
-        queryset = AvailableLabTest.objects.select_related('lab').filter(lab__is_live=True)
+        queryset = AvailableLabTest.objects.select_related('lab').filter(lab_pricing_group__labs__is_live=True)
 
         if ids:
             queryset = queryset.filter(test__in=ids)
@@ -194,20 +197,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if lat is not None and long is not None:
             point_string = 'POINT('+str(long)+' '+str(lat)+')'
             pnt = GEOSGeometry(point_string, srid=4326)
-            queryset = queryset.filter(lab__location__distance_lte=(pnt, max_distance))
+            queryset = queryset.filter(lab_pricing_group__labs__location__distance_lte=(pnt, max_distance))
             if min_distance:
                 min_distance = min_distance*1000  # input is  coming in km
-                queryset = queryset.filter(lab__location__distance_gte=(pnt, min_distance))
+                queryset = queryset.filter(lab_pricing_group__labs__location__distance_gte=(pnt, min_distance))
+
         if ids:
             queryset = (
-                queryset.values('lab').annotate(price=Sum('mrp'), count=Count('id'),
-                                                distance=Max(Distance('lab__location', pnt)),
-                                                name=Max('lab__name')).filter(count__gte=len(ids)))
+                queryset.values('lab_pricing_group__labs__id'
+                                ).annotate(price=Sum('mrp'), count=Count('id'),
+                                           distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
+                                           name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
         else:
             queryset = (
-                queryset.values('lab').annotate(count=Count('id'),
-                                                distance=Max(Distance('lab__location', pnt)),
-                                                name=Max('lab__name')).filter(count__gte=len(ids)))
+                queryset.values('lab_pricing_group__labs__id'
+                                ).annotate(count=Count('id'),
+                                           distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
+                                           name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
 
         if min_price and ids:
             queryset = queryset.filter(price__gte=min_price)
@@ -223,11 +229,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("order_by")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by("price")
+                queryset = queryset.order_by("price", "distance")
             elif order_by == 'distance':
                 queryset = queryset.order_by("distance")
             elif order_by == 'name':
                 queryset = queryset.order_by("name")
+            else:
+                queryset = queryset.order_by("distance")
+        else:
+            queryset = queryset.order_by("distance")
         return queryset
 
     def form_lab_whole_data(self, queryset):
@@ -236,12 +246,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         resp_queryset = list()
         temp_var = dict()
         for obj in labs:
-            # temp_var = id_details[obj.id]
             temp_var[obj.id] = obj
-            # resp_queryset.append(temp_var)
         day_now = timezone.now().weekday()
         for row in queryset:
-            row["lab"] = temp_var[row["lab"]]
+            row["lab"] = temp_var[row["lab_pricing_group__labs__id"]]
             timing_queryset = row["lab"].lab_timings.all()
             timing_data = list()
             for data in timing_queryset:
@@ -259,8 +267,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         ids = list()
         temp_dict = dict()
         for obj in queryset:
-            ids.append(obj['lab'])
-            temp_dict[obj['lab']] = obj
+            ids.append(obj['lab_pricing_group__labs__id'])
+            temp_dict[obj['lab_pricing_group__labs__id']] = obj
         return ids, temp_dict
 
 
@@ -295,16 +303,20 @@ class LabAppointmentView(mixins.CreateModelMixin,
                                       When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
         agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
                                         When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
-        lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
-        temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
-                                                                 total_deal_price=Sum(deal_price_calculation),
-                                                                 total_agreed_price=Sum(agreed_price_calculation))
+        lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
+        temp_lab_test = lab_test_queryset.values('lab_pricing_group__labs').annotate(total_mrp=Sum("mrp"),
+                                                                                     total_deal_price=Sum(
+                                                                                         deal_price_calculation),
+                                                                                     total_agreed_price=Sum(
+                                                                                         agreed_price_calculation))
         total_agreed = total_deal_price = total_mrp = effective_price = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
             total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
             total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
-            effective_price = temp_lab_test[0].get("total_deal_price")
+            effective_price = total_deal_price
+            if data["is_home_pickup"] and data["lab"].is_home_collection_enabled:
+                effective_price += data["lab"].home_pickup_charges
             # TODO PM - call coupon function to calculate effective price
         start_dt = form_time_slot(data["start_date"], data["start_time"])
         profile_detail = {
@@ -322,6 +334,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             "deal_price": total_deal_price,
             "effective_price": effective_price,
             "time_slot_start": start_dt,
+            "is_home_pickup": data["is_home_pickup"],
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
             "payment_type": data["payment_type"],
@@ -372,6 +385,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 amount=payable_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
+
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
             resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id,
@@ -413,6 +427,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['name'] = appointment_details["profile"].name
         pgdata['txAmount'] = appointment_details['payable_amount']
 
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
+
         return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
@@ -432,61 +448,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
         else:
             return False
 
-    # def payment_retry(self, request, pk=None):
-    #     queryset = LabAppointment.objects.filter(pk=pk)
-    #     payment_response = dict()
-    #     if queryset:
-    #         serializer_data = LabAppointmentModelSerializer(queryset.first(), context={'request':request})
-    #         payment_response = self.payment_details(request, serializer_data.data, 1)
-    #     return Response(payment_response)
-
-    # def update(self, request, pk):
-    #     data = request.data
-    #     lab_appointment_obj = get_object_or_404(LabAppointment, pk=pk)
-    #     serializer = LabAppointmentUpdateSerializer(lab_appointment_obj, data=data,
-    #                                                 context={'lab_id': lab_appointment_obj.lab})
-    #     serializer.is_valid(raise_exception=True)
-    #     # allowed = lab_appointment_obj.allowed_action(request.user.user_type)
-    #     allowed = lab_appointment_obj.allowed_action(3)
-    #     if data.get('status') not in allowed:
-    #         resp = dict()
-    #         resp['allowed'] = allowed
-    #         return Response(resp, status=status.HTTP_400_BAD_REQUEST)
-    #
-    #     lab_appointment_queryset = serializer.save()
-    #     serializer = LabAppointmentModelSerializer(lab_appointment_queryset)
-    #     return Response(serializer.data)
-
-    # def payment_details(self, request, appointment_details, product_id):
-    #     details = dict()
-    #     pgdata = dict()
-    #     user = request.user
-    #     user_profile = user.profiles.filter(is_default_user=True).first()
-    #     pgdata['custId'] = user.id
-    #     pgdata['mobile'] = user.phone_number
-    #     pgdata['email'] = user.email
-    #     if not user.email:
-    #         pgdata['email'] = "dummy_appointment@policybazaar.com"
-    #     base_url = (
-    #         "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
-    #     pgdata['productId'] = product_id
-    #     pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-    #     pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-    #     pgdata['checkSum'] = ''
-    #     pgdata['appointmentId'] = appointment_details['id']
-    #     if user_profile:
-    #         pgdata['name'] = user_profile.name
-    #     else:
-    #         pgdata['name'] = "DummyName"
-    #     pgdata['txAmount'] = appointment_details['price']
-    #
-    #     if pgdata:
-    #         details['required'] = True
-    #         details['pgdata'] = pgdata
-    #     else:
-    #         details['required'] = False
-    #     return details
-
 
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
@@ -498,35 +459,38 @@ class LabTimingListView(mixins.ListModelMixin,
     def list(self, request, *args, **kwargs):
         params = request.query_params
 
-        flag = True if int(params.get('pickup', 0)) else False
-        queryset = LabTiming.objects.filter(lab=params.get('lab'), pickup_flag=flag)
-        if not queryset:
+        for_home_pickup = True if int(params.get('pickup', 0)) else False
+        lab = params.get('lab')
+        lab_queryset = Lab.objects.filter(pk=lab, is_live=True).prefetch_related('lab_timings').first()
+        if not lab_queryset or (for_home_pickup and not lab_queryset.is_home_pickup_available):
             return Response([])
 
         obj = TimeSlotExtraction()
 
-        for data in queryset:
-            obj.form_time_slots(data.day, data.start, data.end, None, True)
+        if not for_home_pickup and lab_queryset.always_open:
+            for day in range(0, 7):
+                obj.form_time_slots(day, 0.0, 23.45, None, True)
+        else:
+            lab_timing_queryset = lab_queryset.lab_timings.all()
+            for data in lab_timing_queryset:
+                obj.form_time_slots(data.day, data.start, data.end, None, True)
 
-        # resp_dict = obj.get_timing()
         resp_list = obj.get_timing_list()
-
         return Response(resp_list)
 
 
 class AvailableTestViewSet(mixins.RetrieveModelMixin,
                            viewsets.GenericViewSet):
 
-    queryset = AvailableLabTest.objects.all()
+    queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs__is_live=True).all()
     serializer_class = diagnostic_serializer.AvailableLabTestSerializer
 
     def retrieve(self, request, lab_id):
         params = request.query_params
-        queryset = AvailableLabTest.objects.select_related().filter(lab=lab_id)
-
+        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True)
         if not queryset:
             raise Http404("No data available")
-
+        lab_obj = Lab.objects.filter(pk=lab_id).first()
         if params.get('test_name'):
             search_key = re.findall(r'[a-z0-9A-Z.]+', params.get('test_name'))
             search_key = " ".join(search_key).lower()
@@ -535,7 +499,8 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
 
         queryset = queryset[:20]
 
-        serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True)
+        serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
+                                                                      context={"lab": lab_obj})
         return Response(serializer.data)
 
 
@@ -543,7 +508,7 @@ class TimeSlotExtraction(object):
     MORNING = "Morning"
     AFTERNOON = "Afternoon"
     EVENING = "Evening"
-    TIME_SPAN = 15
+    TIME_SPAN = 15  # In minutes
     timing = dict()
     price_available = dict()
 
@@ -551,49 +516,32 @@ class TimeSlotExtraction(object):
         for i in range(7):
             self.timing[i] = dict()
             self.price_available[i] = dict()
-        # self.extract_time_slot(queryset)
-
-    # def extract_time_slot(self, queryset):
-    #     for obj in queryset:
-    #         self.form_time_slots(obj.day, obj.start, obj.end, obj.)
 
     def form_time_slots(self, day, start, end, price=None, is_available=True,
                         deal_price=None, mrp=None, is_doctor=False):
         start = float(start)
         end = float(end)
-        # day = obj.day
-        # timing = self.context['timing']
         time_span = self.TIME_SPAN
 
-        int_span = (time_span / 60)
-        # timing = dict()
+        float_span = (time_span / 60)
         if not self.timing[day].get('timing'):
             self.timing[day]['timing'] = dict()
             self.timing[day]['timing'][self.MORNING] = OrderedDict()
             self.timing[day]['timing'][self.AFTERNOON] = OrderedDict()
             self.timing[day]['timing'][self.EVENING] = OrderedDict()
-
-        num_slots = int(60 / time_span)
-        if 60 % time_span != 0:
-            num_slots += 1
-        h = start
-        while h < end:
-        # for h in range(start, end):
-            for i in range(0, num_slots):
-                temp_h = h + i * int_span
-                if temp_h > end:
-                    break
-                day_slot, am_pm = self.get_day_slot(temp_h)
-                time_str = self.form_time_string(temp_h, am_pm)
-                self.timing[day]['timing'][day_slot][temp_h] = time_str
-                price_available = {"price": price, "is_available": is_available}
-                if is_doctor:
-                    price_available.update({
-                        "mrp": mrp,
-                        "deal_price": deal_price
-                    })
-                self.price_available[day][temp_h] = price_available
-            h += 1
+        temp_start = start
+        while temp_start <= end:
+            day_slot, am_pm = self.get_day_slot(temp_start)
+            time_str = self.form_time_string(temp_start, am_pm)
+            self.timing[day]['timing'][day_slot][temp_start] = time_str
+            price_available = {"price": price, "is_available": is_available}
+            if is_doctor:
+                price_available.update({
+                    "mrp": mrp,
+                    "deal_price": deal_price
+                })
+            self.price_available[day][temp_start] = price_available
+            temp_start += float_span
 
     def get_day_slot(self, time):
         am = 'AM'

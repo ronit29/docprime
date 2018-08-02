@@ -298,7 +298,7 @@ class UserProfile(TimeStampedModel):
 
     def get_thumbnail(self):
         if self.profile_image:
-            return static(self.profile_image.url)
+            return self.profile_image.url
         return None
         # return static('doctor_images/no_image.png')
 
@@ -324,6 +324,9 @@ class NotificationEndpoint(TimeStampedModel):
     user = models.ForeignKey(User, related_name='notification_endpoints', on_delete=models.CASCADE,
                              blank=True, null=True)
     device_id = models.TextField(blank=True, null=True)
+    platform = models.TextField(blank=True, null=True)
+    app_name = models.TextField(blank=True, null=True)
+    app_version = models.TextField(blank=True, null=True)
     token = models.TextField(unique=True)
 
     class Meta:
@@ -547,7 +550,7 @@ class GenericAdmin(TimeStampedModel):
 
     @classmethod
     def create_admin_permissions(cls, doctor):
-        from ondoc.doctor.models import DoctorHospital, DoctorMobile
+        from ondoc.doctor.models import DoctorClinic, DoctorMobile
         doc_user = None
         doc_number = None
         doctor_admins = []
@@ -564,7 +567,7 @@ class GenericAdmin(TimeStampedModel):
                                                                                is_doc_admin=True,
                                                                                permission_type=GenericAdmin.APPOINTMENT),
                                                                              ~Q(phone_number=doc_number)).distinct('user')
-        doc_hosp_data = DoctorHospital.objects.select_related('doctor', 'hospital')\
+        doc_hosp_data = DoctorClinic.objects.select_related('doctor', 'hospital')\
                                       .filter(doctor=doctor)\
                                       .distinct('hospital')
 

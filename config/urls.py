@@ -29,7 +29,7 @@ additional_urls = [
     path('', include('ondoc.articles.urls'))
     ]
 
-if not settings.DEBUG:
+if not settings.API_ENABLED:
     additional_urls = []
 else:
     from rest_framework_swagger.views import get_swagger_view
@@ -40,9 +40,11 @@ else:
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('nested_admin/', include('nested_admin.urls')),
     path('', include('ondoc.diagnostic.urls', namespace='diagnostic')),
     path('', include('ondoc.web.urls', namespace='web')),
     path('', include('ondoc.matrix.urls', namespace='matrix')),
+    path('', include('ondoc.doctor.urls', namespace='doctor')),
     path('onboard/',include('ondoc.onboard.urls', namespace='onboard')),
 ] + additional_urls + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

@@ -70,6 +70,7 @@ DJANGO_APPS = (
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'collectfast',
     'django.contrib.staticfiles',
     'django.contrib.gis',
     'reversion',
@@ -87,7 +88,8 @@ THIRD_PARTY_APPS = (
     'dal',
     'dal_select2',
     'django_tables2',
-    'anymail'
+    'anymail',
+    'nested_admin'
 )
 
 LOCAL_APPS = (
@@ -220,7 +222,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
     'COERCE_DECIMAL_TO_STRING': True,
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework.authentication.SessionAuthentication',
+        #'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
         # 'ondoc.authentication.auth.CustomAuthentication',
     ),
@@ -238,6 +240,7 @@ MAP_WIDGETS = {
 
 GOOGLE_MAPS_API_KEY = 'AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA'
 
+
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
 SMS_AUTH_KEY = env('SMS_AUTH_KEY')
 
@@ -250,6 +253,9 @@ CELERY_BROKER_URL = env('RABBITMQ_CONNECTION_URL')
 BASE_URL = env('BASE_URL')
 
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
+CHAT_API_URL = env('CHAT_API_URL')
+PG_SECRET_KEY = env('PG_SECRET_KEY')
+PG_CLIENT_KEY = env('PG_CLIENT_KEY')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
@@ -257,6 +263,9 @@ ANYMAIL = {
 }
 
 DEFAULT_FROM_EMAIL = "support@docprime.com"
+
+API_ENABLED = env('API_ENABLED', default=False)
+SEND_THROUGH_NODEJS_ENABLED = env.bool('SEND_THROUGH_NODEJS_ENABLED', default=False)
 
 #Config for AWS S3 bucket
 #MEDIA_URL = '/media/'

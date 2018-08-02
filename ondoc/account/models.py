@@ -8,6 +8,8 @@ from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request
+from django.conf import settings
+import hashlib
 import math
 
 
@@ -148,8 +150,8 @@ class PgTransaction(TimeStampedModel):
     order_no = models.PositiveIntegerField(blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
-    amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, default=0)
-    payment_mode = models.CharField(max_length=50, blank=True, null=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_mode = models.CharField(max_length=50)
     response_code = models.CharField(max_length=50)
     bank_id = models.CharField(max_length=50)
     transaction_date = models.DateTimeField(auto_now=True)
@@ -220,6 +222,24 @@ class PgTransaction(TimeStampedModel):
                 }
                 pg_data.append(params)
         return pg_data
+
+    @classmethod
+    def is_valid_hash(cls, data):
+        pg_hash = data.pop("hash")
+        calculated_hash = cls.create_pg_hash(data, settings.PG_CLIENT_KEY, settings.PG_SECRET_KEY)
+        return True if pg_hash == calculated_hash else False
+
+    @classmethod
+    def create_pg_hash(cls, data, key1, key2):
+        data_to_verify = ''
+        for k in sorted(data.keys()):
+            if str(data[k]):
+                data_to_verify = data_to_verify + k + '=' + str(data[k]) + ';'
+        encrypted_data_to_verify = key2 + '|' + data_to_verify + '|' + key1
+        encrypted_message_object = hashlib.sha256(str(encrypted_data_to_verify).encode())
+
+        encrypted_message_digest = encrypted_message_object.hexdigest()
+        return encrypted_message_digest
 
     class Meta:
         db_table = "pg_transaction"

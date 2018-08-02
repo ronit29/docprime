@@ -46,13 +46,13 @@
 
      <div class="panel panel-primary">
         <div class="panel-heading">
-           {{ lab.name }}
+           {{ lab_group.group_name }}
         </div>
         <div class="panel-body">
             <form action="/admin/labpricing/save/" method="post" id="lab_model_form" enctype="multipart/form-data">
                 {% csrf_token %}
                 {% crispy form %}
-                <input type="hidden" value="{{ id }}" id="lab_id" name="id" class="lab_id_pk"/>
+                <input type="hidden" value="{{ id }}" id="labpricinggroup_id" name="id" class="lab_id_pk"/>
                 <!--<input type="submit" value="Submit" class="btn btn-primary lab_form_submit">-->
                 <div class="form-group">
                     <div class="lab_form_submit">
@@ -242,7 +242,7 @@
                 var tr = $(this).closest('tr');
                 var ajax_submit_button = this;
 
-                var lab = jQuery('input[id=lab_id]').val();
+                var lab_pricing_group = jQuery('input[id=labpricinggroup_id]').val();
                 
                 var enabled = tr.find('td .enabled').is(":checked");
                 var mrp = tr.find('td .mrp').val();
@@ -263,7 +263,7 @@
                      $(ajax_submit_button).siblings('.edit-row').removeClass('hidden');
                      $(ajax_submit_button).closest('tr').find('input').attr("disabled", true);
 
-                     var dataString = 'id='+id +'&enabled='+enabled + '&lab='+lab + '&test='+testid + '&mrp='+mrp + '&custom_agreed_price='+custom_agreed_price + '&custom_deal_price='+custom_deal_price;
+                     var dataString = 'id='+id +'&enabled='+enabled + '&lab_pricing_group='+lab_pricing_group + '&test='+testid + '&mrp='+mrp + '&custom_agreed_price='+custom_agreed_price + '&custom_deal_price='+custom_deal_price;
                       jQuery.ajax({
                             data: dataString,
                             type: "POST",

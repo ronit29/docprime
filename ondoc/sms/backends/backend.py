@@ -1,11 +1,30 @@
+import json
 import requests
 from django.conf import settings
 from ondoc.authentication.models import OtpVerifications
 from random import randint
+from ondoc.notification.rabbitmq_client import publish_message
 
-class BaseSmsBackend(object):
+
+class NodeJsSmsBackend(object):
 
     def send(self, message, phone_no):
+        payload = {
+            "type": "sms",
+            "data": {
+                "phone_number": phone_no,
+                "content": message
+            }
+        }
+        publish_message(json.dumps(payload))
+
+
+class BaseSmsBackend(NodeJsSmsBackend):
+
+    def send(self, message, phone_no):
+        if settings.SEND_THROUGH_NODEJS_ENABLED:
+            super().send(message, phone_no)
+            return True
         payload = {'sender': 'PANCEA', 'route': '4','authkey':settings.SMS_AUTH_KEY}
         payload['message'] = message
         payload['mobiles'] = '91' + str(phone_no)
@@ -68,6 +87,5 @@ def create_otp(phone_no, message):
     otp = randint(100000,999999)
     otpEntry = OtpVerifications(phone_number=phone_no, code=otp, country_code="+91")
     otpEntry.save()
-    print(str(otp))
     message = message.format(str(otp))
     return message

@@ -5,6 +5,7 @@ from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image
                                          UserPermission, GenericAdmin, LabUserPermission)
 from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
+from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from ondoc.account import models as account_model
 from django.utils import timezone
@@ -20,6 +21,76 @@ import random
 import os
 from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
+
+class LabPricingGroup(TimeStampedModel, CreatedByModel):
+    group_name = models.CharField(max_length=256)
+    pathology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                            decimal_places=2)
+    pathology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                          decimal_places=2)
+    radiology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                            decimal_places=2)
+    radiology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
+                                                          decimal_places=2)
+
+    class Meta:
+        db_table = 'lab_pricing_group'
+
+    def __str__(self):
+        return "{}".format(self.group_name)
+
+    def save(self, *args, **kwargs):
+        edit_instance = None
+        if self.id is not None:
+            edit_instance = 1
+            original = LabPricingGroup.objects.get(pk=self.id)
+
+        super(LabPricingGroup, self).save(*args, **kwargs)
+
+        if edit_instance is not None:
+            id = self.id
+
+            path_agreed_price_prcnt = decimal.Decimal(
+                self.pathology_agreed_price_percentage) if self.pathology_agreed_price_percentage is not None else None
+
+            path_deal_price_prcnt = decimal.Decimal(
+                self.pathology_deal_price_percentage) if self.pathology_deal_price_percentage is not None else None
+
+            rad_agreed_price_prcnt = decimal.Decimal(
+                self.radiology_agreed_price_percentage) if self.radiology_agreed_price_percentage is not None else None
+
+            rad_deal_price_prcnt = decimal.Decimal(
+                self.radiology_deal_price_percentage) if self.radiology_deal_price_percentage is not None else None
+
+            if not original.pathology_agreed_price_percentage == self.pathology_agreed_price_percentage \
+                    or not original.pathology_deal_price_percentage == self.pathology_deal_price_percentage:
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
+                    update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), path_agreed_price_prcnt))
+
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
+                    update(
+                    computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), path_deal_price_prcnt))
+
+            if not original.radiology_agreed_price_percentage == self.radiology_agreed_price_percentage \
+                    or not original.radiology_deal_price_percentage == self.radiology_deal_price_percentage:
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
+                    update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), rad_agreed_price_prcnt))
+
+                AvailableLabTest.objects. \
+                    filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
+                    update(
+                    computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
+
+
+class LabTestPricingGroup(LabPricingGroup):
+
+    class Meta:
+        proxy = True
+        default_permissions = []
+
 
 
 class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
@@ -64,11 +135,15 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     radiology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
                                                        decimal_places=2)
 
+    lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
+                                          related_name='labs')
+
     # generic_lab_admins = GenericRelation(GenericAdmin, related_query_name='manageable_labs')
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab')
     matrix_lead_id = models.BigIntegerField(blank=True, null=True)
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     is_home_pickup_available = models.BigIntegerField(null=True, blank=True)
+    is_home_collection_enabled = models.BooleanField(default=False)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
 
@@ -79,9 +154,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         db_table = "lab"
 
     def get_thumbnail(self):
-        all_images = self.lab_image.all()
-        if all_images:
-            return all_images[0].name.url
+        all_documents = self.lab_documents.all()
+        for document in all_documents:
+            if document.document_type == LabDocument.LOGO:
+                return document.name.url
         return None
         # return static('lab_images/lab_default.png')
 
@@ -208,7 +284,7 @@ class LabTiming(TimeStampedModel):
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='lab_timings')
 
-    pickup_flag = models.BooleanField(default=False)
+    for_home_pickup = models.BooleanField(default=False)
     day = models.PositiveSmallIntegerField(blank=False, null=False,
                                            choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"),
                                                     (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
@@ -393,7 +469,7 @@ class LabTest(TimeStampedModel, SearchKey):
 
 
 class AvailableLabTest(TimeStampedModel):
-    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests')
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests', null=True, blank=True)
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='availablelabs')
     mrp = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     computed_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
@@ -401,6 +477,8 @@ class AvailableLabTest(TimeStampedModel):
     computed_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     custom_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     enabled = models.BooleanField(default=False)
+    lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
+                                          related_name='available_lab_tests')
 
     def get_testid(self):
         return self.test.id
@@ -408,10 +486,8 @@ class AvailableLabTest(TimeStampedModel):
     def get_type(self):
         return self.test.test_type
 
-    def __str__(self):
-
-        return "{}".format(self.id)
-        # return self.test.name + ', ' + self.lab.name
+    # def __str__(self):
+    #     return "{}, {}".format(self.test.name, self.lab.name if self.lab else self.lab_pricing_group.group_name)
 
     class Meta:
         db_table = "available_lab_test"
@@ -456,7 +532,9 @@ class LabAppointment(TimeStampedModel):
         if user_type == User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
-
+        if user_type == User.DOCTOR:
+            if self.status in [self.BOOKED]:
+                allowed = [self.COMPLETED]
         return allowed
 
     def send_notification(self, database_instance):
@@ -465,11 +543,40 @@ class LabAppointment(TimeStampedModel):
         if not self.user:
             return
         if self.status == LabAppointment.COMPLETED:
-            notification_models.NotificationAction.trigger(
+            LabNotificationAction.trigger(
                 instance=self,
                 user=self.user,
                 notification_type=notification_models.NotificationAction.LAB_INVOICE,
             )
+            return
+        if self.status == LabAppointment.ACCEPTED:
+            LabNotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_ACCEPTED,
+            )
+            return
+        if self.status == LabAppointment.RESCHEDULED_PATIENT:
+            LabNotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
+            )
+            return
+        if self.status == LabAppointment.RESCHEDULED_LAB:
+            LabNotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
+            )
+            return
+        if self.status == LabAppointment.CANCELED:
+            LabNotificationAction.trigger(
+                instance=self,
+                user=self.user,
+                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_CANCELLED,
+            )
+            return
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
@@ -735,9 +842,12 @@ class LabDocument(TimeStampedModel, Document):
     REGISTRATION = 4
     CHEQUE = 5
     LOGO = 6
+    EMAIL_CONFIRMATION = 9
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
-               (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO")]
-    lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE)
+               (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO"),
+               (EMAIL_CONFIRMATION, "Email Confirmation")]
+    lab = models.ForeignKey(Lab, null=True, blank=True, default=None, on_delete=models.CASCADE,
+                            related_name='lab_documents')
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.FileField(upload_to='lab/images', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
@@ -754,6 +864,38 @@ class LabDocument(TimeStampedModel, Document):
 
     class Meta:
         db_table = "lab_document"
+
+
+class LabNetworkDocument(TimeStampedModel, Document):
+    PAN = 1
+    ADDRESS = 2
+    GST = 3
+    REGISTRATION = 4
+    CHEQUE = 5
+    LOGO = 6
+    EMAIL_CONFIRMATION = 9
+    CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
+               (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO"),
+               (EMAIL_CONFIRMATION, "Email Confirmation"),
+               ]
+    lab_network = models.ForeignKey(LabNetwork, null=True, blank=True, default=None, on_delete=models.CASCADE,
+                            related_name='lab_documents')
+    document_type = models.PositiveSmallIntegerField(choices=CHOICES)
+    name = models.FileField(upload_to='lab_network/documents', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+
+    def extension(self):
+        name, extension = os.path.splitext(self.name.name)
+        return extension
+
+    def is_pdf(self):
+        return self.name.name.endswith('.pdf')
+
+    # def __str__(self):
+        # return self.name
+
+    class Meta:
+        db_table = "lab_network_document"
 
 
 class LabOnboardingToken(TimeStampedModel):

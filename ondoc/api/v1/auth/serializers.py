@@ -108,11 +108,14 @@ class NotificationEndpointSerializer(serializers.ModelSerializer):
     class Meta:
         model = NotificationEndpoint
         # fields = '__all__'
-        fields = ('user', 'device_id', 'token', )
+        fields = ('user', 'device_id', 'platform', 'app_name', 'app_version', 'token')
 
 
 class NotificationEndpointSaveSerializer(serializers.Serializer):
-    device_id = serializers.CharField(required=False)
+    device_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    platform = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    app_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    app_version = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     token = serializers.CharField()
 
 
@@ -133,7 +136,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     name = serializers.CharField()
     age = serializers.IntegerField(read_only=True)
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
-    email = serializers.EmailField(required=False, allow_null=True)
+    email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
 
     class Meta:
@@ -216,6 +219,7 @@ class TransactionSerializer(serializers.Serializer):
     txStatus = serializers.CharField(max_length=200)
     pgTxId = serializers.CharField(max_length=200)
     pbGatewayName = serializers.CharField(max_length=200, required=False)
+    hash = serializers.CharField(max_length=1000)
 
 
 class UserTransactionModelSerializer(serializers.ModelSerializer):
