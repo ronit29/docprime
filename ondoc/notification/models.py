@@ -552,12 +552,12 @@ class PushNotification(TimeStampedModel):
 
 
 class AppointmentAlertNotification(TimeStampedModel):
-    OPS_ALERT_NOTIFICATION =
+    # OPS_ALERT_NOTIFICATION =
     trigger_time = models.IntegerField(verbose_name="Trigger Time in minutes")
     email_ids = ArrayField(models.EmailField(max_length=100), blank=True, null=True)
     email_sub = models.TextField(blank=True, null=True, default=None)
     email_body = models.TextField(blank=True, null=True, default=None)
-    notification_type = models.PositiveSmallIntegerField(choices=)
+    # notification_type = models.PositiveSmallIntegerField(choices=)
 
     class Meta:
         db_table = "appointment_alert_notification"
