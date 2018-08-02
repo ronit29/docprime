@@ -710,6 +710,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
+            obj.is_live = True
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 

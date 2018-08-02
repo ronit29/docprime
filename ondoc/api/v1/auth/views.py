@@ -156,6 +156,7 @@ class UserViewset(GenericViewSet):
         }
         return Response(response)
 
+
     @transaction.atomic
     def doctor_login(self, request, format=None):
         serializer = serializers.DoctorLoginSerializer(data=request.data)
@@ -173,6 +174,8 @@ class UserViewset(GenericViewSet):
                 doctor.save()
 
         GenericAdmin.update_user_admin(phone_number)
+        self.update_live_status(phone_number)
+
         token = Token.objects.get_or_create(user=user)
         expire_otp(data['phone_number'])
 
@@ -181,6 +184,16 @@ class UserViewset(GenericViewSet):
             "token": str(token[0])
         }
         return Response(response)
+
+    def update_live_status(self, phone):
+        queryset = GenericAdmin.objects.select_related('doctor').filter(phone_number=phone)
+        if queryset.first():
+            for admin in queryset.distinct('doctor').all():
+                if admin.doctor is not None:
+                    if not admin.doctor.is_live:
+                        if admin.doctor.data_status == Doctor.QC_APPROVED:
+                            admin.doctor.is_live = True
+                            admin.doctor.save()
 
 
 class NotificationEndpointViewSet(GenericViewSet):

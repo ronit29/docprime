@@ -541,7 +541,7 @@ class GenericAdmin(TimeStampedModel):
 
     @classmethod
     def update_user_admin(cls, phone_number):
-        user = User.objects.filter(phone_number=phone_number)
+        user = User.objects.filter(phone_number=phone_number, user_type = User.DOCTOR)
         if user.exists():
             admin = GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
             if admin.exists():
