@@ -225,7 +225,9 @@ class PgTransaction(TimeStampedModel):
 
     @classmethod
     def is_valid_hash(cls, data):
-        pg_hash = data.pop("hash")
+        pg_hash = None
+        if data.get("hash"):
+            pg_hash = data.pop("hash")
         calculated_hash = cls.create_pg_hash(data, settings.PG_CLIENT_KEY, settings.PG_SECRET_KEY)
         return True if pg_hash == calculated_hash else False
 

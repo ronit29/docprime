@@ -47,7 +47,9 @@ import decimal
 from django.conf import settings
 from collections import defaultdict
 import copy
+import logging
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -787,14 +789,18 @@ class TransactionViewSet(viewsets.GenericViewSet):
         REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
 
         try:
+            response = None
             data = request.data
             # Commenting below for testing
-            coded_response = data.get("response")
-            if isinstance(coded_response, list):
-                coded_response = coded_response[0]
-            coded_response += "=="
-            decoded_response = base64.b64decode(coded_response).decode()
-            response = json.loads(decoded_response)
+            try:
+                coded_response = data.get("response")
+                if isinstance(coded_response, list):
+                    coded_response = coded_response[0]
+                coded_response += "=="
+                decoded_response = base64.b64decode(coded_response).decode()
+                response = json.loads(decoded_response)
+            except Exception as e:
+                logger.error("Cannot decode pg data - " + str(e))
 
             # For testing only
             # response = request.data
@@ -803,6 +809,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
             try:
                 pg_resp_code = int(response.get('statusCode'))
             except:
+                logger.error("ValueError : statusCode is not type integer")
                 pg_resp_code = None
 
             order_obj = Order.objects.filter(pk=response.get("orderId")).first()
@@ -810,17 +817,22 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
                 else:
-                    response_data = self.form_pg_transaction_data(response, order_obj)
-                    if PgTransaction.is_valid_hash(response):
-                        try:
-                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
-                        except:
-                            pass
+                    response_data = response
+                    resp_serializer = serializers.TransactionSerializer(data=response)
+                    if resp_serializer.is_valid():
+                        response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
+                        if PgTransaction.is_valid_hash(response):
+                            try:
+                                pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                            except Exception as e:
+                                logger.error("Error in saving PG Transaction Data - " + str(e))
 
-                        try:
-                            appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
-                        except:
-                            pass
+                            try:
+                                appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
+                            except Exception as e:
+                                logger.error("Error in building appointment - " + str(e))
+                    else:
+                        logger.error("Invalid pg data - " + resp_serializer.error_messages)
 
                     if int(response_data["product_id"]) == account_models.Order.LAB_PRODUCT_ID:
                         if appointment_obj:
@@ -850,17 +862,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                    order_obj.action_data.get("hospital"),
                                                                    response.get('statusCode'))
-        except:
-            pass
+        except Exception as e:
+            logger.error("Error - " + str(e))
 
         # return Response({"url": REDIRECT_URL})
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 
     def form_pg_transaction_data(self, response, order_obj):
         data = dict()
-        resp_serializer = serializers.TransactionSerializer(data=response)
-        resp_serializer.is_valid(raise_exception=True)
-        response = resp_serializer.validated_data
+        # resp_serializer = serializers.TransactionSerializer(data=response)
+        # resp_serializer.is_valid(raise_exception=True)
+        # response = resp_serializer.validated_data
         user = get_object_or_404(User, pk=order_obj.action_data.get("user"))
         data['user'] = user
         data['product_id'] = order_obj.product_id
