@@ -400,16 +400,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
 
 class LabAppointmentForm(forms.ModelForm):
-    time_slot_start = forms.SplitDateTimeField(widget=AdminSplitDateTime(), required=True)
-    RESCHEDULED_LAB = LabAppointment.RESCHEDULED_LAB
-    RESCHEDULED_PATIENT = LabAppointment.RESCHEDULED_PATIENT
-    ACCEPTED = LabAppointment.ACCEPTED
-    CANCELLED = LabAppointment.CANCELLED
-    APPOINTMENT_STATUS_CHOICES = [(RESCHEDULED_LAB, 'Rescheduled by Lab'),
-                                  (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
-                                  (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled')]
-    status = forms.ChoiceField(choices=APPOINTMENT_STATUS_CHOICES)
-
+    pass
     # def clean(self):
     #     cleaned_data = self.cleaned_data
     #     new_status = cleaned_data.get('status')
@@ -426,17 +417,46 @@ class LabAppointmentForm(forms.ModelForm):
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
-    fields = ('lab', 'employees_details', 'lab_test', 'used_profile_name', 'used_profile_number', 'user_number', 'status', 'time_slot_start', 'price', 'agreed_price',
-              'deal_price', 'effective_price', 'payment_status',
-              'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
-    # fields = fields + ('__all__')
-    readonly_fields = ('lab', 'employees_details', 'lab_test', 'used_profile_name', 'used_profile_number', 'user_number', 'price', 'agreed_price',
-                       'deal_price', 'effective_price', 'payment_status',
-                       'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+
+    def get_fields(self, request, obj=None):
+        if request.user.is_superuser:
+            return ('lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end', 'otp', 'payment_status',
+                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+        elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            return ('lab_name', 'lab_test', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+                    'default_profile_number', 'user_number', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'payment_status',
+                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'status', 'time_slot_start')
+        else:
+            return ()
+
+    def get_readonly_fields(self, request, obj=None):
+        if request.user.is_superuser:
+            return ()
+        elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            return ('lab_name', 'lab_test', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+                    'default_profile_number', 'user_number', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'payment_status',
+                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+        else:
+            return ()
 
     def lab_name(self, obj):
         return mark_safe('{name} (<a href="{profile_link}">Profile</a>)'.format(name=obj.lab.name,
                                                                                 profile_link="#"))
+
+    def employees_details(self, obj):
+        employees = obj.lab.labmanager_set.all()
+        details = ''
+        for employee in employees:
+            details += 'Name : {name}<br>Phone number : {number}<br>Email : {email}<br>Type : {type}<br><br>'.format(
+                name=employee.name, number=employee.number, email=employee.email,
+                type=dict(LabManager.CONTACT_TYPE_CHOICES)[employee.contact_type])
+            # ' , '.join([str(employee.name), str(employee.number), str(employee.email), str(employee.details)])
+            # details += '\n'
+        return mark_safe('<p>{details}</p>'.format(details=details))
+
     def used_profile_name(self, obj):
         return obj.profile.name
 
@@ -444,23 +464,25 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         return obj.profile.phone_number
 
     def default_profile_name(self, obj):
-        pass
+        # return obj.profile.user.profiles.all()[:1][0].name
+        default_profile = obj.profile.user.profiles.filter(is_default_user=True)
+        if default_profile.exists():
+            return default_profile.first().name
+        else:
+            return ''
 
     def default_profile_number(self, obj):
-        pass
+        # return obj.profile.user.profiles.all()[:1][0].phone_number
+        default_profile = obj.profile.user.profiles.filter(is_default_user=True)
+        if default_profile.exists():
+            return default_profile.first().phone_number
+        else:
+            return ''
 
     def user_number(self, obj):
         return obj.user.phone_number
 
-    def employees_details(self, obj):
-        managers = obj.lab.labmanager_set.all()
-        details = ''
-        for manager in managers:
-            details += 'Name : {name}<br>Phone number : {number}<br>Email : {email}<br>Type : {type}<br><br>'.format(
-                name=manager.name, number=manager.number, email=manager.email, type=dict(LabManager.CONTACT_TYPE_CHOICES)[manager.contact_type])
-            # ' , '.join([str(manager.name), str(manager.number), str(manager.email), str(manager.details)])
-            # details += '\n'
-        return mark_safe('<p>{details}</p>'.format(details=details))
+
 
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
     change_list_template = 'superuser_import_export.html'

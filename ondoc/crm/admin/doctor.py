@@ -735,44 +735,23 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
 
 class DoctorOpdAppointmentForm(forms.ModelForm):
-    time_slot_start = forms.SplitDateTimeField(widget=AdminSplitDateTime(), required=True)
-    RESCHEDULED_DOCTOR = OpdAppointment.RESCHEDULED_DOCTOR
-    RESCHEDULED_PATIENT = OpdAppointment.RESCHEDULED_PATIENT
-    ACCEPTED = OpdAppointment.ACCEPTED
-    CANCELLED = OpdAppointment.CANCELLED
-    APPOINTMENT_STATUS_CHOICES = [(RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
-                                  (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
-                                  (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled')]
-    status = forms.ChoiceField(choices=APPOINTMENT_STATUS_CHOICES)
-
-    def clean(self):
-        cleaned_data = self.cleaned_data
-        new_status = cleaned_data.get('status')
-        new_time_slot_start = cleaned_data.get('time_slot_start')
-        # validate stuff
-        if True:
-            msg = "ERROR"
-            self._errors["status"] = self.error_class([msg])
-            self._errors["time_slot_start"] = self.error_class([msg])
-            del cleaned_data['status']
-            del cleaned_data['time_slot_start']
-        return cleaned_data
+    pass
+    # def clean(self):
+    #     cleaned_data = self.cleaned_data
+    #     new_status = cleaned_data.get('status')
+    #     new_time_slot_start = cleaned_data.get('time_slot_start')
+    #     # validate stuff
+    #     if True:
+    #         msg = "ERROR"
+    #         self._errors["status"] = self.error_class([msg])
+    #         self._errors["time_slot_start"] = self.error_class([msg])
+    #         del cleaned_data['status']
+    #         del cleaned_data['time_slot_start']
+    #     return cleaned_data
 
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
-    # list_filter = ('data_status', HospCityFilter)
-    # list_display = ('doctor__name', 'hospital__name')
-    # date_hierarchy = 'created_at'
-    # list_filter = ()
     form = DoctorOpdAppointmentForm
-    # fields = ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by', 'fees',
-    #           'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'time_slot_start',
-    #           'payment_type', 'admin_information')
-    # # # fields = fields + ('doctor', 'hospital', 'profile', 'user')
-    # readonly_fields = ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by',
-    #                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-    #                    'admin_information')
-    #
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
@@ -780,9 +759,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'time_slot_start',
                     'payment_type')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'time_slot_start',
-                    'payment_type', 'admin_information')
+            return ('doctor_name', 'hospital_name', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+                    'default_profile_number', 'user_number', 'booked_by',
+                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
+                    'payment_type', 'admin_information', 'status', 'time_slot_start')
         else:
             return ()
 
@@ -790,7 +770,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         if request.user.is_superuser and request.user.is_staff:
             return ()
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('doctor_name', 'hospital_name', 'profile_name', 'profile_number', 'user_number', 'booked_by',
+            return ('doctor_name', 'hospital_name', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+                    'default_profile_number', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                     'admin_information')
         else:
@@ -809,11 +790,27 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         else:
             return obj.hospital.name
 
-    def profile_name(self, obj):
+    def used_profile_name(self, obj):
         return obj.profile.name
 
-    def profile_number(self, obj):
+    def used_profile_number(self, obj):
         return obj.profile.phone_number
+
+    def default_profile_name(self, obj):
+        # return obj.profile.user.profiles.all()[:1][0].name
+        default_profile = obj.profile.user.profiles.filter(is_default_user=True)
+        if default_profile.exists():
+            return default_profile.first().name
+        else:
+            return ''
+
+    def default_profile_number(self, obj):
+        # return obj.profile.user.profiles.all()[:1][0].phone_number
+        default_profile = obj.profile.user.profiles.filter(is_default_user=True)
+        if default_profile.exists():
+            return default_profile.first().phone_number
+        else:
+            return ''
 
     def user_number(self, obj):
         return obj.user.phone_number
