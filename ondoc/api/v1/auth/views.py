@@ -72,14 +72,16 @@ class LoginOTP(GenericViewSet):
         req_type = request.query_params.get('type')
 
         if req_type == 'doctor':
-            otp = False
-            if DoctorMobile.objects.filter(number=phone_number, is_primary=True).exists():
-                otp = True
+            queryset = GenericAdmin.objects.filter( Q(phone_number=phone_number, is_disabled=False),
+                                        (Q(doctor__isnull=True, hospital__data_status=Hospital.QC_APPROVED) |
+                                         Q(doctor__isnull=False,
+                                           doctor__data_status=Doctor.QC_APPROVED, doctor__onboarding_status = Doctor.ONBOARDED
+                                          )
+                                        )
+                                       )
+
+            if queryset.exists():
                 response['exists'] = 1
-            if GenericAdmin.objects.filter(phone_number=phone_number, is_disabled=False).exists():
-                otp = True
-                response['exists'] = 1
-            if otp == True:
                 send_otp("otp sent {}", phone_number)
         else:
             send_otp("otp sent {}", phone_number)
