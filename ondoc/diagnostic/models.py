@@ -503,10 +503,10 @@ class LabAppointment(TimeStampedModel):
     COMPLETED = 7
     ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_LAB]
 
-    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='labappointment')
+    lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
     lab_test = models.ManyToManyField(AvailableLabTest)
-    profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.SET_NULL, null=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     profile_detail = JSONField(blank=True, null=True)
     status = models.PositiveSmallIntegerField(default=CREATED)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # This is mrp
