@@ -192,7 +192,7 @@ class UserViewset(GenericViewSet):
             for admin in queryset.distinct('doctor').all():
                 if admin.doctor is not None:
                     if not admin.doctor.is_live:
-                        if admin.doctor.data_status == Doctor.QC_APPROVED:
+                        if admin.doctor.data_status == Doctor.QC_APPROVED and admin.doctor.onboarding_status == Doctor.ONBOARDED:
                             admin.doctor.is_live = True
                             admin.doctor.save()
 
