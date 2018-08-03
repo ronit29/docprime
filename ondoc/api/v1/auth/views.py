@@ -80,9 +80,9 @@ class LoginOTP(GenericViewSet):
                 otp = True
                 response['exists'] = 1
             if otp == True:
-                send_otp("otp sent {}", phone_number)
+                send_otp("OTP for DocPrime login is {}", phone_number)
         else:
-            send_otp("otp sent {}", phone_number)
+            send_otp("OTP for DocPrime login is {}", phone_number)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists']=1
 
