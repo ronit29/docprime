@@ -228,8 +228,23 @@ class PgTransaction(TimeStampedModel):
         pg_hash = None
         if data.get("hash"):
             pg_hash = data.pop("hash")
-        calculated_hash = cls.create_pg_hash(data, settings.PG_CLIENT_KEY, settings.PG_SECRET_KEY)
+        calculated_hash = cls.create_incomming_pg_hash(data, settings.PG_CLIENT_KEY, settings.PG_SECRET_KEY)
         return True if pg_hash == calculated_hash else False
+
+    @classmethod
+    def create_incomming_pg_hash(cls, data, key1, key2):
+        data_to_verify = ''
+        for k in sorted(data.keys()):
+            if str(data[k]).upper() != 'NULL':
+                data_to_verify = data_to_verify + k + '=' + str(data[k]) + ';'
+        encrypted_data_to_verify = key2 + '|' + data_to_verify + '|' + key1
+        encrypted_message_object = hashlib.sha256(str(encrypted_data_to_verify).encode())
+
+        encrypted_message_digest = encrypted_message_object.hexdigest()
+        return encrypted_message_digest
+
+    class Meta:
+        db_table = "pg_transaction"
 
     @classmethod
     def create_pg_hash(cls, data, key1, key2):

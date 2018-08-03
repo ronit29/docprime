@@ -817,7 +817,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
                 else:
-                    response_data = response
+                    response_data = None
                     resp_serializer = serializers.TransactionSerializer(data=response)
                     if resp_serializer.is_valid():
                         response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
@@ -832,25 +832,21 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             except Exception as e:
                                 logger.error("Error in building appointment - " + str(e))
                     else:
-                        logger.error("Invalid pg data - " + resp_serializer.error_messages)
+                        logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
 
-                    if int(response_data["product_id"]) == account_models.Order.LAB_PRODUCT_ID:
+                    if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
                         if appointment_obj:
                             REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id)
                         elif order_obj:
                             REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
                                 order_obj.action_data.get("lab"), response.get('statusCode'))
-                        else:
-                            REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
-                    elif int(response_data["product_id"]) == account_models.Order.DOCTOR_PRODUCT_ID:
+                    elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                         if appointment_obj:
                             REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id)
                         elif order_obj:
                             REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                        order_obj.action_data.get("hospital"),
                                                                        response.get('statusCode'))
-                        else:
-                            REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
             else:
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
@@ -870,9 +866,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     def form_pg_transaction_data(self, response, order_obj):
         data = dict()
-        # resp_serializer = serializers.TransactionSerializer(data=response)
-        # resp_serializer.is_valid(raise_exception=True)
-        # response = resp_serializer.validated_data
         user = get_object_or_404(User, pk=order_obj.action_data.get("user"))
         data['user'] = user
         data['product_id'] = order_obj.product_id
