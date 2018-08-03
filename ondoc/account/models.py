@@ -11,6 +11,10 @@ from ondoc.api.v1.utils import refund_curl_request
 from django.conf import settings
 import hashlib
 import copy
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Order(TimeStampedModel):
@@ -229,7 +233,12 @@ class PgTransaction(TimeStampedModel):
         temp_data = copy.deepcopy(data)
         if temp_data.get("hash"):
             pg_hash = temp_data.pop("hash")
-        calculated_hash = cls.create_incomming_pg_hash(temp_data, settings.PG_CLIENT_KEY, settings.PG_SECRET_KEY)
+        calculated_hash, prehashed_str = cls.create_incomming_pg_hash(temp_data, settings.PG_CLIENT_KEY, settings.PG_SECRET_KEY)
+        if pg_hash != calculated_hash:
+            logger.error(
+                "Hash Mismatch with Calculated Hash - " + calculated_hash + " pre-hashed string - " + prehashed_str + " pg response data - " + json.dumps(
+                    data))
+
         return True if pg_hash == calculated_hash else False
 
     @classmethod
@@ -242,7 +251,7 @@ class PgTransaction(TimeStampedModel):
         encrypted_message_object = hashlib.sha256(str(encrypted_data_to_verify).encode())
 
         encrypted_message_digest = encrypted_message_object.hexdigest()
-        return encrypted_message_digest
+        return encrypted_message_digest, encrypted_data_to_verify
 
     class Meta:
         db_table = "pg_transaction"
