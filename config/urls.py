@@ -31,11 +31,12 @@ additional_urls = [
 
 if not settings.API_ENABLED:
     additional_urls = []
-else:
-    from rest_framework_swagger.views import get_swagger_view
-    schema_view = get_swagger_view(title='DocPrime API')
+    
+# else:
+#     from rest_framework_swagger.views import get_swagger_view
+#     schema_view = get_swagger_view(title='DocPrime API')
 
-    additional_urls += [path('api-docs', schema_view)]
+#     additional_urls += [path('api-docs', schema_view)]
 
 
 urlpatterns = [
