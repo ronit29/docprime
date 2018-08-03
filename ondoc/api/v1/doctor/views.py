@@ -714,14 +714,4 @@ class ConfigView(viewsets.GenericViewSet):
         serializer_data = serializers.ConfigGetSerializer(data=request.data, context={'request': request})
         serializer_data.is_valid(raise_exception=True)
         validated_data = serializer_data.validated_data
-        return Response({"blocker_screen":{"type":1,
-                         "title_text": "titletext",
-                         "title_text2":"titletext2",
-                         "store_url": "playstore url",
-                         "messages":[
-                            "message1",
-                            "message2",
-                            "message3"
-                         ]
-                        }})
-
+        return Response({})
