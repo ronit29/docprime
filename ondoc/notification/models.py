@@ -15,10 +15,12 @@ from django.conf import settings
 from weasyprint import HTML
 from django.conf import settings
 import pytz
+import logging
 
 import copy
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class NotificationAction:
@@ -330,9 +332,12 @@ class EmailNotificationOpdMixin:
             context.update({"invoice": invoice})
             html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
             filename = "invoice_{}.pdf".format(str(timezone.now().timestamp()))
-            pdf_file = HTML(string=html_body).write_pdf()
-            invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
-            invoice.save()
+            try:
+                pdf_file = HTML(string=html_body).write_pdf()
+                invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
+                invoice.save()
+            except Exception as e:
+                logger.error("Got error while creating pdf for opd invoice {}".format(e))
             context.update({"invoice_url": settings.BASE_URL + invoice.file.url})
             html_body = render_to_string("email/doctor_invoice/body.html", context=context)
             email_subject = render_to_string("email/doctor_invoice/subject.txt", context=context)
@@ -371,9 +376,12 @@ class EmailNotificationLabMixin:
             context.update({"invoice": invoice})
             html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
             filename = "invoice_{}.pdf".format(str(timezone.now().timestamp()))
-            pdf_file = HTML(string=html_body).write_pdf()
-            invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
-            invoice.save()
+            try:
+                pdf_file = HTML(string=html_body).write_pdf()
+                invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
+                invoice.save()
+            except Exception as e:
+                logger.error("Got error while creating pdf for lab invoice {}".format(e))
             context.update({"invoice_url": settings.BASE_URL + invoice.file.url})
             html_body = render_to_string("email/lab_invoice/body.html", context=context)
             email_subject = render_to_string("email/lab_invoice/subject.txt", context=context)
