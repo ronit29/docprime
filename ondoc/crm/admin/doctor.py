@@ -289,8 +289,8 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Only one " + choices[key] + " is allowed")
 
         if DoctorClinic.objects.filter(
-                Q(hospital__network__is_billing_enabled=False, doctor=self.instance) |
-                Q(hospital__is_billing_enabled=False, doctor=self.instance)).exists():
+                Q(hospital__network__is_billing_enabled=False, hospital__is_billing_enabled=False, doctor=self.instance)|
+                Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=self.instance)).exists():
             if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
                 for key, value in count.items():
                     if not key == DoctorDocument.GST and value < 1:
@@ -433,9 +433,12 @@ class DoctorForm(FormCleanMixin):
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
                        'images': 'count', 'doctorspecializations': 'count'}
 
+        # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
+        # (network is null or network billing is false)
+
         if DoctorClinic.objects.filter(
-                Q(hospital__network__is_billing_enabled=False, doctor=self.instance) |
-                Q(hospital__is_billing_enabled=False, doctor=self.instance)).exists():
+                Q(hospital__network__is_billing_enabled=False, hospital__is_billing_enabled=False, doctor=self.instance)|
+                Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=self.instance)).exists():
             qc_required.update({
                 'documents': 'count'
             })
