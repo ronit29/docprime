@@ -11,6 +11,8 @@ import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
+from ondoc.doctor.models import Doctor
+from ondoc.crm.constants import constants
 import requests
 import json
 from django.conf import settings
@@ -270,3 +272,13 @@ def refund_curl_request(req_data):
 
 class ErrorCodeMapping(object):
     IVALID_APPOINTMENT_ORDER = 1
+
+
+def is_valid_testing_data(user, doctor):
+    if (Doctor.objects.filter(doctor=doctor, is_test_doctor=True).exists() and not user.groups.filter(
+            name=constants['TEST_USER_GROUP']).exists()):
+        return False
+    if (Doctor.objects.filter(doctor=doctor, is_test_doctor=False).exists() and user.groups.filter(
+            name=constants['TEST_USER_GROUP']).exists()):
+        return False
+    return True
