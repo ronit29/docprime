@@ -544,7 +544,7 @@ class AppointmentCompleteBodySerializer(serializers.Serializer):
 
         if attrs['id']==10010038:
             if not attrs['otp']==5786:
-                raise serializers.ValidationError("Invalid OTP")
+                raise serializers.ValidationError("Invalid Confirmation Code")
             else:
                 return attrs    
 
@@ -554,7 +554,7 @@ class AppointmentCompleteBodySerializer(serializers.Serializer):
             if appntmnt.first().status == LabAppointment.COMPLETED:
                 raise serializers.ValidationError("Appointment Already Completed")
             if not appntmnt.filter(otp=attrs['otp']).exists():
-                raise serializers.ValidationError("Invalid OTP")
+                raise serializers.ValidationError("Invalid Confirmation Code")
         else:
             raise serializers.ValidationError("Invalid Appointment")
         return attrs
