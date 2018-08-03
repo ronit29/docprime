@@ -235,7 +235,7 @@ class PgTransaction(TimeStampedModel):
     def create_pg_hash(cls, data, key1, key2):
         data_to_verify = ''
         for k in sorted(data.keys()):
-            if str(data[k]):
+            if data[k] is not None:
                 data_to_verify = data_to_verify + k + '=' + str(data[k]) + ';'
         encrypted_data_to_verify = key2 + '|' + data_to_verify + '|' + key1
         encrypted_message_object = hashlib.sha256(str(encrypted_data_to_verify).encode())
