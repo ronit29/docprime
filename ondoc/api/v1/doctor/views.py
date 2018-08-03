@@ -25,7 +25,7 @@ from django.db.models import Q
 from django.db.models import Case, When
 from operator import itemgetter
 from itertools import groupby
-from ondoc.api.v1.utils import RawSql
+from ondoc.api.v1.utils import RawSql, is_valid_testing_data
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F
@@ -320,7 +320,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             'productId': product_id,
             'surl': surl,
             'furl': furl,
-            'referenceId': '',
+            'referenceId': "",
             'orderId': order_id,
             'name': appointment_details['profile'].name,
             'txAmount': str(appointment_details['payable_amount']),
@@ -407,6 +407,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         return response_data
 
     def retrieve(self, request, pk):
+
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
@@ -415,7 +416,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'doctorspecializations__specialization'
                                     )
                   .filter(pk=pk, is_live=True).first())
-        if not doctor:
+        if not doctor or not is_valid_testing_data(request.user, doctor):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                  context={"request": request})

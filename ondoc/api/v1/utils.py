@@ -11,7 +11,6 @@ import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
-from ondoc.doctor.models import Doctor
 from ondoc.crm.constants import constants
 import requests
 import json
@@ -275,10 +274,14 @@ class ErrorCodeMapping(object):
 
 
 def is_valid_testing_data(user, doctor):
-    if (Doctor.objects.filter(doctor=doctor, is_test_doctor=True).exists() and not user.groups.filter(
+    from ondoc.doctor.models import Doctor
+
+    if user.id is None:
+        return False
+    if (Doctor.objects.filter(id=doctor.id, is_test_doctor=True).exists() and not user.groups.filter(
             name=constants['TEST_USER_GROUP']).exists()):
         return False
-    if (Doctor.objects.filter(doctor=doctor, is_test_doctor=False).exists() and user.groups.filter(
+    if (Doctor.objects.filter(id=doctor.id, is_test_doctor=False).exists() and user.groups.filter(
             name=constants['TEST_USER_GROUP']).exists()):
         return False
     return True
