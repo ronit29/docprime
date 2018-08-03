@@ -252,6 +252,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
     is_internal = models.BooleanField(verbose_name='Is Staff Doctor', default=False)
+    is_test_doctor = models.BooleanField(verbose_name='Is Test Doctor', default=False)
     # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
