@@ -10,7 +10,7 @@ from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request
 from django.conf import settings
 import hashlib
-import math
+import copy
 
 
 class Order(TimeStampedModel):
@@ -226,9 +226,10 @@ class PgTransaction(TimeStampedModel):
     @classmethod
     def is_valid_hash(cls, data):
         pg_hash = None
-        if data.get("hash"):
-            pg_hash = data.pop("hash")
-        calculated_hash = cls.create_incomming_pg_hash(data, settings.PG_CLIENT_KEY, settings.PG_SECRET_KEY)
+        temp_data = copy.deepcopy(data)
+        if temp_data.get("hash"):
+            pg_hash = temp_data.pop("hash")
+        calculated_hash = cls.create_incomming_pg_hash(temp_data, settings.PG_CLIENT_KEY, settings.PG_SECRET_KEY)
         return True if pg_hash == calculated_hash else False
 
     @classmethod
