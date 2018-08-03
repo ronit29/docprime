@@ -1,25 +1,24 @@
 from __future__ import absolute_import, unicode_literals
 
-from rest_framework import status
-import requests
-from .models import OpdAppointment
 from celery import task
+from datetime import timedelta
+from django.utils import timezone
+import logging
 
-
-@task(bind=True, max_retries=6)
-def ops_alert(self, app_id, countdown_time):
-    pass
+logger = logging.getLogger(__name__)
 
 
 @task(bind=True)
-def doc_appointment_cancel(self, app_id):
+def doc_app_auto_cancel(self, prev_app_dict):
+    from .models import OpdAppointment
     try:
-        status = [OpdAppointment.CREATED, OpdAppointment.BOOKED, ]
-        opd_obj = OpdAppointment.objects.filter(pk=app_id).first()
-        if opd_obj:
-            if opd_obj.status in status:
-                opd_obj.status = OpdAppointment.CANCELED
-                opd_obj.save()
+        opd_status = [OpdAppointment.CANCELED, OpdAppointment.COMPLETED, ]
+        present_app_obj = OpdAppointment.objects.filter(pk=prev_app_dict.get("id")).first()
+        if present_app_obj:
+            if present_app_obj.status not in opd_status and prev_app_dict.get(
+                    "status") == present_app_obj.status and timezone.now() - present_app_obj.updated_at >= timedelta(
+                    minutes=10):
+                present_app_obj.action_cancelled(refund_flag=1)
     except Exception as e:
-        print(e)
-        self.retry([app_id])
+        logger.error("Error in Celery auto cancel flow - " + str(e))
+        self.retry([prev_app_dict])

@@ -11,7 +11,6 @@ from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.utils import timezone
 from ondoc.account import models as account_model
-from django.conf import settings
 from weasyprint import HTML
 from django.conf import settings
 import pytz
@@ -413,6 +412,34 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             message = json.dumps(message)
             publish_message(message)
 
+    @classmethod
+    def ops_notification_alert(cls, instance, email_list, product):
+        from ondoc.doctor.models import OpdAppointment
+        status_choices = dict()
+        for k, v in OpdAppointment.STATUS_CHOICES:
+            status_choices[k] = v
+        OPD_URL = settings.BASE_URL + "/admin/doctor/opdappointment/" + str(instance.id) + "/change"
+        LAB_URL = settings.BASE_URL + "/admin/diagnostic/opdappointment/" + str(instance.id) + "/change"
+        url = OPD_URL if product == account_model.Order.DOCTOR_PRODUCT_ID else LAB_URL
+        html_body = "status - {status}, user - {username}, url - {url}".format(
+            status=status_choices[instance.status], username=instance.user.username, url=url
+        )
+        email_subject = "Change in appointment of user - {username} and id - {id}".format(
+            username=instance.user.username, id=instance.id
+        )
+        if email_list:
+            email_notif = {
+                "email": email_list,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_notif,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
 
 class SmsNotificationOpdMixin:
 
@@ -549,15 +576,3 @@ class PushNotification(TimeStampedModel):
         }
         message = json.dumps(message)
         publish_message(message)
-
-
-class AppointmentAlertNotification(TimeStampedModel):
-    # OPS_ALERT_NOTIFICATION =
-    trigger_time = models.IntegerField(verbose_name="Trigger Time in minutes")
-    email_ids = ArrayField(models.EmailField(max_length=100), blank=True, null=True)
-    email_sub = models.TextField(blank=True, null=True, default=None)
-    email_body = models.TextField(blank=True, null=True, default=None)
-    # notification_type = models.PositiveSmallIntegerField(choices=)
-
-    class Meta:
-        db_table = "appointment_alert_notification"

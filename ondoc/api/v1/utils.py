@@ -13,6 +13,7 @@ import calendar
 from django.contrib.auth import get_user_model
 from ondoc.account.tasks import refund_curl_task
 from django.conf import settings
+from dateutil.parser import parse
 User = get_user_model()
 
 
@@ -255,6 +256,16 @@ def labappointment_transform(app_data):
 def refund_curl_request(req_data):
     for data in req_data:
         refund_curl_task.delay(data)
+
+
+def custom_form_datetime(time_str, to_zone, diff_days=0):
+    next_dt = timezone.now().replace(tzinfo=to_zone).date()
+    if diff_days:
+        next_dt += datetime.timedelta(days=diff_days)
+    exp_dt = str(next_dt) + " " + time_str
+    exp_dt = parse(exp_dt).replace(tzinfo=to_zone)
+
+    return exp_dt
 
 
 class ErrorCodeMapping(object):
