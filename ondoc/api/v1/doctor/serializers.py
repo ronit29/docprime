@@ -10,6 +10,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
 from ondoc.authentication.models import UserProfile
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
+from ondoc.api.v1.utils import is_valid_testing_data
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 import math
@@ -155,6 +156,10 @@ class CreateAppointmentSerializer(serializers.Serializer):
                            if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         time_slot_end = None
+
+        if not is_valid_testing_data(request.user, data["doctor"]):
+            raise serializers.ValidationError("Both User and Doctor should be for testing")
+
         if data.get('end_date') and data.get('end_time'):
             time_slot_end = self.form_time_slot(data.get('end_date'), data.get('end_time'))
 

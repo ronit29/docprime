@@ -209,6 +209,9 @@ class Command(BaseCommand):
         #Create doctor image cropping team
         self.create_cropping_group()
 
+        #Create testing group
+        self.create_testing_group()
+
         #Create Article team Group
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
@@ -270,3 +273,8 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+    def create_testing_group(self):
+        group, created = Group.objects.get_or_create(name=constants['TEST_USER_GROUP'])
+
+
