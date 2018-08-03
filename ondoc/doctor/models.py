@@ -10,18 +10,21 @@ from django.core.exceptions import NON_FIELD_ERRORS
 from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
 from django.conf import settings
 from datetime import timedelta
+from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund
 from ondoc.payout.models import Outstanding
+from ondoc.doctor.tasks import doc_app_auto_cancel
 # from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from django.contrib.contenttypes.fields import GenericRelation
-from ondoc.api.v1.utils import get_start_end_datetime
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from functools import reduce
 from operator import or_
+import logging
 import math
 import random
 import os
@@ -33,6 +36,8 @@ from django.utils.safestring import mark_safe
 from PIL import Image as Img
 from io import BytesIO
 import hashlib
+
+logger = logging.getLogger(__name__)
 
 
 class Migration(migrations.Migration):
@@ -824,6 +829,10 @@ class OpdAppointment(auth_model.TimeStampedModel):
     CANCELED = 6
     COMPLETED = 7
 
+    STATUS_CHOICES = [(CREATED, "Created"), (BOOKED, "Booked"), (RESCHEDULED_DOCTOR, "Reschedule Doctor"),
+                      (RESCHEDULED_PATIENT, "Reschedule Patient"), (ACCEPTED, "Accepted"), (CANCELED, "Canceled"),
+                      (COMPLETED, "Completed"), ]
+
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_STATUS_CHOICES = (
@@ -1037,6 +1046,18 @@ class OpdAppointment(auth_model.TimeStampedModel):
         #     raise RestFrameworkValidationError("Doctor is on leave.")
         super().save(*args, **kwargs)
         self.send_notification(database_instance)
+        if not database_instance or database_instance.status != self.status:
+            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID, product=Order.DOCTOR_PRODUCT_ID)
+        try:
+            if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELED, OpdAppointment.ACCEPTED]:
+                countdown = self.get_auto_cancel_delay(self)
+                doc_app_auto_cancel.apply_async(({
+                    "id": self.id,
+                    "status": self.status,
+                    "updated_at": self.updated_at
+                }, ), countdown=countdown)
+        except Exception as e:
+            logger.error("Error in auto cancel flow - " + str(e))
 
     def payment_confirmation(self, consumer_account, data, amount):
         otp = random.randint(1000, 9999)
@@ -1129,6 +1150,21 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                                       outstanding=out_obj).filter(**opd_filter_query))
 
         return queryset
+
+    def get_auto_cancel_delay(self, app_obj):
+        delay = settings.AUTO_CANCEL_OPD_DELAY * 60
+        to_zone = tz.gettz(settings.TIME_ZONE)
+        app_updated_time = app_obj.updated_at.astimezone(to_zone)
+        morning_time = "08:00:00"  # In IST
+        evening_time = "20:00:00"  # In IST
+        present_day_end = custom_form_datetime(evening_time, to_zone)
+        next_day_start = custom_form_datetime(morning_time, to_zone, diff_days=1)
+        time_diff = next_day_start - app_updated_time
+
+        if present_day_end - timedelta(minutes=10) < app_updated_time < next_day_start:
+            return time_diff.seconds
+        else:
+            return delay
 
     class Meta:
         db_table = "opd_appointment"

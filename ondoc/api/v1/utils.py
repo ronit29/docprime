@@ -11,10 +11,12 @@ import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
+from ondoc.account.tasks import refund_curl_task
 from ondoc.crm.constants import constants
 import requests
 import json
 from django.conf import settings
+from dateutil.parser import parse
 User = get_user_model()
 
 
@@ -255,19 +257,18 @@ def labappointment_transform(app_data):
 
 
 def refund_curl_request(req_data):
-    token = "gFH8gPXbCWaW8WqUefmFBcyRj0XIw"
-    headers = {
-        "Authorization": token,
-        "Content-Type": "application/json"
-    }
-    url = "http://pgdev.policybazaar.com/dp/refund/refundRequested"
     for data in req_data:
-        response = requests.post(url, data=data, headers=headers)
-        response.raise_for_status()
-        print("\n\n\n")
-        print(response.status_code)
-        print("\n\n\n")
+        refund_curl_task.delay(data)
 
+
+def custom_form_datetime(time_str, to_zone, diff_days=0):
+    next_dt = timezone.now().replace(tzinfo=to_zone).date()
+    if diff_days:
+        next_dt += datetime.timedelta(days=diff_days)
+    exp_dt = str(next_dt) + " " + time_str
+    exp_dt = parse(exp_dt).replace(tzinfo=to_zone)
+
+    return exp_dt
 
 class ErrorCodeMapping(object):
     IVALID_APPOINTMENT_ORDER = 1
