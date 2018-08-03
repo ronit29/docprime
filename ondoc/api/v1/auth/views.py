@@ -831,6 +831,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                 appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
                             except Exception as e:
                                 logger.error("Error in building appointment - " + str(e))
+                        else:
+                            logger.error("Invalid Hash for - " + json.dumps(response))
                     else:
                         logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
 
