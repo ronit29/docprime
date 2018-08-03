@@ -26,3 +26,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Article
         fields = ('title', 'url', 'icon', 'id')
+
+
+class ArticlePreviewSerializer(serializers.Serializer):
+    preview = serializers.BooleanField(required=False)

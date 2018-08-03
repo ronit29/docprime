@@ -19,6 +19,7 @@ class Article(TimeStampedModel, CreatedByModel):
     body = models.CharField(blank=False, null=False, max_length=20000)
     category = models.ManyToManyField(ArticleCategory, related_name='articles')
     icon = models.ImageField(upload_to='articles/icons', null=True)
+    is_published = models.BooleanField(default=False, verbose_name='Published')
 
     def icon_tag(self):
         if self.icon:

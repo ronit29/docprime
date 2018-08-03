@@ -25,7 +25,7 @@ class ArticleAdmin(VersionAdmin):
     model = Article
     list_display = ('title', 'updated_at', 'created_at', 'created_by')
     search_fields = ['title']
-    fields = ['body','title','category','url','icon_tag','icon']
+    fields = ['body','title','category','url','icon_tag', 'icon', 'is_published']
     readonly_fields = ['icon_tag']
     #inlines = [ArticleCategoryInline]
 

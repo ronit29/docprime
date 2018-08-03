@@ -8,14 +8,16 @@ from . import serializers
 
 class ArticleViewSet(viewsets.GenericViewSet):
 
-    queryset = article_models.Article.objects.prefetch_related('category')
+    def get_queryset(self):
+        return article_models.Article.objects.prefetch_related('category')
 
     def list(self, request):
         resp = []
-        categories = self.queryset.values_list('category__name', flat=True)
+        queryset = self.get_queryset().filter(is_published=True)
+        categories = queryset.values_list('category__name', flat=True)
         categories = list(set(categories))
         for category in categories:
-            data = self.queryset.filter(category__name=category)
+            data = queryset.filter(category__name=category)
             if data.exists():
                 cat_data = {}
                 cat_data['title'] = category
@@ -25,8 +27,15 @@ class ArticleViewSet(viewsets.GenericViewSet):
 
     def retrieve(self, request, pk=None):
         response = {}
-        queryset = self.queryset.filter(pk=pk)
+        queryset = self.get_queryset().filter(pk=pk)
+        serializer = serializers.ArticlePreviewSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        preview = serializer.validated_data.get('preview')
+        if not preview:
+            queryset = queryset.filter(is_published=True)
         if queryset.exists():
             serializer = serializers.ArticleRetrieveSerializer(queryset.first(), context={'request': request})
             response = serializer.data
-        return Response(response)
+            return Response(response)
+        else:
+            return Response({"error": "Not Found"}, status=status.HTTP_404_NOT_FOUND)
