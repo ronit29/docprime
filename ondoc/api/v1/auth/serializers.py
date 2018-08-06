@@ -139,15 +139,28 @@ class NotificationEndpointDeleteSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     GENDER_CHOICES = UserProfile.GENDER_CHOICES
     name = serializers.CharField()
-    age = serializers.IntegerField(read_only=True)
+    age = serializers.SerializerMethodField()
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
+
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
                   "profile_image", "age", "user", "dob")
+
+    def get_age(self, obj):
+        from datetime import date
+        age = None
+        birth_date = obj.dob if obj.dob is not None else None
+        if birth_date:
+            today = date.today()
+            age = today.year - birth_date.year
+            full_year_passed = (today.month, today.day) > (birth_date.month, birth_date.day)
+            if not full_year_passed:
+                age -= 1
+        return age
 
     def get_profile_image(self, obj):
         request = self.context.get('request')

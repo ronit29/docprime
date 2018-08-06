@@ -108,9 +108,12 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     is_home_pickup_available = serializers.SerializerMethodField()
 
     def get_is_home_pickup_available(self, obj):
-        if self.context["lab"].is_home_collection_enabled and obj.test.home_collection_possible:
-            return True
-        return False
+        if self.context.get("lab") is not None:
+            if self.context["lab"].is_home_collection_enabled and obj.test.home_collection_possible:
+                return True
+            return False
+        return obj.test.home_collection_possible
+        # return None
 
     def get_agreed_price(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
