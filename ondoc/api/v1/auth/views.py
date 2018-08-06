@@ -437,13 +437,14 @@ class UserAppointmentsViewSet(OndocViewSet):
                         return resp
 
                     test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
-                    lab_test_queryset = AvailableLabTest.objects.select_related('lab').filter(lab=lab_appointment.lab,
-                                                                                              test__in=test_ids)
+                    lab_test_queryset = AvailableLabTest.objects.select_related('lab_pricing_group__labs').filter(
+                        lab_pricing_group__labs=lab_appointment.lab,
+                        test__in=test_ids)
                     deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
                                                   When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
                     agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
                                                     When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
-                    temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
+                    temp_lab_test = lab_test_queryset.values('lab_pricing_group__labs').annotate(total_mrp=Sum("mrp"),
                                                                              total_deal_price=Sum(deal_price_calculation),
                                                                              total_agreed_price=Sum(agreed_price_calculation))
                     old_deal_price = lab_appointment.deal_price
@@ -1012,13 +1013,14 @@ class OrderHistoryViewSet(GenericViewSet):
         lab_name = dict()
         lab_test_map = dict()
         if available_lab_test:
-            test_ids = AvailableLabTest.objects.prefetch_related('lab', 'test').filter(pk__in=available_lab_test)
+            test_ids = AvailableLabTest.objects.prefetch_related('lab_pricing_group__labs', 'test').filter(pk__in=available_lab_test)
             lab_test_map = dict()
             for data in test_ids:
-                lab_name[data.lab.id] = {
-                    'name': data.lab.name,
-                    "lab_thumbnail": request.build_absolute_uri(data.lab.get_thumbnail()) if data.lab.get_thumbnail() else None
-                }
+                for lab_data in data.lab_pricing_group.labs.all():
+                    lab_name[lab_data.id] = {
+                        'name': lab_data.name,
+                        "lab_thumbnail": request.build_absolute_uri(lab_data.get_thumbnail()) if lab_data.get_thumbnail() else None
+                    }
                 lab_test_map[data.id] = {"id": data.test.id,
                                          "name": data.test.name
                                          }

@@ -339,7 +339,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                                       When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
 
         self.num_appointment_validator(data)
-        lab_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids'])
+        lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
         temp_lab_test = lab_test_queryset.values('lab').annotate(total_mrp=Sum("mrp"),
                                                                  total_deal_price=Sum(deal_price_calculation),
                                                                  total_agreed_price=Sum(agreed_price_calculation))
@@ -400,7 +400,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     def test_lab_id_validator(data):
         if not data['test_ids']:
             raise serializers.ValidationError(" No Test Ids given")
-        avail_test_queryset = AvailableLabTest.objects.filter(lab=data["lab"], test__in=data['test_ids']).values(
+        avail_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids']).values(
             'id')
 
         if len(avail_test_queryset) != len(data['test_ids']):
