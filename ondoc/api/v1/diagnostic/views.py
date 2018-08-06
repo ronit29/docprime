@@ -203,9 +203,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(lab_pricing_group__labs__location__distance_gte=(pnt, min_distance))
 
         if ids:
+            deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
+                                          When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
             queryset = (
                 queryset.values('lab_pricing_group__labs__id'
-                                ).annotate(price=Sum('mrp'), count=Count('id'),
+                                ).annotate(price=Sum(deal_price_calculation), count=Count('id'),
                                            distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
                                            name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
         else:
