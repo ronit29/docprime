@@ -151,7 +151,7 @@ class PgTransaction(TimeStampedModel):
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
     reference_id = models.PositiveIntegerField(blank=True, null=True)
     order_id = models.PositiveIntegerField()
-    order_no = models.PositiveIntegerField(blank=True, null=True)
+    order_no = models.CharField(max_length=100, blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
