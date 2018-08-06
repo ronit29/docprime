@@ -418,7 +418,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'qualifications__specialization',
                                     'doctorspecializations__specialization'
                                     )
-                  .filter(pk=pk, is_live=True).first())
+                  .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
         #     return Response(status=status.HTTP_400_BAD_REQUEST)
         if doctor:
