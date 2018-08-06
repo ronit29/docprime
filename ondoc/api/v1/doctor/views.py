@@ -410,7 +410,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         return response_data
 
     def retrieve(self, request, pk):
-
+        response_data = []
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
@@ -419,11 +419,12 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'doctorspecializations__specialization'
                                     )
                   .filter(pk=pk, is_live=True).first())
-        if not doctor or not is_valid_testing_data(request.user, doctor):
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
-                                                                 context={"request": request})
-        response_data = self.prepare_response(serializer.data)
+        # if not doctor or not is_valid_testing_data(request.user, doctor):
+        #     return Response(status=status.HTTP_400_BAD_REQUEST)
+        if doctor:
+            serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+                                                                     context={"request": request})
+            response_data = self.prepare_response(serializer.data)
         return Response(response_data)
 
 
