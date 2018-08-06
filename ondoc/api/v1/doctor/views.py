@@ -419,8 +419,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'doctorspecializations__specialization'
                                     )
                   .filter(pk=pk, is_live=True).first())
-        if not doctor or not is_valid_testing_data(request.user, doctor):
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+        # if not doctor or not is_valid_testing_data(request.user, doctor):
+        #     return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                  context={"request": request})
         response_data = self.prepare_response(serializer.data)
