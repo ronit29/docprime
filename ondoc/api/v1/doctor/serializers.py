@@ -617,7 +617,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     availability = None
 
     def get_hospitals(self, obj):
-        data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj, doctor_clinic__doctor__is_live=True,
+        data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__hospital__is_live=True).select_related(
             "doctor_clinic__doctor", "doctor_clinic__hospital")
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
