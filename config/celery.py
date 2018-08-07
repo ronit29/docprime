@@ -6,8 +6,8 @@ import requests
 
 env = environ.Env()
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', env('DJANGO_SETTINGS_MODULE'))
-
+#os.environ.setdefault('DJANGO_SETTINGS_MODULE', env('DJANGO_SETTINGS_MODULE'))
+print('environment=='+env('DJANGO_SETTINGS_MODULE'))
 app = Celery('ondoc')
 
 app.config_from_object('django.conf:settings', namespace='CELERY')

@@ -25,3 +25,4 @@ WeasyPrint==0.42.3
 Collectfast
 django-nested-admin==3.0.21
 django-silk
+celery
