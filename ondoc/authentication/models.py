@@ -509,9 +509,9 @@ class GenericLabAdmin(TimeStampedModel):
     type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
     lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True,
                                          on_delete=models.CASCADE,
-                                         related_name='manageable_lab_network')
+                                         related_name='manageable_lab_network_admins')
     lab = models.ForeignKey("diagnostic.Lab", null=True, blank=True, on_delete=models.CASCADE,
-                                 related_name='manageablelab')
+                                 related_name='manageable_lab_admins')
     permission_type = models.PositiveSmallIntegerField(max_length=20, choices=type_choices, default=APPOINTMENT)
     is_disabled = models.BooleanField(default=False)
     super_user_permission = models.BooleanField(default=False)
