@@ -16,6 +16,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument)
 from .common import *
+from ondoc.authentication.models import GenericLabAdmin
 from ondoc.authentication.models import GenericAdmin, User, QCModel
 from django.contrib.contenttypes.admin import GenericTabularInline
 
@@ -146,6 +147,11 @@ class LabDoctorInline(admin.TabularInline):
 
 # class LabDocumentForm(forms.ModelForm):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+
+class GenericLabAdminInline(admin.TabularInline):
+    model = GenericLabAdmin
+    extra = 0
+    can_delete = True
 
 
 class LabDocumentFormSet(forms.BaseInlineFormSet):
@@ -389,7 +395,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     form = LabForm
     search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline]
+        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, GenericLabAdminInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200

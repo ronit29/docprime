@@ -9,6 +9,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from PIL import Image as Img
 from django.core.files.uploadedfile import InMemoryUploadedFile
+
 from io import BytesIO
 import math
 import os
@@ -497,6 +498,31 @@ class LabUserPermission(TimeStampedModel):
                         access_list.append({'admin_id': permission.lab_id, 'admin_level': Outstanding.LAB_LEVEL})
         return access_list
         # TODO PM - Logic to get admin for a particular User
+
+
+class GenericLabAdmin(TimeStampedModel):
+    APPOINTMENT = 1
+    BILLINNG = 2
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.CharField(max_length=10)
+    type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
+    lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True,
+                                         on_delete=models.CASCADE,
+                                         related_name='manageable_lab_network')
+    lab = models.ForeignKey("diagnostic.Lab", null=True, blank=True, on_delete=models.CASCADE,
+                                 related_name='manageablelab')
+    permission_type = models.PositiveSmallIntegerField(max_length=20, choices=type_choices, default=APPOINTMENT)
+    is_disabled = models.BooleanField(default=False)
+    super_user_permission = models.BooleanField(default=False)
+    read_permission = models.BooleanField(default=False)
+    write_permission = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'generic_lab_admin'
+
+    def __str__(self):
+        return "{}".format(self.phone_number)
 
 
 class GenericAdmin(TimeStampedModel):

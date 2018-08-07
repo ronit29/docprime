@@ -22,6 +22,7 @@ import os
 from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
 
+
 class LabPricingGroup(TimeStampedModel, CreatedByModel):
     group_name = models.CharField(max_length=256)
     pathology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
