@@ -16,9 +16,7 @@ if os.environ.get('DJANGO_SETTINGS_MODULE') == 'config.settings.local':
 
     app = celery.Celery(__name__)
 
-    app.config_from_object('django.conf:settings', namespace='CELERY')
 
-    app.autodiscover_tasks()
 
 else:
     class Celery(celery.Celery):
@@ -35,4 +33,5 @@ else:
     app = Celery(__name__)
 
 
-app.config_from_object('django.conf:settings')
+app.config_from_object('django.conf:settings', namespace='CELERY')
+app.autodiscover_tasks()
