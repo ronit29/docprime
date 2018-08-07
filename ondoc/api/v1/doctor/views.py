@@ -355,6 +355,9 @@ class DoctorProfileView(viewsets.GenericViewSet):
     authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
 
+    def get_queryset(self):
+        return models.OpdAppointment.objects.all()
+
     def retrieve(self, request):
         from django.contrib.staticfiles.templatetags.staticfiles import static
         resp_data = dict()

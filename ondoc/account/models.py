@@ -273,7 +273,7 @@ class PgTransaction(TimeStampedModel):
 
 
 class ConsumerAccount(TimeStampedModel):
-    user = models.OneToOneField(User, on_delete=models.DO_NOTHING)
+    user = models.OneToOneField(User, blank=True, null=True, on_delete=models.SET_NULL)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def credit_payment(self, data, amount):
