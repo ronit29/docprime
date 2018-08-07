@@ -830,7 +830,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     COMPLETED = 7
 
     STATUS_CHOICES = [(CREATED, "Created"), (BOOKED, "Booked"), (RESCHEDULED_DOCTOR, "Reschedule Doctor"),
-                      (RESCHEDULED_PATIENT, "Reschedule Patient"), (ACCEPTED, "Accepted"), (CANCELED, "Canceled"),
+                      (RESCHEDULED_PATIENT, "Reschedule Patient"), (ACCEPTED, "Accepted"), (CANCELLED, "Canceled"),
                       (COMPLETED, "Completed"), ]
 
     PAYMENT_ACCEPTED = 1
