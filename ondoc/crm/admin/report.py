@@ -5,6 +5,7 @@ from ondoc.api.v1.utils import RawSql
 from django.forms import ModelForm
 import django_tables2 as tables
 from django_tables2 import RequestConfig
+from django_tables2.export.export import TableExport
 
 
 def get_table_class(keys):
@@ -49,10 +50,15 @@ class ReportAdmin(admin.ModelAdmin):
             return render(request, 'access_denied.html')
         query_string = object.sql
         result = RawSql(query_string).fetch_all()
-        table_class = get_table_class(result[0].keys())
-        table = table_class(result)
-        RequestConfig(request).configure(table)
-        form = ReportForm(instance=object, prefix="report")
+        if result:
+            table_class = get_table_class(result[0].keys())
+            table = table_class(result)
+            RequestConfig(request).configure(table)
+            export_format = request.GET.get('_export', None)
+            if TableExport.is_valid_format(export_format):
+                exporter = TableExport(export_format, table)
+                return exporter.response('table.{}'.format(export_format))
+            form = ReportForm(instance=object, prefix="report")
 
-        extra_context = {'result': table, 'form': form, 'id': object_id, 'request': request, 'report': object}
-        return super().change_view(request, object_id, extra_context=extra_context)
+            extra_context = {'result': table, 'form': form, 'id': object_id, 'request': request, 'report': object}
+            return super().change_view(request, object_id, extra_context=extra_context)
