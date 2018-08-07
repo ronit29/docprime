@@ -826,7 +826,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     RESCHEDULED_DOCTOR = 3
     RESCHEDULED_PATIENT = 4
     ACCEPTED = 5
-    CANCELED = 6
+    CANCELLED = 6
     COMPLETED = 7
 
     STATUS_CHOICES = [(CREATED, "Created"), (BOOKED, "Booked"), (RESCHEDULED_DOCTOR, "Reschedule Doctor"),
@@ -836,14 +836,19 @@ class OpdAppointment(auth_model.TimeStampedModel):
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_STATUS_CHOICES = (
-        (PAYMENT_ACCEPTED, "Payment Accepted"),
-        (PAYMENT_PENDING, "Payment Pending"),
+        (PAYMENT_ACCEPTED, 'Payment Accepted'),
+        (PAYMENT_PENDING, 'Payment Pending'),
     )
     PREPAID = 1
     COD = 2
     INSURANCE = 3
-    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, "COD"), (INSURANCE, "Insurance"))
-    ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_DOCTOR]
+    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'))
+    APPOINTMENT_STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
+                                  (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
+                                  (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                                  (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
+                                  (COMPLETED, 'Completed')]
+
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
@@ -857,7 +862,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     effective_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
     mrp = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
     deal_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, default=None, null=False)
-    status = models.PositiveSmallIntegerField(default=CREATED)
+    status = models.PositiveSmallIntegerField(default=CREATED, choices=APPOINTMENT_STATUS_CHOICES)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     otp = models.PositiveIntegerField(blank=True, null=True)
     # patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
@@ -891,7 +896,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
         elif user_type == auth_model.User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
+                allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
 
         return allowed
 
@@ -926,7 +931,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-        self.status = self.CANCELED
+        self.status = self.CANCELLED
         self.save()
 
         if self.payment_type == self.PREPAID:
@@ -1009,7 +1014,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                     instance=self,
                     user=admin,
                     notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED)
-        elif self.status == OpdAppointment.CANCELED:
+        elif self.status == OpdAppointment.CANCELLED:
             for admin in doctor_admins:
                 notification_models.NotificationAction.trigger(
                     instance=self,
