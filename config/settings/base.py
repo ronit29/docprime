@@ -263,7 +263,7 @@ PG_CLIENT_KEY = env('PG_CLIENT_KEY')
 PG_REFUND_URL = env('PG_REFUND_URL')
 AUTO_CANCEL_OPD_DELAY = 10  # In min
 AUTO_CANCEL_LAB_DELAY = 10  # In min
-OPS_EMAIL_ID = ["abc@policybazaar.com", ]
+OPS_EMAIL_ID = ["ankurmittal@policybazaar.com", ]
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
