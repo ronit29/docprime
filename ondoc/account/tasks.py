@@ -1,6 +1,7 @@
 from __future__ import absolute_import, unicode_literals
 
 from rest_framework import status
+from django.conf import settings
 from celery import task
 import requests
 import json
@@ -15,12 +16,15 @@ def refund_curl_task(self, req_data):
     try:
         token = "gFH8gPXbCWaW8WqUefmFBcyRj0XIw"
         headers = {
-            "Authorization": token,
+            "auth": token,
             "Content-Type": "application/json"
         }
-        url = "http://pgdev.policybazaar.com/dp/refund/refundRequested"
+        url = settings.PG_REFUND_URL
+        print(url)
         response = requests.post(url, data=req_data, headers=headers)
         response.raise_for_status()
+        print(response.text, response.status_code)
+        # resp_data = response.json()
         if response.status_code == status.HTTP_200_OK:
             from .models import ConsumerRefund
             refund_queryset = ConsumerRefund.objects.filter(user_id=req_data["user"], consumer_transaction_id=req_data["orderId"], pg_transaction_id=req_data["refNo"]).first()
@@ -30,6 +34,7 @@ def refund_curl_task(self, req_data):
                 print("Status Updated")
         else:
             countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Refund Failure with response - " + str(response.text))
             print(countdown_time)
             self.retry([req_data], countdown=countdown_time)
     except Exception as e:

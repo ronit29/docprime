@@ -218,12 +218,13 @@ class PgTransaction(TimeStampedModel):
         for data in refund_data:
             if data.get("pg_transaction"):
                 params = {
-                    "user": data["user"].id,
-                    "orderId": data["consumer_transaction"].id,
+                    "user": str(data["user"].id),
+                    "orderNo":str(data["pg_transaction"].order_no),
+                    "orderId": str(data["consumer_transaction"].id),
                     "refundAmount": str(data["refund_amount"]),
-                    "refNo": data["pg_transaction"].id,
-                    "checksum": ""
+                    "refNo": str(data["pg_transaction"].id),
                 }
+                params["checksum"] = PgTransaction.create_pg_hash(params, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
                 pg_data.append(params)
         return pg_data
 
