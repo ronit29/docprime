@@ -14,6 +14,8 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.urls import include, path
+from django.conf.urls import url
+
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
@@ -48,6 +50,9 @@ urlpatterns = [
     path('', include('ondoc.doctor.urls', namespace='doctor')),
     path('onboard/',include('ondoc.onboard.urls', namespace='onboard')),
 ] + additional_urls + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+urlpatterns += [url(r'^silk/', include('silk.urls', namespace='silk'))]
 
 if settings.DEBUG:
     import debug_toolbar
