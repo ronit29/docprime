@@ -17,3 +17,4 @@ tests/report/
 /static/
 ondoc/media/*
 deploy.sh
+/silk/
