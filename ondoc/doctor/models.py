@@ -1047,7 +1047,8 @@ class OpdAppointment(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
         self.send_notification(database_instance)
         if not database_instance or database_instance.status != self.status:
-            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID, product=Order.DOCTOR_PRODUCT_ID)
+            for e_id in settings.OPS_EMAIL_ID:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
         try:
             if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELED, OpdAppointment.ACCEPTED]:
                 countdown = self.get_auto_cancel_delay(self)
