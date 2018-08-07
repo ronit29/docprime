@@ -89,7 +89,9 @@ THIRD_PARTY_APPS = (
     'dal_select2',
     'django_tables2',
     'anymail',
-    'nested_admin'
+    'nested_admin',
+    'silk'
+
 )
 
 LOCAL_APPS = (
@@ -123,6 +125,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'silk.middleware.SilkyMiddleware',
+
 
 ]
 
@@ -283,3 +287,8 @@ SEND_THROUGH_NODEJS_ENABLED = env.bool('SEND_THROUGH_NODEJS_ENABLED', default=Fa
 # MEDIA_ROOT = str(APPS_DIR('media'))
 #
 #DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'
+
+
+SILKY_AUTHENTICATION = True  # User must login
+SILKY_AUTHORISATION = True  # User must have permissions
+SILKY_META = True
