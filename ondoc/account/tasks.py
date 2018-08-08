@@ -27,7 +27,7 @@ def refund_curl_task(self, req_data):
         # resp_data = response.json()
         if response.status_code == status.HTTP_200_OK:
             from .models import ConsumerRefund
-            refund_queryset = ConsumerRefund.objects.filter(user_id=req_data["user"], consumer_transaction_id=req_data["orderId"], pg_transaction_id=req_data["refNo"]).first()
+            refund_queryset = ConsumerRefund.objects.filter(pk=req_data["refNo"]).first()
             if refund_queryset:
                 refund_queryset.refund_state = ConsumerRefund.COMPLETED
                 refund_queryset.save()
