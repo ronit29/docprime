@@ -440,7 +440,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
             'languages', 'qualifications', 'general_specialization', 'availability', 'mobiles', 'medical_services',
-            'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail',)
+            'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail', 'signature')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
