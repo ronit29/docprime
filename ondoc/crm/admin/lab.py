@@ -11,6 +11,8 @@ from reversion.admin import VersionAdmin
 from import_export.admin import ImportExportMixin
 from django.db.models import Q
 from django.db import models
+
+from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
@@ -406,7 +408,9 @@ class LabAppointmentForm(forms.ModelForm):
         cleaned_data = self.cleaned_data
         time_slot_start = cleaned_data['time_slot_start']
         hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-        if hour not in [value[0] for value in LabTiming.TIME_CHOICES]:
+        minutes = time_slot_start.minute
+        valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
+        if minutes % valid_minutes_slot != 0:
             self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
             self.cleaned_data.pop('time_slot_start', None)
         selected_test_ids = self.instance.lab_test.all().values_list('test',flat=True)
