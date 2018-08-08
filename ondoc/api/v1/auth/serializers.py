@@ -288,7 +288,8 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
 
         return {
             'token': jwt.encode(new_payload, settings.SECRET_KEY),
-            'user': user
+            'user': user,
+            'payload': new_payload
         }
 
     def check_user_custom(self, payload):

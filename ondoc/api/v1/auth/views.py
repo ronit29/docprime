@@ -1260,6 +1260,7 @@ class RefreshJSONWebToken(GenericViewSet):
         serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data['token'] = serializer.validated_data['token']
+        data['payload'] = serializer.validated_data['payload']
         return Response(data)
 
 # refresh_jwt_token = RefreshJSONWebToken.as_view()
