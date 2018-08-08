@@ -822,7 +822,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     resp_serializer = serializers.TransactionSerializer(data=response)
                     if resp_serializer.is_valid():
                         response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-                        if PgTransaction.is_valid_hash(response):
+                        if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
                             try:
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)
                             except Exception as e:

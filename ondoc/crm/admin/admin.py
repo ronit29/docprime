@@ -12,13 +12,13 @@ from ondoc.notification import models as notifcation_model
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
-                     DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin)
+                     DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
-    LabAppointmentAdmin
+    LabAppointmentAdmin, CommonTestAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -57,7 +57,7 @@ admin.site.register(User, CustomUserAdmin)
 admin.site.register(Language, LanguageAdmin)
 admin.site.register(MedicalService, MedicalServiceAdmin)
 admin.site.register(CommonMedicalCondition)
-admin.site.register(CommonSpecialization)
+admin.site.register(CommonSpecialization, CommonSpecializationAdmin)
 admin.site.register(Specialization, SpecializationAdmin)
 admin.site.register(GeneralSpecialization, GeneralSpecializationAdmin)
 admin.site.register(MedicalCondition, MedicalConditionAdmin)
@@ -66,7 +66,7 @@ admin.site.register(HealthTip, HealthTipAdmin)
 admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
 admin.site.register(Lab, LabAdmin)
-admin.site.register(CommonTest)
+admin.site.register(CommonTest, CommonTestAdmin)
 admin.site.register(CommonDiagnosticCondition, CommonDiagnosticConditionAdmin)
 admin.site.register(LabNetwork, LabNetworkAdmin)
 

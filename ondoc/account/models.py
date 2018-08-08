@@ -224,17 +224,26 @@ class PgTransaction(TimeStampedModel):
                     "refundAmount": str(data.refund_amount),
                     "refNo": str(data.id),
                 }
-                params["checkSum"] = PgTransaction.create_pg_hash(params, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
+                secret_key = settings.PG_SECRET_KEY_REFUND
+                client_key = settings.PG_SECRET_KEY_REFUND
+                params["checkSum"] = PgTransaction.create_pg_hash(params, secret_key, client_key)
                 pg_data.append(params)
         return pg_data
 
     @classmethod
-    def is_valid_hash(cls, data):
+    def is_valid_hash(cls, data, product_id):
+        client_key = secret_key = ""
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            client_key = settings.PG_CLIENT_KEY_P1
+            secret_key = settings.PG_SECRET_KEY_P1
+        elif product_id == Order.LAB_PRODUCT_ID:
+            client_key = settings.PG_CLIENT_KEY_P2
+            secret_key = settings.PG_SECRET_KEY_P2
         pg_hash = None
         temp_data = copy.deepcopy(data)
         if temp_data.get("hash"):
             pg_hash = temp_data.pop("hash")
-        calculated_hash, prehashed_str = cls.create_incomming_pg_hash(temp_data, settings.PG_CLIENT_KEY, settings.PG_SECRET_KEY)
+        calculated_hash, prehashed_str = cls.create_incomming_pg_hash(temp_data, client_key, secret_key)
         if pg_hash != calculated_hash:
             logger.error(
                 "Hash Mismatch with Calculated Hash - " + calculated_hash + " pre-hashed string - " + prehashed_str + " pg response data - " + json.dumps(

@@ -973,3 +973,7 @@ class DoctorMappingAdmin(VersionAdmin):
         form.base_fields['doctor'].queryset = Doctor.objects.filter(is_internal=True)
         form.base_fields['profile_to_be_shown'].queryset = Doctor.objects.filter(is_internal=True)
         return form
+
+
+class CommonSpecializationAdmin(VersionAdmin):
+    autocomplete_fields = ['specialization']
