@@ -446,7 +446,7 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                     'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'lab_test', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+            return ('lab_name', 'lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'status', 'time_slot_start')
@@ -457,7 +457,7 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return ()
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'lab_test', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+            return ('lab_name', 'lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
@@ -524,7 +524,9 @@ class LabTestTypeAdmin(VersionAdmin):
 
 
 class AvailableLabTestAdmin(VersionAdmin):
-    search_fields = ['test__name']
+    list_display = ['test', 'lab_pricing_group', 'get_type', 'mrp', 'computed_agreed_price',
+                    'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'enabled']
+    search_fields = ['test__name', 'lab_pricing_group__group_name', 'lab_pricing_group__labs__name']
 
 
 class DiagnosticConditionLabTestInline(admin.TabularInline):
