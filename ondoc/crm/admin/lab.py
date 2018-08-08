@@ -541,3 +541,7 @@ class CommonDiagnosticConditionAdmin(VersionAdmin):
     search_fields = ['name']
     inlines = [DiagnosticConditionLabTestInline]
 
+
+class CommonTestAdmin(VersionAdmin):
+    autocomplete_fields = ['test']
+
