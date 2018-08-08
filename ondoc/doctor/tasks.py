@@ -16,8 +16,7 @@ def doc_app_auto_cancel(self, prev_app_dict):
         present_app_obj = OpdAppointment.objects.filter(pk=prev_app_dict.get("id")).first()
         if present_app_obj:
             if present_app_obj.status not in opd_status and prev_app_dict.get(
-                    "status") == present_app_obj.status and timezone.now() - present_app_obj.updated_at >= timedelta(
-                    minutes=10):
+                    "status") == present_app_obj.status and prev_app_dict.get("updated_at") == present_app_obj.updated_at:
                 present_app_obj.action_cancelled(refund_flag=1)
     except Exception as e:
         logger.error("Error in Celery auto cancel flow - " + str(e))

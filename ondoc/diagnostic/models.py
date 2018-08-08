@@ -507,6 +507,9 @@ class LabAppointment(TimeStampedModel):
     ACCEPTED = 5
     CANCELED = 6
     COMPLETED = 7
+    STATUS_CHOICES = [(CREATED, "Created"), (BOOKED, "Booked"), (RESCHEDULED_LAB, "Reschedule Lab"),
+                      (RESCHEDULED_PATIENT, "Reschedule Patient"), (ACCEPTED, "Accepted"), (CANCELED, "Canceled"),
+                      (COMPLETED, "Completed"), ]
     ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_LAB]
 
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
@@ -590,7 +593,8 @@ class LabAppointment(TimeStampedModel):
         self.send_notification(database_instance)
 
         if not database_instance or database_instance.status != self.status:
-            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID, product=account_model.Order.LAB_PRODUCT_ID)
+            for e_id in settings.OPS_EMAIL_ID:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
 
         try:
             prev_app_dict = {'id': self.id,
