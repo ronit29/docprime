@@ -859,7 +859,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     effective_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
     mrp = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
     deal_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, default=None, null=False)
-    status = models.PositiveSmallIntegerField(default=CREATED, choices=APPOINTMENT_STATUS_CHOICES)
+    status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     otp = models.PositiveIntegerField(blank=True, null=True)
     # patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
