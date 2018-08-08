@@ -796,6 +796,9 @@ class LabAppointment(TimeStampedModel):
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
 
+    def __str__(self):
+        return "{}-{}".format(self.test.name, self.id)
+
 
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)

@@ -126,9 +126,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'silk.middleware.SilkyMiddleware',
-
-
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -298,11 +295,3 @@ SEND_THROUGH_NODEJS_ENABLED = env.bool('SEND_THROUGH_NODEJS_ENABLED', default=Fa
 # MEDIA_ROOT = str(APPS_DIR('media'))
 #
 #DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'
-
-
-SILKY_AUTHENTICATION = True  # User must login
-SILKY_AUTHORISATION = True  # User must have permissions
-SILKY_META = True
-SILKY_PYTHON_PROFILER = True
-SILKY_PYTHON_PROFILER_BINARY = True
-SILKY_PYTHON_PROFILER_RESULT_PATH = os.path.join(str(ROOT_DIR), "silk")
