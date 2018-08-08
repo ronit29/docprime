@@ -7,10 +7,9 @@ from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
 from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import mixins, viewsets, status
 from rest_framework.exceptions import ValidationError as RestValidationError
-import datetime
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
 from django.db import transaction
@@ -41,13 +40,14 @@ from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
 from ondoc.payout.models import Outstanding
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
-
+from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
 import decimal
 from django.conf import settings
 from collections import defaultdict
 import copy
 import logging
+import jwt
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -97,13 +97,14 @@ class LoginOTP(GenericViewSet):
         serializer = serializers.OTPVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        return Response({"message" : "OTP Generated Sucessfuly."})
+        return Response({"message": "OTP Generated Sucessfuly."})
 
 
 class UserViewset(GenericViewSet):
     serializer_class = serializers.UserSerializer
     @transaction.atomic
     def login(self, request, format=None):
+        from ondoc.authentication.backends import JWTAuthentication
         serializer = serializers.OTPVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -115,17 +116,18 @@ class UserViewset(GenericViewSet):
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
 
-        GenericAdmin.update_user_admin(data['phone_number'])
-
-        token = Token.objects.get_or_create(user=user)
+        # token = Token.objects.get_or_create(user=user)
+        payload = JWTAuthentication.jwt_payload_handler(user)
+        token = jwt.encode(payload, settings.SECRET_KEY)
 
         expire_otp(data['phone_number'])
 
         response = {
-            "login":1,
-            "token" : str(token[0]),
-            "user_exists" : user_exists,
-            "user_id" : user.id
+            "login": 1,
+            "user_exists": user_exists,
+            "user_id": user.id,
+            "token": token,
+            "expiration_time": datetime.datetime.utcnow() + settings.JWT_AUTH['JWT_EXPIRATION_DELTA']
         }
         return Response(response)
 
@@ -247,8 +249,8 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                          GenericViewSet):
     serializer_class = serializers.UserProfileSerializer
     queryset = UserProfile.objects.all()
-    authentication_classes = (TokenAuthentication, )
-    permission_classes = (IsAuthenticated,)
+    # authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, )
     pagination_class = None
 
     def get_queryset(self):
@@ -336,7 +338,7 @@ class OndocViewSet(mixins.CreateModelMixin,
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
-    authentication_classes = (TokenAuthentication, )
+    # authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
 
     def get_queryset(self):
@@ -1246,3 +1248,19 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
         resp = dict()
         resp["status"] = 1
         return Response(resp)
+
+
+
+class RefreshJSONWebToken(GenericViewSet):
+
+    # serializer_class = serializers.RefreshJSONWebTokenSerializer
+
+    def refresh(self, request):
+        data = {}
+        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data['token'] = serializer.validated_data['token']
+        return Response(data)
+
+# refresh_jwt_token = RefreshJSONWebToken.as_view()
+# verify_jwt_token = VerifyJSONWebToken.as_view()

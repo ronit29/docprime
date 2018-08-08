@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
 import environ
+import datetime
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 #BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -34,6 +35,18 @@ if READ_DOT_ENV_FILE:
 # Custom User model
 AUTH_USER_MODEL = 'authentication.User'
 AUTHENTICATION_BACKENDS = ('ondoc.authentication.backends.AuthBackend',)
+
+SECRET_KEY = env('DJANGO_SECRET_KEY')
+
+JWT_AUTH = {
+    'JWT_VERIFY': True,
+    'JWT_VERIFY_EXPIRATION': True,
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(seconds=8000),
+    'JWT_AUTH_HEADER_PREFIX': 'Token',
+    'JWT_ALLOW_REFRESH': True,
+    'JWT_REFRESH_EXPIRATION_DELTA':datetime.timedelta(days=7),
+    'JWT_PAYLOAD_GET_USERNAME_HANDLER': 'ondoc.authentication.backends.jwt_username_handler',
+}
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DJANGO_DEBUG', False)
@@ -223,8 +236,10 @@ REST_FRAMEWORK = {
     'COERCE_DECIMAL_TO_STRING': True,
     'DEFAULT_AUTHENTICATION_CLASSES': (
         #'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
+        # 'rest_framework.authentication.TokenAuthentication',
         # 'ondoc.authentication.auth.CustomAuthentication',
+        # 'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        'ondoc.authentication.backends.JWTAuthentication',
     ),
     'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler'
 }

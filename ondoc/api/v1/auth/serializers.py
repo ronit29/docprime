@@ -3,11 +3,15 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
                                          UserPermission, Address, GenericAdmin)
 from ondoc.doctor.models import DoctorMobile
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
-import datetime
+import datetime, calendar
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
+from rest_framework_jwt.serializers import VerificationBaseSerializer, api_settings
+import jwt
+from django.conf import settings
+
 User = get_user_model()
 
 
@@ -246,3 +250,75 @@ class UserTransactionModelSerializer(serializers.ModelSerializer):
         model = ConsumerTransaction
         fields = ('type', 'action', 'amount', 'product_id', 'reference_id', 'order_id')
         # fields = '__all__'
+
+
+class RefreshJSONWebTokenSerializer(serializers.Serializer):
+
+    token = serializers.CharField(max_length=250)
+
+    def validate(self, attrs):
+        from ondoc.authentication.backends import JWTAuthentication
+        token = attrs['token']
+
+        payload = self.check_payload_custom(token=token)
+        user = self.check_user_custom(payload=payload)
+        # Get and check 'orig_iat'
+        orig_iat = payload.get('orig_iat')
+
+        if orig_iat:
+            # Verify expiration
+            refresh_limit = settings.JWT_AUTH['JWT_REFRESH_EXPIRATION_DELTA']
+
+            if isinstance(refresh_limit, datetime.timedelta):
+                refresh_limit = (refresh_limit.days * 24 * 3600 +
+                                 refresh_limit.seconds)
+
+            expiration_timestamp = orig_iat + int(refresh_limit)
+            now_timestamp = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
+
+            if now_timestamp > expiration_timestamp:
+                msg = _('Refresh has expired.')
+                raise serializers.ValidationError(msg)
+        else:
+            msg = _('orig_iat field is required.')
+            raise serializers.ValidationError(msg)
+
+        new_payload = JWTAuthentication.jwt_payload_handler(user)
+        new_payload['orig_iat'] = orig_iat
+
+        return {
+            'token': jwt.encode(new_payload, settings.SECRET_KEY),
+            'user': user
+        }
+
+    def check_user_custom(self, payload):
+        uid = payload.get('user_id')
+
+        if not uid:
+            msg = ('Invalid payload.')
+            raise serializers.ValidationError(msg)
+
+        # Make sure user exists
+        try:
+            user = User.objects.get(pk=uid)
+        except User.DoesNotExist:
+            msg = ("User doesn't exist.")
+            raise serializers.ValidationError(msg)
+
+        if not user.is_active:
+            msg = ('User account is disabled.')
+            raise serializers.ValidationError(msg)
+
+        return user
+
+    def check_payload_custom(self, token):
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY)
+        except jwt.ExpiredSignature:
+            msg = _('Signature has expired.')
+            raise serializers.ValidationError(msg)
+        except jwt.DecodeError:
+            msg = ('Error decoding signature.')
+            raise serializers.ValidationError(msg)
+
+        return payload

@@ -3,9 +3,11 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     UserProfileViewSet, UserAppointmentsViewSet, AddressViewsSet,
                     TransactionViewSet, UserTransactionViewSet, UserIDViewSet, OrderHistoryViewSet,
                     HospitalDoctorAppointmentPermissionViewSet, HospitalDoctorBillingPermissionViewSet,
-                    OrderViewSet, ConsumerAccountRefundViewSet)
+                    OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken)
 
 urlpatterns = [
+    path('api-token-refresh/', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
+    # path('api-token-verify/', RefreshJSONWebToken.as_view({'post': 'verify'}), name='token-verify'),
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
     #path('otp/verify', OTP.as_view({'post': 'verify'}), name='otp-verify'),
     path('login', UserViewset.as_view({'post': 'login'}), name='user-login'),
