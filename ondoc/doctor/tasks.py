@@ -18,5 +18,9 @@ def doc_app_auto_cancel(self, prev_app_dict):
             if present_app_obj.status not in opd_status and prev_app_dict.get(
                     "status") == present_app_obj.status and prev_app_dict.get("updated_at") == present_app_obj.updated_at:
                 present_app_obj.action_cancelled(refund_flag=1)
+            else:
+                logger.error("Error in Celery - Condition not satisfied for - " + str(prev_app_dict.get("id")) + " with prev status - " + str(prev_app_dict.get("status")) + " and present status - "+ str(present_app_obj.status) + " and prev updated time - "+ str(prev_app_dict.get("updated_at")) + " and present updated time - " + str(present_app_obj.updated_at))
+        else:
+            logger.error("Error in Celery - No opd appointment for - " + str(prev_app_dict.get("id")))
     except Exception as e:
         logger.error("Error in Celery auto cancel flow - " + str(e))
