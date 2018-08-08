@@ -770,8 +770,9 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-
     list_display = ('id', 'get_profile', 'get_doctor', 'status', 'time_slot_start', 'created_at',)
+    list_filter = ('status', )
+    date_hierarchy = 'created_at'
 
     def get_profile(self, obj):
         return obj.profile.name

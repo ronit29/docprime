@@ -426,6 +426,8 @@ class LabAppointmentForm(forms.ModelForm):
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
     list_display = ('id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_filter = ('status', )
+    date_hierarchy = 'created_at'
 
     def get_profile(self, obj):
         return obj.profile.name
