@@ -423,12 +423,17 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     @classmethod
     def ops_notification_alert(cls, instance, email_list, product):
         from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
         status_choices = dict()
-        for k, v in OpdAppointment.STATUS_CHOICES:
-            status_choices[k] = v
-        OPD_URL = settings.BASE_URL + "/admin/doctor/opdappointment/" + str(instance.id) + "/change"
-        LAB_URL = settings.BASE_URL + "/admin/diagnostic/opdappointment/" + str(instance.id) + "/change"
-        url = OPD_URL if product == account_model.Order.DOCTOR_PRODUCT_ID else LAB_URL
+        if product == account_model.Order.DOCTOR_PRODUCT_ID:
+            for k, v in OpdAppointment.STATUS_CHOICES:
+                status_choices[k] = v
+            url = settings.BASE_URL + "/admin/doctor/opdappointment/" + str(instance.id) + "/change"
+        elif product == account_model.Order.LAB_PRODUCT_ID:
+            for k, v in LabAppointment.STATUS_CHOICES:
+                status_choices[k] = v
+            url = settings.BASE_URL + "/admin/diagnostic/labappointment/" + str(instance.id) + "/change"
+
         html_body = "status - {status}, user - {username}, url - {url}".format(
             status=status_choices[instance.status], username=instance.user.username, url=url
         )

@@ -593,7 +593,8 @@ class LabAppointment(TimeStampedModel):
         self.send_notification(database_instance)
 
         if not database_instance or database_instance.status != self.status:
-            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID, product=account_model.Order.LAB_PRODUCT_ID)
+            for e_id in settings.OPS_EMAIL_ID:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
 
         try:
             prev_app_dict = {'id': self.id,
