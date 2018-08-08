@@ -284,7 +284,7 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
     def update(self, instance, data):
         # if data['status'] == LabAppointment.RESCHEDULED_PATIENT:
         #     self.reschedule_validation(instance, data)
-        # elif data['status'] == LabAppointment.CANCELED:
+        # elif data['status'] == LabAppointment.CANCELLED:
         #     self.cancel_validation(instance, data)
         # else:
         #     raise serializers.ValidationError("Invalid Status")

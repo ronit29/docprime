@@ -829,10 +829,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
     CANCELLED = 6
     COMPLETED = 7
 
-    STATUS_CHOICES = [(CREATED, "Created"), (BOOKED, "Booked"), (RESCHEDULED_DOCTOR, "Reschedule Doctor"),
-                      (RESCHEDULED_PATIENT, "Reschedule Patient"), (ACCEPTED, "Accepted"), (CANCELLED, "Canceled"),
-                      (COMPLETED, "Completed"), ]
-
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_STATUS_CHOICES = (
@@ -843,11 +839,12 @@ class OpdAppointment(auth_model.TimeStampedModel):
     COD = 2
     INSURANCE = 3
     PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'))
-    APPOINTMENT_STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
-                                  (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
-                                  (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
-                                  (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
-                                  (COMPLETED, 'Completed')]
+    ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_DOCTOR]
+    STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
+                      (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
+                      (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                      (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
+                      (COMPLETED, 'Completed')]
 
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
@@ -1055,7 +1052,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
             for e_id in settings.OPS_EMAIL_ID:
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
         try:
-            if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELED, OpdAppointment.ACCEPTED]:
+            if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
                 countdown = self.get_auto_cancel_delay(self)
                 doc_app_auto_cancel.apply_async(({
                     "id": self.id,

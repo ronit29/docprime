@@ -15,7 +15,7 @@ def lab_app_auto_cancel(self, prev_app_dict):
     try:
         updated_status_instance = LabAppointment.objects.filter(pk=prev_app_dict['id']).first()
         new_status = updated_status_instance.status
-        if new_status not in [LabAppointment.ACCEPTED, LabAppointment.CANCELED, LabAppointment.COMPLETED]:
+        if new_status not in [LabAppointment.ACCEPTED, LabAppointment.CANCELLED, LabAppointment.COMPLETED]:
             if prev_app_dict['status'] == new_status and timezone.now() - updated_status_instance.updated_at >= datetime.timedelta(minutes=10):
                 updated_status_instance.action_cancelled(refund_flag=1)
 
