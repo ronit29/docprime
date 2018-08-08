@@ -330,7 +330,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         }
 
-        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P1, settings.PG_CLIENT_KEY_P1)
         return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):

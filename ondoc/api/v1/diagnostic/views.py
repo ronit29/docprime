@@ -428,7 +428,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['name'] = appointment_details["profile"].name
         pgdata['txAmount'] = str(appointment_details['payable_amount'])
 
-        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P2, settings.PG_CLIENT_KEY_P2)
 
         return pgdata, payment_required
 
