@@ -17,11 +17,32 @@ def index(request):
     return render(request, 'index.html', {'form': form})
 
 
+def terms_page(request):
+    return render(request, 'terms-of-use.html')
+
+
 def privacy_page(request):
     return render(request, 'privacy.html')
 
+
 def media_page(request):
     return render(request, 'media.html')
+
+
+def about_page(request):
+    return render(request, 'aboutUs.html')
+
+
+def contact_page(request):
+    return render(request, 'contactUs.html')
+
+
+def disclaimer_page(request):
+    return render(request, 'disclaimer.html')
+
+
+def howitworks_page(request):
+    return render(request, 'howItWorks.html')
 
 
 def careers_page(request):

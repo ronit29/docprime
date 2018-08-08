@@ -1,0 +1,28 @@
+@media (min-width: 320px) and (max-width: 767px) {
+
+	.login-block{height: 310px;}	
+	.hidden-xs{}
+}
+
+@media (min-width: 320px) and (max-width: 480px) {
+
+
+}
+
+@media (min-width: 481px) and (max-width: 767px) {
+
+	.login-block{width: 340px; margin: 0 auto;}	
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+
+}
+
+@media (min-width: 992px) and (max-width: 1199px){
+
+}
+
+
+@media (min-width: 1199px) and (max-width: 1200px){
+	.home-screen{padding-top: 50px;}
+}
