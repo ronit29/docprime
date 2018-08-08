@@ -1058,7 +1058,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 doc_app_auto_cancel.apply_async(({
                     "id": self.id,
                     "status": self.status,
-                    "updated_at": self.updated_at
+                    "updated_at": int(self.updated_at.timestamp())
                 }, ), countdown=countdown)
         except Exception as e:
             logger.error("Error in auto cancel flow - " + str(e))
