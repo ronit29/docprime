@@ -265,7 +265,7 @@ class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
 
 class LabAppointmentUpdateSerializer(serializers.Serializer):
     appointment_status = [LabAppointment.CREATED, LabAppointment.ACCEPTED, LabAppointment.RESCHEDULED_LAB,
-                          LabAppointment.CANCELED, LabAppointment.RESCHEDULED_PATIENT, LabAppointment.COMPLETED,
+                          LabAppointment.CANCELLED, LabAppointment.RESCHEDULED_PATIENT, LabAppointment.COMPLETED,
                           LabAppointment.BOOKED]
     status = serializers.ChoiceField(choices=appointment_status)
     start_time = serializers.DateTimeField(required=False)
@@ -284,7 +284,7 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
     def update(self, instance, data):
         # if data['status'] == LabAppointment.RESCHEDULED_PATIENT:
         #     self.reschedule_validation(instance, data)
-        # elif data['status'] == LabAppointment.CANCELED:
+        # elif data['status'] == LabAppointment.CANCELLED:
         #     self.cancel_validation(instance, data)
         # else:
         #     raise serializers.ValidationError("Invalid Status")
