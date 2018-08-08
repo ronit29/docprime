@@ -6,6 +6,7 @@ from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
+from ondoc.web.models import OnlineLead
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
 User = get_user_model()
@@ -210,6 +211,7 @@ class AddressSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
 
+
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
 
@@ -246,3 +248,18 @@ class UserTransactionModelSerializer(serializers.ModelSerializer):
         model = ConsumerTransaction
         fields = ('type', 'action', 'amount', 'product_id', 'reference_id', 'order_id')
         # fields = '__all__'
+
+
+class OnlineLeadSerializer(serializers.ModelSerializer):
+    member_type = serializers.ChoiceField(choices=OnlineLead.TYPE_CHOICES)
+    name = serializers.CharField(max_length=255, required=False)
+    speciality = serializers.CharField(max_length=255, required=False)
+    mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
+    city = serializers.CharField(max_length=255, required=False, default='')
+    email = serializers.EmailField()
+
+    class Meta:
+        model = OnlineLead
+        fields = '__all__'
+
+

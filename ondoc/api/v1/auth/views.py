@@ -43,6 +43,7 @@ from ondoc.payout.models import Outstanding
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
+from ondoc.api.v1.auth .serializers import OnlineLeadSerializer
 import decimal
 from django.conf import settings
 from collections import defaultdict
@@ -1245,4 +1246,18 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
             ConsumerRefund.initiate_refund(user, ctx_obj)
         resp = dict()
         resp["status"] = 1
+        return Response(resp)
+
+
+class OnlineLeadViewSet(GenericViewSet):
+    serializer_class = serializers.OnlineLeadSerializer
+
+    def savetest(self, request):
+        resp = {}
+        serializer = serializers.OnlineLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()
+        if data.id:
+            resp['status'] = 'success'
+            resp['id'] = data.id
         return Response(resp)
