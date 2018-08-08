@@ -9,6 +9,8 @@ from django.shortcuts import render
 from django.db.models import Q
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
+
+from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.authentication.models import GenericAdmin
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
@@ -747,7 +749,9 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         cleaned_data = self.cleaned_data
         time_slot_start = cleaned_data['time_slot_start']
         hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-        if hour not in [value[0] for value in DoctorClinicTiming.TIME_CHOICES]:
+        minutes = time_slot_start.minute
+        valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
+        if minutes % valid_minutes_slot != 0:
             self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
             self.cleaned_data.pop('time_slot_start', None)
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
