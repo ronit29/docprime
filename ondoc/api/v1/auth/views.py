@@ -296,13 +296,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
     def update(self, request, *args, **kwargs):
         data = {key: value for key, value in request.data.items()}
-        if data.get('age'):
-            try:
-                age = int(request.data.get("age"))
-                data['dob'] = datetime.datetime.now() - relativedelta(years=age)
-                data['dob'] = data['dob'].date()
-            except:
-                return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+        # if data.get('age'):
+        #     try:
+        #         age = int(request.data.get("age"))
+        #         data['dob'] = datetime.datetime.now() - relativedelta(years=age)
+        #         data['dob'] = data['dob'].date()
+        #     except:
+        #         return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj = self.get_object()
         if data.get("name") and UserProfile.objects.exclude(id=obj.id).filter(name=data['name'],
