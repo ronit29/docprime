@@ -22,6 +22,8 @@ from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
+from .report import ReportAdmin
+from ondoc.reports import models as report_models
 
 from ondoc.web.models import OnlineLead, Career
 from django.contrib.auth import get_user_model
@@ -81,3 +83,5 @@ admin.site.register(notifcation_model.SmsNotification, SmsNotificationAdmin)
 admin.site.register(notifcation_model.PushNotification, PushNotificationAdmin)
 admin.site.register(notifcation_model.AppNotification, AppNotificationAdmin)
 admin.site.register(OpdAppointment, DoctorOpdAppointmentAdmin)
+admin.site.register(report_models.Report)
+admin.site.register(report_models.GeneratedReport, ReportAdmin)

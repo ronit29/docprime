@@ -508,18 +508,19 @@ class LabAppointment(TimeStampedModel):
     ACCEPTED = 5
     CANCELLED = 6
     COMPLETED = 7
-    ACTIVE_APPOINTMENT_STATUS = [(CREATED, 'Created'), (BOOKED, 'Booked'),
-                                 (RESCHEDULED_LAB, 'Rescheduled by lab'),
-                                 (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
-                                 (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
-                                 (COMPLETED, 'Completed')]
+    ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_LAB]
+    STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
+                      (RESCHEDULED_LAB, 'Rescheduled by lab'),
+                      (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                      (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
+                      (COMPLETED, 'Completed')]
 
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
     lab_test = models.ManyToManyField(AvailableLabTest)
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.SET_NULL, null=True)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     profile_detail = JSONField(blank=True, null=True)
-    status = models.PositiveSmallIntegerField(default=CREATED, choices=ACTIVE_APPOINTMENT_STATUS)
+    status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # This is mrp
     agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -578,7 +579,7 @@ class LabAppointment(TimeStampedModel):
                 notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
             )
             return
-        if self.status == LabAppointment.CANCELED:
+        if self.status == LabAppointment.CANCELLED:
             LabNotificationAction.trigger(
                 instance=self,
                 user=self.user,
@@ -598,7 +599,7 @@ class LabAppointment(TimeStampedModel):
             prev_app_dict = {'id': self.id,
                              'status': self.status,
                              "updated_at": self.time_slot_start}
-            if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELED, LabAppointment.ACCEPTED]:
+            if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
                 countdown = self.get_auto_cancel_delay(self)
                 tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
         except Exception as e:
