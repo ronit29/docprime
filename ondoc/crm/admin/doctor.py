@@ -770,6 +770,22 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
+    list_display = ('id', 'get_profile', 'get_doctor', 'status', 'time_slot_start', 'created_at',)
+    list_filter = ('status', )
+    date_hierarchy = 'created_at'
+
+    def get_profile(self, obj):
+        return obj.profile.name
+
+    get_profile.admin_order_field = 'profile'
+    get_profile.short_description = 'Profile Name'
+
+    def get_doctor(self, obj):
+        return obj.doctor.name
+
+    get_doctor.admin_order_field = 'doctor'
+    get_doctor.short_description = 'Doctor Name'
+
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
         allowed_status_for_agent = [(OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),

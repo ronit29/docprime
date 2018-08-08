@@ -99,14 +99,14 @@ RAVEN_CONFIG = {
     #'release': raven.fetch_git_sha(os.path.abspath(os.pardir)),
 }
 
-SILKY_AUTHENTICATION = True  # User must login
-SILKY_AUTHORISATION = True  # User must have permissions
-SILKY_META = True
-SILKY_PYTHON_PROFILER = True
-SILKY_PYTHON_PROFILER_BINARY = True
-SILKY_PYTHON_PROFILER_RESULT_PATH = os.path.join(str(ROOT_DIR), "silk")
+# SILKY_AUTHENTICATION = True  # User must login
+# SILKY_AUTHORISATION = True  # User must have permissions
+# SILKY_META = True
+# SILKY_PYTHON_PROFILER = True
+# SILKY_PYTHON_PROFILER_BINARY = True
+# SILKY_PYTHON_PROFILER_RESULT_PATH = os.path.join(str(ROOT_DIR), "silk")
 
-SILKY_MAX_RECORDED_REQUESTS = 10**4
-SILKY_MAX_RECORDED_REQUESTS_CHECK_PERCENT = 10
+# SILKY_MAX_RECORDED_REQUESTS = 10**4
+# SILKY_MAX_RECORDED_REQUESTS_CHECK_PERCENT = 10
 
-MIDDLEWARE += ['silk.middleware.SilkyMiddleware']
+# MIDDLEWARE += ['silk.middleware.SilkyMiddleware']
