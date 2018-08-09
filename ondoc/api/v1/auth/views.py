@@ -1053,11 +1053,9 @@ class OrderHistoryViewSet(GenericViewSet):
                     "payment_type": action_data.get("payment_type"),
                     "type": "opd"
                 }
-                serializer = CreateAppointmentSerializer(data=data, context={"request": request})
-                if not serializer.is_valid():
-                    data.pop("time_slot_start")
-                    data.pop("start_date")
-                    data.pop("start_time")
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
                 orders.append(data)
             elif action_data["product_id"] == Order.LAB_PRODUCT_ID:
                 if action_data['lab'] not in lab_name:
@@ -1074,11 +1072,9 @@ class OrderHistoryViewSet(GenericViewSet):
                     "payment_type": action_data.get("payment_type"),
                     "type": "lab"
                 }
-                serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
-                if not serializer.is_valid():
-                    data.pop("time_slot_start")
-                    data.pop("start_date")
-                    data.pop("start_time")
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
                 data["test_ids"] = [lab_test_map[x] for x in action_data.get("lab_test")]
                 orders.append(data)
         return Response(orders)
