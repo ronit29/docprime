@@ -789,11 +789,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
     queryset = PgTransaction.objects.none()
 
     def save(self, request):
-        LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appointment"
-        OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appointment"
-        LAB_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "lab/%s/book?error_code=%s"
-        OPD_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "opd/doctor/%s/%s/bookdetails?error_code=%s"
-        ERROR_REDIRECT_URL = request.build_absolute_uri("/") + "error?error_code=%s"
+        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
+        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
+        LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
+        OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
+        ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
 
         try:
