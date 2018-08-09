@@ -124,7 +124,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.filter(doctor=doctor)
 
         if range == 'previous':
-            queryset = queryset.filter(status__in=[models.OpdAppointment.COMPLETED,models.OpdAppointment.CANCELED]).order_by('-time_slot_start')
+            queryset = queryset.filter(status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).order_by('-time_slot_start')
         elif range == 'upcoming':
             today = datetime.date.today()
             queryset = queryset.filter(
@@ -354,6 +354,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 class DoctorProfileView(viewsets.GenericViewSet):
     authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        return models.OpdAppointment.objects.all()
 
     def retrieve(self, request):
         from django.contrib.staticfiles.templatetags.staticfiles import static

@@ -35,7 +35,7 @@ class ReadOnlyDoctorClinicTimingInline(nested_admin.NestedTabularInline):
     extra = 0
     can_delete = False
     show_change_link = False
-    readonly_fields = ['doctor_clinic', 'day', 'start', 'end', 'fees', 'deal_price', 'mrp', ]
+    readonly_fields = ['doctor_clinic', 'day', 'start', 'end', 'fees', 'deal_price', 'mrp']
 
     def has_add_permission(self, request):
         return False

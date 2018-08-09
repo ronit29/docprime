@@ -265,7 +265,7 @@ class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
 
 class LabAppointmentUpdateSerializer(serializers.Serializer):
     appointment_status = [LabAppointment.CREATED, LabAppointment.ACCEPTED, LabAppointment.RESCHEDULED_LAB,
-                          LabAppointment.CANCELED, LabAppointment.RESCHEDULED_PATIENT, LabAppointment.COMPLETED,
+                          LabAppointment.CANCELLED, LabAppointment.RESCHEDULED_PATIENT, LabAppointment.COMPLETED,
                           LabAppointment.BOOKED]
     status = serializers.ChoiceField(choices=appointment_status)
     start_time = serializers.DateTimeField(required=False)
@@ -284,7 +284,7 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
     def update(self, instance, data):
         # if data['status'] == LabAppointment.RESCHEDULED_PATIENT:
         #     self.reschedule_validation(instance, data)
-        # elif data['status'] == LabAppointment.CANCELED:
+        # elif data['status'] == LabAppointment.CANCELLED:
         #     self.cancel_validation(instance, data)
         # else:
         #     raise serializers.ValidationError("Invalid Status")
@@ -326,11 +326,17 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         request = self.context.get("request")
         if data.get("is_home_pickup") is True and (not data.get("address")):
             raise serializers.ValidationError("Address required for home pickup")
+
         if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
             raise serializers.ValidationError("Invalid profile id")
+
         if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"], lab=data[
-            "lab"]).count() >= MAX_APPOINTMENTS_ALLOWED:
+            "lab"]).exists():
+            raise serializers.ValidationError("A previous appointment with this lab already exists. Cancel it before booking new Appointment.")
+
+        if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"]).count() >= MAX_APPOINTMENTS_ALLOWED:
             raise serializers.ValidationError('Max '+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
+
         self.test_lab_id_validator(data)
         self.time_slot_validator(data)
         return data

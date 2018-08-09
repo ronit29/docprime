@@ -297,13 +297,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
     def update(self, request, *args, **kwargs):
         data = {key: value for key, value in request.data.items()}
-        if data.get('age'):
-            try:
-                age = int(request.data.get("age"))
-                data['dob'] = datetime.datetime.now() - relativedelta(years=age)
-                data['dob'] = data['dob'].date()
-            except:
-                return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+        # if data.get('age'):
+        #     try:
+        #         age = int(request.data.get("age"))
+        #         data['dob'] = datetime.datetime.now() - relativedelta(years=age)
+        #         data['dob'] = data['dob'].date()
+        #     except:
+        #         return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj = self.get_object()
         if data.get("name") and UserProfile.objects.exclude(id=obj.id).filter(name=data['name'],
@@ -422,7 +422,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         resp = dict()
         resp["status"] = 1
         if validated_data.get('status'):
-            if validated_data['status'] == LabAppointment.CANCELED:
+            if validated_data['status'] == LabAppointment.CANCELLED:
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
@@ -479,7 +479,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         if validated_data.get('status'):
             resp = dict()
             resp["status"] = 1
-            if validated_data['status'] == OpdAppointment.CANCELED:
+            if validated_data['status'] == OpdAppointment.CANCELLED:
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:

@@ -1,5 +1,6 @@
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
 from django.conf.urls import url
+from django.conf import settings
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats
 from django.utils.safestring import mark_safe
@@ -10,16 +11,18 @@ from reversion.admin import VersionAdmin
 from import_export.admin import ImportExportMixin
 from django.db.models import Q
 from django.db import models
+
+from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument)
+    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment)
 from .common import *
 from ondoc.authentication.models import GenericLabAdmin
 from ondoc.authentication.models import GenericAdmin, User, QCModel
 from django.contrib.contenttypes.admin import GenericTabularInline
-
+from django.contrib.admin.widgets import AdminSplitDateTime
 
 class LabTestResource(resources.ModelResource):
     excel_id = fields.Field(attribute='excel_id', column_name='Test ID')
@@ -403,6 +406,112 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
     class Media:
         js = ('js/admin/ondoc.js',)
+
+
+class LabAppointmentForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        time_slot_start = cleaned_data['time_slot_start']
+        hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+        minutes = time_slot_start.minute
+        valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
+        if minutes % valid_minutes_slot != 0:
+            self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
+            self.cleaned_data.pop('time_slot_start', None)
+        selected_test_ids = self.instance.lab_test.all().values_list('test',flat=True)
+        if not LabTiming.objects.filter(lab=self.instance.lab,
+                                        lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                                        day=time_slot_start.weekday(),
+                                        start__lte=hour, end__gt=hour).exists():
+            raise forms.ValidationError("This lab test is not available on selected day and time.")
+        return cleaned_data
+
+
+
+class LabAppointmentAdmin(admin.ModelAdmin):
+    form = LabAppointmentForm
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        allowed_status_for_agent = [(LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                                    (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
+                                    (LabAppointment.ACCEPTED, 'Accepted'),
+                                    (LabAppointment.CANCELLED, 'Cancelled')]
+        if db_field.name == "status" and request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            kwargs['choices'] = allowed_status_for_agent
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj=obj, **kwargs)
+        form.request = request
+        return form
+
+    def get_fields(self, request, obj=None):
+        if request.user.is_superuser:
+            return ('lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end', 'otp', 'payment_status',
+                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+        elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            return ('lab_name', 'lab_test', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+                    'default_profile_number', 'user_number', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'payment_status',
+                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'status', 'time_slot_start')
+        else:
+            return ()
+
+    def get_readonly_fields(self, request, obj=None):
+        if request.user.is_superuser:
+            return ()
+        elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            return ('lab_name', 'lab_test', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+                    'default_profile_number', 'user_number', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'payment_status',
+                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+        else:
+            return ()
+
+    def lab_name(self, obj):
+        profile_link = "lab/{}".format(obj.doctor.id)
+        return mark_safe('{name} (<a href="{consumer_app_domain}/{profile_link}">Profile</a>)'.format(name=obj.lab.name,
+                                                                                consumer_app_domain=settings.CONSUMER_APP_DOMAIN,
+                                                                                profile_link=profile_link))
+
+    def employees_details(self, obj):
+        employees = obj.lab.labmanager_set.all()
+        details = ''
+        for employee in employees:
+            details += 'Name : {name}<br>Phone number : {number}<br>Email : {email}<br>Type : {type}<br><br>'.format(
+                name=employee.name, number=employee.number, email=employee.email,
+                type=dict(LabManager.CONTACT_TYPE_CHOICES)[employee.contact_type])
+            # ' , '.join([str(employee.name), str(employee.number), str(employee.email), str(employee.details)])
+            # details += '\n'
+        return mark_safe('<p>{details}</p>'.format(details=details))
+
+    def used_profile_name(self, obj):
+        return obj.profile.name
+
+    def used_profile_number(self, obj):
+        return obj.profile.phone_number
+
+    def default_profile_name(self, obj):
+        # return obj.profile.user.profiles.all()[:1][0].name
+        default_profile = obj.profile.user.profiles.filter(is_default_user=True)
+        if default_profile.exists():
+            return default_profile.first().name
+        else:
+            return ''
+
+    def default_profile_number(self, obj):
+        # return obj.profile.user.profiles.all()[:1][0].phone_number
+        default_profile = obj.profile.user.profiles.filter(is_default_user=True)
+        if default_profile.exists():
+            return default_profile.first().phone_number
+        else:
+            return ''
+
+    def user_number(self, obj):
+        return obj.user.phone_number
+
 
 
 class LabTestAdmin(ImportExportMixin, VersionAdmin):

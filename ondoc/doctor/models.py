@@ -10,18 +10,21 @@ from django.core.exceptions import NON_FIELD_ERRORS
 from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
 from django.conf import settings
 from datetime import timedelta
+from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund
 from ondoc.payout.models import Outstanding
+from ondoc.doctor.tasks import doc_app_auto_cancel
 # from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from django.contrib.contenttypes.fields import GenericRelation
-from ondoc.api.v1.utils import get_start_end_datetime
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from functools import reduce
 from operator import or_
+import logging
 import math
 import random
 import os
@@ -33,6 +36,8 @@ from django.utils.safestring import mark_safe
 from PIL import Image as Img
 from io import BytesIO
 import hashlib
+
+logger = logging.getLogger(__name__)
 
 
 class Migration(migrations.Migration):
@@ -821,20 +826,26 @@ class OpdAppointment(auth_model.TimeStampedModel):
     RESCHEDULED_DOCTOR = 3
     RESCHEDULED_PATIENT = 4
     ACCEPTED = 5
-    CANCELED = 6
+    CANCELLED = 6
     COMPLETED = 7
 
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_STATUS_CHOICES = (
-        (PAYMENT_ACCEPTED, "Payment Accepted"),
-        (PAYMENT_PENDING, "Payment Pending"),
+        (PAYMENT_ACCEPTED, 'Payment Accepted'),
+        (PAYMENT_PENDING, 'Payment Pending'),
     )
     PREPAID = 1
     COD = 2
     INSURANCE = 3
-    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, "COD"), (INSURANCE, "Insurance"))
+    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'))
     ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_DOCTOR]
+    STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
+                      (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
+                      (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                      (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
+                      (COMPLETED, 'Completed')]
+
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
@@ -848,7 +859,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     effective_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
     mrp = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
     deal_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, default=None, null=False)
-    status = models.PositiveSmallIntegerField(default=CREATED)
+    status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     otp = models.PositiveIntegerField(blank=True, null=True)
     # patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
@@ -882,7 +893,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
         elif user_type == auth_model.User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
+                allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
 
         return allowed
 
@@ -917,7 +928,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-        self.status = self.CANCELED
+        self.status = self.CANCELLED
         self.save()
 
         if self.payment_type == self.PREPAID:
@@ -1000,7 +1011,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                     instance=self,
                     user=admin,
                     notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED)
-        elif self.status == OpdAppointment.CANCELED:
+        elif self.status == OpdAppointment.CANCELLED:
             for admin in doctor_admins:
                 notification_models.NotificationAction.trigger(
                     instance=self,
@@ -1037,6 +1048,19 @@ class OpdAppointment(auth_model.TimeStampedModel):
         #     raise RestFrameworkValidationError("Doctor is on leave.")
         super().save(*args, **kwargs)
         self.send_notification(database_instance)
+        if not database_instance or database_instance.status != self.status:
+            for e_id in settings.OPS_EMAIL_ID:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+        try:
+            if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
+                countdown = self.get_auto_cancel_delay(self)
+                doc_app_auto_cancel.apply_async(({
+                    "id": self.id,
+                    "status": self.status,
+                    "updated_at": self.updated_at
+                }, ), countdown=countdown)
+        except Exception as e:
+            logger.error("Error in auto cancel flow - " + str(e))
 
     def payment_confirmation(self, consumer_account, data, amount):
         otp = random.randint(1000, 9999)
@@ -1129,6 +1153,21 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                                       outstanding=out_obj).filter(**opd_filter_query))
 
         return queryset
+
+    def get_auto_cancel_delay(self, app_obj):
+        delay = settings.AUTO_CANCEL_OPD_DELAY * 60
+        to_zone = tz.gettz(settings.TIME_ZONE)
+        app_updated_time = app_obj.updated_at.astimezone(to_zone)
+        morning_time = "08:00:00"  # In IST
+        evening_time = "20:00:00"  # In IST
+        present_day_end = custom_form_datetime(evening_time, to_zone)
+        next_day_start = custom_form_datetime(morning_time, to_zone, diff_days=1)
+        time_diff = next_day_start - app_updated_time
+
+        if present_day_end - timedelta(minutes=10) < app_updated_time < next_day_start:
+            return time_diff.seconds
+        else:
+            return delay
 
     class Meta:
         db_table = "opd_appointment"
