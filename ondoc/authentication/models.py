@@ -521,6 +521,12 @@ class GenericLabAdmin(TimeStampedModel):
     class Meta:
         db_table = 'generic_lab_admin'
 
+    def save(self, *args, **kwargs):
+        user = User.objects.filter(phone_number=self.phone_number).first()
+        if user is not None:
+            self.user = user
+        super(GenericLabAdmin, self).save(*args, **kwargs)
+
     def __str__(self):
         return "{}".format(self.phone_number)
 
