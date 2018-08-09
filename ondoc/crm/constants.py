@@ -11,5 +11,5 @@ constants = {
     'TEST_USER_GROUP': 'test_user_group',
     'OPD_APPOINTMENT_MANAGEMENT_TEAM': 'opd_appointment_management_team',
     'LAB_APPOINTMENT_MANAGEMENT_TEAM': 'lab_appointment_management_team',
-    'CHAT_CONDITIONS_TEAM': 'chat_condition_managment_team'
+    'CONDITIONS_MANAGEMENT_TEAM': 'condition_managment_team'
 }
