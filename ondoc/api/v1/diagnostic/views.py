@@ -189,7 +189,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
 
-        queryset = AvailableLabTest.objects.select_related('lab').filter(lab_pricing_group__labs__is_live=True)
+        queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True)
 
         if ids:
             queryset = queryset.filter(test__in=ids)

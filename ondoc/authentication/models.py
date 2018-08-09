@@ -302,6 +302,35 @@ class UserProfile(TimeStampedModel):
         return None
         # return static('doctor_images/no_image.png')
 
+    def has_image_changed(self):
+        if not self.pk:
+            return True
+        old_value = self.__class__._default_manager.filter(pk=self.pk).values('profile_image').get()['profile_image']
+        return not getattr(self, 'profile_image').name == old_value
+
+    def save(self, *args, **kwargs):
+        if not self.has_image_changed():
+            return super().save(*args, **kwargs)
+
+        if self.profile_image:
+            max_allowed = 1000
+            img = Img.open(self.profile_image)
+            size = img.size
+            if max(size)>max_allowed:
+                size = tuple(math.floor(ti/(max(size)/max_allowed)) for ti in size)
+
+            img = img.resize(size, Img.ANTIALIAS)
+
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+            self.profile_image = InMemoryUploadedFile(new_image_io, None, md5_hash + ".jpg", 'image/jpeg',
+                                                      new_image_io.tell(), None)
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = "user_profile"
 

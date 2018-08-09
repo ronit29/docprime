@@ -14,7 +14,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkHelpline, HospitalNetworkEmail,
                                  HospitalNetworkAccreditation, HospitalNetworkAward, HospitalNetworkDocument,
                                  HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor,
-                                 DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization)
+                                 DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization, MedicalCondition)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -222,7 +222,7 @@ class Command(BaseCommand):
         self.create_lab_appointment_management_group()
 
         # Create Chat Conditions Team group
-        self.create_chat_conditions_group()
+        self.create_conditions_management_group()
 
         # Create Article team Group
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
@@ -318,16 +318,18 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
-    def create_chat_conditions_group(self):
+    def create_conditions_management_group(self):
         # Create chat conditions team
-        group, created = Group.objects.get_or_create(name=constants['CHAT_CONDITIONS_TEAM'])
+        group, created = Group.objects.get_or_create(name=constants['CONDITIONS_MANAGEMENT_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(CommonMedicalCondition, CommonSpecialization, CommonTest, CommonDiagnosticCondition)
+        content_types = ContentType.objects.get_for_models(CommonMedicalCondition, CommonSpecialization, MedicalCondition, CommonTest, CommonDiagnosticCondition)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
-                Q(codename='change_' + ct.model))
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
 
             group.permissions.add(*permissions)
