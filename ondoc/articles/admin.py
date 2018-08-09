@@ -39,7 +39,6 @@ class ArticleAdmin(VersionAdmin):
         else:
             return mark_safe('''<span></span>''')
 
-
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
             obj.created_by = request.user
