@@ -311,8 +311,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             uemail = user.email
         else:
             uemail = "dummyemail@docprime.com"
-        base_url = (
-            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+        base_url = "https://{}".format(request.get_host())
         surl = base_url + '/api/v1/user/transaction/save'
         furl = base_url + '/api/v1/user/transaction/save'
 

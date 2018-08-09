@@ -602,8 +602,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             pgdata['email'] = "dummy_appointment@policybazaar.com"
 
         pgdata['productId'] = product_id
-        base_url = (
-            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+        base_url = "https://{}".format(request.get_host())
         pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['appointmentId'] = appointment_details.get('id')
