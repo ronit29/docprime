@@ -14,7 +14,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkHelpline, HospitalNetworkEmail,
                                  HospitalNetworkAccreditation, HospitalNetworkAward, HospitalNetworkDocument,
                                  HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor,
-                                 DoctorMapping, OpdAppointment)
+                                 DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -22,7 +22,8 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabTest,
                                      LabTestType, LabService, LabAppointment,LabDoctorAvailability,
-                                     LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument)
+                                     LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument, CommonTest,
+                                     CommonDiagnosticCondition)
 
 from ondoc.diagnostic.models import LabPricing
 
@@ -220,6 +221,9 @@ class Command(BaseCommand):
         # Create Lab appointment management team
         self.create_lab_appointment_management_group()
 
+        # Create Chat Conditions Team group
+        self.create_chat_conditions_group()
+
         # Create Article team Group
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
@@ -305,6 +309,21 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(LabAppointment)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+
+    def create_chat_conditions_group(self):
+        # Create chat conditions team
+        group, created = Group.objects.get_or_create(name=constants['CHAT_CONDITIONS_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(CommonMedicalCondition, CommonSpecialization, CommonTest, CommonDiagnosticCondition)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
