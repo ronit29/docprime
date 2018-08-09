@@ -414,10 +414,11 @@ class LabAppointmentForm(forms.ModelForm):
             self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
             self.cleaned_data.pop('time_slot_start', None)
         selected_test_ids = self.instance.lab_test.all().values_list('test',flat=True)
-        if not LabTiming.objects.filter(lab=self.instance.lab,
-                                        lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-                                        day=time_slot_start.weekday(),
-                                        start__lte=hour, end__gt=hour).exists():
+        if (not self.instance.time_slot_start == time_slot_start) and not LabTiming.objects.filter(
+                lab=self.instance.lab,
+                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                day=time_slot_start.weekday(),
+                start__lte=hour, end__gt=hour).exists():
             raise forms.ValidationError("This lab test is not available on selected day and time.")
         return cleaned_data
 
