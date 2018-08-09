@@ -228,7 +228,11 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
         # 'ondoc.authentication.auth.CustomAuthentication',
     ),
-    'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler'
+    'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler',
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    )
+
 }
 MAP_WIDGETS = {
     "GooglePointFieldWidget": (
