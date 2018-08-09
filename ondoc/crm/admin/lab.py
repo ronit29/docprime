@@ -155,6 +155,10 @@ class GenericLabAdminInline(admin.TabularInline):
     model = GenericLabAdmin
     extra = 0
     can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+    verbose_name_plural = "Admins"
+    fields = ['user', 'phone_number', 'lab', 'permission_type', 'is_disabled', 'read_permission', 'write_permission']
 
 
 class LabDocumentFormSet(forms.BaseInlineFormSet):
