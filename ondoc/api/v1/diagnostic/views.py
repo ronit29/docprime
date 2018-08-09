@@ -189,7 +189,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
 
-        queryset = AvailableLabTest.objects.select_related('lab').filter(lab_pricing_group__labs__is_live=True)
+        queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True)
 
         if ids:
             queryset = queryset.filter(test__in=ids)
@@ -487,7 +487,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
 
     def retrieve(self, request, lab_id):
         params = request.query_params
-        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True)
+        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True, enabled=True)
         if not queryset:
             raise Http404("No data available")
         lab_obj = Lab.objects.filter(pk=lab_id).first()
