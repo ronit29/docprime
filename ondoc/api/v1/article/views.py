@@ -25,7 +25,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
                     cat_data['title'] = category.name
                     cat_data['data'] = serializers.ArticleListSerializer(article_data, many=True,
                                                                  context={'request': request}).data
-                resp.append(cat_data)
+                    resp.append(cat_data)
         return Response(resp)
 
     def retrieve(self, request, pk=None):
