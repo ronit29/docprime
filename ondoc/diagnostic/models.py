@@ -152,7 +152,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_home_collection_enabled = models.BooleanField(default=False)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
-    is_test_doctor = models.BooleanField(verbose_name='Is Test Lab', default=False)
+    is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
 
     def __str__(self):
         return self.name
