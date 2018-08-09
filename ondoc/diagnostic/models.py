@@ -787,7 +787,7 @@ class LabAppointment(TimeStampedModel):
         # return queryset
 
     def __str__(self):
-        return self.profile.name + ', ' + self.lab.name
+        return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
     class Meta:
         db_table = "lab_appointment"
