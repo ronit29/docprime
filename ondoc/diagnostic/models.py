@@ -599,7 +599,7 @@ class LabAppointment(TimeStampedModel):
         try:
             prev_app_dict = {'id': self.id,
                              'status': self.status,
-                             "updated_at": self.time_slot_start}
+                             "updated_at": int(self.updated_at.timestamp())}
             if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
                 countdown = self.get_auto_cancel_delay(self)
                 tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
