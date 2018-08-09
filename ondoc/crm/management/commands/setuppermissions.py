@@ -14,7 +14,8 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkHelpline, HospitalNetworkEmail,
                                  HospitalNetworkAccreditation, HospitalNetworkAward, HospitalNetworkDocument,
                                  HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor,
-                                 DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization, MedicalCondition)
+                                 DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization, MedicalCondition,
+                                 MedicalConditionSpecialization)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -323,7 +324,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['CONDITIONS_MANAGEMENT_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(CommonMedicalCondition, CommonSpecialization, MedicalCondition, CommonTest, CommonDiagnosticCondition)
+        content_types = ContentType.objects.get_for_models(CommonMedicalCondition, CommonSpecialization, MedicalConditionSpecialization,  MedicalCondition, CommonTest, CommonDiagnosticCondition)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
