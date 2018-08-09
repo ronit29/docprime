@@ -11,6 +11,7 @@ from django.db.models import Count, Sum, When, Case, Q, F
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
 from django.utils import timezone
+from ondoc.api.v1 import utils
 import datetime
 import pytz
 import json
@@ -324,6 +325,10 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         ACTIVE_APPOINTMENT_STATUS = [LabAppointment.BOOKED, LabAppointment.ACCEPTED,
                                      LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
         request = self.context.get("request")
+
+        if not utils.is_valid_testing_lab_data(request.user, data["lab"]):
+            raise serializers.ValidationError("Both User and Lab should be for testing")
+
         if data.get("is_home_pickup") is True and (not data.get("address")):
             raise serializers.ValidationError("Address required for home pickup")
 
