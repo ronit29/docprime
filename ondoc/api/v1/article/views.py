@@ -13,16 +13,14 @@ class ArticleViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
         resp = []
-        queryset = self.get_queryset().filter(is_published=True)
-        categories = queryset.values_list('category__name', flat=True)
-        categories = list(set(categories))
+        categories = article_models.ArticleCategory.objects.prefetch_related('articles').all()
         for category in categories:
-            data = queryset.filter(category__name=category)
-            if data.exists():
+            if category.articles:
                 cat_data = {}
-                cat_data['title'] = category
-                cat_data['data'] = serializers.ArticleListSerializer(data.all(), many=True, context={'request': request}).data
-                resp.append(cat_data)
+                cat_data['title'] = category.name
+                cat_data['data'] = serializers.ArticleListSerializer(category.articles.all(), many=True,
+                                                                 context={'request': request}).data
+            resp.append(cat_data)
         return Response(resp)
 
     def retrieve(self, request, pk=None):
