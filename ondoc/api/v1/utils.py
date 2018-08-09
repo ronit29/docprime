@@ -286,3 +286,16 @@ def is_valid_testing_data(user, doctor):
             name=constants['TEST_USER_GROUP']).exists()):
         return False
     return True
+
+def is_valid_testing_lab_data(user, lab):
+    from ondoc.diagnostic.models import Lab
+
+    if user.id is None:
+        return False
+    if (Lab.objects.filter(id=lab.id, is_test_lab=True).exists() and not user.groups.filter(
+            name=constants['TEST_USER_GROUP']).exists()):
+        return False
+    if (Lab.objects.filter(id=lab.id, is_test_lab=False).exists() and user.groups.filter(
+            name=constants['TEST_USER_GROUP']).exists()):
+        return False
+    return True

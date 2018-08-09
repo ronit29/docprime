@@ -45,7 +45,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
     def list(self, request, *args, **kwargs):
         test_queryset = CommonTest.objects.all()
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
-        lab_queryset = PromotedLab.objects.filter(lab__is_live=True)
+        lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True)
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
@@ -74,7 +74,7 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             search_key = "".join(search_key.split("."))
             test_queryset = LabTest.objects.filter(search_key__icontains=search_key)
             test_queryset = paginate_queryset(test_queryset, request)
-            lab_queryset = Lab.objects.filter(search_key__icontains=search_key, is_live=True)
+            lab_queryset = Lab.objects.filter(search_key__icontains=search_key, is_live=True, is_test_lab=False)
             lab_queryset = paginate_queryset(lab_queryset, request)
         else:
             test_queryset = self.queryset[:20]
@@ -105,7 +105,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs__id=lab_id, lab_pricing_group__labs__is_live=True, test__in=test_ids)
+        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs__id=lab_id,
+                                                                    lab_pricing_group__labs__is_test_lab=False,
+                                                                    lab_pricing_group__labs__is_live=True,
+                                                                    test__in=test_ids)
         lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
         test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
@@ -189,7 +192,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
 
-        queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True)
+        queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
+                                                                                                lab_pricing_group__labs__is_test_lab=False)
 
         if ids:
             queryset = queryset.filter(test__in=ids)
@@ -281,8 +285,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     queryset = LabAppointment.objects.all()
     serializer_class = diagnostic_serializer.LabAppointmentModelSerializer
-    authentication_classes = (TokenAuthentication, )
-    permission_classes = (IsAuthenticated, IsConsumer, )
+    # authentication_classes = (TokenAuthentication, )
+    # permission_classes = (IsAuthenticated, IsConsumer, )
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
 

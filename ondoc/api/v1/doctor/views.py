@@ -188,8 +188,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             doctor_clinic__doctor=data.get('doctor'),
             doctor_clinic__hospital=data.get('hospital'),
             doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
-            day=time_slot_start.weekday(), start__lte=time_slot_start.hour,
-            end__gte=time_slot_start.hour).first()
+            day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+            end__gte=data.get("start_time")).first()
         profile_model = data.get("profile")
         profile_detail = {
             "name": profile_model.name,
@@ -646,7 +646,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
     queryset = models.Doctor.objects.all()
 
     def list(self, request, *args, **kwargs):
-        serializer = serializers.DoctorListSerializer(data=request.query_params)
+        serializer = serializers.DoctorListSerializer(data=request.query_params, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         doctor_search_helper = DoctorSearchHelper(validated_data)

@@ -108,7 +108,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
     license = models.CharField(max_length=200, blank=True)
-    is_insurance_enabled = models.BooleanField(verbose_name= 'Enabled for Insurance Customer',default=False)
+    is_insurance_enabled = models.BooleanField(verbose_name='Enabled for Insurance Customer',default=False)
     is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
     is_ppc_pathology_enabled = models.BooleanField(verbose_name= 'Enabled for Pathology Pre Policy Checkup', default=False)
     is_ppc_radiology_enabled = models.BooleanField(verbose_name= 'Enabled for Radiology Pre Policy Checkup', default=False)
@@ -152,6 +152,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_home_collection_enabled = models.BooleanField(default=False)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
+    is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
 
     def __str__(self):
         return self.name
