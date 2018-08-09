@@ -352,8 +352,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
 
 class DoctorProfileView(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
-    permission_classes = (IsAuthenticated,)
+    # authentication_classes = (TokenAuthentication, )
+    # permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return models.OpdAppointment.objects.all()
@@ -386,6 +386,23 @@ class DoctorProfileView(viewsets.GenericViewSet):
             if admin_image_url:
                 admin_image = request.build_absolute_uri(admin_image_url)
             resp_data["thumbnail"] = admin_image
+
+        # Check access_type START
+        user = request.user
+        OPD_ONLY = 1
+        LAB_ONLY = 2
+        OPD_AND_LAB = 3
+
+        if auth_models.GenericAdmin.objects.filter(user=user,
+                                                   is_disabled=False).exists() and auth_models.GenericLabAdmin.objects.filter(
+                user=user, is_disabled=False).exists():
+            resp_data["access_type"] = OPD_AND_LAB
+        elif auth_models.GenericAdmin.objects.filter(user=user, is_disabled=False).exists():
+            resp_data["access_type"] = OPD_ONLY
+        elif auth_models.GenericLabAdmin.objects.filter(user=user, is_disabled=False).exists():
+            resp_data["access_type"] = LAB_ONLY
+
+        # Check access_type END
 
         resp_data["count"] = queryset
         return Response(resp_data)
