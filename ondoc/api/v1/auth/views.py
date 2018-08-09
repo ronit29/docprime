@@ -613,7 +613,15 @@ class UserAppointmentsViewSet(OndocViewSet):
             pgdata['name'] = "DummyName"
         pgdata['txAmount'] = str(appointment_details['payable_amount'])
 
-        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
+        secret_key = client_key = ""
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            secret_key = settings.PG_SECRET_KEY_P1
+            client_key = settings.PG_CLIENT_KEY_P1
+        elif product_id == Order.LAB_PRODUCT_ID:
+            secret_key = settings.PG_SECRET_KEY_P2
+            client_key = settings.PG_CLIENT_KEY_P2
+
+        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
         return pgdata, payment_required
 
