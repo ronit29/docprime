@@ -62,7 +62,6 @@ class OndocViewSet(mixins.CreateModelMixin,
     pass
 
 
-
 class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
 
     def complete(self, request):

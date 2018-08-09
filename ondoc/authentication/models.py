@@ -530,6 +530,14 @@ class GenericLabAdmin(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.phone_number)
 
+    @classmethod
+    def update_user_lab_admin(cls, phone_number):
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR)
+        if user.exists():
+            admin = GenericLabAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
+            if admin.exists():
+                admin.update(user=user.first())
+
 
 class GenericAdmin(TimeStampedModel):
     APPOINTMENT = 1
@@ -578,7 +586,6 @@ class GenericAdmin(TimeStampedModel):
             admin = GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
             if admin.exists():
                 admin.update(user=user.first())
-
 
     @classmethod
     def create_admin_permissions(cls, doctor):

@@ -22,7 +22,7 @@ from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         Address, AppointmentTransaction, GenericAdmin)
+                                         Address, AppointmentTransaction, GenericAdmin,GenericLabAdmin)
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -82,14 +82,27 @@ class LoginOTP(GenericViewSet):
                                           )
                                         )
                                        )
+            lab_queryset = GenericLabAdmin.objects.select_related('lab', 'lab_network').filter(
+                Q(phone_number=phone_number, is_disabled=False),
+                (Q(lab__isnull=True, lab_network__data_status=Hospital.QC_APPROVED) |
+                 Q(lab__isnull=False,
+                   lab__data_status=Doctor.QC_APPROVED, lab__onboarding_status=Lab.ONBOARDED
+                   )
+                 )
+                )
+
+            if lab_queryset.exixts():
+                response['exists'] = 1
+                send_otp("OTP for Lab login is {}", phone_number)
 
             if queryset.exists():
                 response['exists'] = 1
                 send_otp("OTP for DocPrime login is {}", phone_number)
+
         else:
-            send_otp("OTP for DocPrime login is {}", phone_number)
+            send_otp("OTP for login is {}", phone_number)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
-                response['exists']=1
+                response['exists'] = 1
 
         return Response(response)
 
@@ -180,6 +193,7 @@ class UserViewset(GenericViewSet):
                 doctor.save()
 
         GenericAdmin.update_user_admin(phone_number)
+        GenericLabAdmin.update_user_lab_admin(phone_number)
         self.update_live_status(phone_number)
 
         token = Token.objects.get_or_create(user=user)

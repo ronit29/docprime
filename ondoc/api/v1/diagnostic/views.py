@@ -35,9 +35,78 @@ import hashlib
 from rest_framework import status
 from collections import OrderedDict
 from django.utils import timezone
+from ondoc.diagnostic import models
+from . import serializers
 import random
 import copy
 import re
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+
+# class OndocViewSet(mixins.CreateModelMixin,
+#                    mixins.RetrieveModelMixin,
+#                    mixins.UpdateModelMixin,
+#                    mixins.ListModelMixin,
+#                    viewsets.GenericViewSet):
+#     pass
+#
+#
+# class LabAppointmentsViewSet(OndocViewSet):
+#     authentication_classes = (TokenAuthentication, )
+#     permission_classes = (IsAuthenticated,)
+#     serializer_class = serializers.LabAppointmentSerializer
+#
+#     def get_queryset(self):
+#         user = self.request.user
+#         if user.user_type == User.DOCTOR:
+#             return models.LabAppointment.objects.filter(user=user.doctor, lab__is_live=True)
+#
+#     def list(self, request):
+#         user = request.user
+#         queryset = models.LabAppointment.objects.filter(lab__is_live=True).filter(lab__manageable_lab_admins__user=user,
+#                                                                                   lab__manageable_lab_admins__is_disabled=False).distinct()
+#         if not queryset:
+#             return Response([])
+#         serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
+#         serializer.is_valid(raise_exception=True)
+#
+#
+#         lab = serializer.validated_data.get('lab_id')
+#         profile = serializer.validated_data.get('profile_id')
+#         user = serializer.validated_data.get('user_id')
+#         date = serializer.validated_data.get('date')
+#
+#         if profile:
+#             queryset = queryset.filter(profile=profile)
+#
+#         if hospital:
+#             queryset = queryset.filter(hospital=hospital)
+#
+#         if doctor:
+#             queryset = queryset.filter(doctor=doctor)
+#
+#         if range == 'previous':
+#             queryset = queryset.filter(status__in=[models.OpdAppointment.COMPLETED,models.OpdAppointment.CANCELED]).order_by('-time_slot_start')
+#         elif range == 'upcoming':
+#             today = datetime.date.today()
+#             queryset = queryset.filter(
+#                 status__in=[models.OpdAppointment.BOOKED, models.OpdAppointment.RESCHEDULED_PATIENT,
+#                             models.OpdAppointment.RESCHEDULED_DOCTOR, models.OpdAppointment.ACCEPTED],
+#                 time_slot_start__date__gte=today).order_by('time_slot_start')
+#         elif range == 'pending':
+#             queryset = queryset.filter(time_slot_start__gt=timezone.now(), status__in = [models.OpdAppointment.BOOKED,
+#                                                                                          models.OpdAppointment.RESCHEDULED_PATIENT
+#                                                                                          ]).order_by('time_slot_start')
+#         else:
+#             queryset = queryset.order_by('-time_slot_start')
+#
+#         if date:
+#             queryset = queryset.filter(time_slot_start__date=date)
+#
+#         queryset = paginate_queryset(queryset, request)
+#         serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
+#         return Response(serializer.data)
 
 
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -282,15 +351,24 @@ class LabAppointmentView(mixins.CreateModelMixin,
     queryset = LabAppointment.objects.all()
     serializer_class = diagnostic_serializer.LabAppointmentModelSerializer
     authentication_classes = (TokenAuthentication, )
-    permission_classes = (IsAuthenticated, IsConsumer, )
+   # permission_classes = (IsAuthenticated, IsConsumer, )
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
 
     def list(self, request, *args, **kwargs):
         user = request.user
         queryset = LabAppointment.objects.filter(profile__user=user)
-        serializer = diagnostic_serializer.LabAppointmentModelSerializer(queryset, many=True)
+        serializer = diagnostic_serializer.LabAppointmentModelSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
+
+    def retrieve(self, request, pk=None):
+        user = request.user
+        queryset = LabAppointment.objects.filter(profile__user=user, pk=pk).distinct()
+        if queryset:
+            serializer = serializers.LabAppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
+            return Response(serializer.data)
+        else:
+            return Response([])
 
     @transaction.atomic
     def create(self, request, **kwargs):
@@ -351,6 +429,33 @@ class LabAppointmentView(mixins.CreateModelMixin,
             })
 
         return appointment_data
+
+    def update(self, request, pk=None):
+        lab_appointment = get_object_or_404(models.LabAppointment, pk=pk)
+        serializer = serializers.UpdateStatusSerializer(data=request.data,
+                                            context={'request': request, 'lab_appointment': lab_appointment})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        allowed = lab_appointment.allowed_action(request.user.user_type, request)
+        appt_status = validated_data['status']
+        if appt_status not in allowed:
+            resp = {}
+            resp['allowed'] = allowed
+            return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+
+        if request.user.user_type == User.DOCTOR:
+            req_status = validated_data.get('status')
+            if req_status == models.LabAppointment.RESCHEDULED_LAB:
+                lab_appointment.action_rescheduled_lab()
+            elif req_status == models.LabAppointment.ACCEPTED:
+                lab_appointment.action_accepted()
+
+        lab_appointment_serializer = serializers.LabAppointmentRetrieveSerializer(lab_appointment, context={'request':request})
+        response = {
+            "status": 1,
+            "data": lab_appointment_serializer.data
+        }
+        return Response(response)
 
     def extract_payment_details(self, request, appointment_details, product_id):
         remaining_amount = 0

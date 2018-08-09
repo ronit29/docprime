@@ -14,6 +14,8 @@ from django.db.models import F, Sum, When, Case, Q
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 from ondoc.payout.models import Outstanding
+from ondoc.authentication import models as auth_model
+import datetime
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from ondoc.diagnostic import tasks
 from dateutil import tz
@@ -530,7 +532,6 @@ class LabAppointment(TimeStampedModel):
     otp = models.PositiveIntegerField(blank=True, null=True)
     payment_status = models.PositiveIntegerField(choices=OpdAppointment.PAYMENT_STATUS_CHOICES,
                                                  default=OpdAppointment.PAYMENT_PENDING)
-
     payment_type = models.PositiveSmallIntegerField(choices=OpdAppointment.PAY_CHOICES, default=OpdAppointment.PREPAID)
     insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
@@ -538,15 +539,26 @@ class LabAppointment(TimeStampedModel):
     address = JSONField(blank=True, null=True)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
 
-    def allowed_action(self, user_type):
+    def allowed_action(self, user_type, request):
         allowed = []
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
-        if user_type == User.DOCTOR:
-            if self.status in [self.BOOKED]:
-                allowed = [self.COMPLETED]
+                allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
+        if user_type == User.DOCTOR and self.time_slot_start.date() >= current_datetime.date():
+            perm_queryset = auth_model.GenericLabAdmin.objects.filter(is_disabled=False, user=request.user)
+            if perm_queryset.first():
+                doc_permission = perm_queryset.first()
+                if doc_permission.write_permission or doc_permission.super_user_permission:
+                    if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
+                        allowed = [self.ACCEPTED, self.RESCHEDULED_LAB]
+                    elif self.status == self.ACCEPTED:
+                        allowed = [self.RESCHEDULED_LAB, self.COMPLETED]
+                    elif self.status == self.RESCHEDULED_LAB:
+                        allowed = [self.ACCEPTED]
+
+            # if self.status in [self.BOOKED]:
+            #     allowed = [self.COMPLETED]
         return allowed
 
     def send_notification(self, database_instance):

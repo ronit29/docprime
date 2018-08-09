@@ -21,6 +21,48 @@ utc = pytz.UTC
 User = get_user_model()
 
 
+# class LabAppointmentSerializer(serializers.ModelSerializer):
+#     lab_name = serializers.ReadOnlyField(source='lab.name')
+#     profile_name = serializers.ReadOnlyField(source='profile.name')
+#     user_phone_number = serializers.ReadOnlyField(source='user.phone_number')
+#     patient_image = serializers.SerializerMethodField()
+#     patient_thumbnail = serializers.SerializerMethodField()
+#     doctor_thumbnail = serializers.SerializerMethodField()
+#
+#     def get_allowed_action(self, obj):
+#         request = self.context.get('request')
+#         return obj.allowed_action(request.user.user_type, request)
+#
+#     class Meta:
+#         model = LabAppointment
+#         fields = ('id', 'lab_name', 'profile_name', 'user_phone_number', 'patient_image', 'doctor_thumbnail', 'patient_thumbnail')
+#
+#     def get_patient_image(self, obj):
+#         if obj.profile.profile_image:
+#             return obj.profile.profile_image.url
+#         else:
+#             return ""
+#
+#     def get_patient_thumbnail(self, obj):
+#         request = self.context.get('request')
+#         if obj.profile.profile_image:
+#             photo_url = obj.profile.profile_image.url
+#             return request.build_absolute_uri(photo_url)
+#         else:
+#             return None
+#
+#     def get_doctor_thumbnail(self, obj):
+#         request = self.context.get('request')
+#         if obj.doctor.images.all():
+#             photo_url = (
+#                 obj.doctor.images.all()[0].cropped_image.url if obj.doctor.images.all()[0].cropped_image else None)
+#             return request.build_absolute_uri(photo_url) if photo_url else None
+#         else:
+#             return None
+#             # url = static('doctor_images/no_image.png')
+#             # return request.build_absolute_uri(url)
+
+
 class LabTestListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
@@ -204,7 +246,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         user_type = ''
         if self.context.get('request'):
             user_type = self.context['request'].user.user_type
-            return obj.allowed_action(user_type)
+            return obj.allowed_action(user_type, self.context.get('request'))
         else:
             return []
 
@@ -410,7 +452,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         if not data['test_ids']:
             raise serializers.ValidationError(" No Test Ids given")
         avail_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids']).values(
-            'id')
+            'id').distinct('test')
 
         if len(avail_test_queryset) != len(data['test_ids']):
             raise serializers.ValidationError("Test Ids or lab Id is incorrect")
@@ -519,6 +561,14 @@ class SearchLabListSerializer(serializers.Serializer):
     lat = serializers.FloatField(required=False)
     ids = IdListField(required=False)
     order_by = serializers.CharField(required=False)
+
+
+class UpdateStatusSerializer(serializers.Serializer):
+    status = serializers.IntegerField()
+    time_slot_start = serializers.DateTimeField(required=False)
+    time_slot_end = serializers.DateTimeField(required=False)
+    start_date = serializers.CharField(required=False)
+    start_time = serializers.FloatField(required=False)
 
 
 class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
