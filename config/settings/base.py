@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
 import environ
+import json
 import os
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 #BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -270,7 +271,7 @@ PG_CLIENT_KEY_REFUND = env('PG_CLIENT_KEY_REFUND')
 PG_REFUND_URL = env('PG_REFUND_URL')
 AUTO_CANCEL_OPD_DELAY = 10  # In min
 AUTO_CANCEL_LAB_DELAY = 10  # In min
-OPS_EMAIL_ID = ["ankurmittal@policybazaar.com", ]
+OPS_EMAIL_ID = env.list('OPS_EMAIL_ID')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),

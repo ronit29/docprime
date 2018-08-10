@@ -613,7 +613,15 @@ class UserAppointmentsViewSet(OndocViewSet):
             pgdata['name'] = "DummyName"
         pgdata['txAmount'] = str(appointment_details['payable_amount'])
 
-        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
+        secret_key = client_key = ""
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            secret_key = settings.PG_SECRET_KEY_P1
+            client_key = settings.PG_CLIENT_KEY_P1
+        elif product_id == Order.LAB_PRODUCT_ID:
+            secret_key = settings.PG_SECRET_KEY_P2
+            client_key = settings.PG_CLIENT_KEY_P2
+
+        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
         return pgdata, payment_required
 
@@ -781,11 +789,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
     queryset = PgTransaction.objects.none()
 
     def save(self, request):
-        LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appointment"
-        OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appointment"
-        LAB_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "lab/%s/book?error_code=%s"
-        OPD_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "opd/doctor/%s/%s/bookdetails?error_code=%s"
-        ERROR_REDIRECT_URL = request.build_absolute_uri("/") + "error?error_code=%s"
+        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
+        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
+        LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
+        OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
+        ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
 
         try:
@@ -1045,11 +1053,9 @@ class OrderHistoryViewSet(GenericViewSet):
                     "payment_type": action_data.get("payment_type"),
                     "type": "opd"
                 }
-                serializer = CreateAppointmentSerializer(data=data, context={"request": request})
-                if not serializer.is_valid():
-                    data.pop("time_slot_start")
-                    data.pop("start_date")
-                    data.pop("start_time")
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
                 orders.append(data)
             elif action_data["product_id"] == Order.LAB_PRODUCT_ID:
                 if action_data['lab'] not in lab_name:
@@ -1066,11 +1072,9 @@ class OrderHistoryViewSet(GenericViewSet):
                     "payment_type": action_data.get("payment_type"),
                     "type": "lab"
                 }
-                serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
-                if not serializer.is_valid():
-                    data.pop("time_slot_start")
-                    data.pop("start_date")
-                    data.pop("start_time")
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
                 data["test_ids"] = [lab_test_map[x] for x in action_data.get("lab_test")]
                 orders.append(data)
         return Response(orders)
