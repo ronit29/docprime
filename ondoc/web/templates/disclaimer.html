@@ -1,0 +1,85 @@
+{% extends "web_base.html" %}
+{% load static %}
+
+    {% block title_text %}
+		Privacy Policy
+	{% endblock %}
+    {% block page_css %}
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/privacy.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/normalize.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/layout.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/custom.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/customer.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/responsive.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/profile.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/static.css' %}" >
+	{% endblock %}
+	{% block content %}
+	<div class="profile-body-wrap">
+		<header class="profile-header" style="display: block;">
+			<div class="smiley-img-div">
+				<img src="{% static 'web/img/customer-icons/smiley.png' %}">
+			</div>
+			<div class="container">
+				<div class="row header-row">
+					<div class="col-12 logo-icon-div" style="text-align: center;" >
+						<a href="javascript:;"><img src="{% static 'web/img/doc-prime-logo.png' %}" class="logo-icon"></a>
+					</div>
+				</div>
+			</div>
+		</header>
+		<div class="subheader d-none d-lg-block"></div>
+		<div class="container about-container">
+			<div class="row">
+				<div class="col-12 text-center">
+					<p class="fw-500 about-heading" style="margin-bottom: 20px;">Disclaimer</p>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-12 privacy-desc-div">
+					<p class="privacy-desc">
+						The information contained on Docprime Technologies Private Limited website www.Docprime.com
+						(“Website”) is solely provided for informational purposes only and is not meant to substitute for the
+						advice provided by your personal doctor and/or other person(s) specializing in healthcare/medical
+						care. Information and statements regarding various tests offered by labs/hospitals or consultancy
+						programs, treatments, is solely for general reading and is a compilation from open source that was
+						available to us and/or the information supplied to us from third party labs/hospitals/doctors.
+						Anyconsultation and various test(s) are intended for general purpose only and are not meant to be
+						used in emergencies/serious illnesses requiring physical/face to face consultation. In case of any
+						negligence on the part of the User of website in acting on the same and the condition of the User
+						deteriorates, Docprime shall not be liable for any consequences arising out of, in relation or in
+						connection, or as a result of the same.
+					</p>
+					<p class="privacy-desc">
+						Any interactions and associated issues with the labs/hospitals/doctors on the Website, is strictly
+						between User and the labs/hospitals/doctors. User shall not hold Docprime responsible for any and all
+						such interactions and associated issues. If the User decides to engage with a lab/hospital/doctor to
+						provide diagnostic services, the User will do so at his/her own risk.
+					</p>
+					<p class="privacy-desc">
+						Be it noted, the information provided here is not medical advice hence is not intended to replace
+						consultation with a medical practitioner, and should not be treated as an alternative to medical
+						diagnosis or treatment from your doctor, or any other licensed healthcare professional. Docprime is not
+						a medical service provider or a clinical establishment, nor it is involved in providing any healthcare or
+						medical advice or diagnosis service, it shall hence not be responsible and owns no liability to Users for
+						any outcome from the consultation and or the various test offered by lab(s)s on the website.
+					</p>
+					<p class="privacy-desc">
+						Do not self-diagnose or treat yourself based on the information provided on this Website. We further
+						assert, please seek medical advice and do not disregard medical advice, or discontinue medical
+						treatment by relying upon the information provided on this Website. External links to videos and other
+						websites provided here are purely for information purposes and Docprime does not warrant or
+						guarantee the accuracy, genuineness, reliability of such links/websites. We do not guarantee the
+						correctness of the information, please exercise discretion while applying the information to use. The
+						information provided hereunder is not intended to be a substitute for getting in touch with emergency
+						healthcare. If you (or the person you intend to provide information to) are facing a medical emergency,
+						please contact an ambulance service or hospital directly.
+					</p>
+					<p class="privacy-desc mrt-20">
+						<strong>Copyright 2018. Docprime.com. All rights reserved.</strong>
+					</p>
+				</div>
+			</div>
+		</div>
+	</div>
+{% endblock %}

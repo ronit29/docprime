@@ -16,6 +16,11 @@ from django.contrib.auth import get_user_model
 import math
 import datetime
 import pytz
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
 User = get_user_model()
 
 
@@ -158,15 +163,22 @@ class CreateAppointmentSerializer(serializers.Serializer):
         time_slot_end = None
 
         if not is_valid_testing_data(request.user, data["doctor"]):
+            logger.error("Error 'Both User and Doctor should be for testing' for opd appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError("Both User and Doctor should be for testing")
 
         if data.get('end_date') and data.get('end_time'):
             time_slot_end = self.form_time_slot(data.get('end_date'), data.get('end_time'))
 
         if not request.user.user_type == User.CONSUMER:
+            logger.error(
+                "Error 'Not allowed to create appointment as user type is not consumer' for opd appointment with data - " + json.dumps(
+                    request.data))
             raise serializers.ValidationError("Not allowed to create appointment")
 
         if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
+            logger.error(
+                "Error 'Invalid profile id' for opd appointment with data - " + json.dumps(
+                    request.data))
             raise serializers.ValidationError("Invalid profile id")
 
         if time_slot_start < timezone.now():
@@ -176,24 +188,33 @@ class CreateAppointmentSerializer(serializers.Serializer):
         if delta.days > MAX_FUTURE_DAY:
             raise serializers.ValidationError("Cannot book appointment more than "+str(MAX_FUTURE_DAY)+" days ahead")
 
-        time_slot_hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+        # time_slot_hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
 
         doctor_leave = DoctorLeave.objects.filter(deleted_at__isnull=True, doctor=data.get('doctor'), start_date__lte=time_slot_start.date(), end_date__gte=time_slot_start.date(), start_time__lte=time_slot_start.time(), end_time__gte=time_slot_start.time()).exists()
 
         if doctor_leave:
+            logger.error(
+                "Error 'Doctor is on leave' for opd appointment with data - " + json.dumps(
+                    request.data))
             raise serializers.ValidationError("Doctor is on leave")
 
 
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
                                                  doctor_clinic__hospital=data.get('hospital'),
-                                                 day=time_slot_start.weekday(), start__lte=time_slot_hour,
-                                                 end__gte=time_slot_hour).exists():
+                                                 day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+                                                 end__gte=data.get("start_time")).exists():
+            logger.error(
+                "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
+                    request.data))
             raise serializers.ValidationError("Invalid Time slot")
 
         if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
             raise serializers.ValidationError('A previous appointment with this doctor already exists. Cancel it before booking new Appointment.')
 
         if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile = data.get('profile')).count()>=MAX_APPOINTMENTS_ALLOWED:
+            logger.error(
+                "Error 'Max active appointments reached' for opd appointment with data - " + json.dumps(
+                    request.data))
             raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
 
         return data
@@ -440,7 +461,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
             'languages', 'qualifications', 'general_specialization', 'availability', 'mobiles', 'medical_services',
-            'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail',)
+            'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail', 'signature', 'is_live')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
@@ -565,6 +586,9 @@ class PrescriptionFileDeleteSerializer(serializers.Serializer):
     def validate_appointment(self, value):
         request = self.context.get('request')
         if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
+            logger.error(
+                "Error 'Appointment is not correct' for removing Prescription with data - " + json.dumps(
+                    request.data))
             raise serializers.ValidationError("Appointment is not correct.")
         return value
 
@@ -577,6 +601,9 @@ class PrescriptionSerializer(serializers.Serializer):
     def validate_appointment(self, value):
         request = self.context.get('request')
         if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
+            logger.error(
+                "Error 'Appointment is not correct' for Prescription create with data - " + json.dumps(
+                    request.data))
             raise serializers.ValidationError("Appointment is not correct.")
         return value
 
@@ -598,7 +625,11 @@ class DoctorListSerializer(serializers.Serializer):
     hospital_name = serializers.CharField(required=False)
 
     def validate_specialization_id(self, value):
+        request = self.context.get("request")
         if not Specialization.objects.filter(id__in=value.strip()).count() == len(value.strip()):
+            logger.error(
+                "Error 'Invalid specialization Id' for Doctor Search with data - " + json.dumps(
+                    request.query_params))
             raise serializers.ValidationError("Invalid specialization Id.")
         return value
 
@@ -628,7 +659,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'thumbnail', 'license')
+                  'general_specialization', 'thumbnail', 'license', 'is_live')
 
 
 

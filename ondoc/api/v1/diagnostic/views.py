@@ -114,7 +114,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
     def list(self, request, *args, **kwargs):
         test_queryset = CommonTest.objects.all()
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
-        lab_queryset = PromotedLab.objects.filter(lab__is_live=True)
+        lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True)
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
@@ -143,7 +143,7 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             search_key = "".join(search_key.split("."))
             test_queryset = LabTest.objects.filter(search_key__icontains=search_key)
             test_queryset = paginate_queryset(test_queryset, request)
-            lab_queryset = Lab.objects.filter(search_key__icontains=search_key, is_live=True)
+            lab_queryset = Lab.objects.filter(search_key__icontains=search_key, is_live=True, is_test_lab=False)
             lab_queryset = paginate_queryset(lab_queryset, request)
         else:
             test_queryset = self.queryset[:20]
@@ -174,7 +174,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs__id=lab_id, lab_pricing_group__labs__is_live=True, test__in=test_ids)
+        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs__id=lab_id,
+                                                                    lab_pricing_group__labs__is_test_lab=False,
+                                                                    lab_pricing_group__labs__is_live=True,
+                                                                    test__in=test_ids)
         lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
         test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
@@ -258,7 +261,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
 
-        queryset = AvailableLabTest.objects.select_related('lab').filter(lab_pricing_group__labs__is_live=True)
+        queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
+                                                                                                lab_pricing_group__labs__is_test_lab=False)
 
         if ids:
             queryset = queryset.filter(test__in=ids)
@@ -524,8 +528,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             pgdata['email'] = "dummy_appointment@policybazaar.com"
 
         pgdata['productId'] = product_id
-        base_url = (
-            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+        base_url = "https://{}".format(request.get_host())
         pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['appointmentId'] = ""
@@ -533,7 +536,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['name'] = appointment_details["profile"].name
         pgdata['txAmount'] = str(appointment_details['payable_amount'])
 
-        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P2, settings.PG_CLIENT_KEY_P2)
 
         return pgdata, payment_required
 
@@ -568,7 +571,7 @@ class LabTimingListView(mixins.ListModelMixin,
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
         lab_queryset = Lab.objects.filter(pk=lab, is_live=True).prefetch_related('lab_timings').first()
-        if not lab_queryset or (for_home_pickup and not lab_queryset.is_home_pickup_available):
+        if not lab_queryset or (for_home_pickup and not lab_queryset.is_home_collection_enabled):
             return Response([])
 
         obj = TimeSlotExtraction()
@@ -579,7 +582,8 @@ class LabTimingListView(mixins.ListModelMixin,
         else:
             lab_timing_queryset = lab_queryset.lab_timings.all()
             for data in lab_timing_queryset:
-                obj.form_time_slots(data.day, data.start, data.end, None, True)
+                if for_home_pickup == data.for_home_pickup:
+                    obj.form_time_slots(data.day, data.start, data.end, None, True)
 
         resp_list = obj.get_timing_list()
         return Response(resp_list)
@@ -593,9 +597,9 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
 
     def retrieve(self, request, lab_id):
         params = request.query_params
-        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True)
+        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True, enabled=True)
         if not queryset:
-            raise Http404("No data available")
+            return Response([])
         lab_obj = Lab.objects.filter(pk=lab_id).first()
         if params.get('test_name'):
             search_key = re.findall(r'[a-z0-9A-Z.]+', params.get('test_name'))

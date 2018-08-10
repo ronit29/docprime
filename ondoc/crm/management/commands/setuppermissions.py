@@ -14,7 +14,8 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkHelpline, HospitalNetworkEmail,
                                  HospitalNetworkAccreditation, HospitalNetworkAward, HospitalNetworkDocument,
                                  HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor,
-                                 DoctorMapping, OpdAppointment)
+                                 DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization, MedicalCondition,
+                                 MedicalConditionSpecialization)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -22,7 +23,9 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabTest,
                                      LabTestType, LabService, LabAppointment,LabDoctorAvailability,
-                                     LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument)
+                                     LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument, CommonTest,
+                                     CommonDiagnosticCondition, DiagnosticConditionLabTest)
+from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
 
@@ -220,6 +223,12 @@ class Command(BaseCommand):
         # Create Lab appointment management team
         self.create_lab_appointment_management_group()
 
+        # Create Chat Conditions Team group
+        self.create_conditions_management_group()
+
+        #Create report team
+        self.create_report_team()
+
         # Create Article team Group
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
@@ -311,4 +320,35 @@ class Command(BaseCommand):
                 Q(content_type=ct),
                 Q(codename='change_' + ct.model))
 
+            group.permissions.add(*permissions)
+
+
+    def create_conditions_management_group(self):
+        # Create chat conditions team
+        group, created = Group.objects.get_or_create(name=constants['CONDITIONS_MANAGEMENT_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(CommonMedicalCondition, CommonSpecialization,
+                                                           MedicalConditionSpecialization,  MedicalCondition,
+                                                           CommonTest, CommonDiagnosticCondition,
+                                                           DiagnosticConditionLabTest)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+    def create_report_team(self):
+        group, created = Group.objects.get_or_create(name=constants['REPORT_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(report_models.GeneratedReport, for_concrete_models=False)
+
+        for cl, ct in content_types.items():
+            Permission.objects.get_or_create(content_type=ct, codename='change_' + ct.model)
+            permissions = Permission.objects.filter(content_type=ct, codename='change_' + ct.model)
             group.permissions.add(*permissions)

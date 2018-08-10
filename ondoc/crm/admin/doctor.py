@@ -720,7 +720,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
-            obj.is_live = True
+            # obj.is_live = True
+            obj.update_live_status()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 
@@ -770,6 +771,22 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
+    list_display = ('id', 'get_profile', 'get_doctor', 'status', 'time_slot_start', 'created_at',)
+    list_filter = ('status', )
+    date_hierarchy = 'created_at'
+
+    def get_profile(self, obj):
+        return obj.profile.name
+
+    get_profile.admin_order_field = 'profile'
+    get_profile.short_description = 'Profile Name'
+
+    def get_doctor(self, obj):
+        return obj.doctor.name
+
+    get_doctor.admin_order_field = 'doctor'
+    get_doctor.short_description = 'Doctor Name'
+
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
         allowed_status_for_agent = [(OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
@@ -973,3 +990,7 @@ class DoctorMappingAdmin(VersionAdmin):
         form.base_fields['doctor'].queryset = Doctor.objects.filter(is_internal=True)
         form.base_fields['profile_to_be_shown'].queryset = Doctor.objects.filter(is_internal=True)
         return form
+
+
+class CommonSpecializationAdmin(VersionAdmin):
+    autocomplete_fields = ['specialization']

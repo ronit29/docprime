@@ -1,0 +1,321 @@
+/*common*/
+.ct-img {display: inline-block;}
+.ct-img-lg{width: 60px; height:60px;}
+.ct-img-md{width: 50px; height: 50px;}
+.ct-img-sm{width: 40px; height: 40px;cursor: pointer}
+.ct-img-xs{width: 18px; height: 18px; margin-right: 4px;}
+
+.img-fluid{vertical-align: middle;}
+
+.tag-sm{font-size: 14px; font-weight: 500; margin-bottom: 10px; padding: 5px 16px; border-radius: 20px;}
+
+.wrap-100{padding-top: 100px;}
+
+
+.book-header.back-icon{}
+.back-icon-white{margin-top: 12px;cursor: pointer}
+
+/*header*/
+.ct-header{height: 100px;}
+.navigate-row{}
+.top-nav>li{line-height: 50px; vertical-align: middle; margin-right: 10px;  font-size: 16px; font-weight: 500;cursor: pointer}
+.alpha-bx{}
+.beta-bx {}
+
+.user-notification-action{padding-top: 10px;}
+
+.search-row{position: relative; padding:10px 0; padding-top: 0;}
+.search-input{padding-left: 40px;  box-shadow: -1.2px 1.6px 4px 0 rgba(0, 0, 0, 0.38);border: none;}
+.search-icon{position: absolute; top: 0; left:0; padding:11px;}
+
+.map-marker-img,
+.arrow-img{width: 15px; height: 14px;}
+
+/*customer home screen 4*/
+.ct-home-screen{height: 100%; padding-bottom: 0;}
+.ct-profile{margin-top: 10px; margin-bottom: 10px;}
+.ct-profile .ct-profile-icon{float:left;}
+.ct-profile .ct-content{padding-left: 60px;}
+.ct-title{font-size: 16px; font-weight: bold; margin-bottom: 2px;}
+.ct-profile p{color: #757575; font-size: 14px; font-weight: 500;}
+
+.welcome{ font-size: 14px; font-weight: 500;}
+.notification-icon{position: relative;}
+.notification-alert{ background-color: #ff6326; width: 10px ; height: 10px; border-radius: 50%; position: absolute;  right: 0; top: 0; display: inline-block;}
+
+/*booked consultant*/
+.booked-dr{height: 140px; margin-bottom: 10px;}
+.stath-img{margin: 0 auto; margin-bottom: 10px;}
+
+.consultant-quick{margin-bottom: 10px;}
+.enq-suggestion{width: 100%; overflow-x: auto; white-space: nowrap;}
+.round-tag{border-radius: 10px; padding: 2px 15px; font-weight: normal;}
+
+/*talk to consultant screen 5*/
+.talk-to-consutant-note{margin:10px 0;}
+
+/*root map*/
+.root-map-field{padding-right: 55px; position: relative;}
+.root-map-field .root-map{position: absolute; top: 0; right: 0;}
+.root-map>span{display: block; padding-top: 4px; color: #757575; font-size: 12px;}
+.root-map-field .rm-title{ font-size: 16px; font-weight: bold;}
+.root-map-field .dr-with{color: #757575;}
+
+/*list of labs*/
+.total-labs{}
+.total-labs .lab-items>li{text-align: center;  padding:2px 10px; margin-bottom: 10px;}
+.total-labs .lab-items .lab-name{font-size: 14px; font-weight: 500;color: #404040;}
+.total-labs .lab-img{width: 60px;}
+
+/*search screen 8*/
+.search-result-list>li{padding: 10px;cursor: pointer}
+.search-result-list>li:last-child{padding-bottom: 0}
+.search-result-list>li>a{font-size: 14px; font-weight: 500;}
+
+
+/*location-detect*/
+.location-detect-header{height: auto;}
+.all-test-screen,
+.locaton-detect-screen{padding-top: 120px}
+.select-location-row{position: relative; padding: 10px;}
+.select-location-row .close{position: absolute; top: 0; left: 0; padding: 5px; width: 24px;}
+.detect-my-locaiton{padding: 4px 0; text-align: right; font-size: 16px; font-weight: 500; color: #f78631;cursor: pointer}
+.location-detect-field .map-marker-blue{width: 20px;height: 20px;}
+.location-detect-field .search-input{box-shadow: none;}
+.map-marker-blue{position:  absolute;top: 8px; left: 10px;}
+
+.locaton-detect-screen .city-list>li{padding: 12px; border-bottom: 1px solid #ddd; background-color: #fff;cursor: pointer}
+.locaton-detect-screen .city-list>li>a{font-size: 16px; font-weight: bold;}
+
+/*search with city locality*/
+.city-list>li>a{display: block; position: relative; padding-right: 100px;}
+.city-list>li>a .state{font-size: 14px; font-weight: 500; color: #757575;}
+.city-list>li>a .city-loc{position: absolute; top: 5px; right: 14px; font-size: 14px; font-weight: normal;}
+
+
+/*search book*/
+.search-book-result{padding-top: 0px;}
+.search-book-header{height: auto;}
+.filter-row{position: fixed; left: 0; right: 0; top: 50px;z-index: 9; background-color: #e8eff3;}
+
+.filter-item{padding: 10px 0;}
+.filter-title{ font-size: 14px; font-weight: 500;}
+
+.action-filter{float: right; width: 100px; text-align: left; border-left: 1px solid #aaa; padding-top: 5px; height: 35px;}
+.action-filter li{margin-left: 10px;}
+.action-filter li:last-child{margin-left: 4px;}
+.applied-filter{position: relative;}
+.applied-filter-noti{ position: absolute; top: 10px; right: 14px; width: 10px; height: 10px; background-color: orange; border-radius: 50%; }
+.filter-title{padding-right: 110px;}
+
+/*book card*/
+.card{margin-bottom: 10px;}
+.card-content .logo-ratting{  float: right; width: 100px; text-align: center;}
+.ratting{display: block;}
+.pickup-btn{padding: 5px; color: #000; background-color: #fad688; font-size: 12px; font-weight: 500;}
+.card-content .logo-ratting  .lab-icon{display: block; text-align: center;}
+.card-content .logo-ratting  .lab-icon img{width: 65px}
+.ratting>li{margin-right: -4px;}
+.card .card-footer{border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; padding: 10px;}
+.logo-ratting{}
+
+.lab-locality{color: #626262; font-size: 14px; margin-bottom: 8px; height: auto; max-height: 36px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-width: 80%;}
+
+.book-card-content{padding-right: 100px;}
+.book-cart-title{font-size: 17px; font-weight: bold;color: #263077; margin-bottom: 6px; height: auto; max-height: 44px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical}
+
+.lab-price{font-size: 16px; font-weight: 500;color: #263077; padding-top: 3px;}
+
+/*filter popup*/
+.filter-popup{margin: 100px auto; width: 100%; max-width: 500px;}
+.info-popup{margin-top: 20px;}
+
+/*All test screen 13*/
+.all-test-list>li{position: relative; padding: 20px; border-bottom:1px solid #ddd; padding-right: 70px;}
+.all-test-list .test-price{position: absolute; top: 18px; right:10px; }
+
+.text-price-btn{position: relative;}
+.selected-item{position: absolute; left: 10px; top: 10px}
+
+
+/*=======================
+	profile-book-screen
+=========================*/
+.empty-header {position: fixed; top: 50px; left: 0; right: 0; height: 40px;}
+.profile-book .pb-logo{width: 90px; border: 1px solid #ddd; padding: 5px; border-radius: 4px; text-align: center; margin: 10px auto;}
+
+.pb-title{font-size: 20px; font-weight: bold; color: #263077; margin-bottom: 5px;}
+.wc-title{margin-bottom: 5px;}
+
+.pb-details,
+.pb-header{border-bottom:1px solid #ddd;}
+.pb-details:last-child{border: none}
+
+.pb-header .location{color: #f78631; font-size: 14px; font-weight: 500; margin-bottom: 10px;}
+.profile-book .time-contact{}
+.profile-book .time-contact>li{padding: 1px 0;}
+.profile-book .time-contact>li .open-close{font-size: 14px; font-weight: 500; color: #f78631;}
+
+.pb-view{ padding: 4px 0; }
+.pb-list>li{padding: 8px 0; font-size: 14px; font-weight: 500; color: #000}
+.pb-list .test-price{float: right;}
+.test-name-item{float: left; width: calc(100% - 42px)}
+
+.pb-location .address-details .add-map{float: right;width: 50px;cursor: pointer; margin-top: 10px}
+.pb-location .address-details .add-info{padding-right: 90px;}
+
+.pb-about>p{margin-bottom: 10px;}
+
+.selected-option{position: absolute; left: 10px; top:15px;}
+
+
+/*===============
+	book-time
+=================*/
+.book-time-screeen{padding-top: 165px;}
+.date-time-calander{position: fixed; left: 0; right: 0;top: 50px; z-index: 8; background-color: #e8eff3}
+.add-new-time{padding: 10px 0;}
+
+
+.booking-type>li{margin-right: 20px;}
+.booking-type>li .radio-inline{font-size: 18px;}
+
+/*booking confirm*/
+.booking-confirm-screen{padding-bottom: 50px;}
+.booking-confirm-screen .lab-details{margin-bottom: 20px;}
+.booking-confirm-screen .lab-details .lab-title{padding-right: 100px;}
+.booking-confirm-screen .lab-details img{width: 70px; border:1px solid #ddd; padding: 3px ; float: right;}
+.booking-confirm-screen .lab-details .lab-title .title{margin-bottom: 5px;}
+
+.booking-confirm-screen .lab-visit-time{margin-bottom: 40px;}
+.booking-confirm-screen .lab-visit-time .title{font-size: 14px;}
+.booking-confirm-screen .lab-visit-time>p{margin-bottom: 10px; margin-top: 5px; word-wrap: break-word;}
+
+.payment-method>li{padding: 10px; vertical-align: middle;}
+.payment-method>li>label{font-size: 14px; font-weight: bold;}
+.payment-method>li>label img{width: 40px; margin-right: 20px; vertical-align: middle;}
+.payment-method .radio-inline{width: 20px; height: 20px; margin-top: 6px;}
+
+.quick-payment>li img{width: 20px!important;}
+
+
+/*credit card screen*/
+.exp-cvv-list{width: 100%}
+.exp-cvv-list .exp-cvv{width: 32.4% ; display: inline-block;}
+
+/*book confirm-timeline*/
+.book-confirmed-timeline{padding-top: 10px;}
+.book-confirmed-timeline .lab-visit-time{margin-bottom: 10px;}
+.cancel-booking-btn{background-color: #b0b0b0; color: #fff;}
+
+
+
+
+/*login mobile verification*/
+.mobile-verification-screen .mv-header{padding: 10px;}
+.mobile-verification-screen .mv-header{padding-top: 20px;}
+.mobile-verification-screen .mobile-field .enter-mobile-number{  width: 200px ; margin: 0 auto;}
+
+/*search dr screen*/
+.search-Dr-Screen{}
+.search-Dr-Screen .drList>li{padding: 6px  0;}
+.search-Dr-Screen .drList>li>a{font-size: 14px; font-weight: 500;}
+
+/*doctor search result*/
+.search-result-dr{padding-top: 160px;}
+
+.search-dr-list{}
+.search-dr-list .dr-header{}
+
+.search-dr-list .alpha{flex: 1;display: flex;align-items: center;}
+.search-dr-list .dr-name{ font-size: 16px; font-weight: bold;}
+
+.search-dr-list .beta{position: absolute; right: 10px;top: 8px;width: 50%;text-align: right;}
+.search-dr-list .beta>p{width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis}
+
+.search-dr-list .dr-info{padding-bottom: 0; position: relative; padding-top: 20px;}
+.dr-card-book{margin-top: 16px;}
+
+.search-dr-list .alpha.dr-exp-details{padding-right: 0px;}
+.search-dr-list .dr-exp-details .dr-desg{font-size: 14px; font-weight: 500; margin-bottom: 4px; height: auto; max-height: 36px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical}
+.dr-result-card-row{align-items: center; margin-left: 0; margin-right: 0}
+.dr-result-card-row .col-6{padding-left: 0; padding-right: 0;}
+
+.pricing{padding-top: 10px;}
+.pricing .new-price{ font-size: 16px; font-weight: 500;color: #f78631;}
+.pricing .old-price{color: #757575; font-weight: 400; font-size: 12px; text-decoration: line-through;vertical-align: 2px;}
+
+.search-dr-list .time-availability,
+.search-dr-list .Clinc-name{padding-left: 4px; display: inline-block; font-size: 12px; font-weight: bold; vertical-align: middle; width: 85%}
+.time-availability, .Clinc-name{vertical-align: bottom}
+.search-dr-list{cursor: pointer}
+
+/*doctor profile screen*/
+.dr-profile-screen{padding-bottom: 50px;}
+.dr-qucik-info{display: flex; flex-wrap: wrap; align-items: center}
+.dr-profile-screen .dr-qucik-info img{height: 80px; width: 80px;}
+.dr-qucik-info .dr-profile {padding-left: 12px; flex: 1}
+.dr-qucik-info .dr-profile .dr-name{font-size: 18px; font-weight: bold; margin: 6px 0;height: auto; max-height: 48px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical}
+.dr-qucik-info .dr-profile .desg{font-size: 14px; font-weight: 500; margin: 6px 0;}
+.dr-qucik-info .dr-profile .add-details{font-size: 12px; font-weight: 500; color: #757575; margin: 6px 0;}
+.add-details{margin-top: 8px;}
+
+.drop-down-list>li{font-size: 16px; font-weight: 500; padding: 10px; border-bottom:1px solid #ddd;}
+.drop-down-list>li .title{font-size: 16px; font-weight: 500;position: relative;}
+.drop-down-list>li .title span{margin-top: 10px;}
+
+/*clinic list*/
+.Clinic-card-list{ width: 100%;}
+.Clinic-card-list>li{ border: solid 1px rgba(0, 0, 0, 0.3); border-radius: 8px}
+.Clinic-card-list>li .location-details img{width: 40px;}
+.Clinic-card-list>li .location-details .address{float: left; font-size: 14px; font-weight: bold; color: #757575; margin-top: 3px; width: 70%; height: 56px; white-space: normal; text-overflow: ellipsis; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;}
+
+.timing-details{margin-top: 25px;}
+.timing-details>p{margin-bottom: 10px;width: 100%; white-space: normal;}
+
+/*consumer profile*/
+.consumer-icon{margin:0 auto!important;}
+
+.online-consultant-list>li{background-color: #fff; border-bottom:1px solid #ddd; padding: 10px;cursor: pointer}
+.consumer-report-list>li:first-child,
+.online-consultant-list>li:first-child{margin-top: -13px; padding: 10px;}
+.online-consultant-list>li>a{display: block;}
+.online-consultant-list>li .consultant-dp{width: 80px; float: left; position: relative;}
+.online-consultant-list>li .consultant-details{padding-left: 100px; font-weight: 500; font-size: 14px;}
+.online-consultant-list>li .view-chat{padding:10px;}
+
+.appointment-icon{position: absolute;right: -2px;bottom: -4px;width: 30px;height: 30px}
+
+/*consumer report list*/
+.consumer-report-list>li{background-color: #fff;}
+
+
+.consumer-app-tab{padding-bottom: 0;}
+
+.ls-activity-table{margin-top: -10px;}
+
+/*my family*/
+.family-list>li{ background-color: #fff; padding: 10px; border-bottom:1px solid #ddd; position: relative;cursor: pointer}
+.family-list>li .member-icon{float: left; width: 73px; }
+.family-list>li>a{display: block;}
+.family-list>li .member-details{padding-left: 90px; }
+
+.arrow-forward-right{position: absolute; top: 35px; right: 0px; }
+.add-more-members-btn{position: fixed; right: 6%; bottom: 3%; width: 70px; height: 70px; border-radius: 50%;font-size: 40px; text-align: center; padding: 0 0 4px 2px;}
+
+
+/*consumer profile*/
+.consumer-profile-update{left: 0; position: fixed; top: 50px;right: 0; z-index: 9}
+
+.verify-number{position: absolute; top: 2px; right: 10px; width: 40px; color: #f78631; z-index: 9; font-weight: bold;padding: 10px 0;}
+
+/*clock and test svgs css*/
+.visit-time-icon{width: 20px;vertical-align: -7px}
+
+.screen-title, .lab-rslt-card{cursor: pointer}
+
+.time-slot-btn:hover, .time-slot-btn:focus{background-color: #f78631; color: #fff;}
+
+.clinic-info-panel{min-width: 100%; width: auto; overflow-x: auto; white-space: nowrap}
+
+.select-location-div{width: 180px;white-space: nowrap;overflow: hidden;text-overflow: ellipsis;}

@@ -424,10 +424,11 @@ class LabAppointmentForm(forms.ModelForm):
             self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
             self.cleaned_data.pop('time_slot_start', None)
         selected_test_ids = self.instance.lab_test.all().values_list('test',flat=True)
-        if not LabTiming.objects.filter(lab=self.instance.lab,
-                                        lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-                                        day=time_slot_start.weekday(),
-                                        start__lte=hour, end__gt=hour).exists():
+        if (not self.instance.time_slot_start == time_slot_start) and not LabTiming.objects.filter(
+                lab=self.instance.lab,
+                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                day=time_slot_start.weekday(),
+                start__lte=hour, end__gt=hour).exists():
             raise forms.ValidationError("This lab test is not available on selected day and time.")
         return cleaned_data
 
@@ -435,6 +436,21 @@ class LabAppointmentForm(forms.ModelForm):
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
+    list_display = ('id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_filter = ('status', )
+    date_hierarchy = 'created_at'
+
+    def get_profile(self, obj):
+        return obj.profile.name
+
+    get_profile.admin_order_field = 'profile'
+    get_profile.short_description = 'Profile Name'
+
+    def get_lab(self, obj):
+        return obj.lab.name
+
+    get_lab.admin_order_field = 'lab'
+    get_lab.short_description = 'Lab Name'
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
         allowed_status_for_agent = [(LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
@@ -456,7 +472,7 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                     'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'lab_test', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+            return ('lab_name', 'lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'status', 'time_slot_start')
@@ -467,7 +483,7 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return ()
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'lab_test', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+            return ('lab_name', 'lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
@@ -534,7 +550,9 @@ class LabTestTypeAdmin(VersionAdmin):
 
 
 class AvailableLabTestAdmin(VersionAdmin):
-    search_fields = ['test__name']
+    list_display = ['test', 'lab_pricing_group', 'get_type', 'mrp', 'computed_agreed_price',
+                    'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'enabled']
+    search_fields = ['test__name', 'lab_pricing_group__group_name', 'lab_pricing_group__labs__name']
 
 
 class DiagnosticConditionLabTestInline(admin.TabularInline):
@@ -548,4 +566,8 @@ class DiagnosticConditionLabTestInline(admin.TabularInline):
 class CommonDiagnosticConditionAdmin(VersionAdmin):
     search_fields = ['name']
     inlines = [DiagnosticConditionLabTestInline]
+
+
+class CommonTestAdmin(VersionAdmin):
+    autocomplete_fields = ['test']
 

@@ -1,0 +1,373 @@
+/*===================
+	common
+====================*/
+.fixed{position: fixed; z-index: 8; width: 100%;}
+.fixed.horizontal{left: 0; right: 0;}
+.fixed.vertical{top: 0; bottom: 0;}
+.fixed.top{top: 0;}
+.fixed.bottom{bottom: 0;}
+
+.full-height{height: 100%;}
+
+.wrap{padding-top: 50px; padding-bottom: 50px;}
+.wrap-64{padding-top: 64px;}
+
+.avtar{border-radius: 50%;}
+.avtar-md{width: 85px; height: 85px;}
+
+.img-round{border-radius: 50%;}
+
+
+.fixed-btn{position: fixed;}
+.fixed-btn.bottom{bottom: 1%;}
+.fixed-btn.right{right: 4%;}
+
+.circle-btn{border-radius: 50%; display: inline-block; cursor:pointer ;  background-color: #007381; box-shadow: 0px 2px 3px 0 rgba(0, 0, 0, 0.25);}
+
+.back-icon{width: 40px; padding: 17px 10px; text-align: center; height: 50px; cursor: pointer}
+
+.no-opacity{opacity: 1}
+
+.bdr-1.bottom{border-bottom: 1px solid}
+.bdr-1.dark{border-color: #000}
+.bdr-1.light{border-color: #ddd;}
+
+.parent-section{margin-top: 141px;padding-top: 10px;}
+.parent-section-temp{margin-top: 0;padding-top: 0;}
+.parent-section-row{margin-top: 0!important;}
+.all-test-screen{padding-top: 10px!important;}
+.test-search-section{margin-top: 118px;}
+.condition-search-section{margin-top: 100px;}
+.book-appointment-section{margin-top: 40px;}
+
+.time-picker-section{margin-top: 50px;}
+.sticky-div-temp{margin-top: 20px;}
+.select-time-slot{padding-top: 130px;padding-bottom: 20px;}
+.appointment-form-container{padding-bottom: 42px;}
+.profile-details{padding-top: 40px !important;}
+.someone-else-labelwrap{display: none;}
+.sticky-btn{padding-bottom: env(safe-area-inset-bottom);}
+
+@media(min-width: 993px){.sticky-header{position: sticky!important; position: -webkit-sticky!important; top: 65px!important;margin-top: 20px;z-index: 9;}
+.sticky-header-2{position: sticky!important; position: -webkit-sticky!important; top: 114px!important;margin-top: 2px!important;}
+.sticky-header-3{position: sticky!important; position: -webkit-sticky!important; top: 115px!important;margin-top: 2px!important;}
+.variable-content-section{padding-top: 15px!important;padding-bottom: 4px!important;margin-top: 0px!important;}
+.sticky-btn{position: sticky!important; position: -webkit-sticky!important; bottom: 0!important;}
+.parent-section{margin-top: 65px;padding-top: 0px;}
+.parent-section-temp{margin-top: 65px;padding-top: 0;}
+.all-test-screen,.locaton-detect-screen {padding-top: 10px!important;}
+.select-time-slot{padding-top: 20px;}
+.d-pd-0{padding-top: 0;}
+.profile-details{padding-top: 0 !important; padding-bottom: 10px;}
+.carousel-wrap{padding-top: 30px !important;}
+.add-more-members-btn{position: sticky !important; position: -webkit-sticky!important; bottom: 8px !important;float: right;}
+}
+
+/*appointment timeline*/
+.app-timeline{margin-bottom: 20px;}
+.app-timeline>ul{width: 100%;}
+.app-timeline li{position: relative; width: 33%; margin-right: -3px; text-align: center;}
+.app-timeline li:before{width: 100%; height: 1px; background-color: #b1b1b1; position: absolute; top:10px; right:0; left: 0; content: '';}
+.app-timeline li .dot{position: relative; width: 20px; background-color: #555; height: 20px; color: #fff; display: inline-block; border-radius: 50%; font-weight: 700;margin-bottom: 5px;}
+.app-timeline li.active .dot{ color: #fff; background-color: #f78631}
+.app-timeline li.active:before{background-color:  #f78631}
+
+.title{font-size: 16px; font-weight: bold; margin-bottom: 5px;}
+.title-div>h4{color: black;}
+/*side  panel*/
+.side-panel{width: 260px; left: 108px; top: 0; bottom: 0; position: fixed; background-color: #f7f7f7; padding-top: 50px; z-index: 8}
+.side-panel:hover{  overflow-y:auto;}
+.srl-details label{font-size: 14px; font-weight: 500; margin-bottom: 10px; color: #f78631;}
+.srl-details .srl-info{margin-bottom: 16px;}
+.srl-details .srl-title{font-size: 18px; font-weight: bold; margin-bottom: 5px;}
+.srl-details p{font-size: 14px; font-weight: 500;color: #494949;}
+
+.srl-logo{width: 190px;  height: 190px;  background-color: #fff; border-radius: 50%; margin:10px auto ;  text-align: center; margin-bottom: 22px;}
+.srl-logo>img{width: 147px; margin-top: 55px;}
+
+.srl-info.photo-gallery .photo-items{width: 100%;}
+.srl-info.photo-gallery .photo-items>li{width: 40px; height: 40px;}
+
+/*fixed warp*/
+.wrap-fixed{background-color: #fff; position: fixed; top: 50px; right: 0 ; left: 0; z-index: 10; }
+.wrap-fixed .fixed-info{padding: 10px 0;}
+.wrap-fixed .fixed-tab{background-color: #f5f5f5}
+/*===================
+	header
+====================*/
+header{height: 50px;}
+header.bottom-line{border-bottom: 1px solid #ddd;}
+header .header-title{font-size: 16px; line-height: 50px;}
+
+.quick-tools>li{line-height: 50px;}
+.bell-icon{width: 20px; height: 23px; text-align: center;}
+.calendar-icon{width: 33px; text-align: left; height: 25px; margin-right: 10px;}
+
+/*===================
+	login
+====================*/
+.logo>img{width: 147px;height: 62px;margin-bottom: 16px;}
+.logo .logo-title{font-size: 16px; font-weight: 500}
+
+/*mobile-nubmer*/
+.verification-block{padding-top: 30px;}
+.vf-field,
+.mobile-field{padding:36px 0;}
+.mobile-input-field .mobile-icon{vertical-align: baseline;}
+.mobile-input{padding-left: 40px}
+
+
+/*===================
+	verification
+====================*/
+.vf-code-item{text-align: center; margin: 0 auto;}
+.vf-code-item>li{width: 14%;}
+.didnt-send{color: #757575; margin-top: 10px;}
+
+
+/*===================
+	popup Screen3
+====================*/
+.overlay {position: fixed; padding: 40px 20px 0px 20px; top: 0; bottom: 0; right: 0; left: 0; width: 100%; z-index: 21;overflow: hidden;}
+.overlay.black{background-color: #000000b0;}
+
+.pending-appointments{height: 100%;}
+
+/*===================
+	home screen
+====================*/
+
+.home-screen{padding-top: 80px;}
+.profile-info{position: relative; z-index: 3}
+.profile-info .pf-imge{float: left; margin-top: -25px;}
+.profile-info .pf-content{padding-left:100px;}
+
+/*navigation list item*/
+.profile-nav{margin-top: -10px;}
+.profile-nav .nav-items>li{background-color: #fff; position: relative; border-bottom: 1px solid #ddd; padding: 22px;}
+.profile-nav .nav-items>li .nav-icon{float: left;}
+.profile-nav .nav-items>li .nav-content{padding-left: 50px; padding-right: 30px;}
+.profile-nav .nav-items>li .nav-content .app-title{color: #5d5d5d}
+.profile-nav .nav-items>li .forward-icon{ position: absolute; top: 40px; right: 20px; width: 18px; height: 20px; opacity: .4; }
+.my-profile-item{cursor: pointer;}
+
+/*===================
+	my appointments
+====================*/
+.myProfile,
+.patientAppointments,
+.myAppointments{padding-top: 150px;}
+
+.nav-tab>.tab-items{width: 100%;}
+.nav-tab>.tab-items>li{padding: 4px; line-height: 30px; text-align: center; background-color:#f5f5f5;  font-weight: 500; width: 50%; margin-right: -4px; border-bottom: 2px solid transparent;cursor: pointer}
+.nav-tab>.tab-items>li a{color: #707070; display: block;}
+.nav-tab>.tab-items>li.active a{color:#f78631;  }
+.nav-tab>.tab-items>li.active{border-color: #f78631; }
+
+.appointment-items>li{background-color: #fff; position: relative; border-bottom: 1px solid #ddd; padding: 12px; }
+
+.appointment-items .ap-icon{float: left;}
+.appointment-items .dr-icon{width: 60px; height: 60px;}
+.appointment-items .ap-content{padding-left: 70px; min-height: 80px;}
+
+.appointment-items .app-title{margin-bottom: 5px;}
+.appointment-items .date-time>li{color: #3f3f3f; font-size: 14px; font-weight: 500; padding: 2px;}
+.appointment-items .date-time>li>span{margin-right: 6px;}
+
+/*accept & update buttons*/
+.action.happend,
+.action.accept{background-color: #f78631}
+.action.accepted{background-color: #e8eff3;}
+.action.update{background-color: #00c13b;;}
+.action.update.disabled{background-color:#c1c1c1;}
+.action.reschedule{background-color:#989898;}
+
+.action.not-happend{background-color: #c84756;}
+
+.add-app-btn{font-size: 45px; line-height: 50px; width: 70px; height: 70px; text-align: center;}
+
+
+/*===================
+	block calendar
+====================*/
+.drAvailability{margin-top: 20px;}
+.drAvailability .drName{padding-bottom: 20px; padding-top: 15px;}
+.drAvailability .mark-availability{color:  #363636;}
+
+/*appointment details*/
+.appointment-with .more-info{ padding-bottom: 20px;}
+
+.app-accept-btn,
+.app-ree-btn{width: 250px;margin-bottom: 20px;}
+
+
+/*===================
+	patinet appointments
+====================*/
+.patientAppointments .appointment-items>li{position: relative;}
+.patientAppointments .appointment-items .ap-content{padding-left: 0;}
+
+.upcomingAppointments-items>li{position: relative; padding: 12px; border-bottom: 1px solid #ddd;}
+.upcomingAppointments-items>li p{color: #3f3f3f;  font-size: 16px; font-weight: 500; margin-bottom: 10px;}
+.upcomingAppointments-items>li p>span{margin-right: 10px}
+
+.forward-icon{ position: absolute; top: 30px; right: 20px; width: 18px; height: 20px; opacity: .4; }
+
+/*===================
+	patinet reeport
+====================*/
+/*.report-on{background-color: #ececec; height: 30px; padding-left: 10px; line-height: 30px; font-size: 14px; font-weight: 500}*/
+.report-on{line-height: 30px; font-size: 14px; font-weight: 600;}
+.report-items .report-icon{width: 20px ; height: 20px; float: left;}
+.report-info{padding-left: 30px; padding-right: 120px;}
+.report-items>li{position: relative; padding: 12px; border-bottom: 1px solid #ddd; min-height: 100px;}
+.report-info .report-title{font-weight: bold; font-size: 16px; }
+.report-info .tests{color: #3f3f3f;}
+.view-report-btn{width: 100px; position: absolute; bottom: 20px; right: 10px; font-size: 12px; text-align: center;}
+
+.andie-report-title{font-size: 14px; font-weight: 500; background-color: #ececec; padding:10px;}
+
+
+/*===================
+	my patient
+====================*/
+/*patient details*/
+.text-call-items{padding-top: 20px; width: 100%; }
+.text-call-items>li{width: 49%; font-size: 14px; font-weight: 500;}
+.text-call-items>li>span{margin-right: 10px;}
+
+
+.myPatient{padding-top: 120px;}
+.new-report{position: absolute; top: 0; right: 0; padding: 27px 10px; text-align: center; display: block;}
+.new-report>p{font-size: 12px;color: #f78631; font-weight: 500}
+.mypatient-items>li .ap-content{ padding-right: 70px; }
+.noOfNewReport{width: 20px; height: 20px; line-height: 20px; border-radius: 50%; background-color: #f78631; display: inline-block; color: #fff; font-weight: 600;}
+
+
+
+/*===================
+	medical profile
+====================*/
+.prescription-done{line-height: 50px;}
+
+
+/*===================
+	update appointemtn
+====================*/
+.choose-time{width: 100%; overflow-x: scroll;white-space: nowrap;height: 80px}
+.datetime-items>li{color: #f78631; width: 34px; font-weight: 700; text-align: center; font-size: 18px;cursor: pointer}
+.datetime-items>li.active{background-color: #f78631; color: #fff; border-radius: 10px}
+.datetime-items>li:hover{border: 1px solid #f78631; border-radius: 10px}
+.datetime-items>li>span{font-size: 15px; display: block; margin-top: 10px;}
+.time-items{margin: 10px 0;}
+.time-items>li{margin: 0 16px 10px 0 !important; outline: none !important; text-align: center}
+.time-items>li>a{padding:2px 5px; width: 80px}
+
+.ua-header{border-bottom: 1px solid #ddd;}
+
+
+/*===================
+	my profile
+====================*/
+.myProfile{background-color: #fff; padding-top: 90px; padding-right: 0; padding-left: 0;}
+.myProfile .profile-title{font-size: 16px; font-weight: 500;}
+.myProfile .profile-title>span{color: #f78631;}
+
+.myProfile .profile-icon{margin: 5px auto;  width: 85px; border-radius: 50%; position: relative; height: 85px;  box-shadow: inset 0 0 1px 0 rgba(0, 0, 0, 0.51); background-color: #ffffff;border: solid 2px #f78631;}
+.myProfile .profile-icon .cam-icon{width: 30px; height: 30px; border-radius: 50%; position: absolute; bottom: -4px; right: 0;} 
+.myProfile .myProfile-info .myProfile-title{font-size: 16px; font-weight: bold; margin-bottom: 5px}
+.myProfile .year-gender{font-size: 14px; margin-bottom: 5px; font-weight: 500;color: #262626;}
+.myProfile p{margin-bottom: 5px; font-weight: 500; color: #757575;}
+
+.profile-more-info-items>li{padding: 5px 0; color: #f78631; font-size: 12px; font-weight: bold;}
+.profile-more-info-items>li>p{color: #757575; font-size: 14px; padding-left: 10px;}
+
+
+/*===================
+	myClincs
+====================*/
+.myClinics{padding-top: 95px; padding-bottom: 0;}
+.clinics-items>li{min-height: 100px; margin-bottom: 10px;   border-radius: 10px;background-color: #ffffff; padding: 10px;box-shadow: 0px 1px 3px 0 rgba(0, 0, 0, 0.25)}
+.fee-details{width: 100px; float: right;}
+.clinic-details{padding-right: 120px;}
+.clinic-name{font-size: 16px; margin-bottom: 5px;font-weight: 500;}
+.clinic-address {font-size: 14px;font-weight: 500; color: #757575;}
+.fee-details>span {color: #757575; font-size: 12px; font-weight: 600;}
+.fee-details>.fee{font-weight: 600}
+.clinics-items .view-details{margin-top: 20px; font-weight: 600}
+
+
+/*===================
+	add new clinic
+====================*/
+.time-slot{margin-bottom: 20px;}
+.time-slot-items{width: 100%; margin: 0 auto; text-align: center;}
+.time-slot-items>li .choose-day{  width: 34px; line-height: 34px; text-align:  center; height: 34px; display: inline-block;  font-size: 16px; color: #f78631; font-weight: bold; background-color: #ffffff; border-radius: 50%; border: solid 1px #f78631;}
+.time-slot-items>li.active .choose-day{background-color:#f78631; color: #fff }
+
+
+/*===================
+	update my profile
+====================*/
+.input-group{position: relative;margin-bottom: 30px;}
+.input-group>.input-label{position: absolute; background-color: #fff; color: #f78631;font-weight: bold; padding: 0px 10px; background-color: #fff; top: -10px; left: 10px; font-size: 12px;}
+.choose-gender{padding: 10px 5px; padding-bottom: 0}
+.choose-gender> label{margin-right: 10px; font-weight: 500; font-size: 14px;cursor: pointer}
+.choose-gender> label>input{height: 11px;margin-right: 5px;}
+
+
+/*===================
+	view clinic
+====================*/
+.label-legend{position: relative; min-height: 40px; border: solid 1px rgba(0, 0, 0, 0.2); border-radius: 5px; padding:10px;}
+.label-legend>label{color:#f78631;font-weight: 700; font-size: 12px; position: absolute; top: -10px; left: 5px; padding: 0 10px; background-color: #fff}
+.label-legend>p{font-size: 14px;font-weight: 700;}
+
+
+
+/*===================
+	notification
+====================*/
+.notification-page .noti-title{ color: #777777;  font-size: 16px; font-weight: bold; margin-bottom: 5px}
+.notificaton-list>li{border-bottom: 1px solid #ddd;padding: 15px;cursor: pointer;}
+.noti-icon{width: 50px; height: 50px; object-fit: contain; float: left;}
+.notificaton-list .noti-content{padding-left: 60px;}
+
+.notificaton-list .noti-content p{ color: #757575;font-size: 14px; font-weight: 500;}
+.notificaton-list .noti-content .noti-title .updated-on{font-size: 12px; float: right; }
+
+/*notification-setting*/
+.notificaton-set-list>li{padding:15px 30px}
+.notificaton-set-list .toggle-icon{width: 40px;}
+
+
+/*===================
+	billing page
+====================*/
+.billing-page .cal-icon{width: 17px; height: 17px; margin: 0 10px;}
+.billing-invoice {padding:30px;}
+.billing-invoice .raised-icon{float: left;  width: 50px;}
+.billing-invoice .content{padding-left: 90px;}
+
+
+/*===================
+	invoice raised
+====================*/
+.invoice-Raised{padding-top: 90px;}
+.insure-list>li{padding: 20px; border-bottom: 1px solid #ddd;}
+.insure-list .total-amt{float: right; font-size: 16px;font-weight: bold;color: #f78631; margin-top: 10px;}
+.insure-list .invoice-summary .invoice-date{padding-right: 100px;  font-size: 16px; font-weight: 500;}
+.insure-list .invoice-summary p{font-size: 14px; font-weight: 500;  color: #757575;}
+.invoice-status{font-size: 12px;}
+.invoice-status.settled{ color: #1faf10;}
+.invoice-status.process{ color: #e9861c;}
+
+/*bill to be raised*/
+.bill-raised-list{}
+
+/*invoice tobe raised*/
+.invoice-tobe-raised{padding-top: 140px;}
+.clinic-filter-row{width: 100%; overflow-x: auto;background-color: #fbfbfb;}
+.clinic-filter-items{white-space: nowrap;}
+.clinic-filter-items>li{white-space: nowrap;}
+.generate-btn{background-color: #9e9e9e; color: #fff;}

@@ -275,14 +275,14 @@ class ErrorCodeMapping(object):
 
 
 def is_valid_testing_data(user, doctor):
-    from ondoc.doctor.models import Doctor
 
-    if user.id is None:
+    if doctor.is_test_doctor and not user.groups.filter(name=constants['TEST_USER_GROUP']).exists():
         return False
-    if (Doctor.objects.filter(id=doctor.id, is_test_doctor=True).exists() and not user.groups.filter(
-            name=constants['TEST_USER_GROUP']).exists()):
-        return False
-    if (Doctor.objects.filter(id=doctor.id, is_test_doctor=False).exists() and user.groups.filter(
-            name=constants['TEST_USER_GROUP']).exists()):
+    return True
+
+
+def is_valid_testing_lab_data(user, lab):
+
+    if lab.is_test_lab and not user.groups.filter(name=constants['TEST_USER_GROUP']).exists():
         return False
     return True
