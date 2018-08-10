@@ -25,6 +25,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabTestType, LabService, LabAppointment,LabDoctorAvailability,
                                      LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument, CommonTest,
                                      CommonDiagnosticCondition, DiagnosticConditionLabTest)
+from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
 
@@ -225,6 +226,9 @@ class Command(BaseCommand):
         # Create Chat Conditions Team group
         self.create_conditions_management_group()
 
+        #Create report team
+        self.create_report_team()
+
         # Create Article team Group
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
@@ -336,4 +340,15 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model) |
                 Q(codename='delete_' + ct.model))
 
+            group.permissions.add(*permissions)
+
+    def create_report_team(self):
+        group, created = Group.objects.get_or_create(name=constants['REPORT_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(report_models.GeneratedReport, for_concrete_models=False)
+
+        for cl, ct in content_types.items():
+            Permission.objects.get_or_create(content_type=ct, codename='change_' + ct.model)
+            permissions = Permission.objects.filter(content_type=ct, codename='change_' + ct.model)
             group.permissions.add(*permissions)

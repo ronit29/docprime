@@ -466,7 +466,7 @@ class LabTimingListView(mixins.ListModelMixin,
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
         lab_queryset = Lab.objects.filter(pk=lab, is_live=True).prefetch_related('lab_timings').first()
-        if not lab_queryset or (for_home_pickup and not lab_queryset.is_home_pickup_available):
+        if not lab_queryset or (for_home_pickup and not lab_queryset.is_home_collection_enabled):
             return Response([])
 
         obj = TimeSlotExtraction()
@@ -477,7 +477,8 @@ class LabTimingListView(mixins.ListModelMixin,
         else:
             lab_timing_queryset = lab_queryset.lab_timings.all()
             for data in lab_timing_queryset:
-                obj.form_time_slots(data.day, data.start, data.end, None, True)
+                if for_home_pickup == data.for_home_pickup:
+                    obj.form_time_slots(data.day, data.start, data.end, None, True)
 
         resp_list = obj.get_timing_list()
         return Response(resp_list)
@@ -493,7 +494,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
         params = request.query_params
         queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True, enabled=True)
         if not queryset:
-            raise Http404("No data available")
+            return Response([])
         lab_obj = Lab.objects.filter(pk=lab_id).first()
         if params.get('test_name'):
             search_key = re.findall(r'[a-z0-9A-Z.]+', params.get('test_name'))
