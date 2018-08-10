@@ -206,49 +206,54 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_price = parameters.get('max_price')
         name = parameters.get('name')
 
-        queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
-                                                                                                lab_pricing_group__labs__is_test_lab=False)
-
-        if ids:
-            queryset = queryset.filter(test__in=ids)
+        # queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
+        #                                                                                         lab_pricing_group__labs__is_test_lab=False)
+        queryset = Lab.objects.select_related().filter(is_test_lab=False, is_live=True).filter()
 
         if lat is not None and long is not None:
             point_string = 'POINT('+str(long)+' '+str(lat)+')'
             pnt = GEOSGeometry(point_string, srid=4326)
-            queryset = queryset.filter(lab_pricing_group__labs__location__distance_lte=(pnt, max_distance))
+            queryset = queryset.filter(location__distance_lte=(pnt, max_distance))
             if min_distance:
                 min_distance = min_distance*1000  # input is  coming in km
-                queryset = queryset.filter(lab_pricing_group__labs__location__distance_gte=(pnt, min_distance))
-
-        if ids:
-            deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
-                                          When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
-            queryset = (
-                queryset.values('lab_pricing_group__labs__id'
-                                ).annotate(price=Sum(deal_price_calculation), count=Count('id'),
-                                           distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
-                                           name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
-        else:
-            queryset = (
-                queryset.values('lab_pricing_group__labs__id'
-                                ).annotate(count=Count('id'),
-                                           distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
-                                           name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
-
-        if min_price and ids:
-            queryset = queryset.filter(price__gte=min_price)
-
-        if max_price and ids:
-            queryset = queryset.filter(price__lte=max_price)
+                queryset = queryset.filter(location__distance_gte=(pnt, min_distance))
 
         if name:
-            queryset = queryset.filter(lab_pricing_group__labs__name__icontains=name)
+            queryset = queryset.filter(name__icontains=name)
 
-        queryset = self.apply_custom_filters(queryset, parameters)
+        if ids:
+            queryset = queryset.filter(lab_pricing_group__available_lab_tests__test_id__in=ids)
+
+        if ids:
+            deal_price_calculation = Case(When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
+                                               then=F('lab_pricing_group__available_lab_tests__computed_deal_price')),
+                                          When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=False,
+                                               then=F('lab_pricing_group__available_lab_tests__custom_deal_price')))
+
+            queryset = (
+                queryset.values('id').annotate(price=Sum(deal_price_calculation),
+                                               count=Count('id'),
+                                               distance=Max(Distance('location', pnt)),
+                                               name=Max('name')).filter(count__gte=len(ids)))
+            if min_price:
+                queryset = queryset.filter(price__gte=min_price)
+
+            if max_price:
+                queryset = queryset.filter(price__lte=max_price)
+
+        else:
+            queryset = queryset.annotate(distance=Distance('location', pnt)).values('id', 'name', 'distance')
+            # queryset = (
+            #     queryset.values('lab_pricing_group__labs__id'
+            #                     ).annotate(count=Count('id'),
+            #                                distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
+            #                                name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
+
+        queryset = self.apply_sort(queryset, parameters)
         return queryset
 
     @staticmethod
-    def apply_custom_filters(queryset, parameters):
+    def apply_sort(queryset, parameters):
         order_by = parameters.get("order_by")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
@@ -264,7 +269,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return queryset
 
     def form_lab_whole_data(self, queryset):
-        ids, id_details = self.extract_lab_ids(queryset)
+        ids = [value.get('id') for value in queryset]
+        # ids, id_details = self.extract_lab_ids(queryset)
         labs = Lab.objects.prefetch_related('lab_documents', 'lab_image', 'lab_timings').filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
@@ -272,13 +278,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             temp_var[obj.id] = obj
         day_now = timezone.now().weekday()
         for row in queryset:
-            row["lab"] = temp_var[row["lab_pricing_group__labs__id"]]
+            row["lab"] = temp_var[row["id"]]
 
             if row["lab"].always_open:
-                lab_timing = "7:00 AM - 7:00 PM"
+                lab_timing = "00:00 AM - 23:45 PM"
                 lab_timing_data = [{
-                    "start": 7.0,
-                    "end": 19.0
+                    "start": 0.0,
+                    "end": 23.75
                 }]
             else:
                 timing_queryset = row["lab"].lab_timings.all()
