@@ -34,4 +34,5 @@ urlpatterns = [
     path('doctortiming', DoctorAvailabilityTimingViewSet.as_view({'get': 'list'}), name='doctor-timing-availability'),
     path('healthtips', HealthTipView.as_view({'get': 'list'}), name='health-tip'),
     path('config', ConfigView.as_view({'post': 'retrieve'}), name='config'),
+    # path('test', TestView.as_view({'post': 'retrieve'}), name='test'),
  ]
