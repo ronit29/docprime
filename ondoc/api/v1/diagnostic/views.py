@@ -265,7 +265,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def form_lab_whole_data(self, queryset):
         ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.prefetch_related('lab_image', 'lab_timings').filter(id__in=ids)
+        labs = Lab.objects.prefetch_related('lab_documents', 'lab_image', 'lab_timings').filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
         for obj in labs:
