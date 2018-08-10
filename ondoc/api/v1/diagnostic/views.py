@@ -194,6 +194,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         ids = parameters.get('ids', [])
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
+        name = parameters.get('name')
 
         queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
                                                                                                 lab_pricing_group__labs__is_test_lab=False)
@@ -229,6 +230,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if max_price and ids:
             queryset = queryset.filter(price__lte=max_price)
+
+        if name:
+            queryset = queryset.filter(lab_pricing_group__labs__name__icontains=name)
 
         queryset = self.apply_custom_filters(queryset, parameters)
         return queryset

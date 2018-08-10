@@ -534,6 +534,7 @@ class SearchLabListSerializer(serializers.Serializer):
     lat = serializers.FloatField(required=False)
     ids = IdListField(required=False)
     order_by = serializers.CharField(required=False)
+    name = serializers.CharField(required=False)
 
 
 class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
