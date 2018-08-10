@@ -115,14 +115,24 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         day_now = timezone.now().weekday()
         timing_queryset = list()
         lab_serializable_data = list()
+        lab_timing = None
+        lab_timing_data = list()
         if lab_obj:
-            timing_queryset = lab_obj.lab_timings.filter(day=day_now)
+            if lab_obj.always_open:
+                lab_timing = "7:00 AM - 7:00 PM"
+                lab_timing_data = [{
+                    "start": 7.0,
+                    "end": 19.0
+                }]
+            else:
+                timing_queryset = lab_obj.lab_timings.filter(day=day_now)
+                lab_timing, lab_timing_data = self.get_lab_timing(timing_queryset)
             lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
             lab_serializable_data = lab_serializer.data
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
         temp_data['tests'] = test_serializer.data
-        temp_data['lab_timing'], temp_data["lab_timing_data"] = self.get_lab_timing(timing_queryset)
+        temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
 
         return Response(temp_data)
 
@@ -256,12 +266,20 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         day_now = timezone.now().weekday()
         for row in queryset:
             row["lab"] = temp_var[row["lab_pricing_group__labs__id"]]
-            timing_queryset = row["lab"].lab_timings.all()
-            timing_data = list()
-            for data in timing_queryset:
-                if data.day == day_now:
-                    timing_data.append(data)
-            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+
+            if row["lab"].always_open:
+                lab_timing = "7:00 AM - 7:00 PM"
+                lab_timing_data = [{
+                    "start": 7.0,
+                    "end": 19.0
+                }]
+            else:
+                timing_queryset = row["lab"].lab_timings.all()
+                timing_data = list()
+                for data in timing_queryset:
+                    if data.day == day_now:
+                        timing_data.append(data)
+                lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
             lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
             row["lab_timing"] = lab_timing
             row["lab_timing_data"] = lab_timing_data
@@ -474,6 +492,10 @@ class LabTimingListView(mixins.ListModelMixin,
         if not for_home_pickup and lab_queryset.always_open:
             for day in range(0, 7):
                 obj.form_time_slots(day, 0.0, 23.45, None, True)
+        # New condition for home pickup timing from 7 to 7
+        elif for_home_pickup:
+            for day in range(0, 7):
+                obj.form_time_slots(day, 7.0, 19.0, None, True)
         else:
             lab_timing_queryset = lab_queryset.lab_timings.all()
             for data in lab_timing_queryset:

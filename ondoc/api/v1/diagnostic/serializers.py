@@ -436,22 +436,23 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Cannot book in past")
 
         day_of_week = start_dt.weekday()
-        start_hour = round(float(start_dt.hour) + (float(start_dt.minute) * 1 / 60), 2)
 
         lab_queryset = data['lab']
 
-        if data["is_home_pickup"] and not lab_queryset.is_home_collection_enabled:
-            logger.error("Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(request.data))
-            raise serializers.ValidationError("Home Pickup is disabled for the lab")
-
-        if not data["is_home_pickup"] and lab_queryset.always_open:
-            return
-
-        lab_timing_queryset = lab_queryset.lab_timings.filter(day=day_of_week, start__lte=start_hour, end__gte=start_hour, for_home_pickup=data["is_home_pickup"]).exists()
-
-        if not lab_timing_queryset:
-            logger.error("Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
-            raise serializers.ValidationError("No time slot available")
+        lab_timing_queryset = lab_queryset.lab_timings.filter(day=day_of_week, start__lte=data.get('start_time'),
+                                                              end__gte=data.get('start_time'),
+                                                              for_home_pickup=data["is_home_pickup"]).exists()
+        if data["is_home_pickup"]:
+            if not lab_queryset.is_home_collection_enabled or data.get("start_time") < 7.0 or data.get("start_time") > 19.0:
+                logger.error(
+                    "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
+                        request.data))
+                raise serializers.ValidationError("Home Pickup is disabled for the lab")
+        else:
+            if not lab_queryset.always_open and not lab_timing_queryset:
+                logger.error(
+                    "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
+                raise serializers.ValidationError("No time slot available")
 
 
 class TimeSlotSerializer(serializers.Serializer):
