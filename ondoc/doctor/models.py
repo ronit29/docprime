@@ -493,7 +493,7 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
         return '{}'.format(self.doctor)
 
     def original_image(self):
-        return mark_safe('<div><img style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.name.url))
+        return mark_safe('<div><img crossOrigin="anonymous" style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.name.url))
 
     def cropped_img(self):
         return mark_safe('<div><img style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.cropped_image.url))
