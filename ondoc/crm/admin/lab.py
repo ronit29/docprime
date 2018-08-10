@@ -414,6 +414,7 @@ class LabAppointmentForm(forms.ModelForm):
             if minutes % valid_minutes_slot != 0:
                 self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
                 self.cleaned_data.pop('time_slot_start', None)
+                return cleaned_data
         else:
             self._errors['time_slot_start'] = self.error_class(["Enter time slot's start."])
             self.cleaned_data.pop('time_slot_start', None)
@@ -423,12 +424,12 @@ class LabAppointmentForm(forms.ModelForm):
             lab_test = self.instance.lab_test
             lab = self.instance.lab
         elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
-            lab_test = cleaned_data.get('lab')
-            lab = cleaned_data.get('lab_test')
+            lab_test = cleaned_data.get('lab_test')
+            lab = cleaned_data.get('lab')
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
 
-        selected_test_ids = lab_test.all().values_list('test', flat=True)
+        selected_test_ids = lab_test.values_list('test', flat=True)
         if not LabTiming.objects.filter(
                 lab=lab,
                 lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
