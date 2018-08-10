@@ -748,30 +748,46 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        time_slot_start = cleaned_data['time_slot_start']
-        hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-        minutes = time_slot_start.minute
-        valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
-        if minutes % valid_minutes_slot != 0:
-            self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
+        time_slot_start = cleaned_data.get('time_slot_start')
+        if time_slot_start:
+            hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+            minutes = time_slot_start.minute
+            valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
+            if minutes % valid_minutes_slot != 0:
+                self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
+                self.cleaned_data.pop('time_slot_start', None)
+                return cleaned_data
+        else:
+            self._errors['time_slot_start'] = self.error_class(["Enter time slot's start."])
             self.cleaned_data.pop('time_slot_start', None)
-        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
-                                                 doctor_clinic__hospital=self.instance.hospital,
+            return cleaned_data
+        if self.instance:
+            doctor = self.instance.doctor
+            hospital = self.instance.hospital
+        elif cleaned_data.get('doctor') and cleaned_data.get('hospital'):
+            doctor = cleaned_data.get('doctor')
+            hospital = cleaned_data.get('hospital')
+        else:
+            raise forms.ValidationError("Doctor and hospital details not entered.")
+
+        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+                                                 doctor_clinic__hospital=hospital,
                                                  day=time_slot_start.weekday(),
                                                  start__lte=hour, end__gt=hour).exists():
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
-        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
-                                                 doctor_clinic__hospital=self.instance.hospital,
+        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+                                                 doctor_clinic__hospital=hospital,
                                                  day=time_slot_start.weekday(),
                                                  start__lte=hour, end__gt=hour,
                                                  deal_price=self.instance.deal_price).exists():
             raise forms.ValidationError("Deal price is different for this time slot.")
+
         return cleaned_data
 
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-    list_display = ('id', 'get_profile', 'get_doctor', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('get_profile', 'get_doctor', 'status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 

@@ -406,20 +406,35 @@ class LabAppointmentForm(forms.ModelForm):
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        time_slot_start = cleaned_data['time_slot_start']
-        hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-        minutes = time_slot_start.minute
-        valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
-        if minutes % valid_minutes_slot != 0:
-            self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
+        time_slot_start = cleaned_data.get('time_slot_start')
+        if time_slot_start:
+            hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+            minutes = time_slot_start.minute
+            valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
+            if minutes % valid_minutes_slot != 0:
+                self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
+                self.cleaned_data.pop('time_slot_start', None)
+        else:
+            self._errors['time_slot_start'] = self.error_class(["Enter time slot's start."])
             self.cleaned_data.pop('time_slot_start', None)
-        selected_test_ids = self.instance.lab_test.all().values_list('test',flat=True)
-        if (not self.instance.time_slot_start == time_slot_start) and not LabTiming.objects.filter(
-                lab=self.instance.lab,
+            return cleaned_data
+        if self.instance:
+            lab_test = self.instance.lab_test
+            lab = self.instance.lab
+        elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
+            lab_test = self.instance.lab_test
+            lab = self.instance.lab
+        else:
+            raise forms.ValidationError("Lab and lab test details not entered.")
+
+        selected_test_ids = lab_test.all().values_list('test', flat=True)
+        if not LabTiming.objects.filter(
+                lab=lab,
                 lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
                 day=time_slot_start.weekday(),
                 start__lte=hour, end__gt=hour).exists():
             raise forms.ValidationError("This lab test is not available on selected day and time.")
+
         return cleaned_data
 
 
