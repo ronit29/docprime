@@ -28,7 +28,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
 from django.db import transaction
-from django.db.models import Count, Sum, Max, When, Case, F
+from django.db.models import Count, Sum, Max, When, Case, F, Q
 from django.http import Http404
 from django.conf import settings
 import hashlib
@@ -72,9 +72,12 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             search_key = re.findall(r'[a-z0-9A-Z.]+', name)
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
-            test_queryset = LabTest.objects.filter(search_key__icontains=search_key)
+            test_queryset = LabTest.objects.filter(
+                Q(search_key__icontains=" " + search_key) | Q(search_key__istartswith=search_key))
             test_queryset = paginate_queryset(test_queryset, request)
-            lab_queryset = Lab.objects.filter(search_key__icontains=search_key, is_live=True, is_test_lab=False)
+            lab_queryset = Lab.objects.filter(is_live=True, is_test_lab=False).filter(
+                Q(search_key__icontains=" " + search_key) | Q(search_key__istartswith=search_key)
+            )
             lab_queryset = paginate_queryset(lab_queryset, request)
         else:
             test_queryset = self.queryset[:20]
@@ -500,7 +503,8 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
             search_key = re.findall(r'[a-z0-9A-Z.]+', params.get('test_name'))
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
-            queryset = queryset.filter(test__search_key__icontains=search_key)
+            queryset = queryset.filter(
+                Q(test__search_key__istartswith=search_key) | Q(test__search_key__icontains=" "+search_key))
 
         queryset = queryset[:20]
 
