@@ -761,7 +761,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             self._errors['time_slot_start'] = self.error_class(["Enter time slot's start."])
             self.cleaned_data.pop('time_slot_start', None)
             return cleaned_data
-        if self.instance.doctor and self.instance.hospital:
+        if self.instance.id:
             doctor = self.instance.doctor
             hospital = self.instance.hospital
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,

@@ -418,12 +418,13 @@ class LabAppointmentForm(forms.ModelForm):
             self._errors['time_slot_start'] = self.error_class(["Enter time slot's start."])
             self.cleaned_data.pop('time_slot_start', None)
             return cleaned_data
-        if self.instance.lab_test and self.instance.lab:
+
+        if self.instance.id:
             lab_test = self.instance.lab_test
             lab = self.instance.lab
         elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
-            lab_test = self.instance.lab_test
-            lab = self.instance.lab
+            lab_test = cleaned_data.get('lab')
+            lab = cleaned_data.get('lab_test')
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
 
