@@ -593,7 +593,7 @@ class TimeSlotExtraction(object):
         day_time_hour = int(time)
         day_time_min = (time - day_time_hour) * 60
 
-        if time >= 12:
+        if day_time_hour > 12:
             day_time_hour -= 12
 
         day_time_hour_str = str(int(day_time_hour))
