@@ -91,7 +91,7 @@ class LoginOTP(GenericViewSet):
                  )
                 )
 
-            if lab_queryset.exixts():
+            if lab_queryset.exists():
                 response['exists'] = 1
                 send_otp("OTP for Lab login is {}", phone_number)
 
