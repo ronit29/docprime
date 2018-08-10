@@ -36,7 +36,7 @@ class LabPricingGroupAdmin(admin.ModelAdmin):
         table = LabTestTable(AvailableLabTest.objects.filter(lab_pricing_group=existing
                                                              ).prefetch_related('lab','test').order_by('-updated_at'))
 
-        RequestConfig(request).configure(table)
+        RequestConfig(request, paginate=False).configure(table)
 
         extra_context = {'labtesttable' :table,'form':form,'id':object_id,'request':request,'lab_group':existing}
         return super().change_view(request, object_id, extra_context=extra_context)
