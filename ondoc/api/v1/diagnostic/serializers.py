@@ -213,7 +213,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -257,6 +257,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     status = serializers.IntegerField()
     payment_type = serializers.IntegerField()
     lab_test = serializers.ListField(child=serializers.IntegerField())
+    is_home_pickup = serializers.BooleanField(default=False)
+    address = serializers.JSONField(required=False)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -443,11 +445,16 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                                                               end__gte=data.get('start_time'),
                                                               for_home_pickup=data["is_home_pickup"]).exists()
         if data["is_home_pickup"]:
-            if not lab_queryset.is_home_collection_enabled or data.get("start_time") < 7.0 or data.get("start_time") > 19.0:
+            if not lab_queryset.is_home_collection_enabled:
                 logger.error(
                     "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
                         request.data))
                 raise serializers.ValidationError("Home Pickup is disabled for the lab")
+            if data.get("start_time") < 7.0 or data.get("start_time") > 19.0:
+                logger.error(
+                    "Error 'No time slot available' for lab appointment with data - " + json.dumps(
+                        request.data))
+                raise serializers.ValidationError("No time slot available")
         else:
             if not lab_queryset.always_open and not lab_timing_queryset:
                 logger.error(
