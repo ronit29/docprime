@@ -466,7 +466,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
 class HospitalModelSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
-    lng = serializers.SerializerMethodField()
+    long = serializers.SerializerMethodField()
     hospital_thumbnail = serializers.SerializerMethodField()
 
     address = serializers.SerializerMethodField()
@@ -507,7 +507,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'operational_since', 'lat', 'lng', 'address', 'registration_number',
+        fields = ('id', 'name', 'operational_since', 'lat', 'long', 'address', 'registration_number',
                   'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', )
 
 
