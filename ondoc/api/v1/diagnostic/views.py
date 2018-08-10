@@ -208,7 +208,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         # queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
         #                                                                                         lab_pricing_group__labs__is_test_lab=False)
-        queryset = Lab.objects.select_related().filter(is_test_lab=False, is_live=True).filter()
+        queryset = Lab.objects.select_related().filter(is_test_lab=False, is_live=True,
+                                                       lab_pricing_group__isnull=False)
 
         if lat is not None and long is not None:
             point_string = 'POINT('+str(long)+' '+str(lat)+')'
