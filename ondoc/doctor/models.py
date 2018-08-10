@@ -30,7 +30,7 @@ import random
 import os
 import re
 import datetime
-
+from django.db.models import Q
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.utils.safestring import mark_safe
 from PIL import Image as Img
@@ -287,6 +287,19 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def get_hospitals(self):
         return self.availability.all()
+
+    # @classmethod
+    def update_live_status(self):
+        if self.onboarding_status == self.ONBOARDED:
+            dochospitals = []
+            for hosp in self.hospitals.all():
+                dochospitals.append(hosp.id)
+            queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
+                                           (Q(doctor__isnull=False, doctor=self) |
+                                            Q(doctor__isnull=True, hospital__id__in=dochospitals)))
+            if queryset.exists():
+                self.is_live = True
+
 
     class Meta:
         db_table = "doctor"
