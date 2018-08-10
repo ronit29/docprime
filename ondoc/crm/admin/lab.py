@@ -421,13 +421,16 @@ class LabAppointmentForm(forms.ModelForm):
             return cleaned_data
 
         if self.instance.id:
-            lab_test = self.instance.lab_test
+            lab_test = self.instance.lab_test.all()
             lab = self.instance.lab
         elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
-            lab_test = cleaned_data.get('lab_test')
+            lab_test = cleaned_data.get('lab_test').all()
             lab = cleaned_data.get('lab')
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
+
+        if not lab.lab_pricing_group:
+            raise forms.ValidationError("Lab is not in any lab pricing group.")
 
         selected_test_ids = lab_test.values_list('test', flat=True)
         if not LabTiming.objects.filter(
@@ -443,7 +446,7 @@ class LabAppointmentForm(forms.ModelForm):
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
-    list_display = ('id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
