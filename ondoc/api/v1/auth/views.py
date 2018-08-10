@@ -398,7 +398,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['Error'] = 'Action Not Allowed'
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_lab_appointment = self.lab_appointment_update(request, lab_appointment, validated_data)
-            if updated_lab_appointment.get("status") and updated_lab_appointment["status"] == 0:
+            if updated_lab_appointment.get("status") is not None and updated_lab_appointment["status"] == 0:
                 return Response(updated_lab_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_lab_appointment)
@@ -411,7 +411,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
-            if updated_opd_appointment.get("status") and updated_opd_appointment["status"] == 0:
+            if updated_opd_appointment.get("status") is not None and updated_opd_appointment["status"] == 0:
                 return Response(updated_opd_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_opd_appointment)
