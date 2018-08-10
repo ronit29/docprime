@@ -213,7 +213,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -258,6 +258,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     payment_type = serializers.IntegerField()
     lab_test = serializers.ListField(child=serializers.IntegerField())
     is_home_pickup = serializers.BooleanField(default=False)
+    address = serializers.JSONField(required=False)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
