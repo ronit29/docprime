@@ -49,11 +49,11 @@ def labajaxmodelsave(request):
             return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')
 
 
-        if not pap and AvailableLabTest.objects.filter(test__test_type=LabTest.PATHOLOGY).exists():
+        if not pap and AvailableLabTest.objects.filter(lab_pricing_group=model_instance,test__test_type=LabTest.PATHOLOGY).exists():
             messages.add_message(request, messages.ERROR, "Delete Pathology tests first")
             return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')
 
-        if not rap and AvailableLabTest.objects.filter(test__test_type=LabTest.RADIOLOGY).exists():
+        if not rap and AvailableLabTest.objects.filter(lab_pricing_group=model_instance,test__test_type=LabTest.RADIOLOGY).exists():
             messages.add_message(request, messages.ERROR, "Delete Radiology tests first")
             return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')
 
