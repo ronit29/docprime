@@ -3,6 +3,10 @@ import datetime
 from django.contrib.gis import forms
 from django.core.exceptions import ObjectDoesNotExist
 from ondoc.crm.constants import constants
+from dateutil import tz
+from django.conf import settings
+from django.utils.dateparse import parse_datetime
+
 
 def practicing_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
@@ -20,6 +24,20 @@ def award_year_choices():
 def award_year_choices_no_blank():
     return [(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
 
+
+def datetime_from_date_and_time(date, time):
+    '''
+    Converts the date and time to datetime with timezone's information.
+
+       :param date: The date
+       :param time: The time
+       :return: The date and time
+       :rtype: datetime
+       '''
+    date_time_field = str(date) + " " + str(time)
+    to_zone = tz.gettz(settings.TIME_ZONE)
+    dt_field = parse_datetime(date_time_field).replace(tzinfo=to_zone)
+    return dt_field
 
 class QCPemAdmin(admin.ModelAdmin):
     change_form_template = 'custom_change_form.html'

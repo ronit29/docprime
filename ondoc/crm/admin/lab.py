@@ -412,11 +412,17 @@ class LabAppointmentForm(forms.ModelForm):
 
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
-    
+
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        time_slot_start = cleaned_data.get('time_slot_start')
+        # time_slot_start = cleaned_data.get('time_slot_start')
+        if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
+                date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
+                to_zone = tz.gettz(settings.TIME_ZONE)
+                dt_field = parse_datetime(date_time_field).replace(tzinfo=to_zone)
+                if dt_field:
+                    time_slot_start = dt_field
         if time_slot_start:
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
             minutes = time_slot_start.minute
@@ -426,10 +432,7 @@ class LabAppointmentForm(forms.ModelForm):
                 self.cleaned_data.pop('time_slot_start', None)
                 return cleaned_data
         else:
-            self._errors['time_slot_start'] = self.error_class(["Enter time slot's start."])
-            self.cleaned_data.pop('time_slot_start', None)
-            return cleaned_data
-
+            raise forms.ValidationError("Enter valid start date and time.")
         if self.instance.id:
             lab_test = self.instance.lab_test.all()
             lab = self.instance.lab
@@ -469,7 +472,6 @@ class LabAppointmentForm(forms.ModelForm):
     #             start__lte=hour, end__gt=hour).exists():
     #         raise forms.ValidationError("This lab test is not available on selected day and time.")
     #     return cleaned_data
-
 
 
 class LabAppointmentAdmin(admin.ModelAdmin):

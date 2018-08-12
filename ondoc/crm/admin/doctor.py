@@ -1,6 +1,5 @@
 from reversion.admin import VersionAdmin
 from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned
-from django.conf import settings
 from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
@@ -777,11 +776,18 @@ class TimePickerWidget(forms.TextInput):
 
 class DoctorOpdAppointmentForm(forms.ModelForm):
 
-<<<<<<< HEAD
+    start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
+    start_time = forms.CharField(widget=TimePickerWidget())
+
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        time_slot_start = cleaned_data.get('time_slot_start')
+        if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
+                date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
+                to_zone = tz.gettz(settings.TIME_ZONE)
+                dt_field = parse_datetime(date_time_field).replace(tzinfo=to_zone)
+                if dt_field:
+                    time_slot_start = dt_field
         if time_slot_start:
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
             minutes = time_slot_start.minute
@@ -791,22 +797,14 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                 self.cleaned_data.pop('time_slot_start', None)
                 return cleaned_data
         else:
-            self._errors['time_slot_start'] = self.error_class(["Enter time slot's start."])
-            self.cleaned_data.pop('time_slot_start', None)
-            return cleaned_data
-        if self.instance.id:
-            doctor = self.instance.doctor
-            hospital = self.instance.hospital
-            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
-                                                     doctor_clinic__hospital=hospital,
-                                                     day=time_slot_start.weekday(),
-                                                     start__lte=hour, end__gt=hour,
-                                                     deal_price=self.instance.deal_price).exists():
-                raise forms.ValidationError("Deal price is different for this time slot.")
+            raise forms.ValidationError("Enter valid start date and time.")
 
-        elif cleaned_data.get('doctor') and cleaned_data.get('hospital'):
+        if cleaned_data.get('doctor') and cleaned_data.get('hospital'):
             doctor = cleaned_data.get('doctor')
             hospital = cleaned_data.get('hospital')
+        elif self.instance.id:
+            doctor = self.instance.doctor
+            hospital = self.instance.hospital
         else:
             raise forms.ValidationError("Doctor and hospital details not entered.")
 
@@ -815,12 +813,15 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                                                  day=time_slot_start.weekday(),
                                                  start__lte=hour, end__gt=hour).exists():
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
+        if self.instance.id:
+            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+                                                     doctor_clinic__hospital=hospital,
+                                                     day=time_slot_start.weekday(),
+                                                     start__lte=hour, end__gt=hour,
+                                                     deal_price=self.instance.deal_price).exists():
+                raise forms.ValidationError("Deal price is different for this time slot.")
 
         return cleaned_data
-=======
-    start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
-    start_time = forms.CharField(widget=TimePickerWidget())
-
 
     # def clean(self):
     #     super().clean()
@@ -844,7 +845,6 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
     #                                              deal_price=self.instance.deal_price).exists():
     #         raise forms.ValidationError("Deal price is different for this time slot.")
     #     return cleaned_data
->>>>>>> master
 
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
@@ -864,7 +864,6 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     get_doctor.admin_order_field = 'doctor'
     get_doctor.short_description = 'Doctor Name'
-
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
         allowed_status_for_agent = [(OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
@@ -888,14 +887,14 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
             return ('doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'start_date', 'start_time',
-                     'payment_type', 'otp', 'insurance', 'outstanding')
+                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'start_date',
+                    'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('doctor_name', 'hospital_name', 'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status','start_date', 'start_time')
+                    'status', 'start_date', 'start_time')
         else:
             return ()
 
