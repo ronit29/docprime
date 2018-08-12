@@ -409,10 +409,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
 
 class LabAppointmentForm(forms.ModelForm):
-
-    start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
-    start_time = forms.CharField(widget=TimePickerWidget())
-    
+<<<<<<< HEAD
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
@@ -451,6 +448,11 @@ class LabAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("This lab test is not available on selected day and time.")
 
         return cleaned_data
+=======
+
+    start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
+    start_time = forms.CharField(widget=TimePickerWidget())
+
     # def clean(self):
     #     super().clean()
     #     cleaned_data = self.cleaned_data
@@ -469,6 +471,7 @@ class LabAppointmentForm(forms.ModelForm):
     #             start__lte=hour, end__gt=hour).exists():
     #         raise forms.ValidationError("This lab test is not available on selected day and time.")
     #     return cleaned_data
+>>>>>>> master
 
 
 
