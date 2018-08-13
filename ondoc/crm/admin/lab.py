@@ -15,6 +15,8 @@ from django.utils.dateparse import parse_datetime
 from dateutil import tz
 from django.conf import settings
 from django.utils import timezone
+from django.utils.timezone import make_aware
+from django.utils.html import format_html_join
 import pytz
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.doctor.models import Hospital
@@ -413,34 +415,51 @@ class LabAppointmentForm(forms.ModelForm):
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
 
-    # def clean(self):
-    #     super().clean()
-    #     cleaned_data = self.cleaned_data
-    #     time_slot_start = cleaned_data['time_slot_start']
-    #     hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-    #     minutes = time_slot_start.minute
-    #     valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
-    #     if minutes % valid_minutes_slot != 0:
-    #         self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
-    #         self.cleaned_data.pop('time_slot_start', None)
-    #     selected_test_ids = self.instance.lab_test.all().values_list('test',flat=True)
-    #     if (not self.instance.time_slot_start == time_slot_start) and not LabTiming.objects.filter(
-    #             lab=self.instance.lab,
-    #             lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-    #             day=time_slot_start.weekday(),
-    #             start__lte=hour, end__gt=hour).exists():
-    #         raise forms.ValidationError("This lab test is not available on selected day and time.")
-    #     return cleaned_data
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
+            date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
+            dt_field = parse_datetime(date_time_field)
+            time_slot_start = make_aware(dt_field)
+        if time_slot_start:
+            hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+        else:
+            raise forms.ValidationError("Enter valid start date and time.")
+        if self.instance.id:
+            lab_test = self.instance.lab_test.all()
+            lab = self.instance.lab
+            if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and cleaned_data.get('status'):
+                raise forms.ValidationError("Status can not be changed.")
+        elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
+            lab_test = cleaned_data.get('lab_test').all()
+            lab = cleaned_data.get('lab')
+        else:
+            raise forms.ValidationError("Lab and lab test details not entered.")
 
+        if not lab.lab_pricing_group:
+            raise forms.ValidationError("Lab is not in any lab pricing group.")
+
+        selected_test_ids = lab_test.values_list('test', flat=True)
+        if not LabTiming.objects.filter(
+                lab=lab,
+                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                day=time_slot_start.weekday(),
+                start__lte=hour, end__gt=hour).exists():
+            raise forms.ValidationError("This lab test is not available on selected day and time.")
+
+        return cleaned_data
 
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
-    list_display = ('id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
     def get_profile(self, obj):
+        if not obj.profile:
+            return ""
         return obj.profile.name
 
     get_profile.admin_order_field = 'profile'
@@ -476,10 +495,10 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_number', 'price', 'agreed_price',
-                    'deal_price', 'effective_price', 'payment_status',
-                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'status', 'start_date', 'start_time')
+            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
+                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'start_date', 'start_time')
         else:
             return ()
 
@@ -487,20 +506,21 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return ()
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_number', 'price', 'agreed_price',
+            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
-                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
         else:
             return ()
 
     def lab_name(self, obj):
-        profile_link = "lab/{}".format(obj.doctor.id)
-        return mark_safe('{name} (<a href="{consumer_app_domain}/{profile_link}">Profile</a>)'.format(name=obj.lab.name,
-                                                                                consumer_app_domain=settings.CONSUMER_APP_DOMAIN,
-                                                                                profile_link=profile_link))
+        profile_link = "lab/{}".format(obj.lab.id)
+        return mark_safe('{name} (<a href="{consumer_app_domain}/{profile_link}">Profile</a>)'.format(
+            name=obj.lab.name,
+            consumer_app_domain=settings.CONSUMER_APP_DOMAIN,
+            profile_link=profile_link))
 
-    def employees_details(self, obj):
+    def lab_contact_details(self, obj):
         employees = obj.lab.labmanager_set.all()
         details = ''
         for employee in employees:
@@ -510,6 +530,42 @@ class LabAppointmentAdmin(admin.ModelAdmin):
             # ' , '.join([str(employee.name), str(employee.number), str(employee.email), str(employee.details)])
             # details += '\n'
         return mark_safe('<p>{details}</p>'.format(details=details))
+
+    def get_lab_test(self, obj):
+        format_string = ""
+        for data in obj.lab_test.all():
+            format_string += "<div><span>{}</span></div>".format(data.test.name)
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+    get_lab_test.short_description = 'Lab Test'
+
+    def get_lab_address(self, obj):
+        address_items = [
+            str(getattr(obj.lab, attribute))
+            for attribute in ['building', 'sublocality', 'locality', 'city', 'state', 'country',
+                              'pin_code'] if getattr(obj.lab, attribute)]
+        format_string = "<div>{}</div>".format(",".join(address_items))
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+    get_lab_address.short_description = 'Lab Address'
+
+    def get_pickup_address(self, obj):
+        if not obj.is_home_pickup:
+            return ""
+        address_items = [str(obj.address.get(key)) for key in ['address', 'landmark', 'pincode'] if obj.address.get(key)]
+        format_string = "<div>{}</div>".format(",".join(address_items))
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+    get_pickup_address.short_description = 'Home Pickup Address'
 
     def used_profile_name(self, obj):
         return obj.profile.name
