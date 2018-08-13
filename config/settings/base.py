@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
 import environ
+import json
 import os
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 #BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -126,9 +127,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'silk.middleware.SilkyMiddleware',
-
-
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -231,7 +229,11 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
         # 'ondoc.authentication.auth.CustomAuthentication',
     ),
-    'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler'
+    'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler',
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    )
+
 }
 MAP_WIDGETS = {
     "GooglePointFieldWidget": (
@@ -260,12 +262,17 @@ CONSUMER_APP_DOMAIN = env('CONSUMER_APP_DOMAIN')
 
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
 CHAT_API_URL = env('CHAT_API_URL')
-PG_SECRET_KEY = env('PG_SECRET_KEY')
-PG_CLIENT_KEY = env('PG_CLIENT_KEY')
+PG_SECRET_KEY_P1 = env('PG_SECRET_KEY_P1')
+PG_CLIENT_KEY_P1 = env('PG_CLIENT_KEY_P1')
+PG_SECRET_KEY_P2 = env('PG_SECRET_KEY_P2')
+PG_CLIENT_KEY_P2 = env('PG_CLIENT_KEY_P2')
+PG_SECRET_KEY_REFUND = env('PG_SECRET_KEY_REFUND')
+PG_CLIENT_KEY_REFUND = env('PG_CLIENT_KEY_REFUND')
 PG_REFUND_URL = env('PG_REFUND_URL')
+PG_REFUND_AUTH_TOKEN = env('PG_REFUND_AUTH_TOKEN')
 AUTO_CANCEL_OPD_DELAY = 10  # In min
 AUTO_CANCEL_LAB_DELAY = 10  # In min
-OPS_EMAIL_ID = ["ankurmittal@policybazaar.com", ]
+OPS_EMAIL_ID = env.list('OPS_EMAIL_ID')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
@@ -294,11 +301,4 @@ SEND_THROUGH_NODEJS_ENABLED = env.bool('SEND_THROUGH_NODEJS_ENABLED', default=Fa
 # MEDIA_ROOT = str(APPS_DIR('media'))
 #
 #DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'
-
-
-SILKY_AUTHENTICATION = True  # User must login
-SILKY_AUTHORISATION = True  # User must have permissions
-SILKY_META = True
-SILKY_PYTHON_PROFILER = True
-SILKY_PYTHON_PROFILER_BINARY = True
-SILKY_PYTHON_PROFILER_RESULT_PATH = os.path.join(str(ROOT_DIR), "silk")
+#DJANGO_TABLES2_TEMPLATE = 'django_tables2/bootstrap.html'

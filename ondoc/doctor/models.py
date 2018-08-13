@@ -30,7 +30,7 @@ import random
 import os
 import re
 import datetime
-
+from django.db.models import Q
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.utils.safestring import mark_safe
 from PIL import Image as Img
@@ -268,6 +268,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_doctors')
     matrix_lead_id = models.BigIntegerField(blank=True, null=True)
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
+    signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -286,6 +287,19 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def get_hospitals(self):
         return self.availability.all()
+
+    # @classmethod
+    def update_live_status(self):
+        if self.onboarding_status == self.ONBOARDED:
+            dochospitals = []
+            for hosp in self.hospitals.all():
+                dochospitals.append(hosp.id)
+            queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
+                                           (Q(doctor__isnull=False, doctor=self) |
+                                            Q(doctor__isnull=True, hospital__id__in=dochospitals)))
+            if queryset.exists():
+                self.is_live = True
+
 
     class Meta:
         db_table = "doctor"
@@ -492,7 +506,7 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
         return '{}'.format(self.doctor)
 
     def original_image(self):
-        return mark_safe('<div><img style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.name.url))
+        return mark_safe('<div><img crossOrigin="anonymous" style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.name.url))
 
     def cropped_img(self):
         return mark_safe('<div><img style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.cropped_image.url))
@@ -1057,7 +1071,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 doc_app_auto_cancel.apply_async(({
                     "id": self.id,
                     "status": self.status,
-                    "updated_at": self.updated_at
+                    "updated_at": int(self.updated_at.timestamp())
                 }, ), countdown=countdown)
         except Exception as e:
             logger.error("Error in auto cancel flow - " + str(e))

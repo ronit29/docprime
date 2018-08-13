@@ -413,7 +413,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['Error'] = 'Action Not Allowed'
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_lab_appointment = self.lab_appointment_update(request, lab_appointment, validated_data)
-            if updated_lab_appointment.get("status") and updated_lab_appointment["status"] == 0:
+            if updated_lab_appointment.get("status") is not None and updated_lab_appointment["status"] == 0:
                 return Response(updated_lab_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_lab_appointment)
@@ -426,7 +426,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
-            if updated_opd_appointment.get("status") and updated_opd_appointment["status"] == 0:
+            if updated_opd_appointment.get("status") is not None and updated_opd_appointment["status"] == 0:
                 return Response(updated_opd_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_opd_appointment)
@@ -617,8 +617,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             pgdata['email'] = "dummy_appointment@policybazaar.com"
 
         pgdata['productId'] = product_id
-        base_url = (
-            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+        base_url = "https://{}".format(request.get_host())
         pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['appointmentId'] = appointment_details.get('id')
@@ -629,7 +628,15 @@ class UserAppointmentsViewSet(OndocViewSet):
             pgdata['name'] = "DummyName"
         pgdata['txAmount'] = str(appointment_details['payable_amount'])
 
-        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
+        secret_key = client_key = ""
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            secret_key = settings.PG_SECRET_KEY_P1
+            client_key = settings.PG_CLIENT_KEY_P1
+        elif product_id == Order.LAB_PRODUCT_ID:
+            secret_key = settings.PG_SECRET_KEY_P2
+            client_key = settings.PG_CLIENT_KEY_P2
+
+        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
         return pgdata, payment_required
 
@@ -797,11 +804,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
     queryset = PgTransaction.objects.none()
 
     def save(self, request):
-        LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appointment"
-        OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appointment"
-        LAB_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "lab/%s/book?error_code=%s"
-        OPD_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "opd/doctor/%s/%s/bookdetails?error_code=%s"
-        ERROR_REDIRECT_URL = request.build_absolute_uri("/") + "error?error_code=%s"
+        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
+        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
+        LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
+        OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
+        ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
 
         try:
@@ -837,7 +844,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     resp_serializer = serializers.TransactionSerializer(data=response)
                     if resp_serializer.is_valid():
                         response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-                        if PgTransaction.is_valid_hash(response):
+                        if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
                             try:
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)
                             except Exception as e:
@@ -1061,11 +1068,9 @@ class OrderHistoryViewSet(GenericViewSet):
                     "payment_type": action_data.get("payment_type"),
                     "type": "opd"
                 }
-                serializer = CreateAppointmentSerializer(data=data, context={"request": request})
-                if not serializer.is_valid():
-                    data.pop("time_slot_start")
-                    data.pop("start_date")
-                    data.pop("start_time")
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
                 orders.append(data)
             elif action_data["product_id"] == Order.LAB_PRODUCT_ID:
                 if action_data['lab'] not in lab_name:
@@ -1082,11 +1087,9 @@ class OrderHistoryViewSet(GenericViewSet):
                     "payment_type": action_data.get("payment_type"),
                     "type": "lab"
                 }
-                serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
-                if not serializer.is_valid():
-                    data.pop("time_slot_start")
-                    data.pop("start_date")
-                    data.pop("start_time")
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
                 data["test_ids"] = [lab_test_map[x] for x in action_data.get("lab_test")]
                 orders.append(data)
         return Response(orders)

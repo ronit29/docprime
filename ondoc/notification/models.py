@@ -150,7 +150,7 @@ class NotificationAction:
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "Appointment Confirmed",
-                "body": "Appointment confirmed for Mr. {} at {}, {} with Dr. {}.".format(
+                "body": "Appointment confirmed for {} at {}, {} with Dr. {}.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y"), doctor_name
                 ),
@@ -168,7 +168,7 @@ class NotificationAction:
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "New Appointment",
-                "body": "New appointment for Mr. {} at {}, {}. Please confirm.".format(
+                "body": "New appointment for {} at {}, {}. Please confirm.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),
@@ -185,7 +185,7 @@ class NotificationAction:
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "Appointment Cancelled",
-                "body": "Appointment with Mr. {} at {}  {} has been cancelled.".format(
+                "body": "Appointment with {} at {}  {} has been cancelled.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),

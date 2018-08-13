@@ -110,7 +110,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
     license = models.CharField(max_length=200, blank=True)
-    is_insurance_enabled = models.BooleanField(verbose_name= 'Enabled for Insurance Customer',default=False)
+    is_insurance_enabled = models.BooleanField(verbose_name='Enabled for Insurance Customer',default=False)
     is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
     is_ppc_pathology_enabled = models.BooleanField(verbose_name= 'Enabled for Pathology Pre Policy Checkup', default=False)
     is_ppc_radiology_enabled = models.BooleanField(verbose_name= 'Enabled for Radiology Pre Policy Checkup', default=False)
@@ -154,6 +154,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_home_collection_enabled = models.BooleanField(default=False)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
+    is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
 
     def __str__(self):
         return self.name
@@ -499,6 +500,7 @@ class AvailableLabTest(TimeStampedModel):
     #     return "{}, {}".format(self.test.name, self.lab.name if self.lab else self.lab_pricing_group.group_name)
 
     class Meta:
+        unique_together = (("test", "lab_pricing_group"))
         db_table = "available_lab_test"
 
 
@@ -614,7 +616,7 @@ class LabAppointment(TimeStampedModel):
         try:
             prev_app_dict = {'id': self.id,
                              'status': self.status,
-                             "updated_at": self.time_slot_start}
+                             "updated_at": int(self.updated_at.timestamp())}
             if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
                 countdown = self.get_auto_cancel_delay(self)
                 tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
@@ -802,7 +804,7 @@ class LabAppointment(TimeStampedModel):
         # return queryset
 
     def __str__(self):
-        return self.profile.name + ', ' + self.lab.name
+        return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
     class Meta:
         db_table = "lab_appointment"
@@ -810,6 +812,9 @@ class LabAppointment(TimeStampedModel):
 
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
+
+    def __str__(self):
+        return "{}-{}".format(self.test.name, self.id)
 
 
 class CommonDiagnosticCondition(TimeStampedModel):

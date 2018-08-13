@@ -1,6 +1,5 @@
 from reversion.admin import VersionAdmin
 from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned
-from django.conf import settings
 from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
@@ -9,7 +8,11 @@ from django.shortcuts import render
 from django.db.models import Q
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
-
+from django.utils.dateparse import parse_datetime
+from dateutil import tz
+from django.conf import settings
+from django.utils import timezone
+import pytz
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.authentication.models import GenericAdmin
 from ondoc.doctor.models import (Doctor, DoctorQualification,
@@ -720,7 +723,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
-            obj.is_live = True
+            # obj.is_live = True
+            obj.update_live_status()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 
@@ -742,34 +746,124 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         js = ('js/admin/ondoc.js',)
 
 
+class CustomDateInput(forms.DateInput):
+    input_type = 'date'
+
+
+class TimePickerWidget(forms.TextInput):
+
+    def render(self, name, value, attrs=None):
+        htmlString = u''
+        htmlString += u'<div><select name="%s">' % (name)
+        default_min = default_hour = 0
+
+        if value:
+            values_list = value.split(':')
+            default_hour = values_list[0].lstrip("0")
+            default_min = values_list[1].lstrip("0")
+        default_hour = default_hour if default_hour else 0
+        default_min = default_min if default_min else 0
+        for i in range(0, 24):
+            for d in range(0, 60, 15):
+                if i==int(default_hour) and d==int(default_min):
+                    htmlString += ('<option selected value="%02d:%02d">%02d:%02d</option>' % (i, d, i, d))
+                else:
+                    htmlString += ('<option value="%02d:%02d">%02d:%02d</option>' % (i, d, i, d))
+
+        htmlString +='</select></div>'
+        return mark_safe(u''.join(htmlString))
+
+
 class DoctorOpdAppointmentForm(forms.ModelForm):
+
+    start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
+    start_time = forms.CharField(widget=TimePickerWidget())
 
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        time_slot_start = cleaned_data['time_slot_start']
-        hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-        minutes = time_slot_start.minute
-        valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
-        if minutes % valid_minutes_slot != 0:
-            self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
-            self.cleaned_data.pop('time_slot_start', None)
-        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
-                                                 doctor_clinic__hospital=self.instance.hospital,
+        if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
+                date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
+                to_zone = tz.gettz(settings.TIME_ZONE)
+                dt_field = parse_datetime(date_time_field).replace(tzinfo=to_zone)
+                if dt_field:
+                    time_slot_start = dt_field
+        if time_slot_start:
+            hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+            minutes = time_slot_start.minute
+            valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
+            if minutes % valid_minutes_slot != 0:
+                self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
+                self.cleaned_data.pop('time_slot_start', None)
+                return cleaned_data
+        else:
+            raise forms.ValidationError("Enter valid start date and time.")
+
+        if cleaned_data.get('doctor') and cleaned_data.get('hospital'):
+            doctor = cleaned_data.get('doctor')
+            hospital = cleaned_data.get('hospital')
+        elif self.instance.id:
+            doctor = self.instance.doctor
+            hospital = self.instance.hospital
+        else:
+            raise forms.ValidationError("Doctor and hospital details not entered.")
+
+        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+                                                 doctor_clinic__hospital=hospital,
                                                  day=time_slot_start.weekday(),
                                                  start__lte=hour, end__gt=hour).exists():
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
-        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
-                                                 doctor_clinic__hospital=self.instance.hospital,
-                                                 day=time_slot_start.weekday(),
-                                                 start__lte=hour, end__gt=hour,
-                                                 deal_price=self.instance.deal_price).exists():
-            raise forms.ValidationError("Deal price is different for this time slot.")
+        if self.instance.id:
+            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
+                                                     doctor_clinic__hospital=hospital,
+                                                     day=time_slot_start.weekday(),
+                                                     start__lte=hour, end__gt=hour,
+                                                     deal_price=self.instance.deal_price).exists():
+                raise forms.ValidationError("Deal price is different for this time slot.")
+
         return cleaned_data
+
+    # def clean(self):
+    #     super().clean()
+    #     cleaned_data = self.cleaned_data
+    #     time_slot_start = cleaned_data['time_slot_start']
+    #     hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+    #     minutes = time_slot_start.minute
+    #     valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
+    #     if minutes % valid_minutes_slot != 0:
+    #         self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
+    #         self.cleaned_data.pop('time_slot_start', None)
+    #     if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
+    #                                              doctor_clinic__hospital=self.instance.hospital,
+    #                                              day=time_slot_start.weekday(),
+    #                                              start__lte=hour, end__gt=hour).exists():
+    #         raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
+    #     if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
+    #                                              doctor_clinic__hospital=self.instance.hospital,
+    #                                              day=time_slot_start.weekday(),
+    #                                              start__lte=hour, end__gt=hour,
+    #                                              deal_price=self.instance.deal_price).exists():
+    #         raise forms.ValidationError("Deal price is different for this time slot.")
+    #     return cleaned_data
 
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
+    list_display = ('get_profile', 'get_doctor', 'status', 'time_slot_start', 'created_at',)
+    list_filter = ('status', )
+    date_hierarchy = 'created_at'
+
+    def get_profile(self, obj):
+        return obj.profile.name
+
+    get_profile.admin_order_field = 'profile'
+    get_profile.short_description = 'Profile Name'
+
+    def get_doctor(self, obj):
+        return obj.doctor.name
+
+    get_doctor.admin_order_field = 'doctor'
+    get_doctor.short_description = 'Doctor Name'
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
         allowed_status_for_agent = [(OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
@@ -784,19 +878,23 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
+        if obj is not None and obj.time_slot_start:
+            time_slot_start = timezone.localtime(obj.time_slot_start, pytz.timezone(settings.TIME_ZONE))
+            form.base_fields['start_date'].initial = time_slot_start.strftime('%Y-%m-%d')
+            form.base_fields['start_time'].initial = time_slot_start.strftime('%H:%M')
         return form
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
             return ('doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'time_slot_start',
-                    'time_slot_end', 'payment_type', 'otp', 'insurance', 'outstanding')
+                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'start_date',
+                    'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('doctor_name', 'hospital_name', 'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'time_slot_start')
+                    'status', 'start_date', 'start_time')
         else:
             return ()
 
@@ -856,6 +954,21 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         for doctor_admin in doctor_admins:
             doctor_admins_phone_numbers.append(doctor_admin.phone_number)
         return mark_safe(','.join(doctor_admins_phone_numbers))
+
+    def save_model(self, request, obj, form, change):
+        if obj:
+            # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
+            # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
+            #
+            # date_time = datetime.datetime.combine(date, time)
+            if request.POST['start_date'] and request.POST['start_time']:
+                date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
+                to_zone = tz.gettz(settings.TIME_ZONE)
+                dt_field = parse_datetime(date_time_field).replace(tzinfo=to_zone)
+
+                if dt_field:
+                    obj.time_slot_start = dt_field
+        super().save_model(request, obj, form, change)
 
 
 class SpecializationResource(resources.ModelResource):
@@ -973,3 +1086,7 @@ class DoctorMappingAdmin(VersionAdmin):
         form.base_fields['doctor'].queryset = Doctor.objects.filter(is_internal=True)
         form.base_fields['profile_to_be_shown'].queryset = Doctor.objects.filter(is_internal=True)
         return form
+
+
+class CommonSpecializationAdmin(VersionAdmin):
+    autocomplete_fields = ['specialization']
