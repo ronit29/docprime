@@ -817,6 +817,8 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         elif self.instance.id:
             doctor = self.instance.doctor
             hospital = self.instance.hospital
+            if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and cleaned_data.get('status'):
+                raise forms.ValidationError("Status can not be changed.")
         else:
             raise forms.ValidationError("Doctor and hospital details not entered.")
 
