@@ -502,24 +502,43 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
     formset = GenericAdminFormSet
-    can_delete = True
+    # can_delete = True
     show_change_link = False
-    readonly_fields = ['user']
     exclude = ('hospital_network', 'super_user_permission')
     verbose_name_plural = "Admins"
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        else:
+            return False
+
+    def has_add_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        else:
+            return False
+
+    def get_readonly_fields(self, request, obj=None):
+        if not request.user.is_superuser:
+            return ['phone_number', 'is_disabled', 'write_permission', 'read_permission', 'hospital',  'permission_type',
+                    'user', 'is_doc_admin']
+        else:
+            return ['user']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj=obj, **kwargs)
-        if not request.POST:
-            if obj is not None:
-                try:
-                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
-                        assoc_doctors=obj).distinct()
-                except MultipleObjectsReturned:
-                    pass
+        if request.user.is_superuser:
+            if not request.POST:
+                if obj is not None:
+                    try:
+                        formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
+                            assoc_doctors=obj).distinct()
+                    except MultipleObjectsReturned:
+                        pass
         return formset
 
 
