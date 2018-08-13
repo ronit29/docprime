@@ -11,7 +11,11 @@ from reversion.admin import VersionAdmin
 from import_export.admin import ImportExportMixin
 from django.db.models import Q
 from django.db import models
-
+from django.utils.dateparse import parse_datetime
+from dateutil import tz
+from django.conf import settings
+from django.utils import timezone
+import pytz
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
@@ -22,6 +26,8 @@ from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.admin.widgets import AdminSplitDateTime
+from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget
+
 
 class LabTestResource(resources.ModelResource):
     excel_id = fields.Field(attribute='excel_id', column_name='Test ID')
@@ -403,24 +409,28 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
 
 class LabAppointmentForm(forms.ModelForm):
-    def clean(self):
-        super().clean()
-        cleaned_data = self.cleaned_data
-        time_slot_start = cleaned_data['time_slot_start']
-        hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-        minutes = time_slot_start.minute
-        valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
-        if minutes % valid_minutes_slot != 0:
-            self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
-            self.cleaned_data.pop('time_slot_start', None)
-        selected_test_ids = self.instance.lab_test.all().values_list('test',flat=True)
-        if (not self.instance.time_slot_start == time_slot_start) and not LabTiming.objects.filter(
-                lab=self.instance.lab,
-                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-                day=time_slot_start.weekday(),
-                start__lte=hour, end__gt=hour).exists():
-            raise forms.ValidationError("This lab test is not available on selected day and time.")
-        return cleaned_data
+
+    start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
+    start_time = forms.CharField(widget=TimePickerWidget())
+
+    # def clean(self):
+    #     super().clean()
+    #     cleaned_data = self.cleaned_data
+    #     time_slot_start = cleaned_data['time_slot_start']
+    #     hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+    #     minutes = time_slot_start.minute
+    #     valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
+    #     if minutes % valid_minutes_slot != 0:
+    #         self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
+    #         self.cleaned_data.pop('time_slot_start', None)
+    #     selected_test_ids = self.instance.lab_test.all().values_list('test',flat=True)
+    #     if (not self.instance.time_slot_start == time_slot_start) and not LabTiming.objects.filter(
+    #             lab=self.instance.lab,
+    #             lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+    #             day=time_slot_start.weekday(),
+    #             start__lte=hour, end__gt=hour).exists():
+    #         raise forms.ValidationError("This lab test is not available on selected day and time.")
+    #     return cleaned_data
 
 
 
@@ -454,18 +464,22 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
+        if obj is not None and obj.time_slot_start:
+            time_slot_start = timezone.localtime(obj.time_slot_start, pytz.timezone(settings.TIME_ZONE))
+            form.base_fields['start_date'].initial = time_slot_start.strftime('%Y-%m-%d') if time_slot_start else None
+            form.base_fields['start_time'].initial = time_slot_start.strftime('%H:%M') if time_slot_start else None
         return form
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
             return ('lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
-                    'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end', 'otp', 'payment_status',
+                    'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('lab_name', 'lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
-                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'status', 'time_slot_start')
+                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'status', 'start_date', 'start_time')
         else:
             return ()
 
@@ -521,6 +535,21 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def user_number(self, obj):
         return obj.user.phone_number
+
+    def save_model(self, request, obj, form, change):
+        if obj:
+            # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
+            # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
+            #
+            # date_time = datetime.datetime.combine(date, time)
+            if request.POST['start_date'] and request.POST['start_time']:
+                date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
+                to_zone = tz.gettz(settings.TIME_ZONE)
+                dt_field = parse_datetime(date_time_field).replace(tzinfo=to_zone)
+
+                if dt_field:
+                    obj.time_slot_start = dt_field
+        super().save_model(request, obj, form, change)
 
 
 

@@ -223,7 +223,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(name__icontains=name)
 
         if ids:
-            queryset = queryset.filter(lab_pricing_group__available_lab_tests__test_id__in=ids)
+            queryset = queryset.filter(lab_pricing_group__available_lab_tests__test_id__in=ids,
+                lab_pricing_group__available_lab_tests__enabled=True)
+
 
         if ids:
             deal_price_calculation = Case(When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
@@ -600,7 +602,7 @@ class TimeSlotExtraction(object):
         day_time_hour = int(time)
         day_time_min = (time - day_time_hour) * 60
 
-        if time >= 12:
+        if day_time_hour > 12:
             day_time_hour -= 12
 
         day_time_hour_str = str(int(day_time_hour))

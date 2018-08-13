@@ -18,6 +18,8 @@ import datetime
 import pytz
 import json
 import logging
+from dateutil import tz
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +144,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
-    start_date = serializers.CharField()
+    start_date = serializers.DateTimeField()
     start_time = serializers.FloatField()
     end_date = serializers.CharField(required=False)
     end_time = serializers.FloatField(required=False)
@@ -220,21 +222,11 @@ class CreateAppointmentSerializer(serializers.Serializer):
         return data
 
     @staticmethod
-    def form_time_slot(date_str, time):
-        date, temp = date_str.split("T")
-        date_str = str(date)
+    def form_time_slot(timestamp, time):
+        to_zone = tz.gettz(settings.TIME_ZONE)
         min, hour = math.modf(time)
         min *= 60
-        if min < 10:
-            min = "0" + str(int(min))
-        else:
-            min = str(int(min))
-        time_str = str(int(hour))+":"+str(min)
-        date_time_field = str(date_str) + "T" + time_str
-        dt_field = datetime.datetime.strptime(date_time_field, "%Y-%m-%dT%H:%M")
-        defined_timezone = str(timezone.get_default_timezone())
-        dt_field = pytz.timezone(defined_timezone).localize(dt_field)
-        # dt_field = pytz.utc.localize(dt_field)
+        dt_field = timestamp.astimezone(to_zone).replace(hour=int(hour), minute=int(min), microsecond=0)
         return dt_field
 
 
@@ -277,7 +269,8 @@ class UpdateStatusSerializer(serializers.Serializer):
     status = serializers.IntegerField()
     time_slot_start = serializers.DateTimeField(required=False)
     time_slot_end = serializers.DateTimeField(required=False)
-    start_date = serializers.CharField(required=False)
+    start_date = serializers.DateTimeField(required=False)
+    # start_date = serializers.CharField(required=False)
     start_time = serializers.FloatField(required=False)
 
 
