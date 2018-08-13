@@ -15,6 +15,8 @@ from .serializers import AjaxAvailableLabTestSerializer
 import decimal
 import math
 from django.contrib.auth.decorators import user_passes_test
+from decimal import Decimal
+from django.contrib import messages
 
 
 class LabTestAutocomplete(autocomplete.Select2QuerySetView):
@@ -33,10 +35,39 @@ def labajaxmodelsave(request):
     if request.method == "POST":
         id = request.POST.get('id')
         model_instance = LabPricingGroup.objects.get(id=id)
-        model_instance.pathology_agreed_price_percentage = decimal.Decimal(request.POST['lab-pathology_agreed_price_percentage']) if request.POST.get('lab-pathology_agreed_price_percentage') else None
-        model_instance.pathology_deal_price_percentage = decimal.Decimal(request.POST['lab-pathology_deal_price_percentage']) if request.POST.get('lab-pathology_deal_price_percentage') else None
-        model_instance.radiology_agreed_price_percentage = decimal.Decimal(request.POST['lab-radiology_agreed_price_percentage']) if request.POST.get('lab-radiology_agreed_price_percentage') else None
-        model_instance.radiology_deal_price_percentage = decimal.Decimal(request.POST['lab-radiology_deal_price_percentage']) if request.POST.get('lab-radiology_deal_price_percentage') else None
+
+
+        pap = decimal.Decimal(request.POST['lab-pathology_agreed_price_percentage']) if request.POST.get('lab-pathology_agreed_price_percentage') else None
+        rap = decimal.Decimal(request.POST['lab-radiology_agreed_price_percentage']) if request.POST.get('lab-radiology_agreed_price_percentage') else None
+
+        if pap and pap<20 or rap and rap<20:
+            messages.add_message(request, messages.ERROR, "Agreed Percent cannot be less than 20 percent")
+            return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')
+
+        if pap and pap>100 or rap and rap>100:
+            messages.add_message(request, messages.ERROR, "Agreed Percent cannot be greater than 100 percent")
+            return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')
+
+
+        if not pap and AvailableLabTest.objects.filter(lab_pricing_group=model_instance,test__test_type=LabTest.PATHOLOGY).exists():
+            messages.add_message(request, messages.ERROR, "Delete Pathology tests first")
+            return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')
+
+        if not rap and AvailableLabTest.objects.filter(lab_pricing_group=model_instance,test__test_type=LabTest.RADIOLOGY).exists():
+            messages.add_message(request, messages.ERROR, "Delete Radiology tests first")
+            return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')
+
+
+        model_instance.pathology_agreed_price_percentage = pap
+        model_instance.radiology_agreed_price_percentage = rap
+
+        multiplier = Decimal(1.2)
+        if pap:
+            model_instance.pathology_deal_price_percentage = min(math.ceil(multiplier*pap),100.0)
+
+        if rap:
+            model_instance.radiology_deal_price_percentage = min(math.ceil(multiplier*rap),100.0)
+
         model_instance.save()
         return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')
     else:
@@ -45,12 +76,20 @@ def labajaxmodelsave(request):
 
 def availablelabtestajaxsave(request):
     if request.method == "POST" and request.is_ajax():
-        serialized_data = AjaxAvailableLabTestSerializer(data=request.POST)
+        instance = None
+        if(request.POST.get('id')):
+            instance = AvailableLabTest.objects.get(pk=request.POST.get('id'))
+
+        serialized_data = AjaxAvailableLabTestSerializer(instance=instance, data=request.POST)
+
         if serialized_data.is_valid(raise_exception=True):
             data = serialized_data.validated_data
             id = data.get('id')
             data['computed_agreed_price'] = get_computed_agreed_price(data)
             data['computed_deal_price'] = get_computed_deal_price(data)
+            data['custom_agreed_price'] = None
+            data['custom_deal_price'] = None
+
             if id:
                 record = AvailableLabTest.objects.filter(id=id)
                 if record:
@@ -165,5 +204,3 @@ def lab_map_view(request):
     return render_to_response('lab_map.html',
                               {'labs': lab_locations, "form": form,
                                'google_map_key': settings.GOOGLE_MAPS_API_KEY})
-
-

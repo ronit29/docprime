@@ -350,8 +350,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
 
 class DoctorProfileView(viewsets.GenericViewSet):
-    # authentication_classes = (TokenAuthentication, )
-    # permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication, )
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return models.OpdAppointment.objects.all()
@@ -399,7 +399,6 @@ class DoctorProfileView(viewsets.GenericViewSet):
             resp_data["access_type"] = OPD_ONLY
         elif auth_models.GenericLabAdmin.objects.filter(user=user, is_disabled=False).exists():
             resp_data["access_type"] = LAB_ONLY
-
         # Check access_type END
 
         resp_data["count"] = queryset

@@ -1119,8 +1119,8 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
 
 class UserLabViewSet(GenericViewSet):
-    # authentication_classes = (TokenAuthentication, )
-    # permission_classes = (IsAuthenticated, IsDoctor,)
+    authentication_classes = (TokenAuthentication, )
+    permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
         user = request.user
@@ -1135,22 +1135,6 @@ class UserLabViewSet(GenericViewSet):
                                                is_live=True
                                                ).values('id', 'name')
         return Response(user_lab_queryset)
-        # doc_hosp_queryset = (DoctorClinic.objects.filter(doctor__is_live=True, hospital__is_live=True).annotate(
-        #     hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
-        #     Q(doctor__manageable_doctors__user=user,
-        #       doctor__manageable_doctors__hospital=F('hospital'),
-        #       doctor__manageable_doctors__is_disabled=False,
-        #       doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
-        #       doctor__manageable_doctors__write_permission=True) |
-        #     Q(hospital__manageable_hospitals__doctor__isnull=True,
-        #       hospital__manageable_hospitals__user=user,
-        #       hospital__manageable_hospitals__is_disabled=False,
-        #       hospital__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT,
-        #       hospital__manageable_hospitals__write_permission=True)).
-        #                   values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
-        #                      )
-        # return Response(doc_hosp_queryset)
-
 
 
 class HospitalDoctorBillingPermissionViewSet(GenericViewSet):

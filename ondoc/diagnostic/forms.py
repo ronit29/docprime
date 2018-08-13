@@ -61,6 +61,10 @@ class LabForm(forms.ModelForm):
         self.fields['pathology_deal_price_percentage'].label = 'Path Deal Price Percentage'
         self.fields['radiology_agreed_price_percentage'].label = 'Radio Agreed Price Percentage'
         self.fields['radiology_deal_price_percentage'].label = 'Radio Deal Price Percentage'
+
+        self.fields['pathology_deal_price_percentage'].widget.attrs['readonly'] = True
+        self.fields['radiology_deal_price_percentage'].widget.attrs['readonly'] = True
+
         self.helper.form_tag = False
         self.helper.layout = Layout(
             Div(CustomField('pathology_agreed_price_percentage'),css_class="col-md-3"),
@@ -79,6 +83,7 @@ class LabForm(forms.ModelForm):
         model = Lab
         fields = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                   'radiology_agreed_price_percentage', 'radiology_deal_price_percentage')
+        readonly_fields = ('pathology_deal_price_percentage','radiology_deal_price_percentage')
 
 
 class LabMapForm(forms.ModelForm):

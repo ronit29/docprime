@@ -500,6 +500,7 @@ class AvailableLabTest(TimeStampedModel):
     #     return "{}, {}".format(self.test.name, self.lab.name if self.lab else self.lab_pricing_group.group_name)
 
     class Meta:
+        unique_together = (("test", "lab_pricing_group"))
         db_table = "available_lab_test"
 
 

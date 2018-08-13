@@ -28,7 +28,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
 from django.db import transaction
-from django.db.models import Count, Sum, Max, When, Case, F
+from django.db.models import Count, Sum, Max, When, Case, F, Q
 from django.http import Http404
 from django.conf import settings
 import hashlib
@@ -141,9 +141,12 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             search_key = re.findall(r'[a-z0-9A-Z.]+', name)
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
-            test_queryset = LabTest.objects.filter(search_key__icontains=search_key)
+            test_queryset = LabTest.objects.filter(
+                Q(search_key__icontains=" " + search_key) | Q(search_key__istartswith=search_key))
             test_queryset = paginate_queryset(test_queryset, request)
-            lab_queryset = Lab.objects.filter(search_key__icontains=search_key, is_live=True, is_test_lab=False)
+            lab_queryset = Lab.objects.filter(is_live=True, is_test_lab=False).filter(
+                Q(search_key__icontains=" " + search_key) | Q(search_key__istartswith=search_key)
+            )
             lab_queryset = paginate_queryset(lab_queryset, request)
         else:
             test_queryset = self.queryset[:20]
@@ -184,14 +187,24 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         day_now = timezone.now().weekday()
         timing_queryset = list()
         lab_serializable_data = list()
+        lab_timing = None
+        lab_timing_data = list()
         if lab_obj:
-            timing_queryset = lab_obj.lab_timings.filter(day=day_now)
+            if lab_obj.always_open:
+                lab_timing = "7:00 AM - 7:00 PM"
+                lab_timing_data = [{
+                    "start": 7.0,
+                    "end": 19.0
+                }]
+            else:
+                timing_queryset = lab_obj.lab_timings.filter(day=day_now)
+                lab_timing, lab_timing_data = self.get_lab_timing(timing_queryset)
             lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
             lab_serializable_data = lab_serializer.data
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
         temp_data['tests'] = test_serializer.data
-        temp_data['lab_timing'], temp_data["lab_timing_data"] = self.get_lab_timing(timing_queryset)
+        temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
 
         return Response(temp_data)
 
@@ -260,47 +273,59 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         ids = parameters.get('ids', [])
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
+        name = parameters.get('name')
 
-        queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
-                                                                                                lab_pricing_group__labs__is_test_lab=False)
-
-        if ids:
-            queryset = queryset.filter(test__in=ids)
+        # queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
+        #                                                                                         lab_pricing_group__labs__is_test_lab=False)
+        queryset = Lab.objects.select_related().filter(is_test_lab=False, is_live=True,
+                                                       lab_pricing_group__isnull=False)
 
         if lat is not None and long is not None:
             point_string = 'POINT('+str(long)+' '+str(lat)+')'
             pnt = GEOSGeometry(point_string, srid=4326)
-            queryset = queryset.filter(lab_pricing_group__labs__location__distance_lte=(pnt, max_distance))
+            queryset = queryset.filter(location__distance_lte=(pnt, max_distance))
             if min_distance:
                 min_distance = min_distance*1000  # input is  coming in km
-                queryset = queryset.filter(lab_pricing_group__labs__location__distance_gte=(pnt, min_distance))
+                queryset = queryset.filter(location__distance_gte=(pnt, min_distance))
+
+        if name:
+            queryset = queryset.filter(name__icontains=name)
 
         if ids:
-            deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
-                                          When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
+            queryset = queryset.filter(lab_pricing_group__available_lab_tests__test_id__in=ids,
+                lab_pricing_group__available_lab_tests__enabled=True)
+
+
+        if ids:
+            deal_price_calculation = Case(When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
+                                               then=F('lab_pricing_group__available_lab_tests__computed_deal_price')),
+                                          When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=False,
+                                               then=F('lab_pricing_group__available_lab_tests__custom_deal_price')))
+
             queryset = (
-                queryset.values('lab_pricing_group__labs__id'
-                                ).annotate(price=Sum(deal_price_calculation), count=Count('id'),
-                                           distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
-                                           name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
+                queryset.values('id').annotate(price=Sum(deal_price_calculation),
+                                               count=Count('id'),
+                                               distance=Max(Distance('location', pnt)),
+                                               name=Max('name')).filter(count__gte=len(ids)))
+            if min_price:
+                queryset = queryset.filter(price__gte=min_price)
+
+            if max_price:
+                queryset = queryset.filter(price__lte=max_price)
+
         else:
-            queryset = (
-                queryset.values('lab_pricing_group__labs__id'
-                                ).annotate(count=Count('id'),
-                                           distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
-                                           name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
+            queryset = queryset.annotate(distance=Distance('location', pnt)).values('id', 'name', 'distance')
+            # queryset = (
+            #     queryset.values('lab_pricing_group__labs__id'
+            #                     ).annotate(count=Count('id'),
+            #                                distance=Max(Distance('lab_pricing_group__labs__location', pnt)),
+            #                                name=Max('lab_pricing_group__labs__name')).filter(count__gte=len(ids)))
 
-        if min_price and ids:
-            queryset = queryset.filter(price__gte=min_price)
-
-        if max_price and ids:
-            queryset = queryset.filter(price__lte=max_price)
-
-        queryset = self.apply_custom_filters(queryset, parameters)
+        queryset = self.apply_sort(queryset, parameters)
         return queryset
 
     @staticmethod
-    def apply_custom_filters(queryset, parameters):
+    def apply_sort(queryset, parameters):
         order_by = parameters.get("order_by")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
@@ -316,21 +341,30 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return queryset
 
     def form_lab_whole_data(self, queryset):
-        ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.prefetch_related('lab_image', 'lab_timings').filter(id__in=ids)
+        ids = [value.get('id') for value in queryset]
+        # ids, id_details = self.extract_lab_ids(queryset)
+        labs = Lab.objects.prefetch_related('lab_documents', 'lab_image', 'lab_timings').filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
         for obj in labs:
             temp_var[obj.id] = obj
         day_now = timezone.now().weekday()
         for row in queryset:
-            row["lab"] = temp_var[row["lab_pricing_group__labs__id"]]
-            timing_queryset = row["lab"].lab_timings.all()
-            timing_data = list()
-            for data in timing_queryset:
-                if data.day == day_now:
-                    timing_data.append(data)
-            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+            row["lab"] = temp_var[row["id"]]
+
+            if row["lab"].always_open:
+                lab_timing = "00:00 AM - 23:45 PM"
+                lab_timing_data = [{
+                    "start": 0.0,
+                    "end": 23.75
+                }]
+            else:
+                timing_queryset = row["lab"].lab_timings.all()
+                timing_data = list()
+                for data in timing_queryset:
+                    if data.day == day_now:
+                        timing_data.append(data)
+                lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
             lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
             row["lab_timing"] = lab_timing
             row["lab_timing_data"] = lab_timing_data
@@ -579,6 +613,10 @@ class LabTimingListView(mixins.ListModelMixin,
         if not for_home_pickup and lab_queryset.always_open:
             for day in range(0, 7):
                 obj.form_time_slots(day, 0.0, 23.45, None, True)
+        # New condition for home pickup timing from 7 to 7
+        elif for_home_pickup:
+            for day in range(0, 7):
+                obj.form_time_slots(day, 7.0, 19.0, None, True)
         else:
             lab_timing_queryset = lab_queryset.lab_timings.all()
             for data in lab_timing_queryset:
@@ -605,7 +643,8 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
             search_key = re.findall(r'[a-z0-9A-Z.]+', params.get('test_name'))
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
-            queryset = queryset.filter(test__search_key__icontains=search_key)
+            queryset = queryset.filter(
+                Q(test__search_key__istartswith=search_key) | Q(test__search_key__icontains=" "+search_key))
 
         queryset = queryset[:20]
 
@@ -668,7 +707,7 @@ class TimeSlotExtraction(object):
         day_time_hour = int(time)
         day_time_min = (time - day_time_hour) * 60
 
-        if time >= 12:
+        if day_time_hour > 12:
             day_time_hour -= 12
 
         day_time_hour_str = str(int(day_time_hour))

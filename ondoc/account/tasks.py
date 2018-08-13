@@ -14,18 +14,20 @@ logger = logging.getLogger(__name__)
 def refund_curl_task(self, req_data):
     print(req_data)
     try:
-        token = "gFH8gPXbCWaW8WqUefmFBcyRj0XIw"
+        token = settings.PG_REFUND_AUTH_TOKEN
         headers = {
             "auth": token,
             "Content-Type": "application/json"
         }
         url = settings.PG_REFUND_URL
+        # For test only
+        # url = 'http://localhost:8000/api/v1/doctor/test'
         print(url)
         response = requests.post(url, data=req_data, headers=headers)
         response.raise_for_status()
-        print(response.text, response.status_code)
-        # resp_data = response.json()
-        if response.status_code == status.HTTP_200_OK:
+        resp_data = response.json()
+        print(resp_data)
+        if response.status_code == status.HTTP_200_OK and resp_data.get("ok") and str(resp_data["ok"]) == str(1):
             from .models import ConsumerRefund
             refund_queryset = ConsumerRefund.objects.filter(pk=req_data["refNo"]).first()
             if refund_queryset:
@@ -34,7 +36,7 @@ def refund_curl_task(self, req_data):
                 print("Status Updated")
         else:
             countdown_time = (2 ** self.request.retries) * 60 * 10
-            logging.error("Refund Failure with response - " + str(response.text))
+            logging.error("Refund Failure with response - " + str(response.content))
             print(countdown_time)
             self.retry([req_data], countdown=countdown_time)
     except Exception as e:
