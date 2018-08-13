@@ -455,6 +455,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('lab').prefetch_related('lab_test')
+
     def get_profile(self, obj):
         return obj.profile.name
 
