@@ -486,7 +486,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
             return loc.y
         return None
 
-    def get_lng(self, obj):   
+    def get_long(self, obj):
         loc = obj.location
         if loc:
             return loc.x

@@ -107,9 +107,9 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     test_id = serializers.ReadOnlyField(source='test.id')
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
-    is_home_pickup_available = serializers.SerializerMethodField()
+    is_home_collection_enabled = serializers.SerializerMethodField()
 
-    def get_is_home_pickup_available(self, obj):
+    def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
             if self.context["lab"].is_home_collection_enabled and obj.test.home_collection_possible:
                 return True
@@ -127,7 +127,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_pickup_available', )
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled', )
 
 
 class LabCustomSerializer(serializers.Serializer):
