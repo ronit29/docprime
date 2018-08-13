@@ -493,8 +493,8 @@ class AvailableLabTest(TimeStampedModel):
     def get_type(self):
         return self.test.test_type
 
-    def __str__(self):
-        return "{}".format(self.test.name)
+    # def __str__(self):
+    #     return "{}".format(self.test.name)
 
     class Meta:
         unique_together = (("test", "lab_pricing_group"))

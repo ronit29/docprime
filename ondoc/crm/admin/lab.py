@@ -429,6 +429,8 @@ class LabAppointmentForm(forms.ModelForm):
         if self.instance.id:
             lab_test = self.instance.lab_test.all()
             lab = self.instance.lab
+            if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and cleaned_data.get('status'):
+                raise forms.ValidationError("Status can not be changed.")
         elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
             lab_test = cleaned_data.get('lab_test').all()
             lab = cleaned_data.get('lab')
@@ -455,10 +457,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('lab').prefetch_related('lab_test')
-
     def get_profile(self, obj):
+        if not obj.profile:
+            return ""
         return obj.profile.name
 
     get_profile.admin_order_field = 'profile'
@@ -494,10 +495,10 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'get_lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_number', 'price', 'agreed_price',
-                    'deal_price', 'effective_price', 'payment_status',
-                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'status', 'start_date', 'start_time')
+            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
+                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'start_date', 'start_time')
         else:
             return ()
 
@@ -505,10 +506,10 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return ()
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'get_lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_number', 'price', 'agreed_price',
+            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
-                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
         else:
             return ()
 
@@ -519,7 +520,7 @@ class LabAppointmentAdmin(admin.ModelAdmin):
             consumer_app_domain=settings.CONSUMER_APP_DOMAIN,
             profile_link=profile_link))
 
-    def employees_details(self, obj):
+    def lab_contact_details(self, obj):
         employees = obj.lab.labmanager_set.all()
         details = ''
         for employee in employees:
@@ -540,6 +541,31 @@ class LabAppointmentAdmin(admin.ModelAdmin):
             ((),),
         )
     get_lab_test.short_description = 'Lab Test'
+
+    def get_lab_address(self, obj):
+        address_items = [
+            str(getattr(obj.lab, attribute))
+            for attribute in ['building', 'sublocality', 'locality', 'city', 'state', 'country',
+                              'pin_code'] if getattr(obj.lab, attribute)]
+        format_string = "<div>{}</div>".format(",".join(address_items))
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+    get_lab_address.short_description = 'Lab Address'
+
+    def get_pickup_address(self, obj):
+        if not obj.is_home_pickup:
+            return ""
+        address_items = [str(obj.address.get(key)) for key in ['address', 'landmark', 'pincode'] if obj.address.get(key)]
+        format_string = "<div>{}</div>".format(",".join(address_items))
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+    get_pickup_address.short_description = 'Home Pickup Address'
 
     def used_profile_name(self, obj):
         return obj.profile.name
