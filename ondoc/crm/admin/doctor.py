@@ -690,7 +690,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         form.request = request
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
         if (not request.user.is_superuser) and (
-                not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+                (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists())):
             form.base_fields['assigned_to'].disabled = True
         return form
 
@@ -758,7 +758,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         if request.user.is_superuser and request.user.is_staff:
             return True
-        if request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() and obj.data_status in (1, 2, 3):
+        if (request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and obj.data_status in (1, 2, 3):
             return True
         return obj.created_by == request.user
 
