@@ -286,7 +286,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter)
 
-    exclude = ('is_home_pickup_available','search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
+    exclude = ('search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
                    'radiology_deal_price_percentage', )
 
     def get_readonly_fields(self, request, obj=None):
