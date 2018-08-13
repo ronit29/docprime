@@ -15,6 +15,7 @@ from django.utils.dateparse import parse_datetime
 from dateutil import tz
 from django.conf import settings
 from django.utils import timezone
+from django.utils.timezone import make_aware
 from django.utils.html import format_html_join
 import pytz
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
@@ -414,30 +415,43 @@ class LabAppointmentForm(forms.ModelForm):
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
 
-    # def clean(self):
-    #     super().clean()
-    #     cleaned_data = self.cleaned_data
-    #     time_slot_start = cleaned_data['time_slot_start']
-    #     hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-    #     minutes = time_slot_start.minute
-    #     valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
-    #     if minutes % valid_minutes_slot != 0:
-    #         self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
-    #         self.cleaned_data.pop('time_slot_start', None)
-    #     selected_test_ids = self.instance.lab_test.all().values_list('test',flat=True)
-    #     if (not self.instance.time_slot_start == time_slot_start) and not LabTiming.objects.filter(
-    #             lab=self.instance.lab,
-    #             lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-    #             day=time_slot_start.weekday(),
-    #             start__lte=hour, end__gt=hour).exists():
-    #         raise forms.ValidationError("This lab test is not available on selected day and time.")
-    #     return cleaned_data
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
+            date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
+            dt_field = parse_datetime(date_time_field)
+            time_slot_start = make_aware(dt_field)
+        if time_slot_start:
+            hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+        else:
+            raise forms.ValidationError("Enter valid start date and time.")
+        if self.instance.id:
+            lab_test = self.instance.lab_test.all()
+            lab = self.instance.lab
+        elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
+            lab_test = cleaned_data.get('lab_test').all()
+            lab = cleaned_data.get('lab')
+        else:
+            raise forms.ValidationError("Lab and lab test details not entered.")
 
+        if not lab.lab_pricing_group:
+            raise forms.ValidationError("Lab is not in any lab pricing group.")
+
+        selected_test_ids = lab_test.values_list('test', flat=True)
+        if not LabTiming.objects.filter(
+                lab=lab,
+                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                day=time_slot_start.weekday(),
+                start__lte=hour, end__gt=hour).exists():
+            raise forms.ValidationError("This lab test is not available on selected day and time.")
+
+        return cleaned_data
 
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
-    list_display = ('id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
