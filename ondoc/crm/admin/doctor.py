@@ -9,6 +9,7 @@ from django.db.models import Q
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
 from django.utils.dateparse import parse_datetime
+from django.utils.timezone import make_aware
 from dateutil import tz
 from django.conf import settings
 from django.utils import timezone
@@ -784,18 +785,10 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         cleaned_data = self.cleaned_data
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
-                to_zone = tz.gettz(settings.TIME_ZONE)
-                dt_field = parse_datetime(date_time_field).replace(tzinfo=to_zone)
-                if dt_field:
-                    time_slot_start = dt_field
+                dt_field = parse_datetime(date_time_field)
+                time_slot_start = make_aware(dt_field)
         if time_slot_start:
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-            minutes = time_slot_start.minute
-            valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
-            if minutes % valid_minutes_slot != 0:
-                self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
-                self.cleaned_data.pop('time_slot_start', None)
-                return cleaned_data
         else:
             raise forms.ValidationError("Enter valid start date and time.")
 
@@ -822,29 +815,6 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                 raise forms.ValidationError("Deal price is different for this time slot.")
 
         return cleaned_data
-
-    # def clean(self):
-    #     super().clean()
-    #     cleaned_data = self.cleaned_data
-    #     time_slot_start = cleaned_data['time_slot_start']
-    #     hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-    #     minutes = time_slot_start.minute
-    #     valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
-    #     if minutes % valid_minutes_slot != 0:
-    #         self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
-    #         self.cleaned_data.pop('time_slot_start', None)
-    #     if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
-    #                                              doctor_clinic__hospital=self.instance.hospital,
-    #                                              day=time_slot_start.weekday(),
-    #                                              start__lte=hour, end__gt=hour).exists():
-    #         raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
-    #     if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
-    #                                              doctor_clinic__hospital=self.instance.hospital,
-    #                                              day=time_slot_start.weekday(),
-    #                                              start__lte=hour, end__gt=hour,
-    #                                              deal_price=self.instance.deal_price).exists():
-    #         raise forms.ValidationError("Deal price is different for this time slot.")
-    #     return cleaned_data
 
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
