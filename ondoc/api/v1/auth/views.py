@@ -115,7 +115,7 @@ class UserViewset(GenericViewSet):
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
 
-        GenericAdmin.update_user_admin(data['phone_number'])
+        #GenericAdmin.update_user_admin(data['phone_number'])
 
         token = Token.objects.get_or_create(user=user)
 
