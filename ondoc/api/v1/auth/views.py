@@ -38,7 +38,7 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
-from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
+from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 
@@ -84,20 +84,20 @@ class LoginOTP(GenericViewSet):
                                        )
             lab_queryset = GenericLabAdmin.objects.select_related('lab', 'lab_network').filter(
                 Q(phone_number=phone_number, is_disabled=False),
-                (Q(lab__isnull=True, lab_network__data_status=Hospital.QC_APPROVED) |
+                (Q(lab__isnull=True, lab_network__data_status=LabNetwork.QC_APPROVED) |
                  Q(lab__isnull=False,
-                   lab__data_status=Doctor.QC_APPROVED, lab__onboarding_status=Lab.ONBOARDED
+                   lab__data_status=Lab.QC_APPROVED, lab__onboarding_status=Lab.ONBOARDED
                    )
                  )
                 )
 
-            if lab_queryset.exists():
+            if lab_queryset.exists() or queryset.exists():
                 response['exists'] = 1
                 send_otp("OTP for Lab login is {}", phone_number)
 
-            if queryset.exists():
-                response['exists'] = 1
-                send_otp("OTP for DocPrime login is {}", phone_number)
+            # if queryset.exists():
+            #     response['exists'] = 1
+            #     send_otp("OTP for DocPrime login is {}", phone_number)
 
         else:
             send_otp("OTP for login is {}", phone_number)

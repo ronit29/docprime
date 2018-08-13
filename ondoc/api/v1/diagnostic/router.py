@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet, LabTimingListView,
-                    AvailableTestViewSet)
+                    AvailableTestViewSet, LabPrescriptionFileViewset)
 # from rest_framework.routers import DefaultRouter
 #
 # router = DefaultRouter()
@@ -21,6 +21,7 @@ urlpatterns = [
          name='lab-create-appointment'),
     path('labappointment', LabAppointmentView.as_view({'get': 'list'}), name='lab-appointment-list'),
     path('labappointment/<int:pk>', LabAppointmentView.as_view({'get': 'retrieve'}), name='get-lab-appointment-detail'),
+    path('labappointment/lab/<int:pk>', LabAppointmentView.as_view({'get': 'retrieve_by_lab_id'}), name='get-lab-appointment-detail-by-lab'),
     path('labappointment/<int:pk>/update', LabAppointmentView.as_view({'post': 'update'}),
          name='update-lab-appointment-detail'),
     # path('labappointment/<int:pk>', LabAppointmentView.as_view({'post':'update', 'get': 'retrieve'}),
@@ -31,4 +32,6 @@ urlpatterns = [
          name='lab-timing'),
     path('labtest/<int:lab_id>', AvailableTestViewSet.as_view({'get': 'retrieve'}),
          name='lab-available-test'),
+    path('lab-prescription-file', LabPrescriptionFileViewset.as_view({'get': 'list'}), name='lab-upload-list'),
+    path('lab-prescription-file/upload', LabPrescriptionFileViewset.as_view({'post': 'create'}), name='upload-lab-prescription'),
 ]

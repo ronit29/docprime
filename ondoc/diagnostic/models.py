@@ -977,3 +977,43 @@ class LabPricing(Lab):
     class Meta:
         proxy = True
         default_permissions = []
+
+
+class LabPrescription(auth_model.TimeStampedModel):
+    appointment = models.ForeignKey(LabAppointment, on_delete=models.CASCADE)
+    prescription_details = models.TextField(max_length=300, blank=True, null=True)
+
+    def __str__(self):
+        return "{}-{}".format(self.id, self.appointment.id)
+
+    class Meta:
+        db_table = "lab_prescription"
+
+
+class LabPrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
+    prescription = models.ForeignKey(LabPrescription, on_delete=models.CASCADE)
+    name = models.FileField(upload_to='lab_prescriptions/', blank=False, null=False)
+
+    def __str__(self):
+        return "{}-{}".format(self.id, self.prescription.id)
+
+    def send_notification(self, database_instance):
+        appointment = self.prescription.appointment
+        if not appointment.user:
+            return
+        if not database_instance:
+            notification_models.NotificationAction.trigger(
+                instance=appointment,
+                user=appointment.user,
+                notification_type=notification_models.NotificationAction.PRESCRIPTION_UPLOADED,
+            )
+
+    def save(self, *args, **kwargs):
+        database_instance = LabPrescriptionFile.objects.filter(pk=self.id).first()
+        super().save(*args, **kwargs)
+        self.send_notification(database_instance)
+
+    class Meta:
+        db_table = "lab_prescription_file"
+
+

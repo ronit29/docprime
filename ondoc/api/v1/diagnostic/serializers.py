@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonTest, CommonDiagnosticCondition, LabImage)
+                                     CommonTest, CommonDiagnosticCondition, LabImage, LabPrescriptionFile)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
@@ -641,3 +641,22 @@ class AppointmentCompleteBodySerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError("Invalid Appointment")
         return attrs
+
+
+class LabPrescriptionFileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = LabPrescriptionFile
+        fields = ('prescription', 'name')
+
+
+class LabPrescriptionSerializer(serializers.Serializer):
+    appointment = serializers.PrimaryKeyRelatedField(queryset=LabAppointment.objects.all())
+    prescription_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
+    name = serializers.FileField()
+
+    def validate_appointment(self, value):
+        request = self.context.get('request')
+        if not LabAppointment.objects.filter(lab__manageable_lab_admins__user=request.user).exists():
+            raise serializers.ValidationError("Appointment is not correct.")
+        return value
