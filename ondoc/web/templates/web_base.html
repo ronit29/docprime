@@ -34,11 +34,11 @@
 <body>
      {% block content %}
      {% endblock %}
-     <footer class="container-fluid footer">
+     <footer class="container-fluid footer" style="margin-top: 0;">
 			<div class="container">
 				<div class="row footer-row">
                     <div class="col-12 col-sm-8 footer-col">
-                        <p class="footer-text"><a href="{% url 'web:about_page' %}">About Us</a><span>|</span><a href="{% url 'web:howitworks_page' %}">How It Works</a><span>|</span><a href="{% url 'web:privacy_page' %}">Privacy Policy</a><span>|</span><a href="{% url 'web:terms_page' %}">Terms &amp; Conditions</a><span>|</span><a href="{% url 'web:careers_page' %}">Careers</a><span>|</span><a href="{% url 'web:media_page' %}">Media</a><span>|</span><a href="{% url 'web:disclaimer_page' %}">Disclaimer</a><span>|</span><a href="{% url 'web:contact_page' %}">Contact Us</a></p>
+                        <p class="footer-text"><a style="display: inline-block;" href="{% url 'web:about_page' %}">About Us</a><span>|</span><a style="display: inline-block;" href="{% url 'web:howitworks_page' %}">How It Works</a><span>|</span><a style="display: inline-block;" href="{% url 'web:privacy_page' %}">Privacy Policy</a><span>|</span><a style="display: inline-block;" href="{% url 'web:terms_page' %}">Terms &amp; Conditions</a><span>|</span><a style="display: inline-block;" href="{% url 'web:careers_page' %}">Careers</a><span>|</span><a style="display: inline-block;" href="{% url 'web:media_page' %}">Media</a><span>|</span><a style="display: inline-block;" href="{% url 'web:disclaimer_page' %}">Disclaimer</a><span>|</span><a style="display: inline-block;" href="{% url 'web:contact_page' %}">Contact Us</a></p>
                     </div>
 					<div class="col-12 col-sm-4 footer-icons">
 						<a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="{% static 'web/images/forma-1.svg' %}" class="footer-icon"></a>

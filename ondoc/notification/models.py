@@ -428,17 +428,17 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         if product == account_model.Order.DOCTOR_PRODUCT_ID:
             for k, v in OpdAppointment.STATUS_CHOICES:
                 status_choices[k] = v
-            url = settings.BASE_URL + "/admin/doctor/opdappointment/" + str(instance.id) + "/change"
+            url = settings.ADMIN_BASE_URL + "/admin/doctor/opdappointment/" + str(instance.id) + "/change"
         elif product == account_model.Order.LAB_PRODUCT_ID:
             for k, v in LabAppointment.STATUS_CHOICES:
                 status_choices[k] = v
-            url = settings.BASE_URL + "/admin/diagnostic/labappointment/" + str(instance.id) + "/change"
+            url = settings.ADMIN_BASE_URL + "/admin/diagnostic/labappointment/" + str(instance.id) + "/change"
 
         html_body = "status - {status}, user - {username}, url - {url}".format(
-            status=status_choices[instance.status], username=instance.user.username, url=url
+            status=status_choices[instance.status], username=instance.profile.name, url=url
         )
         email_subject = "Change in appointment of user - {username} and id - {id}".format(
-            username=instance.user.username, id=instance.id
+            username=instance.profile.name, id=instance.id
         )
         if email_list:
             email_notif = {
