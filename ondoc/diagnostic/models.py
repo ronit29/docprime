@@ -542,7 +542,7 @@ class LabAppointment(TimeStampedModel):
     def allowed_action(self, user_type):
         allowed = []
         current_datetime = timezone.now()
-        if user_type == User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
+        if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
         return allowed
