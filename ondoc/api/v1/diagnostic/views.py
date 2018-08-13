@@ -395,13 +395,15 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     def list(self, request, *args, **kwargs):
         user = request.user
-        queryset = LabAppointment.objects.filter(profile__user=user)
+        queryset = LabAppointment.objects.filter(lab__manageable_lab_admins__user=user)
+        # queryset = LabAppointment.objects.all()
         serializer = diagnostic_serializer.LabAppointmentModelSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
         user = request.user
-        queryset = LabAppointment.objects.filter(profile__user=user, pk=pk).distinct()
+        queryset = LabAppointment.objects.filter(lab__manageable_lab_admins__user=user, pk=pk).distinct()
+        # queryset = LabAppointment.objects.all()
         if queryset:
             serializer = serializers.LabAppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
             return Response(serializer.data)
