@@ -15,6 +15,7 @@ from django.utils.dateparse import parse_datetime
 from dateutil import tz
 from django.conf import settings
 from django.utils import timezone
+from django.utils.html import format_html_join
 import pytz
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.doctor.models import Hospital
@@ -516,7 +517,7 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+            return ('lab_name', 'get_lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding', 'status', 'start_date', 'start_time')
@@ -527,7 +528,7 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return ()
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+            return ('lab_name', 'get_lab_test', 'employees_details', 'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
@@ -535,10 +536,11 @@ class LabAppointmentAdmin(admin.ModelAdmin):
             return ()
 
     def lab_name(self, obj):
-        profile_link = "lab/{}".format(obj.doctor.id)
-        return mark_safe('{name} (<a href="{consumer_app_domain}/{profile_link}">Profile</a>)'.format(name=obj.lab.name,
-                                                                                consumer_app_domain=settings.CONSUMER_APP_DOMAIN,
-                                                                                profile_link=profile_link))
+        profile_link = "lab/{}".format(obj.lab.id)
+        return mark_safe('{name} (<a href="{consumer_app_domain}/{profile_link}">Profile</a>)'.format(
+            name=obj.lab.name,
+            consumer_app_domain=settings.CONSUMER_APP_DOMAIN,
+            profile_link=profile_link))
 
     def employees_details(self, obj):
         employees = obj.lab.labmanager_set.all()
@@ -550,6 +552,17 @@ class LabAppointmentAdmin(admin.ModelAdmin):
             # ' , '.join([str(employee.name), str(employee.number), str(employee.email), str(employee.details)])
             # details += '\n'
         return mark_safe('<p>{details}</p>'.format(details=details))
+
+    def get_lab_test(self, obj):
+        format_string = ""
+        for data in obj.lab_test.all():
+            format_string += "<div><span>{}</span></div>".format(data.test.name)
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+    get_lab_test.short_description = 'Lab Test'
 
     def used_profile_name(self, obj):
         return obj.profile.name

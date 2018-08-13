@@ -1,1 +1,1 @@
-Appointment Confirmed for {{patient_name|capfirst}} requested with Lab - {{doctor_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.
+Appointment Confirmed for {{patient_name|capfirst}} requested with Lab - {{lab_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.
