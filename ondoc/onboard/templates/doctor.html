@@ -332,88 +332,89 @@
 
 
 
+    {% if billing_required %}
+        <div class="panel panel-default">
+          <div class="panel-heading">DOCUMENTS</div>
+              <div class="panel-body lab-documents">
+                {% for id,data in doc_dict.items %}
 
-    <div class="panel panel-default">
-      <div class="panel-heading">DOCUMENTS</div>
-      <div class="panel-body lab-documents">
-        {% for id,data in doc_dict.items %}
+                {% with results=data.2 %}
 
-        {% with results=data.2 %}
+                {% if id == DoctorDocument.ADDRESS %}
+                    <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='3'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+                {% elif id == DoctorDocument.GST %}
+                   <div class='upload-container not-required' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
 
-        {% if id == DoctorDocument.ADDRESS %}
-            <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='3'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
-        {% elif id == DoctorDocument.GST %}        
-           <div class='upload-container not-required' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
-
-        {% else %}
-            <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
-        {% endif %}
-
-        {% if results %}
-        <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}
-        <span class='image-required-message'> (Required)</span>
-        </div>
-            {% for instance in results %}
-
-            <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
-
-                {% if instance.is_pdf %} 
-                    <img width="120" height="120"  src ="{% static 'images/pdf.png' %}">                    
                 {% else %}
-                    <img width="120" height="120" src='{{instance.name.url}}'>
-                {% endif %}    
+                    <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+                {% endif %}
 
-                <div style='text-align: center;'>
-                    <a data-image-id='{{instance.id}}' data-media-type='document' class="remove-image" href="javascript:undefined;">X</a>
-              
-                </div> 
-                <a target="_blank" style="display: block;text-align: center;padding: 3px;cursor: pointer;" class="open-link" href="{{instance.name.url}}">View</a>
+                {% if results %}
+                <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}
+                <span class='image-required-message'> (Required)</span>
+                </div>
+                    {% for instance in results %}
+
+                    <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
+
+                        {% if instance.is_pdf %}
+                            <img width="120" height="120"  src ="{% static 'images/pdf.png' %}">
+                        {% else %}
+                            <img width="120" height="120" src='{{instance.name.url}}'>
+                        {% endif %}
+
+                        <div style='text-align: center;'>
+                            <a data-image-id='{{instance.id}}' data-media-type='document' class="remove-image" href="javascript:undefined;">X</a>
+
+                        </div>
+                        <a target="_blank" style="display: block;text-align: center;padding: 3px;cursor: pointer;" class="open-link" href="{{instance.name.url}}">View</a>
+                    </div>
+                    {% endfor %}
+                {% if results.count < 1 or results.count < 3 and id == DoctorDocument.ADDRESS %}
+                <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
+                </div>
+                <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload'>
+                    <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+                    <div style="padding-top: 10px;">Upload image</div>
+                </div>
+                {% else %}
+                <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
+                </div>
+                <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload hidden'>
+                    <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+                    <div style="padding-top: 10px;">Upload image</div>
+                </div>
+                {% endif %}
+
+                {% else %}
+
+                <div>
+                <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}
+                <span class='image-required-message'> (Required)</span>
+                </div>
+
+                <div class="image-upload dropzone dz-clickable" style='border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;'>
+                </div>
+                <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload'>
+                    <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
+                    <div style="padding-top: 10px;">Upload image</div>
+                </div>
+
+                </div>
+                {% endif %}
+                </div>
+                {% endwith %}
+
+                {% endfor %}
+
+
+              </div>
+
             </div>
-            {% endfor %}
-        {% if results.count < 1 or results.count < 3 and id == DoctorDocument.ADDRESS %}    
-        <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
-        </div>
-        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload'>
-            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
-            <div style="padding-top: 10px;">Upload image</div>
-        </div>
-        {% else %}    
-        <div class="image-upload dropzone dz-clickable" style="border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;">
-        </div>
-        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload hidden'>
-            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
-            <div style="padding-top: 10px;">Upload image</div>
-        </div>
-        {% endif %}    
-
-        {% else %}
-
-        <div>
-        <div style='color:#00AAC5; font-weight: bold;'>{{forloop.counter}}. {{data.1}}
-        <span class='image-required-message'> (Required)</span>
-        </div>
-
-        <div class="image-upload dropzone dz-clickable" style='border:none;padding:0;display: inline-block;min-height: 10px;overflow: hidden;'>
-        </div>
-        <div style="display: inline-block;vertical-align:top;padding:30px 0 0 0;text-align: left;cursor:pointer;" class='trigger-upload'>
-            <img style='margin-left:15px;' class="upload-icon" src="{% static 'images/group-1.png' %}">
-            <div style="padding-top: 10px;">Upload image</div>
-        </div>
 
         </div>
-        {% endif %}
         </div>
-        {% endwith %}        
-
-        {% endfor %}
-
-
-      </div>    
-
-    </div>
-
-</div>
-</div>
+    {% endif %}
 
 <div class='container'>
 <div class="form-group terms-div">
