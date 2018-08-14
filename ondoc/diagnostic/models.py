@@ -150,7 +150,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab')
     matrix_lead_id = models.BigIntegerField(blank=True, null=True)
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
-    # is_home_pickup_available = models.BigIntegerField(null=True, blank=True)
     is_home_collection_enabled = models.BooleanField(default=False)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
@@ -497,7 +496,7 @@ class AvailableLabTest(TimeStampedModel):
         return self.test.test_type
 
     # def __str__(self):
-    #     return "{}, {}".format(self.test.name, self.lab.name if self.lab else self.lab_pricing_group.group_name)
+    #     return "{}".format(self.test.name)
 
     class Meta:
         unique_together = (("test", "lab_pricing_group"))
@@ -544,7 +543,7 @@ class LabAppointment(TimeStampedModel):
     def allowed_action(self, user_type, request):
         allowed = []
         current_datetime = timezone.now()
-        if user_type == User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
+        if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
         if user_type == User.DOCTOR and self.time_slot_start.date() >= current_datetime.date():

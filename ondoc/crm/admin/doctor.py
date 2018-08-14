@@ -9,6 +9,7 @@ from django.db.models import Q
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
 from django.utils.dateparse import parse_datetime
+from django.utils.timezone import make_aware
 from dateutil import tz
 from django.conf import settings
 from django.utils import timezone
@@ -501,24 +502,43 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
     formset = GenericAdminFormSet
-    can_delete = True
+    # can_delete = True
     show_change_link = False
-    readonly_fields = ['user']
     exclude = ('hospital_network', 'super_user_permission')
     verbose_name_plural = "Admins"
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        else:
+            return False
+
+    def has_add_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        else:
+            return False
+
+    def get_readonly_fields(self, request, obj=None):
+        if not request.user.is_superuser:
+            return ['phone_number', 'is_disabled', 'write_permission', 'read_permission', 'hospital',  'permission_type',
+                    'user', 'is_doc_admin']
+        else:
+            return ['user']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj=obj, **kwargs)
-        if not request.POST:
-            if obj is not None:
-                try:
-                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
-                        assoc_doctors=obj).distinct()
-                except MultipleObjectsReturned:
-                    pass
+        if request.user.is_superuser:
+            if not request.POST:
+                if obj is not None:
+                    try:
+                        formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
+                            assoc_doctors=obj).distinct()
+                    except MultipleObjectsReturned:
+                        pass
         return formset
 
 
@@ -670,7 +690,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         form.request = request
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
         if (not request.user.is_superuser) and (
-                not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+                (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists())):
             form.base_fields['assigned_to'].disabled = True
         return form
 
@@ -738,7 +758,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         if request.user.is_superuser and request.user.is_staff:
             return True
-        if request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() and obj.data_status in (1, 2, 3):
+        if (request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and obj.data_status in (1, 2, 3):
             return True
         return obj.created_by == request.user
 
@@ -784,18 +804,10 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         cleaned_data = self.cleaned_data
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
-                to_zone = tz.gettz(settings.TIME_ZONE)
-                dt_field = parse_datetime(date_time_field).replace(tzinfo=to_zone)
-                if dt_field:
-                    time_slot_start = dt_field
+                dt_field = parse_datetime(date_time_field)
+                time_slot_start = make_aware(dt_field)
         if time_slot_start:
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-            minutes = time_slot_start.minute
-            valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
-            if minutes % valid_minutes_slot != 0:
-                self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
-                self.cleaned_data.pop('time_slot_start', None)
-                return cleaned_data
         else:
             raise forms.ValidationError("Enter valid start date and time.")
 
@@ -805,6 +817,8 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         elif self.instance.id:
             doctor = self.instance.doctor
             hospital = self.instance.hospital
+            if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and cleaned_data.get('status'):
+                raise forms.ValidationError("Status can not be changed.")
         else:
             raise forms.ValidationError("Doctor and hospital details not entered.")
 
@@ -822,29 +836,6 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                 raise forms.ValidationError("Deal price is different for this time slot.")
 
         return cleaned_data
-
-    # def clean(self):
-    #     super().clean()
-    #     cleaned_data = self.cleaned_data
-    #     time_slot_start = cleaned_data['time_slot_start']
-    #     hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
-    #     minutes = time_slot_start.minute
-    #     valid_minutes_slot = TimeSlotExtraction.TIME_SPAN
-    #     if minutes % valid_minutes_slot != 0:
-    #         self._errors['time_slot_start'] = self.error_class(['Invalid time slot.'])
-    #         self.cleaned_data.pop('time_slot_start', None)
-    #     if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
-    #                                              doctor_clinic__hospital=self.instance.hospital,
-    #                                              day=time_slot_start.weekday(),
-    #                                              start__lte=hour, end__gt=hour).exists():
-    #         raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
-    #     if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=self.instance.doctor,
-    #                                              doctor_clinic__hospital=self.instance.hospital,
-    #                                              day=time_slot_start.weekday(),
-    #                                              start__lte=hour, end__gt=hour,
-    #                                              deal_price=self.instance.deal_price).exists():
-    #         raise forms.ValidationError("Deal price is different for this time slot.")
-    #     return cleaned_data
 
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):

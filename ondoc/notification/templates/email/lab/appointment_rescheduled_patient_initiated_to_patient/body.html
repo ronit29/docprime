@@ -68,6 +68,69 @@
 									We have received a reschedule request from you for the appointment with Lab - {{lab_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}. We will update you once it is confirmed.
 								</td>
 							</tr>
+							{% if instance.is_home_pickup %}
+								<tr>
+					<td>
+						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 0;">
+							<tbody>
+								<tr>
+									<td style="color: #000000; font-weight: 600; font-size: 16px;">
+
+									</td>
+								</tr>
+
+								<tr>
+									<td style="color: #000000; font-weight: 600; font-size: 16px;">
+									Home Visit Address
+									</td>
+								</tr>
+								{% if instance.address.address %}
+									<tr>
+										<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+										{{instance.address.address}}
+										</td>
+									</tr>
+								{% endif %}
+								<tr>
+									<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</td>
+				</tr>
+							{% else %}
+								<tr>
+					<td>
+						<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 0;">
+							<tbody>
+								{% if instance.lab.name %}
+								<tr>
+									<td style="color: #000000; font-weight: 600; font-size: 16px;">
+										{{instance.lab.name|capfirst}}
+									</td>
+								</tr>
+								{% endif %}
+								<tr>
+									<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
+										{% if instance.lab.building %}{{instance.lab.building}}, {% endif %}{% if instance.lab.sublocality %}{{instance.lab.sublocality}}, {% endif %}{% if instance.hospital.locality %}{{instance.hospital.locality}}{% endif %}
+									</td>
+								</tr>
+								<tr>
+									<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
+										{% if instance.hospital.city %}{{instance.lab.city}} {% endif %}{% if instance.lab.state%}{{instance.lab.state}}{% endif %}
+									</td>
+								</tr>
+								<tr>
+									<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
+									{% if instance.lab.city %} {{instance.lab.pin_code}}{% endif %}
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</td>
+				</tr>
+							{% endif %}
 							<tr>
 								<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 40px;">
 									Our associate might try to get in touch with you to make this as easy as possible.
@@ -77,6 +140,8 @@
 					</table>
 				</td>
 			</tr>
+
+
 			<tr>
 				<td>
 					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">

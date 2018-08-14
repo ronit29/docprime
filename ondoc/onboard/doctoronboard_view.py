@@ -6,10 +6,10 @@ from .forms import  DoctorClinicFormSet, DoctorLanguageFormSet, DoctorAwardFormS
                      DoctorAssociationFormSet, DoctorExperienceFormSet, DoctorForm, \
                      DoctorMobileFormSet, DoctorQualificationFormSet, DoctorServiceFormSet, \
                      DoctorEmailFormSet, DoctorClinicTimingFormSet, BaseDoctorEmailFormSet
-
+from django.db.models import Q
 
 # import models here
-from ondoc.doctor.models import DoctorOnboardingToken, Doctor, DoctorImage, DoctorDocument
+from ondoc.doctor.models import DoctorOnboardingToken, Doctor, DoctorImage, DoctorDocument, DoctorClinic
 from random import randint
 from ondoc.sms import api
 from ondoc.sendemail import api as email_api
@@ -20,8 +20,7 @@ class DoctorOnboard(View):
         token = request.GET.get('token')
 
         if not token:
-            return render(request,'access_denied.html')
-
+            return render(request, 'access_denied.html')
 
         existing = None
 
@@ -47,6 +46,10 @@ class DoctorOnboard(View):
         if not auth:
             return redirect("/onboard/doctor/otp?token="+token, permanent=False)
         doc_images = DoctorImage.objects.filter(doctor=existing.doctor)
+
+        billing_required = DoctorClinic.objects.filter(
+            Q(hospital__network__is_billing_enabled=False, hospital__is_billing_enabled=False, doctor=existing.doctor) |
+            Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=existing.doctor)).exists()
 
         doc_dict = OrderedDict()
         for id, value in DoctorDocument.CHOICES:
@@ -96,6 +99,7 @@ class DoctorOnboard(View):
             'doc_images' : doc_images,
             'doc_dict' : doc_dict,
             'DoctorDocument' : DoctorDocument,
+            'billing_required': billing_required,
             'message' : message})
 
     def post(self, request):

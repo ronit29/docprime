@@ -597,12 +597,11 @@ class GenericAdmin(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.clean()
-        user = User.objects.filter(phone_number=self.phone_number).first()
-        if user is not None:
-            self.user = user
         if self.permission_type == self.BILLINNG and self.doctor is not None:
             self.hospital = None
         super(GenericAdmin, self).save(*args, **kwargs)
+        GenericAdmin.update_user_admin(self.phone_number)
+
 
     def delete(self, *args, **kwargs):
         self.clean()
@@ -703,8 +702,9 @@ class GenericAdmin(TimeStampedModel):
                 doc_number = doc_mobile.first().number
             else:
                 doc_number = doc_user.phone_number
+
         billing_perm = GenericAdmin.objects.filter(doctor=doctor,
-                                                   user=doc_user,
+                                                   phone_number=doc_number,
                                                    permission_type=GenericAdmin.BILLINNG)
         if not billing_perm.exists():
             if doc_number:

@@ -23,48 +23,6 @@ utc = pytz.UTC
 User = get_user_model()
 
 
-# class LabAppointmentSerializer(serializers.ModelSerializer):
-#     lab_name = serializers.ReadOnlyField(source='lab.name')
-#     profile_name = serializers.ReadOnlyField(source='profile.name')
-#     user_phone_number = serializers.ReadOnlyField(source='user.phone_number')
-#     patient_image = serializers.SerializerMethodField()
-#     patient_thumbnail = serializers.SerializerMethodField()
-#     doctor_thumbnail = serializers.SerializerMethodField()
-#
-#     def get_allowed_action(self, obj):
-#         request = self.context.get('request')
-#         return obj.allowed_action(request.user.user_type, request)
-#
-#     class Meta:
-#         model = LabAppointment
-#         fields = ('id', 'lab_name', 'profile_name', 'user_phone_number', 'patient_image', 'doctor_thumbnail', 'patient_thumbnail')
-#
-#     def get_patient_image(self, obj):
-#         if obj.profile.profile_image:
-#             return obj.profile.profile_image.url
-#         else:
-#             return ""
-#
-#     def get_patient_thumbnail(self, obj):
-#         request = self.context.get('request')
-#         if obj.profile.profile_image:
-#             photo_url = obj.profile.profile_image.url
-#             return request.build_absolute_uri(photo_url)
-#         else:
-#             return None
-#
-#     def get_doctor_thumbnail(self, obj):
-#         request = self.context.get('request')
-#         if obj.doctor.images.all():
-#             photo_url = (
-#                 obj.doctor.images.all()[0].cropped_image.url if obj.doctor.images.all()[0].cropped_image else None)
-#             return request.build_absolute_uri(photo_url) if photo_url else None
-#         else:
-#             return None
-#             # url = static('doctor_images/no_image.png')
-#             # return request.build_absolute_uri(url)
-
-
 class LabTestListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
@@ -149,9 +107,9 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     test_id = serializers.ReadOnlyField(source='test.id')
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
-    is_home_pickup_available = serializers.SerializerMethodField()
+    is_home_collection_enabled = serializers.SerializerMethodField()
 
-    def get_is_home_pickup_available(self, obj):
+    def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
             if self.context["lab"].is_home_collection_enabled and obj.test.home_collection_possible:
                 return True
@@ -169,7 +127,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_pickup_available', )
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled', )
 
 
 class LabCustomSerializer(serializers.Serializer):
@@ -599,14 +557,14 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
     lab_test = AvailableLabTestSerializer(many=True)
+    address = serializers.ReadOnlyField(source='address.address')
     type = serializers.SerializerMethodField()
 
 
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp')
-
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address')
     def get_type(self,obj):
         return 'lab'
 

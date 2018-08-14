@@ -294,7 +294,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             dochospitals = []
             for hosp in self.hospitals.all():
                 dochospitals.append(hosp.id)
-            queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
+            queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
                                            (Q(doctor__isnull=False, doctor=self) |
                                             Q(doctor__isnull=True, hospital__id__in=dochospitals)))
             if queryset.exists():
@@ -905,7 +905,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                     elif self.status == self.RESCHEDULED_DOCTOR:
                         allowed = [self.ACCEPTED]
 
-        elif user_type == auth_model.User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
+        elif user_type == auth_model.User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
 

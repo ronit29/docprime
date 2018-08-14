@@ -463,3 +463,9 @@ input[type=number]::-webkit-outer-spin-button {
 .privacy-tab-active>p{
 	color: #111111;
 }
+
+@media(max-width: 410px){
+    .privacy-tab{
+        padding: 10px 8px;
+    }
+}
