@@ -160,7 +160,7 @@ def form_time_slot(timestamp, time):
     to_zone = tz.gettz(settings.TIME_ZONE)
     min, hour = math.modf(time)
     min *= 60
-    dt_field = timestamp.astimezone(to_zone).replace(hour=int(hour), minute=int(min), microsecond=0)
+    dt_field = timestamp.astimezone(to_zone).replace(hour=int(hour), minute=int(min), second=0, microsecond=0)
     return dt_field
 
 

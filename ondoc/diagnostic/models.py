@@ -538,6 +538,7 @@ class LabAppointment(TimeStampedModel):
     is_home_pickup = models.BooleanField(default=False)
     address = JSONField(blank=True, null=True)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
+    home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def allowed_action(self, user_type):
         allowed = []
@@ -690,10 +691,9 @@ class LabAppointment(TimeStampedModel):
     def lab_payout_amount(self):
         amount = 0
         if self.payment_type == OpdAppointment.COD:
-            amount = (-1)*(self.effective_price - self.agreed_price)
+            amount = (-1)*(self.effective_price - self.agreed_price - self.home_pickup_charges)
         elif self.payment_type == OpdAppointment.PREPAID:
-            amount = self.agreed_price
-
+            amount = self.agreed_price + self.home_pickup_charges
         return amount
 
     @classmethod
