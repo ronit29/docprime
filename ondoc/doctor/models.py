@@ -35,7 +35,6 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.utils.safestring import mark_safe
 from PIL import Image as Img
 from io import BytesIO
-from decimal import Decimal
 import hashlib
 
 logger = logging.getLogger(__name__)
@@ -435,12 +434,13 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
         if self.mrp!=None:
             deal_price = math.ceil(self.fees + (self.mrp - self.fees)*.1)
             deal_price = math.ceil(deal_price/10)*10
-            deal_price = max(deal_price, 100)
-            deal_price = min(self.mrp, deal_price)
-            if deal_price>self.mrp:
-                deal_price = self.mrp
             if deal_price<self.fees:
                 deal_price = self.fees
+
+            deal_price = max(deal_price, 100)
+            deal_price = min(self.mrp, deal_price)
+            #if deal_price>self.mrp:
+            #    deal_price = self.mrp
             self.deal_price = deal_price
         super().save(*args, **kwargs)
 
