@@ -554,16 +554,17 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 
     def get_address(self, obj):
         resp_address = ""
-        if obj.address.get("address"):
-            resp_address += str(obj.address.get("address"))
-        if obj.address.get("land_mark"):
-            if resp_address:
-                resp_address += ", "
-            resp_address += str(obj.address.get("land_mark"))
-        if obj.address.get("pincode"):
-            if resp_address:
-                resp_address += ", "
-            resp_address += str(obj.address.get("pincode"))
+        if obj.address:
+            if obj.address.get("address"):
+                resp_address += str(obj.address.get("address"))
+            if obj.address.get("land_mark"):
+                if resp_address:
+                    resp_address += ", "
+                resp_address += str(obj.address.get("land_mark"))
+            if obj.address.get("pincode"):
+                if resp_address:
+                    resp_address += ", "
+                resp_address += str(obj.address.get("pincode"))
         return resp_address
 
     class Meta:
