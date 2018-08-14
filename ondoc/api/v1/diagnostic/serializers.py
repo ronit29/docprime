@@ -549,6 +549,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
     lab_test = AvailableLabTestSerializer(many=True)
+    address = serializers.ReadOnlyField(source='address.address')
 
 
 
