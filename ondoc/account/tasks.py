@@ -24,7 +24,7 @@ def refund_curl_task(self, req_data):
         # url = 'http://localhost:8000/api/v1/doctor/test'
         print(url)
         response = requests.post(url, data=req_data, headers=headers)
-        response.raise_for_status()
+        # response.raise_for_status()
         resp_data = response.json()
         print(resp_data)
         if response.status_code == status.HTTP_200_OK and resp_data.get("ok") and str(resp_data["ok"]) == str(1):
