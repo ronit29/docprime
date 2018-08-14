@@ -20,6 +20,7 @@ from ondoc.doctor.tasks import doc_app_auto_cancel
 from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
+from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from functools import reduce
@@ -1061,7 +1062,8 @@ class OpdAppointment(auth_model.TimeStampedModel):
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
         super().save(*args, **kwargs)
-        self.send_notification(database_instance)
+        if (not database_instance) or (not database_instance.status == self.status):
+            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=5)
         if not database_instance or database_instance.status != self.status:
             for e_id in settings.OPS_EMAIL_ID:
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
