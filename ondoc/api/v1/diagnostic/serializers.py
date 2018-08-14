@@ -590,17 +590,12 @@ class AppointmentCompleteBodySerializer(serializers.Serializer):
 
     def validate(self, attrs):
 
-        if attrs['id']==10010038:
-            if not attrs['otp']==5786:
-                raise serializers.ValidationError("Invalid Confirmation Code")
-            else:
-                return attrs    
-
-
         appntmnt = LabAppointment.objects.filter(id=attrs['id'])
         if appntmnt.exists():
             if appntmnt.first().status == LabAppointment.COMPLETED:
                 raise serializers.ValidationError("Appointment Already Completed")
+            if appntmnt.first().status == LabAppointment.CANCELLED:
+                raise serializers.ValidationError("Cannot Complete a Cancelled Appointment")
             if not appntmnt.filter(otp=attrs['otp']).exists():
                 raise serializers.ValidationError("Invalid Confirmation Code")
         else:
