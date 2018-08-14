@@ -552,6 +552,7 @@ class LabAppointment(TimeStampedModel):
             return
         if not self.user:
             return
+        lab_managers = LabManager.objects.filter(lab=self.lab)
         if self.status == LabAppointment.COMPLETED:
             LabNotificationAction.trigger(
                 instance=self,
@@ -567,6 +568,9 @@ class LabAppointment(TimeStampedModel):
             )
             return
         if self.status == LabAppointment.RESCHEDULED_PATIENT:
+            for lab_manager in lab_managers:
+                LabNotificationAction.send_to_lab_managers(
+                    self, lab_manager, notification_models.NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT)
             LabNotificationAction.trigger(
                 instance=self,
                 user=self.user,
@@ -581,12 +585,19 @@ class LabAppointment(TimeStampedModel):
             )
             return
         if self.status == LabAppointment.CANCELLED:
+            for lab_manager in lab_managers:
+                LabNotificationAction.send_to_lab_managers(
+                    self, lab_manager, notification_models.NotificationAction.LAB_APPOINTMENT_CANCELLED)
             LabNotificationAction.trigger(
                 instance=self,
                 user=self.user,
                 notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_CANCELLED,
             )
             return
+        if self.status == LabAppointment.BOOKED:
+            for lab_manager in lab_managers:
+                LabNotificationAction.send_to_lab_managers(
+                    self, lab_manager, notification_models.NotificationAction.LAB_APPOINTMENT_BOOKED)
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
