@@ -71,8 +71,8 @@ class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
 
         lab_appointment = get_object_or_404(lab_models.LabAppointment, pk=validated_data.get('id'))
-        if request.user.user_type == User.DOCTOR:
-            lab_appointment.action_completed()
+        #if request.user.user_type == User.DOCTOR:
+        lab_appointment.action_completed()
         lab_appointment_serializer = diagnostic_serializer.DoctorLabAppointmentRetrieveSerializer(lab_appointment,
                                                                                      context={'request': request})
         return Response(lab_appointment_serializer.data)
