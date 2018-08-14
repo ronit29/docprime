@@ -5,6 +5,7 @@ from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image
                                          UserPermission, GenericAdmin, LabUserPermission)
 from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
+from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from ondoc.account import models as account_model
@@ -602,7 +603,8 @@ class LabAppointment(TimeStampedModel):
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
-        self.send_notification(database_instance)
+        if (not database_instance) or (not database_instance.status == self.status):
+            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=5)
 
         if not database_instance or database_instance.status != self.status:
             for e_id in settings.OPS_EMAIL_ID:
