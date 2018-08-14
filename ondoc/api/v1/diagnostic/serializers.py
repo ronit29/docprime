@@ -599,13 +599,16 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
     lab_test = AvailableLabTestSerializer(many=True)
-
+    type = serializers.SerializerMethodField()
 
 
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp')
+
+    def get_type(self,obj):
+        return 'lab'
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
@@ -641,6 +644,14 @@ class AppointmentCompleteBodySerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError("Invalid Appointment")
         return attrs
+
+class LabAppointmentFilterSerializer(serializers.Serializer):
+    CHOICES = ['all', 'previous', 'upcoming', 'pending']
+
+    range = serializers.ChoiceField(choices=CHOICES, required=False)
+    lab_id = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True), required=False)
+    profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
+    date = serializers.DateField(required=False)
 
 
 class LabPrescriptionFileSerializer(serializers.ModelSerializer):
