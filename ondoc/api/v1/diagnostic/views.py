@@ -853,3 +853,10 @@ class LabPrescriptionFileViewset(mixins.CreateModelMixin,
         return auth_models.GenericLabAdmin.objects.filter(user=user, lab=appointment.lab,
                                                 permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
                                                 write_permission=True).exists()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = serializers.LabPrescriptionFileSerializer(
+            data=queryset, many=True)
+        serializer.is_valid()
+        return Response(serializer.data)
