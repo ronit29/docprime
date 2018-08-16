@@ -558,15 +558,13 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     lab = LabModelSerializer()
     lab_test = AvailableLabTestSerializer(many=True)
     address = serializers.ReadOnlyField(source='address.address')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(default='lab')
 
 
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address')
-    def get_type(self,obj):
-        return 'lab'
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):

@@ -47,71 +47,6 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-# class OndocViewSet(mixins.CreateModelMixin,
-#                    mixins.RetrieveModelMixin,
-#                    mixins.UpdateModelMixin,
-#                    mixins.ListModelMixin,
-#                    viewsets.GenericViewSet):
-#     pass
-#
-#
-# class LabAppointmentsViewSet(OndocViewSet):
-#     authentication_classes = (TokenAuthentication, )
-#     permission_classes = (IsAuthenticated,)
-#     serializer_class = serializers.LabAppointmentSerializer
-#
-#     def get_queryset(self):
-#         user = self.request.user
-#         if user.user_type == User.DOCTOR:
-#             return models.LabAppointment.objects.filter(user=user.doctor, lab__is_live=True)
-#
-#     def list(self, request):
-#         user = request.user
-#         queryset = models.LabAppointment.objects.filter(lab__is_live=True).filter(lab__manageable_lab_admins__user=user,
-#                                                                                   lab__manageable_lab_admins__is_disabled=False).distinct()
-#         if not queryset:
-#             return Response([])
-#         serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
-#         serializer.is_valid(raise_exception=True)
-#
-#
-#         lab = serializer.validated_data.get('lab_id')
-#         profile = serializer.validated_data.get('profile_id')
-#         user = serializer.validated_data.get('user_id')
-#         date = serializer.validated_data.get('date')
-#
-#         if profile:
-#             queryset = queryset.filter(profile=profile)
-#
-#         if hospital:
-#             queryset = queryset.filter(hospital=hospital)
-#
-#         if doctor:
-#             queryset = queryset.filter(doctor=doctor)
-#
-#         if range == 'previous':
-#             queryset = queryset.filter(status__in=[models.OpdAppointment.COMPLETED,models.OpdAppointment.CANCELED]).order_by('-time_slot_start')
-#         elif range == 'upcoming':
-#             today = datetime.date.today()
-#             queryset = queryset.filter(
-#                 status__in=[models.OpdAppointment.BOOKED, models.OpdAppointment.RESCHEDULED_PATIENT,
-#                             models.OpdAppointment.RESCHEDULED_DOCTOR, models.OpdAppointment.ACCEPTED],
-#                 time_slot_start__date__gte=today).order_by('time_slot_start')
-#         elif range == 'pending':
-#             queryset = queryset.filter(time_slot_start__gt=timezone.now(), status__in = [models.OpdAppointment.BOOKED,
-#                                                                                          models.OpdAppointment.RESCHEDULED_PATIENT
-#                                                                                          ]).order_by('time_slot_start')
-#         else:
-#             queryset = queryset.order_by('-time_slot_start')
-#
-#         if date:
-#             queryset = queryset.filter(time_slot_start__date=date)
-#
-#         queryset = paginate_queryset(queryset, request)
-#         serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
-#         return Response(serializer.data)
-
-
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
@@ -417,8 +352,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             queryset = queryset.filter(lab=lab)
 
         if range == 'previous':
+            today = datetime.date.today()
             queryset = queryset.filter(
-                status__in=[models.LabAppointment.COMPLETED, models.LabAppointment.CANCELLED]).order_by(
+                status__in=[models.LabAppointment.COMPLETED, models.LabAppointment.CANCELLED], time_slot_start__date__lte=today).order_by(
                 '-time_slot_start')
         elif range == 'upcoming':
             today = datetime.date.today()
@@ -428,7 +364,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 time_slot_start__date__gte=today).order_by('time_slot_start')
         elif range == 'pending':
             queryset = queryset.filter(time_slot_start__gt=timezone.now(), status__in=[models.LabAppointment.BOOKED,
-                                                                                       models.LabAppointment.RESCHEDULED_LAB
+                                                                                       models.LabAppointment.RESCHEDULED_PATIENT
                                                                                        ]).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
