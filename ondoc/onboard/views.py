@@ -6,7 +6,7 @@ from ondoc.sendemail import api as email_api
 # import models here
 from ondoc.diagnostic.models import LabOnboardingToken, Lab, LabAward
 from ondoc.doctor.models import DoctorOnboardingToken, Doctor
-
+from django.conf import settings
 
 # import forms here.
 from .forms import LabForm, OTPForm, LabCertificationForm, LabAwardForm, LabAddressForm
@@ -126,7 +126,8 @@ def generate_doctor(request):
     if not request.is_ajax():
         return HttpResponse('invalid request')
 
-    host = request.get_host()
+    # host = request.get_host()
+    host = settings.BASE_URL
     doctor_id = request.POST.get('doctor_id')
     doctor = Doctor.objects.get(pk=doctor_id)
 
