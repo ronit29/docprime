@@ -354,7 +354,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         if range == 'previous':
             today = datetime.date.today()
             queryset = queryset.filter(
-                status__in=[models.LabAppointment.COMPLETED, models.LabAppointment.CANCELLED], time_slot_start__date__lt=today).order_by(
+                status__in=[models.LabAppointment.COMPLETED, models.LabAppointment.CANCELLED], time_slot_start__date__lte=today).order_by(
                 '-time_slot_start')
         elif range == 'upcoming':
             today = datetime.date.today()
@@ -364,7 +364,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 time_slot_start__date__gte=today).order_by('time_slot_start')
         elif range == 'pending':
             queryset = queryset.filter(time_slot_start__gt=timezone.now(), status__in=[models.LabAppointment.BOOKED,
-                                                                                       models.LabAppointment.RESCHEDULED_LAB
+                                                                                       models.LabAppointment.RESCHEDULED_PATIENT
                                                                                        ]).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
