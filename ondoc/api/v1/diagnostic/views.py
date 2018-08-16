@@ -324,12 +324,24 @@ class LabAppointmentView(mixins.CreateModelMixin,
                          mixins.RetrieveModelMixin,
                          viewsets.GenericViewSet):
 
-    queryset = LabAppointment.objects.all()
     serializer_class = diagnostic_serializer.LabAppointmentModelSerializer
-    # authentication_classes = (TokenAuthentication, )
-    # permission_classes = (IsAuthenticated, IsConsumer, )
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
+
+    def get_queryset(self):
+        request = self.request
+        if request.user.user_type == User.DOCTOR:
+            user = request.user
+            return (models.LabAppointment.objects.filter(lab__manageable_lab_admins__user=user))
+
+    # queryset = LabAppointment.objects.all()
+    # serializer_class = diagnostic_serializer.LabAppointmentModelSerializer
+    # # authentication_classes = (TokenAuthentication, )
+    # # permission_classes = (IsAuthenticated, IsConsumer, )
+    # filter_backends = (DjangoFilterBackend,)
+    # filter_fields = ('profile', 'lab',)
 
     def list(self, request, *args, **kwargs):
         user = request.user
@@ -344,8 +356,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
         profile = serializer.validated_data.get('profile_id')
         date = serializer.validated_data.get('date')
 
+
         if profile:
-            queryset = queryset.filter(profile=profile)
+            queryset = queryset.filter(profile=profile.id)
 
         if lab:
             queryset = queryset.filter(lab=lab.id)
@@ -355,6 +368,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             queryset = queryset.filter(
                 status__in=[models.LabAppointment.COMPLETED, models.LabAppointment.CANCELLED], time_slot_start__date__lte=today).order_by(
                 '-time_slot_start')
+
 
         elif range == 'upcoming':
             today = datetime.date.today()

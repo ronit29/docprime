@@ -642,6 +642,9 @@ class LabPrescriptionSerializer(serializers.Serializer):
 
     def validate_appointment(self, value):
         request = self.context.get('request')
-        if not LabAppointment.objects.filter(lab__manageable_lab_admins__user=request.user).exists():
-            raise serializers.ValidationError("Appointment is not correct.")
+
+        if not LabAppointment.objects.filter(Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user) |
+                                             Q(lab__network__isnull=False,
+                                               lab__network__manageable_lab_network_admins__user=request.user)).exists():
+            raise serializers.ValidationError("User is not authorized to upload prescription.")
         return value
