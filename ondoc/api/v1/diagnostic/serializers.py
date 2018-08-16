@@ -1,9 +1,10 @@
 from rest_framework import serializers
+from rest_framework.fields import CharField
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabPrescriptionFile)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
-from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
+from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
 from ondoc.api.v1.utils import form_time_slot
 from ondoc.doctor.models import OpdAppointment
@@ -601,11 +602,11 @@ class AppointmentCompleteBodySerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid Appointment")
         return attrs
 
+
 class LabAppointmentFilterSerializer(serializers.Serializer):
     CHOICES = ['all', 'previous', 'upcoming', 'pending']
-
     range = serializers.ChoiceField(choices=CHOICES, required=False)
-    lab_id = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True), required=False)
+    lab_id = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=False)
     profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
     date = serializers.DateField(required=False)
 
