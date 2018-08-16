@@ -169,6 +169,66 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        # setup permissions for super qc team
+        group, created = Group.objects.get_or_create(name=constants['SUPER_QC_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Doctor, Hospital, HospitalNetwork, Lab, LabNetwork)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct), Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+
+        content_types = ContentType.objects.get_for_models(
+            Qualification, Specialization, Language, MedicalService, College, GeneralSpecialization, LabTest,
+            LabTestType, LabService)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+
+        content_types = ContentType.objects.get_for_models(
+            DoctorClinic, DoctorClinicTiming,
+            DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
+            DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
+            DoctorMobile, DoctorEmail, HospitalSpeciality,
+            HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
+            HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
+            HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
+            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(LabTiming, LabImage,
+                                                           LabManager, LabAccreditation, LabAward, LabCertification,
+                                                           LabNetworkCertification, LabNetworkAward,
+                                                           LabNetworkAccreditation, LabNetworkEmail,
+                                                           LabNetworkHelpline,
+                                                           LabNetworkManager, LabService, LabDoctorAvailability,
+                                                           LabDoctor, LabDocument, LabNetworkDocument)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+
         # Create Pricing Groups
         group, created = Group.objects.get_or_create(name=constants['LAB_PRICING_GROUP_NAME'])
         group.permissions.clear()

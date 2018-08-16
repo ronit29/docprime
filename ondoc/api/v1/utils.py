@@ -160,7 +160,7 @@ def form_time_slot(timestamp, time):
     to_zone = tz.gettz(settings.TIME_ZONE)
     min, hour = math.modf(time)
     min *= 60
-    dt_field = timestamp.astimezone(to_zone).replace(hour=int(hour), minute=int(min), microsecond=0)
+    dt_field = timestamp.astimezone(to_zone).replace(hour=int(hour), minute=int(min), second=0, microsecond=0)
     return dt_field
 
 
@@ -244,6 +244,7 @@ def labappointment_transform(app_data):
     app_data["lab"] = app_data["lab"].id
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
+    app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
     return app_data
 
 

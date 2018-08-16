@@ -337,7 +337,7 @@ class EmailNotificationOpdMixin:
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            context.update({"invoice_url": settings.BASE_URL + invoice.file.url})
+            context.update({"invoice_url": invoice.file.url})
             html_body = render_to_string("email/doctor_invoice/body.html", context=context)
             email_subject = render_to_string("email/doctor_invoice/subject.txt", context=context)
         return html_body, email_subject
@@ -381,7 +381,7 @@ class EmailNotificationLabMixin:
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for lab invoice {}".format(e))
-            context.update({"invoice_url": settings.BASE_URL + invoice.file.url})
+            context.update({"invoice_url": invoice.file.url})
             html_body = render_to_string("email/lab_invoice/body.html", context=context)
             email_subject = render_to_string("email/lab_invoice/subject.txt", context=context)
         return html_body, email_subject

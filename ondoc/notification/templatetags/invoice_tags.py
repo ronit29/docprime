@@ -35,3 +35,10 @@ def get_absolute_url(url):
     else:
         return settings.BASE_URL +url
 
+
+@register.filter
+def get_media_absolute_url(url):
+    if bool(urlparse(url).netloc):
+        return url
+    else:
+        return settings.BASE_URL +url
