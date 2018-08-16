@@ -548,10 +548,22 @@ class LabAppointment(TimeStampedModel):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
         return allowed
 
+    def is_to_send_notification(self, database_instance):
+        if not database_instance:
+            return True
+        if database_instance.status != self.status:
+            return True
+        if (database_instance.status == self.status
+                and database_instance.time_slot_start != self.time_slot_start
+                and database_instance.status in [LabAppointment.RESCHEDULED_LAB, LabAppointment.RESCHEDULED_PATIENT]
+                and self.status in [LabAppointment.RESCHEDULED_LAB, LabAppointment.RESCHEDULED_PATIENT]):
+            return True
+        return False
+
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
-        if (not database_instance) or (not database_instance.status == self.status):
+        if self.is_to_send_notification(database_instance):
             notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=5)
 
         if not database_instance or database_instance.status != self.status:

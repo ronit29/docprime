@@ -991,61 +991,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
                        order_by("created_at").last())
         return consumer_tx.amount
 
-    def send_notification(self, database_instance):
-        doctor_admins = auth_model.GenericAdmin.get_appointment_admins(self)
-        if database_instance and database_instance.status == self.status:
-            return
-        if self.user and self.status == OpdAppointment.ACCEPTED:
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_ACCEPTED,
-            )
-        elif self.status == OpdAppointment.RESCHEDULED_PATIENT:
-            for admin in doctor_admins:
-                notification_models.NotificationAction.trigger(
-                    instance=self,
-                    user=admin,
-                    notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
-            if not self.user:
-                return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
-        elif self.status == OpdAppointment.RESCHEDULED_DOCTOR:
-            if not self.user:
-                return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR)
-        elif self.status == OpdAppointment.BOOKED:
-            for admin in doctor_admins:
-                notification_models.NotificationAction.trigger(
-                    instance=self,
-                    user=admin,
-                    notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED)
-        elif self.status == OpdAppointment.CANCELLED:
-            for admin in doctor_admins:
-                notification_models.NotificationAction.trigger(
-                    instance=self,
-                    user=admin,
-                    notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED)
-            if not self.user:
-                return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED)
-        elif self.status == OpdAppointment.COMPLETED:
-            if not self.user:
-                return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.DOCTOR_INVOICE,
-            )
 
     def is_doctor_available(self):
         if DoctorLeave.objects.filter(start_date__lte=self.time_slot_start.date(),
@@ -1057,12 +1002,24 @@ class OpdAppointment(auth_model.TimeStampedModel):
             return False
         return True
 
+    def is_to_send_notification(self, database_instance):
+        if not database_instance:
+            return True
+        if database_instance.status != self.status:
+            return True
+        if (database_instance.status == self.status
+                and database_instance.time_slot_start != self.time_slot_start
+                and database_instance.status in [OpdAppointment.RESCHEDULED_DOCTOR, OpdAppointment.RESCHEDULED_PATIENT]
+                and self.status in [OpdAppointment.RESCHEDULED_DOCTOR, OpdAppointment.RESCHEDULED_PATIENT]):
+            return True
+        return False
+
     def save(self, *args, **kwargs):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
         super().save(*args, **kwargs)
-        if (not database_instance) or (not database_instance.status == self.status):
+        if self.is_to_send_notification(database_instance):
             notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=5)
         if not database_instance or database_instance.status != self.status:
             for e_id in settings.OPS_EMAIL_ID:
