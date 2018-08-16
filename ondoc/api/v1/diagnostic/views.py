@@ -855,8 +855,15 @@ class LabPrescriptionFileViewset(mixins.CreateModelMixin,
                                                 write_permission=True).exists()
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
+        lab_appointment = request.query_params.get("labappointment")
+        if not lab_appointment:
+            return Response(status=400)
+        try:
+            lab_appointment = int(lab_appointment)
+        except TypeError:
+            return Response("Can't convert labappointment to Integer.")
+        queryset = self.get_queryset().filter(prescription__appointment=lab_appointment)
         serializer = serializers.LabPrescriptionFileSerializer(
-            data=queryset, many=True)
+            data=queryset, many=True, context={"request": request})
         serializer.is_valid()
         return Response(serializer.data)
