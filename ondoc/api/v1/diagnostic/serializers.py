@@ -257,6 +257,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     status = serializers.IntegerField()
     payment_type = serializers.IntegerField()
     lab_test = serializers.ListField(child=serializers.IntegerField())
+    home_pickup_charges = serializers.DecimalField(max_digits=10, decimal_places=2)
     is_home_pickup = serializers.BooleanField(default=False)
     address = serializers.JSONField(required=False)
 
@@ -431,7 +432,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
     @staticmethod
     def time_slot_validator(data, request):
-        start_dt = (CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
+        start_dt = (form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         if start_dt < timezone.now():
             logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
@@ -557,9 +558,23 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
     lab_test = AvailableLabTestSerializer(many=True)
-    address = serializers.ReadOnlyField(source='address.address')
+    address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
 
+    def get_address(self, obj):
+        resp_address = ""
+        if obj.address:
+            if obj.address.get("address"):
+                resp_address += str(obj.address.get("address"))
+            if obj.address.get("land_mark"):
+                if resp_address:
+                    resp_address += ", "
+                resp_address += str(obj.address.get("land_mark"))
+            if obj.address.get("pincode"):
+                if resp_address:
+                    resp_address += ", "
+                resp_address += str(obj.address.get("pincode"))
+        return resp_address
 
     class Meta:
         model = LabAppointment
@@ -595,6 +610,8 @@ class AppointmentCompleteBodySerializer(serializers.Serializer):
         if appntmnt.exists():
             if appntmnt.first().status == LabAppointment.COMPLETED:
                 raise serializers.ValidationError("Appointment Already Completed")
+            if appntmnt.first().status == LabAppointment.CANCELLED:
+                raise serializers.ValidationError("Cannot Complete a Cancelled Appointment")
             if not appntmnt.filter(otp=attrs['otp']).exists():
                 raise serializers.ValidationError("Invalid Confirmation Code")
         else:
