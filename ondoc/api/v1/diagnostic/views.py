@@ -340,7 +340,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = serializers.LabAppointmentFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         range = serializer.validated_data.get('range')
-        lab = serializer.validated_data.get('lab_id').id
+        lab = serializer.validated_data.get('lab_id')
         profile = serializer.validated_data.get('profile_id')
         date = serializer.validated_data.get('date')
 
@@ -348,7 +348,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             queryset = queryset.filter(profile=profile)
 
         if lab:
-            queryset = queryset.filter(lab=lab)
+            queryset = queryset.filter(lab=lab.id)
 
         if range == 'previous':
             today = datetime.date.today()
