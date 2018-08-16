@@ -10,7 +10,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
 from ondoc.authentication.models import UserProfile
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
-from ondoc.api.v1.utils import is_valid_testing_data
+from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 import math
@@ -159,7 +159,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
         MAX_APPOINTMENTS_ALLOWED = 3
         MAX_FUTURE_DAY = 40
         request = self.context.get("request")
-        time_slot_start = (self.form_time_slot(data.get('start_date'), data.get('start_time'))
+        time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
                            if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         time_slot_end = None
@@ -169,7 +169,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
             raise serializers.ValidationError("Both User and Doctor should be for testing")
 
         if data.get('end_date') and data.get('end_time'):
-            time_slot_end = self.form_time_slot(data.get('end_date'), data.get('end_time'))
+            time_slot_end = form_time_slot(data.get('end_date'), data.get('end_time'))
 
         if not request.user.user_type == User.CONSUMER:
             logger.error(
@@ -226,7 +226,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
         to_zone = tz.gettz(settings.TIME_ZONE)
         min, hour = math.modf(time)
         min *= 60
-        dt_field = timestamp.astimezone(to_zone).replace(hour=int(hour), minute=int(min), microsecond=0)
+        dt_field = timestamp.astimezone(to_zone).replace(hour=int(hour), minute=int(min), second=0, microsecond=0)
         return dt_field
 
 
