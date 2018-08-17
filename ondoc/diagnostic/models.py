@@ -2,7 +2,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
-                                         UserPermission, GenericAdmin, LabUserPermission)
+                                         UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin)
 from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -606,6 +606,12 @@ class LabAppointment(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
+        try:
+            if self.status == self.COMPLETED and (not database_instance or database_instance.status != self.status):
+                out_obj = self.outstanding_create()
+                self.outstanding = out_obj
+        except:
+            pass
         super().save(*args, **kwargs)
         self.send_notification(database_instance)
 
@@ -688,14 +694,18 @@ class LabAppointment(TimeStampedModel):
 
     def action_completed(self):
         self.status = self.COMPLETED
-        self.save()
+        out_obj = None
         if self.payment_type != OpdAppointment.INSURANCE:
-            admin_obj, out_level = self.get_billable_admin_level()
-            app_outstanding_fees = self.lab_payout_amount()
-            Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+            out_obj = self.outstanding_create()
+        if out_obj:
+            self.outstanding = out_obj
+        self.save()
 
-        # if self.payment_type != self.INSURANCE:
-        #     Outstanding.create_outstanding(self)
+    def outstanding_create(self):
+        admin_obj, out_level = self.get_billable_admin_level()
+        app_outstanding_fees = self.lab_payout_amount()
+        out_obj = Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+        return out_obj
 
     def get_billable_admin_level(self):
         if self.lab.network and self.lab.network.is_billing_enabled:
@@ -716,36 +726,31 @@ class LabAppointment(TimeStampedModel):
         month = req_data.get("month")
         year = req_data.get("year")
         payment_type = req_data.get("payment_type")
-        out_level = req_data.get("outstanding_level")
+        out_level = req_data.get("level")
         admin_id = req_data.get("admin_id")
         out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
-                                             outstanding_month=month, outstanding_year=year)
+                                             outstanding_month=month, outstanding_year=year).first()
         start_date_time, end_date_time = get_start_end_datetime(month, year)
-        lab_data = UserPermission.get_billable_doctor_hospital(user)
-        lab_list = list()
-        for data in lab_data:
-            if data.get("lab"):
-                lab_list.append(data["lab"])
+
         if payment_type in [OpdAppointment.COD, OpdAppointment.PREPAID]:
             payment_type = [OpdAppointment.COD, OpdAppointment.PREPAID]
         elif payment_type in [OpdAppointment.INSURANCE]:
             payment_type = [OpdAppointment.INSURANCE]
-        queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+
+        queryset = (LabAppointment.objects.filter(outstanding=out_obj, status=cls.COMPLETED,
                                                   time_slot_start__gte=start_date_time,
                                                   time_slot_start__lte=end_date_time,
-                                                  payment_type__in=payment_type,
-                                                  lab__in=lab_list, outstanding=out_obj))
+                                                  payment_type__in=payment_type))
         if payment_type != OpdAppointment.INSURANCE:
             tcp_condition = Case(When(payment_type=OpdAppointment.COD, then=F("effective_price")),
                                  When(~Q(payment_type=OpdAppointment.COD), then=0))
-            tcs_condition = Case(When(payment_type=OpdAppointment.COD, then=F("agreed_price")),
+            tcs_condition = Case(When(payment_type=OpdAppointment.COD, then=F("agreed_price")+F("home_pickup_charges")),
                                  When(~Q(payment_type=OpdAppointment.COD), then=0))
-            tpf_condition = Case(When(payment_type=OpdAppointment.PREPAID, then=F("agreed_price")),
+            tpf_condition = Case(When(payment_type=OpdAppointment.PREPAID, then=F("agreed_price")+F("home_pickup_charges")),
                                  When(~Q(payment_type=OpdAppointment.PREPAID), then=0))
             queryset = queryset.values("lab").annotate(total_cash_payment=Sum(tcp_condition),
                                                        total_cash_share=Sum(tcs_condition),
                                                        total_online_payout=Sum(tpf_condition))
-
         return queryset
 
     @classmethod

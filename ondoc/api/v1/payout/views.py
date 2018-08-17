@@ -2,7 +2,7 @@ from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
-from ondoc.api.v1.payout.serializers import BillingSummarySerializer
+from ondoc.api.v1.payout.serializers import BillingSummarySerializer, BillingSerializer
 from ondoc.api.v1.doctor.serializers import OpdAppointmentBillingSerializer
 from ondoc.api.v1.diagnostic.serializers import LabAppointmentBillingSerializer
 from ondoc.api.v1.utils import get_previous_month_year
@@ -22,42 +22,52 @@ class BillingViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
         params = request.query_params
-        billing_admin_id = int(params.get('admin_id')) if params.get('admin_id') is not None else None
-        level = int(params.get('level')) if params.get('level') is not None else None
+        serializer = BillingSerializer(data=params)
+        serializer.is_valid(raise_exception=True)
+        billing_admin_id = serializer.validated_data.get("admin_id")
+        level = serializer.validated_data.get("level")
         user = request.user
-        user_admin_list = auth_model.GenericAdmin.get_user_admin_obj(user)
+        if level in [Outstanding.HOSPITAL_NETWORK_LEVEL, Outstanding.HOSPITAL_LEVEL, Outstanding.DOCTOR_LEVEL]:
+            user_admin_list = auth_model.GenericAdmin.get_user_admin_obj(user)
+        elif level in [Outstanding.LAB_LEVEL, Outstanding.LAB_NETWORK_LEVEL]:
+            user_admin_list = auth_model.GenericLabAdmin.get_user_admin_obj(user)
         resp_data = list()
         for user_admin in user_admin_list:
             admin_obj = user_admin['admin_obj']
             out_level = user_admin['admin_level']
-            if billing_admin_id and level and billing_admin_id == admin_obj.id and level == out_level:
+            if billing_admin_id == admin_obj.id and level == out_level:
                 self.form_billing_data(admin_obj, out_level, resp_data)
 
         return Response(resp_data)
 
     def form_billing_data(self, admin_obj, out_level, resp_data):
-        out_obj = Outstanding.objects.filter(net_hos_doc_id=admin_obj.id, outstanding_level=out_level)
-
+        out_obj = Outstanding.objects.filter(net_hos_doc_id=admin_obj.id, outstanding_level=out_level).order_by(
+            'outstanding_year', 'outstanding_month')
         prev = None
         for obj in out_obj:
             temp_data = Outstanding.get_month_billing(prev, obj)
-            # temp_data[""]
             resp_data.append(temp_data)
             prev = obj
 
     def current_billing(self, request):
         params = request.query_params
         user = request.user
-        billing_admin_id = int(params.get('admin_id')) if params.get('admin_id') is not None else None
-        level = int(params.get('level')) if params.get('level') is not None else None
-        user_admin_list = auth_model.GenericAdmin.get_user_admin_obj(user)
+        serializer = BillingSerializer(data=params)
+        serializer.is_valid(raise_exception=True)
+        billing_admin_id = serializer.validated_data.get("admin_id")
+        level = serializer.validated_data.get("level")
+        # user_admin_list = auth_model.GenericAdmin.get_user_admin_obj(user)
+        user_admin_list = None
+        if level in [Outstanding.HOSPITAL_NETWORK_LEVEL, Outstanding.HOSPITAL_LEVEL, Outstanding.DOCTOR_LEVEL]:
+            user_admin_list = auth_model.GenericAdmin.get_user_admin_obj(user)
+        elif level in [Outstanding.LAB_LEVEL, Outstanding.LAB_NETWORK_LEVEL]:
+            user_admin_list = auth_model.GenericLabAdmin.get_user_admin_obj(user)
         resp_data = list()
         for user_admin in user_admin_list:
             admin_obj = user_admin['admin_obj']
             out_level = user_admin['admin_level']
             if billing_admin_id and level and billing_admin_id == admin_obj.id and level == out_level:
                 self.form_cb_data(admin_obj, out_level, resp_data)
-
         return Response(resp_data)
 
     def form_cb_data(self, admin_obj, out_level, resp_data):
@@ -65,18 +75,17 @@ class BillingViewSet(viewsets.GenericViewSet):
         present_month, present_year = now.month, now.year
         prev_month, prev_year = get_previous_month_year(present_month, present_year)
 
-        out_obj = (Outstanding.objects.
-                   filter(net_hos_doc_id=admin_obj.id, outstanding_level=out_level).
-                   filter((Q(outstanding_month=present_month) & Q(outstanding_year=present_year)) |
-                          (Q(outstanding_month=prev_month) & Q(outstanding_year=present_year))).
-                   order_by('outstanding_year', 'outstanding_month'))
+        out_obj = (Outstanding.objects.filter(net_hos_doc_id=admin_obj.id, outstanding_level=out_level).order_by(
+            '-outstanding_year', '-outstanding_month'))[:2]
 
-        if out_obj.exists():
+        if out_obj:
             prev_obj = None
-            present_obj = out_obj[0]
-            if out_obj.count() == 2:
-                prev_obj = out_obj[0]
-                present_obj = out_obj[1]
+            present_obj = None
+            if out_obj.count() == 2 and out_obj[0].outstanding_year == present_year and out_obj[0].outstanding_month == present_month:
+                present_obj = out_obj[0]
+                prev_obj = out_obj[1]
+            elif out_obj[0].outstanding_month == present_month and out_obj[0].outstanding_year == present_year:
+                present_obj = out_obj[0]
             resp_data.append(Outstanding.get_month_billing(prev_obj, present_obj))
 
     def billing_summary(self, request):
