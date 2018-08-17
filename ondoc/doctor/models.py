@@ -1316,6 +1316,7 @@ class CommonMedicalCondition(auth_model.TimeStampedModel):
 
 class CommonSpecialization(auth_model.TimeStampedModel):
     specialization = models.OneToOneField(Specialization, related_name="common_specialization", on_delete=models.CASCADE)
+    icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
 
     def __str__(self):
         return "{}".format(self.specialization)
