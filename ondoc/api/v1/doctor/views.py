@@ -649,10 +649,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
     def common_conditions(self, request):
         medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all()[:10]
-        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True)
+        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
 
         common_specializations = models.CommonSpecialization.objects.select_related('specialization').all()[:10]
-        specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True)
+        specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data})
 
 

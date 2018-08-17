@@ -6,7 +6,8 @@ from ondoc.sendemail import api as email_api
 # import models here
 from ondoc.diagnostic.models import LabOnboardingToken, Lab, LabAward
 from ondoc.doctor.models import DoctorOnboardingToken, Doctor
-
+from django.conf import settings
+from django.utils.safestring import mark_safe
 
 # import forms here.
 from .forms import LabForm, OTPForm, LabCertificationForm, LabAwardForm, LabAddressForm
@@ -114,7 +115,6 @@ def generate(request):
                 '\n\nFor any queries you can connect with our representative over the phone which is already associated with you.'
                 )
 
-
     email_api.send_email(lab.primary_email, 'Onboarding link for '+lab.name, message)
     lab.onboarding_status = lab.REQUEST_SENT
     lab.save()
@@ -133,17 +133,18 @@ def generate_doctor(request):
     DoctorOnboardingToken.objects.filter(doctor_id=doctor_id, status=DoctorOnboardingToken.GENERATED).update(status=DoctorOnboardingToken.REJECTED)
     p_email = doctor.emails.filter(is_primary=True)[0]
     p_mobile = doctor.mobiles.filter(is_primary=True)[0]
-    token = DoctorOnboardingToken(status=1,email=p_email.email,mobile=p_mobile.number,doctor_id=doctor_id, token=randint(1000000000, 9000000000))
+    token = DoctorOnboardingToken(status=1,email=p_email.email, mobile=p_mobile.number,doctor_id=doctor_id, token=randint(1000000000, 9000000000))
     token.save()
-    url = host + '/onboard/doctor?token='+str(token.token)
+    url = str(host) + '/onboard/doctor?token='+str(token.token)
 
-    message =  ('Dear Sir/Mam,\n\n'
-                'Please find below the enrolment URL Link:-\n\n'+url+
-                '\n\nWe request you to kindly complete the form by filling an empanelment form to start working together for patient requirements like consultations and investigations.'
-                '\n\nOur agreed rate list along with terms and condition are available on the link for your kind perusal.'
-                '\n\nFor any queries you can connect with our representative over the phone which is already associated with you.'
-                )
+    message = '''Dear Sir/Mam,
+                 \n\nPlease find below the enrolment URL Link:-
+                 \n\n<a href="%s" target="_blank">%s</a>
+                 \n\nWe request you to kindly complete the form by filling an empanelment form to start working together for patient requirements like consultations and investigations.
+                 \n\nOur agreed rate list along with terms and condition are available on the link for your kind perusal.
+                 \n\nFor any queries you can connect with our representative over the phone which is already associated with you.''' % (url, url)
 
+    message = mark_safe(message)
     email_api.send_email(p_email.email, 'Onboarding link for '+doctor.name, message)
     doctor.onboarding_status = doctor.REQUEST_SENT
     doctor.save()

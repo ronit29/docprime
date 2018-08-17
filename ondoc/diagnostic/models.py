@@ -816,6 +816,7 @@ class LabAppointment(TimeStampedModel):
 
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
+    icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
 
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)

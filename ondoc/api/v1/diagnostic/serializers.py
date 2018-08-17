@@ -149,10 +149,16 @@ class LabCustomSerializer(serializers.Serializer):
 class CommonTestSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='test.id')
     name = serializers.ReadOnlyField(source='test.name')
+    icon = serializers.SerializerMethodField
+
+    def get_icon(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
+
 
     class Meta:
         model = CommonTest
-        fields = ('id', 'name', )
+        fields = ('id', 'name', 'icon')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
