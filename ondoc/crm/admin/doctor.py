@@ -16,8 +16,8 @@ from django.utils import timezone
 import pytz
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from django.contrib.contenttypes.admin import GenericTabularInline
-from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 from ondoc.authentication.models import GenericAdmin, BillingAccount
+from ondoc.authentication import forms as auth_forms
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
@@ -35,7 +35,7 @@ from django.template.loader import render_to_string
 import nested_admin
 from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
-
+from django import forms
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -594,31 +594,19 @@ class DoctorResource(resources.ModelResource):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
 
-class BillingAccountFormSet(BaseGenericInlineFormSet):
-    def clean(self):
-        super().clean()
-        if any(self.errors):
-            return
-        enabled = 0
-        count = 0
-        for value in self.cleaned_data:
-            count += 1
-            if value.get('enabled'):
-                enabled += 1
-
-        if count > 0:
-            if enabled >= 1:
-                raise forms.ValidationError("Only one Billing Account can be enabled")
-
-
 class BillingAccountInline(GenericTabularInline, nested_admin.NestedTabularInline):
-    formset = BillingAccountFormSet
+    form = auth_forms.BillingAccountForm
+    formset = auth_forms.BillingAccountFormSet
     can_delete = False
     extra = 0
     model = BillingAccount
     show_change_link = False
     readonly_fields = ['merchant_id']
     fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'enabled']
+
+
+# class BillingAccountAdmin(VersionAdmin):
+#     search_fields = ['merchant_id']
 
 
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):

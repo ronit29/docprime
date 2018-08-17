@@ -790,7 +790,10 @@ class BillingAccount(models.Model):
         return merchant_id
 
     def __str__(self):
-        return '{}-{}'.format(self.name, self.merchant_id)
+        if self.merchant_id and self.content_type:
+            return '{}-{}'.format(self.content_type, self.merchant_id)
+        else:
+            return self.id
 
 
 

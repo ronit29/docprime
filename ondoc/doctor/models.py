@@ -123,6 +123,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
     # generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
+    billing_merchant = GenericRelation(auth_model.BillingAccount)
 
     def __str__(self):
         return self.name
@@ -708,6 +709,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
 
     # generic_hospital_network_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital_networks')
+    billing_merchant = GenericRelation(auth_model.BillingAccount)
 
     def __str__(self):
         return self.name + " (" + self.city + ")"

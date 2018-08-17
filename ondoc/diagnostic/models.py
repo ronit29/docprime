@@ -2,7 +2,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
-                                         UserPermission, GenericAdmin, LabUserPermission)
+                                         UserPermission, GenericAdmin, LabUserPermission, BillingAccount)
 from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -152,6 +152,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
+    billing_merchant = GenericRelation(BillingAccount)
+
 
     def __str__(self):
         return self.name
@@ -318,6 +320,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
 
     # generic_lab_network_admins = GenericRelation(GenericAdmin, related_query_name='manageable_lab_networks')
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab_networks')
+    billing_merchant = GenericRelation(BillingAccount)
 
 
     def __str__(self):

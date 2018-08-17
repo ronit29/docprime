@@ -9,10 +9,9 @@ from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabNetworkDocument)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User
+from ondoc.authentication.models import GenericAdmin, User, BillingAccount
 from django.contrib.contenttypes.admin import GenericTabularInline
-
-
+from ondoc.authentication import forms as auth_forms
 
 class LabNetworkCertificationInline(admin.TabularInline):
     model = LabNetworkCertification
@@ -147,6 +146,17 @@ class LabNetworkDocumentInline(admin.TabularInline):
     show_change_link = False
 
 
+class BillingAccountInline(GenericTabularInline):
+    form = auth_forms.BillingAccountForm
+    formset = auth_forms.BillingAccountFormSet
+    can_delete = False
+    extra = 0
+    model = BillingAccount
+    show_change_link = False
+    readonly_fields = ['merchant_id']
+    fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'enabled']
+
+
 class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     form = LabNetworkForm
     formfield_overrides = {
@@ -173,7 +183,8 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
                LabNetworkAccreditationInline,
                LabNetworkAwardInline,
                LabNetworkCertificationInline,
-               LabNetworkDocumentInline]
+               LabNetworkDocumentInline,
+               BillingAccountInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

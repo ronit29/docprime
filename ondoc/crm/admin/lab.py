@@ -25,11 +25,10 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User, QCModel
-from django.contrib.contenttypes.admin import GenericTabularInline
-from django.contrib.admin.widgets import AdminSplitDateTime
+from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget
-
+from django.contrib.contenttypes.admin import GenericTabularInline
+from ondoc.authentication import forms as auth_forms
 
 class LabTestResource(resources.ModelResource):
     excel_id = fields.Field(attribute='excel_id', column_name='Test ID')
@@ -279,6 +278,17 @@ class LabCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 
+class BillingAccountInline(GenericTabularInline):
+    form = auth_forms.BillingAccountForm
+    formset = auth_forms.BillingAccountFormSet
+    can_delete = False
+    extra = 0
+    model = BillingAccount
+    show_change_link = False
+    readonly_fields = ['merchant_id']
+    fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'enabled']
+
+
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     change_list_template = 'superuser_import_export.html'
@@ -400,7 +410,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     form = LabForm
     search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline]
+        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, BillingAccountInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
