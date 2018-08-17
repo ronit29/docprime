@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
@@ -80,7 +81,7 @@ class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
 
 
 class DoctorAppointmentsViewSet(OndocViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
     serializer_class = serializers.OpdAppointmentSerializer
 
@@ -350,8 +351,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
 
 class DoctorProfileView(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsDoctor)
 
     def get_queryset(self):
         return models.OpdAppointment.objects.all()
@@ -433,7 +434,7 @@ class DoctorHospitalView(mixins.ListModelMixin,
                          mixins.RetrieveModelMixin,
                          viewsets.GenericViewSet):
 
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, )
 
     queryset = models.DoctorClinic.objects.filter(doctor__is_live=True, hospital__is_live=True)
@@ -489,7 +490,7 @@ class DoctorHospitalView(mixins.ListModelMixin,
 class DoctorBlockCalendarViewSet(OndocViewSet):
 
     serializer_class = serializers.DoctorLeaveSerializer
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, DoctorPermission,)
     INTERVAL_MAPPING = {models.DoctorLeave.INTERVAL_MAPPING.get(key): key for key in
                         models.DoctorLeave.INTERVAL_MAPPING.keys()}
@@ -539,7 +540,7 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
 
 class PrescriptionFileViewset(OndocViewSet):
     serializer_class = serializers.PrescriptionFileSerializer
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, )
 
     def get_queryset(self):

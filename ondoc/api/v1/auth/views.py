@@ -185,12 +185,15 @@ class UserViewset(GenericViewSet):
         GenericAdmin.update_user_admin(phone_number)
         self.update_live_status(phone_number)
 
-        token = Token.objects.get_or_create(user=user)
+        # token = Token.objects.get_or_create(user=user)
+        payload = JWTAuthentication.jwt_payload_handler(user)
+        token = jwt.encode(payload, settings.SECRET_KEY)
         expire_otp(data['phone_number'])
 
         response = {
             "login": 1,
-            "token": str(token[0])
+            "token": token,
+            "expiration_time": payload['exp']
         }
         return Response(response)
 
@@ -242,6 +245,7 @@ class NotificationEndpointViewSet(GenericViewSet):
 
 
 class NotificationViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def list(self, request):
@@ -254,10 +258,10 @@ class NotificationViewSet(GenericViewSet):
 class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                          mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
                          GenericViewSet):
+
     serializer_class = serializers.UserProfileSerializer
-    queryset = UserProfile.objects.all()
-    # authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated, )
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsConsumer)
     pagination_class = None
 
     def get_queryset(self):
@@ -345,7 +349,7 @@ class OndocViewSet(mixins.CreateModelMixin,
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
-    # authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication , )
     permission_classes = (IsAuthenticated, IsConsumer, )
 
     def get_queryset(self):
@@ -687,7 +691,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
 class AddressViewsSet(viewsets.ModelViewSet):
     serializer_class = serializers.AddressSerializer
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -781,7 +785,7 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
 
 
 class UserIDViewSet(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -964,7 +968,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 class UserTransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.UserTransactionModelSerializer
     queryset = ConsumerTransaction.objects.all()
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def list(self, request):
@@ -994,7 +998,7 @@ class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
 
 
 class OrderHistoryViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
@@ -1090,7 +1094,7 @@ class OrderHistoryViewSet(GenericViewSet):
 
 
 class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
@@ -1113,7 +1117,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
 
 class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
@@ -1215,7 +1219,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
 
 
 class OrderViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request, pk):
@@ -1244,7 +1248,7 @@ class OrderViewSet(GenericViewSet):
 
 
 class ConsumerAccountRefundViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
 
     @transaction.atomic
@@ -1260,10 +1264,7 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
         return Response(resp)
 
 
-
 class RefreshJSONWebToken(GenericViewSet):
-
-    # serializer_class = serializers.RefreshJSONWebTokenSerializer
 
     def refresh(self, request):
         data = {}
@@ -1272,6 +1273,3 @@ class RefreshJSONWebToken(GenericViewSet):
         data['token'] = serializer.validated_data['token']
         data['payload'] = serializer.validated_data['payload']
         return Response(data)
-
-# refresh_jwt_token = RefreshJSONWebToken.as_view()
-# verify_jwt_token = VerifyJSONWebToken.as_view()
