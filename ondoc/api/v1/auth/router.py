@@ -6,7 +6,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken)
 
 urlpatterns = [
-    path('api-token-refresh/', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
+    path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
     # path('api-token-verify/', RefreshJSONWebToken.as_view({'post': 'verify'}), name='token-verify'),
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
     # path('otp/verify', OTP.as_view({'post': 'verify'}), name='otp-verify'),
