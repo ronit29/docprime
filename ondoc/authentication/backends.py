@@ -85,7 +85,5 @@ class JWTAuthentication(authentication.BaseAuthentication):
             )
         }
 
-def jwt_username_handler(user=None):
-    return {'phone_number': user['phone_number']}
 
 
