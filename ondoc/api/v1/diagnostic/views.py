@@ -12,7 +12,7 @@ from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -324,72 +324,64 @@ class LabAppointmentView(mixins.CreateModelMixin,
                          mixins.RetrieveModelMixin,
                          viewsets.GenericViewSet):
 
-    queryset = LabAppointment.objects.all()
     serializer_class = diagnostic_serializer.LabAppointmentModelSerializer
-    # authentication_classes = (TokenAuthentication, )
-    # permission_classes = (IsAuthenticated, IsConsumer, )
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
 
+    def get_queryset(self):
+        request = self.request
+        if request.user.user_type == User.DOCTOR:
+            return models.LabAppointment.objects.filter(
+                Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user,
+                  lab__manageable_lab_admins__is_disabled=False) |
+                Q(lab__network__isnull=False,
+                  lab__network__manageable_lab_network_admins__user=request.user,
+                  lab__network__manageable_lab_network_admins__is_disabled=False)).distinct()
+
     def list(self, request, *args, **kwargs):
-        user = request.user
-        queryset = LabAppointment.objects.filter(lab__manageable_lab_admins__user=user)
-        # serializer = diagnostic_serializer.LabAppointmentModelSerializer(queryset, many=True, context={'request': request})
+        queryset = self.get_queryset()
         if not queryset:
             return Response([])
         serializer = serializers.LabAppointmentFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         range = serializer.validated_data.get('range')
-        lab = serializer.validated_data.get('lab_id').id
+        lab = serializer.validated_data.get('lab_id')
         profile = serializer.validated_data.get('profile_id')
         date = serializer.validated_data.get('date')
-
         if profile:
-            queryset = queryset.filter(profile=profile)
-
+            queryset = queryset.filter(profile=profile.id)
         if lab:
-            queryset = queryset.filter(lab=lab)
-
+            queryset = queryset.filter(lab=lab.id)
+        today = datetime.date.today()
         if range == 'previous':
-            today = datetime.date.today()
             queryset = queryset.filter(
-                status__in=[models.LabAppointment.COMPLETED, models.LabAppointment.CANCELLED], time_slot_start__date__lte=today).order_by(
-                '-time_slot_start')
-
+                status__in=[models.LabAppointment.COMPLETED, models.LabAppointment.CANCELLED])\
+                .order_by('-time_slot_start')
         elif range == 'upcoming':
-            today = datetime.date.today()
             queryset = queryset.filter(
                 status__in=[models.LabAppointment.BOOKED, models.LabAppointment.RESCHEDULED_PATIENT,
                             models.LabAppointment.RESCHEDULED_LAB, models.LabAppointment.ACCEPTED],
                 time_slot_start__date__gte=today).order_by('time_slot_start')
         elif range == 'pending':
-            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status__in=[models.LabAppointment.BOOKED,
-                                                                                       models.LabAppointment.RESCHEDULED_PATIENT
-                                                                                       ]).order_by('time_slot_start')
+            queryset = queryset.filter(
+                time_slot_start__date__gte=timezone.now(),
+                status__in=[models.LabAppointment.BOOKED, models.LabAppointment.RESCHEDULED_PATIENT]
+            ).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
-
         if date:
             queryset = queryset.filter(time_slot_start__date=date)
-
         queryset = paginate_queryset(queryset, request)
         serializer = serializers.LabAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
         user = request.user
-        queryset = LabAppointment.objects.filter(lab__manageable_lab_admins__user=user, pk=pk).distinct()
+        queryset = self.get_queryset().filter(pk=pk).distinct()
         if queryset:
             serializer = serializers.LabAppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
-            return Response(serializer.data)
-        else:
-            return Response([])
-
-    def retrieve_by_lab_id(self, request, pk=None):
-        user = request.user
-        queryset = LabAppointment.objects.filter(lab__manageable_lab_admins__user=user, lab__pk=pk).distinct()
-        if queryset:
-            serializer = serializers.LabAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
             return Response(serializer.data)
         else:
             return Response([])
@@ -457,18 +449,19 @@ class LabAppointmentView(mixins.CreateModelMixin,
         return appointment_data
 
     def update(self, request, pk=None):
-        lab_appointment = get_object_or_404(models.LabAppointment, pk=pk)
-        serializer = serializers.UpdateStatusSerializer(data=request.data,
-                                            context={'request': request, 'lab_appointment': lab_appointment})
+        lab_appointment = self.get_queryset().filter(pk=pk).first()
+        if not lab_appointment:
+            return Response([])
+        serializer = serializers.UpdateStatusSerializer(
+            data=request.data, context={'request': request, 'lab_appointment': lab_appointment})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        allowed = lab_appointment.allowed_action(request.user.user_type, request)
+        allowed_status = lab_appointment.allowed_action(request.user.user_type, request)
         appt_status = validated_data['status']
-        if appt_status not in allowed:
+        if appt_status not in allowed_status:
             resp = {}
-            resp['allowed'] = allowed
+            resp['allowed_status'] = allowed_status
             return Response(resp, status=status.HTTP_400_BAD_REQUEST)
-
         if request.user.user_type == User.DOCTOR:
             req_status = validated_data.get('status')
             if req_status == models.LabAppointment.RESCHEDULED_LAB:
@@ -755,9 +748,14 @@ class LabPrescriptionFileViewset(mixins.CreateModelMixin,
         if request.user.user_type == User.DOCTOR:
             user = request.user
             return (models.LabPrescriptionFile.objects.filter(
-                Q(prescription__appointment__lab__manageable_lab_admins__user=user,
+                Q(prescription__appointment__lab__network__isnull=True,
+                  prescription__appointment__lab__manageable_lab_admins__user=user,
                   prescription__appointment__lab__manageable_lab_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
-                  prescription__appointment__lab__manageable_lab_admins__is_disabled=False)).distinct())
+                  prescription__appointment__lab__manageable_lab_admins__is_disabled=False)|
+                Q(prescription__appointment__lab__network__isnull=False,
+                  prescription__appointment__lab__network__manageable_lab_network_admins__user=request.user,
+                  prescription__appointment__lab__network__manageable_lab_network_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
+                  prescription__appointment__lab__network__manageable_lab_network_admins__is_disabled=False)).distinct())
 
             # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
         elif request.user.user_type == User.CONSUMER:
@@ -772,17 +770,18 @@ class LabPrescriptionFileViewset(mixins.CreateModelMixin,
         resp_data = list()
         if self.lab_prescription_permission(request.user, validated_data.get('appointment')):
             if models.LabPrescription.objects.filter(appointment=validated_data.get('appointment')).exists():
-                prescription = models.LabPrescription.objects.filter(appointment=validated_data.get('appointment')).first()
+                prescription = models.LabPrescription.objects.filter(
+                    appointment=validated_data.get('appointment')).first()
             else:
                 prescription = models.LabPrescription.objects.create(appointment=validated_data.get('appointment'),
-                                                                  prescription_details=validated_data.get(
-                                                                      'prescription_details'))
+                                                                     prescription_details=validated_data.get(
+                                                                         'prescription_details'))
             prescription_file_data = {
                 "prescription": prescription.id,
                 "name": validated_data.get('name')
             }
             prescription_file_serializer = serializers.LabPrescriptionFileSerializer(data=prescription_file_data,
-                                                                                  context={"request": request})
+                                                                                     context={"request": request})
             prescription_file_serializer.is_valid(raise_exception=True)
             prescription_file_serializer.save()
             resp_data = prescription_file_serializer.data

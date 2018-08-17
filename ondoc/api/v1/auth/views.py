@@ -1293,7 +1293,7 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
 class OnlineLeadViewSet(GenericViewSet):
     serializer_class = serializers.OnlineLeadSerializer
 
-    def savetest(self, request):
+    def create(self, request):
         resp = {}
         serializer = serializers.OnlineLeadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -262,6 +262,6 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OnlineLead
-        fields = '__all__'
+        fields = ('member_type', 'name', 'speciality', 'mobile', 'city', 'email')
 
 
