@@ -64,9 +64,15 @@
 								</td>
 							</tr>
 							<tr>
-								<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
-									Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Dr. {{doctor_name|capfirst}} has been cancelled as requested by you.
-								</td>
+								{% if instance.cancellation_type == 3 %}
+									<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
+										Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Dr. {{doctor_name|capfirst}} has been cancelled due to unavailability of the doctor.
+									</td>
+								{% else %}
+									<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
+										Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Dr. {{doctor_name|capfirst}} has been cancelled as requested by you.
+									</td>
+								{% endif %}
 							</tr>
 						</tbody>
 					</table>

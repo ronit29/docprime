@@ -516,6 +516,11 @@ class LabAppointment(TimeStampedModel):
                       (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                       (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
                       (COMPLETED, 'Completed')]
+    PATIENT_CANCELLED = 1
+    AGENT_CANCELLED = 2
+    AUTO_CANCELLED = 3
+    CANCELLATION_TYPE_CHOICES = [(PATIENT_CANCELLED, 'Patient Cancelled'), (AGENT_CANCELLED, 'Agent Cancelled'),
+                                 (AUTO_CANCELLED, 'Auto Cancelled')]
 
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
     lab_test = models.ManyToManyField(AvailableLabTest)
@@ -523,6 +528,7 @@ class LabAppointment(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     profile_detail = JSONField(blank=True, null=True)
     status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
+    cancellation_type = models.PositiveSmallIntegerField(choices=CANCELLATION_TYPE_CHOICES, blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # This is mrp
     agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)

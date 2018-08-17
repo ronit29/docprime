@@ -948,17 +948,15 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         if obj:
-            # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
-            # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
-            #
-            # date_time = datetime.datetime.combine(date, time)
-            if request.POST['start_date'] and request.POST['start_time']:
+            if request.POST.get('start_date') and request.POST.get('start_time'):
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)
                 dt_field = parse_datetime(date_time_field).replace(tzinfo=to_zone)
 
                 if dt_field:
                     obj.time_slot_start = dt_field
+            if request.POST.get('status') and int(request.POST['status']) == OpdAppointment.CANCELLED:
+                obj.cancellation_type = OpdAppointment.AGENT_CANCELLED
         super().save_model(request, obj, form, change)
 
 
