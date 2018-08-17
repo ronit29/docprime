@@ -621,8 +621,8 @@ class AppointmentCompleteBodySerializer(serializers.Serializer):
 
 
 class LabAppointmentFilterSerializer(serializers.Serializer):
-    CHOICES = ['all', 'previous', 'upcoming', 'pending']
-    range = serializers.ChoiceField(choices=CHOICES, required=False)
+    RANGE_CHOICES = ['all', 'previous', 'upcoming', 'pending']
+    range = serializers.ChoiceField(choices=RANGE_CHOICES, required=False)
     lab_id = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=False)
     profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
     date = serializers.DateField(required=False)
@@ -643,8 +643,10 @@ class LabPrescriptionSerializer(serializers.Serializer):
     def validate_appointment(self, value):
         request = self.context.get('request')
 
-        if not LabAppointment.objects.filter(Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user) |
+        if not LabAppointment.objects.filter(Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user,
+                                               lab__manageable_lab_admins__is_disabled=False) |
                                              Q(lab__network__isnull=False,
-                                               lab__network__manageable_lab_network_admins__user=request.user)).exists():
+                                               lab__network__manageable_lab_network_admins__user=request.user,
+                                               lab__network__manageable_lab_network_admins__is_disabled=False)).exists():
             raise serializers.ValidationError("User is not authorized to upload prescription.")
         return value
