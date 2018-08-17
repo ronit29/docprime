@@ -75,7 +75,7 @@ class LoginOTP(GenericViewSet):
         req_type = request.query_params.get('type')
 
         if req_type == 'doctor':
-            queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
+            doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
                                         (Q(doctor__isnull=True, hospital__data_status=Hospital.QC_APPROVED) |
                                          Q(doctor__isnull=False,
                                            doctor__data_status=Doctor.QC_APPROVED, doctor__onboarding_status = Doctor.ONBOARDED
@@ -91,9 +91,9 @@ class LoginOTP(GenericViewSet):
                  )
                 )
 
-            if lab_queryset.exists() or queryset.exists():
+            if lab_queryset.exists() or doctor_queryset.exists():
                 response['exists'] = 1
-                send_otp("OTP for Lab login is {}", phone_number)
+                send_otp("OTP for login is {}", phone_number)
 
             # if queryset.exists():
             #     response['exists'] = 1
