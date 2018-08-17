@@ -697,11 +697,25 @@ class LabAppointment(TimeStampedModel):
         # if self.payment_type != self.INSURANCE:
         #     Outstanding.create_outstanding(self)
 
+        # self.status = self.COMPLETED
+        # if self.payment_type != self.INSURANCE:
+        #     admin_obj, out_level = self.get_billable_admin_level()
+        #     app_outstanding_fees = self.doc_payout_amount()
+        #     out_obj = payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+        #     self.outstanding = out_obj
+        # self.save()
+
     def get_billable_admin_level(self):
         if self.lab.network and self.lab.network.is_billing_enabled:
             return self.lab.network, Outstanding.LAB_NETWORK_LEVEL
         else:
             return self.lab, Outstanding.LAB_LEVEL
+        # if self.hospital.network and self.hospital.network.is_billing_enabled:
+        #     return self.hospital.network, payout_model.Outstanding.HOSPITAL_NETWORK_LEVEL
+        # elif self.hospital.is_billing_enabled:
+        #     return self.hospital, payout_model.Outstanding.HOSPITAL_LEVEL
+        # else:
+        #     return self.doctor, payout_model.Outstanding.DOCTOR_LEVEL
 
     def lab_payout_amount(self):
         amount = 0

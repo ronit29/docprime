@@ -595,28 +595,17 @@ class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 
 
 class AppointmentCompleteBodySerializer(serializers.Serializer):
-    id = serializers.IntegerField()
+    lab_appointment = serializers.PrimaryKeyRelatedField(queryset=LabAppointment.objects.all())
     otp = serializers.IntegerField(max_value=9999)
 
     def validate(self, attrs):
-
-        if attrs['id']==10010038:
-            if not attrs['otp']==5786:
-                raise serializers.ValidationError("Invalid Confirmation Code")
-            else:
-                return attrs    
-
-
-        appntmnt = LabAppointment.objects.filter(id=attrs['id'])
-        if appntmnt.exists():
-            if appntmnt.first().status == LabAppointment.COMPLETED:
-                raise serializers.ValidationError("Appointment Already Completed")
-            if appntmnt.first().status == LabAppointment.CANCELLED:
-                raise serializers.ValidationError("Cannot Complete a Cancelled Appointment")
-            if not appntmnt.filter(otp=attrs['otp']).exists():
-                raise serializers.ValidationError("Invalid Confirmation Code")
-        else:
-            raise serializers.ValidationError("Invalid Appointment")
+        appointment = attrs.get('lab_appointment')
+        if appointment.status == LabAppointment.COMPLETED:
+            raise serializers.ValidationError("Appointment Already Completed.")
+        elif appointment.status == LabAppointment.CANCELLED:
+            raise serializers.ValidationError("Cannot Complete a Cancelled Appointment.")
+        if not appointment.otp == attrs['otp']:
+            raise serializers.ValidationError("Invalid OTP.")
         return attrs
 
 
