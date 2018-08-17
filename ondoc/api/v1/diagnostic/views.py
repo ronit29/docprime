@@ -357,8 +357,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         today = datetime.date.today()
         if range == 'previous':
             queryset = queryset.filter(
-                status__in=[models.LabAppointment.COMPLETED, models.LabAppointment.CANCELLED],
-                time_slot_start__date__lte=today).order_by('-time_slot_start')
+                status__in=[models.LabAppointment.COMPLETED, models.LabAppointment.CANCELLED])\
+                .order_by('-time_slot_start')
         elif range == 'upcoming':
             queryset = queryset.filter(
                 status__in=[models.LabAppointment.BOOKED, models.LabAppointment.RESCHEDULED_PATIENT,
@@ -366,7 +366,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 time_slot_start__date__gte=today).order_by('time_slot_start')
         elif range == 'pending':
             queryset = queryset.filter(
-                time_slot_start__gt=timezone.now(),
+                time_slot_start__date__gte=timezone.now(),
                 status__in=[models.LabAppointment.BOOKED, models.LabAppointment.RESCHEDULED_PATIENT]
             ).order_by('time_slot_start')
         else:
@@ -770,17 +770,18 @@ class LabPrescriptionFileViewset(mixins.CreateModelMixin,
         resp_data = list()
         if self.lab_prescription_permission(request.user, validated_data.get('appointment')):
             if models.LabPrescription.objects.filter(appointment=validated_data.get('appointment')).exists():
-                prescription = models.LabPrescription.objects.filter(appointment=validated_data.get('appointment')).first()
+                prescription = models.LabPrescription.objects.filter(
+                    appointment=validated_data.get('appointment')).first()
             else:
                 prescription = models.LabPrescription.objects.create(appointment=validated_data.get('appointment'),
-                                                                  prescription_details=validated_data.get(
-                                                                      'prescription_details'))
+                                                                     prescription_details=validated_data.get(
+                                                                         'prescription_details'))
             prescription_file_data = {
                 "prescription": prescription.id,
                 "name": validated_data.get('name')
             }
             prescription_file_serializer = serializers.LabPrescriptionFileSerializer(data=prescription_file_data,
-                                                                                  context={"request": request})
+                                                                                     context={"request": request})
             prescription_file_serializer.is_valid(raise_exception=True)
             prescription_file_serializer.save()
             resp_data = prescription_file_serializer.data
