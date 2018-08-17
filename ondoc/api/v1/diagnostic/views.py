@@ -460,7 +460,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         appt_status = validated_data['status']
         if appt_status not in allowed_status:
             resp = {}
-            resp['allowed'] = allowed_status
+            resp['allowed_status'] = allowed_status
             return Response(resp, status=status.HTTP_400_BAD_REQUEST)
         if request.user.user_type == User.DOCTOR:
             req_status = validated_data.get('status')
