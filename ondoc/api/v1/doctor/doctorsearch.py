@@ -3,6 +3,8 @@ from django.contrib.gis.geos import Point
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
+from ondoc.authentication.models import QCModel
+from ondoc.doctor.models import Doctor
 from datetime import datetime
 import re
 
@@ -17,7 +19,9 @@ class DoctorSearchHelper:
         hospital_type_mapping = {hospital_type[1]: hospital_type[0] for hospital_type in
                                  models.Hospital.HOSPITAL_TYPE_CHOICES}
 
-        filtering_params = ["d.is_live is TRUE", 'h.is_live is TRUE', 'd.is_test_doctor is False']
+        filtering_params = ['d.is_test_doctor is False',
+                            'd.data_status={}'.format(QCModel.QC_APPROVED),
+                            'onboarding_status={}'.format(Doctor.ONBOARDED)]
         if self.query_params.get("specialization_ids"):
             filtering_params.append(
                 "sp.id IN({})".format(",".join(self.query_params.get("specialization_ids")))
@@ -65,17 +69,18 @@ class DoctorSearchHelper:
         rank_by = "rank_distance=1"
         if self.query_params.get('sort_on'):
             if self.query_params.get('sort_on') == 'experience':
-                order_by_field = 'practicing_since'
+                order_by_field = 'practicing_since ASC'
             if self.query_params.get('sort_on') == 'fees':
-                order_by_field = "deal_price"
+                order_by_field = "deal_price ASC"
                 rank_by = "rank_fees=1"
+        order_by_field = "{}, {} ".format('d.is_live DESC', order_by_field)
         return order_by_field, rank_by
 
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
-                       "FROM (SELECT Row_number() OVER( partition BY dct.doctor_clinic_id " \
+                       "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
                        "Row_number() OVER( partition BY dc.doctor_id  ORDER BY " \
                        "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location),dct.deal_price ASC) rank_distance, " \
@@ -91,7 +96,7 @@ class DoctorSearchHelper:
                        "LEFT JOIN specialization sp " \
                        "ON sp.id = dq.specialization_id " \
                        "WHERE  %s " \
-                       "ORDER  BY %s ASC) x " \
+                       "ORDER  BY %s ) x " \
                        "where distance < %s and %s" % (longitude, latitude,
                                                        longitude, latitude,
                                                        filtering_params, order_by_field,
@@ -165,6 +170,7 @@ class DoctorSearchHelper:
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,
                 "mrp": filtered_mrp,
+                "is_live": doctor.is_live,
                 # "fees": filtered_fees,*********show mrp here
                 "discounted_fees": filtered_deal_price,
                 # "discounted_fees": filtered_fees, **********deal_price

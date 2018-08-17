@@ -1,0 +1,81 @@
+{% extends "web_base.html" %}
+{% load static %}
+
+    {% block title_text %}
+		Contact Us
+	{% endblock %}
+    {% block page_css %}
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/privacy.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/normalize.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/layout.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/custom.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/customer.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/responsive.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/profile.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/static.css' %}" >
+	{% endblock %}
+	{% block content %}
+	<div class="profile-body-wrap">
+		<header class="profile-header" style="display: block;">
+			<div class="smiley-img-div">
+				<img src="{% static 'web/img/customer-icons/smiley.png' %}">
+			</div>
+			<div class="container">
+				<div class="row header-row">
+					<div class="col-12 logo-icon-div" style="text-align: center;" >
+						<a href="/"><img src="{% static 'web/img/doc-prime-logo.png' %}" class="logo-icon"></a>
+					</div>
+				</div>
+			</div>
+		</header>
+		<div class="subheader d-none d-lg-block"></div>
+		<div class="container about-container contact-container">
+			<div class="row">
+				<div class="col-12 text-center">
+					<p class="fw-500 about-heading">Contact Us</p>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-6 col-12 contact-background">
+					<div class="contact-text">
+						Feel like contacting us? Submit your queries here and we will try to get back you as soon as possible
+					</div>
+					<div class="gps">
+						<div class="contact-location">
+                        	Plot No. 119, Sector-44, Gurugram
+                        	- 122001, Haryana (India)
+					    </div>
+					    <div class="arrow-down">
+					    </div>	
+					    <div class="image-location">
+ 							<img src="{% static 'web/img/customer-icons/location.png' %}">
+					    </div>	
+				   </div>
+				</div>
+				<div class="col-md-6 col-12">
+					<div class="shadow">
+						<div class="form-title mrt-10">Send Us a Message</div>
+						<form>
+							<div class="contact-fields">
+								<input type="text" class="form-control" placeholder="Name" required>
+							</div>
+							<div class="contact-fields">
+								<input type="email" class="form-control" placeholder="Email" required>
+							</div>
+							<div class="contact-fields">
+								<input type="number" class="form-control" placeholder="Mobile Number" max="9999999999" min="7000000000" required>
+							</div>
+							<div class="contact-fields">
+								<textarea class="form-control" placeholder="Message" rows="3" required></textarea>
+							</div>
+							<div class="submit">
+								<button type="submit" class="btn submit-btn">Submit</button>
+							</div>  
+						</form>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div style="margin-top:20px"></div>
+	{% endblock %}

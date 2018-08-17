@@ -2194,10 +2194,10 @@ var Dropzone = function (_Emitter) {
       });
     }
 
-    // Cancels the file upload and sets the status to CANCELED
+    // Cancels the file upload and sets the status to CANCELLED
     // **if** the file is actually being uploaded.
     // If it's still in the queue, the file is being removed from it and the status
-    // set to CANCELED.
+    // set to CANCELLED.
 
   }, {
     key: "cancelUpload",

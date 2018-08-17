@@ -25,7 +25,7 @@ class BaseSmsBackend(NodeJsSmsBackend):
         if settings.SEND_THROUGH_NODEJS_ENABLED:
             super().send(message, phone_no)
             return True
-        payload = {'sender': 'PANCEA', 'route': '4','authkey':settings.SMS_AUTH_KEY}
+        payload = {'sender': 'DOCPRM', 'route': '4','authkey':settings.SMS_AUTH_KEY}
         payload['message'] = message
         payload['mobiles'] = '91' + str(phone_no)
         r = requests.get('http://api.msg91.com/api/sendhttp.php', params=payload)

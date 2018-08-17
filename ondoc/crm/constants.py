@@ -8,5 +8,10 @@ constants = {
     'ARTICLE_TEAM': 'article_team',
     'DOCTOR_MAPPING_TEAM': 'doctor_mapping_team',
     'DOCTOR_IMAGE_CROPPING_TEAM': 'doctor_image_cropping_team',
-    'TEST_USER_GROUP': 'test_user_group'
+    'TEST_USER_GROUP': 'test_user_group',
+    'OPD_APPOINTMENT_MANAGEMENT_TEAM': 'opd_appointment_management_team',
+    'LAB_APPOINTMENT_MANAGEMENT_TEAM': 'lab_appointment_management_team',
+    'CONDITIONS_MANAGEMENT_TEAM': 'condition_managment_team',
+    'REPORT_TEAM': 'report_team',
+    'SUPER_QC_GROUP': 'super_qc_group'
 }

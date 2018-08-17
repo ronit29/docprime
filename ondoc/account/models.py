@@ -155,7 +155,7 @@ class PgTransaction(TimeStampedModel):
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    payment_mode = models.CharField(max_length=50)
+    payment_mode = models.CharField(max_length=50, null=True, blank=True)
     response_code = models.CharField(max_length=50)
     bank_id = models.CharField(max_length=50)
     transaction_date = models.DateTimeField(auto_now=True)
@@ -213,27 +213,37 @@ class PgTransaction(TimeStampedModel):
         return pgtx_details
 
     @staticmethod
-    def form_pg_refund_data(refund_data):
+    def form_pg_refund_data(refund_objs):
         pg_data = list()
-        for data in refund_data:
-            if data.get("pg_transaction"):
+        for data in refund_objs:
+            if data.pg_transaction:
                 params = {
-                    "user": data["user"].id,
-                    "orderId": data["consumer_transaction"].id,
-                    "refundAmount": str(data["refund_amount"]),
-                    "refNo": data["pg_transaction"].id,
-                    "checksum": ""
+                    "user": str(data.user.id),
+                    "orderNo": str(data.pg_transaction.order_no),
+                    "orderId": str(data.pg_transaction.order_id),
+                    "refundAmount": str(data.refund_amount),
+                    "refNo": str(data.id),
                 }
+                secret_key = settings.PG_SECRET_KEY_REFUND
+                client_key = settings.PG_SECRET_KEY_REFUND
+                params["checkSum"] = PgTransaction.create_pg_hash(params, secret_key, client_key)
                 pg_data.append(params)
         return pg_data
 
     @classmethod
-    def is_valid_hash(cls, data):
+    def is_valid_hash(cls, data, product_id):
+        client_key = secret_key = ""
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            client_key = settings.PG_CLIENT_KEY_P1
+            secret_key = settings.PG_SECRET_KEY_P1
+        elif product_id == Order.LAB_PRODUCT_ID:
+            client_key = settings.PG_CLIENT_KEY_P2
+            secret_key = settings.PG_SECRET_KEY_P2
         pg_hash = None
         temp_data = copy.deepcopy(data)
         if temp_data.get("hash"):
             pg_hash = temp_data.pop("hash")
-        calculated_hash, prehashed_str = cls.create_incomming_pg_hash(temp_data, settings.PG_CLIENT_KEY, settings.PG_SECRET_KEY)
+        calculated_hash, prehashed_str = cls.create_incomming_pg_hash(temp_data, client_key, secret_key)
         if pg_hash != calculated_hash:
             logger.error(
                 "Hash Mismatch with Calculated Hash - " + calculated_hash + " pre-hashed string - " + prehashed_str + " pg response data - " + json.dumps(
@@ -273,7 +283,7 @@ class PgTransaction(TimeStampedModel):
 
 
 class ConsumerAccount(TimeStampedModel):
-    user = models.OneToOneField(User, on_delete=models.DO_NOTHING)
+    user = models.OneToOneField(User, blank=True, null=True, on_delete=models.SET_NULL)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def credit_payment(self, data, amount):
@@ -371,8 +381,8 @@ class ConsumerRefund(TimeStampedModel):
     def initiate_refund(cls, user, ctx_obj):
         BATCH_SIZE = 100
         pgtx_list = PgTransaction.get_transactions(user, ctx_obj.amount)
-        refund_data = list()
         refund_obj_data = list()
+        consumer_refund_objs = list()
         num = 0
         for tx in pgtx_list:
             temp_data = {
@@ -382,17 +392,19 @@ class ConsumerRefund(TimeStampedModel):
                 'pg_transaction': tx['id']
             }
             if num == BATCH_SIZE:
-                cls.objects.bulk_create(refund_obj_data, batch_size=BATCH_SIZE)
+                obj = cls.objects.bulk_create(refund_obj_data, batch_size=BATCH_SIZE)
+                consumer_refund_objs.extend(obj)
                 refund_obj_data = list()
                 num = 0
-            refund_data.append(temp_data)
+            # refund_data.append(temp_data)
             refund_obj_data.append(cls(**temp_data))
             num += 1
         if num:
-            cls.objects.bulk_create(refund_obj_data, batch_size=BATCH_SIZE)
+            obj = cls.objects.bulk_create(refund_obj_data, batch_size=BATCH_SIZE)
+            consumer_refund_objs.extend(obj)
 
         try:
-            pg_data = PgTransaction.form_pg_refund_data(refund_data)
+            pg_data = PgTransaction.form_pg_refund_data(consumer_refund_objs)
             refund_curl_request(pg_data)
         except Exception as e:
             print(e)
@@ -403,16 +415,7 @@ class ConsumerRefund(TimeStampedModel):
     @classmethod
     def schedule_refund(cls, consumer_tx):
         consumer_refund_obj = cls.objects.filter(consumer_transaction=consumer_tx)
-        refund_data = list()
-        for data in consumer_refund_obj:
-            temp_data = {
-                'user': data.user,
-                'consumer_transaction': data.consumer_transaction,
-                'refund_amount': data.refund_amount,
-                'pg_transaction': data.pg_transaction
-            }
-            refund_data.append(temp_data)
-        pg_data = PgTransaction.form_pg_refund_data(refund_data)
+        pg_data = PgTransaction.form_pg_refund_data(consumer_refund_obj)
         refund_curl_request(pg_data)
 
 

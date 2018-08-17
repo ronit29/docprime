@@ -11,12 +11,14 @@ from django.db.models import Count, Sum, When, Case, Q, F
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
 from django.utils import timezone
+from ondoc.api.v1 import utils
 import datetime
 import pytz
-import json
-import decimal
 import random
+import logging
+import json
 
+logger = logging.getLogger(__name__)
 utc = pytz.UTC
 User = get_user_model()
 
@@ -105,9 +107,9 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     test_id = serializers.ReadOnlyField(source='test.id')
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
-    is_home_pickup_available = serializers.SerializerMethodField()
+    is_home_collection_enabled = serializers.SerializerMethodField()
 
-    def get_is_home_pickup_available(self, obj):
+    def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
             if self.context["lab"].is_home_collection_enabled and obj.test.home_collection_possible:
                 return True
@@ -125,7 +127,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_pickup_available', )
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled', )
 
 
 class LabCustomSerializer(serializers.Serializer):
@@ -211,7 +213,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -255,6 +257,9 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     status = serializers.IntegerField()
     payment_type = serializers.IntegerField()
     lab_test = serializers.ListField(child=serializers.IntegerField())
+    home_pickup_charges = serializers.DecimalField(max_digits=10, decimal_places=2)
+    is_home_pickup = serializers.BooleanField(default=False)
+    address = serializers.JSONField(required=False)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -265,16 +270,17 @@ class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
 
 class LabAppointmentUpdateSerializer(serializers.Serializer):
     appointment_status = [LabAppointment.CREATED, LabAppointment.ACCEPTED, LabAppointment.RESCHEDULED_LAB,
-                          LabAppointment.CANCELED, LabAppointment.RESCHEDULED_PATIENT, LabAppointment.COMPLETED,
+                          LabAppointment.CANCELLED, LabAppointment.RESCHEDULED_PATIENT, LabAppointment.COMPLETED,
                           LabAppointment.BOOKED]
     status = serializers.ChoiceField(choices=appointment_status)
     start_time = serializers.DateTimeField(required=False)
     end_time = serializers.DateTimeField(required=False)
 
     def validate(self, data):
+        request = self.context.get("request")
         temp_data = data
         temp_data["lab_id"] = self.context["lab_id"]
-        LabAppointmentCreateSerializer.time_slot_validator(temp_data)
+        LabAppointmentCreateSerializer.time_slot_validator(temp_data, request)
 
         return data
 
@@ -284,7 +290,7 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
     def update(self, instance, data):
         # if data['status'] == LabAppointment.RESCHEDULED_PATIENT:
         #     self.reschedule_validation(instance, data)
-        # elif data['status'] == LabAppointment.CANCELED:
+        # elif data['status'] == LabAppointment.CANCELLED:
         #     self.cancel_validation(instance, data)
         # else:
         #     raise serializers.ValidationError("Invalid Status")
@@ -311,9 +317,9 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     test_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all()))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
     time_slot_start = serializers.DateTimeField(required=False)
-    start_date = serializers.CharField()
+    start_date = serializers.DateTimeField()
     start_time = serializers.FloatField()
-    end_date = serializers.CharField(required=False)
+    end_date = serializers.DateTimeField(required=False)
     end_time = serializers.FloatField(required=False)
     is_home_pickup = serializers.BooleanField(default=False)
     address = serializers.IntegerField(required=False, allow_null=True)
@@ -324,15 +330,26 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         ACTIVE_APPOINTMENT_STATUS = [LabAppointment.BOOKED, LabAppointment.ACCEPTED,
                                      LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
         request = self.context.get("request")
+
+        if not utils.is_valid_testing_lab_data(request.user, data["lab"]):
+            raise serializers.ValidationError("Both User and Lab should be for testing")
+
         if data.get("is_home_pickup") is True and (not data.get("address")):
+
             raise serializers.ValidationError("Address required for home pickup")
+
         if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
             raise serializers.ValidationError("Invalid profile id")
+
         if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"], lab=data[
-            "lab"]).count() >= MAX_APPOINTMENTS_ALLOWED:
+            "lab"]).exists():
+            raise serializers.ValidationError("A previous appointment with this lab already exists. Cancel it before booking new Appointment.")
+
+        if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"]).count() >= MAX_APPOINTMENTS_ALLOWED:
             raise serializers.ValidationError('Max '+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
-        self.test_lab_id_validator(data)
-        self.time_slot_validator(data)
+
+        self.test_lab_id_validator(data, request)
+        self.time_slot_validator(data, request)
         return data
 
     def create(self, data):
@@ -400,37 +417,50 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("More than 2 appointment with the lab")
 
     @staticmethod
-    def test_lab_id_validator(data):
+    def test_lab_id_validator(data, request):
         if not data['test_ids']:
+            logger.error(
+                "Error 'No Test Ids given' for lab appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError(" No Test Ids given")
+
         avail_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids']).values(
-            'id')
+            'id').distinct('test')
 
         if len(avail_test_queryset) != len(data['test_ids']):
+            logger.error("Error 'Test Ids or lab Id is incorrect' for lab appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError("Test Ids or lab Id is incorrect")
 
     @staticmethod
-    def time_slot_validator(data):
-        start_dt = (CreateAppointmentSerializer.form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
+    def time_slot_validator(data, request):
+        start_dt = (form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         if start_dt < timezone.now():
+            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError("Cannot book in past")
 
         day_of_week = start_dt.weekday()
-        start_hour = round(float(start_dt.hour) + (float(start_dt.minute) * 1 / 60), 2)
 
         lab_queryset = data['lab']
 
-        if data["is_home_pickup"] and not lab_queryset.is_home_collection_enabled:
-            raise serializers.ValidationError("Home Pickup is disabled for the lab")
-
-        if not data["is_home_pickup"] and lab_queryset.always_open:
-            return
-
-        lab_timing_queryset = lab_queryset.lab_timings.filter(day=day_of_week, start__lte=start_hour, end__gte=start_hour, for_home_pickup=data["is_home_pickup"]).exists()
-
-        if not lab_timing_queryset:
-            raise serializers.ValidationError("No time slot available")
+        lab_timing_queryset = lab_queryset.lab_timings.filter(day=day_of_week, start__lte=data.get('start_time'),
+                                                              end__gte=data.get('start_time'),
+                                                              for_home_pickup=data["is_home_pickup"]).exists()
+        if data["is_home_pickup"]:
+            if not lab_queryset.is_home_collection_enabled:
+                logger.error(
+                    "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
+                        request.data))
+                raise serializers.ValidationError("Home Pickup is disabled for the lab")
+            if data.get("start_time") < 7.0 or data.get("start_time") > 19.0:
+                logger.error(
+                    "Error 'No time slot available' for lab appointment with data - " + json.dumps(
+                        request.data))
+                raise serializers.ValidationError("No time slot available")
+        else:
+            if not lab_queryset.always_open and not lab_timing_queryset:
+                logger.error(
+                    "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
+                raise serializers.ValidationError("No time slot available")
 
 
 class TimeSlotSerializer(serializers.Serializer):
@@ -513,19 +543,34 @@ class SearchLabListSerializer(serializers.Serializer):
     lat = serializers.FloatField(required=False)
     ids = IdListField(required=False)
     order_by = serializers.CharField(required=False)
+    name = serializers.CharField(required=False)
 
 
 class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
     lab_test = AvailableLabTestSerializer(many=True)
+    address = serializers.SerializerMethodField()
 
-
+    def get_address(self, obj):
+        resp_address = ""
+        if obj.address:
+            if obj.address.get("address"):
+                resp_address += str(obj.address.get("address"))
+            if obj.address.get("land_mark"):
+                if resp_address:
+                    resp_address += ", "
+                resp_address += str(obj.address.get("land_mark"))
+            if obj.address.get("pincode"):
+                if resp_address:
+                    resp_address += ", "
+                resp_address += str(obj.address.get("pincode"))
+        return resp_address
 
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
@@ -545,17 +590,12 @@ class AppointmentCompleteBodySerializer(serializers.Serializer):
 
     def validate(self, attrs):
 
-        if attrs['id']==10010038:
-            if not attrs['otp']==5786:
-                raise serializers.ValidationError("Invalid Confirmation Code")
-            else:
-                return attrs    
-
-
         appntmnt = LabAppointment.objects.filter(id=attrs['id'])
         if appntmnt.exists():
             if appntmnt.first().status == LabAppointment.COMPLETED:
                 raise serializers.ValidationError("Appointment Already Completed")
+            if appntmnt.first().status == LabAppointment.CANCELLED:
+                raise serializers.ValidationError("Cannot Complete a Cancelled Appointment")
             if not appntmnt.filter(otp=attrs['otp']).exists():
                 raise serializers.ValidationError("Invalid Confirmation Code")
         else:

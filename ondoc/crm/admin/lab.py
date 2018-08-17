@@ -1,5 +1,6 @@
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
 from django.conf.urls import url
+from django.conf import settings
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats
 from django.utils.safestring import mark_safe
@@ -10,14 +11,24 @@ from reversion.admin import VersionAdmin
 from import_export.admin import ImportExportMixin
 from django.db.models import Q
 from django.db import models
+from django.utils.dateparse import parse_datetime
+from dateutil import tz
+from django.conf import settings
+from django.utils import timezone
+from django.utils.timezone import make_aware
+from django.utils.html import format_html_join
+import pytz
+from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument)
+    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel
 from django.contrib.contenttypes.admin import GenericTabularInline
+from django.contrib.admin.widgets import AdminSplitDateTime
+from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget
 
 
 class LabTestResource(resources.ModelResource):
@@ -277,7 +288,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter)
 
-    exclude = ('is_home_pickup_available','search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
+    exclude = ('search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
                    'radiology_deal_price_percentage', )
 
     def get_readonly_fields(self, request, obj=None):
@@ -399,6 +410,205 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         js = ('js/admin/ondoc.js',)
 
 
+class LabAppointmentForm(forms.ModelForm):
+
+    start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
+    start_time = forms.CharField(widget=TimePickerWidget())
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
+            date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
+            dt_field = parse_datetime(date_time_field)
+            time_slot_start = make_aware(dt_field)
+        if time_slot_start:
+            hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
+        else:
+            raise forms.ValidationError("Enter valid start date and time.")
+        if self.instance.id:
+            lab_test = self.instance.lab_test.all()
+            lab = self.instance.lab
+            if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and cleaned_data.get('status'):
+                raise forms.ValidationError("Status can not be changed.")
+        elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
+            lab_test = cleaned_data.get('lab_test').all()
+            lab = cleaned_data.get('lab')
+        else:
+            raise forms.ValidationError("Lab and lab test details not entered.")
+
+        if not lab.lab_pricing_group:
+            raise forms.ValidationError("Lab is not in any lab pricing group.")
+
+        selected_test_ids = lab_test.values_list('test', flat=True)
+        if not LabTiming.objects.filter(
+                lab=lab,
+                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+                day=time_slot_start.weekday(),
+                start__lte=hour, end__gt=hour).exists():
+            raise forms.ValidationError("This lab test is not available on selected day and time.")
+
+        return cleaned_data
+
+
+class LabAppointmentAdmin(admin.ModelAdmin):
+    form = LabAppointmentForm
+    list_display = ('get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_filter = ('status', )
+    date_hierarchy = 'created_at'
+
+    def get_profile(self, obj):
+        if not obj.profile:
+            return ""
+        return obj.profile.name
+
+    get_profile.admin_order_field = 'profile'
+    get_profile.short_description = 'Profile Name'
+
+    def get_lab(self, obj):
+        return obj.lab.name
+
+    get_lab.admin_order_field = 'lab'
+    get_lab.short_description = 'Lab Name'
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        allowed_status_for_agent = [(LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                                    (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
+                                    (LabAppointment.ACCEPTED, 'Accepted'),
+                                    (LabAppointment.CANCELLED, 'Cancelled')]
+        if db_field.name == "status" and request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            kwargs['choices'] = allowed_status_for_agent
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj=obj, **kwargs)
+        form.request = request
+        if obj is not None and obj.time_slot_start:
+            time_slot_start = timezone.localtime(obj.time_slot_start, pytz.timezone(settings.TIME_ZONE))
+            form.base_fields['start_date'].initial = time_slot_start.strftime('%Y-%m-%d') if time_slot_start else None
+            form.base_fields['start_time'].initial = time_slot_start.strftime('%H:%M') if time_slot_start else None
+        return form
+
+    def get_fields(self, request, obj=None):
+        if request.user.is_superuser:
+            return ('lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
+                    'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
+        elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
+                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'start_date', 'start_time')
+        else:
+            return ()
+
+    def get_readonly_fields(self, request, obj=None):
+        if request.user.is_superuser:
+            return ()
+        elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
+                    'deal_price', 'effective_price', 'payment_status',
+                    'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
+        else:
+            return ()
+
+    def lab_name(self, obj):
+        profile_link = "lab/{}".format(obj.lab.id)
+        return mark_safe('{name} (<a href="{consumer_app_domain}/{profile_link}">Profile</a>)'.format(
+            name=obj.lab.name,
+            consumer_app_domain=settings.CONSUMER_APP_DOMAIN,
+            profile_link=profile_link))
+
+    def lab_contact_details(self, obj):
+        employees = obj.lab.labmanager_set.all()
+        details = ''
+        for employee in employees:
+            details += 'Name : {name}<br>Phone number : {number}<br>Email : {email}<br>Type : {type}<br><br>'.format(
+                name=employee.name, number=employee.number, email=employee.email,
+                type=dict(LabManager.CONTACT_TYPE_CHOICES)[employee.contact_type])
+            # ' , '.join([str(employee.name), str(employee.number), str(employee.email), str(employee.details)])
+            # details += '\n'
+        return mark_safe('<p>{details}</p>'.format(details=details))
+
+    def get_lab_test(self, obj):
+        format_string = ""
+        for data in obj.lab_test.all():
+            format_string += "<div><span>{}</span></div>".format(data.test.name)
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+    get_lab_test.short_description = 'Lab Test'
+
+    def get_lab_address(self, obj):
+        address_items = [
+            str(getattr(obj.lab, attribute))
+            for attribute in ['building', 'sublocality', 'locality', 'city', 'state', 'country',
+                              'pin_code'] if getattr(obj.lab, attribute)]
+        format_string = "<div>{}</div>".format(",".join(address_items))
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+    get_lab_address.short_description = 'Lab Address'
+
+    def get_pickup_address(self, obj):
+        if not obj.is_home_pickup:
+            return ""
+        address_items = [str(obj.address.get(key)) for key in ['address', 'landmark', 'pincode'] if obj.address.get(key)]
+        format_string = "<div>{}</div>".format(",".join(address_items))
+        return format_html_join(
+            mark_safe('<br/>'),
+            format_string,
+            ((),),
+        )
+    get_pickup_address.short_description = 'Home Pickup Address'
+
+    def used_profile_name(self, obj):
+        return obj.profile.name
+
+    def used_profile_number(self, obj):
+        return obj.profile.phone_number
+
+    def default_profile_name(self, obj):
+        # return obj.profile.user.profiles.all()[:1][0].name
+        default_profile = obj.profile.user.profiles.filter(is_default_user=True)
+        if default_profile.exists():
+            return default_profile.first().name
+        else:
+            return ''
+
+    def default_profile_number(self, obj):
+        # return obj.profile.user.profiles.all()[:1][0].phone_number
+        default_profile = obj.profile.user.profiles.filter(is_default_user=True)
+        if default_profile.exists():
+            return default_profile.first().phone_number
+        else:
+            return ''
+
+    def user_number(self, obj):
+        return obj.user.phone_number
+
+    def save_model(self, request, obj, form, change):
+        if obj:
+            # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
+            # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
+            #
+            # date_time = datetime.datetime.combine(date, time)
+            if request.POST['start_date'] and request.POST['start_time']:
+                date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
+                to_zone = tz.gettz(settings.TIME_ZONE)
+                dt_field = parse_datetime(date_time_field).replace(tzinfo=to_zone)
+
+                if dt_field:
+                    obj.time_slot_start = dt_field
+        super().save_model(request, obj, form, change)
+
+
+
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
@@ -415,7 +625,9 @@ class LabTestTypeAdmin(VersionAdmin):
 
 
 class AvailableLabTestAdmin(VersionAdmin):
-    search_fields = ['test__name']
+    list_display = ['test', 'lab_pricing_group', 'get_type', 'mrp', 'computed_agreed_price',
+                    'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'enabled']
+    search_fields = ['test__name', 'lab_pricing_group__group_name', 'lab_pricing_group__labs__name']
 
 
 class DiagnosticConditionLabTestInline(admin.TabularInline):
@@ -429,4 +641,8 @@ class DiagnosticConditionLabTestInline(admin.TabularInline):
 class CommonDiagnosticConditionAdmin(VersionAdmin):
     search_fields = ['name']
     inlines = [DiagnosticConditionLabTestInline]
+
+
+class CommonTestAdmin(VersionAdmin):
+    autocomplete_fields = ['test']
 

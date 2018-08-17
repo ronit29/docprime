@@ -1,0 +1,104 @@
+{% extends "web_base.html" %}
+{% load static %}
+
+    {% block title_text %}
+		How it Works
+	{% endblock %}
+    {% block page_css %}
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/privacy.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/normalize.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/layout.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/custom.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/customer.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/responsive.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/profile.css' %}" >
+		<link rel="stylesheet" type="text/css" href="{% static 'web/css/static.css' %}" >
+	{% endblock %}
+	{% block content %}
+	<div class="profile-body-wrap">
+		<header class="profile-header" style="display: block;">
+			<div class="smiley-img-div">
+				<img src="{% static 'web/img/customer-icons/smiley.png' %}">
+			</div>
+			<div class="container">
+				<div class="row header-row">
+					<div class="col-12 logo-icon-div" style="text-align: center;" >
+						<a href="/"><img src="{% static 'web/img/doc-prime-logo.png' %}" class="logo-icon"></a>
+					</div>
+				</div>
+			</div>
+		</header>
+		<div class="subheader d-none d-lg-block"></div>
+		<div class="container about-container">
+			<div class="row">
+				<div class="col-12 text-center">
+					<p class="fw-500 about-heading">How it Works</p>
+				</div>
+				<div class="col-12">
+					<p class="fw-500 about-content">DocPrime aims to provide efficient and affordable access to doctors and medical help to people across India and improving the healthcare experience for all humanity.</p>
+				</div>
+			</div>
+			<div class="row working-row">
+				<div class="working-content-div col-12 col-lg-8">
+					<div class="doctor-consultation">	
+ 					    <div class="working-count text-center">
+						   <p class="fw-500">1</p>
+					    </div>
+					    <div class="consultation-text">
+					    	<p class="fw-500">Doctor Consultation</p>
+					    </div>
+                    </div>
+                    <div class="doctext">
+                    	<p class="fw-500">
+                    	   Our flawless platform helps user get answers to their queries and offers one-on-one interaction with experienced doctors at a nominal fee. Users can anonymously, or otherwise, communicate with doctors with various areas of expertise directly from their smartphones.
+                    	</p>   
+                    </div>
+   				</div>
+				<div class="col-lg-4 d-none d-lg-block">
+					<img class="consultation-image" src="{% static 'web/img/doctorConslutation.png' %} ">
+				</div>
+			</div>
+			<div class="row working-row lab">
+				<div class="working-content-div col-12 col-lg-8">
+					<div class="doctor-consultation">	
+ 					    <div class="working-count text-center">
+						   <p class="fw-500">2</p>
+					    </div>
+					    <div class="consultation-text">
+					    	<p class="fw-500">Lab Tests</p>
+					    </div>
+                    </div>
+                    <div class="doctext">
+                    	<p class="fw-500">
+                            Detailed information about procedures of the tests, prices, and relevant preparations are easily accessible on our platform. This is to ensure that in the need of the hour, a disease can be diagnosed without having to leave the house.  
+                      	</p>   
+                    </div>
+   				</div>
+				<div class="col-lg-4 d-none d-lg-block">
+					<img class="lab-image" src="{% static 'web/img/phone.png' %}">
+				</div>
+			</div>
+			<div class="row working-row lab">
+				<div class="working-content-div col-12 col-lg-8">
+					<div class="doctor-consultation">	
+ 					    <div class="working-count text-center">
+						   <p class="fw-500">3</p>
+					    </div>
+					    <div class="consultation-text">
+					    	<p class="fw-500">Staying Healthy</p>
+					    </div>
+                    </div>
+                    <div class="doctext">
+                    	<p class="fw-500">
+                           The feed on the website is created with the aim of keeping people updated of the latest development in the healthcare industry. This feed is curated by healthcare experts and is filled with information that can help users make an informed decision about their health.
+                    	</p>   
+                    </div>
+   				</div>
+				<div class="col-lg-4 d-none d-lg-block">
+					<img class="consultation-image" src="{% static 'web/img/stayinghealthy.png' %}">
+				</div>
+			</div>
+		</div>
+
+	</div>
+{% endblock %}

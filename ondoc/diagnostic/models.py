@@ -14,13 +14,19 @@ from django.db.models import F, Sum, When, Case, Q
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 from ondoc.payout.models import Outstanding
-from ondoc.api.v1.utils import get_start_end_datetime
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
+from ondoc.diagnostic import tasks
+from dateutil import tz
+from django.conf import settings
+import logging
 import decimal
 import math
 import random
 import os
 from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
+
+logger = logging.getLogger(__name__)
 
 class LabPricingGroup(TimeStampedModel, CreatedByModel):
     group_name = models.CharField(max_length=256)
@@ -102,7 +108,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
     license = models.CharField(max_length=200, blank=True)
-    is_insurance_enabled = models.BooleanField(verbose_name= 'Enabled for Insurance Customer',default=False)
+    is_insurance_enabled = models.BooleanField(verbose_name='Enabled for Insurance Customer',default=False)
     is_retail_enabled = models.BooleanField(verbose_name= 'Enabled for Retail Customer', default=False)
     is_ppc_pathology_enabled = models.BooleanField(verbose_name= 'Enabled for Pathology Pre Policy Checkup', default=False)
     is_ppc_radiology_enabled = models.BooleanField(verbose_name= 'Enabled for Radiology Pre Policy Checkup', default=False)
@@ -142,10 +148,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab')
     matrix_lead_id = models.BigIntegerField(blank=True, null=True)
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
-    is_home_pickup_available = models.BigIntegerField(null=True, blank=True)
     is_home_collection_enabled = models.BooleanField(default=False)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
+    is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
 
     def __str__(self):
         return self.name
@@ -245,8 +251,9 @@ class LabManager(TimeStampedModel):
     number = models.BigIntegerField()
     email = models.EmailField(max_length=100, blank=True)
     details = models.CharField(max_length=200, blank=True)
+    CONTACT_TYPE_CHOICES = [(1, "Other"), (2, "Single Point of Contact"), (3, "Manager"), (4, "Owner")]
     contact_type = models.PositiveSmallIntegerField(
-        choices=[(1, "Other"), (2, "Single Point of Contact"), (3, "Manager"), (4, "Owner")])
+        choices=CONTACT_TYPE_CHOICES)
 
     def __str__(self):
         return self.lab.name + " (" + self.name + ")"
@@ -487,9 +494,10 @@ class AvailableLabTest(TimeStampedModel):
         return self.test.test_type
 
     # def __str__(self):
-    #     return "{}, {}".format(self.test.name, self.lab.name if self.lab else self.lab_pricing_group.group_name)
+    #     return "{}".format(self.test.name)
 
     class Meta:
+        unique_together = (("test", "lab_pricing_group"))
         db_table = "available_lab_test"
 
 
@@ -499,16 +507,21 @@ class LabAppointment(TimeStampedModel):
     RESCHEDULED_LAB = 3
     RESCHEDULED_PATIENT = 4
     ACCEPTED = 5
-    CANCELED = 6
+    CANCELLED = 6
     COMPLETED = 7
     ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_LAB]
+    STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
+                      (RESCHEDULED_LAB, 'Rescheduled by lab'),
+                      (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                      (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
+                      (COMPLETED, 'Completed')]
 
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
     lab_test = models.ManyToManyField(AvailableLabTest)
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.SET_NULL, null=True)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     profile_detail = JSONField(blank=True, null=True)
-    status = models.PositiveSmallIntegerField(default=CREATED)
+    status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # This is mrp
     agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -525,16 +538,14 @@ class LabAppointment(TimeStampedModel):
     is_home_pickup = models.BooleanField(default=False)
     address = JSONField(blank=True, null=True)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
+    home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def allowed_action(self, user_type):
         allowed = []
         current_datetime = timezone.now()
-        if user_type == User.CONSUMER and current_datetime < self.time_slot_start + timedelta(hours=6):
+        if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT, self.CANCELED]
-        if user_type == User.DOCTOR:
-            if self.status in [self.BOOKED]:
-                allowed = [self.COMPLETED]
+                allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
         return allowed
 
     def send_notification(self, database_instance):
@@ -570,7 +581,7 @@ class LabAppointment(TimeStampedModel):
                 notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
             )
             return
-        if self.status == LabAppointment.CANCELED:
+        if self.status == LabAppointment.CANCELLED:
             LabNotificationAction.trigger(
                 instance=self,
                 user=self.user,
@@ -582,6 +593,35 @@ class LabAppointment(TimeStampedModel):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
         self.send_notification(database_instance)
+
+        if not database_instance or database_instance.status != self.status:
+            for e_id in settings.OPS_EMAIL_ID:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
+
+        try:
+            prev_app_dict = {'id': self.id,
+                             'status': self.status,
+                             "updated_at": int(self.updated_at.timestamp())}
+            if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
+                countdown = self.get_auto_cancel_delay(self)
+                tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
+        except Exception as e:
+            logger.error("Error in auto cancel flow - " + str(e))
+
+    def get_auto_cancel_delay(self, app_obj):
+        delay = settings.AUTO_CANCEL_LAB_DELAY * 60
+        to_zone = tz.gettz(settings.TIME_ZONE)
+        app_updated_time = app_obj.updated_at.astimezone(to_zone)
+        morning_time = "08:00:00"  # In IST
+        evening_time = "20:00:00"  # In IST
+        present_day_end = custom_form_datetime(evening_time, to_zone)
+        next_day_start = custom_form_datetime(morning_time, to_zone, diff_days=1)
+        time_diff = next_day_start - app_updated_time
+
+        if present_day_end - timedelta(minutes=10) < app_updated_time < next_day_start:
+            return time_diff.seconds
+        else:
+            return delay
 
     @classmethod
     def create_appointment(cls, appointment_data):
@@ -614,7 +654,7 @@ class LabAppointment(TimeStampedModel):
         self.save()
 
     def action_cancelled(self, refund_flag=1):
-        self.status = self.CANCELED
+        self.status = self.CANCELLED
         self.save()
 
         consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
@@ -651,10 +691,9 @@ class LabAppointment(TimeStampedModel):
     def lab_payout_amount(self):
         amount = 0
         if self.payment_type == OpdAppointment.COD:
-            amount = (-1)*(self.effective_price - self.agreed_price)
+            amount = (-1)*(self.effective_price - self.agreed_price - self.home_pickup_charges)
         elif self.payment_type == OpdAppointment.PREPAID:
-            amount = self.agreed_price
-
+            amount = self.agreed_price + self.home_pickup_charges
         return amount
 
     @classmethod
@@ -749,7 +788,7 @@ class LabAppointment(TimeStampedModel):
         # return queryset
 
     def __str__(self):
-        return self.profile.name + ', ' + self.lab.name
+        return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
     class Meta:
         db_table = "lab_appointment"
@@ -757,6 +796,9 @@ class LabAppointment(TimeStampedModel):
 
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
+
+    def __str__(self):
+        return "{}-{}".format(self.test.name, self.id)
 
 
 class CommonDiagnosticCondition(TimeStampedModel):

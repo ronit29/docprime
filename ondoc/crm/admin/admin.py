@@ -4,7 +4,7 @@ from django.contrib.gis import admin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment, GeneralSpecialization,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
-                                 DoctorClinic, DoctorMapping, DoctorImage)
+                                 DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup)
 from ondoc.lead.models import HospitalLead, DoctorLead
@@ -12,15 +12,18 @@ from ondoc.notification import models as notifcation_model
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
-                     DoctorMappingAdmin, DoctorImageAdmin)
+                     DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
-from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin
+from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
+    LabAppointmentAdmin, CommonTestAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
+from .report import ReportAdmin
+from ondoc.reports import models as report_models
 
 from ondoc.web.models import OnlineLead, Career
 from django.contrib.auth import get_user_model
@@ -37,10 +40,10 @@ admin.site.index_title = 'CRM Administration'
 
 
 admin.site.register(OtpVerifications)
-admin.site.register(OpdAppointment)
+# admin.site.register(OpdAppointment)
 admin.site.register(UserProfile)
 
-admin.site.register(LabAppointment) #temp temp temp
+admin.site.register(LabAppointment, LabAppointmentAdmin) #temp temp temp
 admin.site.register(DoctorClinic, DoctorClinicAdmin)
 
 admin.site.register(Doctor, DoctorAdmin)
@@ -54,7 +57,7 @@ admin.site.register(User, CustomUserAdmin)
 admin.site.register(Language, LanguageAdmin)
 admin.site.register(MedicalService, MedicalServiceAdmin)
 admin.site.register(CommonMedicalCondition)
-admin.site.register(CommonSpecialization)
+admin.site.register(CommonSpecialization, CommonSpecializationAdmin)
 admin.site.register(Specialization, SpecializationAdmin)
 admin.site.register(GeneralSpecialization, GeneralSpecializationAdmin)
 admin.site.register(MedicalCondition, MedicalConditionAdmin)
@@ -63,7 +66,7 @@ admin.site.register(HealthTip, HealthTipAdmin)
 admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
 admin.site.register(Lab, LabAdmin)
-admin.site.register(CommonTest)
+admin.site.register(CommonTest, CommonTestAdmin)
 admin.site.register(CommonDiagnosticCondition, CommonDiagnosticConditionAdmin)
 admin.site.register(LabNetwork, LabNetworkAdmin)
 
@@ -79,3 +82,6 @@ admin.site.register(notifcation_model.EmailNotification, EmailNotificationAdmin)
 admin.site.register(notifcation_model.SmsNotification, SmsNotificationAdmin)
 admin.site.register(notifcation_model.PushNotification, PushNotificationAdmin)
 admin.site.register(notifcation_model.AppNotification, AppNotificationAdmin)
+admin.site.register(OpdAppointment, DoctorOpdAppointmentAdmin)
+admin.site.register(report_models.Report)
+admin.site.register(report_models.GeneratedReport, ReportAdmin)

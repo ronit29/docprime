@@ -1,0 +1,27 @@
+{% load render_table from django_tables2 %}
+{% load export_url from django_tables2 %}
+<!doctype html>
+<html>
+    <head>
+        <title>{{ report.report_name }}</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
+
+        <style type="text/css">
+            thead
+            {
+                white-space: nowrap;
+            }
+        </style>
+    </head>
+    <body>
+        <div style='padding:20px;'>
+        <h2>{{ report.report_name }}</h2>
+        {% render_table result %}
+{% for format in result.export_formats %}
+    <a href="{% export_url format %}">
+        <button class="btn btn-primary">download  <code>.{{ format }}</code></button>
+    </a>
+{% endfor %}
+        </div>
+    </body>
+</html>

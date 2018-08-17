@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -17,10 +18,15 @@
         {% block title_text %}
         {% endblock %}
     </title>
-	<meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-	<link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700">
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="viewport" content="width=device-width, shrink-to-fit=no, initial-scale=1, user-scalable=no">
+	<meta name="description" content="">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+	<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
 
     {% block page_css %}
     {% endblock %}
@@ -28,6 +34,22 @@
 <body>
      {% block content %}
      {% endblock %}
+     <footer class="container-fluid footer" style="margin-top: 0;">
+			<div class="container">
+				<div class="row footer-row">
+                    <div class="col-12 col-sm-8 footer-col">
+                        <p class="footer-text"><a style="display: inline-block;" href="{% url 'web:about_page' %}">About Us</a><span>|</span><a style="display: inline-block;" href="{% url 'web:howitworks_page' %}">How It Works</a><span>|</span><a style="display: inline-block;" href="{% url 'web:privacy_page' %}">Privacy Policy</a><span>|</span><a style="display: inline-block;" href="{% url 'web:terms_page' %}">Terms &amp; Conditions</a><span>|</span><a style="display: inline-block;" href="{% url 'web:careers_page' %}">Careers</a><span>|</span><a style="display: inline-block;" href="{% url 'web:media_page' %}">Media</a><span>|</span><a style="display: inline-block;" href="{% url 'web:disclaimer_page' %}">Disclaimer</a><span>|</span><a style="display: inline-block;" href="{% url 'web:contact_page' %}">Contact Us</a></p>
+                    </div>
+					<div class="col-12 col-sm-4 footer-icons">
+						<a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="{% static 'web/images/forma-1.svg' %}" class="footer-icon"></a>
+						<a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img src="{% static 'web/images/forma-2.svg' %}" class="footer-icon"></a>
+						<a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img src="{% static 'web/images/forma-3.svg' %}" class="footer-icon"></a>
+						<a href="https://twitter.com/DocPrimeindia" target="_blank"><img src="{% static 'web/images/forma-4.svg' %}" class="footer-icon"></a>
+						<a href="https://www.linkedin.com/company/docprime/" target="_blank"><img src="{% static 'web/images/forma-5.svg' %}" class="footer-icon"></a>
+					</div>
+				</div>
+			</div>
+     </footer>
 </body>
      {% block page_script %}{% endblock %}
 </html>

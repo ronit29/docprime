@@ -1,3 +1,4 @@
+{% load static %}
 {% load invoice_tags %}
 <!DOCTYPE html>
 <html>
@@ -17,13 +18,13 @@
 						<tbody>
 							<tr>
 								<td style="width: 120px;">
-									<img src="invoice-logo.png">
+									<img src="{% static 'notification/images/logo.png' %}">
 								</td>
 								<td>
 									<h3 style="font-weight: 500;">{{instance.lab.name|capfirst}}</h3>
 								</td>
 								<td style="text-align: right;">
-									<h3 style="font-weight: 500;">Inovice</h3>
+									<h3 style="font-weight: 500;">Invoice</h3>
 								</td>
 							</tr>
 						</tbody>

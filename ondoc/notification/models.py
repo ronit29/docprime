@@ -1,7 +1,7 @@
 import json
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
-from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.fields import JSONField, ArrayField
 from django.forms.models import model_to_dict
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.authentication.models import NotificationEndpoint
@@ -11,7 +11,6 @@ from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.utils import timezone
 from ondoc.account import models as account_model
-from django.conf import settings
 from weasyprint import HTML
 from django.conf import settings
 import pytz
@@ -151,7 +150,7 @@ class NotificationAction:
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "Appointment Confirmed",
-                "body": "Appointment confirmed for Mr. {} at {}, {} with Dr. {}.".format(
+                "body": "Appointment confirmed for {} at {}, {} with Dr. {}.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y"), doctor_name
                 ),
@@ -169,7 +168,7 @@ class NotificationAction:
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "New Appointment",
-                "body": "New appointment for Mr. {} at {}, {}. Please confirm.".format(
+                "body": "New appointment for {} at {}, {}. Please confirm.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),
@@ -186,7 +185,7 @@ class NotificationAction:
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "Appointment Cancelled",
-                "body": "Appointment with Mr. {} at {}  {} has been cancelled.".format(
+                "body": "Appointment with {} at {}  {} has been cancelled.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")),
                 "url": "/opd/appointment/{}".format(instance.id),
@@ -338,7 +337,7 @@ class EmailNotificationOpdMixin:
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            context.update({"invoice_url": settings.BASE_URL + invoice.file.url})
+            context.update({"invoice_url": invoice.file.url})
             html_body = render_to_string("email/doctor_invoice/body.html", context=context)
             email_subject = render_to_string("email/doctor_invoice/subject.txt", context=context)
         return html_body, email_subject
@@ -382,7 +381,7 @@ class EmailNotificationLabMixin:
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for lab invoice {}".format(e))
-            context.update({"invoice_url": settings.BASE_URL + invoice.file.url})
+            context.update({"invoice_url": invoice.file.url})
             html_body = render_to_string("email/lab_invoice/body.html", context=context)
             email_subject = render_to_string("email/lab_invoice/subject.txt", context=context)
         return html_body, email_subject
@@ -416,6 +415,39 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             )
             message = {
                 "data": model_to_dict(email_noti),
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def ops_notification_alert(cls, instance, email_list, product):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        status_choices = dict()
+        if product == account_model.Order.DOCTOR_PRODUCT_ID:
+            for k, v in OpdAppointment.STATUS_CHOICES:
+                status_choices[k] = v
+            url = settings.ADMIN_BASE_URL + "/admin/doctor/opdappointment/" + str(instance.id) + "/change"
+        elif product == account_model.Order.LAB_PRODUCT_ID:
+            for k, v in LabAppointment.STATUS_CHOICES:
+                status_choices[k] = v
+            url = settings.ADMIN_BASE_URL + "/admin/diagnostic/labappointment/" + str(instance.id) + "/change"
+
+        html_body = "status - {status}, user - {username}, url - {url}".format(
+            status=status_choices[instance.status], username=instance.profile.name, url=url
+        )
+        email_subject = "Change in appointment of user - {username} and id - {id}".format(
+            username=instance.profile.name, id=instance.id
+        )
+        if email_list:
+            email_notif = {
+                "email": email_list,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_notif,
                 "type": "email"
             }
             message = json.dumps(message)

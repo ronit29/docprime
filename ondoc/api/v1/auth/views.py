@@ -116,9 +116,11 @@ class UserViewset(GenericViewSet):
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
 
-        # token = Token.objects.get_or_create(user=user)
         payload = JWTAuthentication.jwt_payload_handler(user)
         token = jwt.encode(payload, settings.SECRET_KEY)
+
+        # token = Token.objects.get_or_create(user=user)
+
 
         expire_otp(data['phone_number'])
 
@@ -127,7 +129,7 @@ class UserViewset(GenericViewSet):
             "user_exists": user_exists,
             "user_id": user.id,
             "token": token,
-            "expiration_time": datetime.datetime.utcnow() + settings.JWT_AUTH['JWT_EXPIRATION_DELTA']
+            "expiration_time": payload['exp']
         }
         return Response(response)
 
@@ -201,6 +203,11 @@ class UserViewset(GenericViewSet):
                         if admin.doctor.data_status == Doctor.QC_APPROVED and admin.doctor.onboarding_status == Doctor.ONBOARDED:
                             admin.doctor.is_live = True
                             admin.doctor.save()
+                else:
+                    for hosp_doc in admin.hospital.assoc_doctors.all():
+                        if hosp_doc.data_status == Doctor.QC_APPROVED and hosp_doc.onboarding_status == Doctor.ONBOARDED:
+                            hosp_doc.is_live = True
+                            hosp_doc.save()
 
 
 class NotificationEndpointViewSet(GenericViewSet):
@@ -298,13 +305,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
     def update(self, request, *args, **kwargs):
         data = {key: value for key, value in request.data.items()}
-        if data.get('age'):
-            try:
-                age = int(request.data.get("age"))
-                data['dob'] = datetime.datetime.now() - relativedelta(years=age)
-                data['dob'] = data['dob'].date()
-            except:
-                return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
+        # if data.get('age'):
+        #     try:
+        #         age = int(request.data.get("age"))
+        #         data['dob'] = datetime.datetime.now() - relativedelta(years=age)
+        #         data['dob'] = data['dob'].date()
+        #     except:
+        #         return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj = self.get_object()
         if data.get("name") and UserProfile.objects.exclude(id=obj.id).filter(name=data['name'],
@@ -400,7 +407,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['Error'] = 'Action Not Allowed'
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_lab_appointment = self.lab_appointment_update(request, lab_appointment, validated_data)
-            if updated_lab_appointment.get("status") and updated_lab_appointment["status"] == 0:
+            if updated_lab_appointment.get("status") is not None and updated_lab_appointment["status"] == 0:
                 return Response(updated_lab_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_lab_appointment)
@@ -413,7 +420,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
-            if updated_opd_appointment.get("status") and updated_opd_appointment["status"] == 0:
+            if updated_opd_appointment.get("status") is not None and updated_opd_appointment["status"] == 0:
                 return Response(updated_opd_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_opd_appointment)
@@ -423,7 +430,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         resp = dict()
         resp["status"] = 1
         if validated_data.get('status'):
-            if validated_data['status'] == LabAppointment.CANCELED:
+            if validated_data['status'] == LabAppointment.CANCELLED:
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
@@ -480,7 +487,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         if validated_data.get('status'):
             resp = dict()
             resp["status"] = 1
-            if validated_data['status'] == OpdAppointment.CANCELED:
+            if validated_data['status'] == OpdAppointment.CANCELLED:
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
@@ -604,8 +611,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             pgdata['email'] = "dummy_appointment@policybazaar.com"
 
         pgdata['productId'] = product_id
-        base_url = (
-            "https://{}".format(request.get_host()) if request.is_secure() else "http://{}".format(request.get_host()))
+        base_url = "https://{}".format(request.get_host())
         pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
         pgdata['appointmentId'] = appointment_details.get('id')
@@ -616,7 +622,15 @@ class UserAppointmentsViewSet(OndocViewSet):
             pgdata['name'] = "DummyName"
         pgdata['txAmount'] = str(appointment_details['payable_amount'])
 
-        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY, settings.PG_CLIENT_KEY)
+        secret_key = client_key = ""
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            secret_key = settings.PG_SECRET_KEY_P1
+            client_key = settings.PG_CLIENT_KEY_P1
+        elif product_id == Order.LAB_PRODUCT_ID:
+            secret_key = settings.PG_SECRET_KEY_P2
+            client_key = settings.PG_CLIENT_KEY_P2
+
+        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
         return pgdata, payment_required
 
@@ -784,11 +798,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
     queryset = PgTransaction.objects.none()
 
     def save(self, request):
-        LAB_REDIRECT_URL = request.build_absolute_uri("/") + "lab/appointment"
-        OPD_REDIRECT_URL = request.build_absolute_uri("/") + "opd/appointment"
-        LAB_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "lab/%s/book?error_code=%s"
-        OPD_FAILURE_REDIRECT_URL = request.build_absolute_uri("/") + "opd/doctor/%s/%s/bookdetails?error_code=%s"
-        ERROR_REDIRECT_URL = request.build_absolute_uri("/") + "error?error_code=%s"
+        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
+        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
+        LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
+        OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
+        ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
 
         try:
@@ -824,7 +838,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     resp_serializer = serializers.TransactionSerializer(data=response)
                     if resp_serializer.is_valid():
                         response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-                        if PgTransaction.is_valid_hash(response):
+                        if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
                             try:
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)
                             except Exception as e:
@@ -1048,11 +1062,9 @@ class OrderHistoryViewSet(GenericViewSet):
                     "payment_type": action_data.get("payment_type"),
                     "type": "opd"
                 }
-                serializer = CreateAppointmentSerializer(data=data, context={"request": request})
-                if not serializer.is_valid():
-                    data.pop("time_slot_start")
-                    data.pop("start_date")
-                    data.pop("start_time")
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
                 orders.append(data)
             elif action_data["product_id"] == Order.LAB_PRODUCT_ID:
                 if action_data['lab'] not in lab_name:
@@ -1069,11 +1081,9 @@ class OrderHistoryViewSet(GenericViewSet):
                     "payment_type": action_data.get("payment_type"),
                     "type": "lab"
                 }
-                serializer = LabAppointmentCreateSerializer(data=data, context={'request': request})
-                if not serializer.is_valid():
-                    data.pop("time_slot_start")
-                    data.pop("start_date")
-                    data.pop("start_time")
+                data.pop("time_slot_start")
+                data.pop("start_date")
+                data.pop("start_time")
                 data["test_ids"] = [lab_test_map[x] for x in action_data.get("lab_test")]
                 orders.append(data)
         return Response(orders)

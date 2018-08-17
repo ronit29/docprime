@@ -11,10 +11,13 @@ import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
+from ondoc.account.tasks import refund_curl_task
 from ondoc.crm.constants import constants
 import requests
 import json
 from django.conf import settings
+from dateutil.parser import parse
+from dateutil import tz
 User = get_user_model()
 
 
@@ -153,21 +156,11 @@ class DealPriceCalculate(Func):
     function = 'labtest_deal_price_calculate'
 
 
-def form_time_slot(date_str, time):
-    date, temp = date_str.split("T")
-    date_str = str(date)
+def form_time_slot(timestamp, time):
+    to_zone = tz.gettz(settings.TIME_ZONE)
     min, hour = math.modf(time)
     min *= 60
-    if min < 10:
-        min = "0" + str(int(min))
-    else:
-        min = str(int(min))
-    time_str = str(int(hour))+":"+str(min)
-    date_time_field = str(date_str) + "T" + time_str
-    dt_field = datetime.datetime.strptime(date_time_field, "%Y-%m-%dT%H:%M")
-    defined_timezone = str(timezone.get_default_timezone())
-    dt_field = pytz.timezone(defined_timezone).localize(dt_field)
-    # dt_field = pytz.utc.localize(dt_field)
+    dt_field = timestamp.astimezone(to_zone).replace(hour=int(hour), minute=int(min), second=0, microsecond=0)
     return dt_field
 
 
@@ -251,37 +244,37 @@ def labappointment_transform(app_data):
     app_data["lab"] = app_data["lab"].id
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
+    app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
     return app_data
 
 
 def refund_curl_request(req_data):
-    token = "gFH8gPXbCWaW8WqUefmFBcyRj0XIw"
-    headers = {
-        "Authorization": token,
-        "Content-Type": "application/json"
-    }
-    url = "http://pgdev.policybazaar.com/dp/refund/refundRequested"
     for data in req_data:
-        response = requests.post(url, data=data, headers=headers)
-        response.raise_for_status()
-        print("\n\n\n")
-        print(response.status_code)
-        print("\n\n\n")
+        refund_curl_task.delay(data)
 
+
+def custom_form_datetime(time_str, to_zone, diff_days=0):
+    next_dt = timezone.now().replace(tzinfo=to_zone).date()
+    if diff_days:
+        next_dt += datetime.timedelta(days=diff_days)
+    exp_dt = str(next_dt) + " " + time_str
+    exp_dt = parse(exp_dt).replace(tzinfo=to_zone)
+
+    return exp_dt
 
 class ErrorCodeMapping(object):
     IVALID_APPOINTMENT_ORDER = 1
 
 
 def is_valid_testing_data(user, doctor):
-    from ondoc.doctor.models import Doctor
 
-    if user.id is None:
+    if doctor.is_test_doctor and not user.groups.filter(name=constants['TEST_USER_GROUP']).exists():
         return False
-    if (Doctor.objects.filter(id=doctor.id, is_test_doctor=True).exists() and not user.groups.filter(
-            name=constants['TEST_USER_GROUP']).exists()):
-        return False
-    if (Doctor.objects.filter(id=doctor.id, is_test_doctor=False).exists() and user.groups.filter(
-            name=constants['TEST_USER_GROUP']).exists()):
+    return True
+
+
+def is_valid_testing_lab_data(user, lab):
+
+    if lab.is_test_lab and not user.groups.filter(name=constants['TEST_USER_GROUP']).exists():
         return False
     return True

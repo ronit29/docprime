@@ -142,7 +142,7 @@ class NotificationEndpointDeleteSerializer(serializers.Serializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     GENDER_CHOICES = UserProfile.GENDER_CHOICES
-    name = serializers.CharField()
+    name = serializers.CharField(max_length=100)
     age = serializers.SerializerMethodField()
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
