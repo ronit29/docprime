@@ -13,6 +13,8 @@ from io import BytesIO
 import math
 import os
 import hashlib
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 
 class Image(models.Model):
@@ -752,6 +754,43 @@ class GenericAdmin(TimeStampedModel):
                 admin_users.append(admin.user)
         return admin_users
 
+
+class BillingAccount(models.Model):
+    SAVINGS = 1
+    CURRENT = 2
+    merchant_id = models.BigIntegerField(null=True, default=None, blank=True)
+    account_number = models.BigIntegerField(null=True, default=None, blank=True)
+    ifsc_code = models.CharField(max_length=128, null=True)
+    TYPE_CHOICES = (
+        (SAVINGS, 'Savings'),
+        (CURRENT, 'Current'),
+    )
+    type = models.PositiveIntegerField(max_length=1, choices=TYPE_CHOICES, null=True)
+    enabled = models.BooleanField(default=False)
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = 'billing_account'
+
+    def save(self, *args, **kwargs):
+        if not self.merchant_id:
+            self.merchant_id = self.get_merchant_id()
+        super(BillingAccount, self).save(*args, **kwargs)
+
+    def get_merchant_id(self):
+        from ondoc.api.v1.utils import RawSql
+        merchant_id = None
+        query = '''select nextval('merchant_id_seq') as inc'''
+        seq = RawSql(query).fetch_all()
+        if seq:
+            merchant_id = seq[0]['inc'] if seq[0]['inc'] else None
+        return merchant_id
+
+    def __str__(self):
+        return '{}-{}'.format(self.name, self.merchant_id)
 
 
 

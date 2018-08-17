@@ -15,7 +15,9 @@ from django.conf import settings
 from django.utils import timezone
 import pytz
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
-from ondoc.authentication.models import GenericAdmin
+from django.contrib.contenttypes.admin import GenericTabularInline
+from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
+from ondoc.authentication.models import GenericAdmin, BillingAccount
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
@@ -592,6 +594,33 @@ class DoctorResource(resources.ModelResource):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
 
+class BillingAccountFormSet(BaseGenericInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        enabled = 0
+        count = 0
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('enabled'):
+                enabled += 1
+
+        if count > 0:
+            if enabled >= 1:
+                raise forms.ValidationError("Only one Billing Account can be enabled")
+
+
+class BillingAccountInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    formset = BillingAccountFormSet
+    can_delete = False
+    extra = 0
+    model = BillingAccount
+    show_change_link = False
+    readonly_fields = ['merchant_id']
+    fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'enabled']
+
+
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -619,7 +648,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         DoctorMedicalServiceInline,
         DoctorImageInline,
         DoctorDocumentInline,
-        GenericAdminInline
+        GenericAdminInline,
+        BillingAccountInline
     ]
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key']
     search_fields = ['name']

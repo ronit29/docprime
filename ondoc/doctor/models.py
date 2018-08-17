@@ -36,6 +36,7 @@ from django.utils.safestring import mark_safe
 from PIL import Image as Img
 from io import BytesIO
 import hashlib
+from django.contrib.contenttypes.fields import GenericRelation
 
 logger = logging.getLogger(__name__)
 
@@ -269,6 +270,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     matrix_lead_id = models.BigIntegerField(blank=True, null=True)
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
+    billing_merchant = GenericRelation(auth_model.BillingAccount)
+
 
     def __str__(self):
         return self.name
