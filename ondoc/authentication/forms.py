@@ -22,15 +22,20 @@ class BillingAccountFormSet(BaseGenericInlineFormSet):
 
 class BillingAccountForm(forms.ModelForm):
 
+    account_copy = forms.ImageField()
+    pan_copy = forms.ImageField()
+
+
     class Meta:
         model = models.BillingAccount
-        fields = ('merchant_id', 'type', 'account_number', 'ifsc_code', 'enabled', )
+        fields = ('merchant_id', 'type', 'account_number', 'ifsc_code','pan_number','pan_copy','account_copy', 'enabled')
 
     def __init__(self, *args, **kwargs):
         super(BillingAccountForm, self).__init__(*args, **kwargs)
         if self.instance.pk:
             self.fields['type'].widget = forms.TextInput(attrs={'readonly':True})
+            self.fields['pan_copy'].disabled = True
+            self.fields['account_copy'].disabled = True
             self.fields['account_number'].widget.attrs['readonly'] = True
-            # self.fields['account_number'].widget.attrs['disabled'] = True
+            self.fields['pan_number'].widget.attrs['readonly'] = True
             self.fields['ifsc_code'].widget.attrs['readonly'] = True
-            # self.fields['ifsc_code'].widget.attrs['disabled'] = True

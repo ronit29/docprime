@@ -29,6 +29,8 @@ from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAcco
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
+from ondoc.authentication.admin import BillingAccountInline
+
 
 class LabTestResource(resources.ModelResource):
     excel_id = fields.Field(attribute='excel_id', column_name='Test ID')
@@ -276,17 +278,6 @@ class LabCityFilter(SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value():
             return queryset.filter(city__iexact=self.value()).distinct()
-
-
-class BillingAccountInline(GenericTabularInline):
-    form = auth_forms.BillingAccountForm
-    formset = auth_forms.BillingAccountFormSet
-    can_delete = False
-    extra = 0
-    model = BillingAccount
-    show_change_link = False
-    readonly_fields = ['merchant_id']
-    fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'enabled']
 
 
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):

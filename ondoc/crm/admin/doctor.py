@@ -17,7 +17,7 @@ import pytz
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, BillingAccount
-from ondoc.authentication import forms as auth_forms
+from ondoc.authentication.admin import BillingAccountInline
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
@@ -592,18 +592,6 @@ class DoctorResource(resources.ModelResource):
 
     def dehydrate_qualification(self, doctor):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
-
-
-class BillingAccountInline(GenericTabularInline, nested_admin.NestedTabularInline):
-    form = auth_forms.BillingAccountForm
-    formset = auth_forms.BillingAccountFormSet
-    can_delete = False
-    extra = 0
-    model = BillingAccount
-    show_change_link = False
-    readonly_fields = ['merchant_id']
-    fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'enabled']
-
 
 # class BillingAccountAdmin(VersionAdmin):
 #     search_fields = ['merchant_id']

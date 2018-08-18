@@ -9,9 +9,9 @@ from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabNetworkDocument)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User, BillingAccount
-from django.contrib.contenttypes.admin import GenericTabularInline
-from ondoc.authentication import forms as auth_forms
+from ondoc.authentication.models import User
+
+from ondoc.authentication.admin import BillingAccountInline
 
 class LabNetworkCertificationInline(admin.TabularInline):
     model = LabNetworkCertification
@@ -144,17 +144,6 @@ class LabNetworkDocumentInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-
-
-class BillingAccountInline(GenericTabularInline):
-    form = auth_forms.BillingAccountForm
-    formset = auth_forms.BillingAccountFormSet
-    can_delete = False
-    extra = 0
-    model = BillingAccount
-    show_change_link = False
-    readonly_fields = ['merchant_id']
-    fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'enabled']
 
 
 class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):

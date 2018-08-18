@@ -7,9 +7,9 @@ from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
-from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount
-from django.contrib.contenttypes.admin import GenericTabularInline
-from ondoc.authentication import forms as auth_forms
+from ondoc.authentication.models import GenericAdmin, User, QCModel
+from ondoc.authentication.admin import BillingAccountInline
+
 
 class HospitalImageInline(admin.TabularInline):
     model = HospitalImage
@@ -165,18 +165,6 @@ class HospCityFilter(SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value():
             return queryset.filter(city__iexact=self.value()).distinct()
-
-
-class BillingAccountInline(GenericTabularInline):
-    form = auth_forms.BillingAccountForm
-    formset = auth_forms.BillingAccountFormSet
-    can_delete = False
-    extra = 0
-    model = BillingAccount
-    show_change_link = False
-    readonly_fields = ['merchant_id']
-    fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'enabled']
-
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', HospCityFilter)

@@ -33,6 +33,9 @@ from ondoc.web.models import Career, OnlineLead
 
 from ondoc.articles.models import Article
 
+from ondoc.authentication.models import BillingAccount
+
+
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
 
@@ -115,7 +118,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(
+        content_types = ContentType.objects.get_for_models(BillingAccount,
             Qualification, Specialization, Language, MedicalService, College, GeneralSpecialization)
 
         for cl, ct in content_types.items():

@@ -4,15 +4,15 @@ from django.db import models
 from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
-from ondoc.authentication.models import GenericAdmin, User, BillingAccount
-from django.contrib.contenttypes.admin import GenericTabularInline
-from ondoc.authentication import forms as auth_forms
+from ondoc.authentication.models import GenericAdmin, User
+
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
     HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
     HospitalNetworkAward, HospitalNetworkCertification, HospitalNetworkDocument)
 
 from .common import *
+from ondoc.authentication.admin import BillingAccountInline
 
 
 class HospitalNetworkCertificationInline(admin.TabularInline):
@@ -147,18 +147,6 @@ class HospitalNetworkDocumentInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-
-
-class BillingAccountInline(GenericTabularInline):
-    form = auth_forms.BillingAccountForm
-    formset = auth_forms.BillingAccountFormSet
-    can_delete = False
-    extra = 0
-    model = BillingAccount
-    show_change_link = False
-    readonly_fields = ['merchant_id']
-    fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'enabled']
-
 
 
 class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):

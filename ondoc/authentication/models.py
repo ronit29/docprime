@@ -761,10 +761,13 @@ class BillingAccount(models.Model):
     merchant_id = models.BigIntegerField(null=True, default=None, blank=True)
     account_number = models.BigIntegerField(null=True, default=None, blank=True)
     ifsc_code = models.CharField(max_length=128, null=True)
+    pan_number = models.CharField(max_length=20, null=True)
     TYPE_CHOICES = (
         (SAVINGS, 'Savings'),
         (CURRENT, 'Current'),
     )
+    pan_copy = models.ImageField('Pan Card Image',upload_to='billing/documents', null=True, blank=True)
+    account_copy = models.ImageField('Account/Cheque Image',upload_to='billing/documents', null=True, blank=True)
     type = models.PositiveIntegerField(max_length=1, choices=TYPE_CHOICES, null=True)
     enabled = models.BooleanField(default=False)
 
