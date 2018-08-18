@@ -47,7 +47,7 @@ class Command(BaseCommand):
         group.permissions.clear()
 
 
-        content_types = ContentType.objects.get_for_models(Doctor, Hospital, HospitalNetwork)
+        content_types = ContentType.objects.get_for_models(BillingAccount, Doctor, Hospital, HospitalNetwork)
         for cl, ct in content_types.items():
 
             permissions = Permission.objects.filter(
