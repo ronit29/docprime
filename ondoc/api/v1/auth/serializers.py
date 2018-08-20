@@ -8,7 +8,6 @@ from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
-from rest_framework_jwt.serializers import VerificationBaseSerializer, api_settings
 import jwt
 from django.conf import settings
 

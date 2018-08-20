@@ -84,6 +84,3 @@ class JWTAuthentication(authentication.BaseAuthentication):
                 datetime.datetime.utcnow().utctimetuple()
             )
         }
-
-
-
