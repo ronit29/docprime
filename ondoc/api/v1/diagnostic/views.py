@@ -47,7 +47,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         test_queryset = CommonTest.objects.all()
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
-        test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True)
+        test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
         temp_data = dict()

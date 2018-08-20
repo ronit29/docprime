@@ -737,17 +737,22 @@ class MedicalConditionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonMedicalCondition
-        fields = ('id', 'name', 'specialization')
+        fields = ('id', 'name', 'specialization',)
 
 
 class CommonSpecializationsSerializer(serializers.ModelSerializer):
 
     id = serializers.ReadOnlyField(source='specialization.id')
     name = serializers.ReadOnlyField(source='specialization.name')
+    icon = serializers.SerializerMethodField
+
+    def get_icon(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
 
     class Meta:
         model = CommonSpecialization
-        fields = ('id', 'name')
+        fields = ('id', 'name', 'icon', )
 
 
 class ConfigGetSerializer(serializers.Serializer):

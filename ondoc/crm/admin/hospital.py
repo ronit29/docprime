@@ -8,8 +8,7 @@ from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
 from ondoc.authentication.models import GenericAdmin, User, QCModel
-from django.contrib.contenttypes.admin import GenericTabularInline
-
+from ondoc.authentication.admin import BillingAccountInline
 
 
 class HospitalImageInline(admin.TabularInline):
@@ -167,7 +166,6 @@ class HospCityFilter(SimpleListFilter):
         if self.value():
             return queryset.filter(city__iexact=self.value()).distinct()
 
-
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', HospCityFilter)
     readonly_fields = ('associated_doctors', 'is_live', )
@@ -236,7 +234,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalDocumentInline,
         HospitalCertificationInline,
         GenericAdminInline,
-
+        BillingAccountInline
     ]
 
     map_width = 200
