@@ -15,7 +15,9 @@ from django.conf import settings
 from django.utils import timezone
 import pytz
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
-from ondoc.authentication.models import GenericAdmin
+from django.contrib.contenttypes.admin import GenericTabularInline
+from ondoc.authentication.models import GenericAdmin, BillingAccount
+from ondoc.authentication.admin import BillingAccountInline
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
@@ -33,7 +35,7 @@ from django.template.loader import render_to_string
 import nested_admin
 from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
-
+from django import forms
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -591,6 +593,9 @@ class DoctorResource(resources.ModelResource):
     def dehydrate_qualification(self, doctor):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
+# class BillingAccountAdmin(VersionAdmin):
+#     search_fields = ['merchant_id']
+
 
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
@@ -619,7 +624,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         DoctorMedicalServiceInline,
         DoctorImageInline,
         DoctorDocumentInline,
-        GenericAdminInline
+        GenericAdminInline,
+        BillingAccountInline
     ]
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key']
     search_fields = ['name']
