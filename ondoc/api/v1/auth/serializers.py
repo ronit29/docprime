@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         UserPermission, Address, GenericAdmin)
+                                         UserPermission, Address, GenericAdmin, UserSecretKey)
 from ondoc.doctor.models import DoctorMobile
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime, calendar
@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
 from django.conf import settings
+from ondoc.authentication.backends import JWTAuthentication
 
 User = get_user_model()
 
@@ -256,7 +257,6 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
     token = serializers.CharField()
 
     def validate(self, attrs):
-        from ondoc.authentication.backends import JWTAuthentication
         token = attrs['token']
 
         payload = self.check_payload_custom(token=token)
@@ -312,8 +312,14 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         return user
 
     def check_payload_custom(self, token):
+        user_key = None
+        user_id = JWTAuthentication.get_unverified_user(token)
+        if user_id:
+            user_key_object = UserSecretKey.objects.get(user_id=user_id)
+            if user_key_object:
+                user_key = user_key_object.key
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY)
+            payload = jwt.decode(token, user_key)
         except jwt.ExpiredSignature:
             msg = _('Token has expired.')
             raise serializers.ValidationError(msg)

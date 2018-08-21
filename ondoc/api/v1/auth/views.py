@@ -21,7 +21,7 @@ from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         Address, AppointmentTransaction, GenericAdmin)
+                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey)
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -116,11 +116,11 @@ class UserViewset(GenericViewSet):
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
 
+        user_key = UserSecretKey.objects.get_or_create(user=user)
         payload = JWTAuthentication.jwt_payload_handler(user)
-        token = jwt.encode(payload, settings.SECRET_KEY)
+        token = jwt.encode(payload, user_key[0].key)
 
         # token = Token.objects.get_or_create(user=user)
-
 
         expire_otp(data['phone_number'])
 
@@ -186,8 +186,9 @@ class UserViewset(GenericViewSet):
         self.update_live_status(phone_number)
 
         # token = Token.objects.get_or_create(user=user)
+        user_key = UserSecretKey.objects.get_or_create(user=user)
         payload = JWTAuthentication.jwt_payload_handler(user)
-        token = jwt.encode(payload, settings.SECRET_KEY)
+        token = jwt.encode(payload, user_key[0].key)
         expire_otp(data['phone_number'])
 
         response = {

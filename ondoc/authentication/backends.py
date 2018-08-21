@@ -4,6 +4,7 @@ import jwt
 import datetime
 from django.conf import settings
 from rest_framework import authentication, exceptions
+from ondoc.authentication.models import UserSecretKey
 
 User = get_user_model()
 
@@ -53,8 +54,14 @@ class JWTAuthentication(authentication.BaseAuthentication):
 
 
     def _authenticate_credentials(self, request, token):
+        user_key = None
+        user_id = JWTAuthentication.get_unverified_user(token)
+        if user_id:
+            user_key_object = UserSecretKey.objects.get(user_id=user_id)
+            if user_key_object:
+                user_key = user_key_object.key
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY)
+            payload = jwt.decode(token, user_key)
         except:
             msg = 'Invalid authentication. Could not decode token.'
             raise exceptions.AuthenticationFailed(msg)
@@ -84,3 +91,9 @@ class JWTAuthentication(authentication.BaseAuthentication):
                 datetime.datetime.utcnow().utctimetuple()
             )
         }
+
+    @staticmethod
+    def get_unverified_user(token):
+        unverified_payload = jwt.decode(token, verify=False)
+        return unverified_payload.get('user_id', None)
+

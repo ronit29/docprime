@@ -799,6 +799,30 @@ class BillingAccount(models.Model):
             return self.id
 
 
+class UserSecretKey(TimeStampedModel):
+
+    key = models.CharField(max_length=40, unique=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, related_name='secret_key',
+        on_delete=models.CASCADE, verbose_name="User"
+    )
+
+    class Meta:
+        db_table = "user_secret_key"
+
+    def __str__(self):
+        return '{}-{}'.format(self.user, self.key)
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        return super(UserSecretKey, self).save(*args, **kwargs)
+
+    def generate_key(self):
+        import binascii
+        return binascii.hexlify(os.urandom(20)).decode()
+
+
 
 
 
