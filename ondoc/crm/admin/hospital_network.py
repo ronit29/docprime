@@ -5,13 +5,14 @@ from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from ondoc.authentication.models import GenericAdmin, User
-from django.contrib.contenttypes.admin import GenericTabularInline
+
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
     HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
     HospitalNetworkAward, HospitalNetworkCertification, HospitalNetworkDocument)
 
 from .common import *
+from ondoc.authentication.admin import BillingAccountInline
 
 
 class HospitalNetworkCertificationInline(admin.TabularInline):
@@ -148,7 +149,6 @@ class HospitalNetworkDocumentInline(admin.TabularInline):
     show_change_link = False
 
 
-
 class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     form = HospitalNetworkForm
 
@@ -168,6 +168,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkCertificationInline,
         HospitalNetworkDocumentInline,
         GenericAdminInline,
+        BillingAccountInline
     ]
 
     def associated_hospitals(self, instance):

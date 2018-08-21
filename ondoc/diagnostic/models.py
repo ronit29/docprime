@@ -2,7 +2,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
-                                         UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin)
+                                         UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
 from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -154,6 +154,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
+    billing_merchant = GenericRelation(BillingAccount)
+
 
     def __str__(self):
         return self.name
@@ -320,6 +322,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
 
     # generic_lab_network_admins = GenericRelation(GenericAdmin, related_query_name='manageable_lab_networks')
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab_networks')
+    billing_merchant = GenericRelation(BillingAccount)
 
 
     def __str__(self):
@@ -709,23 +712,13 @@ class LabAppointment(TimeStampedModel):
 
         # self.status = self.COMPLETED
         # if self.payment_type != self.INSURANCE:
-        #     admin_obj, out_level = self.get_billable_admin_level()
-        #     app_outstanding_fees = self.doc_payout_amount()
-        #     out_obj = payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
-        #     self.outstanding = out_obj
-        # self.save()
+        #     Outstanding.create_outstanding(self)
 
     def get_billable_admin_level(self):
         if self.lab.network and self.lab.network.is_billing_enabled:
             return self.lab.network, Outstanding.LAB_NETWORK_LEVEL
         else:
             return self.lab, Outstanding.LAB_LEVEL
-        # if self.hospital.network and self.hospital.network.is_billing_enabled:
-        #     return self.hospital.network, payout_model.Outstanding.HOSPITAL_NETWORK_LEVEL
-        # elif self.hospital.is_billing_enabled:
-        #     return self.hospital, payout_model.Outstanding.HOSPITAL_LEVEL
-        # else:
-        #     return self.doctor, payout_model.Outstanding.DOCTOR_LEVEL
 
     def lab_payout_amount(self):
         amount = 0

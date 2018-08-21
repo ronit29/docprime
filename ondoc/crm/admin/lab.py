@@ -25,11 +25,11 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment)
 from .common import *
-from ondoc.authentication.models import GenericLabAdmin
-from ondoc.authentication.models import GenericAdmin, User, QCModel
-from django.contrib.contenttypes.admin import GenericTabularInline
-from django.contrib.admin.widgets import AdminSplitDateTime
+from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget
+from django.contrib.contenttypes.admin import GenericTabularInline
+from ondoc.authentication import forms as auth_forms
+from ondoc.authentication.admin import BillingAccountInline
 
 
 class LabTestResource(resources.ModelResource):
@@ -410,7 +410,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     form = LabForm
     search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, GenericLabAdminInline]
+        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, BillingAccountInline, GenericLabAdminInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
