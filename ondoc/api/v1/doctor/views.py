@@ -380,6 +380,14 @@ class DoctorProfileView(viewsets.GenericViewSet):
             Q(status=models.OpdAppointment.ACCEPTED,
               time_slot_start__date=today)
             ).distinct().count()
+        lab_appointment_count = lab_models.LabAppointment.objects.filter(
+            Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user,
+              lab__manageable_lab_admins__is_disabled=False) |
+            Q(lab__network__isnull=False,
+              lab__network__manageable_lab_network_admins__user=request.user,
+              lab__network__manageable_lab_network_admins__is_disabled=False),
+            Q(status=lab_models.LabAppointment.ACCEPTED,
+              time_slot_start__date=today)).distinct().count()
         if hasattr(request.user, 'doctor') and request.user.doctor:
             doctor = request.user.doctor
             doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
@@ -412,6 +420,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
         # Check access_type END
 
         resp_data["count"] = queryset
+        resp_data['lab_appointment_count'] = lab_appointment_count
         return Response(resp_data)
 
 
