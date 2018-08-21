@@ -1,8 +1,4 @@
-# from .serializers import (LabModelSerializer, LabTestListSerializer, LabCustomSerializer, AvailableLabTestSerializer,
-#                           LabAppointmentModelSerializer, LabAppointmentCreateSerializer,
-#                           LabAppointmentUpdateSerializer, LabListSerializer, CommonTestSerializer,
-#                           PromotedLabsSerializer, CommonConditionsSerializer, TimeSlotSerializer,
-#                           SearchLabListSerializer)
+from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 
@@ -30,9 +26,7 @@ from django.shortcuts import get_object_or_404
 
 from django.db import transaction
 from django.db.models import Count, Sum, Max, When, Case, F, Q
-from django.http import Http404
 from django.conf import settings
-import hashlib
 from rest_framework import status
 from collections import OrderedDict
 from django.utils import timezone
@@ -40,7 +34,6 @@ from ondoc.diagnostic import models
 from ondoc.authentication import models as auth_models
 from django.db.models import Q
 from . import serializers
-import random
 import copy
 import re
 import datetime
@@ -578,7 +571,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
 
-    # authentication_classes = (TokenAuthentication,)
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
@@ -741,7 +733,7 @@ class LabReportFileViewset(mixins.CreateModelMixin,
                                  viewsets.GenericViewSet):
 
     serializer_class = serializers.LabReportFileSerializer
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, )
 
     def get_queryset(self):
