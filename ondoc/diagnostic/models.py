@@ -5,6 +5,7 @@ from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image
                                          UserPermission, GenericAdmin, LabUserPermission, BillingAccount)
 from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
+from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from ondoc.account import models as account_model
@@ -518,6 +519,11 @@ class LabAppointment(TimeStampedModel):
                       (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                       (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
                       (COMPLETED, 'Completed')]
+    PATIENT_CANCELLED = 1
+    AGENT_CANCELLED = 2
+    AUTO_CANCELLED = 3
+    CANCELLATION_TYPE_CHOICES = [(PATIENT_CANCELLED, 'Patient Cancelled'), (AGENT_CANCELLED, 'Agent Cancelled'),
+                                 (AUTO_CANCELLED, 'Auto Cancelled')]
 
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
     lab_test = models.ManyToManyField(AvailableLabTest)
@@ -525,6 +531,7 @@ class LabAppointment(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     profile_detail = JSONField(blank=True, null=True)
     status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
+    cancellation_type = models.PositiveSmallIntegerField(choices=CANCELLATION_TYPE_CHOICES, blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # This is mrp
     agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -551,51 +558,23 @@ class LabAppointment(TimeStampedModel):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
         return allowed
 
-    def send_notification(self, database_instance):
-        if database_instance and database_instance.status == self.status:
-            return
-        if not self.user:
-            return
-        if self.status == LabAppointment.COMPLETED:
-            LabNotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.LAB_INVOICE,
-            )
-            return
-        if self.status == LabAppointment.ACCEPTED:
-            LabNotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_ACCEPTED,
-            )
-            return
-        if self.status == LabAppointment.RESCHEDULED_PATIENT:
-            LabNotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
-            )
-            return
-        if self.status == LabAppointment.RESCHEDULED_LAB:
-            LabNotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
-            )
-            return
-        if self.status == LabAppointment.CANCELLED:
-            LabNotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_CANCELLED,
-            )
-            return
+    def is_to_send_notification(self, database_instance):
+        if not database_instance:
+            return True
+        if database_instance.status != self.status:
+            return True
+        if (database_instance.status == self.status
+                and database_instance.time_slot_start != self.time_slot_start
+                and database_instance.status in [LabAppointment.RESCHEDULED_LAB, LabAppointment.RESCHEDULED_PATIENT]
+                and self.status in [LabAppointment.RESCHEDULED_LAB, LabAppointment.RESCHEDULED_PATIENT]):
+            return True
+        return False
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
-        self.send_notification(database_instance)
+        if self.is_to_send_notification(database_instance):
+            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=5)
 
         if not database_instance or database_instance.status != self.status:
             for e_id in settings.OPS_EMAIL_ID:

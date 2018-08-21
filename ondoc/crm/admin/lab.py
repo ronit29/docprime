@@ -606,6 +606,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
                 if dt_field:
                     obj.time_slot_start = dt_field
+            if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
+                obj.cancellation_type = LabAppointment.AGENT_CANCELLED
         super().save_model(request, obj, form, change)
 
 

@@ -436,6 +436,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         resp["status"] = 1
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELLED:
+                lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
@@ -493,6 +494,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             resp = dict()
             resp["status"] = 1
             if validated_data['status'] == OpdAppointment.CANCELLED:
+                opd_appointment.cancellation_type = OpdAppointment.PATIENT_CANCELLED
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:

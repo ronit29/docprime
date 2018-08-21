@@ -1,2 +1,0 @@
-New appointment received for {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}
-Kindly accept the same to confirm in your docprime account.
