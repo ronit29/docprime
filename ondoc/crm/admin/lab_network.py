@@ -12,7 +12,7 @@ from .common import *
 from ondoc.authentication.models import GenericAdmin, User, GenericLabAdmin
 from django.contrib.contenttypes.admin import GenericTabularInline
 
-
+from ondoc.authentication.admin import BillingAccountInline
 
 class LabNetworkCertificationInline(admin.TabularInline):
     model = LabNetworkCertification
@@ -183,7 +183,8 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
                LabNetworkAwardInline,
                LabNetworkCertificationInline,
                LabNetworkDocumentInline,
-               GenericLabNetworkAdminInline]
+               GenericLabNetworkAdminInline,
+               BillingAccountInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
