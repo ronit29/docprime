@@ -1135,7 +1135,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
 
 
 class UserLabViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
