@@ -998,23 +998,23 @@ class LabPricing(Lab):
         default_permissions = []
 
 
-class LabPrescription(auth_model.TimeStampedModel):
+class LabReport(auth_model.TimeStampedModel):
     appointment = models.ForeignKey(LabAppointment, on_delete=models.CASCADE)
-    prescription_details = models.TextField(max_length=300, blank=True, null=True)
+    report_details = models.TextField(max_length=300, blank=True, null=True)
 
     def __str__(self):
         return "{}-{}".format(self.id, self.appointment.id)
 
     class Meta:
-        db_table = "lab_prescription"
+        db_table = "lab_report"
 
 
-class LabPrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
-    prescription = models.ForeignKey(LabPrescription, on_delete=models.CASCADE)
-    name = models.FileField(upload_to='lab_prescriptions/', blank=False, null=False)
+class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
+    report = models.ForeignKey(LabReport, on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.FileField(upload_to='lab_reports/', blank=False, null=False)
 
     def __str__(self):
-        return "{}-{}".format(self.id, self.prescription.id)
+        return "{}-{}".format(self.id, self.report.id)
 
     # def send_notification(self, database_instance):
     #     appointment = self.prescription.appointment
@@ -1028,11 +1028,11 @@ class LabPrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
     #         )
 
     def save(self, *args, **kwargs):
-        database_instance = LabPrescriptionFile.objects.filter(pk=self.id).first()
+        database_instance = LabReportFile.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
         # self.send_notification(database_instance)
 
     class Meta:
-        db_table = "lab_prescription_file"
+        db_table = "lab_report_file"
 
 

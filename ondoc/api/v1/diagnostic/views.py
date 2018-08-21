@@ -747,7 +747,7 @@ class LabPrescriptionFileViewset(mixins.CreateModelMixin,
         request = self.request
         if request.user.user_type == User.DOCTOR:
             user = request.user
-            return (models.LabPrescriptionFile.objects.filter(
+            return (models.LabReportFile.objects.filter(
                 Q(prescription__appointment__lab__network__isnull=True,
                   prescription__appointment__lab__manageable_lab_admins__user=user,
                   prescription__appointment__lab__manageable_lab_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
@@ -759,9 +759,9 @@ class LabPrescriptionFileViewset(mixins.CreateModelMixin,
 
             # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
         elif request.user.user_type == User.CONSUMER:
-            return models.LabPrescriptionFile.objects.filter(prescription__appointment__user=request.user)
+            return models.LabReportFile.objects.filter(prescription__appointment__user=request.user)
         else:
-            return models.LabPrescriptionFile.objects.none()
+            return models.LabReportFile.objects.none()
 
     def create(self, request, *args, **kwargs):
         serializer = serializers.LabPrescriptionSerializer(data=request.data, context={"request": request})

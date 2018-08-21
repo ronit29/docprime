@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonTest, CommonDiagnosticCondition, LabImage, LabPrescriptionFile)
+                                     CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
@@ -617,7 +617,7 @@ class AppointmentCompleteBodySerializer(serializers.Serializer):
 
 class LabAppointmentFilterSerializer(serializers.Serializer):
     RANGE_CHOICES = ['all', 'previous', 'upcoming', 'pending']
-    range = serializers.ChoiceField(choices=RANGE_CHOICES, required=False)
+    range = serializers.ChoiceField(choices=RANGE_CHOICES, required=False, default='all')
     lab_id = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=False)
     profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
     date = serializers.DateField(required=False)
@@ -626,7 +626,7 @@ class LabAppointmentFilterSerializer(serializers.Serializer):
 class LabPrescriptionFileSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = LabPrescriptionFile
+        model = LabReportFile
         fields = ('prescription', 'name')
 
 
