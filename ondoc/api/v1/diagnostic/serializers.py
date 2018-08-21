@@ -623,16 +623,16 @@ class LabAppointmentFilterSerializer(serializers.Serializer):
     date = serializers.DateField(required=False)
 
 
-class LabPrescriptionFileSerializer(serializers.ModelSerializer):
+class LabReportFileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LabReportFile
-        fields = ('prescription', 'name')
+        fields = ('report', 'name')
 
 
-class LabPrescriptionSerializer(serializers.Serializer):
+class LabReportSerializer(serializers.Serializer):
     appointment = serializers.PrimaryKeyRelatedField(queryset=LabAppointment.objects.all())
-    prescription_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
+    report_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
     name = serializers.FileField()
 
     def validate_appointment(self, value):

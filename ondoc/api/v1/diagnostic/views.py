@@ -733,13 +733,13 @@ class TimeSlotExtraction(object):
         return format_data
 
 
-class LabPrescriptionFileViewset(mixins.CreateModelMixin,
-                   mixins.RetrieveModelMixin,
-                   mixins.UpdateModelMixin,
-                   mixins.ListModelMixin,
-                   viewsets.GenericViewSet):
+class LabReportFileViewset(mixins.CreateModelMixin,
+                                 mixins.RetrieveModelMixin,
+                                 mixins.UpdateModelMixin,
+                                 mixins.ListModelMixin,
+                                 viewsets.GenericViewSet):
 
-    serializer_class = serializers.LabPrescriptionFileSerializer
+    serializer_class = serializers.LabReportFileSerializer
     authentication_classes = (TokenAuthentication, )
     permission_classes = (IsAuthenticated, )
 
@@ -748,60 +748,58 @@ class LabPrescriptionFileViewset(mixins.CreateModelMixin,
         if request.user.user_type == User.DOCTOR:
             user = request.user
             return (models.LabReportFile.objects.filter(
-                Q(prescription__appointment__lab__network__isnull=True,
-                  prescription__appointment__lab__manageable_lab_admins__user=user,
-                  prescription__appointment__lab__manageable_lab_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
-                  prescription__appointment__lab__manageable_lab_admins__is_disabled=False)|
-                Q(prescription__appointment__lab__network__isnull=False,
-                  prescription__appointment__lab__network__manageable_lab_network_admins__user=request.user,
-                  prescription__appointment__lab__network__manageable_lab_network_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
-                  prescription__appointment__lab__network__manageable_lab_network_admins__is_disabled=False)).distinct())
+                Q(report__appointment__lab__network__isnull=True,
+                  report__appointment__lab__manageable_lab_admins__user=user,
+                  report__appointment__lab__manageable_lab_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
+                  report__appointment__lab__manageable_lab_admins__is_disabled=False) |
+                Q(report__appointment__lab__network__isnull=False,
+                  report__appointment__lab__network__manageable_lab_network_admins__user=request.user,
+                  report__appointment__lab__network__manageable_lab_network_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
+                  report__appointment__lab__network__manageable_lab_network_admins__is_disabled=False)).distinct())
 
             # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
         elif request.user.user_type == User.CONSUMER:
-            return models.LabReportFile.objects.filter(prescription__appointment__user=request.user)
+            return models.LabReportFile.objects.filter(report__appointment__user=request.user)
         else:
             return models.LabReportFile.objects.none()
 
     def create(self, request, *args, **kwargs):
-        serializer = serializers.LabPrescriptionSerializer(data=request.data, context={"request": request})
+        serializer = serializers.LabReportSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        resp_data = list()
-        if self.lab_prescription_permission(request.user, validated_data.get('appointment')):
-            if models.LabPrescription.objects.filter(appointment=validated_data.get('appointment')).exists():
-                prescription = models.LabPrescription.objects.filter(
-                    appointment=validated_data.get('appointment')).first()
-            else:
-                prescription = models.LabPrescription.objects.create(appointment=validated_data.get('appointment'),
-                                                                     prescription_details=validated_data.get(
-                                                                         'prescription_details'))
-            prescription_file_data = {
-                "prescription": prescription.id,
-                "name": validated_data.get('name')
-            }
-            prescription_file_serializer = serializers.LabPrescriptionFileSerializer(data=prescription_file_data,
-                                                                                     context={"request": request})
-            prescription_file_serializer.is_valid(raise_exception=True)
-            prescription_file_serializer.save()
-            resp_data = prescription_file_serializer.data
-        return Response(resp_data)
+        if not self.lab_report_permission(request.user, validated_data.get('appointment')):
+            return Response([])
+        if models.LabReport.objects.filter(appointment=validated_data.get('appointment')).exists():
+            report = models.LabReport.objects.filter(
+                appointment=validated_data.get('appointment')).first()
+        else:
+            report = models.LabReport.objects.create(appointment=validated_data.get('appointment'),
+                                                     report_details=validated_data.get('report_details'))
+        report_file_data = {
+            "report": report.id,
+            "name": validated_data.get('name')
+        }
+        report_file_serializer = serializers.LabReportFileSerializer(data=report_file_data,
+                                                                     context={"request": request})
+        report_file_serializer.is_valid(raise_exception=True)
+        report_file_serializer.save()
+        return Response(report_file_serializer.data)
 
-    def lab_prescription_permission(self, user, appointment):
+    def lab_report_permission(self, user, appointment):
         return auth_models.GenericLabAdmin.objects.filter(user=user, lab=appointment.lab,
-                                                permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
-                                                write_permission=True).exists()
+                                                          permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
+                                                          write_permission=True).exists()
 
     def list(self, request, *args, **kwargs):
         lab_appointment = request.query_params.get("labappointment")
         if not lab_appointment:
-            return Response(status=400)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
         try:
             lab_appointment = int(lab_appointment)
         except TypeError:
-            return Response({'msg':"Can't convert labappointment to Integer."}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.get_queryset().filter(prescription__appointment=lab_appointment)
-        serializer = serializers.LabPrescriptionFileSerializer(
+            return Response({'msg': "Can't convert labappointment to Integer."}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.get_queryset().filter(report__appointment=lab_appointment)
+        serializer = serializers.LabReportFileSerializer(
             data=queryset, many=True, context={"request": request})
         serializer.is_valid()
         return Response(serializer.data)
