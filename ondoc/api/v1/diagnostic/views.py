@@ -457,7 +457,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['mobile'] = user.phone_number
         pgdata['email'] = user.email
         if not user.email:
-            pgdata['email'] = "dummy_appointment@policybazaar.com"
+            pgdata['email'] = "dummy_appointment@docprime.com"
 
         pgdata['productId'] = product_id
         base_url = "https://{}".format(request.get_host())
