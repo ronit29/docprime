@@ -32,24 +32,16 @@ class Outstanding(auth_model.TimeStampedModel):
         # obj, out_level = auth_model.UserPermission.doc_hospital_admin(app_obj)
         now = timezone.now()
         present_month, present_year = now.month, now.year
-        out_obj = None
-        try:
-            out_obj = Outstanding.objects.get(net_hos_doc_id=billing_level_obj.id, outstanding_level=out_level,
-                                              outstanding_month=present_month, outstanding_year=present_year)
-        except:
-            pass
-        # app_outstanding_fees = app_obj.doc_payout_amount()
+        out_obj = Outstanding.objects.filter(net_hos_doc_id=billing_level_obj.id, outstanding_level=out_level,
+                                             outstanding_month=present_month, outstanding_year=present_year).first()
         if out_obj:
             out_obj.current_month_outstanding += app_outstanding_fees
             out_obj.save()
         else:
-            month, year = get_previous_month_year(present_month, present_year)
-            prev_out_obj = None
-            try:
-                prev_out_obj = Outstanding.objects.get(net_hos_doc_id=billing_level_obj.id, outstanding_level=out_level,
-                                                       outstanding_month=month, outstanding_year=year)
-            except:
-                pass
+            # prev_month, prev_year = get_previous_month_year(present_month, present_year)
+            prev_out_obj = Outstanding.objects.filter(net_hos_doc_id=billing_level_obj.id,
+                                                      outstanding_level=out_level).order_by('outstanding_year',
+                                                                                            'outstanding_month').last()
             previous_month_outstanding = 0
             if prev_out_obj:
                 previous_month_outstanding = (prev_out_obj.current_month_outstanding +
@@ -72,22 +64,24 @@ class Outstanding(auth_model.TimeStampedModel):
     @classmethod
     def get_month_billing(cls, prev_obj, present_obj):
         prev_out = prev_payed_by_pb = prev_payed_to_pb = 0
-        if prev_obj is not None:
-            prev_out = prev_obj.current_month_outstanding
-            prev_payed_by_pb = prev_obj.paid_by_pb
-            prev_payed_to_pb = prev_obj.paid_to_pb
-        total_out = (present_obj.current_month_outstanding + present_obj.previous_month_outstanding -
-                     present_obj.paid_by_pb + present_obj.paid_to_pb)
-        resp_data = {
-            "previous_outstanding": prev_out,
-            "previous_payed_by_pb": prev_payed_by_pb,
-            "previous_payed_to_pb": prev_payed_to_pb,
-            "current_outstanding": present_obj.current_month_outstanding,
-            "total_outstanding": total_out,
-            "current_month": present_obj.outstanding_month,
-            "current_year": present_obj.outstanding_year,
-            "outstanding_level": present_obj.outstanding_level
-        }
+        resp_data = dict()
+        if present_obj:
+            if prev_obj is not None:
+                prev_out = prev_obj.current_month_outstanding
+                prev_payed_by_pb = prev_obj.paid_by_pb
+                prev_payed_to_pb = prev_obj.paid_to_pb
+            total_out = (present_obj.current_month_outstanding + present_obj.previous_month_outstanding -
+                         present_obj.paid_by_pb + present_obj.paid_to_pb)
+            resp_data = {
+                "previous_outstanding": prev_out,
+                "previous_payed_by_pb": prev_payed_by_pb,
+                "previous_payed_to_pb": prev_payed_to_pb,
+                "current_outstanding": present_obj.current_month_outstanding,
+                "total_outstanding": total_out,
+                "current_month": present_obj.outstanding_month,
+                "current_year": present_obj.outstanding_year,
+                "outstanding_level": present_obj.outstanding_level
+            }
         return resp_data
 
 

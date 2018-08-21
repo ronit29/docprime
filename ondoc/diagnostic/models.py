@@ -2,7 +2,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
-                                         UserPermission, GenericAdmin, LabUserPermission, BillingAccount)
+                                         UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
 from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
@@ -15,6 +15,8 @@ from django.db.models import F, Sum, When, Case, Q
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 from ondoc.payout.models import Outstanding
+from ondoc.authentication import models as auth_model
+import datetime
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from ondoc.diagnostic import tasks
 from dateutil import tz
@@ -541,7 +543,6 @@ class LabAppointment(TimeStampedModel):
     otp = models.PositiveIntegerField(blank=True, null=True)
     payment_status = models.PositiveIntegerField(choices=OpdAppointment.PAYMENT_STATUS_CHOICES,
                                                  default=OpdAppointment.PAYMENT_PENDING)
-
     payment_type = models.PositiveSmallIntegerField(choices=OpdAppointment.PAY_CHOICES, default=OpdAppointment.PREPAID)
     insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
@@ -550,12 +551,26 @@ class LabAppointment(TimeStampedModel):
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
-    def allowed_action(self, user_type):
+    def allowed_action(self, user_type, request):
         allowed = []
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
                 allowed = [self.RESCHEDULED_PATIENT, self.CANCELLED]
+        if user_type == User.DOCTOR and self.time_slot_start.date() >= current_datetime.date():
+            perm_queryset = auth_model.GenericLabAdmin.objects.filter(is_disabled=False, user=request.user)
+            if perm_queryset.first():
+                doc_permission = perm_queryset.first()
+                if doc_permission.write_permission or doc_permission.super_user_permission:
+                    if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
+                        allowed = [self.ACCEPTED, self.RESCHEDULED_LAB]
+                    elif self.status == self.ACCEPTED:
+                        allowed = [self.RESCHEDULED_LAB, self.COMPLETED]
+                    elif self.status == self.RESCHEDULED_LAB:
+                        allowed = [self.ACCEPTED]
+
+            # if self.status in [self.BOOKED]:
+            #     allowed = [self.COMPLETED]
         return allowed
 
     def is_to_send_notification(self, database_instance):
@@ -572,6 +587,12 @@ class LabAppointment(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
+        try:
+            if self.status == self.COMPLETED and (not database_instance or database_instance.status != self.status):
+                out_obj = self.outstanding_create()
+                self.outstanding = out_obj
+        except:
+            pass
         super().save(*args, **kwargs)
         if self.is_to_send_notification(database_instance):
             notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=5)
@@ -655,12 +676,20 @@ class LabAppointment(TimeStampedModel):
 
     def action_completed(self):
         self.status = self.COMPLETED
-        self.save()
+        out_obj = None
         if self.payment_type != OpdAppointment.INSURANCE:
-            admin_obj, out_level = self.get_billable_admin_level()
-            app_outstanding_fees = self.lab_payout_amount()
-            Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+            out_obj = self.outstanding_create()
+        if out_obj:
+            self.outstanding = out_obj
+        self.save()
 
+    def outstanding_create(self):
+        admin_obj, out_level = self.get_billable_admin_level()
+        app_outstanding_fees = self.lab_payout_amount()
+        out_obj = Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+        return out_obj
+
+        # self.status = self.COMPLETED
         # if self.payment_type != self.INSURANCE:
         #     Outstanding.create_outstanding(self)
 
@@ -683,36 +712,31 @@ class LabAppointment(TimeStampedModel):
         month = req_data.get("month")
         year = req_data.get("year")
         payment_type = req_data.get("payment_type")
-        out_level = req_data.get("outstanding_level")
+        out_level = req_data.get("level")
         admin_id = req_data.get("admin_id")
         out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
-                                             outstanding_month=month, outstanding_year=year)
+                                             outstanding_month=month, outstanding_year=year).first()
         start_date_time, end_date_time = get_start_end_datetime(month, year)
-        lab_data = UserPermission.get_billable_doctor_hospital(user)
-        lab_list = list()
-        for data in lab_data:
-            if data.get("lab"):
-                lab_list.append(data["lab"])
+
         if payment_type in [OpdAppointment.COD, OpdAppointment.PREPAID]:
             payment_type = [OpdAppointment.COD, OpdAppointment.PREPAID]
         elif payment_type in [OpdAppointment.INSURANCE]:
             payment_type = [OpdAppointment.INSURANCE]
-        queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+
+        queryset = (LabAppointment.objects.filter(outstanding=out_obj, status=cls.COMPLETED,
                                                   time_slot_start__gte=start_date_time,
                                                   time_slot_start__lte=end_date_time,
-                                                  payment_type__in=payment_type,
-                                                  lab__in=lab_list, outstanding=out_obj))
+                                                  payment_type__in=payment_type))
         if payment_type != OpdAppointment.INSURANCE:
             tcp_condition = Case(When(payment_type=OpdAppointment.COD, then=F("effective_price")),
                                  When(~Q(payment_type=OpdAppointment.COD), then=0))
-            tcs_condition = Case(When(payment_type=OpdAppointment.COD, then=F("agreed_price")),
+            tcs_condition = Case(When(payment_type=OpdAppointment.COD, then=F("agreed_price")+F("home_pickup_charges")),
                                  When(~Q(payment_type=OpdAppointment.COD), then=0))
-            tpf_condition = Case(When(payment_type=OpdAppointment.PREPAID, then=F("agreed_price")),
+            tpf_condition = Case(When(payment_type=OpdAppointment.PREPAID, then=F("agreed_price")+F("home_pickup_charges")),
                                  When(~Q(payment_type=OpdAppointment.PREPAID), then=0))
             queryset = queryset.values("lab").annotate(total_cash_payment=Sum(tcp_condition),
                                                        total_cash_share=Sum(tcs_condition),
                                                        total_online_payout=Sum(tpf_condition))
-
         return queryset
 
     @classmethod
@@ -944,3 +968,43 @@ class LabPricing(Lab):
     class Meta:
         proxy = True
         default_permissions = []
+
+
+class LabReport(auth_model.TimeStampedModel):
+    appointment = models.ForeignKey(LabAppointment, on_delete=models.CASCADE)
+    report_details = models.TextField(max_length=300, blank=True, null=True)
+
+    def __str__(self):
+        return "{}-{}".format(self.id, self.appointment.id)
+
+    class Meta:
+        db_table = "lab_report"
+
+
+class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
+    report = models.ForeignKey(LabReport, on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.FileField(upload_to='lab_reports/', blank=False, null=False)
+
+    def __str__(self):
+        return "{}-{}".format(self.id, self.report.id)
+
+    # def send_notification(self, database_instance):
+    #     appointment = self.prescription.appointment
+    #     if not appointment.user:
+    #         return
+    #     if not database_instance:
+    #         notification_models.NotificationAction.trigger(
+    #             instance=appointment,
+    #             user=appointment.user,
+    #             notification_type=notification_models.NotificationAction.PRESCRIPTION_UPLOADED,
+    #         )
+
+    def save(self, *args, **kwargs):
+        database_instance = LabReportFile.objects.filter(pk=self.id).first()
+        super().save(*args, **kwargs)
+        # self.send_notification(database_instance)
+
+    class Meta:
+        db_table = "lab_report_file"
+
+

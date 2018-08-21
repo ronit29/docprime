@@ -1,9 +1,10 @@
 from rest_framework import serializers
+from rest_framework.fields import CharField
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonTest, CommonDiagnosticCondition, LabImage)
+                                     CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
-from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
+from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
 from ondoc.api.v1.utils import form_time_slot
 from ondoc.doctor.models import OpdAppointment
@@ -212,7 +213,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         user_type = ''
         if self.context.get('request'):
             user_type = self.context['request'].user.user_type
-            return obj.allowed_action(user_type)
+            return obj.allowed_action(user_type, self.context.get('request'))
         else:
             return []
 
@@ -552,11 +553,20 @@ class SearchLabListSerializer(serializers.Serializer):
     name = serializers.CharField(required=False)
 
 
+class UpdateStatusSerializer(serializers.Serializer):
+    status = serializers.IntegerField()
+    time_slot_start = serializers.DateTimeField(required=False)
+    time_slot_end = serializers.DateTimeField(required=False)
+    start_date = serializers.CharField(required=False)
+    start_time = serializers.FloatField(required=False)
+
+
 class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
     lab_test = AvailableLabTestSerializer(many=True)
     address = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(default='lab')
 
     def get_address(self, obj):
         resp_address = ""
@@ -576,7 +586,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
@@ -591,19 +601,47 @@ class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 
 
 class AppointmentCompleteBodySerializer(serializers.Serializer):
-    id = serializers.IntegerField()
+    lab_appointment = serializers.PrimaryKeyRelatedField(queryset=LabAppointment.objects.all())
     otp = serializers.IntegerField(max_value=9999)
 
     def validate(self, attrs):
-
-        appntmnt = LabAppointment.objects.filter(id=attrs['id'])
-        if appntmnt.exists():
-            if appntmnt.first().status == LabAppointment.COMPLETED:
-                raise serializers.ValidationError("Appointment Already Completed")
-            if appntmnt.first().status == LabAppointment.CANCELLED:
-                raise serializers.ValidationError("Cannot Complete a Cancelled Appointment")
-            if not appntmnt.filter(otp=attrs['otp']).exists():
-                raise serializers.ValidationError("Invalid Confirmation Code")
-        else:
-            raise serializers.ValidationError("Invalid Appointment")
+        appointment = attrs.get('lab_appointment')
+        if appointment.status == LabAppointment.COMPLETED:
+            raise serializers.ValidationError("Appointment Already Completed.")
+        elif appointment.status == LabAppointment.CANCELLED:
+            raise serializers.ValidationError("Cannot Complete a Cancelled Appointment.")
+        if not appointment.otp == attrs['otp']:
+            raise serializers.ValidationError("Invalid OTP.")
         return attrs
+
+
+class LabAppointmentFilterSerializer(serializers.Serializer):
+    RANGE_CHOICES = ['all', 'previous', 'upcoming', 'pending']
+    range = serializers.ChoiceField(choices=RANGE_CHOICES, required=False, default='all')
+    lab_id = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=False)
+    profile_id = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
+    date = serializers.DateField(required=False)
+
+
+class LabReportFileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = LabReportFile
+        fields = ('report', 'name')
+
+
+class LabReportSerializer(serializers.Serializer):
+    appointment = serializers.PrimaryKeyRelatedField(queryset=LabAppointment.objects.all())
+    report_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
+    name = serializers.FileField()
+
+    def validate_appointment(self, value):
+        request = self.context.get('request')
+
+        if not LabAppointment.objects.filter(Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user,
+                                               lab__manageable_lab_admins__is_disabled=False) |
+                                             Q(lab__network__isnull=False,
+                                               lab__network__manageable_lab_network_admins__user=request.user,
+                                               lab__network__manageable_lab_network_admins__is_disabled=False)).exists():
+            raise serializers.ValidationError("User is not authorized to upload prescription.")
+        return value

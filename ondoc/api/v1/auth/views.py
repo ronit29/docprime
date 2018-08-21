@@ -21,7 +21,7 @@ from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey)
+                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin)
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -37,11 +37,12 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
-from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
+from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
+from ondoc.api.v1.auth .serializers import OnlineLeadSerializer
 import decimal
 from django.conf import settings
 from collections import defaultdict
@@ -74,21 +75,34 @@ class LoginOTP(GenericViewSet):
         req_type = request.query_params.get('type')
 
         if req_type == 'doctor':
-            queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
+            doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
                                         (Q(doctor__isnull=True, hospital__data_status=Hospital.QC_APPROVED) |
                                          Q(doctor__isnull=False,
                                            doctor__data_status=Doctor.QC_APPROVED, doctor__onboarding_status = Doctor.ONBOARDED
                                           )
                                         )
                                        )
+            lab_queryset = GenericLabAdmin.objects.select_related('lab', 'lab_network').filter(
+                Q(phone_number=phone_number, is_disabled=False),
+                (Q(lab__isnull=True, lab_network__data_status=LabNetwork.QC_APPROVED) |
+                 Q(lab__isnull=False,
+                   lab__data_status=Lab.QC_APPROVED, lab__onboarding_status=Lab.ONBOARDED
+                   )
+                 )
+                )
 
-            if queryset.exists():
+            if lab_queryset.exists() or doctor_queryset.exists():
                 response['exists'] = 1
-                send_otp("OTP for DocPrime login is {}", phone_number)
+                send_otp("OTP for login is {}", phone_number)
+
+            # if queryset.exists():
+            #     response['exists'] = 1
+            #     send_otp("OTP for DocPrime login is {}", phone_number)
+
         else:
-            send_otp("OTP for DocPrime login is {}", phone_number)
+            send_otp("OTP for login is {}", phone_number)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
-                response['exists']=1
+                response['exists'] = 1
 
         return Response(response)
 
@@ -183,6 +197,7 @@ class UserViewset(GenericViewSet):
                 doctor.save()
 
         GenericAdmin.update_user_admin(phone_number)
+        GenericLabAdmin.update_user_lab_admin(phone_number)
         self.update_live_status(phone_number)
 
         # token = Token.objects.get_or_create(user=user)
@@ -1119,6 +1134,25 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
         return Response(doc_hosp_queryset)
 
 
+class UserLabViewSet(GenericViewSet):
+    authentication_classes = (TokenAuthentication, )
+    permission_classes = (IsAuthenticated, IsDoctor,)
+
+    def list(self, request):
+        user = request.user
+        user_lab_queryset = Lab.objects.filter(Q(manageable_lab_admins__user=user,
+                                                 manageable_lab_admins__is_disabled=False,
+                                                 manageable_lab_admins__write_permission=True) |
+                                               Q(network__manageable_lab_network_admins__user=user,
+                                                 network__manageable_lab_network_admins__is_disabled=False,
+                                                 network__manageable_lab_network_admins__write_permission=True
+                                                 )
+                                               ,
+                                               is_live=True
+                                               ).values('id', 'name')
+        return Response(user_lab_queryset)
+
+
 class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
@@ -1276,3 +1310,17 @@ class RefreshJSONWebToken(GenericViewSet):
         data['token'] = serializer.validated_data['token']
         data['payload'] = serializer.validated_data['payload']
         return Response(data)
+
+
+class OnlineLeadViewSet(GenericViewSet):
+    serializer_class = serializers.OnlineLeadSerializer
+
+    def create(self, request):
+        resp = {}
+        serializer = serializers.OnlineLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()
+        if data.id:
+            resp['status'] = 'success'
+            resp['id'] = data.id
+        return Response(resp)

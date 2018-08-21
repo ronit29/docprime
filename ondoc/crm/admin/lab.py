@@ -25,7 +25,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount
+from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
@@ -158,6 +158,15 @@ class LabDoctorInline(admin.TabularInline):
 
 # class LabDocumentForm(forms.ModelForm):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+
+class GenericLabAdminInline(admin.TabularInline):
+    model = GenericLabAdmin
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+    verbose_name_plural = "Admins"
+    fields = ['user', 'phone_number', 'lab', 'permission_type', 'is_disabled', 'read_permission', 'write_permission']
 
 
 class LabDocumentFormSet(forms.BaseInlineFormSet):
@@ -401,7 +410,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     form = LabForm
     search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, BillingAccountInline]
+        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, BillingAccountInline, GenericLabAdminInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200

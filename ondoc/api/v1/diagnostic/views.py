@@ -12,7 +12,7 @@ from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -36,9 +36,16 @@ import hashlib
 from rest_framework import status
 from collections import OrderedDict
 from django.utils import timezone
+from ondoc.diagnostic import models
+from ondoc.authentication import models as auth_models
+from django.db.models import Q
+from . import serializers
 import random
 import copy
 import re
+import datetime
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -318,18 +325,67 @@ class LabAppointmentView(mixins.CreateModelMixin,
                          mixins.RetrieveModelMixin,
                          viewsets.GenericViewSet):
 
-    queryset = LabAppointment.objects.all()
     serializer_class = diagnostic_serializer.LabAppointmentModelSerializer
     authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated, IsConsumer, )
+    permission_classes = (IsAuthenticated, IsDoctor, )
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
 
+    def get_queryset(self):
+        request = self.request
+        if request.user.user_type == User.DOCTOR:
+            return models.LabAppointment.objects.filter(
+                Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user,
+                  lab__manageable_lab_admins__is_disabled=False) |
+                Q(lab__network__isnull=False,
+                  lab__network__manageable_lab_network_admins__user=request.user,
+                  lab__network__manageable_lab_network_admins__is_disabled=False)).distinct()
+
     def list(self, request, *args, **kwargs):
-        user = request.user
-        queryset = LabAppointment.objects.filter(profile__user=user)
-        serializer = diagnostic_serializer.LabAppointmentModelSerializer(queryset, many=True)
+        queryset = self.get_queryset()
+        if not queryset:
+            return Response([])
+        serializer = serializers.LabAppointmentFilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        range = serializer.validated_data.get('range')
+        lab = serializer.validated_data.get('lab_id')
+        profile = serializer.validated_data.get('profile_id')
+        date = serializer.validated_data.get('date')
+        if profile:
+            queryset = queryset.filter(profile=profile.id)
+        if lab:
+            queryset = queryset.filter(lab=lab.id)
+        today = datetime.date.today()
+        if range == 'previous':
+            queryset = queryset.filter(
+                status__in=[models.LabAppointment.COMPLETED, models.LabAppointment.CANCELLED])\
+                .order_by('-time_slot_start')
+        elif range == 'upcoming':
+            queryset = queryset.filter(
+                status__in=[models.LabAppointment.BOOKED, models.LabAppointment.RESCHEDULED_PATIENT,
+                            models.LabAppointment.RESCHEDULED_LAB, models.LabAppointment.ACCEPTED],
+                time_slot_start__date__gte=today).order_by('time_slot_start')
+        elif range == 'pending':
+            queryset = queryset.filter(
+                time_slot_start__date__gte=timezone.now(),
+                status__in=[models.LabAppointment.BOOKED, models.LabAppointment.RESCHEDULED_PATIENT]
+            ).order_by('time_slot_start')
+        else:
+            queryset = queryset.order_by('-time_slot_start')
+        if date:
+            queryset = queryset.filter(time_slot_start__date=date)
+        queryset = paginate_queryset(queryset, request)
+        serializer = serializers.LabAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
+
+    def retrieve(self, request, pk=None):
+        user = request.user
+        queryset = self.get_queryset().filter(pk=pk).distinct()
+        if queryset:
+            serializer = serializers.LabAppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
+            return Response(serializer.data)
+        else:
+            return Response([])
 
     @transaction.atomic
     def create(self, request, **kwargs):
@@ -392,6 +448,34 @@ class LabAppointmentView(mixins.CreateModelMixin,
             })
 
         return appointment_data
+
+    def update(self, request, pk=None):
+        lab_appointment = self.get_queryset().filter(pk=pk).first()
+        if not lab_appointment:
+            return Response([])
+        serializer = serializers.UpdateStatusSerializer(
+            data=request.data, context={'request': request, 'lab_appointment': lab_appointment})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        allowed_status = lab_appointment.allowed_action(request.user.user_type, request)
+        appt_status = validated_data['status']
+        if appt_status not in allowed_status:
+            resp = {}
+            resp['allowed_status'] = allowed_status
+            return Response(resp, status=status.HTTP_400_BAD_REQUEST)
+        if request.user.user_type == User.DOCTOR:
+            req_status = validated_data.get('status')
+            if req_status == models.LabAppointment.RESCHEDULED_LAB:
+                lab_appointment.action_rescheduled_lab()
+            elif req_status == models.LabAppointment.ACCEPTED:
+                lab_appointment.action_accepted()
+
+        lab_appointment_serializer = serializers.LabAppointmentRetrieveSerializer(lab_appointment, context={'request':request})
+        response = {
+            "status": 1,
+            "data": lab_appointment_serializer.data
+        }
+        return Response(response)
 
     def extract_payment_details(self, request, appointment_details, product_id):
         remaining_amount = 0
@@ -649,3 +733,74 @@ class TimeSlotExtraction(object):
         format_data['timing'] = data_list
         return format_data
 
+
+class LabReportFileViewset(mixins.CreateModelMixin,
+                                 mixins.RetrieveModelMixin,
+                                 mixins.UpdateModelMixin,
+                                 mixins.ListModelMixin,
+                                 viewsets.GenericViewSet):
+
+    serializer_class = serializers.LabReportFileSerializer
+    authentication_classes = (TokenAuthentication, )
+    permission_classes = (IsAuthenticated, )
+
+    def get_queryset(self):
+        request = self.request
+        if request.user.user_type == User.DOCTOR:
+            user = request.user
+            return (models.LabReportFile.objects.filter(
+                Q(report__appointment__lab__network__isnull=True,
+                  report__appointment__lab__manageable_lab_admins__user=user,
+                  report__appointment__lab__manageable_lab_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
+                  report__appointment__lab__manageable_lab_admins__is_disabled=False) |
+                Q(report__appointment__lab__network__isnull=False,
+                  report__appointment__lab__network__manageable_lab_network_admins__user=request.user,
+                  report__appointment__lab__network__manageable_lab_network_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
+                  report__appointment__lab__network__manageable_lab_network_admins__is_disabled=False)).distinct())
+
+            # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
+        elif request.user.user_type == User.CONSUMER:
+            return models.LabReportFile.objects.filter(report__appointment__user=request.user)
+        else:
+            return models.LabReportFile.objects.none()
+
+    def create(self, request, *args, **kwargs):
+        serializer = serializers.LabReportSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        if not self.lab_report_permission(request.user, validated_data.get('appointment')):
+            return Response([])
+        if models.LabReport.objects.filter(appointment=validated_data.get('appointment')).exists():
+            report = models.LabReport.objects.filter(
+                appointment=validated_data.get('appointment')).first()
+        else:
+            report = models.LabReport.objects.create(appointment=validated_data.get('appointment'),
+                                                     report_details=validated_data.get('report_details'))
+        report_file_data = {
+            "report": report.id,
+            "name": validated_data.get('name')
+        }
+        report_file_serializer = serializers.LabReportFileSerializer(data=report_file_data,
+                                                                     context={"request": request})
+        report_file_serializer.is_valid(raise_exception=True)
+        report_file_serializer.save()
+        return Response(report_file_serializer.data)
+
+    def lab_report_permission(self, user, appointment):
+        return auth_models.GenericLabAdmin.objects.filter(user=user, lab=appointment.lab,
+                                                          permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
+                                                          write_permission=True).exists()
+
+    def list(self, request, *args, **kwargs):
+        lab_appointment = request.query_params.get("labappointment")
+        if not lab_appointment:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        try:
+            lab_appointment = int(lab_appointment)
+        except TypeError:
+            return Response({'msg': "Can't convert labappointment to Integer."}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.get_queryset().filter(report__appointment=lab_appointment)
+        serializer = serializers.LabReportFileSerializer(
+            data=queryset, many=True, context={"request": request})
+        serializer.is_valid()
+        return Response(serializer.data)

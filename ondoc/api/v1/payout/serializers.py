@@ -10,6 +10,10 @@ class OutstandingModelSerializer(serializers.ModelSerializer):
         model = payout_models.Outstanding
         fields = "__all__"
 
+class BillingSerializer(serializers.Serializer):
+    admin_id = serializers.IntegerField()
+    level = serializers.ChoiceField(payout_models.Outstanding.LEVEL_CHOICES)
+
 
 class BillingSummarySerializer(serializers.Serializer):
     month = serializers.IntegerField(max_value=12, min_value=1)

@@ -1,11 +1,13 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         UserPermission, Address, GenericAdmin, UserSecretKey)
+                                         UserPermission, Address, GenericAdmin, UserSecretKey,
+                                         UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor.models import DoctorMobile
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime, calendar
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
+from ondoc.web.models import OnlineLead
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
@@ -51,6 +53,8 @@ class DoctorLoginSerializer(serializers.Serializer):
             if not DoctorMobile.objects.filter(number=attrs['phone_number'], is_primary=True).exists():
                 doctor_not_exists = True
             if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
+                admin_not_exists = True
+            if not GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 admin_not_exists = True
             if doctor_not_exists and admin_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
@@ -214,6 +218,7 @@ class AddressSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
 
+
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
 
@@ -328,3 +333,16 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             raise serializers.ValidationError(msg)
 
         return payload
+
+
+class OnlineLeadSerializer(serializers.ModelSerializer):
+    member_type = serializers.ChoiceField(choices=OnlineLead.TYPE_CHOICES)
+    name = serializers.CharField(max_length=255, required=False)
+    speciality = serializers.CharField(max_length=255, required=False)
+    mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
+    city = serializers.CharField(max_length=255, required=False, default='')
+    email = serializers.EmailField()
+
+    class Meta:
+        model = OnlineLead
+        fields = ('member_type', 'name', 'speciality', 'mobile', 'city', 'email')

@@ -9,6 +9,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from PIL import Image as Img
 from django.core.files.uploadedfile import InMemoryUploadedFile
+
 from io import BytesIO
 import math
 import os
@@ -530,6 +531,61 @@ class LabUserPermission(TimeStampedModel):
         # TODO PM - Logic to get admin for a particular User
 
 
+class GenericLabAdmin(TimeStampedModel):
+    APPOINTMENT = 1
+    BILLING = 2
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.CharField(max_length=10)
+    type_choices = ((APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
+    lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True,
+                                    on_delete=models.CASCADE,
+                                    related_name='manageable_lab_network_admins')
+    lab = models.ForeignKey("diagnostic.Lab", null=True, blank=True, on_delete=models.CASCADE,
+                            related_name='manageable_lab_admins')
+    permission_type = models.PositiveSmallIntegerField(max_length=20, choices=type_choices, default=APPOINTMENT)
+    is_disabled = models.BooleanField(default=False)
+    super_user_permission = models.BooleanField(default=False)
+    read_permission = models.BooleanField(default=False)
+    write_permission = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'generic_lab_admin'
+
+    def save(self, *args, **kwargs):
+        user = User.objects.filter(phone_number=self.phone_number).first()
+        if user is not None:
+            self.user = user
+        super(GenericLabAdmin, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return "{}".format(self.phone_number)
+
+    @classmethod
+    def update_user_lab_admin(cls, phone_number):
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR)
+        if user.exists():
+            admin = GenericLabAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
+            if admin.exists():
+                admin.update(user=user.first())
+
+    @classmethod
+    def get_user_admin_obj(cls, user):
+        from ondoc.payout.models import Outstanding
+        access_list = []
+        permissions = (cls.objects.select_related('lab_network', 'lab').
+                           filter(user_id=user.id, permission_type=cls.BILLINNG, is_disabled=False).
+                           filter(Q(write_permission=True) | Q(read_permission=True)))
+        if permissions:
+            for permission in permissions:
+                if permission.lab_network and permission.lab_network.is_billing_enabled:
+                    access_list.append({'admin_obj': permission.lab_network,
+                                        'admin_level': Outstanding.LAB_NETWORK_LEVEL})
+                else:
+                    access_list.append({'admin_obj': permission.lab, 'admin_level': Outstanding.LAB_LEVEL})
+        return access_list
+
+
 class GenericAdmin(TimeStampedModel):
     APPOINTMENT = 1
     BILLINNG = 2
@@ -576,7 +632,6 @@ class GenericAdmin(TimeStampedModel):
             admin = GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
             if admin.exists():
                 admin.update(user=user.first())
-
 
     @classmethod
     def create_admin_permissions(cls, doctor):
@@ -704,7 +759,8 @@ class GenericAdmin(TimeStampedModel):
         from ondoc.payout.models import Outstanding
         access_list = []
         get_permissions = (GenericAdmin.objects.select_related('hospital_network', 'hospital', 'doctor').
-                           filter(user_id=user.id, write_permission=True, permission_type=GenericAdmin.BILLINNG))
+                           filter(user_id=user.id, write_permission=True, permission_type=GenericAdmin.BILLINNG,
+                                  is_disabled=False))
         if get_permissions:
             for permission in get_permissions:
                 if permission.hospital_network_id:

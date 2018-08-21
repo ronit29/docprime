@@ -63,21 +63,31 @@ class OndocViewSet(mixins.CreateModelMixin,
     pass
 
 
-
 class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
 
     def complete(self, request):
         serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-
-        lab_appointment = get_object_or_404(lab_models.LabAppointment, pk=validated_data.get('id'))
-        #if request.user.user_type == User.DOCTOR:
-        lab_appointment.action_completed()
-        return Response({"status":1})
-        # lab_appointment_serializer = diagnostic_serializer.DoctorLabAppointmentRetrieveSerializer(lab_appointment,
-        #                                                                              context={'request': request})
-        # return Response(lab_appointment_serializer.data)
+        lab_appointment = validated_data.get('lab_appointment')
+        if lab_appointment.lab.manageable_lab_admins.filter(user=request.user,
+                                                            is_disabled=False,
+                                                            write_permission=True).exists() or \
+                (lab_appointment.lab.network is not None and
+                 lab_appointment.lab.network.manageable_lab_network_admins.filter(
+                     user=request.user,
+                     is_disabled=False,
+                     write_permission=True).exists()):
+            lab_appointment.action_completed()
+            lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
+                                                                                                context={
+                                                                                                    'request': request})
+            return Response(lab_appointment_serializer.data)
+        else:
+            return Response({'msg': 'User is not allowed to complete this appointment.'},
+                            status=status.HTTP_401_UNAUTHORIZED)
 
 
 class DoctorAppointmentsViewSet(OndocViewSet):
@@ -371,6 +381,14 @@ class DoctorProfileView(viewsets.GenericViewSet):
             Q(status=models.OpdAppointment.ACCEPTED,
               time_slot_start__date=today)
             ).distinct().count()
+        lab_appointment_count = lab_models.LabAppointment.objects.filter(
+            Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user,
+              lab__manageable_lab_admins__is_disabled=False) |
+            Q(lab__network__isnull=False,
+              lab__network__manageable_lab_network_admins__user=request.user,
+              lab__network__manageable_lab_network_admins__is_disabled=False),
+            Q(status=lab_models.LabAppointment.ACCEPTED,
+              time_slot_start__date=today)).distinct().count()
         if hasattr(request.user, 'doctor') and request.user.doctor:
             doctor = request.user.doctor
             doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
@@ -386,7 +404,24 @@ class DoctorProfileView(viewsets.GenericViewSet):
                 admin_image = request.build_absolute_uri(admin_image_url)
             resp_data["thumbnail"] = admin_image
 
+        # Check access_type START
+        user = request.user
+        OPD_ONLY = 1
+        LAB_ONLY = 2
+        OPD_AND_LAB = 3
+
+        if auth_models.GenericAdmin.objects.filter(user=user,
+                                                   is_disabled=False).exists() and auth_models.GenericLabAdmin.objects.filter(
+                user=user, is_disabled=False).exists():
+            resp_data["access_type"] = OPD_AND_LAB
+        elif auth_models.GenericAdmin.objects.filter(user=user, is_disabled=False).exists():
+            resp_data["access_type"] = OPD_ONLY
+        elif auth_models.GenericLabAdmin.objects.filter(user=user, is_disabled=False).exists():
+            resp_data["access_type"] = LAB_ONLY
+        # Check access_type END
+
         resp_data["count"] = queryset
+        resp_data['lab_appointment_count'] = lab_appointment_count
         return Response(resp_data)
 
 
