@@ -253,7 +253,7 @@ class UserTransactionModelSerializer(serializers.ModelSerializer):
 
 class RefreshJSONWebTokenSerializer(serializers.Serializer):
 
-    token = serializers.CharField(max_length=250)
+    token = serializers.CharField()
 
     def validate(self, attrs):
         from ondoc.authentication.backends import JWTAuthentication
@@ -276,10 +276,10 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             now_timestamp = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
 
             if now_timestamp > expiration_timestamp:
-                msg = _('Refresh has expired.')
+                msg = _('Token has expired.')
                 raise serializers.ValidationError(msg)
         else:
-            msg = _('orig_iat field is required.')
+            msg = _('orig_iat missing')
             raise serializers.ValidationError(msg)
 
         new_payload = JWTAuthentication.jwt_payload_handler(user)
@@ -295,7 +295,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         uid = payload.get('user_id')
 
         if not uid:
-            msg = ('Invalid payload.')
+            msg = ('Invalid Token.')
             raise serializers.ValidationError(msg)
 
         # Make sure user exists
@@ -315,7 +315,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         try:
             payload = jwt.decode(token, settings.SECRET_KEY)
         except jwt.ExpiredSignature:
-            msg = _('Signature has expired.')
+            msg = _('Token has expired.')
             raise serializers.ValidationError(msg)
         except jwt.DecodeError:
             msg = ('Error decoding signature.')
