@@ -9,7 +9,8 @@ from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabNetworkDocument)
 from .common import *
-from ondoc.authentication.models import User
+from ondoc.authentication.models import GenericAdmin, User, GenericLabAdmin
+from django.contrib.contenttypes.admin import GenericTabularInline
 
 from ondoc.authentication.admin import BillingAccountInline
 
@@ -145,6 +146,15 @@ class LabNetworkDocumentInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+class GenericLabNetworkAdminInline(admin.TabularInline):
+    model = GenericLabAdmin
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+    verbose_name_plural = "Admins"
+    fields = ['user', 'phone_number', 'lab_network', 'permission_type', 'is_disabled', 'read_permission', 'write_permission']
+
 
 class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     form = LabNetworkForm
@@ -173,6 +183,7 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
                LabNetworkAwardInline,
                LabNetworkCertificationInline,
                LabNetworkDocumentInline,
+               GenericLabNetworkAdminInline,
                BillingAccountInline]
 
     def get_queryset(self, request):

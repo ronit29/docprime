@@ -3,7 +3,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     UserProfileViewSet, UserAppointmentsViewSet, AddressViewsSet,
                     TransactionViewSet, UserTransactionViewSet, UserIDViewSet, OrderHistoryViewSet,
                     HospitalDoctorAppointmentPermissionViewSet, HospitalDoctorBillingPermissionViewSet,
-                    OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken)
+                    OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken, OnlineLeadViewSet, UserLabViewSet)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -44,6 +44,8 @@ urlpatterns = [
     path('managebilling', HospitalDoctorBillingPermissionViewSet.as_view({"get": "list"}), name="hosp-doc-billing-permission"),
     path('pgdata/<int:pk>', OrderViewSet.as_view({"get": "retrieve"}), name="pg-order-detail"),
     path('refund', ConsumerAccountRefundViewSet.as_view({"post": "refund"}), name="consumer-refund"),
+    path('onlinelead/create', OnlineLeadViewSet.as_view({"post": "create"}), name='doctor-signup'),
+    path('manageablelabs', UserLabViewSet.as_view({"get": "list"}), name='user-manageable-labs'),
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
 ]

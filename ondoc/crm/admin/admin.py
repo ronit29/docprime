@@ -24,6 +24,7 @@ from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
 from .report import ReportAdmin
 from ondoc.reports import models as report_models
+from ondoc.authentication.models import GenericLabAdmin
 
 from ondoc.web.models import OnlineLead, Career
 from django.contrib.auth import get_user_model
@@ -36,7 +37,6 @@ admin.site.site_header = 'Ondoc CRM'
 admin.site.site_title = 'Ondoc CRM'
 admin.site.site_url = None
 admin.site.index_title = 'CRM Administration'
-
 
 
 admin.site.register(OtpVerifications)

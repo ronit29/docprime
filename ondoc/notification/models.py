@@ -388,7 +388,7 @@ class EmailNotificationLabMixin:
 
 
 class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotificationLabMixin):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
     email_subject = models.TextField(blank=True, null=True)
     email = models.EmailField()
@@ -408,6 +408,37 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         if email and user:
             email_noti = EmailNotification.objects.create(
                 user=user,
+                email=email,
+                notification_type=notification_type,
+                content=html_body,
+                email_subject=email_subject
+            )
+            message = {
+                "data": model_to_dict(email_noti),
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def send_to_manager(cls, email, notification_type, context):
+        html_body = ''
+        email_subject = ''
+        context = copy.deepcopy(context)
+        if notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED:
+            html_body = render_to_string("email/lab/appointment_booked_lab/body.html", context=context)
+            email_subject = render_to_string("email/lab/appointment_booked_lab/subject.txt", context=context)
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT:
+            html_body = render_to_string("email/lab/appointment_rescheduled_patient_initiated_to_lab/body.html",
+                                         context=context)
+            email_subject = render_to_string(
+                "email/lab/appointment_rescheduled_patient_initiated_to_lab/subject.txt",
+                context=context)
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED:
+            html_body = render_to_string("email/lab/appointment_cancelled_lab/body.html", context=context)
+            email_subject = render_to_string("email/lab/appointment_cancelled_lab/subject.txt", context=context)
+        if email:
+            email_noti = EmailNotification.objects.create(
                 email=email,
                 notification_type=notification_type,
                 content=html_body,
@@ -501,7 +532,7 @@ class SmsNotificationLabMixin:
 
 
 class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotificationLabMixin):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True)
     content = models.TextField()
     phone_number = models.BigIntegerField()
     viewed_at = models.DateTimeField(blank=True, null=True)
@@ -520,6 +551,29 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         if phone_number and user:
             sms_noti = SmsNotification.objects.create(
                 user=user,
+                phone_number=phone_number,
+                notification_type=notification_type,
+                content=html_body
+            )
+            message = {
+                "data": model_to_dict(sms_noti),
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def send_to_manager(cls, phone_number, notification_type, context):
+        html_body = ''
+        if notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED:
+            html_body = render_to_string("sms/lab/appointment_booked_lab.txt", context=context)
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT:
+            html_body = render_to_string("sms/lab/appointment_rescheduled_patient_initiated_to_lab.txt",
+                                         context=context)
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED:
+            html_body = render_to_string("sms/lab/appointment_cancelled_lab.txt", context=context)
+        if phone_number:
+            sms_noti = SmsNotification.objects.create(
                 phone_number=phone_number,
                 notification_type=notification_type,
                 content=html_body

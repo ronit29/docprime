@@ -1,15 +1,18 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         UserPermission, Address, GenericAdmin)
+                                         UserPermission, Address, GenericAdmin, UserSecretKey,
+                                         UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor.models import DoctorMobile
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime, calendar
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
+from ondoc.web.models import OnlineLead
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
 from django.conf import settings
+from ondoc.authentication.backends import JWTAuthentication
 
 User = get_user_model()
 
@@ -50,6 +53,8 @@ class DoctorLoginSerializer(serializers.Serializer):
             if not DoctorMobile.objects.filter(number=attrs['phone_number'], is_primary=True).exists():
                 doctor_not_exists = True
             if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
+                admin_not_exists = True
+            if not GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 admin_not_exists = True
             if doctor_not_exists and admin_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
@@ -213,6 +218,7 @@ class AddressSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
 
+
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
 
@@ -256,7 +262,6 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
     token = serializers.CharField()
 
     def validate(self, attrs):
-        from ondoc.authentication.backends import JWTAuthentication
         token = attrs['token']
 
         payload = self.check_payload_custom(token=token)
@@ -312,8 +317,14 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         return user
 
     def check_payload_custom(self, token):
+        user_key = None
+        user_id = JWTAuthentication.get_unverified_user(token)
+        if user_id:
+            user_key_object = UserSecretKey.objects.get(user_id=user_id)
+            if user_key_object:
+                user_key = user_key_object.key
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY)
+            payload = jwt.decode(token, user_key)
         except jwt.ExpiredSignature:
             msg = _('Token has expired.')
             raise serializers.ValidationError(msg)
@@ -322,3 +333,16 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             raise serializers.ValidationError(msg)
 
         return payload
+
+
+class OnlineLeadSerializer(serializers.ModelSerializer):
+    member_type = serializers.ChoiceField(choices=OnlineLead.TYPE_CHOICES)
+    name = serializers.CharField(max_length=255, required=False)
+    speciality = serializers.CharField(max_length=255, required=False)
+    mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
+    city = serializers.CharField(max_length=255, required=False, default='')
+    email = serializers.EmailField()
+
+    class Meta:
+        model = OnlineLead
+        fields = ('member_type', 'name', 'speciality', 'mobile', 'city', 'email')
