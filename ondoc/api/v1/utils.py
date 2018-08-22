@@ -209,6 +209,15 @@ class IsDoctor(permissions.BasePermission):
         return False
 
 
+class IsNotAgent(permissions.BasePermission):
+    message = 'Agent is not allowed to perform action only.'
+
+    def has_permission(self, request, view):
+        if hasattr(request, 'agent') and request.agent is not None:
+            return False
+        return True
+
+
 class IsMatrixUser(permissions.BasePermission):
     message = 'Only Matrix User is allowed to Perform Action.'
 

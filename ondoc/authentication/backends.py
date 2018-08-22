@@ -76,6 +76,9 @@ class JWTAuthentication(authentication.BaseAuthentication):
             msg = 'This user has been deactivated.'
             raise exceptions.AuthenticationFailed(msg)
 
+        if payload.get('agent_id', None) is not None:
+            request.agent = payload.get('agent_id')
+
         return (user, token)
 
     def authenticate_header(self, request):
@@ -90,6 +93,18 @@ class JWTAuthentication(authentication.BaseAuthentication):
             'orig_iat': calendar.timegm(
                 datetime.datetime.utcnow().utctimetuple()
             )
+        }
+
+    @classmethod
+    def appointment_agent_payload_handler(cls, request, created_user):
+        import calendar
+        return {
+            'agent_id': request.user.id,
+            'user_id': created_user.pk,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=10),
+            'orig_iat': calendar.timegm(
+                datetime.datetime.utcnow().utctimetuple()
+            ),
         }
 
     @staticmethod
