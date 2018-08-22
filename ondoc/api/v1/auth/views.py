@@ -27,6 +27,7 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
 from ondoc.api.v1 import utils
+from rest_framework import authentication, exceptions
 from ondoc.doctor.models import OpdAppointment
 from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, AppointmentFilterUserSerializer,
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
@@ -1336,4 +1337,38 @@ class OrderDetailViewSet(GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         queryset = Order.objects.filter(id=order_id, action_data__user=8).first()
         serializer = serializers.OrderDetailSerializer(queryset, context={"request": request})
+        return Response(serializer.data)
+
+
+class UserDetailsViewSet(GenericViewSet):
+    serializer_class = serializers.UserDetailsSerializer
+
+    def details(self, request):
+        Response([])
+        token = request.query_params.get("token")
+        if not token:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        user_key = None
+        user_id = JWTAuthentication.get_unverified_user(token)
+        if user_id:
+            user_key_object = UserSecretKey.objects.get(user_id=user_id)
+            if user_key_object:
+                user_key = user_key_object.key
+        try:
+            payload = jwt.decode(token, user_key)
+        except:
+            msg = 'Invalid authentication. Could not decode token.'
+            raise exceptions.AuthenticationFailed(msg)
+
+        try:
+            user = User.objects.get(pk=payload['user_id'])
+        except User.DoesNotExist:
+            msg = 'No user matching this token was found.'
+            raise exceptions.AuthenticationFailed(msg)
+
+        if not user.is_active:
+            msg = 'This user has been deactivated.'
+            raise exceptions.AuthenticationFailed(msg)
+
+        serializer = serializers.UserDetailsSerializer(token, context={"request": request})
         return Response(serializer.data)

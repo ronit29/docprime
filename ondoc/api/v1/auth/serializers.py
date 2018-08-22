@@ -378,3 +378,9 @@ class OrderDetailSerializer(serializers.Serializer):
     class Meta:
         fields = ('product_id', 'date', 'hospital', 'doctor', 'time')
 
+
+class UserDetailsSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+    class Meta:
+        fields = ('token')
