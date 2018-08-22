@@ -45,8 +45,9 @@ def disclaimer_page(request):
 def howitworks_page(request):
     return render(request, 'howItWorks.html')
 
-def agenntlogin_page(request):
-    api_domain = '%s%s' % (settings.BASE_URL, '/api/v1/user/agent/login/')
+
+def user_appointment_via_agent(request):
+    api_domain = '%s%s' % (settings.BASE_URL, '/api/v1/admin/agent/user/appointment')
     appDomain = 'https://%s%s' % (settings.CONSUMER_APP_DOMAIN, '/agent/login')
     return render(request, 'agentLogin.html', {'apiDomain': api_domain, 'appDomain': appDomain})
 

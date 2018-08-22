@@ -105,6 +105,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
             'orig_iat': calendar.timegm(
                 datetime.datetime.utcnow().utctimetuple()
             ),
+            'refresh': False
         }
 
     @staticmethod

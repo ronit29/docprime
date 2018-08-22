@@ -21,10 +21,6 @@ class OTPSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
 
 
-class AgenctVerificationSerializer(serializers.Serializer):
-    phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
-
-
 class OTPVerificationSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000, max_value=999999)

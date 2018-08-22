@@ -1329,32 +1329,3 @@ class OnlineLeadViewSet(GenericViewSet):
         return Response(resp)
 
 
-def agent_login(request):
-    from django.http import JsonResponse
-    from ondoc.authentication.backends import JWTAuthentication
-    response = {'login': 0}
-    if request.POST and request.is_ajax():
-        serializer = serializers.AgenctVerificationSerializer(data=request.POST)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        agent_exists = 1
-        user = User.objects.filter(phone_number=data['phone_number'], user_type=User.CONSUMER).first()
-        if not user:
-            agent_exists = 0
-            user = User.objects.get_or_create(phone_number=data['phone_number'],
-                                       is_phone_number_verified=True,
-                                       user_type=User.CONSUMER)
-            user = user[0]
-
-        user_key = UserSecretKey.objects.get_or_create(user=user)
-        payload = JWTAuthentication.appointment_agent_payload_handler(request, user)
-        token = jwt.encode(payload, user_key[0].key)
-
-        response = {
-            "login": 1,
-            "agent_id": request.user.id,
-            "token": str(token, 'utf-8'),
-            "expiration_time": payload['exp'],
-            "refresh": False
-        }
-    return JsonResponse(response)
