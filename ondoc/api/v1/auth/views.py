@@ -1328,12 +1328,21 @@ class OnlineLeadViewSet(GenericViewSet):
 
 class OrderDetailViewSet(GenericViewSet):
 
-    serializer_class = serializers.OrderDetailSerializer
+    authentication_classes = (JWTAuthentication,)
+    serializer_class = serializers.OrderDetailDoctorSerializer
 
     def details(self, request):
         order_id = request.query_params.get("order_id")
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         queryset = Order.objects.filter(id=order_id, action_data__user=request.user.id).first()
-        serializer = serializers.OrderDetailSerializer(queryset, context={"request": request})
-        return Response(serializer.data)
+        if not queryset:
+            return Response([])
+        resp = None
+        if queryset.product_id == Order.DOCTOR_PRODUCT_ID:
+            serializer = serializers.OrderDetailDoctorSerializer(queryset, context={"request": request})
+            resp = serializer.data
+        elif queryset.product_id == Order.LAB_PRODUCT_ID:
+            serializer = serializers.OrderDetailLabSerializer(queryset, context={"request": request})
+            resp = serializer.data
+        return Response(resp)

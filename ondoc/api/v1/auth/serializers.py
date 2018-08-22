@@ -3,6 +3,7 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
                                          UserPermission, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor.models import DoctorMobile
+from ondoc.diagnostic.models import AvailableLabTest
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime, calendar
 from dateutil.relativedelta import relativedelta
@@ -349,14 +350,15 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
         fields = ('member_type', 'name', 'speciality', 'mobile', 'city', 'email')
 
 
-class OrderDetailSerializer(serializers.Serializer):
+class OrderDetailDoctorSerializer(serializers.Serializer):
     product_id = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
-    app_date = serializers.SerializerMethodField()
+    profile = serializers.IntegerField(source="action_data.profile")
+    date = serializers.SerializerMethodField()
     hospital = serializers.IntegerField(source="action_data.hospital")
     doctor = serializers.IntegerField(source="action_data.doctor")
-    app_time = serializers.SerializerMethodField()
+    time = serializers.SerializerMethodField()
 
-    def get_app_time(self, obj):
+    def get_time(self, obj):
         from ondoc.api.v1.diagnostic.views import LabList
         app_date_time = parse_datetime(obj.action_data.get("time_slot_start"))
         value = round(float(app_date_time.hour) + (float(app_date_time.minute)*1/60), 2)
@@ -372,11 +374,51 @@ class OrderDetailSerializer(serializers.Serializer):
         }
         return data
 
-    def get_app_date(self, obj):
+    def get_date(self, obj):
         date_str = obj.action_data.get("time_slot_start")
         date = parse_datetime(date_str)
         return date.date()
 
     class Meta:
         fields = ('product_id', 'date', 'hospital', 'doctor', 'time')
+
+
+class OrderDetailLabSerializer(serializers.Serializer):
+    product_id = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
+    profile = serializers.IntegerField(source="action_data.profile")
+    lab = serializers.IntegerField(source="action_data.lab")
+    test_ids = serializers.SerializerMethodField()
+    date = serializers.SerializerMethodField()
+    time = serializers.SerializerMethodField()
+    is_home_pickup = serializers.BooleanField(source="action_data.is_home_pickup", default=False)
+    address = serializers.IntegerField(source="action_data.address.id", default=None)
+
+    def get_test_ids(self, obj):
+        queryset = AvailableLabTest.objects.filter(id__in=obj.action_data.get("lab_test")).values("test", "test__name")
+        test_ids = [{"id": d["test"], "name": d["test__name"]} for d in queryset]
+        return test_ids
+
+    def get_time(self, obj):
+        from ondoc.api.v1.diagnostic.views import LabList
+        app_date_time = parse_datetime(obj.action_data.get("time_slot_start"))
+        value = round(float(app_date_time.hour) + (float(app_date_time.minute)*1/60), 2)
+        lab_obj = LabList()
+        text = lab_obj.convert_time(value)
+        data = {
+            'deal_price': obj.action_data.get("deal_price"),
+            'is_available': True,
+            'effective_price': obj.action_data.get("effective_price"),
+            'price': obj.action_data.get("price"),
+            'value': value,
+            'text': text
+        }
+        return data
+
+    def get_date(self, obj):
+        date_str = obj.action_data.get("time_slot_start")
+        date = parse_datetime(date_str)
+        return date.date()
+
+    class Meta:
+        fields = ('product_id', 'lab', 'date', 'time', 'test_ids', 'profile', 'is_home_pickup', 'address')
 
