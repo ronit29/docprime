@@ -1334,6 +1334,6 @@ class OrderDetailViewSet(GenericViewSet):
         order_id = request.query_params.get("order_id")
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        queryset = Order.objects.filter(id=order_id, action_data__user=8).first()
+        queryset = Order.objects.filter(id=order_id, action_data__user=request.user.id).first()
         serializer = serializers.OrderDetailSerializer(queryset, context={"request": request})
         return Response(serializer.data)

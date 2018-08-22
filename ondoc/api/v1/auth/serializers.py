@@ -7,6 +7,7 @@ from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime, calendar
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from ondoc.web.models import OnlineLead
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -357,23 +358,24 @@ class OrderDetailSerializer(serializers.Serializer):
 
     def get_app_time(self, obj):
         from ondoc.api.v1.diagnostic.views import LabList
-        x = obj.action_data.get("time_slot_start")
-        value = round(float(obj.action_data.get("time_slot_start").hour) + (float(obj.action_data.get("time_slot_start").minute)*1/60), 2)
+        app_date_time = parse_datetime(obj.action_data.get("time_slot_start"))
+        value = round(float(app_date_time.hour) + (float(app_date_time.minute)*1/60), 2)
+        lab_obj = LabList()
+        text = lab_obj.convert_time(value)
         data = {
-            'deal_price': obj.action_data.deal_price,
+            'deal_price': obj.action_data.get("deal_price"),
             'is_available': True,
-            'effective_price': obj.action_data.effective_price,
-            'mrp': obj.action_data.mrp,
+            'effective_price': obj.action_data.get("effective_price"),
+            'mrp': obj.action_data.get("mrp"),
             'value': value,
-            'text': LabList.convert_time(value)
+            'text': text
         }
         return data
 
     def get_app_date(self, obj):
-        from django.utils.dateparse import parse_date
-        date_str = obj.action_data.get("time_slot_start").date
-        date = parse_date(date_str)
-        return date
+        date_str = obj.action_data.get("time_slot_start")
+        date = parse_datetime(date_str)
+        return date.date()
 
     class Meta:
         fields = ('product_id', 'date', 'hospital', 'doctor', 'time')
