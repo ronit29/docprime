@@ -305,6 +305,10 @@ def payment_details(request, order):
         'name': profile.name,
         'txAmount': str(order.amount),
     }
+    if request.agent:
+        pgdata["is_agent"] = True
+    else:
+        pgdata["is_agent"] = False
 
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P1, settings.PG_CLIENT_KEY_P1)
     return pgdata, payment_required
