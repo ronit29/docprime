@@ -879,6 +879,19 @@ class UserSecretKey(TimeStampedModel):
         return binascii.hexlify(os.urandom(20)).decode()
 
 
+class AgentToken(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    token = models.CharField(max_length=100)
+    is_consumed = models.BooleanField(default=False)
+    expiry_time = models.DateTimeField()
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = 'agent_token'
+
+
 
 
 
