@@ -49,7 +49,7 @@ urlpatterns = [
     path('manageablelabs', UserLabViewSet.as_view({"get": "list"}), name='user-manageable-labs'),
     path('sendbookingurl', SendBookingUrlViewSet.as_view({"post": "send_booking_url"}), name='send-booking-url'),
     path('extract_order_details', OrderDetailViewSet.as_view({"get": "details"}), name='extract-order-detail'),
-    path('extract_user_token', UserTokenViewSet.as_view({"get": "details"}), name='extract-user-token'),
+    path('create_user_token', UserTokenViewSet.as_view({"get": "details"}), name='create-user-token'),
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
 ]
