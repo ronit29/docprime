@@ -222,7 +222,7 @@ class UserViewset(GenericViewSet):
                         if admin.doctor.data_status == Doctor.QC_APPROVED and admin.doctor.onboarding_status == Doctor.ONBOARDED:
                             admin.doctor.is_live = True
                             admin.doctor.save()
-                else:
+                elif admin.hospital:
                     for hosp_doc in admin.hospital.assoc_doctors.all():
                         if hosp_doc.data_status == Doctor.QC_APPROVED and hosp_doc.onboarding_status == Doctor.ONBOARDED:
                             hosp_doc.is_live = True

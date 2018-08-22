@@ -293,6 +293,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def get_hospitals(self):
         return self.availability.all()
 
+    def get_thumbnail(self):
+        for image in self.images.all():
+            if image.cropped_image:
+                return image.name.url
+        if self.images.all():
+            return self.images.all()[0].name.url
+        return None
+
     # @classmethod
     def update_live_status(self):
         if self.onboarding_status == self.ONBOARDED:
