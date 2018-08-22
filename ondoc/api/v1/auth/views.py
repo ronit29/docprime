@@ -1355,35 +1355,17 @@ class OrderDetailViewSet(GenericViewSet):
         return Response(serializer.data)
 
 
-class UserDetailsViewSet(GenericViewSet):
-    serializer_class = serializers.UserDetailsSerializer
+class UserTokenViewSet(GenericViewSet):
 
     def details(self, request):
         Response([])
         token = request.query_params.get("token")
         if not token:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        user_key = None
-        user_id = JWTAuthentication.get_unverified_user(token)
-        if user_id:
-            user_key_object = UserSecretKey.objects.get(user_id=user_id)
-            if user_key_object:
-                user_key = user_key_object.key
-        try:
-            payload = jwt.decode(token, user_key)
-        except:
-            msg = 'Invalid authentication. Could not decode token.'
-            raise exceptions.AuthenticationFailed(msg)
 
-        try:
-            user = User.objects.get(pk=payload['user_id'])
-        except User.DoesNotExist:
-            msg = 'No user matching this token was found.'
-            raise exceptions.AuthenticationFailed(msg)
-
-        if not user.is_active:
-            msg = 'This user has been deactivated.'
-            raise exceptions.AuthenticationFailed(msg)
-
-        serializer = serializers.UserDetailsSerializer(token, context={"request": request})
-        return Response(serializer.data)
+        agent_token = AgentToken.objects.filter(token=token, is_consumed=False, expiry_time__gte=timezone.now()).first()
+        if agent_token:
+            user_key = UserSecretKey.objects.get_or_create(user=agent_token.user)
+            payload = JWTAuthentication.jwt_payload_handler(agent_token.user)
+            token = jwt.encode(payload, user_key[0].key)
+            return Response({"token": token})
