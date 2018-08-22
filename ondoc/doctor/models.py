@@ -512,6 +512,8 @@ class DoctorHospital(auth_model.TimeStampedModel):
 
 
 class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
+    image_sizes = [(100, 100), (200, 200)]
+    image_base_path = 'doctor/images'
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
     name = models.ImageField('Original Image Name',upload_to='doctor/images',height_field='height', width_field='width')
     cropped_image = models.ImageField(upload_to='doctor/images', height_field='height', width_field='width',
@@ -520,6 +522,38 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
 
     def __str__(self):
         return '{}'.format(self.doctor)
+
+    def resize_cropped_image(self, height, width):
+            with Img.open(self.cropped_image.path) as img:
+                path = "{}/{}/{}x{}/".format(settings.MEDIA_ROOT, self.image_base_path, height, width)
+                if not os.path.exists(path):
+                    os.mkdir(path)
+                original_width, original_height = img.size
+                if original_width > original_height:
+                    ratio = width/float(original_width)
+                    height = int(float(original_height)*float(ratio))
+                else:
+                    ratio = height / float(original_height)
+                    width = int(float(original_width) * float(ratio))
+                img = img.resize(tuple([width, height]), Img.ANTIALIAS)
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+                img.save(path + md5_hash + '.jpg', 'JPEG')
+
+    def create_all_images(self):
+        if not self.cropped_image:
+            return
+        for size in self.image_sizes:
+            height = size[0]
+            width = size[1]
+            self.resize_cropped_image(height, width)
+
+    def save(self, *args, **kwargs):
+        self.create_all_images()
+        super().save(*args, **kwargs)
+
+
 
     def original_image(self):
         return mark_safe('<div><img crossOrigin="anonymous" style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.name.url))
