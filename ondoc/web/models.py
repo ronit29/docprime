@@ -11,6 +11,7 @@ class OnlineLead(TimeStampedModel):
                     (HOSPITAL, 'Hospital/Clinic'),)
     member_type = models.PositiveSmallIntegerField(choices=TYPE_CHOICES)
     name = models.CharField(max_length=255)
+    speciality = models.CharField(max_length=255, blank=True, null=True)
     mobile = models.BigIntegerField(blank=False, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     city = models.CharField(max_length=255, blank=False, default='')
     email = models.EmailField(blank=False)

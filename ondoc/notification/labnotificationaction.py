@@ -1,4 +1,4 @@
-from .models import NotificationAction, EmailNotification
+from .models import NotificationAction, EmailNotification, SmsNotification
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import pytz
@@ -27,7 +27,7 @@ class LabNotificationAction(NotificationAction):
                     time_slot_start.strftime("%d/%m/%y"), lab_name
                 ),
                 "url": "/lab/appointment/{}".format(instance.id),
-                "action_type": notification_type,
+                "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
                 "image_url": ""
             }
@@ -44,7 +44,7 @@ class LabNotificationAction(NotificationAction):
                 "title": "Appointment Reschedule",
                 "body": "Reschedule request received for the appointment with Lab - {}".format(lab_name),
                 "url": "/lab/appointment/{}".format(instance.id),
-                "action_type": notification_type,
+                "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
                 "image_url": ""
             }
@@ -61,7 +61,7 @@ class LabNotificationAction(NotificationAction):
                 "title": "Appointment Reschedule",
                 "body": "Reschedule request received for the appointment from Lab - {}".format(lab_name),
                 "url": "/lab/appointment/{}".format(instance.id),
-                "action_type": notification_type,
+                "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
                 "image_url": ""
             }
@@ -80,7 +80,7 @@ class LabNotificationAction(NotificationAction):
                     time_slot_start.strftime("%d/%m/%y"), lab_name
                 ),
                 "url": "/lab/appointment/{}".format(instance.id),
-                "action_type": notification_type,
+                "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
                 "image_url": ""
             }
@@ -98,7 +98,7 @@ class LabNotificationAction(NotificationAction):
                     lab_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")),
                 "url": "/lab/appointment/{}".format(instance.id),
-                "action_type": notification_type,
+                "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
                 "image_url": ""
             }
@@ -120,3 +120,58 @@ class LabNotificationAction(NotificationAction):
             }
             EmailNotification.send_notification(user=user, notification_type=notification_type,
                                                 email=user.email, context=context)
+
+    @classmethod
+    def send_to_lab_managers(cls, instance, lab_manager, notification_type):
+        if notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            lab_name = instance.lab.name.title() if instance.lab.name else ""
+            context = {
+                "patient_name": patient_name,
+                "lab_name": lab_name,
+                "instance": instance,
+                "url": "/lab/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.LAB_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            EmailNotification.send_to_manager(email=lab_manager.email, notification_type=notification_type,
+                                              context=context)
+            SmsNotification.send_to_manager(phone_number=lab_manager.number, notification_type=notification_type,
+                                            context=context)
+        if notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            lab_name = instance.lab.name.title() if instance.lab.name else ""
+            context = {
+                "patient_name": patient_name,
+                "lab_name": lab_name,
+                "id": instance.id,
+                "instance": instance,
+                "url": "/lab/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.LAB_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            EmailNotification.send_to_manager(email=lab_manager.email, notification_type=notification_type,
+                                              context=context)
+            SmsNotification.send_to_manager(phone_number=lab_manager.number, notification_type=notification_type,
+                                            context=context)
+            return
+
+        if notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            lab_name = instance.lab.name.title() if instance.lab.name else ""
+            context = {
+                "patient_name": patient_name,
+                "lab_name": lab_name,
+                "instance": instance,
+                "url": "/lab/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.LAB_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            EmailNotification.send_to_manager(email=lab_manager.email, notification_type=notification_type,
+                                              context=context)
+            SmsNotification.send_to_manager(phone_number=lab_manager.number, notification_type=notification_type,
+                                            context=context)
+

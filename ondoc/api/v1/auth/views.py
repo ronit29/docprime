@@ -7,10 +7,9 @@ from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
 from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import mixins, viewsets, status
 from rest_framework.exceptions import ValidationError as RestValidationError
-import datetime
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
 from django.db import transaction
@@ -22,7 +21,7 @@ from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         Address, AppointmentTransaction, GenericAdmin)
+                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin)
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -38,16 +37,18 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
-from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
+from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
-
+from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
+from ondoc.api.v1.auth .serializers import OnlineLeadSerializer
 import decimal
 from django.conf import settings
 from collections import defaultdict
 import copy
 import logging
+import jwt
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -74,21 +75,34 @@ class LoginOTP(GenericViewSet):
         req_type = request.query_params.get('type')
 
         if req_type == 'doctor':
-            queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
+            doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
                                         (Q(doctor__isnull=True, hospital__data_status=Hospital.QC_APPROVED) |
                                          Q(doctor__isnull=False,
                                            doctor__data_status=Doctor.QC_APPROVED, doctor__onboarding_status = Doctor.ONBOARDED
                                           )
                                         )
                                        )
+            lab_queryset = GenericLabAdmin.objects.select_related('lab', 'lab_network').filter(
+                Q(phone_number=phone_number, is_disabled=False),
+                (Q(lab__isnull=True, lab_network__data_status=LabNetwork.QC_APPROVED) |
+                 Q(lab__isnull=False,
+                   lab__data_status=Lab.QC_APPROVED, lab__onboarding_status=Lab.ONBOARDED
+                   )
+                 )
+                )
 
-            if queryset.exists():
+            if lab_queryset.exists() or doctor_queryset.exists():
                 response['exists'] = 1
-                send_otp("OTP for DocPrime login is {}", phone_number)
+                send_otp("OTP for login is {}", phone_number)
+
+            # if queryset.exists():
+            #     response['exists'] = 1
+            #     send_otp("OTP for DocPrime login is {}", phone_number)
+
         else:
-            send_otp("OTP for DocPrime login is {}", phone_number)
+            send_otp("OTP for login is {}", phone_number)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
-                response['exists']=1
+                response['exists'] = 1
 
         return Response(response)
 
@@ -97,13 +111,14 @@ class LoginOTP(GenericViewSet):
         serializer = serializers.OTPVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        return Response({"message" : "OTP Generated Sucessfuly."})
+        return Response({"message": "OTP Generated Sucessfuly."})
 
 
 class UserViewset(GenericViewSet):
     serializer_class = serializers.UserSerializer
     @transaction.atomic
     def login(self, request, format=None):
+        from ondoc.authentication.backends import JWTAuthentication
         serializer = serializers.OTPVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -115,17 +130,20 @@ class UserViewset(GenericViewSet):
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
 
-        #GenericAdmin.update_user_admin(data['phone_number'])
+        user_key = UserSecretKey.objects.get_or_create(user=user)
+        payload = JWTAuthentication.jwt_payload_handler(user)
+        token = jwt.encode(payload, user_key[0].key)
 
-        token = Token.objects.get_or_create(user=user)
+        # token = Token.objects.get_or_create(user=user)
 
         expire_otp(data['phone_number'])
 
         response = {
-            "login":1,
-            "token" : str(token[0]),
-            "user_exists" : user_exists,
-            "user_id" : user.id
+            "login": 1,
+            "user_exists": user_exists,
+            "user_id": user.id,
+            "token": token,
+            "expiration_time": payload['exp']
         }
         return Response(response)
 
@@ -179,14 +197,19 @@ class UserViewset(GenericViewSet):
                 doctor.save()
 
         GenericAdmin.update_user_admin(phone_number)
+        GenericLabAdmin.update_user_lab_admin(phone_number)
         self.update_live_status(phone_number)
 
-        token = Token.objects.get_or_create(user=user)
+        # token = Token.objects.get_or_create(user=user)
+        user_key = UserSecretKey.objects.get_or_create(user=user)
+        payload = JWTAuthentication.jwt_payload_handler(user)
+        token = jwt.encode(payload, user_key[0].key)
         expire_otp(data['phone_number'])
 
         response = {
             "login": 1,
-            "token": str(token[0])
+            "token": token,
+            "expiration_time": payload['exp']
         }
         return Response(response)
 
@@ -238,6 +261,7 @@ class NotificationEndpointViewSet(GenericViewSet):
 
 
 class NotificationViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def list(self, request):
@@ -250,10 +274,10 @@ class NotificationViewSet(GenericViewSet):
 class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                          mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
                          GenericViewSet):
+
     serializer_class = serializers.UserProfileSerializer
-    queryset = UserProfile.objects.all()
-    authentication_classes = (TokenAuthentication, )
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsConsumer)
     pagination_class = None
 
     def get_queryset(self):
@@ -341,7 +365,7 @@ class OndocViewSet(mixins.CreateModelMixin,
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication , )
     permission_classes = (IsAuthenticated, IsConsumer, )
 
     def get_queryset(self):
@@ -427,6 +451,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         resp["status"] = 1
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELLED:
+                lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
@@ -484,6 +509,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             resp = dict()
             resp["status"] = 1
             if validated_data['status'] == OpdAppointment.CANCELLED:
+                opd_appointment.cancellation_type = OpdAppointment.PATIENT_CANCELLED
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
@@ -683,7 +709,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
 class AddressViewsSet(viewsets.ModelViewSet):
     serializer_class = serializers.AddressSerializer
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -777,7 +803,7 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
 
 
 class UserIDViewSet(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -960,7 +986,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 class UserTransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.UserTransactionModelSerializer
     queryset = ConsumerTransaction.objects.all()
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def list(self, request):
@@ -990,8 +1016,8 @@ class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
 
 
 class OrderHistoryViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
-    permission_classes = (IsAuthenticated, IsConsumer,)
+    # authentication_classes = (JWTAuthentication, )
+    # permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
         # opd_action_data = list()
@@ -1086,7 +1112,7 @@ class OrderHistoryViewSet(GenericViewSet):
 
 
 class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
@@ -1108,8 +1134,27 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
         return Response(doc_hosp_queryset)
 
 
+class UserLabViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsDoctor,)
+
+    def list(self, request):
+        user = request.user
+        user_lab_queryset = Lab.objects.filter(Q(manageable_lab_admins__user=user,
+                                                 manageable_lab_admins__is_disabled=False,
+                                                 manageable_lab_admins__write_permission=True) |
+                                               Q(network__manageable_lab_network_admins__user=user,
+                                                 network__manageable_lab_network_admins__is_disabled=False,
+                                                 network__manageable_lab_network_admins__write_permission=True
+                                                 )
+                                               ,
+                                               is_live=True
+                                               ).values('id', 'name')
+        return Response(user_lab_queryset)
+
+
 class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
@@ -1211,7 +1256,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
 
 
 class OrderViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request, pk):
@@ -1240,7 +1285,7 @@ class OrderViewSet(GenericViewSet):
 
 
 class ConsumerAccountRefundViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
 
     @transaction.atomic
@@ -1254,3 +1299,41 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
         resp = dict()
         resp["status"] = 1
         return Response(resp)
+
+
+class RefreshJSONWebToken(GenericViewSet):
+
+    def refresh(self, request):
+        data = {}
+        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data['token'] = serializer.validated_data['token']
+        data['payload'] = serializer.validated_data['payload']
+        return Response(data)
+
+
+class OnlineLeadViewSet(GenericViewSet):
+    serializer_class = serializers.OnlineLeadSerializer
+
+    def create(self, request):
+        resp = {}
+        serializer = serializers.OnlineLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()
+        if data.id:
+            resp['status'] = 'success'
+            resp['id'] = data.id
+        return Response(resp)
+
+
+class OrderDetailViewSet(GenericViewSet):
+
+    serializer_class = serializers.OrderDetailSerializer
+
+    def details(self, request):
+        order_id = request.query_params.get("order_id")
+        if not order_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        queryset = Order.objects.filter(id=order_id, action_data__user=8).first()
+        serializer = serializers.OrderDetailSerializer(queryset, context={"request": request})
+        return Response(serializer.data)

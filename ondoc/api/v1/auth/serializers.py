@@ -1,13 +1,19 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         UserPermission, Address, GenericAdmin)
+                                         UserPermission, Address, GenericAdmin, UserSecretKey,
+                                         UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor.models import DoctorMobile
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
-import datetime
+import datetime, calendar
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
+from ondoc.web.models import OnlineLead
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
+import jwt
+from django.conf import settings
+from ondoc.authentication.backends import JWTAuthentication
+
 User = get_user_model()
 
 
@@ -47,6 +53,8 @@ class DoctorLoginSerializer(serializers.Serializer):
             if not DoctorMobile.objects.filter(number=attrs['phone_number'], is_primary=True).exists():
                 doctor_not_exists = True
             if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
+                admin_not_exists = True
+            if not GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 admin_not_exists = True
             if doctor_not_exists and admin_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
@@ -210,6 +218,7 @@ class AddressSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Profile is not correct.")
         return attrs
 
+
 class AppointmentqueryRetrieveSerializer(serializers.Serializer):
     type = serializers.CharField(required=True)
 
@@ -246,3 +255,126 @@ class UserTransactionModelSerializer(serializers.ModelSerializer):
         model = ConsumerTransaction
         fields = ('type', 'action', 'amount', 'product_id', 'reference_id', 'order_id')
         # fields = '__all__'
+
+
+class RefreshJSONWebTokenSerializer(serializers.Serializer):
+
+    token = serializers.CharField()
+
+    def validate(self, attrs):
+        token = attrs['token']
+
+        payload = self.check_payload_custom(token=token)
+        user = self.check_user_custom(payload=payload)
+        # Get and check 'orig_iat'
+        orig_iat = payload.get('orig_iat')
+
+        if orig_iat:
+            # Verify expiration
+            refresh_limit = settings.JWT_AUTH['JWT_REFRESH_EXPIRATION_DELTA']
+
+            if isinstance(refresh_limit, datetime.timedelta):
+                refresh_limit = (refresh_limit.days * 24 * 3600 +
+                                 refresh_limit.seconds)
+
+            expiration_timestamp = orig_iat + int(refresh_limit)
+            now_timestamp = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
+
+            if now_timestamp > expiration_timestamp:
+                msg = _('Token has expired.')
+                raise serializers.ValidationError(msg)
+        else:
+            msg = _('orig_iat missing')
+            raise serializers.ValidationError(msg)
+
+        new_payload = JWTAuthentication.jwt_payload_handler(user)
+        new_payload['orig_iat'] = orig_iat
+
+        return {
+            'token': jwt.encode(new_payload, settings.SECRET_KEY),
+            'user': user,
+            'payload': new_payload
+        }
+
+    def check_user_custom(self, payload):
+        uid = payload.get('user_id')
+
+        if not uid:
+            msg = ('Invalid Token.')
+            raise serializers.ValidationError(msg)
+
+        # Make sure user exists
+        try:
+            user = User.objects.get(pk=uid)
+        except User.DoesNotExist:
+            msg = ("User doesn't exist.")
+            raise serializers.ValidationError(msg)
+
+        if not user.is_active:
+            msg = ('User account is disabled.')
+            raise serializers.ValidationError(msg)
+
+        return user
+
+    def check_payload_custom(self, token):
+        user_key = None
+        user_id = JWTAuthentication.get_unverified_user(token)
+        if user_id:
+            user_key_object = UserSecretKey.objects.get(user_id=user_id)
+            if user_key_object:
+                user_key = user_key_object.key
+        try:
+            payload = jwt.decode(token, user_key)
+        except jwt.ExpiredSignature:
+            msg = _('Token has expired.')
+            raise serializers.ValidationError(msg)
+        except jwt.DecodeError:
+            msg = ('Error decoding signature.')
+            raise serializers.ValidationError(msg)
+
+        return payload
+
+
+class OnlineLeadSerializer(serializers.ModelSerializer):
+    member_type = serializers.ChoiceField(choices=OnlineLead.TYPE_CHOICES)
+    name = serializers.CharField(max_length=255, required=False)
+    speciality = serializers.CharField(max_length=255, required=False)
+    mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
+    city = serializers.CharField(max_length=255, required=False, default='')
+    email = serializers.EmailField()
+
+    class Meta:
+        model = OnlineLead
+        fields = ('member_type', 'name', 'speciality', 'mobile', 'city', 'email')
+
+
+class OrderDetailSerializer(serializers.Serializer):
+    product_id = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
+    app_date = serializers.SerializerMethodField()
+    hospital = serializers.IntegerField(source="action_data.hospital")
+    doctor = serializers.IntegerField(source="action_data.doctor")
+    app_time = serializers.SerializerMethodField()
+
+    def get_app_time(self, obj):
+        from ondoc.api.v1.diagnostic.views import LabList
+        x = obj.action_data.get("time_slot_start")
+        value = round(float(obj.action_data.get("time_slot_start").hour) + (float(obj.action_data.get("time_slot_start").minute)*1/60), 2)
+        data = {
+            'deal_price': obj.action_data.deal_price,
+            'is_available': True,
+            'effective_price': obj.action_data.effective_price,
+            'mrp': obj.action_data.mrp,
+            'value': value,
+            'text': LabList.convert_time(value)
+        }
+        return data
+
+    def get_app_date(self, obj):
+        from django.utils.dateparse import parse_date
+        date_str = obj.action_data.get("time_slot_start").date
+        date = parse_date(date_str)
+        return date
+
+    class Meta:
+        fields = ('product_id', 'date', 'hospital', 'doctor', 'time')
+
