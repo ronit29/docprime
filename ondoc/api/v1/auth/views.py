@@ -21,7 +21,9 @@ from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin)
+                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
+                                         AgentToken)
+from ondoc.notification.models import EmailNotification, SmsNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -1324,3 +1326,16 @@ class OnlineLeadViewSet(GenericViewSet):
             resp['status'] = 'success'
             resp['id'] = data.id
         return Response(resp)
+
+
+class SendBookingUrlViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+
+    def send_booking_url(self, request):
+        type = request.data.get('type')
+        order_id = request.data.get('order_id')
+        agent_token = AgentToken.objects.create_token(user=request.user)
+        booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
+                                                       phone_number=request.user.phone_number)
+        return Response({"booking_url": booking_url})
