@@ -6,14 +6,28 @@ from rest_framework.response import Response
 from . import serializers
 
 
+class ArticleCategoryViewSet(viewsets.GenericViewSet):
+
+    def get_queryset(self):
+        return article_models.ArticleCategory.objects.all()
+
+    def list(self, request):
+        article_category_list = [serializers.ArticleCategoryListSerializer(category, context={'request': request}).data
+                                 for category in self.get_queryset()]
+        return Response(article_category_list)
+
+
 class ArticleViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
         return article_models.Article.objects.prefetch_related('category')
 
     def list(self, request):
+        category_url = request.GET.get('categoryUrl', None)
         resp = []
-        categories = article_models.ArticleCategory.objects.prefetch_related('articles').distinct()
+        if not category_url:
+            return Response([])
+        categories = article_models.ArticleCategory.objects.filter(url=category_url).prefetch_related('articles').distinct()
         for category in categories.all():
             if category.articles:
                 article_data = []
@@ -24,7 +38,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
                 if article_data:
                     cat_data['title'] = category.name
                     cat_data['data'] = serializers.ArticleListSerializer(article_data, many=True,
-                                                                 context={'request': request}).data
+                                                                 context={'request': request, 'category': category}).data
                     resp.append(cat_data)
         return Response(resp)
 

@@ -9,7 +9,7 @@ from django.conf import settings
 
 class ArticleForm(forms.ModelForm):
     body = forms.CharField(widget=forms.Textarea, required=False)
-    category = forms.ModelMultipleChoiceField(queryset=ArticleCategory.objects.all(),widget=forms.CheckboxSelectMultiple)
+    category = forms.ModelChoiceField(queryset=ArticleCategory.objects.all(),widget=forms.Select)
 
     class Media:
         extend=False
@@ -17,8 +17,8 @@ class ArticleForm(forms.ModelForm):
         css = {'all':('articles/css/style.css',)}
 
 
-class ArticleCategoryInline(admin.TabularInline):
-    model = Article.category.through
+# class ArticleCategoryInline(admin.TabularInline):
+#     model = Article.category.through
 
 
 class ArticleAdmin(VersionAdmin):
@@ -26,7 +26,7 @@ class ArticleAdmin(VersionAdmin):
     model = Article
     list_display = ('title', 'updated_at', 'created_at', 'created_by')
     search_fields = ['title']
-    fields = ['body', 'title', 'category', 'url', 'icon_tag', 'icon', 'is_published', 'preview']
+    fields = ['title', 'body', 'header_image', 'category', 'url', 'description', 'keywords', 'icon_tag', 'icon', 'is_published', 'preview']
     readonly_fields = ['icon_tag', 'preview']
     #inlines = [ArticleCategoryInline]
 
