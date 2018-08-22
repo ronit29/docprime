@@ -21,7 +21,9 @@ from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin)
+                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
+                                         AgentToken)
+from ondoc.notification.models import EmailNotification, SmsNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -1016,8 +1018,8 @@ class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
 
 
 class OrderHistoryViewSet(GenericViewSet):
-    # authentication_classes = (JWTAuthentication, )
-    # permission_classes = (IsAuthenticated, IsConsumer,)
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
         # opd_action_data = list()
@@ -1326,6 +1328,19 @@ class OnlineLeadViewSet(GenericViewSet):
         return Response(resp)
 
 
+class SendBookingUrlViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+
+    def send_booking_url(self, request):
+        type = request.data.get('type')
+        order_id = request.data.get('order_id')
+        agent_token = AgentToken.objects.create_token(user=request.user)
+        booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
+                                                       phone_number=request.user.phone_number)
+        return Response({"booking_url": booking_url})
+
+
 class OrderDetailViewSet(GenericViewSet):
 
     authentication_classes = (JWTAuthentication,)
@@ -1346,3 +1361,19 @@ class OrderDetailViewSet(GenericViewSet):
             serializer = serializers.OrderDetailLabSerializer(queryset, context={"request": request})
             resp = serializer.data
         return Response(resp)
+
+
+class UserTokenViewSet(GenericViewSet):
+
+    def details(self, request):
+        Response([])
+        token = request.query_params.get("token")
+        if not token:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        agent_token = AgentToken.objects.filter(token=token, is_consumed=False, expiry_time__gte=timezone.now()).first()
+        if agent_token:
+            user_key = UserSecretKey.objects.get_or_create(user=agent_token.user)
+            payload = JWTAuthentication.jwt_payload_handler(agent_token.user)
+            token = jwt.encode(payload, user_key[0].key)
+            return Response({"token": token})
