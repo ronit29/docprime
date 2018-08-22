@@ -351,12 +351,12 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
 
 class OrderDetailSerializer(serializers.Serializer):
     product_id = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
-    app_date = serializers.SerializerMethodField()
+    date = serializers.SerializerMethodField()
     hospital = serializers.IntegerField(source="action_data.hospital")
     doctor = serializers.IntegerField(source="action_data.doctor")
-    app_time = serializers.SerializerMethodField()
+    time = serializers.SerializerMethodField()
 
-    def get_app_time(self, obj):
+    def get_time(self, obj):
         from ondoc.api.v1.diagnostic.views import LabList
         app_date_time = parse_datetime(obj.action_data.get("time_slot_start"))
         value = round(float(app_date_time.hour) + (float(app_date_time.minute)*1/60), 2)
@@ -372,7 +372,7 @@ class OrderDetailSerializer(serializers.Serializer):
         }
         return data
 
-    def get_app_date(self, obj):
+    def get_date(self, obj):
         date_str = obj.action_data.get("time_slot_start")
         date = parse_datetime(date_str)
         return date.date()
