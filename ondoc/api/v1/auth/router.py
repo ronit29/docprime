@@ -4,7 +4,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     TransactionViewSet, UserTransactionViewSet, UserIDViewSet, OrderHistoryViewSet,
                     HospitalDoctorAppointmentPermissionViewSet, HospitalDoctorBillingPermissionViewSet,
                     OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken, OnlineLeadViewSet, UserLabViewSet,
-                    OrderDetailViewSet, UserDetailsViewSet)
+                    OrderDetailViewSet, UserDetailsViewSet, SendBookingUrlViewSet)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -47,6 +47,7 @@ urlpatterns = [
     path('refund', ConsumerAccountRefundViewSet.as_view({"post": "refund"}), name="consumer-refund"),
     path('onlinelead/create', OnlineLeadViewSet.as_view({"post": "create"}), name='doctor-signup'),
     path('manageablelabs', UserLabViewSet.as_view({"get": "list"}), name='user-manageable-labs'),
+    path('sendbookingurl', SendBookingUrlViewSet.as_view({"post": "send_booking_url"}), name='send-booking-url'),
     path('extract_order_details', OrderDetailViewSet.as_view({"get": "details"}), name='extract-order-detail'),
     path('extract_user_details', UserDetailsViewSet.as_view({"get": "details"}), name='extract-user-details'),
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
