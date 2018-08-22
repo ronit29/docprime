@@ -62,8 +62,8 @@ class JWTAuthentication(authentication.BaseAuthentication):
                 user_key = user_key_object.key
         try:
             payload = jwt.decode(token, user_key)
-        except:
-            msg = 'Invalid authentication. Could not decode token.'
+        except Exception as e:
+            msg = 'Invalid authentication.'
             raise exceptions.AuthenticationFailed(msg)
 
         try:
@@ -75,7 +75,6 @@ class JWTAuthentication(authentication.BaseAuthentication):
         if not user.is_active:
             msg = 'This user has been deactivated.'
             raise exceptions.AuthenticationFailed(msg)
-
         return (user, token)
 
     def authenticate_header(self, request):
@@ -94,6 +93,11 @@ class JWTAuthentication(authentication.BaseAuthentication):
 
     @staticmethod
     def get_unverified_user(token):
-        unverified_payload = jwt.decode(token, verify=False)
+        try:
+            unverified_payload = jwt.decode(token, verify=False)
+        except Exception as e:
+            msg = 'Invalid authentication.'
+            raise exceptions.AuthenticationFailed(msg)
+
         return unverified_payload.get('user_id', None)
 
