@@ -577,7 +577,12 @@ class UserAppointmentsViewSet(OndocViewSet):
         }
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
-        if consumer_account.balance + appointment_details.effective_price >= new_appointment_details.get('effective_price'):
+        balance = consumer_account.balance
+
+        if request.agent:
+            balance = 0
+
+        if balance + appointment_details.effective_price >= new_appointment_details.get('effective_price'):
             # Debit or Refund/Credit in Account
             if appointment_details.effective_price > new_appointment_details.get('effective_price'):
                 #TODO PM - Refund difference b/w effective price
@@ -1367,7 +1372,6 @@ class OrderDetailViewSet(GenericViewSet):
 class UserTokenViewSet(GenericViewSet):
 
     def details(self, request):
-        Response([])
         token = request.query_params.get("token")
         if not token:
             return Response(status=status.HTTP_400_BAD_REQUEST)
