@@ -346,3 +346,35 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
     class Meta:
         model = OnlineLead
         fields = ('member_type', 'name', 'speciality', 'mobile', 'city', 'email')
+
+
+class OrderDetailSerializer(serializers.Serializer):
+    product_id = serializers.ChoiceField(choices=Order.PRODUCT_IDS)
+    app_date = serializers.SerializerMethodField()
+    hospital = serializers.IntegerField(source="action_data.hospital")
+    doctor = serializers.IntegerField(source="action_data.doctor")
+    app_time = serializers.SerializerMethodField()
+
+    def get_app_time(self, obj):
+        from ondoc.api.v1.diagnostic.views import LabList
+        x = obj.action_data.get("time_slot_start")
+        value = round(float(obj.action_data.get("time_slot_start").hour) + (float(obj.action_data.get("time_slot_start").minute)*1/60), 2)
+        data = {
+            'deal_price': obj.action_data.deal_price,
+            'is_available': True,
+            'effective_price': obj.action_data.effective_price,
+            'mrp': obj.action_data.mrp,
+            'value': value,
+            'text': LabList.convert_time(value)
+        }
+        return data
+
+    def get_app_date(self, obj):
+        from django.utils.dateparse import parse_date
+        date_str = obj.action_data.get("time_slot_start").date
+        date = parse_date(date_str)
+        return date
+
+    class Meta:
+        fields = ('product_id', 'date', 'hospital', 'doctor', 'time')
+

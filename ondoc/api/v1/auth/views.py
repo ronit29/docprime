@@ -1016,8 +1016,8 @@ class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
 
 
 class OrderHistoryViewSet(GenericViewSet):
-    authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated, IsConsumer,)
+    # authentication_classes = (JWTAuthentication, )
+    # permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
         # opd_action_data = list()
@@ -1324,3 +1324,16 @@ class OnlineLeadViewSet(GenericViewSet):
             resp['status'] = 'success'
             resp['id'] = data.id
         return Response(resp)
+
+
+class OrderDetailViewSet(GenericViewSet):
+
+    serializer_class = serializers.OrderDetailSerializer
+
+    def details(self, request):
+        order_id = request.query_params.get("order_id")
+        if not order_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        queryset = Order.objects.filter(id=order_id, action_data__user=8).first()
+        serializer = serializers.OrderDetailSerializer(queryset, context={"request": request})
+        return Response(serializer.data)
