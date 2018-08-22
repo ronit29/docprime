@@ -384,7 +384,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             "lab_test": [x["id"] for x in lab_test_queryset.values("id")]
         }
         if data.get("is_home_pickup") is True:
-            address = Address.objects.filter(pk=data.get("address")).first()
+            address = Address.objects.filter(pk=data.get("address").id).first()
             address_serialzer = AddressSerializer(address)
             appointment_data.update({
                 "address": address_serialzer.data,
@@ -458,7 +458,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         pgdata['mobile'] = user.phone_number
         pgdata['email'] = user.email
         if not user.email:
-            pgdata['email'] = "dummy_appointment@policybazaar.com"
+            pgdata['email'] = "dummy_appointment@docprime.com"
 
         pgdata['productId'] = product_id
         base_url = "https://{}".format(request.get_host())

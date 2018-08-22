@@ -412,7 +412,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_lab_appointment = self.lab_appointment_update(request, lab_appointment, validated_data)
             if updated_lab_appointment.get("status") is not None and updated_lab_appointment["status"] == 0:
-                return Response(updated_lab_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
+                return Response(updated_lab_appointment, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_lab_appointment)
         elif appointment_type == 'doctor':
@@ -425,7 +425,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
             if updated_opd_appointment.get("status") is not None and updated_opd_appointment["status"] == 0:
-                return Response(updated_opd_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
+                return Response(updated_opd_appointment, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_opd_appointment)
 
@@ -445,7 +445,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                     if lab_appointment.time_slot_start == time_slot_start:
                         resp = {
                             "status": 0,
-                            "msg": "Cannot Reschedule for same timeslot"
+                            "message": "Cannot Reschedule for same timeslot"
                         }
                         return resp
 
@@ -502,7 +502,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                     if opd_appointment.time_slot_start == time_slot_start:
                         resp = {
                             "status": 0,
-                            "msg": "Cannot Reschedule for same timeslot"
+                            "message": "Cannot Reschedule for same timeslot"
                         }
                         return resp
 
@@ -612,7 +612,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         pgdata['mobile'] = user.phone_number
         pgdata['email'] = user.email
         if not user.email:
-            pgdata['email'] = "dummy_appointment@policybazaar.com"
+            pgdata['email'] = "dummy_appointment@docprime.com"
 
         pgdata['productId'] = product_id
         base_url = "https://{}".format(request.get_host())

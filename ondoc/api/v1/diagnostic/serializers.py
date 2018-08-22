@@ -328,7 +328,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     end_date = serializers.DateTimeField(required=False)
     end_time = serializers.FloatField(required=False)
     is_home_pickup = serializers.BooleanField(default=False)
-    address = serializers.IntegerField(required=False, allow_null=True)
+    address = serializers.PrimaryKeyRelatedField(queryset=Address.objects.all(), required=False, allow_null=True)
+    # address = serializers.IntegerField(required=False, allow_null=True)
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
 
     def validate(self, data):
@@ -340,9 +341,11 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         if not utils.is_valid_testing_lab_data(request.user, data["lab"]):
             raise serializers.ValidationError("Both User and Lab should be for testing")
 
-        if data.get("is_home_pickup") is True and (not data.get("address")):
-
-            raise serializers.ValidationError("Address required for home pickup")
+        if data.get("is_home_pickup"):
+            if data.get("address") is None:
+                raise serializers.ValidationError("Address required for home pickup")
+            elif not Address.objects.filter(id=data.get("address").id, user=request.user).exists():
+                raise serializers.ValidationError("Invalid address for given user")
 
         if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
             raise serializers.ValidationError("Invalid profile id")
