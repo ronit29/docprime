@@ -421,7 +421,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         appointment_type = query_input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
             lab_appointment = get_object_or_404(LabAppointment, pk=pk)
-            allowed = lab_appointment.allowed_action(request.user.user_type)
+            allowed = lab_appointment.allowed_action(request.user.user_type, request)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
                 resp = dict()
