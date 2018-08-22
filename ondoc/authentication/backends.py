@@ -57,7 +57,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
         user_key = None
         user_id = JWTAuthentication.get_unverified_user(token)
         if user_id:
-            user_key_object = UserSecretKey.objects.get(user_id=user_id)
+            user_key_object = UserSecretKey.objects.filter(user_id=user_id).first()
             if user_key_object:
                 user_key = user_key_object.key
         try:
