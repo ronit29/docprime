@@ -8,6 +8,7 @@ from .v1.chat.router import urlpatterns as chat_url
 from .v1.notification.router import urlpatterns as noti_url
 from .v1.payout.router import urlpatterns as payout_url
 from .v1.article.router import urlpatterns as article_url
+from .v1.admin.router import urlpatterns as admin_url
 # from .v1.account.router import urlpatterns as acct_url
 
 
@@ -20,4 +21,5 @@ urlpatterns = [
     # path('v1/account/', include(acct_url)),
     path('v1/payout/', include(payout_url)),
     path('v1/article/', include(article_url)),
+    path('v1/admin/', include(admin_url)),
 ]

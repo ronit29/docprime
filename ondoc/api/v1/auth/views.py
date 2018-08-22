@@ -21,8 +21,7 @@ from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken)
+                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin)
 from ondoc.notification.models import EmailNotification, SmsNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
@@ -1382,34 +1381,3 @@ class UserTokenViewSet(GenericViewSet):
             payload = JWTAuthentication.jwt_payload_handler(agent_token.user)
             token = jwt.encode(payload, user_key[0].key)
             return Response({"token": token})
-
-
-def agent_login(request):
-    from django.http import JsonResponse
-    from ondoc.authentication.backends import JWTAuthentication
-    response = {'login': 0}
-    if request.POST and request.is_ajax():
-        serializer = serializers.AgenctVerificationSerializer(data=request.POST)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        agent_exists = 1
-        user = User.objects.filter(phone_number=data['phone_number'], user_type=User.CONSUMER).first()
-        if not user:
-            agent_exists = 0
-            user = User.objects.get_or_create(phone_number=data['phone_number'],
-                                       is_phone_number_verified=True,
-                                       user_type=User.CONSUMER)
-            user = user[0]
-
-        user_key = UserSecretKey.objects.get_or_create(user=user)
-        payload = JWTAuthentication.appointment_agent_payload_handler(request, user)
-        token = jwt.encode(payload, user_key[0].key)
-
-        response = {
-            "login": 1,
-            "agent_id": request.user.id,
-            "token": str(token, 'utf-8'),
-            "expiration_time": payload['exp'],
-            "refresh": False
-        }
-    return JsonResponse(response)
