@@ -8,6 +8,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, FileExt
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
+from django.core.files.storage import get_storage_class
 from django.conf import settings
 from datetime import timedelta
 from dateutil import tz
@@ -512,7 +513,7 @@ class DoctorHospital(auth_model.TimeStampedModel):
 
 
 class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
-    image_sizes = [(80, 80), ]
+    image_sizes = [(80, 80)]
     image_base_path = 'doctor/images'
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
     name = models.ImageField('Original Image Name',upload_to='doctor/images',height_field='height', width_field='width')

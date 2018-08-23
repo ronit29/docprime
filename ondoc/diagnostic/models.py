@@ -7,6 +7,7 @@ from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
+from django.core.files.storage import get_storage_class
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from ondoc.account import models as account_model
 from django.utils import timezone
@@ -16,6 +17,8 @@ from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from io import BytesIO
 import datetime
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from ondoc.diagnostic import tasks
@@ -913,6 +916,8 @@ class LabDocument(TimeStampedModel, Document):
 
     def resize_image(self, height, width):
             with Img.open(self.name.path) as img:
+                default_storage_class = get_storage_class()
+                storage_instance = default_storage_class()
                 path = "{}/{}/{}x{}/".format(settings.MEDIA_ROOT, LabDocument.image_base_path, height, width)
                 if os.path.exists(path+os.path.basename(self.name.name)):
                     return
@@ -928,7 +933,12 @@ class LabDocument(TimeStampedModel, Document):
                 img = img.resize(tuple([width, height]), Img.ANTIALIAS)
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
-                img.save(path + os.path.basename(self.name.name), 'JPEG')
+                new_image_io = BytesIO()
+                img.save(new_image_io, format='JPEG')
+                in_memory_file = InMemoryUploadedFile(new_image_io, None, os.path.basename(self.name.name), 'image/jpeg',
+                                                      new_image_io.tell(), None)
+                storage_instance.save(path + os.path.basename(self.name.name), in_memory_file)
+                # img.save(path + os.path.basename(self.name.name), 'JPEG')
 
     def create_all_images(self):
         if not self.name:
