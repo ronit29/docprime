@@ -289,13 +289,13 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             msg = _('orig_iat missing')
             raise serializers.ValidationError(msg)
 
-        new_payload = JWTAuthentication.jwt_payload_handler(user)
-        new_payload['orig_iat'] = orig_iat
+        token_object = JWTAuthentication.generate_token(user)
+        token_object['payload']['orig_iat'] = orig_iat
 
         return {
-            'token': jwt.encode(new_payload, settings.SECRET_KEY),
+            'token': token_object['token'],
             'user': user,
-            'payload': new_payload
+            'payload': token_object['payload']
         }
 
     def check_user_custom(self, payload):

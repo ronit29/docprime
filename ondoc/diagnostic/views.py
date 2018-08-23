@@ -139,7 +139,37 @@ def get_computed_deal_price(obj):
         return None
 
 
-
+def testcsvupload(request):
+    import xlrd
+    if request.FILES and request.FILES['csv']:
+        csv = request.FILES['csv']
+        try:
+            book = xlrd.open_workbook(file_contents=csv.read())
+        except Exception:
+            return JsonResponse({'error': "Invalid File"})
+        if book:
+            sheet = book.sheet_by_index(0)
+            keys = sheet.row_values(0)
+            values = [sheet.row_values(i) for i in range(1, sheet.nrows)]
+            for value in values:
+                row_object = dict(zip(keys, value))
+                if row_object.get('mrp') and row_object.get('test') and row_object.get('lab_pricing_group'):
+                    instance = None
+                    existing_test = AvailableLabTest.objects.filter(test__id=row_object['test'],
+                                                                    lab_pricing_group=row_object['lab_pricing_group'])
+                    if existing_test.exists():
+                        instance = existing_test.first()
+                        if instance:
+                            instance.mrp = row_object.get('mrp')
+                    else:
+                        serialized_data = AjaxAvailableLabTestSerializer(instance=instance, data=row_object)
+                        if serialized_data.is_valid(raise_exception=True):
+                            data = serialized_data.validated_data
+                            instance = AvailableLabTest(**data)
+                    instance.save()
+            return JsonResponse({'success': "Uploaded Successfully"})
+    else:
+        return JsonResponse({'error': "Invalid File"})
 
 # class LabTestTable(tables.Table):
 #     MRP_TEMPLATE = '<input disabled id="mrp" class="mrp input-sm" maxlength="10" name="mrp" type="number" value={{ value|default_if_none:"" }} >'
