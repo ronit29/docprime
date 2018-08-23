@@ -727,7 +727,12 @@ class AddressViewsSet(viewsets.ModelViewSet):
         serializer = serializers.AddressSerializer(data=serialized_req_data, context={"request": request})
         # serializer = serializers.AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        if not Address.objects.filter(user=request.user).filter(**serializer.validated_data).exists():
+        validated_data = copy.deepcopy(serializer.validated_data)
+        loc_position = validated_data.pop("locality_location")
+        land_position = validated_data.pop("landmark_location")
+        if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                locality_location__distance_lte=(loc_position, 100),
+                landmark_location__distance_lte=(land_position, 100)).exists():
             serializer.save()
         else:
             address = Address.objects.filter(user=request.user).filter(**serializer.validated_data).first()
