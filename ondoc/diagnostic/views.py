@@ -8,7 +8,6 @@ from dal import autocomplete
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-import django_tables2 as tables
 from django.http import HttpResponseRedirect
 from django_tables2 import RequestConfig
 from .serializers import AjaxAvailableLabTestSerializer
