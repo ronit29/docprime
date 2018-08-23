@@ -133,11 +133,7 @@ class UserViewset(GenericViewSet):
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
 
-        user_key = UserSecretKey.objects.get_or_create(user=user)
-        payload = JWTAuthentication.jwt_payload_handler(user)
-        token = jwt.encode(payload, user_key[0].key)
-
-        # token = Token.objects.get_or_create(user=user)
+        token_object = JWTAuthentication.generate_token(user)
 
         expire_otp(data['phone_number'])
 
@@ -145,8 +141,8 @@ class UserViewset(GenericViewSet):
             "login": 1,
             "user_exists": user_exists,
             "user_id": user.id,
-            "token": token,
-            "expiration_time": payload['exp']
+            "token": token_object['token'],
+            "expiration_time": token_object['payload']['exp']
         }
         return Response(response)
 
@@ -203,16 +199,13 @@ class UserViewset(GenericViewSet):
         GenericLabAdmin.update_user_lab_admin(phone_number)
         self.update_live_status(phone_number)
 
-        # token = Token.objects.get_or_create(user=user)
-        user_key = UserSecretKey.objects.get_or_create(user=user)
-        payload = JWTAuthentication.jwt_payload_handler(user)
-        token = jwt.encode(payload, user_key[0].key)
+        token_object = JWTAuthentication.generate_token(user)
         expire_otp(data['phone_number'])
 
         response = {
             "login": 1,
-            "token": token,
-            "expiration_time": payload['exp']
+            "token": token_object['token'],
+            "expiration_time": token_object['payload']['exp']
         }
         return Response(response)
 
@@ -1375,11 +1368,9 @@ class UserTokenViewSet(GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         agent_token = AgentToken.objects.filter(token=token, is_consumed=False, expiry_time__gte=timezone.now()).first()
         if agent_token:
-            user_key = UserSecretKey.objects.get_or_create(user=agent_token.user)
-            payload = JWTAuthentication.jwt_payload_handler(agent_token.user)
-            token = jwt.encode(payload, user_key[0].key)
+            token_object = JWTAuthentication.generate_token(agent_token.user)
             agent_token.is_consumed = True
             agent_token.save()
-            return Response({"status": 1, "token": token})
+            return Response({"status" : 1,"token": token_object['token']})
         else:
             return Response({"status": 0})
