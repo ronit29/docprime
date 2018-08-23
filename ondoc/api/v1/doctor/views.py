@@ -64,7 +64,7 @@ class OndocViewSet(mixins.CreateModelMixin,
 
 
 class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, IsDoctor)
 
     def complete(self, request):
