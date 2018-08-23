@@ -1333,27 +1333,25 @@ class SendBookingUrlViewSet(GenericViewSet):
 
     def send_booking_url(self, request, order_id):
         type = request.data.get('type')
-        #order_id = request.data.get('order_id')
         agent_token = AgentToken.objects.create_token(user=request.user)
         booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
                                                        phone_number=request.user.phone_number)
-        #return Response({"booking_url": booking_url})
         return Response({"status": 1})
 
 
 class OrderDetailViewSet(GenericViewSet):
 
     authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
     serializer_class = serializers.OrderDetailDoctorSerializer
 
     def details(self, request, order_id):
-        #order_id = request.query_params.get("order_id")
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         queryset = Order.objects.filter(id=order_id, action_data__user=request.user.id).first()
         if not queryset:
-            return Response([])
-        resp = None
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        resp = dict()
         if queryset.product_id == Order.DOCTOR_PRODUCT_ID:
             serializer = serializers.OrderDetailDoctorSerializer(queryset)
             resp = serializer.data
@@ -1364,15 +1362,15 @@ class OrderDetailViewSet(GenericViewSet):
 
 
 class UserTokenViewSet(GenericViewSet):
-
     def details(self, request):
         token = request.query_params.get("token")
         if not token:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-
         agent_token = AgentToken.objects.filter(token=token, is_consumed=False, expiry_time__gte=timezone.now()).first()
         if agent_token:
             token_object = JWTAuthentication.generate_token(agent_token.user)
+            agent_token.is_consumed = True
+            agent_token.save()
             return Response({"status" : 1,"token": token_object['token']})
         else:
             return Response({"status": 0})

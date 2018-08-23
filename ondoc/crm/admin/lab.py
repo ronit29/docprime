@@ -468,9 +468,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
 
     def get_profile(self, obj):
-        if not obj.profile:
-            return ""
-        return obj.profile.name
+        if not obj.profile_detail:
+            return ''
+        return obj.profile_detail.get('name', '')
 
     get_profile.admin_order_field = 'profile'
     get_profile.short_description = 'Profile Name'
