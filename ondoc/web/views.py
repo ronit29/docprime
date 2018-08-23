@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.contrib import messages
 from .forms import OnlineLeadsForm, CareersForm
 from django.http import HttpResponseRedirect
+from django.conf import settings
 
 
 def index(request):
@@ -43,6 +44,12 @@ def disclaimer_page(request):
 
 def howitworks_page(request):
     return render(request, 'howItWorks.html')
+
+
+def user_appointment_via_agent(request):
+    api_domain = '%s%s' % (settings.BASE_URL, '/api/v1/admin/agent/user/appointment')
+    appDomain = 'https://%s%s' % (settings.CONSUMER_APP_DOMAIN, '/agent/login')
+    return render(request, 'agentLogin.html', {'apiDomain': api_domain, 'appDomain': appDomain})
 
 
 def careers_page(request):

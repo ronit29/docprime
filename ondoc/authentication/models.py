@@ -7,6 +7,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import JSONField
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.utils import timezone
 from PIL import Image as Img
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
@@ -14,6 +15,7 @@ from io import BytesIO
 import math
 import os
 import hashlib
+import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
@@ -877,6 +879,29 @@ class UserSecretKey(TimeStampedModel):
     def generate_key(self):
         import binascii
         return binascii.hexlify(os.urandom(20)).decode()
+
+
+class AgentTokenManager(models.Manager):
+    def create_token(self, user):
+        expiry_time = timezone.now() + timezone.timedelta(hours=AgentToken.expiry_duration)
+        token = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
+        return super().create(user=user, token=token, expiry_time=expiry_time)
+
+
+class AgentToken(TimeStampedModel):
+    expiry_duration = 2  # IN HOURS
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    token = models.CharField(max_length=100)
+    is_consumed = models.BooleanField(default=False)
+    expiry_time = models.DateTimeField()
+
+    objects = AgentTokenManager()  # The default manager.
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = 'agent_token'
 
 
 

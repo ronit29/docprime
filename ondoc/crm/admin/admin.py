@@ -28,6 +28,7 @@ from ondoc.authentication.models import GenericLabAdmin
 
 from ondoc.web.models import OnlineLead, Career
 from django.contrib.auth import get_user_model
+
 User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
 
@@ -85,3 +86,4 @@ admin.site.register(notifcation_model.AppNotification, AppNotificationAdmin)
 admin.site.register(OpdAppointment, DoctorOpdAppointmentAdmin)
 admin.site.register(report_models.Report)
 admin.site.register(report_models.GeneratedReport, ReportAdmin)
+

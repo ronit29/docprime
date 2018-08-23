@@ -1048,13 +1048,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
         except Exception as e:
             logger.error("Error in auto cancel flow - " + str(e))
 
-    def payment_confirmation(self, consumer_account, data, amount):
-        otp = random.randint(1000, 9999)
-        self.payment_status = OpdAppointment.PAYMENT_ACCEPTED
-        self.otp = otp
-        self.save()
-        consumer_account.debit_schedule(data, amount)
-
     def doc_payout_amount(self):
         amount = 0
         if self.payment_type == self.COD:

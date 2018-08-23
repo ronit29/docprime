@@ -21,7 +21,9 @@ from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin)
+                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
+                                         AgentToken)
+from ondoc.notification.models import EmailNotification, SmsNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -41,7 +43,8 @@ from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabN
 from ondoc.payout.models import Outstanding
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from ondoc.authentication.backends import JWTAuthentication
-from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
+from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, \
+    ErrorCodeMapping, IsNotAgent
 from ondoc.api.v1.auth .serializers import OnlineLeadSerializer
 import decimal
 from django.conf import settings
@@ -419,7 +422,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         appointment_type = query_input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
             lab_appointment = get_object_or_404(LabAppointment, pk=pk)
-            allowed = lab_appointment.allowed_action(request.user.user_type)
+            allowed = lab_appointment.allowed_action(request.user.user_type, request)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
                 resp = dict()
@@ -574,7 +577,12 @@ class UserAppointmentsViewSet(OndocViewSet):
         }
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
-        if consumer_account.balance + appointment_details.effective_price >= new_appointment_details.get('effective_price'):
+        balance = consumer_account.balance
+
+        if hasattr(request, 'agent') and request.agent:
+            balance = 0
+
+        if balance + appointment_details.effective_price >= new_appointment_details.get('effective_price'):
             # Debit or Refund/Credit in Account
             if appointment_details.effective_price > new_appointment_details.get('effective_price'):
                 #TODO PM - Refund difference b/w effective price
@@ -1324,3 +1332,53 @@ class OnlineLeadViewSet(GenericViewSet):
             resp['status'] = 'success'
             resp['id'] = data.id
         return Response(resp)
+
+
+class SendBookingUrlViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+
+    def send_booking_url(self, request):
+        type = request.data.get('type')
+        order_id = request.data.get('order_id')
+        agent_token = AgentToken.objects.create_token(user=request.user)
+        booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
+                                                       phone_number=request.user.phone_number)
+        return Response({"booking_url": booking_url})
+
+
+class OrderDetailViewSet(GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    serializer_class = serializers.OrderDetailDoctorSerializer
+
+    def details(self, request):
+        order_id = request.query_params.get("order_id")
+        if not order_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        queryset = Order.objects.filter(id=order_id, action_data__user=request.user.id).first()
+        if not queryset:
+            return Response([])
+        resp = None
+        if queryset.product_id == Order.DOCTOR_PRODUCT_ID:
+            serializer = serializers.OrderDetailDoctorSerializer(queryset, context={"request": request})
+            resp = serializer.data
+        elif queryset.product_id == Order.LAB_PRODUCT_ID:
+            serializer = serializers.OrderDetailLabSerializer(queryset, context={"request": request})
+            resp = serializer.data
+        return Response(resp)
+
+
+class UserTokenViewSet(GenericViewSet):
+
+    def details(self, request):
+        token = request.query_params.get("token")
+        if not token:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        agent_token = AgentToken.objects.filter(token=token, is_consumed=False, expiry_time__gte=timezone.now()).first()
+        if agent_token:
+            user_key = UserSecretKey.objects.get_or_create(user=agent_token.user)
+            payload = JWTAuthentication.jwt_payload_handler(agent_token.user)
+            token = jwt.encode(payload, user_key[0].key)
+            return Response({"token": token})

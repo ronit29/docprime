@@ -8,7 +8,7 @@ from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -26,7 +26,9 @@ from django.shortcuts import get_object_or_404
 
 from django.db import transaction
 from django.db.models import Count, Sum, Max, When, Case, F, Q
+from django.http import Http404
 from django.conf import settings
+import hashlib
 from rest_framework import status
 from collections import OrderedDict
 from django.utils import timezone
@@ -494,8 +496,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
                                                     account_models.Order.LAB_APPOINTMENT_CREATE)
-        if appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and \
-                balance < appointment_details.get("effective_price"):
+
+        if hasattr(request, 'agent') and request.agent:
+            balance = 0
+
+        if (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
+                balance < appointment_details.get("effective_price")):
 
             payable_amount = appointment_details.get("effective_price") - balance
 
@@ -509,10 +515,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
-            resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id,
-                                                                              order.id)
+            resp['data'], resp['payment_required'] = payment_details(request, order)
+            # resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id,order.id)
         else:
-
             lab_appointment = LabAppointment.create_appointment(appointment_details)
             if appointment_details["payment_type"] == doctor_model.OpdAppointment.PREPAID:
                 user_account_data = {
@@ -526,29 +531,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp["data"] = {"id": lab_appointment.id,
                             "type": diagnostic_serializer.LabAppointmentModelSerializer.LAB_TYPE}
         return resp
-    
-    def get_payment_details(self, request, appointment_details, product_id, order_id):
-        pgdata = dict()
-        payment_required = True
-        user = request.user
-        pgdata['custId'] = user.id
-        pgdata['mobile'] = user.phone_number
-        pgdata['email'] = user.email
-        if not user.email:
-            pgdata['email'] = "dummy_appointment@docprime.com"
-
-        pgdata['productId'] = product_id
-        base_url = "https://{}".format(request.get_host())
-        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
-        pgdata['appointmentId'] = ""
-        pgdata['orderId'] = order_id
-        pgdata['name'] = appointment_details["profile"].name
-        pgdata['txAmount'] = str(appointment_details['payable_amount'])
-
-        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P2, settings.PG_CLIENT_KEY_P2)
-
-        return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
         # Check if appointment can be covered under insurance

@@ -209,6 +209,15 @@ class IsDoctor(permissions.BasePermission):
         return False
 
 
+class IsNotAgent(permissions.BasePermission):
+    message = 'Agent is not allowed to perform action only.'
+
+    def has_permission(self, request, view):
+        if hasattr(request, 'agent') and request.agent is not None:
+            return False
+        return True
+
+
 class IsMatrixUser(permissions.BasePermission):
     message = 'Only Matrix User is allowed to Perform Action.'
 
@@ -278,3 +287,37 @@ def is_valid_testing_lab_data(user, lab):
     if lab.is_test_lab and not user.groups.filter(name=constants['TEST_USER_GROUP']).exists():
         return False
     return True
+
+
+def payment_details(request, order):
+    from ondoc.authentication.models import UserProfile
+    from ondoc.account.models import PgTransaction
+    payment_required = True
+    user = request.user
+    if user.email:
+        uemail = user.email
+    else:
+        uemail = "dummyemail@docprime.com"
+    base_url = "https://{}".format(request.get_host())
+    surl = base_url + '/api/v1/user/transaction/save'
+    furl = base_url + '/api/v1/user/transaction/save'
+    profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
+    pgdata = {
+        'custId': user.id,
+        'mobile': user.phone_number,
+        'email': uemail,
+        'productId': order.product_id,
+        'surl': surl,
+        'furl': furl,
+        'referenceId': "",
+        'orderId': order.id,
+        'name': profile.name,
+        'txAmount': str(order.amount),
+    }
+    if request.agent:
+        pgdata["is_agent"] = True
+    else:
+        pgdata["is_agent"] = False
+
+    pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P1, settings.PG_CLIENT_KEY_P1)
+    return pgdata, payment_required
