@@ -324,7 +324,4 @@ def payment_details(request, order):
 
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
-    if hasattr(request, 'agent') and request.agent:
-        pgdata["is_agent"] = True
-    else:
-        pgdata["is_agent"] = False
+    return pgdata, payment_required
