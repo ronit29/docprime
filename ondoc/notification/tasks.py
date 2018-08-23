@@ -15,7 +15,8 @@ def send_lab_notifications(appointment_id):
         return
     if not instance.user:
         return
-    lab_managers = lab_models.LabManager.objects.filter(lab=instance.lab)
+    # lab_managers = lab_models.LabManager.objects.filter(lab=instance.lab)
+    lab_managers = instance.get_lab_admins()
     if instance.status == lab_models.LabAppointment.COMPLETED:
         LabNotificationAction.trigger(
             instance=instance,

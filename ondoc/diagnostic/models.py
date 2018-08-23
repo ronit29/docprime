@@ -585,6 +585,14 @@ class LabAppointment(TimeStampedModel):
             return True
         return False
 
+    def get_lab_admins(self):
+        if self.lab.network and self.lab.network.manageable_lab_network_admins.filter(is_disabled=False).exists():
+            return [admin.user for admin in self.lab.network.manageable_lab_network_admins.filter(is_disabled=False)
+                    if admin.user]
+        else:
+            return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
+                    if admin.user]
+
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
         try:
