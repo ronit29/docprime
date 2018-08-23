@@ -720,11 +720,17 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
+
+        serializer = serializers.AddressSerializer(data=data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+
+
         req_serializer = serializers.AddressCustomSerializer(data)
         serialized_req_data = req_serializer.data
 
         serializer = serializers.AddressSerializer(data=serialized_req_data, context={"request": request})
-        # serializer = serializers.AddressSerializer(data=data, context={"request": request})
+        serializer = serializers.AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = copy.deepcopy(serializer.validated_data)
         loc_position = validated_data.pop("locality_location")

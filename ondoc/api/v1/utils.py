@@ -291,7 +291,7 @@ def is_valid_testing_lab_data(user, lab):
 
 def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
-    from ondoc.account.models import PgTransaction
+    from ondoc.account.models import PgTransaction, Order
     payment_required = True
     user = request.user
     if user.email:
@@ -318,6 +318,8 @@ def payment_details(request, order):
         pgdata["is_agent"] = True
     else:
         pgdata["is_agent"] = False
-
-    pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P1, settings.PG_CLIENT_KEY_P1)
+    if order.payment_id == Order.DOCTOR_PRODUCT_ID:
+        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P1, settings.PG_CLIENT_KEY_P1)
+    elif order.payment_id == Order.LAB_PRODUCT_ID:
+        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P2, settings.PG_CLIENT_KEY_P2)
     return pgdata, payment_required
