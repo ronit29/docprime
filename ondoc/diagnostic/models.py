@@ -23,6 +23,7 @@ from dateutil import tz
 from django.conf import settings
 import logging
 import decimal
+from PIL import Image as Img
 import math
 import random
 import os
@@ -892,6 +893,8 @@ class LabDocument(TimeStampedModel, Document):
     CHEQUE = 5
     LOGO = 6
     EMAIL_CONFIRMATION = 9
+    image_sizes = [(80, 80), ]
+    image_base_path = 'lab/images'
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
                (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO"),
                (EMAIL_CONFIRMATION, "Email Confirmation")]
@@ -907,6 +910,39 @@ class LabDocument(TimeStampedModel, Document):
 
     def is_pdf(self):
         return self.name.name.endswith('.pdf')
+
+    def resize_image(self, height, width):
+            with Img.open(self.name.path) as img:
+                path = "{}/{}/{}x{}/".format(settings.MEDIA_ROOT, LabDocument.image_base_path, height, width)
+                if os.path.exists(path+os.path.basename(self.name.name)):
+                    return
+                if not os.path.exists(path):
+                    os.mkdir(path)
+                original_width, original_height = img.size
+                if original_width > original_height:
+                    ratio = width/float(original_width)
+                    height = int(float(original_height)*float(ratio))
+                else:
+                    ratio = height / float(original_height)
+                    width = int(float(original_width) * float(ratio))
+                img = img.resize(tuple([width, height]), Img.ANTIALIAS)
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                img.save(path + os.path.basename(self.name.name), 'JPEG')
+
+    def create_all_images(self):
+        if not self.name:
+            return
+        for size in LabDocument.image_sizes:
+            height = size[0]
+            width = size[1]
+            self.resize_image(height, width)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.document_type == LabDocument.LOGO:
+            self.create_all_images()
+
 
     # def __str__(self):
         # return self.name
