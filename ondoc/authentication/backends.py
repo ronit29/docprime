@@ -1,12 +1,13 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
 import jwt
-import datetime
+import datetime, calendar
 from django.conf import settings
 from rest_framework import authentication, exceptions
 from ondoc.authentication.models import UserSecretKey
 
 User = get_user_model()
+
 
 class AuthBackend(ModelBackend):
     def authenticate(self, username=None, password=None):
@@ -85,7 +86,6 @@ class JWTAuthentication(authentication.BaseAuthentication):
 
     @classmethod
     def jwt_payload_handler(cls, user):
-        import calendar
         return {
             'user_id': user.pk,
             'exp': datetime.datetime.utcnow() + settings.JWT_AUTH['JWT_EXPIRATION_DELTA'],
@@ -96,7 +96,6 @@ class JWTAuthentication(authentication.BaseAuthentication):
 
     @classmethod
     def appointment_agent_payload_handler(cls, request, created_user):
-        import calendar
         return {
             'agent_id': request.user.id,
             'user_id': created_user.pk,
@@ -116,4 +115,12 @@ class JWTAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed(msg)
 
         return unverified_payload.get('user_id', None)
+
+    @staticmethod
+    def generate_token(user):
+        user_key = UserSecretKey.objects.get_or_create(user=user)
+        payload = JWTAuthentication.jwt_payload_handler(user)
+        token = jwt.encode(payload, user_key[0].key)
+        return {'token': token,
+                'payload': payload}
 
