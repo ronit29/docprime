@@ -314,7 +314,7 @@ def payment_details(request, order):
         'name': profile.name,
         'txAmount': str(order.amount),
     }
-    if request.agent:
+    if hasattr(request, 'agent') and request.agent:
         pgdata["is_agent"] = True
     else:
         pgdata["is_agent"] = False
