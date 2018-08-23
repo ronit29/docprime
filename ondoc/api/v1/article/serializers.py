@@ -45,7 +45,8 @@ class ArticlePreviewSerializer(serializers.Serializer):
     url = serializers.CharField(required=True)
 
     def validate(self, data):
-        article_url, identifier = data.get('url').split('-')
+        url_keys = data.get('url').split('-')
+        article_url = "-".join(url_keys[:-1])
         data['url'] = article_url
         return data
 
