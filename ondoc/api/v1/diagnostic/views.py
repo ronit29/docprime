@@ -802,3 +802,48 @@ class LabReportFileViewset(mixins.CreateModelMixin,
             data=queryset, many=True, context={"request": request})
         serializer.is_valid()
         return Response(serializer.data)
+
+
+class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
+
+    def complete(self, request):
+        serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        lab_appointment = validated_data.get('lab_appointment')
+        if lab_appointment.lab.manageable_lab_admins.filter(user=request.user,
+                                                            is_disabled=False,
+                                                            write_permission=True).exists() or \
+                (lab_appointment.lab.network is not None and
+                 lab_appointment.lab.network.manageable_lab_network_admins.filter(
+                     user=request.user,
+                     is_disabled=False,
+                     write_permission=True).exists()):
+            lab_appointment.action_completed()
+            lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
+                                                                                                context={
+                                                                                                    'request': request})
+            return Response(lab_appointment_serializer.data)
+        else:
+            return Response({'msg': 'User is not allowed to complete this appointment.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+
+class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
+
+    def complete(self, request):
+        resp = {}
+        serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        lab_appointment = validated_data.get('lab_appointment')
+        if lab_appointment:
+            lab_appointment.action_completed()
+            lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
+                                                                                                    context={
+                                                                                                        'request': request})
+            resp = lab_appointment_serializer.data
+        return Response(resp)
+
