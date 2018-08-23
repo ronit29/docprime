@@ -241,10 +241,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                count=Count('id'),
                                                distance=Max(Distance('location', pnt)),
                                                name=Max('name')).filter(count__gte=len(ids)))
-            if min_price:
+            if min_price is not None:
                 queryset = queryset.filter(price__gte=min_price)
 
-            if max_price:
+            if max_price is not None:
                 queryset = queryset.filter(price__lte=max_price)
 
         else:
