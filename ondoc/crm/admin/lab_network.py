@@ -158,11 +158,12 @@ class GenericLabNetworkAdminFormSet(forms.BaseInlineFormSet):
         if current_lab_network_id:
             associated_labs = Lab.objects.filter(network=current_lab_network_id).prefetch_related('manageable_lab_admins')
             if associated_labs.exists():
-                admin_count = 0
+                is_lab_network_admin = False
                 for value in self.cleaned_data:
                     if value and not value['DELETE']:
-                        admin_count += 1
-                if admin_count > 0:
+                        is_lab_network_admin = True
+                        break
+                if is_lab_network_admin:
                     is_disabled_value = True
                 else:
                     is_disabled_value = False

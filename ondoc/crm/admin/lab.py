@@ -169,11 +169,12 @@ class GenericLabAdminFormSet(forms.BaseInlineFormSet):
         current_lab_network = self.instance.network
         if current_lab_network:
             if current_lab_network.manageable_lab_network_admins.all().exists():
-                active_admin = False
+                is_lab_admin_active = False
                 for value in self.cleaned_data:
                     if value and not value['DELETE'] and not value['is_disabled']:
-                        active_admin = True
-                if active_admin:
+                        is_lab_admin_active = True
+                        break
+                if is_lab_admin_active:
                     raise forms.ValidationError("This lab's network already has admin(s), so disable all admins of the lab.")
 
 
