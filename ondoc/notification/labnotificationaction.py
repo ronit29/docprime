@@ -89,14 +89,21 @@ class LabNotificationAction(NotificationAction):
         if notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             patient_name = instance.profile.name if instance.profile.name else ""
             lab_name = instance.lab.name.title() if instance.lab.name else ""
+            if instance.cancellation_type != instance.AUTO_CANCELLED:
+                body = "Appointment with Lab - {} at {}, {} has been cancelled as per your request.".format(
+                        lab_name, time_slot_start.strftime("%I:%M %P"),
+                        time_slot_start.strftime("%d/%m/%y")
+                )
+            else:
+                body = "Appointment with Lab - {} at {}, {} has due to unavailability of lab manager.".format(
+                        lab_name, time_slot_start.strftime("%I:%M %P"),
+                        time_slot_start.strftime("%d/%m/%y"))
             context = {
                 "patient_name": patient_name,
                 "lab_name": lab_name,
                 "instance": instance,
                 "title": "Appointment Cancelled",
-                "body": "Appointment with Lab - {} at {}, {} has been cancelled as per your request..".format(
-                    lab_name, time_slot_start.strftime("%I:%M %P"),
-                    time_slot_start.strftime("%d/%m/%y")),
+                "body": body,
                 "url": "/lab/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
