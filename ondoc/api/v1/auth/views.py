@@ -21,7 +21,8 @@ from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin)
+                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
+                                         AgentToken)
 from ondoc.notification.models import EmailNotification, SmsNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
