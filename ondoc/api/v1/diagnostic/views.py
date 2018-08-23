@@ -40,6 +40,7 @@ import copy
 import re
 import datetime
 from django.contrib.auth import get_user_model
+from decimal import Decimal
 User = get_user_model()
 
 
@@ -594,7 +595,7 @@ class LabTimingListView(mixins.ListModelMixin,
 
         if not for_home_pickup and lab_queryset.always_open:
             for day in range(0, 7):
-                obj.form_time_slots(day, 0.0, 23.45, None, True)
+                obj.form_time_slots(day, 0.0, 23.75, None, True)
         # New condition for home pickup timing from 7 to 7
         elif for_home_pickup:
             for day in range(0, 7):
@@ -650,11 +651,11 @@ class TimeSlotExtraction(object):
 
     def form_time_slots(self, day, start, end, price=None, is_available=True,
                         deal_price=None, mrp=None, is_doctor=False):
-        start = float(start)
-        end = float(end)
+        start = Decimal(str(start))
+        end = Decimal(str(end))
         time_span = self.TIME_SPAN
 
-        float_span = (time_span / 60)
+        float_span = (Decimal(time_span) / Decimal(60))
         if not self.timing[day].get('timing'):
             self.timing[day]['timing'] = dict()
             self.timing[day]['timing'][self.MORNING] = OrderedDict()
