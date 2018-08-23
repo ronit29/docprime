@@ -720,7 +720,6 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
-
         req_serializer = serializers.AddressCustomSerializer(data)
         serialized_req_data = req_serializer.data
 
@@ -731,16 +730,20 @@ class AddressViewsSet(viewsets.ModelViewSet):
         loc_position = validated_data.pop("locality_location")
         land_position = validated_data.pop("landmark_location")
         if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
-                locality_location__distance_lte=(loc_position, 100),
-                landmark_location__distance_lte=(land_position, 100)).exists():
+                locality_location__distance_lte=(loc_position, 0),
+                landmark_location__distance_lte=(land_position, 0)).exists():
             serializer.save()
         else:
-            address = Address.objects.filter(user=request.user).filter(**serializer.validated_data).first()
+            address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                locality_location__distance_lte=(loc_position, 0),
+                landmark_location__distance_lte=(land_position, 0)).first()
             serializer = serializers.AddressSerializer(address)
         return Response(serializer.data)
 
     def update(self, request, pk=None):
         data = {key: value for key, value in request.data.items()}
+        # req_serializer = serializers.AddressCustomSerializer(data)
+        # data = req_serializer.data
         data['user'] = request.user.id
         address = self.get_queryset().filter(pk=pk).first()
         if data.get("is_default"):
@@ -1285,13 +1288,9 @@ class OrderViewSet(GenericViewSet):
         product_id = order_obj.product_id
         resp["status"] = 1
         if product_id == Order.DOCTOR_PRODUCT_ID:
-            app_obj = DoctorAppointmentsViewSet()
-            resp['data'], resp["payment_required"] = app_obj.payment_details(request, appointment_details, product_id,
-                                                                             order_obj.id)
+            resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
         elif product_id == Order.LAB_PRODUCT_ID:
-            app_obj = LabAppointmentView()
-            resp['data'], resp["payment_required"] = app_obj.get_payment_details(request, appointment_details,
-                                                                                 product_id, order_obj.id)
+            resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
         return Response(resp)
 
 

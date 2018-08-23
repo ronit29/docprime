@@ -217,8 +217,8 @@ class AddressCustomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
         fields = ('type', 'address', 'land_mark', 'pincode', 'phone_number', 'is_default',
-                  'profile', 'locality_location', 'landmark_location',
-                  'landmark_place_id', 'locality_place_id', 'phone_number')
+                  'profile', 'locality_location', 'landmark_location', 'landmark_place_id',
+                  'locality_place_id', 'phone_number')
 
 
 class AddressSerializer(serializers.ModelSerializer):
