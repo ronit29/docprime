@@ -1269,19 +1269,8 @@ class OrderViewSet(GenericViewSet):
         if not order_obj:
             return Response(resp)
 
-        appointment_details = dict()
-        appointment_details["payable_amount"] = order_obj.amount
-        appointment_details["profile"] = UserProfile.objects.get(pk=order_obj.action_data.get("profile"))
-        product_id = order_obj.product_id
         resp["status"] = 1
-        if product_id == Order.DOCTOR_PRODUCT_ID:
-            app_obj = DoctorAppointmentsViewSet()
-            resp['data'], resp["payment_required"] = app_obj.payment_details(request, appointment_details, product_id,
-                                                                             order_obj.id)
-        elif product_id == Order.LAB_PRODUCT_ID:
-            app_obj = LabAppointmentView()
-            resp['data'], resp["payment_required"] = app_obj.get_payment_details(request, appointment_details,
-                                                                                 product_id, order_obj.id)
+        resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
         return Response(resp)
 
 
