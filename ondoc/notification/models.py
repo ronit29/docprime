@@ -197,14 +197,21 @@ class NotificationAction:
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
+            if instance.cancellation_type != instance.AUTO_CANCELLED:
+                body = "Appointment with Dr. {} at {}, {} has been cancelled as per your request.".format(
+                    doctor_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y")
+                )
+            else:
+                body = "Appointment with Dr. {} at {}, {} has been cancelled due to unavailability of doctor manager.".format(
+                    doctor_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y"))
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "Appointment Cancelled",
-                "body": "Appointment with Dr. {} at {}, {} has been cancelled as per your request..".format(
-                    doctor_name, time_slot_start.strftime("%I:%M %P"),
-                    time_slot_start.strftime("%d/%m/%y")),
+                "body": body,
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,

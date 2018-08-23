@@ -1,4 +1,4 @@
-from .models import NotificationAction, EmailNotification, SmsNotification
+from .models import NotificationAction, EmailNotification, SmsNotification, AppNotification, PushNotification
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import pytz
@@ -89,14 +89,21 @@ class LabNotificationAction(NotificationAction):
         if notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             patient_name = instance.profile.name if instance.profile.name else ""
             lab_name = instance.lab.name.title() if instance.lab.name else ""
+            if instance.cancellation_type != instance.AUTO_CANCELLED:
+                body = "Appointment with Lab - {} at {}, {} has been cancelled as per your request.".format(
+                        lab_name, time_slot_start.strftime("%I:%M %P"),
+                        time_slot_start.strftime("%d/%m/%y")
+                )
+            else:
+                body = "Appointment with Lab - {} at {}, {} has cancelled due to unavailability of lab manager.".format(
+                        lab_name, time_slot_start.strftime("%I:%M %P"),
+                        time_slot_start.strftime("%d/%m/%y"))
             context = {
                 "patient_name": patient_name,
                 "lab_name": lab_name,
                 "instance": instance,
                 "title": "Appointment Cancelled",
-                "body": "Appointment with Lab - {} at {}, {} has been cancelled as per your request..".format(
-                    lab_name, time_slot_start.strftime("%I:%M %P"),
-                    time_slot_start.strftime("%d/%m/%y")),
+                "body": body,
                 "url": "/lab/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
@@ -123,6 +130,8 @@ class LabNotificationAction(NotificationAction):
 
     @classmethod
     def send_to_lab_managers(cls, instance, lab_manager, notification_type):
+        est = pytz.timezone(settings.TIME_ZONE)
+        time_slot_start = instance.time_slot_start.astimezone(est)
         if notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED:
             patient_name = instance.profile.name if instance.profile.name else ""
             lab_name = instance.lab.name.title() if instance.lab.name else ""
@@ -130,6 +139,10 @@ class LabNotificationAction(NotificationAction):
                 "patient_name": patient_name,
                 "lab_name": lab_name,
                 "instance": instance,
+                "title": "New Appointment",
+                "body": "New appointment for {} at {}, {}. Please confirm.".format(
+                    patient_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y")),
                 "url": "/lab/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
@@ -137,8 +150,12 @@ class LabNotificationAction(NotificationAction):
             }
             EmailNotification.send_to_manager(email=lab_manager.email, notification_type=notification_type,
                                               context=context)
-            SmsNotification.send_to_manager(phone_number=lab_manager.number, notification_type=notification_type,
+            SmsNotification.send_to_manager(phone_number=lab_manager.phone_number, notification_type=notification_type,
                                             context=context)
+            AppNotification.send_notification(user=lab_manager, notification_type=notification_type,
+                                              context=context)
+            PushNotification.send_notification(user=lab_manager, notification_type=notification_type,
+                                               context=context)
         if notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT:
             patient_name = instance.profile.name if instance.profile.name else ""
             lab_name = instance.lab.name.title() if instance.lab.name else ""
@@ -147,6 +164,8 @@ class LabNotificationAction(NotificationAction):
                 "lab_name": lab_name,
                 "id": instance.id,
                 "instance": instance,
+                "title": "Appointment Reschedule",
+                "body": "Reschedule request received for the appointment with Lab - {}".format(lab_name),
                 "url": "/lab/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
@@ -154,8 +173,12 @@ class LabNotificationAction(NotificationAction):
             }
             EmailNotification.send_to_manager(email=lab_manager.email, notification_type=notification_type,
                                               context=context)
-            SmsNotification.send_to_manager(phone_number=lab_manager.number, notification_type=notification_type,
+            SmsNotification.send_to_manager(phone_number=lab_manager.phone_number, notification_type=notification_type,
                                             context=context)
+            AppNotification.send_notification(user=lab_manager, notification_type=notification_type,
+                                              context=context)
+            PushNotification.send_notification(user=lab_manager, notification_type=notification_type,
+                                               context=context)
             return
 
         if notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED:
@@ -165,6 +188,10 @@ class LabNotificationAction(NotificationAction):
                 "patient_name": patient_name,
                 "lab_name": lab_name,
                 "instance": instance,
+                "title": "Appointment Cancelled",
+                "body": "Appointment with {} at {}  {} has been cancelled.".format(
+                    patient_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y")),
                 "url": "/lab/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.LAB_APPOINTMENT,
                 "action_id": instance.id,
@@ -172,6 +199,10 @@ class LabNotificationAction(NotificationAction):
             }
             EmailNotification.send_to_manager(email=lab_manager.email, notification_type=notification_type,
                                               context=context)
-            SmsNotification.send_to_manager(phone_number=lab_manager.number, notification_type=notification_type,
+            SmsNotification.send_to_manager(phone_number=lab_manager.phone_number, notification_type=notification_type,
                                             context=context)
+            AppNotification.send_notification(user=lab_manager, notification_type=notification_type,
+                                              context=context)
+            PushNotification.send_notification(user=lab_manager, notification_type=notification_type,
+                                               context=context)
 
