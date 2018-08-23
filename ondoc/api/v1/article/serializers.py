@@ -5,39 +5,50 @@ from ondoc.articles.models import ArticleCategory
 
 class ArticleRetrieveSerializer(serializers.ModelSerializer):
 
-    icon = serializers.SerializerMethodField
+    icon = serializers.SerializerMethodField()
+    seo = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
+        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') else None
+
+    def get_seo(self, obj):
+        request = self.context.get('request')
+        return {'description': obj.description, 'keywords': obj.keywords,
+                'headerImage': request.build_absolute_uri(obj.header_image.url), 'title': obj.title}
 
     class Meta:
         model = Article
-        fields = ('title', 'url', 'body', 'icon', 'id', 'description', 'keywords', 'header_image')
+        fields = ('title', 'url', 'body', 'icon', 'id', 'seo')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
 
-    icon = serializers.SerializerMethodField
+    icon = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
+        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') else None
 
     def get_url(self, obj):
-        request = self.context.get('request')
         category = self.context.get('category')
-        return request.build_absolute_uri('%s-%s' % (obj.url, category.identifier))\
-            if (hasattr(obj, 'url') and hasattr(category, 'identifier')) else None
+        return '%s-%s' % (obj.url, category.identifier) if (hasattr(obj, 'url') and hasattr(category, 'identifier')) else None
 
     class Meta:
         model = Article
-        fields = ('title', 'url', 'icon', 'id')
+        fields = ('title', 'url', 'icon')
 
 
 class ArticlePreviewSerializer(serializers.Serializer):
     preview = serializers.BooleanField(required=False)
+    url = serializers.CharField(required=True)
+
+    def validate(self, data):
+        article_url, identifier = data.get('url').split('-')
+        data['url'] = article_url
+        return data
+
 
 
 class ArticleCategoryListSerializer(serializers.ModelSerializer):

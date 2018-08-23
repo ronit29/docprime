@@ -24,30 +24,27 @@ class ArticleViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
         category_url = request.GET.get('categoryUrl', None)
-        resp = []
         if not category_url:
+            return Response({"error": "Invalid Parameter: categoryUrl"}, status=status.HTTP_400_BAD_REQUEST)
+
+        category_list = article_models.ArticleCategory.objects.filter(url=category_url)
+        if not len(category_list) > 0:
             return Response([])
-        categories = article_models.ArticleCategory.objects.filter(url=category_url).prefetch_related('articles').distinct()
-        for category in categories.all():
-            if category.articles:
-                article_data = []
-                for article in category.articles.all():
-                    if article.is_published:
-                        article_data.append(article)
-                cat_data = {}
-                if article_data:
-                    cat_data['title'] = category.name
-                    cat_data['data'] = serializers.ArticleListSerializer(article_data, many=True,
-                                                                 context={'request': request, 'category': category}).data
-                    resp.append(cat_data)
+
+        category = category_list[0]
+        articles = category.articles.all()
+        article_data = list(filter(lambda article: article.is_published, articles))
+
+        resp = serializers.ArticleListSerializer(article_data, many=True,
+                                                             context={'request': request, 'category': category}).data
         return Response(resp)
 
-    def retrieve(self, request, pk=None):
-        response = {}
-        queryset = self.get_queryset().filter(pk=pk)
+    def retrieve(self, request):
         serializer = serializers.ArticlePreviewSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         preview = serializer.validated_data.get('preview')
+        article_url = serializer.validated_data.get('url')
+        queryset = self.get_queryset().filter(url=article_url)
         if not preview:
             queryset = queryset.filter(is_published=True)
         if queryset.exists():
