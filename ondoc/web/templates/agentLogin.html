@@ -27,7 +27,7 @@ Agent Login
                     {% csrf_token %}
 
                     <div class="form-group">
-                        <label for="phoneNumber">Email address:</label>
+                        <label for="phoneNumber">User Phone Number:</label>
                         <input type="number" name="phone_number" min="7000000000" max="9999999999" class="form-control" id="phoneNumber" required>
                     </div>
                     <button type="submit" class="btn btn-default">Submit</button>
@@ -95,7 +95,6 @@ Agent Login
 
                 $('#agent_login_form').submit(function() {
                     var phoneNumber = $('#phoneNumber').val();
-                    console.log('in');
                     $.ajax({
                       url:  "{{apiDomain}}",
                       type: 'POST',

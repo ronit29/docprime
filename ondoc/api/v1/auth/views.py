@@ -1338,13 +1338,14 @@ class SendBookingUrlViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, )
 
-    def send_booking_url(self, request):
+    def send_booking_url(self, request, order_id):
         type = request.data.get('type')
-        order_id = request.data.get('order_id')
+        #order_id = request.data.get('order_id')
         agent_token = AgentToken.objects.create_token(user=request.user)
         booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
                                                        phone_number=request.user.phone_number)
-        return Response({"booking_url": booking_url})
+        #return Response({"booking_url": booking_url})
+        return Response({"status": 1})
 
 
 class OrderDetailViewSet(GenericViewSet):
@@ -1352,8 +1353,8 @@ class OrderDetailViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     serializer_class = serializers.OrderDetailDoctorSerializer
 
-    def details(self, request):
-        order_id = request.query_params.get("order_id")
+    def details(self, request, order_id):
+        #order_id = request.query_params.get("order_id")
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         queryset = Order.objects.filter(id=order_id, action_data__user=request.user.id).first()
@@ -1361,10 +1362,10 @@ class OrderDetailViewSet(GenericViewSet):
             return Response([])
         resp = None
         if queryset.product_id == Order.DOCTOR_PRODUCT_ID:
-            serializer = serializers.OrderDetailDoctorSerializer(queryset, context={"request": request})
+            serializer = serializers.OrderDetailDoctorSerializer(queryset)
             resp = serializer.data
         elif queryset.product_id == Order.LAB_PRODUCT_ID:
-            serializer = serializers.OrderDetailLabSerializer(queryset, context={"request": request})
+            serializer = serializers.OrderDetailLabSerializer(queryset)
             resp = serializer.data
         return Response(resp)
 
@@ -1381,4 +1382,6 @@ class UserTokenViewSet(GenericViewSet):
             user_key = UserSecretKey.objects.get_or_create(user=agent_token.user)
             payload = JWTAuthentication.jwt_payload_handler(agent_token.user)
             token = jwt.encode(payload, user_key[0].key)
-            return Response({"token": token})
+            return Response({"status" : 1,"token": token})
+        else:
+            return Response({"status": 0})

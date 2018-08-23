@@ -210,7 +210,7 @@ class IsDoctor(permissions.BasePermission):
 
 
 class IsNotAgent(permissions.BasePermission):
-    message = 'Agent is not allowed to perform action only.'
+    message = 'Agent is not allowed to perform this action.'
 
     def has_permission(self, request, view):
         if hasattr(request, 'agent') and request.agent is not None:

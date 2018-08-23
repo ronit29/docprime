@@ -19,10 +19,10 @@ def userlogin_via_agent(request):
         data = serializer.validated_data
         user = User.objects.filter(phone_number=data['phone_number'], user_type=User.CONSUMER).first()
         if not user:
-            user = User.objects.get_or_create(phone_number=data['phone_number'],
-                                              is_phone_number_verified=True,
+            user = User.objects.create(phone_number=data['phone_number'],
+                                              is_phone_number_verified=False,
                                               user_type=User.CONSUMER)
-            user = user[0]
+
 
         user_key = UserSecretKey.objects.get_or_create(user=user)
         payload = JWTAuthentication.appointment_agent_payload_handler(request, user)

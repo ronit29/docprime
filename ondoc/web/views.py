@@ -47,8 +47,8 @@ def howitworks_page(request):
 
 
 def user_appointment_via_agent(request):
-    api_domain = '%s%s' % (settings.BASE_URL, '/api/v1/admin/agent/user/appointment')
-    appDomain = 'https://%s%s' % (settings.CONSUMER_APP_DOMAIN, '/agent/login')
+    api_domain = '%s%s' % (settings.API_BASE_URL, '/api/v1/admin/agent/user/login')
+    appDomain = '%s%s' % (settings.CONSUMER_APP_DOMAIN, '/agent/login')
     return render(request, 'agentLogin.html', {'apiDomain': api_domain, 'appDomain': appDomain})
 
 
