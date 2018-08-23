@@ -15,11 +15,11 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     def get_seo(self, obj):
         request = self.context.get('request')
         return {'description': obj.description, 'keywords': obj.keywords,
-                'headerImage': request.build_absolute_uri(obj.header_image.url), 'title': obj.title}
+                'image': request.build_absolute_uri(obj.header_image.url), 'title': obj.title}
 
     class Meta:
         model = Article
-        fields = ('title', 'url', 'body', 'icon', 'id', 'seo')
+        fields = ('title', 'url', 'body', 'icon', 'id', 'seo', 'header_image')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
