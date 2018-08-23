@@ -579,7 +579,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
 
-        if request.agent:
+        if hasattr(request, 'agent') and request.agent:
             balance = 0
 
         if balance + appointment_details.effective_price >= new_appointment_details.get('effective_price'):

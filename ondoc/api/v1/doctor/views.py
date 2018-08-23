@@ -283,10 +283,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         account_models.Order.disable_pending_orders(temp_app_details, product_id,
                                                     account_models.Order.OPD_APPOINTMENT_CREATE)
 
-        if request.agent:
+        if hasattr(request, 'agent') and request.agent:
             balance = 0
-        if ((appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
-             balance < appointment_details.get("effective_price")) or request.agent):
+
+        if (appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
+             balance < appointment_details.get("effective_price")):
 
             payable_amount = appointment_details.get("effective_price") - balance
 

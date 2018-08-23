@@ -497,10 +497,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
         account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
                                                     account_models.Order.LAB_APPOINTMENT_CREATE)
 
-        if request.agent:
+        if hasattr(request, 'agent') and request.agent:
             balance = 0
-        if ((appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
-                balance < appointment_details.get("effective_price")) or request.agent):
+
+        if (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
+                balance < appointment_details.get("effective_price")):
 
             payable_amount = appointment_details.get("effective_price") - balance
 
@@ -517,7 +518,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp['data'], resp['payment_required'] = payment_details(request, order)
             # resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id,order.id)
         else:
-
             lab_appointment = LabAppointment.create_appointment(appointment_details)
             if appointment_details["payment_type"] == doctor_model.OpdAppointment.PREPAID:
                 user_account_data = {
