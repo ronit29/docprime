@@ -95,7 +95,7 @@ class LabNotificationAction(NotificationAction):
                         time_slot_start.strftime("%d/%m/%y")
                 )
             else:
-                body = "Appointment with Lab - {} at {}, {} has due to unavailability of lab manager.".format(
+                body = "Appointment with Lab - {} at {}, {} has cancelled due to unavailability of lab manager.".format(
                         lab_name, time_slot_start.strftime("%I:%M %P"),
                         time_slot_start.strftime("%d/%m/%y"))
             context = {
