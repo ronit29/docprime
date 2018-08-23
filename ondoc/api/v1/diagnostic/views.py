@@ -322,7 +322,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     serializer_class = diagnostic_serializer.LabAppointmentModelSerializer
     authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated, IsDoctor, )
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('profile', 'lab',)
 
