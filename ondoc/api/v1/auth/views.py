@@ -727,7 +727,12 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        serializer = serializers.AddressSerializer(data=data, context={"request": request})
+
+        req_serializer = serializers.AddressCustomSerializer(data)
+        serialized_req_data = req_serializer.data
+
+        serializer = serializers.AddressSerializer(data=serialized_req_data, context={"request": request})
+        # serializer = serializers.AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         if not Address.objects.filter(user=request.user).filter(**serializer.validated_data).exists():
             serializer.save()
