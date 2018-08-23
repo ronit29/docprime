@@ -300,8 +300,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             )
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
-            resp['data'], resp["payment_required"] = payment_details(request, order)
-            # resp['data'], resp["payment_required"] = self.payment_details(request, appointment_details, product_id, order.id)
+            # resp['data'], resp["payment_required"] = payment_details(request, order)
+            resp['data'], resp["payment_required"] = self.payment_details(request, appointment_details, product_id, order.id)
 
         else:
             opd_obj = models.OpdAppointment.create_appointment(appointment_details)
@@ -317,6 +317,35 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp["payment_required"] = False
             resp["data"] = {"id": opd_obj.id, "type": serializers.OpdAppointmentSerializer.DOCTOR_TYPE}
         return resp
+
+    def payment_details(self, request, appointment_details, product_id, order_id):
+        payment_required = True
+        user = request.user
+        if user.email:
+            uemail = user.email
+        else:
+            uemail = "dummyemail@docprime.com"
+        base_url = "https://{}".format(request.get_host())
+        surl = base_url + '/api/v1/user/transaction/save'
+        furl = base_url + '/api/v1/user/transaction/save'
+
+        pgdata = {
+            'custId': user.id,
+            'mobile': user.phone_number,
+            'email': uemail,
+            'productId': product_id,
+            'surl': surl,
+            'furl': furl,
+            'referenceId': "",
+            'orderId': order_id,
+            'name': appointment_details['profile'].name,
+            'txAmount': str(appointment_details['payable_amount']),
+
+        }
+
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P1,
+                                                                     settings.PG_CLIENT_KEY_P1)
+        return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
         # Check if appointment can be covered under insurance

@@ -515,8 +515,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
-            resp['data'], resp['payment_required'] = payment_details(request, order)
-            # resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id,order.id)
+            # resp['data'], resp['payment_required'] = payment_details(request, order)
+            resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id, order.id)
         else:
             lab_appointment = LabAppointment.create_appointment(appointment_details)
             if appointment_details["payment_type"] == doctor_model.OpdAppointment.PREPAID:
@@ -531,6 +531,30 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp["data"] = {"id": lab_appointment.id,
                             "type": diagnostic_serializer.LabAppointmentModelSerializer.LAB_TYPE}
         return resp
+
+    def get_payment_details(self, request, appointment_details, product_id, order_id):
+        pgdata = dict()
+        payment_required = True
+        user = request.user
+        pgdata['custId'] = user.id
+        pgdata['mobile'] = user.phone_number
+        pgdata['email'] = user.email
+        if not user.email:
+            pgdata['email'] = "dummy_appointment@policybazaar.com"
+
+        pgdata['productId'] = product_id
+        base_url = "https://{}".format(request.get_host())
+        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['appointmentId'] = ""
+        pgdata['orderId'] = order_id
+        pgdata['name'] = appointment_details["profile"].name
+        pgdata['txAmount'] = str(appointment_details['payable_amount'])
+
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P2,
+                                                                     settings.PG_CLIENT_KEY_P2)
+
+        return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
         # Check if appointment can be covered under insurance
