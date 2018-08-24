@@ -63,33 +63,6 @@ class OndocViewSet(mixins.CreateModelMixin,
     pass
 
 
-class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated, IsDoctor)
-
-    def complete(self, request):
-        serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        lab_appointment = validated_data.get('lab_appointment')
-        if lab_appointment.lab.manageable_lab_admins.filter(user=request.user,
-                                                            is_disabled=False,
-                                                            write_permission=True).exists() or \
-                (lab_appointment.lab.network is not None and
-                 lab_appointment.lab.network.manageable_lab_network_admins.filter(
-                     user=request.user,
-                     is_disabled=False,
-                     write_permission=True).exists()):
-            lab_appointment.action_completed()
-            lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
-                                                                                                context={
-                                                                                                    'request': request})
-            return Response(lab_appointment_serializer.data)
-        else:
-            return Response({'msg': 'User is not allowed to complete this appointment.'},
-                            status=status.HTTP_401_UNAUTHORIZED)
-
-
 class DoctorAppointmentsViewSet(OndocViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
@@ -282,8 +255,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         account_models.Order.disable_pending_orders(temp_app_details, product_id,
                                                     account_models.Order.OPD_APPOINTMENT_CREATE)
-
+        resp['is_agent'] = False
         if hasattr(request, 'agent') and request.agent:
+            resp['is_agent'] = True
             balance = 0
 
         if (appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
@@ -317,6 +291,35 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp["payment_required"] = False
             resp["data"] = {"id": opd_obj.id, "type": serializers.OpdAppointmentSerializer.DOCTOR_TYPE}
         return resp
+
+    def payment_details(self, request, appointment_details, product_id, order_id):
+        payment_required = True
+        user = request.user
+        if user.email:
+            uemail = user.email
+        else:
+            uemail = "dummyemail@docprime.com"
+        base_url = "https://{}".format(request.get_host())
+        surl = base_url + '/api/v1/user/transaction/save'
+        furl = base_url + '/api/v1/user/transaction/save'
+
+        pgdata = {
+            'custId': user.id,
+            'mobile': user.phone_number,
+            'email': uemail,
+            'productId': product_id,
+            'surl': surl,
+            'furl': furl,
+            'referenceId': "",
+            'orderId': order_id,
+            'name': appointment_details['profile'].name,
+            'txAmount': str(appointment_details['payable_amount']),
+
+        }
+
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P1,
+                                                                     settings.PG_CLIENT_KEY_P1)
+        return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
         # Check if appointment can be covered under insurance

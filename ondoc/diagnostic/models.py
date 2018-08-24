@@ -499,6 +499,47 @@ class AvailableLabTest(TimeStampedModel):
     def get_type(self):
         return self.test.test_type
 
+    def save(self, *args, **kwargs):
+        if self.mrp:
+            self.computed_deal_price = self.get_computed_deal_price()
+            self.computed_agreed_price = self.get_computed_agreed_price()
+        super(AvailableLabTest, self).save(*args, **kwargs)
+
+    def get_computed_deal_price(self):
+        if self.test.test_type == LabTest.RADIOLOGY:
+            deal_percent = self.lab_pricing_group.radiology_deal_price_percentage if self.lab_pricing_group.radiology_deal_price_percentage else None
+        else:
+            deal_percent = self.lab_pricing_group.pathology_deal_price_percentage if self.lab_pricing_group.pathology_deal_price_percentage else None
+        mrp = decimal.Decimal(self.mrp)
+        computed_agreed_price = self.computed_agreed_price
+        if deal_percent is not None:
+            price = math.ceil(mrp * (deal_percent / 100))
+            # ceil to next 10 and subtract 1 so it end with a 9
+            price = math.ceil(price / 10.0) * 10 - 1
+            if price > mrp:
+                price = mrp
+            if computed_agreed_price is not None:
+                if price < computed_agreed_price:
+                    price = computed_agreed_price
+            return price
+        else:
+            return None
+
+    def get_computed_agreed_price(self):
+        if self.test.test_type == LabTest.RADIOLOGY:
+            agreed_percent = self.lab_pricing_group.radiology_agreed_price_percentage if self.lab_pricing_group.radiology_agreed_price_percentage else None
+        else:
+            agreed_percent = self.lab_pricing_group.pathology_agreed_price_percentage if self.lab_pricing_group.pathology_agreed_price_percentage else None
+        mrp = decimal.Decimal(self.mrp)
+
+        if agreed_percent is not None:
+            price = math.ceil(mrp * (agreed_percent / 100))
+            if price > mrp:
+                price = mrp
+            return price
+        else:
+            return None
+
     # def __str__(self):
     #     return "{}".format(self.test.name)
 
@@ -584,6 +625,14 @@ class LabAppointment(TimeStampedModel):
                 and self.status in [LabAppointment.RESCHEDULED_LAB, LabAppointment.RESCHEDULED_PATIENT]):
             return True
         return False
+
+    def get_lab_admins(self):
+        if self.lab.network and self.lab.network.manageable_lab_network_admins.filter(is_disabled=False).exists():
+            return [admin.user for admin in self.lab.network.manageable_lab_network_admins.filter(is_disabled=False)
+                    if admin.user]
+        else:
+            return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
+                    if admin.user]
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()

@@ -52,13 +52,14 @@ class DoctorLoginSerializer(serializers.Serializer):
 
         if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.DOCTOR).exists():
             doctor_not_exists = admin_not_exists = False
+            lab_admin_not_exists = False
             if not DoctorMobile.objects.filter(number=attrs['phone_number'], is_primary=True).exists():
                 doctor_not_exists = True
             if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 admin_not_exists = True
             if not GenericLabAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
-                admin_not_exists = True
-            if doctor_not_exists and admin_not_exists:
+                lab_admin_not_exists = True
+            if doctor_not_exists and admin_not_exists and lab_admin_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
 
         return attrs        
@@ -290,13 +291,13 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             msg = _('orig_iat missing')
             raise serializers.ValidationError(msg)
 
-        new_payload = JWTAuthentication.jwt_payload_handler(user)
-        new_payload['orig_iat'] = orig_iat
+        token_object = JWTAuthentication.generate_token(user)
+        token_object['payload']['orig_iat'] = orig_iat
 
         return {
-            'token': jwt.encode(new_payload, settings.SECRET_KEY),
+            'token': token_object['token'],
             'user': user,
-            'payload': new_payload
+            'payload': token_object['payload']
         }
 
     def check_user_custom(self, payload):

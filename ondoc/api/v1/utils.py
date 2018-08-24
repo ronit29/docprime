@@ -315,14 +315,16 @@ def payment_details(request, order):
         'name': profile.name,
         'txAmount': str(order.amount),
     }
-    if hasattr(request, 'agent') and request.agent:
-        pgdata["is_agent"] = True
-    else:
-        pgdata["is_agent"] = False
+    secret_key = client_key = ""
     if order.product_id == Order.DOCTOR_PRODUCT_ID:
-        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P1, settings.PG_CLIENT_KEY_P1)
+        secret_key = settings.PG_SECRET_KEY_P1
+        client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:
-        pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P2, settings.PG_CLIENT_KEY_P2)
+        secret_key = settings.PG_SECRET_KEY_P2
+        client_key = settings.PG_CLIENT_KEY_P2
+
+    pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
+
     return pgdata, payment_required
 
 
@@ -332,3 +334,4 @@ def get_location(lat, long):
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
     return pnt
+

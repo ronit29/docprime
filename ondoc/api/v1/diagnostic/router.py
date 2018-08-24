@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet, LabTimingListView,
-                    AvailableTestViewSet, LabReportFileViewset)
+                    AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet, DoctorLabAppointmentsNoAuthViewSet)
 # from rest_framework.routers import DefaultRouter
 #
 # router = DefaultRouter()
@@ -34,4 +34,8 @@ urlpatterns = [
          name='lab-available-test'),
     path('lab-report-file', LabReportFileViewset.as_view({'get': 'list'}), name='lab-upload-list'),
     path('lab-report-file/upload', LabReportFileViewset.as_view({'post': 'create'}), name='upload-lab-prescription'),
+    path('labappointment/complete', DoctorLabAppointmentsViewSet.as_view({'post': 'complete'}),
+         name='lab-appointment-complete'),
+    path('appointment/complete', DoctorLabAppointmentsNoAuthViewSet.as_view({'post': 'complete'}),
+         name='appointment-complete'),
 ]

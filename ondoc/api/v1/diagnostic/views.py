@@ -40,6 +40,7 @@ import copy
 import re
 import datetime
 from django.contrib.auth import get_user_model
+from decimal import Decimal
 User = get_user_model()
 
 
@@ -125,7 +126,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing_data = list()
         if lab_obj:
             if lab_obj.always_open:
-                lab_timing = "7:00 AM - 7:00 PM"
+                lab_timing = "00:00 AM - 23:45 PM"
                 lab_timing_data = [{
                     "start": 7.0,
                     "end": 19.0
@@ -241,10 +242,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                count=Count('id'),
                                                distance=Max(Distance('location', pnt)),
                                                name=Max('name')).filter(count__gte=len(ids)))
-            if min_price:
+            if min_price is not None:
                 queryset = queryset.filter(price__gte=min_price)
 
-            if max_price:
+            if max_price is not None:
                 queryset = queryset.filter(price__lte=max_price)
 
         else:
@@ -496,9 +497,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
                                                     account_models.Order.LAB_APPOINTMENT_CREATE)
-
+        resp['is_admin'] = False
         if hasattr(request, 'agent') and request.agent:
             balance = 0
+            resp['is_admin'] = True
 
         if (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
                 balance < appointment_details.get("effective_price")):
@@ -516,7 +518,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
             resp['data'], resp['payment_required'] = payment_details(request, order)
-            # resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id,order.id)
+            # resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id, order.id)
         else:
             lab_appointment = LabAppointment.create_appointment(appointment_details)
             if appointment_details["payment_type"] == doctor_model.OpdAppointment.PREPAID:
@@ -531,6 +533,30 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp["data"] = {"id": lab_appointment.id,
                             "type": diagnostic_serializer.LabAppointmentModelSerializer.LAB_TYPE}
         return resp
+
+    def get_payment_details(self, request, appointment_details, product_id, order_id):
+        pgdata = dict()
+        payment_required = True
+        user = request.user
+        pgdata['custId'] = user.id
+        pgdata['mobile'] = user.phone_number
+        pgdata['email'] = user.email
+        if not user.email:
+            pgdata['email'] = "dummy_appointment@policybazaar.com"
+
+        pgdata['productId'] = product_id
+        base_url = "https://{}".format(request.get_host())
+        pgdata['surl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['furl'] = base_url + '/api/v1/user/transaction/save'
+        pgdata['appointmentId'] = ""
+        pgdata['orderId'] = order_id
+        pgdata['name'] = appointment_details["profile"].name
+        pgdata['txAmount'] = str(appointment_details['payable_amount'])
+
+        pgdata['hash'] = account_models.PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P2,
+                                                                     settings.PG_CLIENT_KEY_P2)
+
+        return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
         # Check if appointment can be covered under insurance
@@ -569,7 +595,7 @@ class LabTimingListView(mixins.ListModelMixin,
 
         if not for_home_pickup and lab_queryset.always_open:
             for day in range(0, 7):
-                obj.form_time_slots(day, 0.0, 23.45, None, True)
+                obj.form_time_slots(day, 0.0, 23.75, None, True)
         # New condition for home pickup timing from 7 to 7
         elif for_home_pickup:
             for day in range(0, 7):
@@ -625,11 +651,11 @@ class TimeSlotExtraction(object):
 
     def form_time_slots(self, day, start, end, price=None, is_available=True,
                         deal_price=None, mrp=None, is_doctor=False):
-        start = float(start)
-        end = float(end)
+        start = Decimal(str(start))
+        end = Decimal(str(end))
         time_span = self.TIME_SPAN
 
-        float_span = (time_span / 60)
+        float_span = (Decimal(time_span) / Decimal(60))
         if not self.timing[day].get('timing'):
             self.timing[day]['timing'] = dict()
             self.timing[day]['timing'][self.MORNING] = OrderedDict()
@@ -778,3 +804,48 @@ class LabReportFileViewset(mixins.CreateModelMixin,
             data=queryset, many=True, context={"request": request})
         serializer.is_valid()
         return Response(serializer.data)
+
+
+class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
+
+    def complete(self, request):
+        serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        lab_appointment = validated_data.get('lab_appointment')
+        if lab_appointment.lab.manageable_lab_admins.filter(user=request.user,
+                                                            is_disabled=False,
+                                                            write_permission=True).exists() or \
+                (lab_appointment.lab.network is not None and
+                 lab_appointment.lab.network.manageable_lab_network_admins.filter(
+                     user=request.user,
+                     is_disabled=False,
+                     write_permission=True).exists()):
+            lab_appointment.action_completed()
+            lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
+                                                                                                context={
+                                                                                                    'request': request})
+            return Response(lab_appointment_serializer.data)
+        else:
+            return Response({'msg': 'User is not allowed to complete this appointment.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+
+class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
+
+    def complete(self, request):
+        resp = {}
+        serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        lab_appointment = validated_data.get('lab_appointment')
+        if lab_appointment:
+            lab_appointment.action_completed()
+            lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
+                                                                                                    context={
+                                                                                                        'request': request})
+            resp = lab_appointment_serializer.data
+        return Response(resp)
+

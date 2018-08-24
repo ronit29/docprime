@@ -227,6 +227,7 @@ class UserViewset(GenericViewSet):
 
 class NotificationEndpointViewSet(GenericViewSet):
     serializer_class = serializers.NotificationEndpointSerializer
+    permission_classes = (IsNotAgent, )
 
     @transaction.atomic
     def save(self, request):
@@ -258,7 +259,7 @@ class NotificationEndpointViewSet(GenericViewSet):
 
 class NotificationViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, IsNotAgent)
 
     def list(self, request):
         queryset = paginate_queryset(queryset=Notification.objects.filter(user=request.user),
@@ -361,7 +362,7 @@ class OndocViewSet(mixins.CreateModelMixin,
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
-    authentication_classes = (JWTAuthentication , )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
 
     def get_queryset(self):
@@ -572,7 +573,9 @@ class UserAppointmentsViewSet(OndocViewSet):
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
 
+        resp["is_agent"] = False
         if hasattr(request, 'agent') and request.agent:
+            resp["is_agent"] = True
             balance = 0
 
         if balance + appointment_details.effective_price >= new_appointment_details.get('effective_price'):
