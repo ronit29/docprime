@@ -11,7 +11,6 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from ondoc.web.models import OnlineLead
 from django.contrib.auth import get_user_model
-from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
 from django.conf import settings
@@ -196,38 +195,12 @@ class UserPermissionSerializer(serializers.ModelSerializer):
         exclude = ('created_at', 'updated_at',)
 
 
-class AddressCustomSerializer(serializers.ModelSerializer):
-    locality_location = serializers.SerializerMethodField()
-    landmark_location = serializers.SerializerMethodField()
-
-    def get_locality_location(self, attrs):
-        pnt = None
-        if attrs.get("locality_long") is not None and attrs.get("locality_lat") is not None:
-            point_string = 'POINT(' + str(attrs.get("locality_long")) + ' ' + str(attrs.get("locality_lat")) + ')'
-            pnt = GEOSGeometry(point_string, srid=4326)
-        return pnt
-
-    def get_landmark_location(self, attrs):
-        pnt = None
-        if attrs.get("landmark_long") is not None and attrs.get("landmark_lat") is not None:
-            point_string = 'POINT(' + str(attrs.get("landmark_long")) + ' ' + str(attrs.get("landmark_lat")) + ')'
-            pnt = GEOSGeometry(point_string, srid=4326)
-        return pnt
-
-    class Meta:
-        model = Address
-        fields = ('type', 'address', 'land_mark', 'pincode', 'phone_number', 'is_default',
-                  'profile', 'locality_location', 'landmark_location', 'landmark_place_id',
-                  'locality_place_id', 'phone_number')
-
-
 class AddressSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Address
         fields = ('id', 'type', 'address', 'land_mark', 'pincode',
-                  'phone_number', 'is_default', 'profile', 'locality_location', 'landmark_location',
-                  'landmark_place_id', 'locality_place_id')
+                  'phone_number', 'is_default', 'profile', 'locality_name', 'landmark_name')
 
     def create(self, validated_data):
         request = self.context.get("request")

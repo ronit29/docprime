@@ -723,22 +723,19 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
         serializer = serializers.AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
 
-
-
-        req_serializer = serializers.AddressCustomSerializer(data)
-        serialized_req_data = req_serializer.data
-
-        serializer = serializers.AddressSerializer(data=serialized_req_data, context={"request": request})
-        serializer = serializers.AddressSerializer(data=data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        validated_data = copy.deepcopy(serializer.validated_data)
-        loc_position = validated_data.pop("locality_location")
-        land_position = validated_data.pop("landmark_location")
+        loc_position = utils.get_location(data.get('locality_lat'), data.get('locality_long'))
+        land_position = utils.get_location(data.get('landmark_lat'), data.get('landmark_long'))
+        resp = dict()
         if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
                 locality_location__distance_lte=(loc_position, 0),
                 landmark_location__distance_lte=(land_position, 0)).exists():
-            serializer.save()
+            validated_data["locality_location"] = loc_position
+            validated_data["landmark_location"] = land_position
+            validated_data['user'] = request.user
+            address = Address.objects.create(**validated_data)
+            serializer = serializers.AddressSerializer(address)
         else:
             address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
                 locality_location__distance_lte=(loc_position, 0),
@@ -748,30 +745,41 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
     def update(self, request, pk=None):
         data = {key: value for key, value in request.data.items()}
-        # req_serializer = serializers.AddressCustomSerializer(data)
-        # data = req_serializer.data
+        if data.get('locality_lat') is not None and data.get('locality_long') is not None:
+            data["locality_location"] = utils.get_location(data.get('locality_lat'), data.get('locality_long'))
+        if data.get('landmark_lat') is not None and data.get('landmark_long') is not None:
+            data["landmark_location"] = utils.get_location(data.get('landmark_lat'), data.get('landmark_long'))
         data['user'] = request.user.id
-        address = self.get_queryset().filter(pk=pk).first()
+        address = self.get_queryset().filter(pk=pk)
         if data.get("is_default"):
             add_default_qs = Address.objects.filter(user=request.user.id, is_default=True)
             if add_default_qs:
                 add_default_qs.update(is_default=False)
-        serializer = serializers.AddressSerializer(address, data=data, context={"request": request})
+        serializer = serializers.AddressSerializer(address.first(), data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        # New Code
+        if address:
+            address.update(**serializer.validated_data)
+            address = address.first()
+        else:
+            serializer.validated_data["user"] = request.user
+            address = Address.objects.create(**serializer.validated_data)
+        resp_serializer = serializers.AddressSerializer(address)
+        # Old One
+        # serializer.save()
+        return Response(resp_serializer.data)
 
     def destroy(self, request, pk=None):
         address = get_object_or_404(Address, pk=pk)
+        is_default_address = address.is_default
 
-        if address.is_default:
+        address.delete()
+
+        if is_default_address:
             temp_addr = Address.objects.filter(user=request.user.id).first()
             if temp_addr:
                 temp_addr.is_default = True
                 temp_addr.save()
-
-        # address = Address.objects.filter(pk=pk).first()
-        address.delete()
         return Response({
             "status": 1
         })

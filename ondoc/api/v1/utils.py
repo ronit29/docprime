@@ -11,6 +11,7 @@ import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
+from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
 from ondoc.crm.constants import constants
 import requests
@@ -323,3 +324,11 @@ def payment_details(request, order):
     elif order.product_id == Order.LAB_PRODUCT_ID:
         pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, settings.PG_SECRET_KEY_P2, settings.PG_CLIENT_KEY_P2)
     return pgdata, payment_required
+
+
+def get_location(lat, long):
+    pnt = None
+    if long is not None and lat is not None:
+        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+    return pnt

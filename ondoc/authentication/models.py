@@ -401,15 +401,24 @@ class Address(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, null=True, blank=True, on_delete=models.CASCADE)
     # place_id = models.CharField(null=True, blank=True, max_length=100)
-    landmark_place_id = models.CharField(null=True, blank=True, max_length=300)
     locality_place_id = models.CharField(null=True, blank=True, max_length=300)
     locality_location = geo_models.PointField(geography=True, srid=4326, blank=True, null=True)
+    locality_name = models.CharField(null=True, blank=True, max_length=300)
+    landmark_place_id = models.CharField(null=True, blank=True, max_length=300)
     landmark_location = geo_models.PointField(geography=True, srid=4326, blank=True, null=True)
+    landmark_name = models.CharField(null=True, blank=True, max_length=300)
     address = models.TextField(null=True, blank=True)
     land_mark = models.TextField(null=True, blank=True)
     pincode = models.PositiveIntegerField(null=True, blank=True)
     phone_number = models.CharField(null=True, blank=True, max_length=10)
     is_default = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.is_default:
+            if not Address.objects.filter(user=self.user).exists():
+                self.is_default = True
+        super().save(*args, **kwargs)
+        pass
 
     class Meta:
         db_table = "address"
