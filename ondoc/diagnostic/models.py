@@ -1037,21 +1037,21 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
     def __str__(self):
         return "{}-{}".format(self.id, self.report.id)
 
-    # def send_notification(self, database_instance):
-    #     appointment = self.prescription.appointment
-    #     if not appointment.user:
-    #         return
-    #     if not database_instance:
-    #         notification_models.NotificationAction.trigger(
-    #             instance=appointment,
-    #             user=appointment.user,
-    #             notification_type=notification_models.NotificationAction.PRESCRIPTION_UPLOADED,
-    #         )
+    def send_notification(self, database_instance):
+        appointment = self.report.appointment
+        if not appointment.user:
+            return
+        if not database_instance:
+            LabNotificationAction.trigger(
+                instance=appointment,
+                user=appointment.user,
+                notification_type=notification_models.NotificationAction.LAB_REPORT_UPLOADED,
+            )
 
     def save(self, *args, **kwargs):
         database_instance = LabReportFile.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
-        # self.send_notification(database_instance)
+        self.send_notification(database_instance)
 
     class Meta:
         db_table = "lab_report_file"

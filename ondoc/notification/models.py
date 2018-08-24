@@ -34,6 +34,7 @@ class NotificationAction:
     LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT = 22
     LAB_APPOINTMENT_RESCHEDULED_BY_LAB = 23
     LAB_APPOINTMENT_BOOKED = 24
+    LAB_REPORT_UPLOADED = 25
 
     PRESCRIPTION_UPLOADED = 6
     PAYMENT_PENDING = 7
@@ -49,11 +50,13 @@ class NotificationAction:
         (APPOINTMENT_RESCHEDULED_BY_DOCTOR, "Appointment Rescheduled by Doctor"),
         (APPOINTMENT_BOOKED, "Appointment Booked"),
 
+
         (LAB_APPOINTMENT_ACCEPTED, "Lab Appointment Accepted"),
         (LAB_APPOINTMENT_CANCELLED, "Lab Appointment Cancelled"),
         (LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT, "Lab Appointment Rescheduled by Patient"),
         (LAB_APPOINTMENT_RESCHEDULED_BY_LAB, "Lab Appointment Rescheduled by Lab"),
         (LAB_APPOINTMENT_BOOKED, "Lab Appointment Booked"),
+        (LAB_REPORT_UPLOADED, "Lab Report Uploaded"),
 
         (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
         (PAYMENT_PENDING, "Payment Pending"),
@@ -376,6 +379,9 @@ class EmailNotificationLabMixin:
         elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
             html_body = render_to_string("email/lab/appointment_cancelled_patient/body.html", context=context)
             email_subject = render_to_string("email/lab/appointment_cancelled_patient/subject.txt", context=context)
+        elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
+            html_body = render_to_string("email/lab/lab_report_uploaded/body.html", context=context)
+            email_subject = render_to_string("email/lab/lab_report_uploaded/subject.txt", context=context)
         elif notification_type == NotificationAction.LAB_INVOICE:
             invoice, created = account_model.Invoice.objects.get_or_create(reference_id=context.get("instance").id,
                                                                            product_id=account_model.Order.LAB_PRODUCT_ID)
@@ -552,6 +558,8 @@ class SmsNotificationLabMixin:
             html_body = render_to_string("sms/lab/appointment_rescheduled_lab_initiated_to_patient.txt", context=context)
         elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
             html_body = render_to_string("sms/lab/appointment_cancelled_patient.txt", context=context)
+        elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
+            html_body = render_to_string("sms/lab/lab_report_uploaded.txt", context=context)
         return html_body
 
 
