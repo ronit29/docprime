@@ -497,10 +497,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
                                                     account_models.Order.LAB_APPOINTMENT_CREATE)
-        resp['is_admin'] = False
+        resp['is_agent'] = False
         if hasattr(request, 'agent') and request.agent:
             balance = 0
-            resp['is_admin'] = True
+            resp['is_agent'] = True
 
         if (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
                 balance < appointment_details.get("effective_price")):
