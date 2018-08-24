@@ -1,7 +1,6 @@
 from config.settings.base import *
-import os
 import logging
-import raven
+
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 
