@@ -111,8 +111,16 @@ class LabImageInline(admin.TabularInline):
     max_num = 3
 
 
+class LabManagerFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+
 class LabManagerInline(admin.TabularInline):
     model = LabManager
+    formset = LabManagerFormSet
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
@@ -415,7 +423,23 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
         super().save_model(request, obj, form, change)
 
+    def save_related(self, request, form, formsets, change):
+        super(type(self), self).save_related(request, form, formsets, change)
+        lab = form.instance
+        lab_mgr_form_change = False
+        lab_mgr_new_len = lab_mgr_del_len = 0
+        for formset in formsets:
+            if isinstance(formset, LabManagerFormSet):
+                for form in formset.forms:
+                    if 'contact_type' in form.changed_data or 'number' in form.changed_data:
+                        lab_mgr_form_change = True
+                        break
+                lab_mgr_new_len = len(formset.new_objects)
+                lab_mgr_del_len = len(formset.deleted_objects)
 
+        if lab is not None:
+            if (lab_mgr_form_change or lab_mgr_new_len > 0 or lab_mgr_del_len > 0):
+                GenericLabAdmin.create_admin_permissions(lab)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(LabAdmin, self).get_form(request, obj=obj, **kwargs)

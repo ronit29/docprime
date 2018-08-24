@@ -251,12 +251,16 @@ class LabAward(TimeStampedModel):
 
 
 class LabManager(TimeStampedModel):
+    OTHER =1
+    SPOC = 2
+    MANAGER = 3
+    OWNER = 4
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
     number = models.BigIntegerField()
     email = models.EmailField(max_length=100, blank=True)
     details = models.CharField(max_length=200, blank=True)
-    CONTACT_TYPE_CHOICES = [(1, "Other"), (2, "Single Point of Contact"), (3, "Manager"), (4, "Owner")]
+    CONTACT_TYPE_CHOICES = [(OTHER, "Other"), (SPOC, "Single Point of Contact"), (MANAGER, "Manager"), (OWNER, "Owner")]
     contact_type = models.PositiveSmallIntegerField(
         choices=CONTACT_TYPE_CHOICES)
 
