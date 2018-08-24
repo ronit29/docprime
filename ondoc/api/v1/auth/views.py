@@ -904,13 +904,13 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                     if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
                         if appointment_obj:
-                            REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id)
+                            REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
                         elif order_obj:
                             REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
                                 order_obj.action_data.get("lab"), response.get('statusCode'))
                     elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                         if appointment_obj:
-                            REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id)
+                            REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
                         elif order_obj:
                             REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                        order_obj.action_data.get("hospital"),
