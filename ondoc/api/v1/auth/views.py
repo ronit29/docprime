@@ -227,6 +227,7 @@ class UserViewset(GenericViewSet):
 
 class NotificationEndpointViewSet(GenericViewSet):
     serializer_class = serializers.NotificationEndpointSerializer
+    permission_classes = (IsNotAgent, )
 
     @transaction.atomic
     def save(self, request):
@@ -258,7 +259,7 @@ class NotificationEndpointViewSet(GenericViewSet):
 
 class NotificationViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, IsNotAgent)
 
     def list(self, request):
         queryset = paginate_queryset(queryset=Notification.objects.filter(user=request.user),
@@ -1271,6 +1272,7 @@ class OrderViewSet(GenericViewSet):
         if not order_obj:
             return Response(resp)
 
+        resp["status"] = 1
         resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
         return Response(resp)
 
