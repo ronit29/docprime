@@ -151,7 +151,7 @@ class LabServiceInline(admin.TabularInline):
 
 class LabDoctorInline(admin.TabularInline):
     model = LabDoctor
-    #form = LabAwardForm
+    # form = LabAwardForm
     extra = 0
     can_delete = True
     show_change_link = False
@@ -159,8 +159,28 @@ class LabDoctorInline(admin.TabularInline):
 # class LabDocumentForm(forms.ModelForm):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
+
+class GenericLabAdminFormSet(forms.BaseInlineFormSet):
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        current_lab_network = self.instance.network
+        if current_lab_network:
+            if current_lab_network.manageable_lab_network_admins.all().exists():
+                is_lab_admin_active = False
+                for value in self.cleaned_data:
+                    if value and not value['DELETE'] and not value['is_disabled']:
+                        is_lab_admin_active = True
+                        break
+                if is_lab_admin_active:
+                    raise forms.ValidationError("This lab's network already has admin(s), so disable all admins of the lab.")
+
+
 class GenericLabAdminInline(admin.TabularInline):
     model = GenericLabAdmin
+    formset = GenericLabAdminFormSet
     extra = 0
     can_delete = True
     show_change_link = False
