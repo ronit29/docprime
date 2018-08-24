@@ -748,9 +748,9 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
     def update(self, request, pk=None):
         data = {key: value for key, value in request.data.items()}
-        if data.get('locality_location_lat') is not None and data.get('locality_location_long') is not None:
+        if data.get('locality_location_lat') and data.get('locality_location_long'):
             data["locality_location"] = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
-        if data.get('landmark_location_lat') is not None and data.get('landmark_location_long') is not None:
+        if data.get('landmark_location_lat') and data.get('landmark_location_long'):
             data["landmark_location"] = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
         data['user'] = request.user.id
         address = self.get_queryset().filter(pk=pk)

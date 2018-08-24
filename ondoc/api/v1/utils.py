@@ -330,7 +330,7 @@ def payment_details(request, order):
 
 def get_location(lat, long):
     pnt = None
-    if long is not None and lat is not None:
+    if long and lat:
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
     return pnt
