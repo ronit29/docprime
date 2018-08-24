@@ -1271,6 +1271,7 @@ class OrderViewSet(GenericViewSet):
         if not order_obj:
             return Response(resp)
 
+        resp["status"] = 1
         resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
         return Response(resp)
 
