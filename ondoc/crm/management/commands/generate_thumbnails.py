@@ -7,13 +7,20 @@ class Command(BaseCommand):
     help = 'Generate thumbnails'
 
     def handle(self, *args, **options):
+        count=0
         for di in DoctorImage.objects.filter(cropped_image__isnull=False):
                 try:
+                    count+=1
+                    print(count)
                     di.save()
                 except Exception as e:
                     print(str(e))
+
+        count=0            
         for ld in LabDocument.objects.filter(document_type=LabDocument.LOGO):
                 try:
+                    count+=1
+                    print(count)
                     ld.save()
                 except Exception as e:
                     print(str(e))
