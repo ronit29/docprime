@@ -8,6 +8,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, FileExt
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
 from rest_framework.exceptions import ValidationError as RestFrameworkValidationError
+from django.core.files.storage import get_storage_class
 from django.conf import settings
 from datetime import timedelta
 from dateutil import tz
@@ -293,6 +294,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def get_hospitals(self):
         return self.availability.all()
 
+    def get_thumbnail(self):
+        for image in self.images.all():
+            if image.cropped_image:
+                return image.get_thumbnail_path(image.cropped_image.url,'80x80')
+        # if self.images.all():
+        #     return self.images.all()[0].name.url
+        return None
+
     # @classmethod
     def update_live_status(self):
         if self.onboarding_status == self.ONBOARDED:
@@ -504,23 +513,63 @@ class DoctorHospital(auth_model.TimeStampedModel):
 
 
 class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
+    image_sizes = [(80, 80)]
+    image_base_path = 'doctor/images'
     doctor = models.ForeignKey(Doctor, related_name="images", on_delete=models.CASCADE)
     name = models.ImageField('Original Image Name',upload_to='doctor/images',height_field='height', width_field='width')
     cropped_image = models.ImageField(upload_to='doctor/images', height_field='height', width_field='width',
                                       blank=True, null=True)
 
-
     def __str__(self):
         return '{}'.format(self.doctor)
 
+    def resize_cropped_image(self, height, width):
+            if self.cropped_image.closed:
+                self.cropped_image.open()
+            with Img.open(self.cropped_image) as img:
+
+                default_storage_class = get_storage_class()
+                storage_instance = default_storage_class()
+
+                path = self.get_thumbnail_path(self.cropped_image.name,"{}x{}".format(height, width))
+                if storage_instance.exists(path):
+                    return
+
+                original_width, original_height = img.size
+                if original_width > original_height:
+                    ratio = width/float(original_width)
+                    height = int(float(original_height)*float(ratio))
+                else:
+                    ratio = height / float(original_height)
+                    width = int(float(original_width) * float(ratio))
+                img = img.resize(tuple([width, height]), Img.ANTIALIAS)
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+
+                new_image_io = BytesIO()
+                img.save(new_image_io, format='JPEG')
+                in_memory_file = InMemoryUploadedFile(new_image_io, None, os.path.basename(self.name.name), 'image/jpeg',
+                                                      new_image_io.tell(), None)
+                storage_instance.save(path, in_memory_file)
+
+
+    def create_all_images(self):
+        if not self.cropped_image:
+            return
+        for size in DoctorImage.image_sizes:
+            height = size[0]
+            width = size[1]
+            self.resize_cropped_image(height, width)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.create_all_images()
+
     def original_image(self):
-        return mark_safe('<div><img crossOrigin="anonymous" style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.name.url))
+        return mark_safe('<div><img crossOrigin="anonymous" style="max-width:300px; max-height:300px;" src="{0}"/></div>'.format(self.name.url))
 
     def cropped_img(self):
-        return mark_safe('<div><img style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.cropped_image.url))
-
-    class Meta:
-        db_table = "doctor_image"
+        return mark_safe('<div><img style="max-width:200px; max-height:200px;" src="{0}"/></div>'.format(self.cropped_image.url))
 
     def crop_image(self):
         if self.cropped_image:
@@ -546,7 +595,10 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
             img = Img.open(image_file)
             md5_hash = hashlib.md5(img.tobytes()).hexdigest()
             self.cropped_image.save(md5_hash + ".jpg", image_file, save=True)
-            self.save()
+            #self.save()
+
+    class Meta:
+        db_table = "doctor_image"
 
 
 class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):

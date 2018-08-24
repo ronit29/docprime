@@ -1,4 +1,4 @@
-from config.settings.production import *
+from config.settings.base import *
 API_ENABLED=True
 DEBUG = env.bool('DJANGO_DEBUG', default=False)
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['qa.panaceatechno.com', 'crmqa.panaceatechno.com', 'docqa.panaceatechno.com', 'qa.docprime.com', 'crmqa.docprime.com', 'docqa.docprime.com','liveqa.docprime.com','livecrm.docprime.com','local.docprime.com'])
