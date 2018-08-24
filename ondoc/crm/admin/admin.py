@@ -8,6 +8,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup)
 from ondoc.lead.models import HospitalLead, DoctorLead
+from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
@@ -87,3 +88,4 @@ admin.site.register(OpdAppointment, DoctorOpdAppointmentAdmin)
 admin.site.register(report_models.Report)
 admin.site.register(report_models.GeneratedReport, ReportAdmin)
 
+admin.site.register(ConsumerAccount)
