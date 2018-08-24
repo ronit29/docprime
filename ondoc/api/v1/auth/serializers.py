@@ -200,8 +200,9 @@ class AddressSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Address
-        fields = ('id', 'type', 'place_id', 'address', 'land_mark', 'pincode',
-                  'phone_number', 'is_default', 'profile')
+        fields = ('id', 'type', 'address', 'land_mark', 'pincode',
+                  'phone_number', 'is_default', 'profile', 'locality', 'landmark_location', 'locality_location',
+                  'landmark_place_id', 'locality_place_id')
 
     def create(self, validated_data):
         request = self.context.get("request")
