@@ -1,4 +1,5 @@
 from ondoc.notification import models
+from ondoc.api.v1.utils import IsNotAgent
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from ondoc.api.pagination import paginate_queryset
@@ -9,7 +10,7 @@ from . import serializers
 
 class AppNotificationViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.AppNotificationSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, IsNotAgent)
 
     @staticmethod
     def get_notification_ids_list(ids):

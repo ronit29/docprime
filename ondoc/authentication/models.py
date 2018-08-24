@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.contrib.gis.db import models as geo_models
 from django.db.models import Q, Prefetch
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
@@ -399,12 +400,22 @@ class Address(TimeStampedModel):
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, null=True, blank=True, on_delete=models.CASCADE)
-    place_id = models.CharField(null=True, blank=True, max_length=100)
+    locality_place_id = models.CharField(null=True, blank=True, max_length=400)
+    locality_location = geo_models.PointField(geography=True, srid=4326, blank=True, null=True)
+    locality = models.CharField(null=True, blank=True, max_length=400)
+    landmark_place_id = models.CharField(null=True, blank=True, max_length=400)
+    landmark_location = geo_models.PointField(geography=True, srid=4326, blank=True, null=True)
     address = models.TextField(null=True, blank=True)
     land_mark = models.TextField(null=True, blank=True)
     pincode = models.PositiveIntegerField(null=True, blank=True)
     phone_number = models.CharField(null=True, blank=True, max_length=10)
     is_default = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.is_default:
+            if not Address.objects.filter(user=self.user).exists():
+                self.is_default = True
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = "address"
