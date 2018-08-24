@@ -172,7 +172,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         all_documents = self.lab_documents.all()
         for document in all_documents:
             if document.document_type == LabDocument.LOGO:
-                return document.name.url
+                return document.get_thumbnail_path(document.name.url,'90x60')
         return None
         # return static('lab_images/lab_default.png')
 
@@ -896,7 +896,7 @@ class LabDocument(TimeStampedModel, Document):
     CHEQUE = 5
     LOGO = 6
     EMAIL_CONFIRMATION = 9
-    image_sizes = [(80, 80), ]
+    image_sizes = [(90, 60), ]
     image_base_path = 'lab/images'
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
                (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO"),
@@ -915,14 +915,20 @@ class LabDocument(TimeStampedModel, Document):
         return self.name.name.endswith('.pdf')
 
     def resize_image(self, height, width):
-            with Img.open(self.name.path) as img:
+            with Img.open(self.name) as img:
+
                 default_storage_class = get_storage_class()
                 storage_instance = default_storage_class()
-                path = "{}/{}/{}x{}/".format(settings.MEDIA_ROOT, LabDocument.image_base_path, height, width)
-                if os.path.exists(path+os.path.basename(self.name.name)):
+
+                path = self.get_thumbnail_path(self.name.name,"{}x{}".format(height, width))
+                if storage_instance.exists(path):
                     return
-                if not os.path.exists(path):
-                    os.mkdir(path)
+
+                #path = "{}/{}/{}x{}/".format(settings.MEDIA_ROOT, LabDocument.image_base_path, height, width)
+                # if os.path.exists(path+os.path.basename(self.name.name)):
+                #     return
+                # if not os.path.exists(path):
+                #     os.mkdir(path)
                 original_width, original_height = img.size
                 if original_width > original_height:
                     ratio = width/float(original_width)
@@ -937,7 +943,8 @@ class LabDocument(TimeStampedModel, Document):
                 img.save(new_image_io, format='JPEG')
                 in_memory_file = InMemoryUploadedFile(new_image_io, None, os.path.basename(self.name.name), 'image/jpeg',
                                                       new_image_io.tell(), None)
-                storage_instance.save(path + os.path.basename(self.name.name), in_memory_file)
+                storage_instance.save(path, in_memory_file)
+                #storage_instance.save(path + os.path.basename(self.name.name), in_memory_file)
                 # img.save(path + os.path.basename(self.name.name), 'JPEG')
 
     def create_all_images(self):

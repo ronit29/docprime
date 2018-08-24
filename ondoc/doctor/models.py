@@ -297,9 +297,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def get_thumbnail(self):
         for image in self.images.all():
             if image.cropped_image:
-                return image.name.url
-        if self.images.all():
-            return self.images.all()[0].name.url
+                return image.get_thumbnail_path(image.cropped_image.url,'80x80')
+        # if self.images.all():
+        #     return self.images.all()[0].name.url
         return None
 
     # @classmethod
@@ -524,12 +524,17 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
         return '{}'.format(self.doctor)
 
     def resize_cropped_image(self, height, width):
-            with Img.open(self.cropped_image.path) as img:
-                path = "{}/{}/{}x{}/".format(settings.MEDIA_ROOT, DoctorImage.image_base_path, height, width)
-                if os.path.exists(path+os.path.basename(self.cropped_image.name)):
+            if self.cropped_image.closed:
+                self.cropped_image.open()
+            with Img.open(self.cropped_image) as img:
+
+                default_storage_class = get_storage_class()
+                storage_instance = default_storage_class()
+
+                path = self.get_thumbnail_path(self.cropped_image.name,"{}x{}".format(height, width))
+                if storage_instance.exists(path):
                     return
-                if not os.path.exists(path):
-                    os.mkdir(path)
+
                 original_width, original_height = img.size
                 if original_width > original_height:
                     ratio = width/float(original_width)
@@ -540,7 +545,13 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
                 img = img.resize(tuple([width, height]), Img.ANTIALIAS)
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
-                img.save(path + os.path.basename(self.cropped_image.name), 'JPEG')
+
+                new_image_io = BytesIO()
+                img.save(new_image_io, format='JPEG')
+                in_memory_file = InMemoryUploadedFile(new_image_io, None, os.path.basename(self.name.name), 'image/jpeg',
+                                                      new_image_io.tell(), None)
+                storage_instance.save(path, in_memory_file)
+
 
     def create_all_images(self):
         if not self.cropped_image:
@@ -554,16 +565,11 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
         super().save(*args, **kwargs)
         self.create_all_images()
 
-
-
     def original_image(self):
-        return mark_safe('<div><img crossOrigin="anonymous" style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.name.url))
+        return mark_safe('<div><img crossOrigin="anonymous" style="max-width:300px; max-height:300px;" src="{0}"/></div>'.format(self.name.url))
 
     def cropped_img(self):
-        return mark_safe('<div><img style="max-width:100px; max-height:100px;" src="{0}"/></div>'.format(self.cropped_image.url))
-
-    class Meta:
-        db_table = "doctor_image"
+        return mark_safe('<div><img style="max-width:200px; max-height:200px;" src="{0}"/></div>'.format(self.cropped_image.url))
 
     def crop_image(self):
         if self.cropped_image:
@@ -589,7 +595,10 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
             img = Img.open(image_file)
             md5_hash = hashlib.md5(img.tobytes()).hexdigest()
             self.cropped_image.save(md5_hash + ".jpg", image_file, save=True)
-            self.save()
+            #self.save()
+
+    class Meta:
+        db_table = "doctor_image"
 
 
 class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):
