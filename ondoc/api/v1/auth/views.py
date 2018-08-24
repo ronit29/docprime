@@ -725,8 +725,8 @@ class AddressViewsSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
-        loc_position = utils.get_location(data.get('locality_lat'), data.get('locality_long'))
-        land_position = utils.get_location(data.get('landmark_lat'), data.get('landmark_long'))
+        loc_position = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
+        land_position = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
         resp = dict()
         if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
                 locality_location__distance_lte=(loc_position, 0),
@@ -745,10 +745,10 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
     def update(self, request, pk=None):
         data = {key: value for key, value in request.data.items()}
-        if data.get('locality_lat') is not None and data.get('locality_long') is not None:
-            data["locality_location"] = utils.get_location(data.get('locality_lat'), data.get('locality_long'))
-        if data.get('landmark_lat') is not None and data.get('landmark_long') is not None:
-            data["landmark_location"] = utils.get_location(data.get('landmark_lat'), data.get('landmark_long'))
+        if data.get('locality_location_lat') is not None and data.get('locality_location_long') is not None:
+            data["locality_location"] = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
+        if data.get('landmark_location_lat') is not None and data.get('landmark_location_long') is not None:
+            data["landmark_location"] = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
         data['user'] = request.user.id
         address = self.get_queryset().filter(pk=pk)
         if data.get("is_default"):
@@ -765,8 +765,6 @@ class AddressViewsSet(viewsets.ModelViewSet):
             serializer.validated_data["user"] = request.user
             address = Address.objects.create(**serializer.validated_data)
         resp_serializer = serializers.AddressSerializer(address)
-        # Old One
-        # serializer.save()
         return Response(resp_serializer.data)
 
     def destroy(self, request, pk=None):
