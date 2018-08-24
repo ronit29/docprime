@@ -235,8 +235,19 @@ class NotificationAction:
                 "action_id": instance.id,
                 "image_url": ""
             }
+            if user.user_type == User.CONSUMER:
+                email = instance.profile.email
+
+                # send notification to default profile also
+                default_user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
+                if default_user_profile and (
+                        default_user_profile.id != instance.profile.id) and default_user_profile.email:
+                    EmailNotification.send_notification(user=user, notification_type=notification_type,
+                                                        email=default_user_profile.email, context=context)
+            else:
+                email = user.email
             EmailNotification.send_notification(user=user, notification_type=notification_type,
-                                                email=user.email, context=context)
+                                                email=email, context=context)
 
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
             patient_name = instance.profile.name if instance.profile.name else ""
