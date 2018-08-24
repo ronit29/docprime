@@ -32,6 +32,7 @@ from django.conf import settings
 from django.db.models import F
 import datetime
 import copy
+from ondoc.matrix.tasks import push_appointment_to_matrix
 import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 User = get_user_model()
