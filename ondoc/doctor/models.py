@@ -20,6 +20,7 @@ from ondoc.doctor.tasks import doc_app_auto_cancel
 from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
+from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from functools import reduce
@@ -867,7 +868,11 @@ class OpdAppointment(auth_model.TimeStampedModel):
                       (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                       (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
                       (COMPLETED, 'Completed')]
-
+    PATIENT_CANCELLED = 1
+    AGENT_CANCELLED = 2
+    AUTO_CANCELLED = 3
+    CANCELLATION_TYPE_CHOICES = [(PATIENT_CANCELLED, 'Patient Cancelled'), (AGENT_CANCELLED, 'Agent Cancelled'),
+                                 (AUTO_CANCELLED, 'Auto Cancelled')]
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
@@ -882,6 +887,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     mrp = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
     deal_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, default=None, null=False)
     status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
+    cancellation_type = models.PositiveSmallIntegerField(choices=CANCELLATION_TYPE_CHOICES, blank=True, null=True)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     otp = models.PositiveIntegerField(blank=True, null=True)
     # patient_status = models.PositiveSmallIntegerField(blank=True, null=True)
@@ -998,61 +1004,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
                        order_by("created_at").last())
         return consumer_tx.amount
 
-    def send_notification(self, database_instance):
-        doctor_admins = auth_model.GenericAdmin.get_appointment_admins(self)
-        if database_instance and database_instance.status == self.status:
-            return
-        if self.user and self.status == OpdAppointment.ACCEPTED:
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_ACCEPTED,
-            )
-        elif self.status == OpdAppointment.RESCHEDULED_PATIENT:
-            for admin in doctor_admins:
-                notification_models.NotificationAction.trigger(
-                    instance=self,
-                    user=admin,
-                    notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
-            if not self.user:
-                return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT)
-        elif self.status == OpdAppointment.RESCHEDULED_DOCTOR:
-            if not self.user:
-                return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR)
-        elif self.status == OpdAppointment.BOOKED:
-            for admin in doctor_admins:
-                notification_models.NotificationAction.trigger(
-                    instance=self,
-                    user=admin,
-                    notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED)
-        elif self.status == OpdAppointment.CANCELLED:
-            for admin in doctor_admins:
-                notification_models.NotificationAction.trigger(
-                    instance=self,
-                    user=admin,
-                    notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED)
-            if not self.user:
-                return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.APPOINTMENT_CANCELLED)
-        elif self.status == OpdAppointment.COMPLETED:
-            if not self.user:
-                return
-            notification_models.NotificationAction.trigger(
-                instance=self,
-                user=self.user,
-                notification_type=notification_models.NotificationAction.DOCTOR_INVOICE,
-            )
 
     def is_doctor_available(self):
         if DoctorLeave.objects.filter(start_date__lte=self.time_slot_start.date(),
@@ -1064,12 +1015,25 @@ class OpdAppointment(auth_model.TimeStampedModel):
             return False
         return True
 
+    def is_to_send_notification(self, database_instance):
+        if not database_instance:
+            return True
+        if database_instance.status != self.status:
+            return True
+        if (database_instance.status == self.status
+                and database_instance.time_slot_start != self.time_slot_start
+                and database_instance.status in [OpdAppointment.RESCHEDULED_DOCTOR, OpdAppointment.RESCHEDULED_PATIENT]
+                and self.status in [OpdAppointment.RESCHEDULED_DOCTOR, OpdAppointment.RESCHEDULED_PATIENT]):
+            return True
+        return False
+
     def save(self, *args, **kwargs):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
         super().save(*args, **kwargs)
-        self.send_notification(database_instance)
+        if self.is_to_send_notification(database_instance):
+            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=5)
         if not database_instance or database_instance.status != self.status:
             for e_id in settings.OPS_EMAIL_ID:
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
@@ -1083,13 +1047,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
                 }, ), countdown=countdown)
         except Exception as e:
             logger.error("Error in auto cancel flow - " + str(e))
-
-    def payment_confirmation(self, consumer_account, data, amount):
-        otp = random.randint(1000, 9999)
-        self.payment_status = OpdAppointment.PAYMENT_ACCEPTED
-        self.otp = otp
-        self.save()
-        consumer_account.debit_schedule(data, amount)
 
     def doc_payout_amount(self):
         amount = 0

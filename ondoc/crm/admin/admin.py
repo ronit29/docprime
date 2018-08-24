@@ -8,6 +8,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup)
 from ondoc.lead.models import HospitalLead, DoctorLead
+from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
@@ -24,9 +25,11 @@ from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
 from .report import ReportAdmin
 from ondoc.reports import models as report_models
+from ondoc.authentication.models import GenericLabAdmin
 
 from ondoc.web.models import OnlineLead, Career
 from django.contrib.auth import get_user_model
+
 User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
 
@@ -36,7 +39,6 @@ admin.site.site_header = 'Ondoc CRM'
 admin.site.site_title = 'Ondoc CRM'
 admin.site.site_url = None
 admin.site.index_title = 'CRM Administration'
-
 
 
 admin.site.register(OtpVerifications)
@@ -85,3 +87,5 @@ admin.site.register(notifcation_model.AppNotification, AppNotificationAdmin)
 admin.site.register(OpdAppointment, DoctorOpdAppointmentAdmin)
 admin.site.register(report_models.Report)
 admin.site.register(report_models.GeneratedReport, ReportAdmin)
+
+admin.site.register(ConsumerAccount)

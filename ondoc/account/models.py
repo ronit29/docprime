@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
-from ondoc.authentication.models import TimeStampedModel, User
+from ondoc.authentication.models import TimeStampedModel, User, UserProfile
 # from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction

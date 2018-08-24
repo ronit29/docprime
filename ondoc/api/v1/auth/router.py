@@ -3,9 +3,12 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     UserProfileViewSet, UserAppointmentsViewSet, AddressViewsSet,
                     TransactionViewSet, UserTransactionViewSet, UserIDViewSet, OrderHistoryViewSet,
                     HospitalDoctorAppointmentPermissionViewSet, HospitalDoctorBillingPermissionViewSet,
-                    OrderViewSet, ConsumerAccountRefundViewSet)
+                    OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken, OnlineLeadViewSet, UserLabViewSet,
+                    OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet)
 
 urlpatterns = [
+    path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
+    # path('api-token-verify/', RefreshJSONWebToken.as_view({'post': 'verify'}), name='token-verify'),
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
     # path('otp/verify', OTP.as_view({'post': 'verify'}), name='otp-verify'),
     path('login', UserViewset.as_view({'post': 'login'}), name='user-login'),
@@ -42,6 +45,11 @@ urlpatterns = [
     path('managebilling', HospitalDoctorBillingPermissionViewSet.as_view({"get": "list"}), name="hosp-doc-billing-permission"),
     path('pgdata/<int:pk>', OrderViewSet.as_view({"get": "retrieve"}), name="pg-order-detail"),
     path('refund', ConsumerAccountRefundViewSet.as_view({"post": "refund"}), name="consumer-refund"),
+    path('onlinelead/create', OnlineLeadViewSet.as_view({"post": "create"}), name='doctor-signup'),
+    path('manageablelabs', UserLabViewSet.as_view({"get": "list"}), name='user-manageable-labs'),
+    path('order/<int:order_id>/send', SendBookingUrlViewSet.as_view({"post": "send_booking_url"}), name='send-booking-url'),
+    path('order/<int:order_id>', OrderDetailViewSet.as_view({"get": "details"}), name='extract-order-detail'),
+    path('token/exchange', UserTokenViewSet.as_view({"get": "details"}), name='create-user-token'),
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
 ]

@@ -1,18 +1,19 @@
 from django.conf import settings
 from django.db import models
+from django.contrib.gis.db import models as geo_models
 from django.db.models import Q, Prefetch
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import JSONField
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
+from django.utils import timezone
 from PIL import Image as Img
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from io import BytesIO
 import math
 import os
 import hashlib
+import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
@@ -396,12 +397,22 @@ class Address(TimeStampedModel):
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     profile = models.ForeignKey(UserProfile, null=True, blank=True, on_delete=models.CASCADE)
-    place_id = models.CharField(null=True, blank=True, max_length=100)
+    locality_place_id = models.CharField(null=True, blank=True, max_length=400)
+    locality_location = geo_models.PointField(geography=True, srid=4326, blank=True, null=True)
+    locality = models.CharField(null=True, blank=True, max_length=400)
+    landmark_place_id = models.CharField(null=True, blank=True, max_length=400)
+    landmark_location = geo_models.PointField(geography=True, srid=4326, blank=True, null=True)
     address = models.TextField(null=True, blank=True)
     land_mark = models.TextField(null=True, blank=True)
     pincode = models.PositiveIntegerField(null=True, blank=True)
     phone_number = models.CharField(null=True, blank=True, max_length=10)
     is_default = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.is_default:
+            if not Address.objects.filter(user=self.user).exists():
+                self.is_default = True
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = "address"
@@ -530,6 +541,87 @@ class LabUserPermission(TimeStampedModel):
         # TODO PM - Logic to get admin for a particular User
 
 
+class GenericLabAdmin(TimeStampedModel):
+    APPOINTMENT = 1
+    BILLING = 2
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.CharField(max_length=10)
+    type_choices = ((APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
+    lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True,
+                                    on_delete=models.CASCADE,
+                                    related_name='manageable_lab_network_admins')
+    lab = models.ForeignKey("diagnostic.Lab", null=True, blank=True, on_delete=models.CASCADE,
+                            related_name='manageable_lab_admins')
+    permission_type = models.PositiveSmallIntegerField(max_length=20, choices=type_choices, default=APPOINTMENT)
+    is_disabled = models.BooleanField(default=False)
+    super_user_permission = models.BooleanField(default=False)
+    read_permission = models.BooleanField(default=False)
+    write_permission = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'generic_lab_admin'
+
+    def save(self, *args, **kwargs):
+        user = User.objects.filter(phone_number=self.phone_number, user_type=User.DOCTOR).first()
+        if user is not None:
+            self.user = user
+        super(GenericLabAdmin, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return "{}".format(self.phone_number)
+
+    @classmethod
+    def update_user_lab_admin(cls, phone_number):
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR)
+        if user.exists():
+            admin = GenericLabAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
+            if admin.exists():
+                admin.update(user=user.first())
+
+    @classmethod
+    def get_user_admin_obj(cls, user):
+        from ondoc.payout.models import Outstanding
+        access_list = []
+        permissions = (cls.objects.select_related('lab_network', 'lab').
+                           filter(user_id=user.id, permission_type=cls.BILLINNG, is_disabled=False).
+                           filter(Q(write_permission=True) | Q(read_permission=True)))
+        if permissions:
+            for permission in permissions:
+                if permission.lab_network and permission.lab_network.is_billing_enabled:
+                    access_list.append({'admin_obj': permission.lab_network,
+                                        'admin_level': Outstanding.LAB_NETWORK_LEVEL})
+                else:
+                    access_list.append({'admin_obj': permission.lab, 'admin_level': Outstanding.LAB_LEVEL})
+        return access_list
+
+    @staticmethod
+    def create_admin_permissions(lab):
+        from ondoc.diagnostic import models as diag_models
+        if lab is not  None:
+            manager_queryset = diag_models.LabManager.objects.filter(lab=lab, contact_type= diag_models.LabManager.SPOC)
+            delete_queryset = GenericLabAdmin.objects.filter(lab=lab, super_user_permission=True)
+            if delete_queryset.exists():
+                delete_queryset.delete()
+            if manager_queryset.exists():
+                for mgr in manager_queryset.all():
+                    if lab.network and lab.network.manageable_lab_network_admins.exists():
+                        is_disabled = True
+                    else:
+                        is_disabled = False
+                    if mgr.number and not mgr.lab.manageable_lab_admins.filter(phone_number=mgr.number).exists():
+                        admin_object = GenericLabAdmin(lab=lab,
+                                      phone_number=mgr.number,
+                                      lab_network=None,
+                                      permission_type=GenericLabAdmin.APPOINTMENT,
+                                      is_disabled=is_disabled,
+                                      super_user_permission=True,
+                                      write_permission=True,
+                                      read_permission=True,
+                                      )
+                        admin_object.save()
+
+
 class GenericAdmin(TimeStampedModel):
     APPOINTMENT = 1
     BILLINNG = 2
@@ -576,7 +668,6 @@ class GenericAdmin(TimeStampedModel):
             admin = GenericAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
             if admin.exists():
                 admin.update(user=user.first())
-
 
     @classmethod
     def create_admin_permissions(cls, doctor):
@@ -704,7 +795,8 @@ class GenericAdmin(TimeStampedModel):
         from ondoc.payout.models import Outstanding
         access_list = []
         get_permissions = (GenericAdmin.objects.select_related('hospital_network', 'hospital', 'doctor').
-                           filter(user_id=user.id, write_permission=True, permission_type=GenericAdmin.BILLINNG))
+                           filter(user_id=user.id, write_permission=True, permission_type=GenericAdmin.BILLINNG,
+                                  is_disabled=False))
         if get_permissions:
             for permission in get_permissions:
                 if permission.hospital_network_id:
@@ -797,6 +889,53 @@ class BillingAccount(models.Model):
             return '{}-{}'.format(self.content_type, self.merchant_id)
         else:
             return self.id
+
+
+class UserSecretKey(TimeStampedModel):
+
+    key = models.CharField(max_length=40, unique=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, related_name='secret_key',
+        on_delete=models.CASCADE, verbose_name="User"
+    )
+
+    class Meta:
+        db_table = "user_secret_key"
+
+    def __str__(self):
+        return '{}-{}'.format(self.user, self.key)
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        return super(UserSecretKey, self).save(*args, **kwargs)
+
+    def generate_key(self):
+        import binascii
+        return binascii.hexlify(os.urandom(20)).decode()
+
+
+class AgentTokenManager(models.Manager):
+    def create_token(self, user):
+        expiry_time = timezone.now() + timezone.timedelta(hours=AgentToken.expiry_duration)
+        token = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
+        return super().create(user=user, token=token, expiry_time=expiry_time)
+
+
+class AgentToken(TimeStampedModel):
+    expiry_duration = 2  # IN HOURS
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    token = models.CharField(max_length=100)
+    is_consumed = models.BooleanField(default=False)
+    expiry_time = models.DateTimeField()
+
+    objects = AgentTokenManager()  # The default manager.
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = 'agent_token'
 
 
 

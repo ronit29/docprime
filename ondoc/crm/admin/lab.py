@@ -25,7 +25,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount
+from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
@@ -111,8 +111,16 @@ class LabImageInline(admin.TabularInline):
     max_num = 3
 
 
+class LabManagerFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+
 class LabManagerInline(admin.TabularInline):
     model = LabManager
+    formset = LabManagerFormSet
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
@@ -151,13 +159,42 @@ class LabServiceInline(admin.TabularInline):
 
 class LabDoctorInline(admin.TabularInline):
     model = LabDoctor
-    #form = LabAwardForm
+    # form = LabAwardForm
     extra = 0
     can_delete = True
     show_change_link = False
 
 # class LabDocumentForm(forms.ModelForm):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
+
+
+class GenericLabAdminFormSet(forms.BaseInlineFormSet):
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        current_lab_network = self.instance.network
+        if current_lab_network:
+            if current_lab_network.manageable_lab_network_admins.all().exists():
+                is_lab_admin_active = False
+                for value in self.cleaned_data:
+                    if value and not value['DELETE'] and not value['is_disabled']:
+                        is_lab_admin_active = True
+                        break
+                if is_lab_admin_active:
+                    raise forms.ValidationError("This lab's network already has admin(s), so disable all admins of the lab.")
+
+
+class GenericLabAdminInline(admin.TabularInline):
+    model = GenericLabAdmin
+    formset = GenericLabAdminFormSet
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    readonly_fields = ['user']
+    verbose_name_plural = "Admins"
+    fields = ['user', 'phone_number', 'lab', 'permission_type', 'is_disabled', 'read_permission', 'write_permission']
 
 
 class LabDocumentFormSet(forms.BaseInlineFormSet):
@@ -386,7 +423,23 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
         super().save_model(request, obj, form, change)
 
+    def save_related(self, request, form, formsets, change):
+        super(type(self), self).save_related(request, form, formsets, change)
+        lab = form.instance
+        lab_mgr_form_change = False
+        lab_mgr_new_len = lab_mgr_del_len = 0
+        for formset in formsets:
+            if isinstance(formset, LabManagerFormSet):
+                for form in formset.forms:
+                    if 'contact_type' in form.changed_data or 'number' in form.changed_data:
+                        lab_mgr_form_change = True
+                        break
+                lab_mgr_new_len = len(formset.new_objects)
+                lab_mgr_del_len = len(formset.deleted_objects)
 
+        if lab is not None:
+            if (lab_mgr_form_change or lab_mgr_new_len > 0 or lab_mgr_del_len > 0):
+                GenericLabAdmin.create_admin_permissions(lab)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(LabAdmin, self).get_form(request, obj=obj, **kwargs)
@@ -401,7 +454,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     form = LabForm
     search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, BillingAccountInline]
+        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, BillingAccountInline, GenericLabAdminInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
@@ -459,9 +512,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
 
     def get_profile(self, obj):
-        if not obj.profile:
-            return ""
-        return obj.profile.name
+        if not obj.profile_detail:
+            return ''
+        return obj.profile_detail.get('name', '')
 
     get_profile.admin_order_field = 'profile'
     get_profile.short_description = 'Profile Name'
@@ -606,6 +659,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
                 if dt_field:
                     obj.time_slot_start = dt_field
+            if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
+                obj.cancellation_type = LabAppointment.AGENT_CANCELLED
         super().save_model(request, obj, form, change)
 
 

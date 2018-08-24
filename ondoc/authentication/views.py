@@ -95,7 +95,7 @@ def generate_otp_doctor(request):
 def login_user(request):
     phone_number = request.data['phone_number']
 
-    try:        
+    try:
         user_data = User.objects.get(phone_number=phone_number, user_type=3)
         token = Token.objects.get_or_create(user=user_data)
 

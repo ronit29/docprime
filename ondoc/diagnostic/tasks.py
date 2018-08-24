@@ -17,6 +17,7 @@ def lab_app_auto_cancel(self, prev_app_dict):
         new_status = updated_status_instance.status
         if new_status not in [LabAppointment.ACCEPTED, LabAppointment.CANCELLED, LabAppointment.COMPLETED]:
             if prev_app_dict['status'] == new_status and int(prev_app_dict.get("updated_at")) == int(updated_status_instance.updated_at.timestamp()):
+                updated_status_instance.cancellation_type = LabAppointment.AUTO_CANCELLED
                 updated_status_instance.action_cancelled(refund_flag=1)
 
     except Exception as e:

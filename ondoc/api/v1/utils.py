@@ -11,6 +11,7 @@ import datetime
 import pytz
 import calendar
 from django.contrib.auth import get_user_model
+from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
 from ondoc.crm.constants import constants
 import requests
@@ -209,6 +210,15 @@ class IsDoctor(permissions.BasePermission):
         return False
 
 
+class IsNotAgent(permissions.BasePermission):
+    message = 'Agent is not allowed to perform this action.'
+
+    def has_permission(self, request, view):
+        if hasattr(request, 'agent') and request.agent is not None:
+            return False
+        return True
+
+
 class IsMatrixUser(permissions.BasePermission):
     message = 'Only Matrix User is allowed to Perform Action.'
 
@@ -278,3 +288,50 @@ def is_valid_testing_lab_data(user, lab):
     if lab.is_test_lab and not user.groups.filter(name=constants['TEST_USER_GROUP']).exists():
         return False
     return True
+
+
+def payment_details(request, order):
+    from ondoc.authentication.models import UserProfile
+    from ondoc.account.models import PgTransaction, Order
+    payment_required = True
+    user = request.user
+    if user.email:
+        uemail = user.email
+    else:
+        uemail = "dummyemail@docprime.com"
+    base_url = "https://{}".format(request.get_host())
+    surl = base_url + '/api/v1/user/transaction/save'
+    furl = base_url + '/api/v1/user/transaction/save'
+    profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
+    pgdata = {
+        'custId': user.id,
+        'mobile': user.phone_number,
+        'email': uemail,
+        'productId': order.product_id,
+        'surl': surl,
+        'furl': furl,
+        'referenceId': "",
+        'orderId': order.id,
+        'name': profile.name,
+        'txAmount': str(order.amount),
+    }
+    secret_key = client_key = ""
+    if order.product_id == Order.DOCTOR_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P1
+        client_key = settings.PG_CLIENT_KEY_P1
+    elif order.product_id == Order.LAB_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P2
+        client_key = settings.PG_CLIENT_KEY_P2
+
+    pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
+
+    return pgdata, payment_required
+
+
+def get_location(lat, long):
+    pnt = None
+    if long is not None and lat is not None:
+        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+    return pnt
+

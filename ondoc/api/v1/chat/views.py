@@ -5,6 +5,7 @@ from ondoc.api.v1.doctor import serializers as doc_serializers
 from rest_framework import mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from ondoc.authentication.backends import JWTAuthentication
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
@@ -24,7 +25,7 @@ class ChatSearchedItemsViewSet(viewsets.GenericViewSet):
 
 class DoctorsListViewSet(viewsets.GenericViewSet):
 
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, )
     queryset = doc_models.Doctor.objects.none()
 
@@ -54,7 +55,7 @@ class DoctorProfileViewSet(viewsets.GenericViewSet):
 
 class UserProfileViewSet(viewsets.GenericViewSet):
 
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, )
 
     def retrieve(self, request):

@@ -7,10 +7,9 @@ from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
 from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import mixins, viewsets, status
 from rest_framework.exceptions import ValidationError as RestValidationError
-import datetime
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
 from django.db import transaction
@@ -22,7 +21,9 @@ from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
-                                         Address, AppointmentTransaction, GenericAdmin)
+                                         Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
+                                         AgentToken)
+from ondoc.notification.models import EmailNotification, SmsNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -38,16 +39,19 @@ from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
-from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest)
+from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
-
-from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, ErrorCodeMapping
+from ondoc.authentication.backends import JWTAuthentication
+from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, \
+    ErrorCodeMapping, IsNotAgent
+from ondoc.api.v1.auth .serializers import OnlineLeadSerializer
 import decimal
 from django.conf import settings
 from collections import defaultdict
 import copy
 import logging
+import jwt
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -74,21 +78,34 @@ class LoginOTP(GenericViewSet):
         req_type = request.query_params.get('type')
 
         if req_type == 'doctor':
-            queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
+            doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
                                         (Q(doctor__isnull=True, hospital__data_status=Hospital.QC_APPROVED) |
                                          Q(doctor__isnull=False,
                                            doctor__data_status=Doctor.QC_APPROVED, doctor__onboarding_status = Doctor.ONBOARDED
                                           )
                                         )
                                        )
+            lab_queryset = GenericLabAdmin.objects.select_related('lab', 'lab_network').filter(
+                Q(phone_number=phone_number, is_disabled=False),
+                (Q(lab__isnull=True, lab_network__data_status=LabNetwork.QC_APPROVED) |
+                 Q(lab__isnull=False,
+                   lab__data_status=Lab.QC_APPROVED, lab__onboarding_status=Lab.ONBOARDED
+                   )
+                 )
+                )
 
-            if queryset.exists():
+            if lab_queryset.exists() or doctor_queryset.exists():
                 response['exists'] = 1
-                send_otp("OTP for DocPrime login is {}", phone_number)
+                send_otp("OTP for login is {}", phone_number)
+
+            # if queryset.exists():
+            #     response['exists'] = 1
+            #     send_otp("OTP for DocPrime login is {}", phone_number)
+
         else:
-            send_otp("OTP for DocPrime login is {}", phone_number)
+            send_otp("OTP for login is {}", phone_number)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
-                response['exists']=1
+                response['exists'] = 1
 
         return Response(response)
 
@@ -97,13 +114,14 @@ class LoginOTP(GenericViewSet):
         serializer = serializers.OTPVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        return Response({"message" : "OTP Generated Sucessfuly."})
+        return Response({"message": "OTP Generated Sucessfuly."})
 
 
 class UserViewset(GenericViewSet):
     serializer_class = serializers.UserSerializer
     @transaction.atomic
     def login(self, request, format=None):
+        from ondoc.authentication.backends import JWTAuthentication
         serializer = serializers.OTPVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -115,17 +133,16 @@ class UserViewset(GenericViewSet):
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
 
-        #GenericAdmin.update_user_admin(data['phone_number'])
-
-        token = Token.objects.get_or_create(user=user)
+        token_object = JWTAuthentication.generate_token(user)
 
         expire_otp(data['phone_number'])
 
         response = {
-            "login":1,
-            "token" : str(token[0]),
-            "user_exists" : user_exists,
-            "user_id" : user.id
+            "login": 1,
+            "user_exists": user_exists,
+            "user_id": user.id,
+            "token": token_object['token'],
+            "expiration_time": token_object['payload']['exp']
         }
         return Response(response)
 
@@ -179,14 +196,16 @@ class UserViewset(GenericViewSet):
                 doctor.save()
 
         GenericAdmin.update_user_admin(phone_number)
+        GenericLabAdmin.update_user_lab_admin(phone_number)
         self.update_live_status(phone_number)
 
-        token = Token.objects.get_or_create(user=user)
+        token_object = JWTAuthentication.generate_token(user)
         expire_otp(data['phone_number'])
 
         response = {
             "login": 1,
-            "token": str(token[0])
+            "token": token_object['token'],
+            "expiration_time": token_object['payload']['exp']
         }
         return Response(response)
 
@@ -208,6 +227,7 @@ class UserViewset(GenericViewSet):
 
 class NotificationEndpointViewSet(GenericViewSet):
     serializer_class = serializers.NotificationEndpointSerializer
+    permission_classes = (IsNotAgent, )
 
     @transaction.atomic
     def save(self, request):
@@ -238,7 +258,8 @@ class NotificationEndpointViewSet(GenericViewSet):
 
 
 class NotificationViewSet(GenericViewSet):
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsNotAgent)
 
     def list(self, request):
         queryset = paginate_queryset(queryset=Notification.objects.filter(user=request.user),
@@ -250,10 +271,10 @@ class NotificationViewSet(GenericViewSet):
 class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                          mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
                          GenericViewSet):
+
     serializer_class = serializers.UserProfileSerializer
-    queryset = UserProfile.objects.all()
-    authentication_classes = (TokenAuthentication, )
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsConsumer)
     pagination_class = None
 
     def get_queryset(self):
@@ -341,7 +362,7 @@ class OndocViewSet(mixins.CreateModelMixin,
 class UserAppointmentsViewSet(OndocViewSet):
 
     serializer_class = OpdAppointmentSerializer
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
 
     def get_queryset(self):
@@ -395,7 +416,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         appointment_type = query_input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
             lab_appointment = get_object_or_404(LabAppointment, pk=pk)
-            allowed = lab_appointment.allowed_action(request.user.user_type)
+            allowed = lab_appointment.allowed_action(request.user.user_type, request)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
                 resp = dict()
@@ -404,7 +425,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_lab_appointment = self.lab_appointment_update(request, lab_appointment, validated_data)
             if updated_lab_appointment.get("status") is not None and updated_lab_appointment["status"] == 0:
-                return Response(updated_lab_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
+                return Response(updated_lab_appointment, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_lab_appointment)
         elif appointment_type == 'doctor':
@@ -417,7 +438,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
             if updated_opd_appointment.get("status") is not None and updated_opd_appointment["status"] == 0:
-                return Response(updated_opd_appointment["msg"], status=status.HTTP_400_BAD_REQUEST)
+                return Response(updated_opd_appointment, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(updated_opd_appointment)
 
@@ -427,6 +448,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         resp["status"] = 1
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELLED:
+                lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
@@ -437,7 +459,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                     if lab_appointment.time_slot_start == time_slot_start:
                         resp = {
                             "status": 0,
-                            "msg": "Cannot Reschedule for same timeslot"
+                            "message": "Cannot Reschedule for same timeslot"
                         }
                         return resp
 
@@ -484,6 +506,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             resp = dict()
             resp["status"] = 1
             if validated_data['status'] == OpdAppointment.CANCELLED:
+                opd_appointment.cancellation_type = OpdAppointment.PATIENT_CANCELLED
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
@@ -494,7 +517,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                     if opd_appointment.time_slot_start == time_slot_start:
                         resp = {
                             "status": 0,
-                            "msg": "Cannot Reschedule for same timeslot"
+                            "message": "Cannot Reschedule for same timeslot"
                         }
                         return resp
 
@@ -548,7 +571,14 @@ class UserAppointmentsViewSet(OndocViewSet):
         }
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
-        if consumer_account.balance + appointment_details.effective_price >= new_appointment_details.get('effective_price'):
+        balance = consumer_account.balance
+
+        resp["is_agent"] = False
+        if hasattr(request, 'agent') and request.agent:
+            resp["is_agent"] = True
+            balance = 0
+
+        if balance + appointment_details.effective_price >= new_appointment_details.get('effective_price'):
             # Debit or Refund/Credit in Account
             if appointment_details.effective_price > new_appointment_details.get('effective_price'):
                 #TODO PM - Refund difference b/w effective price
@@ -604,7 +634,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         pgdata['mobile'] = user.phone_number
         pgdata['email'] = user.email
         if not user.email:
-            pgdata['email'] = "dummy_appointment@policybazaar.com"
+            pgdata['email'] = "dummy_appointment@docprime.com"
 
         pgdata['productId'] = product_id
         base_url = "https://{}".format(request.get_host())
@@ -683,7 +713,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
 class AddressViewsSet(viewsets.ModelViewSet):
     serializer_class = serializers.AddressSerializer
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -693,39 +723,64 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
+
         serializer = serializers.AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        if not Address.objects.filter(user=request.user).filter(**serializer.validated_data).exists():
-            serializer.save()
+        validated_data = serializer.validated_data
+
+        loc_position = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
+        land_position = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
+        resp = dict()
+        if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                locality_location__distance_lte=(loc_position, 0),
+                landmark_location__distance_lte=(land_position, 0)).exists():
+            validated_data["locality_location"] = loc_position
+            validated_data["landmark_location"] = land_position
+            validated_data['user'] = request.user
+            address = Address.objects.create(**validated_data)
+            serializer = serializers.AddressSerializer(address)
         else:
-            address = Address.objects.filter(user=request.user).filter(**serializer.validated_data).first()
+            address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                locality_location__distance_lte=(loc_position, 0),
+                landmark_location__distance_lte=(land_position, 0)).first()
             serializer = serializers.AddressSerializer(address)
         return Response(serializer.data)
 
     def update(self, request, pk=None):
         data = {key: value for key, value in request.data.items()}
+        if data.get('locality_location_lat') is not None and data.get('locality_location_long') is not None:
+            data["locality_location"] = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
+        if data.get('landmark_location_lat') is not None and data.get('landmark_location_long') is not None:
+            data["landmark_location"] = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
         data['user'] = request.user.id
-        address = self.get_queryset().filter(pk=pk).first()
+        address = self.get_queryset().filter(pk=pk)
         if data.get("is_default"):
             add_default_qs = Address.objects.filter(user=request.user.id, is_default=True)
             if add_default_qs:
                 add_default_qs.update(is_default=False)
-        serializer = serializers.AddressSerializer(address, data=data, context={"request": request})
+        serializer = serializers.AddressSerializer(address.first(), data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        # New Code
+        if address:
+            address.update(**serializer.validated_data)
+            address = address.first()
+        else:
+            serializer.validated_data["user"] = request.user
+            address = Address.objects.create(**serializer.validated_data)
+        resp_serializer = serializers.AddressSerializer(address)
+        return Response(resp_serializer.data)
 
     def destroy(self, request, pk=None):
         address = get_object_or_404(Address, pk=pk)
+        is_default_address = address.is_default
 
-        if address.is_default:
+        address.delete()
+
+        if is_default_address:
             temp_addr = Address.objects.filter(user=request.user.id).first()
             if temp_addr:
                 temp_addr.is_default = True
                 temp_addr.save()
-
-        # address = Address.objects.filter(pk=pk).first()
-        address.delete()
         return Response({
             "status": 1
         })
@@ -777,7 +832,7 @@ class AppointmentTransactionViewSet(viewsets.GenericViewSet):
 
 
 class UserIDViewSet(viewsets.GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
@@ -960,7 +1015,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 class UserTransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.UserTransactionModelSerializer
     queryset = ConsumerTransaction.objects.all()
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def list(self, request):
@@ -990,7 +1045,7 @@ class ConsumerAccountViewSet(mixins.ListModelMixin, GenericViewSet):
 
 
 class OrderHistoryViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer,)
 
     def list(self, request):
@@ -1086,7 +1141,7 @@ class OrderHistoryViewSet(GenericViewSet):
 
 
 class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
@@ -1108,8 +1163,27 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
         return Response(doc_hosp_queryset)
 
 
+class UserLabViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsDoctor,)
+
+    def list(self, request):
+        user = request.user
+        user_lab_queryset = Lab.objects.filter(Q(manageable_lab_admins__user=user,
+                                                 manageable_lab_admins__is_disabled=False,
+                                                 manageable_lab_admins__write_permission=True) |
+                                               Q(network__manageable_lab_network_admins__user=user,
+                                                 network__manageable_lab_network_admins__is_disabled=False,
+                                                 network__manageable_lab_network_admins__write_permission=True
+                                                 )
+                                               ,
+                                               is_live=True
+                                               ).values('id', 'name')
+        return Response(user_lab_queryset)
+
+
 class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
     def list(self, request):
@@ -1211,7 +1285,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
 
 
 class OrderViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request, pk):
@@ -1223,24 +1297,13 @@ class OrderViewSet(GenericViewSet):
         if not order_obj:
             return Response(resp)
 
-        appointment_details = dict()
-        appointment_details["payable_amount"] = order_obj.amount
-        appointment_details["profile"] = UserProfile.objects.get(pk=order_obj.action_data.get("profile"))
-        product_id = order_obj.product_id
         resp["status"] = 1
-        if product_id == Order.DOCTOR_PRODUCT_ID:
-            app_obj = DoctorAppointmentsViewSet()
-            resp['data'], resp["payment_required"] = app_obj.payment_details(request, appointment_details, product_id,
-                                                                             order_obj.id)
-        elif product_id == Order.LAB_PRODUCT_ID:
-            app_obj = LabAppointmentView()
-            resp['data'], resp["payment_required"] = app_obj.get_payment_details(request, appointment_details,
-                                                                                 product_id, order_obj.id)
+        resp['data'], resp["payment_required"] = utils.payment_details(request, order_obj)
         return Response(resp)
 
 
 class ConsumerAccountRefundViewSet(GenericViewSet):
-    authentication_classes = (TokenAuthentication, )
+    authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer, )
 
     @transaction.atomic
@@ -1254,3 +1317,77 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
         resp = dict()
         resp["status"] = 1
         return Response(resp)
+
+
+class RefreshJSONWebToken(GenericViewSet):
+
+    def refresh(self, request):
+        data = {}
+        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data['token'] = serializer.validated_data['token']
+        data['payload'] = serializer.validated_data['payload']
+        return Response(data)
+
+
+class OnlineLeadViewSet(GenericViewSet):
+    serializer_class = serializers.OnlineLeadSerializer
+
+    def create(self, request):
+        resp = {}
+        serializer = serializers.OnlineLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()
+        if data.id:
+            resp['status'] = 'success'
+            resp['id'] = data.id
+        return Response(resp)
+
+
+class SendBookingUrlViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+
+    def send_booking_url(self, request, order_id):
+        type = request.data.get('type')
+        agent_token = AgentToken.objects.create_token(user=request.user)
+        booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
+                                                       phone_number=request.user.phone_number)
+        return Response({"status": 1})
+
+
+class OrderDetailViewSet(GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+    serializer_class = serializers.OrderDetailDoctorSerializer
+
+    def details(self, request, order_id):
+        if not order_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        queryset = Order.objects.filter(id=order_id, action_data__user=request.user.id).first()
+        if not queryset:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        resp = dict()
+        if queryset.product_id == Order.DOCTOR_PRODUCT_ID:
+            serializer = serializers.OrderDetailDoctorSerializer(queryset)
+            resp = serializer.data
+        elif queryset.product_id == Order.LAB_PRODUCT_ID:
+            serializer = serializers.OrderDetailLabSerializer(queryset)
+            resp = serializer.data
+        return Response(resp)
+
+
+class UserTokenViewSet(GenericViewSet):
+    def details(self, request):
+        token = request.query_params.get("token")
+        if not token:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        agent_token = AgentToken.objects.filter(token=token, is_consumed=False, expiry_time__gte=timezone.now()).first()
+        if agent_token:
+            token_object = JWTAuthentication.generate_token(agent_token.user)
+            agent_token.is_consumed = True
+            agent_token.save()
+            return Response({"status" : 1,"token": token_object['token']})
+        else:
+            return Response({"status": 0})

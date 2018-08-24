@@ -1,0 +1,114 @@
+{% extends "web_base.html" %}
+{% load static %}
+
+{% block title_text %}
+Agent Login
+{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" type="text/css" href="{% static 'web/css/careers.css' %}" >
+{% endblock %}
+{% block content %}
+<div class="body-wrapper">
+    <nav class="navbar navbar-expand-sm header-nav">
+        <a class="navbar-brand" href="/">
+            <img src="{% static 'web/images/header-logo.png' %}" alt="Logo" class="logo">
+        </a>
+    </nav>
+    <div class="laptop-img-div absolute-images">
+        <img src="{% static 'web/images/laptop.png' %}">
+    </div>
+    <div class="pages-img-div absolute-images">
+        <img src="{% static 'web/images/pages.png' %}">
+    </div>
+    <div class="container">
+        <div class="row">
+            <div class="col-12 col-md-6 hiring-col">
+                <form method="post" action="" id="agent_login_form">
+                    {% csrf_token %}
+
+                    <div class="form-group">
+                        <label for="phoneNumber">User Phone Number:</label>
+                        <input type="number" name="phone_number" min="7000000000" max="9999999999" class="form-control" id="phoneNumber" required>
+                    </div>
+                    <button type="submit" class="btn btn-default">Submit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid absolute-images">
+        <div class="row career-img-row">
+            <div class="bag-img career-img-div">
+                <img src="{% static 'web/images/bag.png' %}" class="career-img">
+            </div>
+            <div class="specs-img career-img-div">
+                <img src="{% static 'web/images/specs.png' %}" class="career-img">
+            </div>
+            <div class="pen-img career-img-div">
+                <img src="{% static 'web/images/pen.png' %}" class="career-img">
+            </div>
+            <div class="cv-img career-img-div">
+                <img src="{% static 'web/images/cv.png' %}" class="career-img">
+            </div>
+            <div class="exam-img career-img-div">
+                <img src="{% static 'web/images/exam.png' %}" class="career-img">
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block page_script %}
+<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+<script>
+                $(document).ready(function(){
+                    console.log('test');
+                 });
+
+                function getCookie(name) {
+                    var cookieValue = null;
+                    if (document.cookie && document.cookie != '') {
+                        var cookies = document.cookie.split(';');
+                        for (var i = 0; i < cookies.length; i++) {
+                            var cookie = jQuery.trim(cookies[i]);
+                            // Does this cookie string begin with the name we want?
+                            if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                                break;
+                            }
+                        }
+                    }
+                    return cookieValue;
+                }
+                var csrftoken = getCookie('csrftoken');
+                function csrfSafeMethod(method) {
+                    // these HTTP methods do not require CSRF protection
+                    return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+                }
+                $.ajaxSetup({
+                    crossDomain: false, // obviates need for sameOrigin test
+                    beforeSend: function(xhr, settings) {
+                        if (!csrfSafeMethod(settings.type)) {
+                            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                        }
+                    }
+                });
+
+                $('#agent_login_form').submit(function() {
+                    var phoneNumber = $('#phoneNumber').val();
+                    $.ajax({
+                      url:  "{{apiDomain}}",
+                      type: 'POST',
+                      data: "phone_number="+ phoneNumber,
+                      cache: false,
+                      success: function(request, data){
+                        window.open("{{appDomain}}?token=" + request['token']);
+                      },
+                      error: function(request, err){
+                        console.log(err)
+                      }
+                    });
+                    return false;
+                });
+
+		</script>
+{% endblock %}

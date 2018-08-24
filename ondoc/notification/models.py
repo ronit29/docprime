@@ -197,14 +197,21 @@ class NotificationAction:
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
+            if instance.cancellation_type != instance.AUTO_CANCELLED:
+                body = "Appointment with Dr. {} at {}, {} has been cancelled as per your request.".format(
+                    doctor_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y")
+                )
+            else:
+                body = "Appointment with Dr. {} at {}, {} has been cancelled due to unavailability of doctor manager.".format(
+                    doctor_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y"))
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "Appointment Cancelled",
-                "body": "Appointment with Dr. {} at {}, {} has been cancelled as per your request..".format(
-                    doctor_name, time_slot_start.strftime("%I:%M %P"),
-                    time_slot_start.strftime("%d/%m/%y")),
+                "body": body,
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -388,7 +395,7 @@ class EmailNotificationLabMixin:
 
 
 class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotificationLabMixin):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
     email_subject = models.TextField(blank=True, null=True)
     email = models.EmailField()
@@ -408,6 +415,37 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         if email and user:
             email_noti = EmailNotification.objects.create(
                 user=user,
+                email=email,
+                notification_type=notification_type,
+                content=html_body,
+                email_subject=email_subject
+            )
+            message = {
+                "data": model_to_dict(email_noti),
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def send_to_manager(cls, email, notification_type, context):
+        html_body = ''
+        email_subject = ''
+        context = copy.deepcopy(context)
+        if notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED:
+            html_body = render_to_string("email/lab/appointment_booked_lab/body.html", context=context)
+            email_subject = render_to_string("email/lab/appointment_booked_lab/subject.txt", context=context)
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT:
+            html_body = render_to_string("email/lab/appointment_rescheduled_patient_initiated_to_lab/body.html",
+                                         context=context)
+            email_subject = render_to_string(
+                "email/lab/appointment_rescheduled_patient_initiated_to_lab/subject.txt",
+                context=context)
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED:
+            html_body = render_to_string("email/lab/appointment_cancelled_lab/body.html", context=context)
+            email_subject = render_to_string("email/lab/appointment_cancelled_lab/subject.txt", context=context)
+        if email:
+            email_noti = EmailNotification.objects.create(
                 email=email,
                 notification_type=notification_type,
                 content=html_body,
@@ -443,6 +481,23 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         if email_list:
             email_notif = {
                 "email": email_list,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_notif,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def send_token(cls, token, order_id, email):
+        html_body = "".format()
+        email_subject = "".format()
+        if email:
+            email_notif = {
+                "email": email,
                 "content": html_body,
                 "email_subject": email_subject
             }
@@ -501,7 +556,7 @@ class SmsNotificationLabMixin:
 
 
 class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotificationLabMixin):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True)
     content = models.TextField()
     phone_number = models.BigIntegerField()
     viewed_at = models.DateTimeField(blank=True, null=True)
@@ -530,6 +585,46 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             }
             message = json.dumps(message)
             publish_message(message)
+
+    @classmethod
+    def send_to_manager(cls, phone_number, notification_type, context):
+        html_body = ''
+        if notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED:
+            html_body = render_to_string("sms/lab/appointment_booked_lab.txt", context=context)
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT:
+            html_body = render_to_string("sms/lab/appointment_rescheduled_patient_initiated_to_lab.txt",
+                                         context=context)
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED:
+            html_body = render_to_string("sms/lab/appointment_cancelled_lab.txt", context=context)
+        if phone_number:
+            sms_noti = SmsNotification.objects.create(
+                phone_number=phone_number,
+                notification_type=notification_type,
+                content=html_body
+            )
+            message = {
+                "data": model_to_dict(sms_noti),
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def send_booking_url(cls, token, order_id, phone_number):
+        booking_url = "{}/agent/booking?order_id={}&token={}".format(settings.CONSUMER_APP_DOMAIN, order_id, token)
+        html_body = "Your booking url is - {}. Please pay to confirm".format(booking_url)
+        if phone_number:
+            sms_noti = {
+                "phone_number": phone_number,
+                "content": html_body,
+            }
+            message = {
+                "data": sms_noti,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
 
 
 class AppNotification(TimeStampedModel):
