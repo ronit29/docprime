@@ -8,7 +8,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         count=0
-        for di in DoctorImage.objects.filter(cropped_image__isnull=False):
+        for di in DoctorImage.objects.exclude(cropped_image__isnull=True).exclude(cropped_image__exact=''):
                 try:
                     count+=1
                     print(count)

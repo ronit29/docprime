@@ -967,15 +967,18 @@ class LabDocument(TimeStampedModel, Document):
     def is_pdf(self):
         return self.name.name.endswith('.pdf')
 
-    def resize_image(self, height, width):
+    def resize_image(self, width, height):
         default_storage_class = get_storage_class()
         storage_instance = default_storage_class()
 
-        path = self.get_thumbnail_path(self.name.name,"{}x{}".format(height, width))
+        path = self.get_thumbnail_path(self.name.name,"{}x{}".format(width, height))
         if storage_instance.exists(path):
             return
+        if self.name.closed:
+            self.name.open()
 
-            with Img.open(self.name) as img:
+        with Img.open(self.name) as img:
+            img = img.copy()
 
 
                 #path = "{}/{}/{}x{}/".format(settings.MEDIA_ROOT, LabDocument.image_base_path, height, width)
@@ -983,21 +986,23 @@ class LabDocument(TimeStampedModel, Document):
                 #     return
                 # if not os.path.exists(path):
                 #     os.mkdir(path)
-                original_width, original_height = img.size
-                if original_width > original_height:
-                    ratio = width/float(original_width)
-                    height = int(float(original_height)*float(ratio))
-                else:
-                    ratio = height / float(original_height)
-                    width = int(float(original_width) * float(ratio))
-                img = img.resize(tuple([width, height]), Img.ANTIALIAS)
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
-                new_image_io = BytesIO()
-                img.save(new_image_io, format='JPEG')
-                in_memory_file = InMemoryUploadedFile(new_image_io, None, os.path.basename(self.name.name), 'image/jpeg',
+                # original_width, original_height = img.size
+                # if original_width > original_height:
+                #     ratio = width/float(original_width)
+                #     height = int(float(original_height)*float(ratio))
+                # else:
+                #     ratio = height / float(original_height)
+                #     width = int(float(original_width) * float(ratio))
+
+            img.thumbnail(tuple([width, height]), Img.LANCZOS)
+                #img = img.resize(tuple([width, height]), Img.ANTIALIAS)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+            in_memory_file = InMemoryUploadedFile(new_image_io, None, os.path.basename(path), 'image/jpeg',
                                                       new_image_io.tell(), None)
-                storage_instance.save(path, in_memory_file)
+            storage_instance.save(path, in_memory_file)
                 #storage_instance.save(path + os.path.basename(self.name.name), in_memory_file)
                 # img.save(path + os.path.basename(self.name.name), 'JPEG')
 
@@ -1005,9 +1010,9 @@ class LabDocument(TimeStampedModel, Document):
         if not self.name:
             return
         for size in LabDocument.image_sizes:
-            height = size[0]
-            width = size[1]
-            self.resize_image(height, width)
+            width = size[0]
+            height = size[1]
+            self.resize_image(width, height)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

@@ -523,50 +523,46 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
     def __str__(self):
         return '{}'.format(self.doctor)
 
-    def resize_cropped_image(self, height, width):
-            default_storage_class = get_storage_class()
-            storage_instance = default_storage_class()
+    def resize_cropped_image(self, width, height):
+        default_storage_class = get_storage_class()
+        storage_instance = default_storage_class()
 
-            path = self.get_thumbnail_path(self.name.name,"{}x{}".format(height, width))
-            if storage_instance.exists(path):
-                return
+        path = self.get_thumbnail_path(self.cropped_image.name,"{}x{}".format(width, height))
+        if storage_instance.exists(path):
+            return
 
-            if self.cropped_image.closed:
-                self.cropped_image.open()
-            with Img.open(self.cropped_image) as img:
+        if self.cropped_image.closed:
+            self.cropped_image.open()
+        with Img.open(self.cropped_image) as img:
+            img = img.copy()
 
-                default_storage_class = get_storage_class()
-                storage_instance = default_storage_class()
+                # original_width, original_height = img.size
+                # if original_width > original_height:
+                #     ratio = width/float(original_width)
+                #     height = int(float(original_height)*float(ratio))
+                # else:
+                #     ratio = height / float(original_height)
+                #     width = int(float(original_width) * float(ratio))
+            img.thumbnail(tuple([width, height]), Img.LANCZOS)
 
-                path = self.get_thumbnail_path(self.cropped_image.name,"{}x{}".format(height, width))
-                if storage_instance.exists(path):
-                    return
+                #img = img.resize(tuple([width, height]), Img.ANTIALIAS)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
 
-                original_width, original_height = img.size
-                if original_width > original_height:
-                    ratio = width/float(original_width)
-                    height = int(float(original_height)*float(ratio))
-                else:
-                    ratio = height / float(original_height)
-                    width = int(float(original_width) * float(ratio))
-                img = img.resize(tuple([width, height]), Img.ANTIALIAS)
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
-
-                new_image_io = BytesIO()
-                img.save(new_image_io, format='JPEG')
-                in_memory_file = InMemoryUploadedFile(new_image_io, None, os.path.basename(self.name.name), 'image/jpeg',
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+            in_memory_file = InMemoryUploadedFile(new_image_io, None, os.path.basename(path), 'image/jpeg',
                                                       new_image_io.tell(), None)
-                storage_instance.save(path, in_memory_file)
+            storage_instance.save(path, in_memory_file)
 
 
     def create_all_images(self):
         if not self.cropped_image:
             return
         for size in DoctorImage.image_sizes:
-            height = size[0]
-            width = size[1]
-            self.resize_cropped_image(height, width)
+            width = size[0]
+            height = size[1]
+            self.resize_cropped_image(width, height)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
