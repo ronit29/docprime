@@ -524,6 +524,13 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
         return '{}'.format(self.doctor)
 
     def resize_cropped_image(self, height, width):
+            default_storage_class = get_storage_class()
+            storage_instance = default_storage_class()
+
+            path = self.get_thumbnail_path(self.name.name,"{}x{}".format(height, width))
+            if storage_instance.exists(path):
+                return
+
             if self.cropped_image.closed:
                 self.cropped_image.open()
             with Img.open(self.cropped_image) as img:

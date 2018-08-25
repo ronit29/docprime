@@ -968,14 +968,15 @@ class LabDocument(TimeStampedModel, Document):
         return self.name.name.endswith('.pdf')
 
     def resize_image(self, height, width):
+        default_storage_class = get_storage_class()
+        storage_instance = default_storage_class()
+
+        path = self.get_thumbnail_path(self.name.name,"{}x{}".format(height, width))
+        if storage_instance.exists(path):
+            return
+
             with Img.open(self.name) as img:
 
-                default_storage_class = get_storage_class()
-                storage_instance = default_storage_class()
-
-                path = self.get_thumbnail_path(self.name.name,"{}x{}".format(height, width))
-                if storage_instance.exists(path):
-                    return
 
                 #path = "{}/{}/{}x{}/".format(settings.MEDIA_ROOT, LabDocument.image_base_path, height, width)
                 # if os.path.exists(path+os.path.basename(self.name.name)):
