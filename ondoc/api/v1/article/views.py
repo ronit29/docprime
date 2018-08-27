@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from . import serializers
-
+from ondoc.api.pagination import paginate_queryset
 
 class ArticleCategoryViewSet(viewsets.GenericViewSet):
 
@@ -12,8 +12,9 @@ class ArticleCategoryViewSet(viewsets.GenericViewSet):
         return article_models.ArticleCategory.objects.all()
 
     def list(self, request):
+        queryset = paginate_queryset(self.get_queryset(), request, 10)
         article_category_list = [serializers.ArticleCategoryListSerializer(category, context={'request': request}).data
-                                 for category in self.get_queryset()]
+                                 for category in queryset]
         return Response(article_category_list)
 
 
@@ -35,6 +36,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
         articles = category.articles.all()
         article_data = list(filter(lambda article: article.is_published, articles))
 
+        article_data = paginate_queryset(article_data, request, 10)
         resp = serializers.ArticleListSerializer(article_data, many=True,
                                                              context={'request': request, 'category': category}).data
         return Response(resp)

@@ -204,6 +204,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "payment_type": data.get("payment_type")
         }
         resp = self.extract_payment_details(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID)
+        push_appointment_to_matrix.apply_async(({'appointment_id': resp.get('data').get('id'), 'product_id':5,
+                                                 'sub_product_id': 2}, ), countdown=5)
         return Response(data=resp)
 
     def update(self, request, pk=None):
