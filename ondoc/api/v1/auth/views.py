@@ -1344,6 +1344,20 @@ class OnlineLeadViewSet(GenericViewSet):
         return Response(resp)
 
 
+class CareerViewSet(GenericViewSet):
+    serializer_class = serializers.CareerSerializer
+
+    def upload(self, request):
+        resp = {}
+        serializer = serializers.CareerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()
+        if data.id:
+            resp['status'] = 'success'
+            resp['id'] = data.id
+        return Response(resp)
+
+
 class SendBookingUrlViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, )
