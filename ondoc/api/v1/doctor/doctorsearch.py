@@ -24,7 +24,7 @@ class DoctorSearchHelper:
                             'onboarding_status={}'.format(Doctor.ONBOARDED)]
         if self.query_params.get("specialization_ids"):
             filtering_params.append(
-                "gs.id IN({})".format(",".join(self.query_params.get("specialization_ids")))
+                " gs.id IN({})".format(",".join(self.query_params.get("specialization_ids")))
             )
         if self.query_params.get("sits_at"):
             filtering_params.append(
@@ -91,8 +91,8 @@ class DoctorSearchHelper:
                        "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
                        "INNER JOIN hospital h ON h.id = dc.hospital_id " \
                        "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
-                       "LEFT JOIN doctor_specialization ds on ds.doctor_id = d.id" \
-                       "LEFT JOIN general_specialization gs on ds.specialization_id = gs.id" \
+                       "LEFT JOIN doctor_specialization ds on ds.doctor_id = d.id " \
+                       "LEFT JOIN general_specialization gs on ds.specialization_id = gs.id " \
                        "WHERE  %s " \
                        "ORDER  BY %s ) x " \
                        "where distance < %s and %s" % (longitude, latitude,
