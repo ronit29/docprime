@@ -643,7 +643,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             return Response({"conditions": [], "specializations": []})
         medical_conditions = models.MedicalCondition.objects.filter(
             name__icontains=name).values("id", "name")[:5]
-        specializations = models.Specialization.objects.filter(
+        specializations = models.GeneralSpecialization.objects.filter(
             name__icontains=name).values("id", "name")[:5]
         return Response({"conditions": medical_conditions, "specializations": specializations})
 
