@@ -631,7 +631,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     @classmethod
     def send_booking_url(cls, token, order_id, phone_number):
         booking_url = "{}/agent/booking?order_id={}&token={}".format(settings.CONSUMER_APP_DOMAIN, order_id, token)
-        html_body = "Your booking url is - {}. Please pay to confirm".format(booking_url)
+        html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
         if phone_number:
             sms_noti = {
                 "phone_number": phone_number,
