@@ -9,7 +9,7 @@ import datetime, calendar
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from ondoc.web.models import OnlineLead
+from ondoc.web.models import OnlineLead, Career
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
@@ -168,7 +168,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if birth_date:
             today = date.today()
             age = today.year - birth_date.year
-            full_year_passed = (today.month, today.day) > (birth_date.month, birth_date.day)
+            full_year_passed = (today.month, today.day) >= (birth_date.month, birth_date.day)
             if not full_year_passed:
                 age -= 1
         return age
@@ -341,15 +341,27 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
 
 class OnlineLeadSerializer(serializers.ModelSerializer):
     member_type = serializers.ChoiceField(choices=OnlineLead.TYPE_CHOICES)
-    name = serializers.CharField(max_length=255, required=False)
+    name = serializers.CharField(max_length=255)
     speciality = serializers.CharField(max_length=255, required=False)
     mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
-    city = serializers.CharField(max_length=255, required=False, default='')
+    city = serializers.CharField(max_length=255, default='')
     email = serializers.EmailField()
 
     class Meta:
         model = OnlineLead
         fields = ('member_type', 'name', 'speciality', 'mobile', 'city', 'email')
+
+
+class CareerSerializer(serializers.ModelSerializer):
+    profile_type = serializers.ChoiceField(choices=Career.PROFILE_TYPE_CHOICES)
+    name = serializers.CharField(max_length=255)
+    mobile = serializers.IntegerField(max_value=9999999999, min_value=1000000000)
+    email = serializers.EmailField()
+    resume = serializers.FileField(allow_null=False)
+
+    class Meta:
+        model = Career
+        fields = ('profile_type', 'name', 'mobile', 'email', 'resume')
 
 
 class OrderDetailDoctorSerializer(serializers.Serializer):

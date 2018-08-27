@@ -445,9 +445,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
         return appointment_data
 
     def update(self, request, pk=None):
-        lab_appointment = self.get_queryset().filter(pk=pk).first()
-        if not lab_appointment:
-            return Response([])
+        lab_appointment = get_object_or_404(LabAppointment, pk=pk)
+        # lab_appointment = self.get_queryset().filter(pk=pk).first()
+        # if not lab_appointment:
+        #     return Response()
         serializer = serializers.UpdateStatusSerializer(
             data=request.data, context={'request': request, 'lab_appointment': lab_appointment})
         serializer.is_valid(raise_exception=True)
