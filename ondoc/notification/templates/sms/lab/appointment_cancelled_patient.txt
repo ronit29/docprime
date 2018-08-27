@@ -1,1 +1,7 @@
-Your appointment for {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - {{lab_name|capfirst}} has been cancelled as requested by you.
+{% spaceless %}
+{% if instance.cancellation_type == 3 %}
+    Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - {{lab_name|capfirst}} has been cancelled due to unavailability of lab manager.
+{% else %}
+    Your appointment for {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - {{lab_name|capfirst}} has been cancelled as requested by you.
+{% endif %}
+{% endspaceless %}

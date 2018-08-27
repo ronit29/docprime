@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 @task(bind=True, max_retries=6)
 def refund_curl_task(self, req_data):
     print(req_data)
+    return
     try:
         token = settings.PG_REFUND_AUTH_TOKEN
         headers = {
