@@ -1404,4 +1404,4 @@ class UserTokenViewSet(GenericViewSet):
             agent_token.save()
             return Response({"status": 1, "token": token_object['token'], 'order_id': agent_token.token})
         else:
-            return Response({"status": 0}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"status": 0}, status=status.HTTP_400_BAD_REQUEST)
