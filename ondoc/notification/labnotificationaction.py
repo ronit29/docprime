@@ -1,4 +1,5 @@
 from .models import NotificationAction, EmailNotification, SmsNotification, AppNotification, PushNotification
+from ondoc.authentication.models import UserProfile
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import pytz
@@ -111,7 +112,7 @@ class LabNotificationAction(NotificationAction):
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
             return
-        elif notification_type == NotificationAction.LAB_INVOICE:
+        if notification_type == NotificationAction.LAB_INVOICE:
             patient_name = instance.profile.name if instance.profile.name else ""
             lab_name = instance.lab.name if instance.lab.name else ""
             context = {
@@ -125,8 +126,36 @@ class LabNotificationAction(NotificationAction):
                 "action_id": instance.id,
                 "image_url": ""
             }
+            if user.user_type == User.CONSUMER:
+                email = instance.profile.email
+
+                # send notification to default profile also
+                default_user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
+                if default_user_profile and (
+                        default_user_profile.id != instance.profile.id) and default_user_profile.email:
+                    EmailNotification.send_notification(user=user, notification_type=notification_type,
+                                                        email=default_user_profile.email, context=context)
+            else:
+                email = user.email
             EmailNotification.send_notification(user=user, notification_type=notification_type,
-                                                email=user.email, context=context)
+                                                email=email, context=context)
+            return
+        if notification_type == NotificationAction.LAB_REPORT_UPLOADED:
+            patient_name = instance.profile.name if instance.profile.name else ""
+            lab_name = instance.lab.name if instance.lab.name else ""
+            context = {
+                "patient_name": patient_name,
+                "lab_name": lab_name,
+                "instance": instance,
+                "title": "Report Uploaded",
+                "body": "Report available for your appointment with Lab - {} on {}".format(
+                    lab_name, time_slot_start.strftime("%d/%m/%y")),
+                "url": "/lab/appointment/{}".format(instance.id),
+                "action_type": NotificationAction.LAB_APPOINTMENT,
+                "action_id": instance.id,
+                "image_url": ""
+            }
+            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
 
     @classmethod
     def send_to_lab_managers(cls, instance, lab_manager, notification_type):

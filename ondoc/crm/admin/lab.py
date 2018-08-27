@@ -490,17 +490,25 @@ class LabAppointmentForm(forms.ModelForm):
             lab = cleaned_data.get('lab')
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
-
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
 
         selected_test_ids = lab_test.values_list('test', flat=True)
-        if not LabTiming.objects.filter(
-                lab=lab,
-                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-                day=time_slot_start.weekday(),
-                start__lte=hour, end__gt=hour).exists():
-            raise forms.ValidationError("This lab test is not available on selected day and time.")
+        is_lab_timing_available = LabTiming.objects.filter(
+            lab=lab,
+            lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+            day=time_slot_start.weekday(),
+            start__lte=hour, end__gt=hour).exists()
+        # if not is_lab_timing_available:
+        #     raise forms.ValidationError("This lab test is not available on selected day and time.")
+        if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
+            if not lab.is_home_collection_enabled:
+                raise forms.ValidationError("Home Pickup is disabled for the lab")
+            if self.instance.start_time < 7.0 or self.instance.start_time > 19.0:
+                raise forms.ValidationError("No time slot available")
+        else:
+            if not lab.always_open and not is_lab_timing_available:
+                raise forms.ValidationError("No time slot available")
 
         return cleaned_data
 
@@ -512,9 +520,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
 
     def get_profile(self, obj):
-        if not obj.profile_detail:
+        if not obj.profile:
             return ''
-        return obj.profile_detail.get('name', '')
+        return obj.profile.name
 
     get_profile.admin_order_field = 'profile'
     get_profile.short_description = 'Profile Name'

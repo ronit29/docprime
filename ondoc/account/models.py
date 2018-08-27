@@ -225,7 +225,7 @@ class PgTransaction(TimeStampedModel):
                     "refNo": str(data.id),
                 }
                 secret_key = settings.PG_SECRET_KEY_REFUND
-                client_key = settings.PG_SECRET_KEY_REFUND
+                client_key = settings.PG_CLIENT_KEY_REFUND
                 params["checkSum"] = PgTransaction.create_pg_hash(params, secret_key, client_key)
                 pg_data.append(params)
         return pg_data

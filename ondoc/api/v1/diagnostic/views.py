@@ -331,10 +331,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
         request = self.request
         if request.user.user_type == User.DOCTOR:
             return models.LabAppointment.objects.filter(
-                Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user,
+                Q(lab__manageable_lab_admins__user=request.user,
                   lab__manageable_lab_admins__is_disabled=False) |
-                Q(lab__network__isnull=False,
-                  lab__network__manageable_lab_network_admins__user=request.user,
+                Q(lab__network__manageable_lab_network_admins__user=request.user,
                   lab__network__manageable_lab_network_admins__is_disabled=False)).distinct()
 
     def list(self, request, *args, **kwargs):
@@ -381,7 +380,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             serializer = serializers.LabAppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
             return Response(serializer.data)
         else:
-            return Response([])
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.atomic
     def create(self, request, **kwargs):
@@ -749,12 +748,10 @@ class LabReportFileViewset(mixins.CreateModelMixin,
         if request.user.user_type == User.DOCTOR:
             user = request.user
             return (models.LabReportFile.objects.filter(
-                Q(report__appointment__lab__network__isnull=True,
-                  report__appointment__lab__manageable_lab_admins__user=user,
+                Q(report__appointment__lab__manageable_lab_admins__user=user,
                   report__appointment__lab__manageable_lab_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
                   report__appointment__lab__manageable_lab_admins__is_disabled=False) |
-                Q(report__appointment__lab__network__isnull=False,
-                  report__appointment__lab__network__manageable_lab_network_admins__user=request.user,
+                Q(report__appointment__lab__network__manageable_lab_network_admins__user=request.user,
                   report__appointment__lab__network__manageable_lab_network_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
                   report__appointment__lab__network__manageable_lab_network_admins__is_disabled=False)).distinct())
 
