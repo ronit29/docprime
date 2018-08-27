@@ -168,7 +168,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if birth_date:
             today = date.today()
             age = today.year - birth_date.year
-            full_year_passed = (today.month, today.day) > (birth_date.month, birth_date.day)
+            full_year_passed = (today.month, today.day) >= (birth_date.month, birth_date.day)
             if not full_year_passed:
                 age -= 1
         return age
