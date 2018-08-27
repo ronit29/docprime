@@ -7,6 +7,7 @@ from ondoc.doctor.models import Hospital, SearchKey
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
+from django.core.files.storage import get_storage_class
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
 from ondoc.account import models as account_model
 from django.utils import timezone
@@ -16,6 +17,8 @@ from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 from ondoc.payout.models import Outstanding
 from ondoc.authentication import models as auth_model
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from io import BytesIO
 import datetime
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from ondoc.diagnostic import tasks
@@ -23,6 +26,7 @@ from dateutil import tz
 from django.conf import settings
 import logging
 import decimal
+from PIL import Image as Img
 import math
 import random
 import os
@@ -168,7 +172,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         all_documents = self.lab_documents.all()
         for document in all_documents:
             if document.document_type == LabDocument.LOGO:
-                return document.name.url
+                return document.get_thumbnail_path(document.name.url,'90x60')
         return None
         # return static('lab_images/lab_default.png')
 
@@ -251,12 +255,16 @@ class LabAward(TimeStampedModel):
 
 
 class LabManager(TimeStampedModel):
+    OTHER =1
+    SPOC = 2
+    MANAGER = 3
+    OWNER = 4
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
     number = models.BigIntegerField()
     email = models.EmailField(max_length=100, blank=True)
     details = models.CharField(max_length=200, blank=True)
-    CONTACT_TYPE_CHOICES = [(1, "Other"), (2, "Single Point of Contact"), (3, "Manager"), (4, "Owner")]
+    CONTACT_TYPE_CHOICES = [(OTHER, "Other"), (SPOC, "Single Point of Contact"), (MANAGER, "Manager"), (OWNER, "Owner")]
     contact_type = models.PositiveSmallIntegerField(
         choices=CONTACT_TYPE_CHOICES)
 
@@ -941,6 +949,8 @@ class LabDocument(TimeStampedModel, Document):
     CHEQUE = 5
     LOGO = 6
     EMAIL_CONFIRMATION = 9
+    image_sizes = [(90, 60), ]
+    image_base_path = 'lab/images'
     CHOICES = [(PAN, "PAN Card"), (ADDRESS, "Address Proof"), (GST, "GST Certificate"),
                (REGISTRATION, "Registration Certificate"), (CHEQUE, "Cancel Cheque Copy"), (LOGO, "LOGO"),
                (EMAIL_CONFIRMATION, "Email Confirmation")]
@@ -956,6 +966,59 @@ class LabDocument(TimeStampedModel, Document):
 
     def is_pdf(self):
         return self.name.name.endswith('.pdf')
+
+    def resize_image(self, width, height):
+        default_storage_class = get_storage_class()
+        storage_instance = default_storage_class()
+
+        path = self.get_thumbnail_path(self.name.name,"{}x{}".format(width, height))
+        if storage_instance.exists(path):
+            return
+        if self.name.closed:
+            self.name.open()
+
+        with Img.open(self.name) as img:
+            img = img.copy()
+
+
+                #path = "{}/{}/{}x{}/".format(settings.MEDIA_ROOT, LabDocument.image_base_path, height, width)
+                # if os.path.exists(path+os.path.basename(self.name.name)):
+                #     return
+                # if not os.path.exists(path):
+                #     os.mkdir(path)
+                # original_width, original_height = img.size
+                # if original_width > original_height:
+                #     ratio = width/float(original_width)
+                #     height = int(float(original_height)*float(ratio))
+                # else:
+                #     ratio = height / float(original_height)
+                #     width = int(float(original_width) * float(ratio))
+
+            img.thumbnail(tuple([width, height]), Img.LANCZOS)
+                #img = img.resize(tuple([width, height]), Img.ANTIALIAS)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+            in_memory_file = InMemoryUploadedFile(new_image_io, None, os.path.basename(path), 'image/jpeg',
+                                                      new_image_io.tell(), None)
+            storage_instance.save(path, in_memory_file)
+                #storage_instance.save(path + os.path.basename(self.name.name), in_memory_file)
+                # img.save(path + os.path.basename(self.name.name), 'JPEG')
+
+    def create_all_images(self):
+        if not self.name:
+            return
+        for size in LabDocument.image_sizes:
+            width = size[0]
+            height = size[1]
+            self.resize_image(width, height)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.document_type == LabDocument.LOGO:
+            self.create_all_images()
+
 
     # def __str__(self):
         # return self.name

@@ -1,4 +1,7 @@
-from config.settings.production import *
+from config.settings.base import *
+import logging
+
+
 API_ENABLED=True
 DEBUG = env.bool('DJANGO_DEBUG', default=False)
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['qa.panaceatechno.com', 'crmqa.panaceatechno.com', 'docqa.panaceatechno.com', 'qa.docprime.com', 'crmqa.docprime.com', 'docqa.docprime.com','liveqa.docprime.com','livecrm.docprime.com','local.docprime.com'])
@@ -21,7 +24,7 @@ AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=86400',
 }
 AWS_S3_CUSTOM_DOMAIN = 's3.%s.amazonaws.com/%s' % (AWS_S3_REGION_NAME, AWS_STORAGE_BUCKET_NAME)
-AWS_PRELOAD_METADATA = True
+AWS_PRELOAD_METADATA = False
 
 
 DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'

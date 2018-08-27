@@ -1,4 +1,3 @@
-from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.gis.geos import Point
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
@@ -7,6 +6,7 @@ from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor
 from datetime import datetime
 import re
+
 
 class DoctorSearchHelper:
     MAX_DISTANCE = "20000"
@@ -160,10 +160,7 @@ class DoctorSearchHelper:
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False)
                 }]
-            if doctor.images.exists():
-                thumbnail = (doctor.images.all()[0].cropped_image.url if doctor.images.all()[0].cropped_image else None)
-            else:
-                thumbnail = None
+            thumbnail = doctor.get_thumbnail()
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),

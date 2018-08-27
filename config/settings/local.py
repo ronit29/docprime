@@ -16,12 +16,12 @@ TEMPLATES[0]['OPTIONS']['debug'] = DEBUG
 INSTALLED_APPS += ('debug_toolbar',)
 MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
 
-# DEBUG_TOOLBAR_CONFIG = {
-#     'DISABLE_PANELS': [
-#         'debug_toolbar.panels.redirects.RedirectsPanel',
-#     ],
-#     'SHOW_TEMPLATE_CONTEXT': True,
-# }
+DEBUG_TOOLBAR_CONFIG = {
+    'DISABLE_PANELS': [
+        'debug_toolbar.panels.redirects.RedirectsPanel',
+    ],
+    'SHOW_TEMPLATE_CONTEXT': True,
+}
 
 INTERNAL_IPS = ['127.0.0.1']
 
@@ -110,4 +110,21 @@ LOGGING = {
             'propagate': False,
         },
     },
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
+    'PAGE_SIZE': 10,
+    'COERCE_DECIMAL_TO_STRING': True,
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        #'rest_framework.authentication.SessionAuthentication',
+        # 'rest_framework.authentication.TokenAuthentication',
+        # 'ondoc.authentication.auth.CustomAuthentication',
+        # 'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        'ondoc.authentication.backends.JWTAuthentication',
+    ),
+    'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler',
+
+
 }

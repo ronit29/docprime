@@ -218,7 +218,7 @@ class UserViewset(GenericViewSet):
                         if admin.doctor.data_status == Doctor.QC_APPROVED and admin.doctor.onboarding_status == Doctor.ONBOARDED:
                             admin.doctor.is_live = True
                             admin.doctor.save()
-                else:
+                elif admin.hospital:
                     for hosp_doc in admin.hospital.assoc_doctors.all():
                         if hosp_doc.data_status == Doctor.QC_APPROVED and hosp_doc.onboarding_status == Doctor.ONBOARDED:
                             hosp_doc.is_live = True
@@ -723,39 +723,64 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
+
         serializer = serializers.AddressSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        if not Address.objects.filter(user=request.user).filter(**serializer.validated_data).exists():
-            serializer.save()
+        validated_data = serializer.validated_data
+
+        loc_position = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
+        land_position = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
+        resp = dict()
+        if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                locality_location__distance_lte=(loc_position, 0),
+                landmark_location__distance_lte=(land_position, 0)).exists():
+            validated_data["locality_location"] = loc_position
+            validated_data["landmark_location"] = land_position
+            validated_data['user'] = request.user
+            address = Address.objects.create(**validated_data)
+            serializer = serializers.AddressSerializer(address)
         else:
-            address = Address.objects.filter(user=request.user).filter(**serializer.validated_data).first()
+            address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                locality_location__distance_lte=(loc_position, 0),
+                landmark_location__distance_lte=(land_position, 0)).first()
             serializer = serializers.AddressSerializer(address)
         return Response(serializer.data)
 
     def update(self, request, pk=None):
         data = {key: value for key, value in request.data.items()}
+        if data.get('locality_location_lat') and data.get('locality_location_long'):
+            data["locality_location"] = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
+        if data.get('landmark_location_lat') and data.get('landmark_location_long'):
+            data["landmark_location"] = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
         data['user'] = request.user.id
-        address = self.get_queryset().filter(pk=pk).first()
+        address = self.get_queryset().filter(pk=pk)
         if data.get("is_default"):
             add_default_qs = Address.objects.filter(user=request.user.id, is_default=True)
             if add_default_qs:
                 add_default_qs.update(is_default=False)
-        serializer = serializers.AddressSerializer(address, data=data, context={"request": request})
+        serializer = serializers.AddressSerializer(address.first(), data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        # New Code
+        if address:
+            address.update(**serializer.validated_data)
+            address = address.first()
+        else:
+            serializer.validated_data["user"] = request.user
+            address = Address.objects.create(**serializer.validated_data)
+        resp_serializer = serializers.AddressSerializer(address)
+        return Response(resp_serializer.data)
 
     def destroy(self, request, pk=None):
         address = get_object_or_404(Address, pk=pk)
+        is_default_address = address.is_default
 
-        if address.is_default:
+        address.delete()
+
+        if is_default_address:
             temp_addr = Address.objects.filter(user=request.user.id).first()
             if temp_addr:
                 temp_addr.is_default = True
                 temp_addr.save()
-
-        # address = Address.objects.filter(pk=pk).first()
-        address.delete()
         return Response({
             "status": 1
         })
@@ -879,13 +904,13 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                     if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
                         if appointment_obj:
-                            REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id)
+                            REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
                         elif order_obj:
                             REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
                                 order_obj.action_data.get("lab"), response.get('statusCode'))
                     elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                         if appointment_obj:
-                            REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id)
+                            REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
                         elif order_obj:
                             REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                        order_obj.action_data.get("hospital"),
