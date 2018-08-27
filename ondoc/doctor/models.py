@@ -374,7 +374,7 @@ class DoctorQualification(auth_model.TimeStampedModel):
         unique_together = (("doctor", "qualification", "specialization", "college"),)
 
 
-class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel):
+class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
     name = models.CharField(max_length=200)
 
     def __str__(self):
@@ -1279,7 +1279,7 @@ class PrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
         db_table = "prescription_file"
 
 
-class MedicalCondition(auth_model.TimeStampedModel):
+class MedicalCondition(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=100, verbose_name="Name")
     specialization = models.ManyToManyField(
         GeneralSpecialization,
