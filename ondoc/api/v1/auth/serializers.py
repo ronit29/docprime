@@ -9,7 +9,7 @@ import datetime, calendar
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from ondoc.web.models import OnlineLead
+from ondoc.web.models import OnlineLead, ContactUs
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
@@ -424,3 +424,13 @@ class OrderDetailLabSerializer(serializers.Serializer):
     class Meta:
         fields = ('product_id', 'lab', 'date', 'time', 'test_ids', 'profile', 'is_home_pickup', 'address')
 
+
+class ContactUsSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    mobile = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
+    email = serializers.EmailField()
+    message = serializers.CharField(max_length=2000)
+
+    class Meta:
+        model = ContactUs
+        fields = ('name', 'mobile', 'email', 'message')

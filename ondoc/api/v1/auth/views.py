@@ -53,6 +53,8 @@ import copy
 import logging
 import jwt
 
+from ondoc.web.models import ContactUs
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -1391,3 +1393,13 @@ class UserTokenViewSet(GenericViewSet):
             return Response({"status" : 1,"token": token_object['token']})
         else:
             return Response({"status": 0})
+
+
+class ContactUsViewSet(GenericViewSet):
+
+    def create(self, request):
+        serializer = serializers.ContactUsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        ContactUs.objects.create(**validated_data)
+        return Response({'message': 'success'})
