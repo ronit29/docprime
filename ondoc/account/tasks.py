@@ -34,6 +34,11 @@ def refund_curl_task(self, req_data):
                     refund_queryset.refund_state = ConsumerRefund.COMPLETED
                     refund_queryset.save()
                     print("Status Updated")
+            else:
+                countdown_time = (2 ** self.request.retries) * 60 * 10
+                logging.error("Refund Failure with response - " + str(response.content))
+                print(countdown_time)
+                self.retry([req_data], countdown=countdown_time)
         else:
             countdown_time = (2 ** self.request.retries) * 60 * 10
             logging.error("Refund Failure with response - " + str(response.content))
