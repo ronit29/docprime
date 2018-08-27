@@ -93,7 +93,7 @@ class DoctorSearchHelper:
                        "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                        "LEFT JOIN doctor_specialization ds on ds.doctor_id = d.id " \
                        "LEFT JOIN general_specialization gs on ds.specialization_id = gs.id " \
-                       "WHERE d.is_live=true %s " \
+                       "WHERE d.is_live=true and %s " \
                        "ORDER  BY %s ) x " \
                        "where distance < %s and %s" % (longitude, latitude,
                                                        longitude, latitude,
