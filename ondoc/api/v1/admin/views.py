@@ -13,8 +13,8 @@ def userlogin_via_agent(request):
     from django.http import JsonResponse
     from ondoc.authentication.backends import JWTAuthentication
     response = {'login': 0}
-    if request.POST and request.is_ajax():
-        serializer = serializers.AgenctVerificationSerializer(data=request.POST)
+    if request.GET and request.is_ajax():
+        serializer = serializers.AgenctVerificationSerializer(data=request.GET)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         user = User.objects.filter(phone_number=data['phone_number'], user_type=User.CONSUMER).first()
