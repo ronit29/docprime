@@ -1402,6 +1402,6 @@ class UserTokenViewSet(GenericViewSet):
             token_object = JWTAuthentication.generate_token(agent_token.user)
             agent_token.is_consumed = True
             agent_token.save()
-            return Response({"status": 1, "token": token_object['token'], 'order_id': agent_token.token})
+            return Response({"status": 1, "token": token_object['token'], 'order_id': agent_token.order_id})
         else:
             return Response({"status": 0}, status=status.HTTP_400_BAD_REQUEST)
