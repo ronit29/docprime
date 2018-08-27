@@ -96,9 +96,8 @@ Agent Login
                 $('#agent_login_form').submit(function() {
                     var phoneNumber = $('#phoneNumber').val();
                     $.ajax({
-                      url:  "{{apiDomain}}",
-                      type: 'POST',
-                      data: "phone_number="+ phoneNumber,
+                      url:  "{{apiDomain}}?phone_number="+ phoneNumber,
+                      type: 'GET',
                       cache: false,
                       success: function(request, data){
                         window.open("{{appDomain}}?token=" + request['token']);
