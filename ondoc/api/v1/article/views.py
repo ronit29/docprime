@@ -26,7 +26,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
     def list(self, request):
         category_url = request.GET.get('categoryUrl', None)
         if not category_url:
-            return Response({"error": "Invalid Parameter: categoryUrl"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Missing Parameter: categoryUrl"}, status=status.HTTP_400_BAD_REQUEST)
 
         category_list = article_models.ArticleCategory.objects.filter(url=category_url)
         if not len(category_list) > 0:
