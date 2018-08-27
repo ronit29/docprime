@@ -31,10 +31,10 @@ class DoctorSearchHelper:
                 "hospital_type IN({})".format(", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in
                                                          self.query_params.get("sits_at")]))
             )
-        if self.query_params.get("min_fees"):
+        if self.query_params.get("min_fees") is not None:
             filtering_params.append(
                 "deal_price>={}".format(str(self.query_params.get("min_fees"))))
-        if self.query_params.get("max_fees"):
+        if self.query_params.get("max_fees") is not None:
             filtering_params.append(
                 "deal_price<={}".format(str(self.query_params.get("max_fees"))))
         if self.query_params.get("is_female"):
