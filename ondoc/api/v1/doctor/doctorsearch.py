@@ -91,8 +91,8 @@ class DoctorSearchHelper:
                        "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
                        "INNER JOIN hospital h ON h.id = dc.hospital_id " \
                        "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
-                       "LEFT JOIN doctor_specialization ds on ds.doctor_id = d.id"\
-                       "LEFT JOIN general_specialization gs on ds.specialization_id = gs.id"
+                       "LEFT JOIN doctor_specialization ds on ds.doctor_id = d.id" \
+                       "LEFT JOIN general_specialization gs on ds.specialization_id = gs.id" \
                        #"LEFT JOIN doctor_qualification dq " \
                        #"ON dq.doctor_id = d.id " \
                        #"LEFT JOIN specialization sp " \
