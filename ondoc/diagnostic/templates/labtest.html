@@ -312,10 +312,13 @@
             $("#import-test-form").submit(function(event) {
                 $(".overlay").show();
                 event.preventDefault();
+                var lpg_id = $('#labpricinggroup_id').val();
+                console.log(lpg_id);
                 var csv = $('#import-csv')[0].files[0];
                 console.log($('#import-csv'));
                 var formdata = new FormData();
                 formdata.append("csv", csv );
+                formdata.append("lpg_id", lpg_id );
                 $.ajax({
                       data: formdata,
                       type: "POST",
@@ -328,10 +331,13 @@
                         if(response['success']){
                             $('#upload-message').html(response['success']);
                         }
+                        if(response['error']){
+                            $('#upload-message').html(response['error']);
+                        }
                       },
                       error: function (request, status, error) {
                          $(".overlay").hide();
-                         $('#upload-message').html(response['error']);
+                         
                       }
                  });
 

@@ -27,6 +27,11 @@ class Image(models.Model):
         super().__init__(*args, **kwargs)
         self.__original_name = self.name
 
+    def get_thumbnail_path(self, path, prefix):
+        first, last = path.rsplit('/', 1)
+        return "{}/{}/{}".format(first,prefix,last)
+    
+
     def has_image_changed(self):
         if not self.pk:
             return True
@@ -83,6 +88,10 @@ class Image(models.Model):
         abstract = True
 
 class Document(models.Model):
+
+    def get_thumbnail_path(self, path, prefix):
+        first, last = path.rsplit('/', 1)
+        return "{}/{}/{}".format(first,prefix,last)
 
     def has_changed(self):
         if not self.pk:

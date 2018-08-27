@@ -101,17 +101,13 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
     def get_doctor_thumbnail(self, obj):
         request = self.context.get('request')
-        if obj.doctor.images.all():
-            photo_url = (
-                obj.doctor.images.all()[0].cropped_image.url if obj.doctor.images.all()[0].cropped_image else None)
-            return request.build_absolute_uri(photo_url) if photo_url else None
+        thumbnail = obj.doctor.get_thumbnail()
+        if thumbnail:
+            return request.build_absolute_uri(thumbnail) if thumbnail else None
         else:
             return None
             # url = static('doctor_images/no_image.png')
             # return request.build_absolute_uri(url)
-
-
-
 
 
 class OpdAppModelSerializer(serializers.ModelSerializer):
@@ -428,16 +424,11 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
     def get_thumbnail(self, obj):
         request = self.context.get('request')
-        default_image_url = static('doctor_images/no_image.png')
-        if obj.images.all().exists():
-            image = obj.images.all().first()
-            if not image.cropped_image:
-                return None
-                # return request.build_absolute_uri(default_image_url)
-            return request.build_absolute_uri(image.cropped_image.url)
+        thumbnail = obj.get_thumbnail()
+        if thumbnail:
+            return request.build_absolute_uri(thumbnail) if thumbnail else None
         else:
             return None
-            # return request.build_absolute_uri(default_image_url)
 
 
     # def to_representation(self, doctor):
