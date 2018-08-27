@@ -342,7 +342,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
 class OnlineLeadSerializer(serializers.ModelSerializer):
     member_type = serializers.ChoiceField(choices=OnlineLead.TYPE_CHOICES)
     name = serializers.CharField(max_length=255)
-    speciality = serializers.CharField(max_length=255, required=False)
+    speciality = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
     mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
     city = serializers.CharField(max_length=255, default='')
     email = serializers.EmailField()
@@ -357,7 +357,7 @@ class CareerSerializer(serializers.ModelSerializer):
     name = serializers.CharField(max_length=255)
     mobile = serializers.IntegerField(max_value=9999999999, min_value=1000000000)
     email = serializers.EmailField()
-    resume = serializers.FileField(allow_null=False)
+    resume = serializers.FileField()
 
     class Meta:
         model = Career
