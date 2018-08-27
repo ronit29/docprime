@@ -53,6 +53,8 @@ import copy
 import logging
 import jwt
 
+from ondoc.web.models import ContactUs
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -1364,7 +1366,7 @@ class SendBookingUrlViewSet(GenericViewSet):
 
     def send_booking_url(self, request, order_id):
         type = request.data.get('type')
-        agent_token = AgentToken.objects.create_token(user=request.user)
+        agent_token = AgentToken.objects.create_token(user=request.user, order_id=order_id)
         booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
                                                        phone_number=request.user.phone_number)
         return Response({"status": 1})
@@ -1402,6 +1404,15 @@ class UserTokenViewSet(GenericViewSet):
             token_object = JWTAuthentication.generate_token(agent_token.user)
             agent_token.is_consumed = True
             agent_token.save()
-            return Response({"status" : 1,"token": token_object['token']})
+            return Response({"status": 1, "token": token_object['token'], 'order_id': agent_token.order_id})
         else:
-            return Response({"status": 0})
+            return Response({"status": 0}, status=status.HTTP_400_BAD_REQUEST)
+
+class ContactUsViewSet(GenericViewSet):
+
+    def create(self, request):
+        serializer = serializers.ContactUsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        ContactUs.objects.create(**validated_data)
+        return Response({'message': 'success'})

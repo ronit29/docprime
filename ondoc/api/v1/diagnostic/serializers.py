@@ -580,6 +580,10 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
                 if resp_address:
                     resp_address += ", "
                 resp_address += str(obj.address.get("land_mark"))
+            if obj.address.get("locality"):
+                if resp_address:
+                    resp_address += ", "
+                resp_address += str(obj.address.get("locality"))
             if obj.address.get("pincode"):
                 if resp_address:
                     resp_address += ", "
