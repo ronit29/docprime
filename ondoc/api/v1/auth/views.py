@@ -1350,7 +1350,7 @@ class SendBookingUrlViewSet(GenericViewSet):
 
     def send_booking_url(self, request, order_id):
         type = request.data.get('type')
-        agent_token = AgentToken.objects.create_token(user=request.user)
+        agent_token = AgentToken.objects.create_token(user=request.user, order_id=order_id)
         booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
                                                        phone_number=request.user.phone_number)
         return Response({"status": 1})
@@ -1388,6 +1388,6 @@ class UserTokenViewSet(GenericViewSet):
             token_object = JWTAuthentication.generate_token(agent_token.user)
             agent_token.is_consumed = True
             agent_token.save()
-            return Response({"status" : 1,"token": token_object['token']})
+            return Response({"status": 1, "token": token_object['token'], 'order_id': agent_token.token})
         else:
             return Response({"status": 0})
