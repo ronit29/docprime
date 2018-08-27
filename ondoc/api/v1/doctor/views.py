@@ -642,9 +642,13 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         if not name:
             return Response({"conditions": [], "specializations": []})
         medical_conditions = models.MedicalCondition.objects.filter(
-            search_key__icontains=name).values("id", "name")[:5]
+            Q(search_key__icontains=' '.name),
+            Q(search_key__istartswith=' '.name)).values("id", "name")[:5]
+        
         specializations = models.GeneralSpecialization.objects.filter(
-            search_key__icontains=name).values("id", "name")[:5]
+            Q(search_key__icontains=' '.name),
+            Q(search_key__istartswith=' '.name)).values("id", "name")[:5]
+
         return Response({"conditions": medical_conditions, "specializations": specializations})
 
     def common_conditions(self, request):
