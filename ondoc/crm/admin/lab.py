@@ -499,8 +499,8 @@ class LabAppointmentForm(forms.ModelForm):
             lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
             day=time_slot_start.weekday(),
             start__lte=hour, end__gt=hour).exists()
-        if not is_lab_timing_available:
-            raise forms.ValidationError("This lab test is not available on selected day and time.")
+        # if not is_lab_timing_available:
+        #     raise forms.ValidationError("This lab test is not available on selected day and time.")
         if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
             if not lab.is_home_collection_enabled:
                 raise forms.ValidationError("Home Pickup is disabled for the lab")
