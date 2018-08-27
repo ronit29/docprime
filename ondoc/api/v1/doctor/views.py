@@ -656,10 +656,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <=0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all()[:count]
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("priority")[:count]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all()[:10]
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("priority")[:10]
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data})
 

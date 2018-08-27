@@ -1323,7 +1323,7 @@ class HealthTip(auth_model.TimeStampedModel):
 
 class CommonMedicalCondition(auth_model.TimeStampedModel):
     condition = models.OneToOneField(MedicalCondition, related_name="common_condition", on_delete=models.CASCADE)
-
+    priority = models.PositiveIntegerField(default=0)
     def __str__(self):
         return "{}".format(self.condition)
 
@@ -1334,6 +1334,7 @@ class CommonMedicalCondition(auth_model.TimeStampedModel):
 class CommonSpecialization(auth_model.TimeStampedModel):
     specialization = models.OneToOneField(GeneralSpecialization, related_name="common_specialization", on_delete=models.CASCADE)
     icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return "{}".format(self.specialization)
