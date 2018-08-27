@@ -146,14 +146,40 @@ class LabNetworkDocumentInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+
+class GenericLabNetworkAdminFormSet(forms.BaseInlineFormSet):
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        current_lab_network_id = self.instance.id
+        if current_lab_network_id:
+            associated_labs = Lab.objects.filter(network=current_lab_network_id).prefetch_related('manageable_lab_admins')
+            if associated_labs.exists():
+                is_lab_network_admin = False
+                for value in self.cleaned_data:
+                    if value and not value['DELETE']:
+                        is_lab_network_admin = True
+                        break
+                if is_lab_network_admin:
+                    is_disabled_value = True
+                else:
+                    is_disabled_value = False
+                for lab in associated_labs:
+                    lab.manageable_lab_admins.update(is_disabled=is_disabled_value)
+
+
 class GenericLabNetworkAdminInline(admin.TabularInline):
     model = GenericLabAdmin
+    formset = GenericLabNetworkAdminFormSet
     extra = 0
     can_delete = True
     show_change_link = False
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    fields = ['user', 'phone_number', 'lab_network', 'permission_type', 'is_disabled', 'read_permission', 'write_permission']
+    fields = ['user', 'phone_number', 'lab_network', 'permission_type', 'read_permission', 'write_permission']
 
 
 class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):

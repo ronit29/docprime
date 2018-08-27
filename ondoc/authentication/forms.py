@@ -33,9 +33,15 @@ class BillingAccountForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(BillingAccountForm, self).__init__(*args, **kwargs)
         if self.instance.pk:
-            self.fields['type'].widget = forms.TextInput(attrs={'readonly':True})
+            self.fields['type'].required = False
+            self.fields['account_number'].required = False
+            self.fields['pan_number'].required = False
+            self.fields['ifsc_code'].required = False
+            self.fields['pan_copy'].required = False
+            self.fields['account_copy'].required = False
             #self.fields['pan_copy'].disabled = True
             #self.fields['account_copy'].disabled = True
+            self.fields['type'].widget = forms.TextInput(attrs={'readonly': True})
             self.fields['account_number'].widget.attrs['readonly'] = True
             self.fields['pan_number'].widget.attrs['readonly'] = True
             self.fields['ifsc_code'].widget.attrs['readonly'] = True

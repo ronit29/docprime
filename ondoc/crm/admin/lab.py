@@ -111,8 +111,16 @@ class LabImageInline(admin.TabularInline):
     max_num = 3
 
 
+class LabManagerFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+
 class LabManagerInline(admin.TabularInline):
     model = LabManager
+    formset = LabManagerFormSet
     formfield_overrides = {
         models.BigIntegerField: {'widget': forms.TextInput},
     }
@@ -151,7 +159,7 @@ class LabServiceInline(admin.TabularInline):
 
 class LabDoctorInline(admin.TabularInline):
     model = LabDoctor
-    #form = LabAwardForm
+    # form = LabAwardForm
     extra = 0
     can_delete = True
     show_change_link = False
@@ -159,8 +167,28 @@ class LabDoctorInline(admin.TabularInline):
 # class LabDocumentForm(forms.ModelForm):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
+
+class GenericLabAdminFormSet(forms.BaseInlineFormSet):
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        current_lab_network = self.instance.network
+        if current_lab_network:
+            if current_lab_network.manageable_lab_network_admins.all().exists():
+                is_lab_admin_active = False
+                for value in self.cleaned_data:
+                    if value and not value['DELETE'] and not value['is_disabled']:
+                        is_lab_admin_active = True
+                        break
+                if is_lab_admin_active:
+                    raise forms.ValidationError("This lab's network already has admin(s), so disable all admins of the lab.")
+
+
 class GenericLabAdminInline(admin.TabularInline):
     model = GenericLabAdmin
+    formset = GenericLabAdminFormSet
     extra = 0
     can_delete = True
     show_change_link = False
@@ -395,7 +423,23 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
         super().save_model(request, obj, form, change)
 
+    def save_related(self, request, form, formsets, change):
+        super(type(self), self).save_related(request, form, formsets, change)
+        lab = form.instance
+        lab_mgr_form_change = False
+        lab_mgr_new_len = lab_mgr_del_len = 0
+        for formset in formsets:
+            if isinstance(formset, LabManagerFormSet):
+                for form in formset.forms:
+                    if 'contact_type' in form.changed_data or 'number' in form.changed_data:
+                        lab_mgr_form_change = True
+                        break
+                lab_mgr_new_len = len(formset.new_objects)
+                lab_mgr_del_len = len(formset.deleted_objects)
 
+        if lab is not None:
+            if (lab_mgr_form_change or lab_mgr_new_len > 0 or lab_mgr_del_len > 0):
+                GenericLabAdmin.create_admin_permissions(lab)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(LabAdmin, self).get_form(request, obj=obj, **kwargs)
@@ -446,17 +490,25 @@ class LabAppointmentForm(forms.ModelForm):
             lab = cleaned_data.get('lab')
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
-
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
 
         selected_test_ids = lab_test.values_list('test', flat=True)
-        if not LabTiming.objects.filter(
-                lab=lab,
-                lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
-                day=time_slot_start.weekday(),
-                start__lte=hour, end__gt=hour).exists():
-            raise forms.ValidationError("This lab test is not available on selected day and time.")
+        is_lab_timing_available = LabTiming.objects.filter(
+            lab=lab,
+            lab__lab_pricing_group__available_lab_tests__test__in=selected_test_ids,
+            day=time_slot_start.weekday(),
+            start__lte=hour, end__gt=hour).exists()
+        # if not is_lab_timing_available:
+        #     raise forms.ValidationError("This lab test is not available on selected day and time.")
+        if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
+            if not lab.is_home_collection_enabled:
+                raise forms.ValidationError("Home Pickup is disabled for the lab")
+            if self.instance.start_time < 7.0 or self.instance.start_time > 19.0:
+                raise forms.ValidationError("No time slot available")
+        else:
+            if not lab.always_open and not is_lab_timing_available:
+                raise forms.ValidationError("No time slot available")
 
         return cleaned_data
 
@@ -468,9 +520,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
 
     def get_profile(self, obj):
-        if not obj.profile_detail:
+        if not obj.profile:
             return ''
-        return obj.profile_detail.get('name', '')
+        return obj.profile.name
 
     get_profile.admin_order_field = 'profile'
     get_profile.short_description = 'Profile Name'

@@ -25,15 +25,20 @@ def refund_curl_task(self, req_data):
         print(url)
         response = requests.post(url, data=req_data, headers=headers)
         # response.raise_for_status()
-        resp_data = response.json()
-        print(resp_data)
-        if response.status_code == status.HTTP_200_OK and resp_data.get("ok") and str(resp_data["ok"]) == str(1):
+        if response.status_code == status.HTTP_200_OK:
             from .models import ConsumerRefund
-            refund_queryset = ConsumerRefund.objects.filter(pk=req_data["refNo"]).first()
-            if refund_queryset:
-                refund_queryset.refund_state = ConsumerRefund.COMPLETED
-                refund_queryset.save()
-                print("Status Updated")
+            resp_data = response.json()
+            if resp_data.get("ok") and str(resp_data["ok"]) == str(1):
+                refund_queryset = ConsumerRefund.objects.filter(pk=req_data["refNo"]).first()
+                if refund_queryset:
+                    refund_queryset.refund_state = ConsumerRefund.COMPLETED
+                    refund_queryset.save()
+                    print("Status Updated")
+            else:
+                countdown_time = (2 ** self.request.retries) * 60 * 10
+                logging.error("Refund Failure with response - " + str(response.content))
+                print(countdown_time)
+                self.retry([req_data], countdown=countdown_time)
         else:
             countdown_time = (2 ** self.request.retries) * 60 * 10
             logging.error("Refund Failure with response - " + str(response.content))

@@ -6,12 +6,9 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import JSONField
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from PIL import Image as Img
 from django.core.files.uploadedfile import InMemoryUploadedFile
-
 from io import BytesIO
 import math
 import os
@@ -29,6 +26,11 @@ class Image(models.Model):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_name = self.name
+
+    def get_thumbnail_path(self, path, prefix):
+        first, last = path.rsplit('/', 1)
+        return "{}/{}/{}".format(first,prefix,last)
+    
 
     def has_image_changed(self):
         if not self.pk:
@@ -86,6 +88,10 @@ class Image(models.Model):
         abstract = True
 
 class Document(models.Model):
+
+    def get_thumbnail_path(self, path, prefix):
+        first, last = path.rsplit('/', 1)
+        return "{}/{}/{}".format(first,prefix,last)
 
     def has_changed(self):
         if not self.pk:
@@ -566,7 +572,7 @@ class GenericLabAdmin(TimeStampedModel):
         db_table = 'generic_lab_admin'
 
     def save(self, *args, **kwargs):
-        user = User.objects.filter(phone_number=self.phone_number).first()
+        user = User.objects.filter(phone_number=self.phone_number, user_type=User.DOCTOR).first()
         if user is not None:
             self.user = user
         super(GenericLabAdmin, self).save(*args, **kwargs)
@@ -597,6 +603,32 @@ class GenericLabAdmin(TimeStampedModel):
                 else:
                     access_list.append({'admin_obj': permission.lab, 'admin_level': Outstanding.LAB_LEVEL})
         return access_list
+
+    @staticmethod
+    def create_admin_permissions(lab):
+        from ondoc.diagnostic import models as diag_models
+        if lab is not  None:
+            manager_queryset = diag_models.LabManager.objects.filter(lab=lab, contact_type= diag_models.LabManager.SPOC)
+            delete_queryset = GenericLabAdmin.objects.filter(lab=lab, super_user_permission=True)
+            if delete_queryset.exists():
+                delete_queryset.delete()
+            if manager_queryset.exists():
+                for mgr in manager_queryset.all():
+                    if lab.network and lab.network.manageable_lab_network_admins.exists():
+                        is_disabled = True
+                    else:
+                        is_disabled = False
+                    if mgr.number and not mgr.lab.manageable_lab_admins.filter(phone_number=mgr.number).exists():
+                        admin_object = GenericLabAdmin(lab=lab,
+                                      phone_number=mgr.number,
+                                      lab_network=None,
+                                      permission_type=GenericLabAdmin.APPOINTMENT,
+                                      is_disabled=is_disabled,
+                                      super_user_permission=True,
+                                      write_permission=True,
+                                      read_permission=True,
+                                      )
+                        admin_object.save()
 
 
 class GenericAdmin(TimeStampedModel):

@@ -1,0 +1,1 @@
+Report uploaded by Lab - {{lab_name|capfirst}} for your appointment for {{patient_name|capfirst}}.

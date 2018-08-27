@@ -1,7 +1,6 @@
 from config.settings.base import *
-import os
 import logging
-import raven
+
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 
@@ -129,7 +128,7 @@ AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=86400',
 }
 AWS_S3_CUSTOM_DOMAIN = 's3.%s.amazonaws.com/%s' % (AWS_S3_REGION_NAME, AWS_STORAGE_BUCKET_NAME)
-AWS_PRELOAD_METADATA = True
+AWS_PRELOAD_METADATA = False
 
 
 DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'
