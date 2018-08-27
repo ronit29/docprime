@@ -4,7 +4,9 @@ from django.contrib.auth import get_user_model
 import logging
 import jwt
 from ondoc.api.v1.admin import serializers
+from ondoc.crm.constants import constants
 
+from rest_framework.response import Response
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -13,7 +15,11 @@ def userlogin_via_agent(request):
     from django.http import JsonResponse
     from ondoc.authentication.backends import JWTAuthentication
     response = {'login': 0}
-    if request.GET and request.is_ajax():
+    if request.method != 'GET':
+        return Response(status=405)
+
+    if request.is_ajax() and (request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists()
+                              or request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists()):
         serializer = serializers.AgenctVerificationSerializer(data=request.GET)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
