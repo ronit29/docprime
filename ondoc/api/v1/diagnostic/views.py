@@ -47,7 +47,11 @@ User = get_user_model()
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
-        test_queryset = CommonTest.objects.all()
+        count = request.query_params.get('count', 10)
+        count = int(count)
+        if count <= 0:
+            count = 10
+        test_queryset = CommonTest.objects.all()[:count]
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})

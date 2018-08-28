@@ -642,16 +642,24 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         if not name:
             return Response({"conditions": [], "specializations": []})
         medical_conditions = models.MedicalCondition.objects.filter(
-            name__icontains=name).values("id", "name")[:5]
-        specializations = models.Specialization.objects.filter(
-            name__icontains=name).values("id", "name")[:5]
+            Q(search_key__icontains=' '+name) | 
+            Q(search_key__istartswith=name)).values("id", "name")[:5]
+
+        specializations = models.GeneralSpecialization.objects.filter(
+            Q(search_key__icontains=' '+name) | 
+            Q(search_key__istartswith=name)).values("id", "name")[:5]
+
         return Response({"conditions": medical_conditions, "specializations": specializations})
 
     def common_conditions(self, request):
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all()[:10]
+        count = request.query_params.get('count', 10)
+        count = int(count)
+        if count <=0:
+            count = 10
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("priority")[:count]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all()[:10]
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("priority")[:10]
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data})
 

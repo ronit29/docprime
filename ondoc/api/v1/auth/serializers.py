@@ -9,7 +9,7 @@ import datetime, calendar
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from ondoc.web.models import OnlineLead, Career
+from ondoc.web.models import OnlineLead, Career, ContactUs
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
@@ -342,7 +342,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
 class OnlineLeadSerializer(serializers.ModelSerializer):
     member_type = serializers.ChoiceField(choices=OnlineLead.TYPE_CHOICES)
     name = serializers.CharField(max_length=255)
-    speciality = serializers.CharField(max_length=255, required=False)
+    speciality = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
     mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
     city = serializers.CharField(max_length=255, default='')
     email = serializers.EmailField()
@@ -357,7 +357,7 @@ class CareerSerializer(serializers.ModelSerializer):
     name = serializers.CharField(max_length=255)
     mobile = serializers.IntegerField(max_value=9999999999, min_value=1000000000)
     email = serializers.EmailField()
-    resume = serializers.FileField(allow_null=False)
+    resume = serializers.FileField()
 
     class Meta:
         model = Career
@@ -436,3 +436,13 @@ class OrderDetailLabSerializer(serializers.Serializer):
     class Meta:
         fields = ('product_id', 'lab', 'date', 'time', 'test_ids', 'profile', 'is_home_pickup', 'address')
 
+
+class ContactUsSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    mobile = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
+    email = serializers.EmailField()
+    message = serializers.CharField(max_length=2000)
+
+    class Meta:
+        model = ContactUs
+        fields = ('name', 'mobile', 'email', 'message')
