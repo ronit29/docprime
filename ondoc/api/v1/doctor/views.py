@@ -22,7 +22,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
-from django.db.models import Q
+from django.db.models import Q, Value
 from django.db.models import Case, When
 from operator import itemgetter
 from itertools import groupby
@@ -30,6 +30,7 @@ from ondoc.api.v1.utils import RawSql, is_valid_testing_data
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F
+from django.db.models.functions import StrIndex
 import datetime
 import copy
 import hashlib
@@ -642,12 +643,16 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         if not name:
             return Response({"conditions": [], "specializations": []})
         medical_conditions = models.MedicalCondition.objects.filter(
-            Q(search_key__icontains=' '+name) | 
-            Q(search_key__istartswith=name)).values("id", "name")[:5]
+            Q(search_key__icontains=name) |
+            Q(search_key__icontains=' ' + name) |
+            Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
+            'search_index').values("id", "name")[:5]
 
         specializations = models.GeneralSpecialization.objects.filter(
-            Q(search_key__icontains=' '+name) | 
-            Q(search_key__istartswith=name)).values("id", "name")[:5]
+            Q(search_key__icontains=name) |
+            Q(search_key__icontains=' ' + name) |
+            Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
+            'search_index').values("id", "name")[:5]
 
         return Response({"conditions": medical_conditions, "specializations": specializations})
 
