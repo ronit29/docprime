@@ -1,5 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 
+from django.db import transaction
 from celery import task
 import logging
 
@@ -7,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 @task(bind=True)
+@transaction.atomic
 def doc_app_auto_cancel(self, prev_app_dict):
     from .models import OpdAppointment
     try:

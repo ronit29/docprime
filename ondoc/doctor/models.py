@@ -1192,13 +1192,13 @@ class OpdAppointment(auth_model.TimeStampedModel):
         delay = settings.AUTO_CANCEL_OPD_DELAY * 60
         to_zone = tz.gettz(settings.TIME_ZONE)
         app_updated_time = app_obj.updated_at.astimezone(to_zone)
-        morning_time = "08:00:00"  # In IST
+        morning_time = "09:00:00"  # In IST
         evening_time = "20:00:00"  # In IST
         present_day_end = custom_form_datetime(evening_time, to_zone)
         next_day_start = custom_form_datetime(morning_time, to_zone, diff_days=1)
         time_diff = next_day_start - app_updated_time
 
-        if present_day_end - timedelta(minutes=10) < app_updated_time < next_day_start:
+        if present_day_end - timedelta(minutes=settings.AUTO_CANCEL_OPD_DELAY) < app_updated_time < next_day_start:
             return time_diff.seconds
         else:
             return delay
