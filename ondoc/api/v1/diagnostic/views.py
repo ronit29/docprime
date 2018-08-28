@@ -34,7 +34,8 @@ from collections import OrderedDict
 from django.utils import timezone
 from ondoc.diagnostic import models
 from ondoc.authentication import models as auth_models
-from django.db.models import Q
+from django.db.models import Q, Value
+from django.db.models.functions import StrIndex
 from . import serializers
 import copy
 import re
@@ -81,11 +82,16 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             test_queryset = LabTest.objects.filter(
-                Q(search_key__icontains=" " + search_key) | Q(search_key__istartswith=search_key))
+                Q(search_key__icontains=search_key) |
+                Q(search_key__icontains=' ' + search_key) |
+                Q(search_key__istartswith=search_key)).annotate(search_index=StrIndex('search_key', Value(search_key))).order_by(
+                'search_index')
             test_queryset = paginate_queryset(test_queryset, request)
             lab_queryset = Lab.objects.filter(is_live=True, is_test_lab=False).filter(
-                Q(search_key__icontains=" " + search_key) | Q(search_key__istartswith=search_key)
-            )
+                Q(search_key__icontains=search_key) |
+                Q(search_key__icontains=' ' + search_key) |
+                Q(search_key__istartswith=search_key)).annotate(search_index=StrIndex('search_key', Value(search_key))).order_by(
+                'search_index')
             lab_queryset = paginate_queryset(lab_queryset, request)
         else:
             test_queryset = self.queryset[:20]
