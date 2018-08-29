@@ -164,7 +164,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def get_age(self, obj):
         from datetime import date
         age = None
-        birth_date = obj.dob if obj.dob is not None else None
+        birth_date = None
+        if hasattr(obj, 'dob') and obj.dob:
+            birth_date = hasattr(obj, 'dob') and obj.dob
+        else:
+            birth_date = obj.get('dob')
         if birth_date:
             today = date.today()
             age = today.year - birth_date.year
@@ -175,8 +179,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_profile_image(self, obj):
         request = self.context.get('request')
-        if obj.profile_image:
-            photo_url = obj.profile_image.url
+        profile_image = None
+        if hasattr(obj, 'profile_image') and obj.profile_image:
+            profile_image = obj.profile_image
+        else:
+            profile_image = obj.get('profile_image')
+        if profile_image:
+            photo_url = profile_image.url
             return request.build_absolute_uri(photo_url)
         else:
             return None
