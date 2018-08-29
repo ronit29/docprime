@@ -123,6 +123,7 @@ LOCAL_APPS = (
     'ondoc.matrix',
     'ondoc.articles',
     'ondoc.reports',
+    'ondoc.location',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

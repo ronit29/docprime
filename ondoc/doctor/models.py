@@ -14,6 +14,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
+from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund
 from ondoc.payout.models import Outstanding
 from ondoc.doctor.tasks import doc_app_auto_cancel
@@ -39,6 +40,8 @@ from PIL import Image as Img
 from io import BytesIO
 import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +277,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
     billing_merchant = GenericRelation(auth_model.BillingAccount)
+    extras = GenericRelation(location_models.EntityAddress)
 
+    def save(self, *args, **kwargs):
+        super(Doctor, self).save(*args, **kwargs)
+        ea = location_models.EntityAddress.create(latitude='44.42514', longitude='26.10540', content_object=self)
+        ea.save()
 
     def __str__(self):
         return self.name
@@ -1350,4 +1358,5 @@ class DoctorMapping(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "doctor_mapping"
+
 
