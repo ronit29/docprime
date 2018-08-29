@@ -24,7 +24,7 @@ def refund_curl_task(self, req_data):
             # For test only
             # url = 'http://localhost:8000/api/v1/doctor/test'
             print(url)
-            response = requests.post(url, data=req_data, headers=headers)
+            response = requests.post(url, data=json.dumps(req_data), headers=headers)
             # response.raise_for_status()
             if response.status_code == status.HTTP_200_OK:
                 from .models import ConsumerRefund
@@ -36,15 +36,9 @@ def refund_curl_task(self, req_data):
                         refund_queryset.save()
                         print("Status Updated")
                 else:
-                    countdown_time = (2 ** self.request.retries) * 60 * 10
-                    logging.error("Refund Failure with response - " + str(response.content))
-                    print(countdown_time)
-                    self.retry([req_data], countdown=countdown_time)
+                    raise Exception("Retry on wrong response - " + str(response.content))
             else:
-                countdown_time = (2 ** self.request.retries) * 60 * 10
-                logging.error("Refund Failure with response - " + str(response.content))
-                print(countdown_time)
-                self.retry([req_data], countdown=countdown_time)
+                raise Exception("Retry on invalid Http response status - " + str(response.content))
         except Exception as e:
             countdown_time = (2 ** self.request.retries) * 60 * 10
             logging.error("Error in Refund with next retry countdown - " + str(countdown_time) + " of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
