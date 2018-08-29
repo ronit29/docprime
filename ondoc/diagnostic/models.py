@@ -13,6 +13,7 @@ from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import F, Sum, When, Case, Q
+from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 from ondoc.payout.models import Outstanding
@@ -717,6 +718,7 @@ class LabAppointment(TimeStampedModel):
         self.status = self.ACCEPTED
         self.save()
 
+    @transaction.atomic
     def action_cancelled(self, refund_flag=1):
         self.status = self.CANCELLED
         self.save()
