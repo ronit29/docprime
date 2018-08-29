@@ -860,7 +860,7 @@ class BillingAccount(models.Model):
     SAVINGS = 1
     CURRENT = 2
     merchant_id = models.BigIntegerField(null=True, default=None, blank=True)
-    account_number = models.BigIntegerField(null=True, default=None, blank=True)
+    account_number = models.CharField(max_length=50, null=True, default=None, blank=True)
     ifsc_code = models.CharField(max_length=128, null=True)
     pan_number = models.CharField(max_length=20, null=True)
     TYPE_CHOICES = (
