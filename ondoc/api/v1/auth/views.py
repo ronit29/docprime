@@ -298,6 +298,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             data.update({
                 "is_default_user": True
             })
+
         if request.data.get('age'):
             try:
                 age = int(request.data.get("age"))
@@ -314,11 +315,12 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
         if UserProfile.objects.filter(name=data['name'], user=request.user).exists():
-            return Response({
-                "request_errors": {"code": "invalid",
-                                   "message": "Profile with the given name already exists."
-                                   }
-            }, status=status.HTTP_400_BAD_REQUEST)
+            # return Response({
+            #     "request_errors": {"code": "invalid",
+            #                        "message": "Profile with the given name already exists."
+            #                        }
+            # }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.data)
         serializer.save()
         return Response(serializer.data)
 
