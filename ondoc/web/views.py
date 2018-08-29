@@ -72,8 +72,8 @@ def careers_page(request):
 
 
 def redirect_to_original_url(request, hash):
-    tiny_url = web_models.TinyUrl.objects.filter(hash=hash).first()
+    tiny_url = web_models.TinyUrl.objects.filter(short_code=hash).first()
     if not tiny_url:
         return HttpResponse(status=status.HTTP_404_NOT_FOUND)
     original_url = tiny_url.original_url
-    return HttpResponsePermanentRedirect(original_url)
+    return HttpResponseRedirect(original_url)

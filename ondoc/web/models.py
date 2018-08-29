@@ -66,18 +66,14 @@ class ContactUs(TimeStampedModel):
 
 class TinyUrl(TimeStampedModel):
     SHORT_URL_PREFIX = 'short'
-    original_url = models.URLField(max_length=256)
-    hash = models.CharField(max_length=50, unique=True, default='')
+    original_url = models.URLField(max_length=5000)
+    short_code = models.CharField(max_length=50, unique=True)
 
     def __str__(self):
         return "{}".format(self.id)
 
-    def set_hash(self, hash):
-        self.hash = hash
-        self.save()
-
     def get_tiny_url(self):
-        return "{}/{}/{}".format(settings.BASE_URL, TinyUrl.SHORT_URL_PREFIX, self.hash)
+        return "{}/{}/{}".format(settings.BASE_URL, TinyUrl.SHORT_URL_PREFIX, self.short_code)
 
     class Meta:
         db_table = 'tiny_url'

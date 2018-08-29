@@ -15,10 +15,10 @@ class TinyUrlViewset(GenericViewSet):
         data = request.data
         original_url = data.get('url')
         random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
-        tiny_url = web_models.TinyUrl.objects.filter(hash=random_string).first()
+        tiny_url = web_models.TinyUrl.objects.filter(short_code=random_string).first()
         if tiny_url:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
-        tiny_url = web_models.TinyUrl.objects.create(original_url=original_url, hash=hash)
+        tiny_url = web_models.TinyUrl.objects.create(original_url=original_url, short_code=random_string)
         return Response({'tiny_url': tiny_url.get_tiny_url()})
 
 
