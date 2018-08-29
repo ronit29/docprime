@@ -35,23 +35,23 @@ def prepare_and_hit(self, data):
         'PrimaryNo': appointment.user.phone_number,
         'LeadSource': 'DocPrime',
         'EmailId': 'testsk@gmail.com',
-        'Gender': appointment.profile.gender,
-        'CityId': '',
+        'Gender': 1 if appointment.profile.gender == 'm' else 2 if appointment.profile.gender == 'f' else 0,
+        'CityId': 0,
         'ProductId': task_data.get('product_id'),
         'SubProductId': task_data.get('sub_product_id'),
         'AppointmentDetails': appointment_details
     }
 
     url = settings.MATRIX_API_URL
-    response = requests.post(url, data=request_data, headers={'authorization': 'RG9jcHJpbWU= d2Vi',
+    response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': 'RG9jcHJpbWU= d2Vi',
                                                               'Content-Type': 'application/json'})
 
     if response.status_code != status.HTTP_200_OK or not response.ok:
         logger.info("[ERROR] Appointment could not be published to the matrix system")
         logger.info("[ERROR] %s", response.reason)
-    else:
+
         countdown_time = (2 ** self.request.retries) * 60 * 10
-        logging.error("Refund Failure with response - " + str(response.content))
+        logging.error("Appointment sync with the Matrix System failed with response - " + str(response.content))
         print(countdown_time)
         self.retry([data], countdown=countdown_time)
 
