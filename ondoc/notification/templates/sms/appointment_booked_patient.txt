@@ -1,1 +1,1 @@
-Appointment Confirmed for {{patient_name|capfirst}} requested with Dr. {{docor_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.
+We have received your appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}, will confirm you once when its accepted by the doctor.

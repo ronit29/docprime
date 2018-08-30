@@ -62,6 +62,12 @@ def send_lab_notifications(appointment_id):
         for lab_manager in lab_managers:
             LabNotificationAction.send_to_lab_managers(
                 instance, lab_manager, notification_models.NotificationAction.LAB_APPOINTMENT_BOOKED)
+        LabNotificationAction.trigger(
+            instance=instance,
+            user=instance.user,
+            notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_BOOKED,
+        )
+        return
 
 @task
 def send_opd_notifications(appointment_id):
@@ -104,6 +110,10 @@ def send_opd_notifications(appointment_id):
                 instance=instance,
                 user=admin,
                 notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED)
+        notification_models.NotificationAction.trigger(
+            instance=instance,
+            user=instance.user,
+            notification_type=notification_models.NotificationAction.APPOINTMENT_BOOKED)
     elif instance.status == OpdAppointment.CANCELLED:
         for admin in doctor_admins:
             notification_models.NotificationAction.trigger(
