@@ -758,7 +758,7 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         serializer = serializers.OpdAppointmentCompleteTempSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('id'))
+        opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('opd_appointment'))
         if opd_appointment:
             opd_appointment.action_completed()
 
