@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from . import serializers
 from ondoc.api.pagination import paginate_queryset
 
+
 class ArticleCategoryViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
@@ -16,6 +17,22 @@ class ArticleCategoryViewSet(viewsets.GenericViewSet):
         article_category_list = [serializers.ArticleCategoryListSerializer(category, context={'request': request}).data
                                  for category in queryset]
         return Response(article_category_list)
+
+
+class TopArticleCategoryViewSet(viewsets.GenericViewSet):
+
+    def get_queryset(self):
+        return article_models.ArticleCategory.objects.all()
+
+    def list(self, request):
+        response = list()
+        for category in self.get_queryset():
+            article_list = category.articles.filter(is_published=True).order_by('id')[:8]
+            resp = serializers.ArticleListSerializer(article_list, many=True,
+                                                     context={'request': request, 'category': category}).data
+            category_serialized = serializers.ArticleCategoryListSerializer(category, context={'request': request}).data
+            response.append({'articles': resp, 'name': category_serialized['name'], 'url': category_serialized['url']})
+        return Response(response)
 
 
 class ArticleViewSet(viewsets.GenericViewSet):
@@ -38,7 +55,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
 
         article_data = paginate_queryset(article_data, request, 10)
         resp = serializers.ArticleListSerializer(article_data, many=True,
-                                                             context={'request': request, 'category': category}).data
+                                                 context={'request': request, 'category': category}).data
         return Response(resp)
 
     def retrieve(self, request):

@@ -94,7 +94,8 @@ def push_appointment_to_matrix(self, data):
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
 
-
+        # Preparing the data and now pushing the data to the matrix system.
         prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data})
+
     except Exception as e:
-        logger.error("Error in Celery. Failed pushing Opd Appointment to the matrix- " + str(e))
+        logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
