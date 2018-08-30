@@ -208,12 +208,17 @@ class UserPermissionSerializer(serializers.ModelSerializer):
 
 
 class AddressSerializer(serializers.ModelSerializer):
+    locality_location_lat = serializers.ReadOnlyField(source='locality_location.y')
+    locality_location_long = serializers.ReadOnlyField(source='locality_location.x')
+    landmark_location_lat = serializers.ReadOnlyField(source='landmark_location.y')
+    landmark_location_long = serializers.ReadOnlyField(source='landmark_location.x')
 
     class Meta:
         model = Address
         fields = ('id', 'type', 'address', 'land_mark', 'pincode',
-                  'phone_number', 'is_default', 'profile', 'locality', 'landmark_location', 'locality_location',
-                  'landmark_place_id', 'locality_place_id')
+                  'phone_number', 'is_default', 'profile', 'locality',
+                  'landmark_place_id', 'locality_place_id', 'locality_location_lat', 'locality_location_long',
+                  'landmark_location_lat', 'landmark_location_long')
 
     def create(self, validated_data):
         request = self.context.get("request")

@@ -737,7 +737,7 @@ class AddressViewsSet(viewsets.ModelViewSet):
 
         loc_position = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
         land_position = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
-        resp = dict()
+        address = None
         if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
                 locality_location__distance_lte=(loc_position, 0),
                 landmark_location__distance_lte=(land_position, 0)).exists():
@@ -745,20 +745,20 @@ class AddressViewsSet(viewsets.ModelViewSet):
             validated_data["landmark_location"] = land_position
             validated_data['user'] = request.user
             address = Address.objects.create(**validated_data)
-            serializer = serializers.AddressSerializer(address)
         else:
             address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
                 locality_location__distance_lte=(loc_position, 0),
                 landmark_location__distance_lte=(land_position, 0)).first()
-            serializer = serializers.AddressSerializer(address)
+        serializer = serializers.AddressSerializer(address)
         return Response(serializer.data)
 
     def update(self, request, pk=None):
         data = {key: value for key, value in request.data.items()}
+        validated_data = dict()
         if data.get('locality_location_lat') and data.get('locality_location_long'):
-            data["locality_location"] = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
+            validated_data["locality_location"] = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
         if data.get('landmark_location_lat') and data.get('landmark_location_long'):
-            data["landmark_location"] = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
+            validated_data["landmark_location"] = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
         data['user'] = request.user.id
         address = self.get_queryset().filter(pk=pk)
         if data.get("is_default"):
@@ -767,13 +767,13 @@ class AddressViewsSet(viewsets.ModelViewSet):
                 add_default_qs.update(is_default=False)
         serializer = serializers.AddressSerializer(address.first(), data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        # New Code
+        validated_data.update(serializer.validated_data)
         if address:
-            address.update(**serializer.validated_data)
+            address.update(**validated_data)
             address = address.first()
         else:
-            serializer.validated_data["user"] = request.user
-            address = Address.objects.create(**serializer.validated_data)
+            validated_data["user"] = request.user
+            address = Address.objects.create(**validated_data)
         resp_serializer = serializers.AddressSerializer(address)
         return Response(resp_serializer.data)
 

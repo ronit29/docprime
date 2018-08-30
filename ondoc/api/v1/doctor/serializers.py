@@ -752,5 +752,23 @@ class ConfigGetSerializer(serializers.Serializer):
     ver = serializers.CharField(max_length=10)
 
 
+class OpdAppointmentCompleteTempSerializer(serializers.Serializer):
+
+    opd_appointment = serializers.IntegerField()
+    otp = serializers.IntegerField(max_value=9999)
+
+    def validate(self, attrs):
+        appointment_id = attrs.get('opd_appointment')
+        appointment = OpdAppointment.objects.filter(id=appointment_id).first()
+        if appointment:
+            if appointment.status == OpdAppointment.COMPLETED:
+                raise serializers.ValidationError("Appointment Already Completed.")
+            elif appointment.status == OpdAppointment.CANCELLED:
+                raise serializers.ValidationError("Cannot Complete a Cancelled Appointment.")
+            if not appointment.otp == attrs['otp']:
+                raise serializers.ValidationError("Invalid OTP.")
+        return attrs
+
+
 
 
