@@ -292,6 +292,9 @@ class Command(BaseCommand):
         #Create report team
         self.create_report_team()
 
+        #Create XL Data Export Group
+        Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
+
         # Create Article team Group
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
