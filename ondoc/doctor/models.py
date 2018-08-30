@@ -281,8 +281,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         super(Doctor, self).save(*args, **kwargs)
-        ea = location_models.EntityAddress.create(latitude='44.42514', longitude='26.10540', content_object=self)
-        ea.save()
+        # ea = location_models.EntityAddress.create(latitude='28.57422', longitude='77.2542084', content_object=self)
 
     def __str__(self):
         return self.name

@@ -31,7 +31,7 @@ class EntityAddress(models.Model):
 
     class AllowedKeys(Choices):
         LOCALITY = 'LOCALITY'
-        SUBLALITY = 'SUBLOCALITY'
+        SUBLOCALITY = 'SUBLOCALITY'
         ROUTE = 'ROUTE'
         STREET_NUMBER = 'STREET_NUMBER'
 
@@ -47,7 +47,7 @@ class EntityAddress(models.Model):
     @classmethod
     def create(cls, *args, **kwargs):
         meta_data = get_meta_by_latlong(kwargs.get('latitude'), kwargs.get('longitude'))
-        if kwargs.get('content_object', None):
+        if not kwargs.get('content_object', None):
             raise ValueError('Missing parameter: content_object')
 
         for meta in meta_data:

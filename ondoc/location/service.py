@@ -1,17 +1,18 @@
 import requests
 import logging
 from rest_framework import status
+from django.conf import settings
 import logging
 logger = logging.getLogger(__name__)
 
 
 def get_meta_by_latlong(lat, long):
     response = requests.get('http://maps.googleapis.com/maps/api/geocode/json?sensor=false',
-                 params={'latlng': '44.42514,26.10540'})
+                            params={'latlng': '%s,%s' % (lat, long), 'KEY': settings.REVERSE_GEOCODING_API_KEY})
     if response.status_code != status.HTTP_200_OK or not response.ok:
         logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
         logger.info("[ERROR] %s", response.reason)
-        return {}
+        return []
 
     resp_data = response.json()
     if resp_data.get('status',None) == 'OK' and len(resp_data.get('results', [])) > 0:
@@ -28,10 +29,10 @@ def get_meta_by_latlong(lat, long):
 
         for type in EntityAddress.AllowedKeys.availabilities():
             if type.upper() in resp_data.keys():
-                result_list.append({'key': type, 'value': resp_data[key.upper()]})
+                result_list.append({'key': type, 'value': resp_data[type.upper()]})
         return result_list
 
     else:
         logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
         logger.info("[ERROR] %s", response.reason)
-        return {}
+        return []
