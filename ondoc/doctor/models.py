@@ -432,11 +432,15 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
                     (21.0, "9:00 PM"), (21.5, "9:30 PM"),
                     (22.0, "10:00 PM"), (22.5, "10:30 PM")]
 
+    TYPE_CHOICES = [(1, "Fixed"),
+                    (2, "On Call")]
+
     start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
     end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
     deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     mrp = models.PositiveSmallIntegerField(blank=False, null=True)
+    type = models.IntegerField(default=1, choices=TYPE_CHOICES)
     # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
