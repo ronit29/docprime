@@ -854,12 +854,14 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                                                  day=time_slot_start.weekday(),
                                                  start__lte=hour, end__gt=hour).exists():
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
+
         if self.instance.id:
+            deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                      doctor_clinic__hospital=hospital,
                                                      day=time_slot_start.weekday(),
                                                      start__lte=hour, end__gt=hour,
-                                                     deal_price=self.instance.deal_price).exists():
+                                                     deal_price=deal_price).exists():
                 raise forms.ValidationError("Deal price is different for this time slot.")
 
         return cleaned_data
@@ -867,7 +869,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-    list_display = ('get_profile', 'get_doctor', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('get_doctor', 'get_profile','status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
