@@ -18,14 +18,14 @@ def prepare_and_hit(self, data):
 
     appointment_details = {
         'DocPrimeBookingID': appointment.id,
-        'BookingDateTime': time.mktime(appointment.created_at.timetuple()),
-        'AppointmentDateTime': time.mktime(appointment.time_slot_start.timetuple()),
+        'BookingDateTime': int(time.mktime(appointment.created_at.utctimetuple())),
+        'AppointmentDateTime': int(time.mktime(appointment.time_slot_start.utctimetuple())),
         'BookingType': 'DC' if task_data.get('type') == 'LAB_APPOINTMENT' else 'D',
         'AppointmentType': '',
         'PatientName': appointment.profile.name,
         'PatientAddress': appointment.user.address_set.all().first().address if len(appointment.user.address_set.all()) else '',
         'ProviderName': getattr(appointment, 'doctor').name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
-        'ServiceName': "Blood test,city scan",
+        'ServiceName': appointment.lab_test.test.name if task_data.get('type') == 'LAB_APPOINTMENT' else '',
         'InsuranceCover': 1,
         'MobileList': data.get('mobile_list')
     }
@@ -34,7 +34,7 @@ def prepare_and_hit(self, data):
         'Name': appointment.profile.name,
         'PrimaryNo': appointment.user.phone_number,
         'LeadSource': 'DocPrime',
-        'EmailId': 'testsk@gmail.com',
+        'EmailId': appointment.profile.email,
         'Gender': 1 if appointment.profile.gender == 'm' else 2 if appointment.profile.gender == 'f' else 0,
         'CityId': 0,
         'ProductId': task_data.get('product_id'),
