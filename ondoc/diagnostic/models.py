@@ -33,8 +33,11 @@ import random
 import os
 from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 logger = logging.getLogger(__name__)
+
 
 class LabPricingGroup(TimeStampedModel, CreatedByModel):
     group_name = models.CharField(max_length=256)
@@ -107,6 +110,14 @@ class LabTestPricingGroup(LabPricingGroup):
 
 
 
+class HomePickupCharges(models.Model):
+    home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    distance = models.PositiveIntegerField()
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+
 class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
@@ -161,6 +172,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
     billing_merchant = GenericRelation(BillingAccount)
+    home_collection_charges = GenericRelation(HomePickupCharges)
 
 
     def __str__(self):
@@ -333,7 +345,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     # generic_lab_network_admins = GenericRelation(GenericAdmin, related_query_name='manageable_lab_networks')
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab_networks')
     billing_merchant = GenericRelation(BillingAccount)
-
+    home_collection_charges = GenericRelation(HomePickupCharges)
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
@@ -1124,5 +1136,7 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
 
     class Meta:
         db_table = "lab_report_file"
+
+
 
 
