@@ -749,3 +749,18 @@ class ConfigView(viewsets.GenericViewSet):
         serializer_data.is_valid(raise_exception=True)
         validated_data = serializer_data.validated_data
         return Response({})
+
+
+class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
+
+    def complete(self, request):
+        resp = {}
+        serializer = serializers.OpdAppointmentCompleteTempSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        opd_appointment = validated_data.get('opd_appointment')
+        if opd_appointment:
+            opd_appointment.action_completed()
+
+            resp = {'success': 'Appointment Completed Successfullly!'}
+        return Response(resp)

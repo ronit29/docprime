@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospitalView,
                     DoctorBlockCalendarViewSet, PrescriptionFileViewset, SearchedItemsViewSet, DoctorListViewSet,
-                    DoctorProfileUserViewSet, DoctorAvailabilityTimingViewSet, HealthTipView, ConfigView)
+                    DoctorProfileUserViewSet, DoctorAvailabilityTimingViewSet, HealthTipView, ConfigView, DoctorAppointmentNoAuthViewSet)
 
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
@@ -11,7 +11,8 @@ urlpatterns = [
          name='update-appointment-detail'),
     path('appointment/complete', DoctorAppointmentsViewSet.as_view({'post': 'complete'}),
          name='appointment-complete'),
-
+    path('noauthappointment/complete', DoctorAppointmentNoAuthViewSet.as_view({'post': 'complete'}),
+         name='noauthappointment-complete'),
     path('profile',
          DoctorProfileView.as_view({'get': 'retrieve'}), name='doctor-profile'),
     path('profileuserview/<int:pk>', DoctorProfileUserViewSet.as_view({'get': 'retrieve'}), name='doctor-profile-user-view'),
