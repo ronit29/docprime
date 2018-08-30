@@ -485,6 +485,19 @@ class CityFilter(SimpleListFilter):
             return queryset.filter(hospitals__city__iexact=self.value()).distinct()
 
 
+class CreatedByFilter(SimpleListFilter):
+    title = 'creating user'
+    parameter_name = 'created_by'
+
+    def lookups(self, request, model_admin):
+        return ('0', 'Me',),
+
+    def queryset(self, request, queryset):
+        if self.value() is '0':
+            queryset = queryset.filter(created_by=request.user)
+        return queryset
+
+
 class DoctorSpecializationInline(nested_admin.NestedTabularInline):
     model = DoctorSpecialization
     extra = 0
@@ -629,7 +642,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     date_hierarchy = 'created_at'
     list_filter = (
         'data_status', 'onboarding_status', 'is_insurance_enabled', 'doctorspecializations__specialization',
-        CityFilter,)
+        CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [
         DoctorMobileInline,
@@ -785,7 +798,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         if request.user.is_superuser and request.user.is_staff:
             return True
-        if (request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and obj.data_status in (1, 2, 3):
+        if (request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or request.user.groups.filter(
+                name=constants['SUPER_QC_GROUP']).exists() or request.user.groups.filter(
+                name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists()) and obj.data_status in (1, 2, 3):
             return True
         return obj.created_by == request.user
 
