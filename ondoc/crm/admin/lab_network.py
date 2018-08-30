@@ -4,7 +4,7 @@ from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from django.db import models
-
+from ondoc.crm.admin.lab import HomePickupChargesInline
 from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabNetworkDocument)
@@ -208,6 +208,7 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
                LabNetworkAccreditationInline,
                LabNetworkAwardInline,
                LabNetworkCertificationInline,
+               HomePickupChargesInline,
                LabNetworkDocumentInline,
                GenericLabNetworkAdminInline,
                BillingAccountInline]

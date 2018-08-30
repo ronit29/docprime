@@ -1,7 +1,8 @@
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
+from django.conf import settings
 from ondoc.authentication.models import TimeStampedModel
-
+import hashlib
 
 class OnlineLead(TimeStampedModel):
     DOCTOR = 1
@@ -47,3 +48,32 @@ class Career(TimeStampedModel):
 
     class Meta:
         db_table = "career"
+
+
+class ContactUs(TimeStampedModel):
+    name = models.CharField(max_length=255)
+    mobile = models.BigIntegerField(validators=[MaxValueValidator(9999999999),
+                                                MinValueValidator(1000000000)])
+    email = models.EmailField()
+    message = models.CharField(max_length=2000)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "contactus"
+
+
+class TinyUrl(TimeStampedModel):
+    SHORT_URL_PREFIX = 'short'
+    original_url = models.URLField(max_length=5000)
+    short_code = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    def get_tiny_url(self):
+        return "{}/{}/{}".format(settings.BASE_URL, TinyUrl.SHORT_URL_PREFIX, self.short_code)
+
+    class Meta:
+        db_table = 'tiny_url'

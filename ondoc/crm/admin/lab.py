@@ -23,13 +23,14 @@ from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment)
+    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
+from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 
 
 class LabTestResource(resources.ModelResource):
@@ -168,6 +169,67 @@ class LabDoctorInline(admin.TabularInline):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
 
+class DistancePickerWidget(forms.TextInput):
+
+    def render(self, name, value, attrs=None):
+        htmlString = u''
+        htmlString += u'<div><select name="%s">' % (name)
+        instance = 0
+        if value:
+            instance = int(value)
+
+        for i in range(1, 100):
+            if i == instance:
+                htmlString += ('<option selected value="%d">%d KM</option>' % (i, i))
+            else:
+                htmlString += ('<option value="%d">%d KM</option>' % (i, i))
+
+        htmlString +='</select></div>'
+        return mark_safe(u''.join(htmlString))
+
+
+class HomePickupChargesForm(forms.ModelForm):
+    distance = forms.CharField(widget=DistancePickerWidget())
+
+
+class HomePickupChargesFormSet(BaseGenericInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        count = 0
+        charge_list = []
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('distance') and value.get('home_pickup_charges'):
+                charge_list.append((value.get('home_pickup_charges'), int(value.get('distance'))))
+        if charge_list:
+            charge_list.sort(key=lambda t: t[1])
+
+            last_iter = None
+            for chg in charge_list:
+                if not last_iter:
+                    last_iter = chg[0]
+                else:
+                    if chg[0] < last_iter:
+                        raise forms.ValidationError("Please correct charges accordingly.")
+                    last_iter = chg[0]
+            unzip = list(zip(*charge_list))
+            if not len(set(unzip[1])) == len(unzip[1]):
+                raise forms.ValidationError("Duplicate prices found for same distance.")
+
+
+
+class HomePickupChargesInline(GenericTabularInline):
+    form = HomePickupChargesForm
+    formset = HomePickupChargesFormSet
+    model = HomePickupCharges
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
 class GenericLabAdminFormSet(forms.BaseInlineFormSet):
 
     def clean(self):
@@ -221,7 +283,6 @@ class LabDocumentFormSet(forms.BaseInlineFormSet):
                 for key, value in count.items():
                     if not key==LabDocument.GST and value<1:
                         raise forms.ValidationError(choices[key]+" is required")
-
 
 
 class LabDocumentInline(admin.TabularInline):
@@ -454,7 +515,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     form = LabForm
     search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, BillingAccountInline, GenericLabAdminInline]
+        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline, BillingAccountInline, GenericLabAdminInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200

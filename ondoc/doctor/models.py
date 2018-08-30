@@ -374,7 +374,7 @@ class DoctorQualification(auth_model.TimeStampedModel):
         unique_together = (("doctor", "qualification", "specialization", "college"),)
 
 
-class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel):
+class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
     name = models.CharField(max_length=200)
 
     def __str__(self):
@@ -1192,13 +1192,13 @@ class OpdAppointment(auth_model.TimeStampedModel):
         delay = settings.AUTO_CANCEL_OPD_DELAY * 60
         to_zone = tz.gettz(settings.TIME_ZONE)
         app_updated_time = app_obj.updated_at.astimezone(to_zone)
-        morning_time = "08:00:00"  # In IST
+        morning_time = "09:00:00"  # In IST
         evening_time = "20:00:00"  # In IST
         present_day_end = custom_form_datetime(evening_time, to_zone)
         next_day_start = custom_form_datetime(morning_time, to_zone, diff_days=1)
         time_diff = next_day_start - app_updated_time
 
-        if present_day_end - timedelta(minutes=10) < app_updated_time < next_day_start:
+        if present_day_end - timedelta(minutes=settings.AUTO_CANCEL_OPD_DELAY) < app_updated_time < next_day_start:
             return time_diff.seconds
         else:
             return delay
@@ -1279,10 +1279,10 @@ class PrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
         db_table = "prescription_file"
 
 
-class MedicalCondition(auth_model.TimeStampedModel):
+class MedicalCondition(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=100, verbose_name="Name")
     specialization = models.ManyToManyField(
-        Specialization,
+        GeneralSpecialization,
         through='MedicalConditionSpecialization',
         through_fields=('medical_condition', 'specialization'),
     )
@@ -1296,7 +1296,7 @@ class MedicalCondition(auth_model.TimeStampedModel):
 
 class MedicalConditionSpecialization(auth_model.TimeStampedModel):
     medical_condition = models.ForeignKey(MedicalCondition, on_delete=models.CASCADE)
-    specialization = models.ForeignKey(Specialization, on_delete=models.CASCADE)
+    specialization = models.ForeignKey(GeneralSpecialization, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.medical_condition.name + " " + self.specialization.name
@@ -1323,7 +1323,7 @@ class HealthTip(auth_model.TimeStampedModel):
 
 class CommonMedicalCondition(auth_model.TimeStampedModel):
     condition = models.OneToOneField(MedicalCondition, related_name="common_condition", on_delete=models.CASCADE)
-
+    priority = models.PositiveIntegerField(default=0)
     def __str__(self):
         return "{}".format(self.condition)
 
@@ -1332,8 +1332,9 @@ class CommonMedicalCondition(auth_model.TimeStampedModel):
 
 
 class CommonSpecialization(auth_model.TimeStampedModel):
-    specialization = models.OneToOneField(Specialization, related_name="common_specialization", on_delete=models.CASCADE)
+    specialization = models.OneToOneField(GeneralSpecialization, related_name="common_specialization", on_delete=models.CASCADE)
     icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
+    priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return "{}".format(self.specialization)

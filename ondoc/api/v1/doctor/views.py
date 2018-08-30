@@ -22,7 +22,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
-from django.db.models import Q
+from django.db.models import Q, Value
 from django.db.models import Case, When
 from operator import itemgetter
 from itertools import groupby
@@ -30,6 +30,7 @@ from ondoc.api.v1.utils import RawSql, is_valid_testing_data
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F
+from django.db.models.functions import StrIndex
 import datetime
 import copy
 from ondoc.matrix.tasks import push_appointment_to_matrix
@@ -645,16 +646,28 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         if not name:
             return Response({"conditions": [], "specializations": []})
         medical_conditions = models.MedicalCondition.objects.filter(
-            name__icontains=name).values("id", "name")[:5]
-        specializations = models.Specialization.objects.filter(
-            name__icontains=name).values("id", "name")[:5]
+            Q(search_key__icontains=name) |
+            Q(search_key__icontains=' ' + name) |
+            Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
+            'search_index').values("id", "name")[:5]
+
+        specializations = models.GeneralSpecialization.objects.filter(
+            Q(search_key__icontains=name) |
+            Q(search_key__icontains=' ' + name) |
+            Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
+            'search_index').values("id", "name")[:5]
+
         return Response({"conditions": medical_conditions, "specializations": specializations})
 
     def common_conditions(self, request):
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all()[:10]
+        count = request.query_params.get('count', 10)
+        count = int(count)
+        if count <=0:
+            count = 10
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by("priority")[:count]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True, context={'request': request})
 
-        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all()[:10]
+        common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("priority")[:10]
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data})
 

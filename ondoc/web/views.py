@@ -1,9 +1,11 @@
+from rest_framework import status
 from django.shortcuts import render
 from django.contrib import messages
 from .forms import OnlineLeadsForm, CareersForm
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse, HttpResponsePermanentRedirect
 from django.conf import settings
 from ondoc.crm.constants import constants
+from ondoc.web import models as web_models
 
 
 def index(request):
@@ -51,7 +53,7 @@ def user_appointment_via_agent(request):
     if not (request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists()
             or request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists()):
         return HttpResponseRedirect('%s' % settings.ADMIN_BASE_URL)
-    api_domain = '%s%s' % (settings.API_BASE_URL, '/api/v1/admin/agent/user/login')
+    api_domain = '%s%s' % ('', '/api/v1/admin/agent/user/login')
     appDomain = '%s%s' % (settings.CONSUMER_APP_DOMAIN, '/agent/login')
     return render(request, 'agentLogin.html', {'apiDomain': api_domain, 'appDomain': appDomain})
 
@@ -69,3 +71,9 @@ def careers_page(request):
     return render(request, 'careers.html', {'form': form})
 
 
+def redirect_to_original_url(request, hash):
+    tiny_url = web_models.TinyUrl.objects.filter(short_code=hash).first()
+    if not tiny_url:
+        return HttpResponse(status=status.HTTP_404_NOT_FOUND)
+    original_url = tiny_url.original_url
+    return HttpResponseRedirect(original_url)

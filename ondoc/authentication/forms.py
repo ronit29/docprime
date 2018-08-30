@@ -8,13 +8,19 @@ class BillingAccountFormSet(BaseGenericInlineFormSet):
         super().clean()
         if any(self.errors):
             return
+
+
         enabled = 0
         count = 0
         for value in self.cleaned_data:
             count += 1
             if value.get('enabled'):
                 enabled += 1
-
+            if value.get('account_number'):
+                try:
+                    int(value.get('account_number'))
+                except ValueError:
+                    raise forms.ValidationError("Account Number must be numeric.")
         if count > 0:
             if enabled > 1:
                 raise forms.ValidationError("Only one Billing Account can be enabled")

@@ -544,10 +544,31 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
         return formset
 
 
+
+class CroppedImageNullFilter(SimpleListFilter):
+    title = 'CroppedImage'
+    parameter_name = 'cropped_image'
+
+    def lookups(self, request, model_admin):
+        return (('1', 'Not NuLL',),
+                ('0', 'NuLL',),
+               )
+
+    def queryset(self, request, queryset):
+        if self.value() in ('0', '1'):
+            if self.value() == '1':
+                queryset = queryset.exclude(Q(cropped_image='') | Q(cropped_image=None))
+            else:
+                queryset = queryset.filter(cropped_image__exact='')
+
+        return queryset
+
+
 class DoctorImageAdmin(admin.ModelAdmin):
     model = DoctorImage
     readonly_fields = ('original_image', 'cropped_img', 'crop_image', 'doctor',)
     fields = ('original_image', 'cropped_img', 'crop_image', 'doctor')
+    list_filter = ('doctor__data_status', CroppedImageNullFilter)
 
     def has_change_permission(self, request, obj=None):
         if not super().has_change_permission(request, obj):

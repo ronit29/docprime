@@ -13,6 +13,7 @@ from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import F, Sum, When, Case, Q
+from django.db import transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.doctor.models import OpdAppointment
 from ondoc.payout.models import Outstanding
@@ -32,8 +33,11 @@ import random
 import os
 from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 logger = logging.getLogger(__name__)
+
 
 class LabPricingGroup(TimeStampedModel, CreatedByModel):
     group_name = models.CharField(max_length=256)
@@ -106,6 +110,14 @@ class LabTestPricingGroup(LabPricingGroup):
 
 
 
+class HomePickupCharges(models.Model):
+    home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    distance = models.PositiveIntegerField()
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+
 class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
@@ -160,6 +172,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
     billing_merchant = GenericRelation(BillingAccount)
+    home_collection_charges = GenericRelation(HomePickupCharges)
 
 
     def __str__(self):
@@ -332,7 +345,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     # generic_lab_network_admins = GenericRelation(GenericAdmin, related_query_name='manageable_lab_networks')
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab_networks')
     billing_merchant = GenericRelation(BillingAccount)
-
+    home_collection_charges = GenericRelation(HomePickupCharges)
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
@@ -672,13 +685,17 @@ class LabAppointment(TimeStampedModel):
         delay = settings.AUTO_CANCEL_LAB_DELAY * 60
         to_zone = tz.gettz(settings.TIME_ZONE)
         app_updated_time = app_obj.updated_at.astimezone(to_zone)
-        morning_time = "08:00:00"  # In IST
-        evening_time = "20:00:00"  # In IST
+        if app_obj.is_home_pickup:
+            morning_time = "10:00:00"  # In IST
+            evening_time = "17:00:00"  # In IST
+        else:
+            morning_time = "09:00:00"  # In IST
+            evening_time = "18:00:00"  # In IST
         present_day_end = custom_form_datetime(evening_time, to_zone)
         next_day_start = custom_form_datetime(morning_time, to_zone, diff_days=1)
         time_diff = next_day_start - app_updated_time
 
-        if present_day_end - timedelta(minutes=10) < app_updated_time < next_day_start:
+        if present_day_end - timedelta(minutes=settings.AUTO_CANCEL_LAB_DELAY) < app_updated_time < next_day_start:
             return time_diff.seconds
         else:
             return delay
@@ -713,6 +730,7 @@ class LabAppointment(TimeStampedModel):
         self.status = self.ACCEPTED
         self.save()
 
+    @transaction.atomic
     def action_cancelled(self, refund_flag=1):
         self.status = self.CANCELLED
         self.save()
@@ -1118,5 +1136,7 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
 
     class Meta:
         db_table = "lab_report_file"
+
+
 
 
