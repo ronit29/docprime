@@ -665,7 +665,7 @@ class LabAppointment(TimeStampedModel):
             pass
         super().save(*args, **kwargs)
         if self.is_to_send_notification(database_instance):
-            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=5)
+            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
 
         if not database_instance or database_instance.status != self.status:
             for e_id in settings.OPS_EMAIL_ID:

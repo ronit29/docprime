@@ -26,7 +26,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
-from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget
+from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
@@ -385,7 +385,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     list_display = ('name', 'updated_at', 'onboarding_status','data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
 
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter)
+    list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter, CreatedByFilter)
 
     exclude = ('search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
                    'radiology_deal_price_percentage', )
@@ -576,7 +576,7 @@ class LabAppointmentForm(forms.ModelForm):
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
-    list_display = ('get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -614,11 +614,11 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
+            return ('booking_id', 'lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+            return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'start_date', 'start_time')
@@ -627,14 +627,17 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ()
+            return ('booking_id',)
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+            return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
         else:
             return ()
+
+    def booking_id(self, obj):
+        return obj.id if obj.id else None
 
     def lab_name(self, obj):
         profile_link = "lab/{}".format(obj.lab.id)

@@ -13,5 +13,6 @@ constants = {
     'LAB_APPOINTMENT_MANAGEMENT_TEAM': 'lab_appointment_management_team',
     'CONDITIONS_MANAGEMENT_TEAM': 'condition_managment_team',
     'REPORT_TEAM': 'report_team',
-    'SUPER_QC_GROUP': 'super_qc_group'
+    'SUPER_QC_GROUP': 'super_qc_group',
+    'DATA_EXPORT_GROUP': 'data_export'
 }

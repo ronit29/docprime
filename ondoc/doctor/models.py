@@ -279,6 +279,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def __str__(self):
         return self.name
 
+    def get_display_name(self):
+        return "Dr. {}".format(self.name.title()) if self.name else None
+
     def experience_years(self):
         if not self.practicing_since:
             return None
@@ -432,11 +435,15 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
                     (21.0, "9:00 PM"), (21.5, "9:30 PM"),
                     (22.0, "10:00 PM"), (22.5, "10:30 PM")]
 
+    TYPE_CHOICES = [(1, "Fixed"),
+                    (2, "On Call")]
+
     start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
     end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
     fees = models.PositiveSmallIntegerField(blank=False, null=False)
     deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     mrp = models.PositiveSmallIntegerField(blank=False, null=True)
+    type = models.IntegerField(default=1, choices=TYPE_CHOICES)
     # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
@@ -1088,7 +1095,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         #     raise RestFrameworkValidationError("Doctor is on leave.")
         super().save(*args, **kwargs)
         if self.is_to_send_notification(database_instance):
-            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=5)
+            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
         if not database_instance or database_instance.status != self.status:
             for e_id in settings.OPS_EMAIL_ID:
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)

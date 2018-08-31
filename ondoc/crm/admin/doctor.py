@@ -485,6 +485,19 @@ class CityFilter(SimpleListFilter):
             return queryset.filter(hospitals__city__iexact=self.value()).distinct()
 
 
+class CreatedByFilter(SimpleListFilter):
+    title = 'creating user'
+    parameter_name = 'created_by'
+
+    def lookups(self, request, model_admin):
+        return ('0', 'Me',),
+
+    def queryset(self, request, queryset):
+        if self.value() is '0':
+            queryset = queryset.filter(created_by=request.user)
+        return queryset
+
+
 class DoctorSpecializationInline(nested_admin.NestedTabularInline):
     model = DoctorSpecialization
     extra = 0
@@ -629,7 +642,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     date_hierarchy = 'created_at'
     list_filter = (
         'data_status', 'onboarding_status', 'is_insurance_enabled', 'doctorspecializations__specialization',
-        CityFilter,)
+        CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [
         DoctorMobileInline,
@@ -785,7 +798,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         if request.user.is_superuser and request.user.is_staff:
             return True
-        if (request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and obj.data_status in (1, 2, 3):
+        if (request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or request.user.groups.filter(
+                name=constants['SUPER_QC_GROUP']).exists() or request.user.groups.filter(
+                name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists()) and obj.data_status in (1, 2, 3):
             return True
         return obj.created_by == request.user
 
@@ -854,12 +869,14 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                                                  day=time_slot_start.weekday(),
                                                  start__lte=hour, end__gt=hour).exists():
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
+
         if self.instance.id:
+            deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                      doctor_clinic__hospital=hospital,
                                                      day=time_slot_start.weekday(),
                                                      start__lte=hour, end__gt=hour,
-                                                     deal_price=self.instance.deal_price).exists():
+                                                     deal_price=deal_price).exists():
                 raise forms.ValidationError("Deal price is different for this time slot.")
 
         return cleaned_data
@@ -867,7 +884,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-    list_display = ('get_profile', 'get_doctor', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -906,11 +923,12 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ('doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
+            return ('booking_id', 'doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'start_date',
                     'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('doctor_name', 'hospital_name', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+            return ('booking_id', 'doctor_name', 'hospital_name', 'contact_details', 'used_profile_name',
+                    'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
@@ -920,14 +938,32 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ()
+            return ('booking_id',)
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('doctor_name', 'hospital_name', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+            return ('booking_id', 'doctor_name', 'hospital_name', 'contact_details', 'used_profile_name',
+                    'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                     'admin_information', 'otp', 'insurance', 'outstanding')
         else:
             return ()
+
+    def contact_details(self, obj):
+        details = ''
+        if obj.doctor:
+            doctor_admins = GenericAdmin.get_appointment_admins(obj)
+            if doctor_admins:
+                for doctor_admin in doctor_admins:
+                    details += 'Phone number : {number}<br>Email : {email}<br><br>'.format(
+                        number=doctor_admin.phone_number,
+                        email=doctor_admin.email if doctor_admin.email else 'Not provided')
+            else:
+                details += "-"
+        return mark_safe('<p>{details}</p>'.format(details=details))
+    contact_details.short_description = "Concerned Admin Details"
+
+    def booking_id(self, obj):
+        return obj.id if obj.id else None
 
     def doctor_name(self, obj):
         profile_link = "opd/doctor/{}".format(obj.doctor.id)

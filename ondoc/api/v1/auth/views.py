@@ -12,7 +12,7 @@ from rest_framework import mixins, viewsets, status
 from rest_framework.exceptions import ValidationError as RestValidationError
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When
@@ -247,7 +247,10 @@ class NotificationEndpointViewSet(GenericViewSet):
         }
         notification_endpoint_serializer = serializers.NotificationEndpointSerializer(data=notification_endpoint_data)
         notification_endpoint_serializer.is_valid(raise_exception=True)
-        notification_endpoint_serializer.save()
+        try:
+            notification_endpoint_serializer.save()
+        except IntegrityError:
+            return Response(notification_endpoint_serializer.data)
         return Response(notification_endpoint_serializer.data)
 
     def delete(self, request):
