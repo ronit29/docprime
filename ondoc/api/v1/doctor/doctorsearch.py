@@ -153,6 +153,7 @@ class DoctorSearchHelper:
                         [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
                          value]),
                     "doctor": doctor.name,
+                    "display_name": doctor.get_display_name(),
                     "hospital_id": doctor_clinic.hospital.id,
                     "mrp": min_price["mrp"],
                     "discounted_fees": min_price["deal_price"],
