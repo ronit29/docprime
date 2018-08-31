@@ -884,7 +884,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-    list_display = ('get_doctor', 'get_profile','status', 'time_slot_start', 'created_at',)
+    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -923,11 +923,12 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ('doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
+            return ('booking_id', 'doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'start_date',
                     'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('doctor_name', 'hospital_name', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+            return ('booking_id', 'doctor_name', 'hospital_name', 'contact_details', 'used_profile_name',
+                    'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
@@ -937,14 +938,45 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ()
+            return ('booking_id',)
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('doctor_name', 'hospital_name', 'used_profile_name', 'used_profile_number', 'default_profile_name',
+            return ('booking_id', 'doctor_name', 'hospital_name', 'contact_details', 'used_profile_name',
+                    'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                     'admin_information', 'otp', 'insurance', 'outstanding')
         else:
             return ()
+
+    def contact_details(self, obj):
+        details = ''
+        if obj.doctor:
+            doctor_admins = obj.doctor.manageable_doctors.filter(is_disabled=False)
+            details += "<b>Doctor's Admin : </b><br>"
+            if doctor_admins.exists():
+                for doctor_admin in doctor_admins:
+                    details += 'Phone number : {number}<br>Handles : {permission_type}<br>Email : {email}<br>Hospital : {hospital}<br><br>'.format(
+                        number=doctor_admin.phone_number,
+                        permission_type=dict(GenericAdmin.type_choices)[doctor_admin.permission_type],
+                        email=doctor_admin.user.email if doctor_admin.user and doctor_admin.user.email else 'Not provided',
+                        hospital=obj.hospital if obj.hospital else 'Not provided')
+            else:
+                details += "-"
+        if obj.hospital:
+            hospital_admins = obj.hospital.manageable_hospitals.filter(is_disabled=False)
+            details += "<b>Hospital's Admin : </b><br>"
+            if hospital_admins.exists():
+                for hospital_admin in hospital_admins:
+                    details += 'Phone number : {number}<br>Handles : {permission_type}<br>Email : {email}<br><br>'.format(
+                        number=hospital_admin.phone_number,
+                        permission_type=dict(GenericAdmin.type_choices)[hospital_admin.permission_type],
+                        email=hospital_admin.user.email if hospital_admin.user and hospital_admin.user.email else 'Not provided',)
+            else:
+                details += "-"
+        return mark_safe('<p>{details}</p>'.format(details=details))
+
+    def booking_id(self, obj):
+        return obj.id if obj.id else None
 
     def doctor_name(self, obj):
         profile_link = "opd/doctor/{}".format(obj.doctor.id)
