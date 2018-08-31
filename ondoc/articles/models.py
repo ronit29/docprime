@@ -14,6 +14,11 @@ class ArticleCategory(TimeStampedModel):
     class Meta:
         db_table = "article_categories"
 
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'url'):
+            self.url = self.url.strip('/')
+        super(ArticleCategory, self).save(*args, **kwargs)
+
 
 class Article(TimeStampedModel, CreatedByModel):
     title = models.CharField(blank=False, null=False, max_length=500, unique=True)
@@ -38,8 +43,8 @@ class Article(TimeStampedModel, CreatedByModel):
         db_table = "article"
 
 
-class ArticleImage(TimeStampedModel, CreatedByModel, Image):
-    name = models.ImageField(upload_to='article/images', height_field='height', width_field='width')
+class ArticleImage(TimeStampedModel, CreatedByModel):
+    name = models.ImageField(upload_to='article/images')
 
     def image_tag(self):
         if self.name:

@@ -34,7 +34,7 @@ class ArticleAdmin(VersionAdmin):
         if instance.id:
             app_url = settings.CONSUMER_APP_DOMAIN
             if app_url:
-                html = '''<a href='%s/article/%s?preview=1' target=_blank>Preview</a>''' % (app_url, instance.id)
+                html = '''<a href='%s/%s' target=_blank>Preview</a>''' % (app_url, instance.url)
                 return mark_safe(html)
         else:
             return mark_safe('''<span></span>''')
@@ -43,12 +43,21 @@ class ArticleAdmin(VersionAdmin):
         if not obj.created_by:
             obj.created_by = request.user
 
+        if hasattr(obj, 'url'):
+            obj.url = obj.url.strip('/')
+            url_components = obj.url.split('-')
+            if ArticleCategory.objects.filter(identifier=url_components[len(url_components)-1]).exists():
+                pass
+            else:
+                identifier = obj.category.identifier
+                obj.url = '%s-%s' % (obj.url, identifier)
+
         super().save_model(request, obj, form, change)
 
 
 class ArticleImageAdmin(ModelAdmin):
-    fields = ['image_tag', 'height', 'width']
-    readonly_fields = ['image_tag', 'height', 'width']
+    fields = ['image_tag']
+    readonly_fields = ['image_tag']
 
 
 admin.site.register(Article, ArticleAdmin)

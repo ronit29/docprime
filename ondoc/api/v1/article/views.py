@@ -29,7 +29,7 @@ class TopArticleCategoryViewSet(viewsets.GenericViewSet):
         for category in self.get_queryset():
             article_list = category.articles.filter(is_published=True).order_by('id')[:8]
             resp = serializers.ArticleListSerializer(article_list, many=True,
-                                                     context={'request': request, 'category': category}).data
+                                                     context={'request': request}).data
             category_serialized = serializers.ArticleCategoryListSerializer(category, context={'request': request}).data
             response.append({'articles': resp, 'name': category_serialized['name'], 'url': category_serialized['url']})
         return Response(response)
@@ -55,7 +55,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
 
         article_data = paginate_queryset(article_data, request, 10)
         resp = serializers.ArticleListSerializer(article_data, many=True,
-                                                 context={'request': request, 'category': category}).data
+                                                 context={'request': request}).data
         return Response(resp)
 
     def retrieve(self, request):

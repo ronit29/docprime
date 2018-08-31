@@ -99,3 +99,55 @@ def push_appointment_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
+
+
+@task(bind=True, max_retries=2)
+def push_signup_lead_to_matrix(self, data):
+    try:
+        from ondoc.web.models import OnlineLead
+        lead_id = data.get('lead_id', None)
+        if not lead_id:
+            logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise ValueError()
+
+        online_lead_obj = OnlineLead.objects.get(id=lead_id)
+
+        request_data = {
+            'Name': online_lead_obj.name,
+            'PrimaryNo': online_lead_obj.mobile,
+            'LeadSource': 'DocPrime',
+            'EmailId': online_lead_obj.email,
+            'Gender': 0,
+            'CityId': 0,
+            'ProductId': data.get('product_id'),
+            'SubProductId': data.get('sub_product_id'),
+        }
+
+        url = settings.MATRIX_API_URL
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': 'RG9jcHJpbWU= d2Vi',
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] Lead could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+        resp_data = response.json()
+        print(str(resp_data))
+        if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
+            logger.info("[SUCCESS] Lead successfully published to the matrix system")
+        else:
+            logger.info("[ERROR] Lead could not be published to the matrix system")
+
+
+
+        # Preparing the data and now pushing the data to the matrix system.
+        # prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data})
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing online lead to the matrix- " + str(e))
+

@@ -6,6 +6,7 @@ from django.http import HttpResponseRedirect, HttpResponse, HttpResponsePermanen
 from django.conf import settings
 from ondoc.crm.constants import constants
 from ondoc.web import models as web_models
+from ondoc.matrix.tasks import push_signup_lead_to_matrix
 
 
 def index(request):
@@ -14,6 +15,8 @@ def index(request):
         if form.is_valid():
             model_instance = form.save(commit=False)
             model_instance.save()
+            push_signup_lead_to_matrix.apply_async(({'type': 'SIGNUP_LEAD', 'lead_id':model_instance.id,
+                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
             messages.success(request, 'Submission Successful')
             return HttpResponseRedirect('/')
     else:

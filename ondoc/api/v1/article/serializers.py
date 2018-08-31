@@ -32,8 +32,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') else None
 
     def get_url(self, obj):
-        category = self.context.get('category')
-        return '%s-%s' % (obj.url, category.identifier) if (hasattr(obj, 'url') and hasattr(category, 'identifier')) else None
+        return obj.url if hasattr(obj, 'url') else None
 
     class Meta:
         model = Article
@@ -45,11 +44,7 @@ class ArticlePreviewSerializer(serializers.Serializer):
     url = serializers.CharField(required=True)
 
     def validate(self, data):
-        url_keys = data.get('url').split('-')
-        article_url = "-".join(url_keys[:-1])
-        data['url'] = article_url
         return data
-
 
 
 class ArticleCategoryListSerializer(serializers.ModelSerializer):
