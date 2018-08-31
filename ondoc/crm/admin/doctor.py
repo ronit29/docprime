@@ -954,11 +954,11 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             doctor_admins = obj.doctor.manageable_doctors.filter(is_disabled=False)
             details += "<b>Doctor's Admin : </b><br>"
             if doctor_admins.exists():
-                for _admin in doctor_admins:
+                for doctor_admin in doctor_admins:
                     details += 'Phone number : {number}<br>Handles : {permission_type}<br>Email : {email}<br>Hospital : {hospital}<br><br>'.format(
-                        number=_admin.phone_number,
-                        permission_type=dict(GenericAdmin.type_choices)[_admin.permission_type],
-                        email=_admin.user.email if _admin.user.email and _admin.user else 'Not provided',
+                        number=doctor_admin.phone_number,
+                        permission_type=dict(GenericAdmin.type_choices)[doctor_admin.permission_type],
+                        email=doctor_admin.user.email if doctor_admin.user and doctor_admin.user.email else 'Not provided',
                         hospital=obj.hospital if obj.hospital else 'Not provided')
             else:
                 details += "-"
@@ -966,11 +966,11 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             hospital_admins = obj.hospital.manageable_hospitals.filter(is_disabled=False)
             details += "<b>Hospital's Admin : </b><br>"
             if hospital_admins.exists():
-                for _admin in hospital_admins:
+                for hospital_admin in hospital_admins:
                     details += 'Phone number : {number}<br>Handles : {permission_type}<br>Email : {email}<br><br>'.format(
-                        number=_admin.phone_number,
-                        permission_type=dict(GenericAdmin.type_choices)[_admin.permission_type],
-                        email=_admin.user.email if _admin.user.email and _admin.user else 'Not provided',)
+                        number=hospital_admin.phone_number,
+                        permission_type=dict(GenericAdmin.type_choices)[hospital_admin.permission_type],
+                        email=hospital_admin.user.email if hospital_admin.user and hospital_admin.user.email else 'Not provided',)
             else:
                 details += "-"
         return mark_safe('<p>{details}</p>'.format(details=details))
