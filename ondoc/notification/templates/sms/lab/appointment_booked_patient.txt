@@ -1,1 +1,1 @@
-We have received your appointment for {{patient_name|capfirst}} with Lab - {{lab_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}, will confirm you once when its accepted by the lab manager.
+We have received your appointment for {{patient_name|capfirst}} with Lab - {{lab_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}. You will receive a confirmation as soon as it is accepted by the lab.

@@ -153,7 +153,7 @@ class NotificationAction:
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "New Appointment",
-                "body": "New Appointment for {} at {}, {} with Dr. {}, will confirm you once when its accepted by the doctor".format(
+                "body": "New Appointment for {} at {}, {} with Dr. {}. You will receive a confirmation as soon as it is accepted by the doctor.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y"), doctor_name),
                 "url": "/opd/appointment/{}".format(instance.id),

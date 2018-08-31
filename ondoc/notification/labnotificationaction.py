@@ -76,7 +76,7 @@ class LabNotificationAction(NotificationAction):
                 "lab_name": lab_name,
                 "instance": instance,
                 "title": "New Appointment",
-                "body": "New Appointment for {} at {}, {} with Lab - {}, will confirm you once when its accepted by the doctor".format(
+                "body": "New Appointment for {} at {}, {} with Lab - {}. You will receive a confirmation as soon as it is accepted by the lab".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y"), lab_name
                 ),

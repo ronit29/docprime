@@ -60,7 +60,7 @@
 						<tbody>
                             <tr>
 								<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
-									We have received your appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}}, will confirm you once when its accepted by the doctor.
+									We have received your appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}}. You will receive a confirmation as soon as it is accepted by the doctor.
 								</td>
 							</tr>
 							<!--<tr>-->
@@ -78,6 +78,16 @@
 									<!--Appointment with <span style="font-weight: 600;" > {{doctor_name|capfirst}}</span>-->
 								<!--</td>-->
 							<!--</tr>-->
+							<tr>
+								<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
+									Booking ID
+								</td>
+							</tr>
+							<tr>
+								<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
+									{{instance.id}}
+								</td>
+							</tr>
 							<tr>
 								<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
 									Date and Time
