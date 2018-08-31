@@ -1095,7 +1095,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         #     raise RestFrameworkValidationError("Doctor is on leave.")
         super().save(*args, **kwargs)
         if self.is_to_send_notification(database_instance):
-            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=5)
+            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
         if not database_instance or database_instance.status != self.status:
             for e_id in settings.OPS_EMAIL_ID:
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
