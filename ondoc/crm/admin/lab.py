@@ -576,7 +576,7 @@ class LabAppointmentForm(forms.ModelForm):
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
-    list_display = ('get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -614,11 +614,11 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
+            return ('booking_id', 'lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+            return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'start_date', 'start_time')
@@ -627,14 +627,17 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ()
+            return ('booking_id',)
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+            return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
         else:
             return ()
+
+    def booking_id(self, obj):
+        return obj.id if obj.id else None
 
     def lab_name(self, obj):
         profile_link = "lab/{}".format(obj.lab.id)
