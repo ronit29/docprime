@@ -65,6 +65,7 @@ class AppointmentFilterUserSerializer(serializers.Serializer):
 class OpdAppointmentSerializer(serializers.ModelSerializer):
     DOCTOR_TYPE = 'doctor'
     doctor_name = serializers.ReadOnlyField(source='doctor.name')
+    display_name = serializers.ReadOnlyField(source='doctor.get_display_name')
     hospital_name = serializers.ReadOnlyField(source='hospital.name')
     patient_name = serializers.ReadOnlyField(source='profile.name')
     # patient_dob = serializers.ReadOnlyField(source='profile.dob')
@@ -83,7 +84,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name')
 
     def get_patient_image(self, obj):
         if obj.profile.profile_image:
@@ -412,6 +413,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     experiences = DoctorExperienceSerializer(read_only=True, many=True)
     associations = DoctorAssociationSerializer(read_only=True, many=True)
     awards = DoctorAwardSerializer(read_only=True, many=True)
+    display_name = serializers.ReadOnlyField(source='get_display_name')
     thumbnail = serializers.SerializerMethodField()
 
     # def get_general_specialization(self, obj):
@@ -443,7 +445,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
         fields = (
-            'id', 'name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
+            'id', 'name', 'display_name', 'gender', 'about', 'license', 'emails', 'practicing_since', 'images',
             'languages', 'qualifications', 'general_specialization', 'availability', 'mobiles', 'medical_services',
             'experiences', 'associations', 'awards', 'appointments', 'hospitals', 'thumbnail', 'signature', 'is_live')
 
@@ -641,7 +643,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         model = Doctor
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
-        fields = ('about', 'additional_details', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
+        fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live')
 
@@ -665,8 +667,8 @@ class DoctorTimeSlotSerializer(serializers.Serializer):
 class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'gender', 'images','about', 'practicing_since',
-                  'qualifications', 'general_specialization', 'mobiles',)
+        fields = ('id', 'name', 'gender', 'images', 'about', 'practicing_since',
+                  'qualifications', 'general_specialization', 'mobiles', 'display_name')
 
 
 class OpdAppointmentBillingSerializer(OpdAppointmentSerializer):
@@ -702,8 +704,9 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'allowed_action', 'effective_price',
-                   'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',)
+                  'deal_price', 'status', 'time_slot_start', 'time_slot_end',
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',
+                  'display_name')
 
 
 class HealthTipSerializer(serializers.ModelSerializer):

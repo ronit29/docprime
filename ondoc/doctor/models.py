@@ -279,6 +279,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def __str__(self):
         return self.name
 
+    def get_display_name(self):
+        return "Dr. {}".format(self.name.title()) if self.name else None
+
     def experience_years(self):
         if not self.practicing_since:
             return None
