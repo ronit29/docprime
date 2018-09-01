@@ -584,14 +584,14 @@ class PrescriptionSerializer(serializers.Serializer):
     prescription_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
     name = serializers.FileField()
 
-    def validate_appointment(self, value):
-        request = self.context.get('request')
-        if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
-            logger.error(
-                "Error 'Appointment is not correct' for Prescription create with data - " + json.dumps(
-                    request.data))
-            raise serializers.ValidationError("Appointment is not correct.")
-        return value
+    # def validate_appointment(self, value):
+    #     request = self.context.get('request')
+    #     if not OpdAppointment.objects.filter(doctor=request.user.doctor).exists():
+    #         logger.error(
+    #             "Error 'Appointment is not correct' for Prescription create with data - " + json.dumps(
+    #                 request.data.get('appointment')))
+    #         raise serializers.ValidationError("Appointment is not correct.")
+    #     return value
 
 
 class DoctorListSerializer(serializers.Serializer):

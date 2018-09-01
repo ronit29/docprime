@@ -249,6 +249,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             queryset = (
                 queryset.values('id').annotate(price=Sum(deal_price_calculation),
+                                               mrp=Sum(mrp), 
                                                count=Count('id'),
                                                distance=Max(Distance('location', pnt)),
                                                name=Max('name')).filter(count__gte=len(ids)))
