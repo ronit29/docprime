@@ -135,6 +135,7 @@ class LabCustomSerializer(serializers.Serializer):
     # lab = serializers.SerializerMethodField()
     lab = LabModelSerializer()
     price = serializers.IntegerField(default=None)
+    mrp = serializers.IntegerField(default=None)
     distance = serializers.IntegerField(source='distance.m')
     pickup_available = serializers.IntegerField(default=0)
     lab_timing = serializers.CharField(max_length=200)
