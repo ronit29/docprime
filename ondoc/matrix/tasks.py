@@ -15,6 +15,10 @@ def prepare_and_hit(self, data):
 
     appointment = data.get('appointment')
     task_data = data.get('task_data')
+    if task_data.get('type') == 'OPD_APPOINTMENT':
+        booking_url = '%s/admin/doctor/opdappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
+    elif task_data.get('type') == 'LAB_APPOINTMENT':
+        booking_url = '%s/admin/doctor/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
 
     appointment_details = {
         'DocPrimeBookingID': appointment.id,
@@ -27,10 +31,13 @@ def prepare_and_hit(self, data):
         'ProviderName': getattr(appointment, 'doctor').name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
         'ServiceName': appointment.lab_test.test.name if task_data.get('type') == 'LAB_APPOINTMENT' else '',
         'InsuranceCover': 1,
-        'MobileList': data.get('mobile_list')
+        'MobileList': data.get('mobile_list'),
+        'BookingUrl': booking_url
     }
 
     request_data = {
+        'DocPrimeUserId': appointment.user.id,
+        'LeadID': appointment.matrix_lead_id if appointment.matrix_lead_id else 0,
         'Name': appointment.profile.name,
         'PrimaryNo': appointment.user.phone_number,
         'LeadSource': 'DocPrime',
@@ -57,6 +64,11 @@ def prepare_and_hit(self, data):
         self.retry([data], countdown=countdown_time)
 
     resp_data = response.json()
+
+    # save the appointment with the matrix lead id.
+    appointment.matrix_lead_id = resp_data.get('Id', None)
+    appointment.save()
+
     print(str(resp_data))
     if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
         logger.info("[SUCCESS] Appointment successfully published to the matrix system")

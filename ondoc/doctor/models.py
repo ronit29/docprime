@@ -959,6 +959,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
+    matrix_lead_id = models.IntegerField(null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"

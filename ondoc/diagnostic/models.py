@@ -612,6 +612,7 @@ class LabAppointment(TimeStampedModel):
     address = JSONField(blank=True, null=True)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    matrix_lead_id = models.IntegerField(null=True)
 
     def allowed_action(self, user_type, request):
         allowed = []
