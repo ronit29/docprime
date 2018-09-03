@@ -43,7 +43,8 @@ def prepare_and_hit(self, data):
     }
 
     url = settings.MATRIX_API_URL
-    response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': 'RG9jcHJpbWU= d2Vi',
+    matrix_api_token = settings.MATRIX_API_TOKEN
+    response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                               'Content-Type': 'application/json'})
 
     if response.status_code != status.HTTP_200_OK or not response.ok:
@@ -118,13 +119,15 @@ def push_signup_lead_to_matrix(self, data):
             'LeadSource': 'DocPrime',
             'EmailId': online_lead_obj.email,
             'Gender': 0,
-            'CityId': 0,
+            'CityId': online_lead_obj.city_name.id if online_lead_obj.city_name.id else 0,
             'ProductId': data.get('product_id'),
             'SubProductId': data.get('sub_product_id'),
+            'CreatedOn': int(time.mktime(online_lead_obj.created_at.utctimetuple()))
         }
 
         url = settings.MATRIX_API_URL
-        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': 'RG9jcHJpbWU= d2Vi',
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code != status.HTTP_200_OK or not response.ok:

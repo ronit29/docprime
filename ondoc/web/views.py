@@ -16,7 +16,7 @@ def index(request):
             model_instance = form.save(commit=False)
             model_instance.save()
             push_signup_lead_to_matrix.apply_async(({'type': 'SIGNUP_LEAD', 'lead_id':model_instance.id,
-                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+                                                     'product_id': 1, 'sub_product_id': 0}, ), countdown=5)
             messages.success(request, 'Submission Successful')
             return HttpResponseRedirect('/')
     else:

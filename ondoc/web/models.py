@@ -2,6 +2,7 @@ from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.conf import settings
 from ondoc.authentication.models import TimeStampedModel
+from ondoc.common.models import Cities
 import hashlib
 
 class OnlineLead(TimeStampedModel):
@@ -14,7 +15,8 @@ class OnlineLead(TimeStampedModel):
     name = models.CharField(max_length=255)
     speciality = models.CharField(max_length=255, blank=True, null=True)
     mobile = models.BigIntegerField(blank=False, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
-    city = models.CharField(max_length=255, blank=False, default='')
+    city = models.CharField(max_length=255, blank=True, null=True, default='')
+    city_name = models.ForeignKey(Cities, on_delete=models.CASCADE, null=True)
     email = models.EmailField(blank=False)
 
     def __str__(self):
