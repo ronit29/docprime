@@ -565,7 +565,7 @@ class LabAppointmentForm(forms.ModelForm):
         if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
             if not lab.is_home_collection_enabled:
                 raise forms.ValidationError("Home Pickup is disabled for the lab")
-            if self.instance.start_time < 7.0 or self.instance.start_time > 19.0:
+            if hour < 7.0 or hour > 19.0:
                 raise forms.ValidationError("No time slot available")
         else:
             if not lab.always_open and not is_lab_timing_available:
