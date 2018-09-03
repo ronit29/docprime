@@ -525,7 +525,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             publish_message(message)
 
     @classmethod
-    def send_onboarding_link(cls, email, context):
+    def send_app_download_link(cls, email, context):
         html_body = render_to_string('email/doctor_onboarding/body.html', context=context)
         email_subject = render_to_string('email/doctor_onboarding/subject.txt', context=context)
         if email:
@@ -662,7 +662,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_onboarding_link(cls, phone_number, context):
+    def send_app_download_link(cls, phone_number, context):
         html_body = render_to_string('sms/doctor_onboarding.txt', context=context)
         if phone_number:
             sms_noti = {
