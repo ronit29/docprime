@@ -41,7 +41,7 @@ class LabOnboard(View):
             return render(request, 'onboard/success.html')
 
         if existing.status != LabOnboardingToken.GENERATED:
-            return render(request, 'access_denied.html')
+            return render(request, 'onboard/access_denied.html')
 
         auth = request.session.get(token, False)
 
