@@ -524,6 +524,23 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             message = json.dumps(message)
             publish_message(message)
 
+    @classmethod
+    def send_onboarding_link(cls, email, context):
+        html_body = render_to_string('email/doctor_onboarding/body.html', context=context)
+        email_subject = render_to_string('email/doctor_onboarding/subject.txt', context=context)
+        if email:
+            email_notif = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_notif,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
 
 class SmsNotificationOpdMixin:
 
@@ -643,6 +660,21 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             message = json.dumps(message)
             publish_message(message)
         return booking_url
+
+    @classmethod
+    def send_onboarding_link(cls, phone_number, context):
+        html_body = render_to_string('sms/doctor_onboarding.txt', context=context)
+        if phone_number:
+            sms_noti = {
+                "phone_number": phone_number,
+                "content": html_body,
+            }
+            message = {
+                "data": sms_noti,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
 
 
 class AppNotification(TimeStampedModel):
