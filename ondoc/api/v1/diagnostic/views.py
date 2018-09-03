@@ -538,7 +538,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
                     "product_id": product_id,
                     "reference_id": lab_appointment.id
                 }
-                consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
+                consumer_account.debit_schedule_new(lab_appointment, product_id, appointment_details.get("effective_price"))
+                # consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
             resp["status"] = 1
             resp["payment_required"] = False
             resp["data"] = {"id": lab_appointment.id,

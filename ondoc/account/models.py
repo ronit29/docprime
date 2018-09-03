@@ -74,6 +74,59 @@ class Order(TimeStampedModel):
             ).update(is_viewable=False)
 
     @transaction.atomic
+    def process_order_new(self, consumer_account, pg_data, appointment_data):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        appointment_obj = None
+        if self.action == Order.OPD_APPOINTMENT_CREATE:
+            if consumer_account.balance >= appointment_data["effective_price"]:
+                appointment_obj = OpdAppointment.create_appointment(appointment_data)
+                order_dict = {
+                    "reference_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                self.update_order(order_dict)
+                appointment_amount = appointment_obj.effective_price
+                consumer_account.debit_schedule_new(appointment_obj, pg_data.get("product_id"), appointment_amount)
+                # self.debit_payment(consumer_account, pg_data, appointment_obj, appointment_amount)
+        elif self.action == Order.LAB_APPOINTMENT_CREATE:
+            if consumer_account.balance >= appointment_data["effective_price"]:
+                appointment_obj = LabAppointment.create_appointment(appointment_data)
+                order_dict = {
+                    "reference_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                self.update_order(order_dict)
+                appointment_amount = appointment_obj.effective_price
+                consumer_account.debit_schedule_new(appointment_obj, pg_data.get("product_id"), appointment_amount)
+                # self.debit_payment(consumer_account, pg_data, appointment_obj, appointment_amount)
+        elif self.action == Order.OPD_APPOINTMENT_RESCHEDULE:
+            new_appointment_data = appointment_data
+            appointment_obj = OpdAppointment.objects.get(pk=self.reference_id)
+            if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
+                debit_amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
+                appointment_obj.action_rescheduled_patient(new_appointment_data)
+                order_dict = {
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                self.update_order(order_dict)
+                consumer_account.debit_schedule_new(appointment_obj, pg_data.get("product_id"), debit_amount)
+                # self.debit_payment(consumer_account, pg_data, appointment_obj, debit_amount)
+        elif self.action == Order.LAB_APPOINTMENT_RESCHEDULE:
+            new_appointment_data = appointment_data
+            appointment_obj = LabAppointment.objects.get(pk=self.reference_id)
+            if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
+                debit_amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
+                appointment_obj.action_rescheduled_patient(new_appointment_data)
+                order_dict = {
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                self.update_order(order_dict)
+                consumer_account.debit_schedule_new(appointment_obj, pg_data.get("product_id"), debit_amount)
+                # self.debit_payment(consumer_account, pg_data, appointment_obj, debit_amount)
+        return appointment_obj
+
+    @transaction.atomic
     def process_order(self, consumer_account, pg_data, appointment_data):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
@@ -294,11 +347,27 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
+    def credit_payment_new(self, pg_data, amount):
+        self.balance += amount
+        action = ConsumerTransaction.PAYMENT
+        tx_type = PgTransaction.CREDIT
+        consumer_tx_data = self.consumer_tx_pg_data(pg_data, amount, action, tx_type)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+        self.save()
+
     def credit_cancellation(self, data, amount):
         self.balance += amount
         action = ConsumerTransaction.CANCELLATION
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = self.form_consumer_tx_data(data, amount, action, tx_type)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+        self.save()
+
+    def credit_cancellation_new(self, appointment_obj, product_id, amount):
+        self.balance += amount
+        action = ConsumerTransaction.CANCELLATION
+        tx_type = PgTransaction.CREDIT
+        consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, amount, action, tx_type)
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
@@ -320,11 +389,28 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
+    def debit_schedule_new(self, appointment_obj, product_id, amount):
+        self.balance -= amount
+        action = ConsumerTransaction.SALE
+        tx_type = PgTransaction.DEBIT
+
+        consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, amount, action, tx_type)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+        self.save()
+
     def credit_schedule(self, data, amount):
         self.balance += amount
         action = ConsumerTransaction.RESCHEDULE_PAYMENT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = self.form_consumer_tx_data(data, amount, action, tx_type)
+        ConsumerTransaction.objects.create(**consumer_tx_data)
+        self.save()
+
+    def credit_schedule_new(self, appointment_obj, product_id, amount):
+        self.balance += amount
+        action = ConsumerTransaction.RESCHEDULE_PAYMENT
+        tx_type = PgTransaction.CREDIT
+        consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj, product_id, amount, action, tx_type)
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
@@ -335,6 +421,30 @@ class ConsumerAccount(TimeStampedModel):
         consumer_tx_data['reference_id'] = data.get('reference_id')
         consumer_tx_data['transaction_id'] = data.get('transaction_id')
         consumer_tx_data['order_id'] = data.get('order_id')
+        consumer_tx_data['type'] = tx_type
+        consumer_tx_data['action'] = action
+        consumer_tx_data['amount'] = amount
+        return consumer_tx_data
+
+    def consumer_tx_pg_data(self, data, amount, action, tx_type):
+        consumer_tx_data = dict()
+        consumer_tx_data['user'] = data['user']
+        consumer_tx_data['product_id'] = data.get('product_id')
+        consumer_tx_data['reference_id'] = data.get('reference_id')
+        consumer_tx_data['transaction_id'] = data.get('transaction_id')
+        consumer_tx_data['order_id'] = data.get('order_id')
+        consumer_tx_data['type'] = tx_type
+        consumer_tx_data['action'] = action
+        consumer_tx_data['amount'] = amount
+        return consumer_tx_data
+
+    def consumer_tx_appointment_data(self, app_obj, product_id, amount, action, tx_type):
+        consumer_tx_data = dict()
+        consumer_tx_data['user'] = app_obj.user
+        consumer_tx_data['product_id'] = product_id
+        consumer_tx_data['reference_id'] = app_obj.id
+        # consumer_tx_data['transaction_id'] = data.get('transaction_id')
+        # consumer_tx_data['order_id'] = data.get('order_id')
         consumer_tx_data['type'] = tx_type
         consumer_tx_data['action'] = action
         consumer_tx_data['amount'] = amount
