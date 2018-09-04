@@ -35,6 +35,7 @@ from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from ondoc.matrix.tasks import push_appointment_to_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -614,6 +615,7 @@ class LabAppointment(TimeStampedModel):
     address = JSONField(blank=True, null=True)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    matrix_lead_id = models.IntegerField(null=True)
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -665,7 +667,18 @@ class LabAppointment(TimeStampedModel):
                 self.outstanding = out_obj
         except:
             pass
+
+        push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        if 'push_again_to_matrix' in kwargs.keys():
+            kwargs.pop('push_again_to_matrix')
+
         super().save(*args, **kwargs)
+
+        if push_to_matrix:
+            # Push the appointment data to the matrix
+            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':4,
+                                                     'sub_product_id': 2}, ), countdown=5)
+
         if self.is_to_send_notification(database_instance):
             notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
 
@@ -673,15 +686,15 @@ class LabAppointment(TimeStampedModel):
             for e_id in settings.OPS_EMAIL_ID:
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
 
-        try:
-            prev_app_dict = {'id': self.id,
-                             'status': self.status,
-                             "updated_at": int(self.updated_at.timestamp())}
-            if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
-                countdown = self.get_auto_cancel_delay(self)
-                tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
-        except Exception as e:
-            logger.error("Error in auto cancel flow - " + str(e))
+        # try:
+        #     prev_app_dict = {'id': self.id,
+        #                      'status': self.status,
+        #                      "updated_at": int(self.updated_at.timestamp())}
+        #     if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
+        #         countdown = self.get_auto_cancel_delay(self)
+        #         tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
+        # except Exception as e:
+        #     logger.error("Error in auto cancel flow - " + str(e))
 
     def get_auto_cancel_delay(self, app_obj):
         delay = settings.AUTO_CANCEL_LAB_DELAY * 60

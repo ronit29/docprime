@@ -20,7 +20,7 @@ class LabOnboard(View):
         token = request.GET.get('token')
 
         if not token:
-            return render(request,'access_denied.html')
+            return render(request,'onboard/access_denied.html')
 
 
         existing = None
@@ -31,17 +31,17 @@ class LabOnboard(View):
             pass
 
         if not existing:
-            return render(request,'access_denied.html')
+            return render(request,'onboard/access_denied.html')
 
 
         if not existing.lab:
-            return render(request,'access_denied.html')
+            return render(request,'onboard/access_denied.html')
 
         if existing.status == LabOnboardingToken.CONSUMED:
-            return render(request, 'success.html')
+            return render(request, 'onboard/success.html')
 
         if existing.status != LabOnboardingToken.GENERATED:
-            return render(request, 'access_denied.html')
+            return render(request, 'onboard/access_denied.html')
 
         auth = request.session.get(token, False)
 
@@ -100,7 +100,7 @@ class LabOnboard(View):
         message = request.session.get('message','')
         request.session['message'] = ''
 
-        return render(request, 'lab.html', {'lab_form': lab_form,
+        return render(request, 'onboard/lab.html', {'lab_form': lab_form,
             'lab_address_form': lab_address_form,
             'lab_open_form' : lab_open_form,
             'award_formset': award_formset,
@@ -188,7 +188,7 @@ class LabOnboard(View):
             for service in LabService.objects.filter(lab=instance):
                 lab_service_dict[service.service] = service
 
-            return render(request, 'lab.html', {'lab_form': lab_form,
+            return render(request, 'onboard/lab.html', {'lab_form': lab_form,
                 'lab_address_form': lab_address_form,
                 'award_formset': award_formset,
                 'certificates_formset': certificates_formset,

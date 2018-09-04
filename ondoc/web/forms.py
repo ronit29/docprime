@@ -13,13 +13,13 @@ class OnlineLeadsForm(ModelForm):
             'name': TextInput(attrs={'placeholder': 'Name', 'class': 'form-control', 'id': 'name'}),
             'mobile': TextInput(attrs={'placeholder': 'Mobile Number', 'class': 'form-control', 'id': 'mobile',
                                        'type': 'number', 'min': 7000000000, 'max': 9999999999, }),
-            'city': TextInput(attrs={'placeholder': 'City', 'class': 'form-control', 'id': 'city'}),
+            'city_name': TextInput(attrs={'placeholder': 'City', 'class': 'form-control', 'id': 'city'}),
             'email': EmailInput(attrs={'placeholder': 'Email', 'class': 'form-control', 'id': 'email', 'pattern':
                                         "[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,3}$", 'oninvalid':
                                         "setCustomValidity('Enter a Valid Email Address')",
                                        'oninput': "setCustomValidity('')"}),
             }
-        fields = ['member_type', 'name','city', 'mobile', 'email']
+        fields = ['member_type', 'name', 'city_name', 'mobile', 'email']
 
 
 class CareersForm(ModelForm):
