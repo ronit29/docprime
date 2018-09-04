@@ -22,7 +22,7 @@ def otp(request):
 
     if not token:
         #return HttpResponse('Invalid URL. Token is required')
-        return render(request,'access_denied.html')
+        return render(request,'onboard/access_denied.html')
 
 
     existing = None
@@ -33,14 +33,14 @@ def otp(request):
         pass
 
     if not existing:
-        return render(request,'access_denied.html')
+        return render(request,'onboard/access_denied.html')
 
     if not existing.lab:
-        return render(request,'access_denied.html')
+        return render(request,'onboard/access_denied.html')
 
 
     if existing.status != LabOnboardingToken.GENERATED:
-        return render(request,'access_denied.html')
+        return render(request,'onboard/access_denied.html')
 
     auth = request.session.get(token, False)
     if auth:
@@ -91,7 +91,7 @@ def otp(request):
             #api.send_sms(message, '91'+str(existing.lab.primary_mobile))
             #request.session['otp'] = otp
 
-    return render(request,'otp.html',{'label':label, 'page':page, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})
+    return render(request,'onboard/otp.html',{'label':label, 'page':page, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})
 
 
 def generate(request):
@@ -153,4 +153,4 @@ def generate_doctor(request):
 
 
 def terms(request):
-    return render(request,'terms.html')
+    return render(request,'onboard/terms.html')
