@@ -3,12 +3,49 @@ from ondoc.authentication.models import UserSecretKey
 from django.contrib.auth import get_user_model
 import logging
 import jwt
+import math
 from ondoc.api.v1.admin import serializers
 from ondoc.crm.constants import constants
 
+from io import BytesIO
 from rest_framework.response import Response
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from ondoc.articles.serializers import ArticleImageSerializer
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from PIL import Image as Img
+from ondoc.articles.models import ArticleImage
+
+
+@api_view(['POST'])
+def upload(request):
+    data = {}
+    data['name'] = request.data.get('upload')
+    uploaded_image = request.data.get('upload')
+    max_allowed = 1000
+    img = Img.open(uploaded_image)
+    size = img.size
+
+    if max(size)>max_allowed:
+        size = tuple(math.floor(ti/(max(size)/max_allowed)) for ti in size)
+
+    img = img.resize(size, Img.ANTIALIAS)
+
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+
+    new_image_io = BytesIO()
+    img.save(new_image_io, format='JPEG')
+
+    image = InMemoryUploadedFile(new_image_io, None, uploaded_image.name, 'image/jpeg',
+                                        new_image_io.tell(), None)
+    ai = ArticleImage(name=image)
+    ai.save()
+
+    return Response({'uploaded': 1, 'url': request.build_absolute_uri(ai.name.url)})
 
 
 def userlogin_via_agent(request):
