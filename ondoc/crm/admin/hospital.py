@@ -1,7 +1,7 @@
 from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
 from django.db.models import Q
-
+from datetime import datetime
 from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,Doctor,
     HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
@@ -171,7 +171,7 @@ class HospCityFilter(SimpleListFilter):
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', HospCityFilter, CreatedByFilter)
     readonly_fields = ('associated_doctors', 'is_live', )
-    exclude = ('search_key', )
+    exclude = ('search_key', 'live_at', 'qc_approved_at' )
 
     def associated_doctors(self, instance):
         if instance.id:
@@ -193,6 +193,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         if '_qc_approve' in request.POST:
             obj.data_status = 3
             obj.is_live = True
+            obj.live_at = datetime.now()
+            obj.qc_approved_at = datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
         super().save_model(request, obj, form, change)

@@ -123,7 +123,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
     is_appointment_manager = models.BooleanField(verbose_name='Enabled for Managing Appointments', default=False)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
-    # generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
+    live_at = models.DateTimeField(null=True, blank=True)
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
 
@@ -246,6 +246,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     #                                                                            MinValueValidator(1000000000)])
     license = models.CharField(max_length=200, blank=True)
     onboarding_status = models.PositiveSmallIntegerField(default=NOT_ONBOARDED, choices=ONBOARDING_STATUS)
+    onboarded_at = models.DateTimeField(null=True, blank=True)
     additional_details = models.CharField(max_length=2000, blank=True)
     # email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name='Email Verified', default=False)
@@ -260,6 +261,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
                                                          default=False)
     online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
+    live_at = models.DateTimeField(null=True, blank=True)
     is_internal = models.BooleanField(verbose_name='Is Staff Doctor', default=False)
     is_test_doctor = models.BooleanField(verbose_name='Is Test Doctor', default=False)
     # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
@@ -316,6 +318,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
                                             Q(doctor__isnull=True, hospital__id__in=dochospitals)))
             if queryset.exists():
                 self.is_live = True
+                self.live_at = datetime.datetime.now()
 
 
     class Meta:

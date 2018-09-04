@@ -219,11 +219,13 @@ class UserViewset(GenericViewSet):
                     if not admin.doctor.is_live:
                         if admin.doctor.data_status == Doctor.QC_APPROVED and admin.doctor.onboarding_status == Doctor.ONBOARDED:
                             admin.doctor.is_live = True
+                            admin.doctor.live_at = datetime.datetime.now()
                             admin.doctor.save()
                 elif admin.hospital:
                     for hosp_doc in admin.hospital.assoc_doctors.all():
                         if hosp_doc.data_status == Doctor.QC_APPROVED and hosp_doc.onboarding_status == Doctor.ONBOARDED:
                             hosp_doc.is_live = True
+                            hosp_doc.live_at= datetime.datetime.now()
                             hosp_doc.save()
 
 

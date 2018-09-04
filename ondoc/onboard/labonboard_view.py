@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, HttpResponse
 from django.views import View
 from collections import OrderedDict
-
+from datetime import datetime
 from .forms import LabForm, LabAddressForm, LabOpenForm, LabAwardFormSet, LabAccreditationFormSet, LabManagerFormSet, \
                     LabTimingFormSet, LabCertificationFormSet, LabServiceFormSet, LabDoctorAvailabilityFormSet, \
                     LabDoctorFormSet
@@ -238,6 +238,7 @@ class LabOnboard(View):
 
         if action=='_submit':
             instance.onboarding_status = Lab.ONBOARDED
+            instance.onboarded_at = datetime.now()
             instance.save()
             LabOnboardingToken.objects.filter(token = token).update(status=LabOnboardingToken.CONSUMED)
 
