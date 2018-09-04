@@ -744,7 +744,7 @@ class LabAppointment(TimeStampedModel):
         data["product_id"] = 1
 
         cancel_amount = self.effective_price
-        consumer_account.credit_cancellation_new(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
+        consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
         # consumer_account.credit_cancellation(data, cancel_amount)
         if refund_flag:
             ctx_obj = consumer_account.debit_refund()

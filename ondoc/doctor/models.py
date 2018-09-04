@@ -1031,7 +1031,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
             data["product_id"] = Order.DOCTOR_PRODUCT_ID
 
             cancel_amount = self.effective_price
-            consumer_account.credit_cancellation_new(self, Order.DOCTOR_PRODUCT_ID, cancel_amount)
+            consumer_account.credit_cancellation(self, Order.DOCTOR_PRODUCT_ID, cancel_amount)
             # consumer_account.credit_cancellation(data, cancel_amount)
             if refund_flag:
                 ctx_obj = consumer_account.debit_refund()

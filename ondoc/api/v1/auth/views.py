@@ -589,12 +589,12 @@ class UserAppointmentsViewSet(OndocViewSet):
             # Debit or Refund/Credit in Account
             if appointment_details.effective_price > new_appointment_details.get('effective_price'):
                 #TODO PM - Refund difference b/w effective price
-                consumer_account.credit_schedule_new(appointment_details, product_id, appointment_details.effective_price - new_appointment_details.get('effective_price'))
+                consumer_account.credit_schedule(appointment_details, product_id, appointment_details.effective_price - new_appointment_details.get('effective_price'))
                 # consumer_account.credit_schedule(user_account_data, appointment_details.effective_price - new_appointment_details.get('effective_price'))
             else:
                 debit_balance = new_appointment_details.get('effective_price') - appointment_details.effective_price
                 if debit_balance:
-                    consumer_account.debit_schedule_new(appointment_details, product_id, debit_balance)
+                    consumer_account.debit_schedule(appointment_details, product_id, debit_balance)
                     # consumer_account.debit_schedule(user_account_data, debit_balance)
 
             # Update appointment
@@ -906,8 +906,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                 logger.error("Error in saving PG Transaction Data - " + str(e))
 
                             try:
-                                appointment_obj = self.block_pay_schedule_transaction_new(response_data, order_obj)
-                                # appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
+                                appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
                             except Exception as e:
                                 logger.error("Error in building appointment - " + str(e))
                     else:
@@ -992,36 +991,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 appointment_data = serializer.validated_data
 
             appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
-        except:
-            pass
-
-        return appointment_obj
-
-    @transaction.atomic
-    def block_pay_schedule_transaction_new(self, pg_data, order_obj):
-        # def block_pay_schedule_transaction(self, pg_data, order_obj):
-
-        consumer_account = ConsumerAccount.objects.get_or_create(user=pg_data["user"])
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=pg_data["user"])
-
-        tx_amount = order_obj.amount
-
-        consumer_account.credit_payment_new(pg_data, tx_amount)
-        # consumer_account.credit_payment(pg_data, tx_amount)
-
-        appointment_obj = None
-        try:
-            appointment_data = order_obj.action_data
-            if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                serializer = OpdAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid()
-                appointment_data = serializer.validated_data
-            elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                serializer = LabAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid()
-                appointment_data = serializer.validated_data
-
-            appointment_obj = order_obj.process_order_new(consumer_account, pg_data, appointment_data)
             # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
         except:
             pass
