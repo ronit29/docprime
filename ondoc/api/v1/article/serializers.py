@@ -19,7 +19,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Article
-        fields = ('title', 'url', 'body', 'icon', 'id', 'seo', 'header_image')
+        fields = ('title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
@@ -36,7 +36,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Article
-        fields = ('title', 'url', 'icon', 'header_image')
+        fields = ('title', 'url', 'icon', 'header_image', 'header_image_alt')
 
 
 class ArticlePreviewSerializer(serializers.Serializer):

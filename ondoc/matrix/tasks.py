@@ -67,7 +67,10 @@ def prepare_and_hit(self, data):
 
     # save the appointment with the matrix lead id.
     appointment.matrix_lead_id = resp_data.get('Id', None)
-    appointment.save()
+    appointment.matrix_lead_id = int(appointment.matrix_lead_id)
+
+    data = {'push_again_to_matrix':False}
+    appointment.save(**data)
 
     print(str(resp_data))
     if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
@@ -129,6 +132,7 @@ def push_signup_lead_to_matrix(self, data):
             'Name': online_lead_obj.name,
             'PrimaryNo': online_lead_obj.mobile,
             'LeadSource': 'DocPrime',
+            'LeadID': online_lead_obj.matrix_lead_id if online_lead_obj.matrix_lead_id else 0,
             'EmailId': online_lead_obj.email,
             'Gender': 0,
             'CityId': online_lead_obj.city_name.id if online_lead_obj.city_name.id else 0,
@@ -152,6 +156,14 @@ def push_signup_lead_to_matrix(self, data):
             self.retry([data], countdown=countdown_time)
 
         resp_data = response.json()
+
+        # save the appointment with the matrix lead id.
+        online_lead_obj.matrix_lead_id = resp_data.get('Id', None)
+        online_lead_obj.matrix_lead_id = int(online_lead_obj.matrix_lead_id)
+
+        data = {'push_again_to_matrix':False}
+        online_lead_obj.save(**data)
+
         print(str(resp_data))
         if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
             logger.info("[SUCCESS] Lead successfully published to the matrix system")

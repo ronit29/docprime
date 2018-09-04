@@ -42,7 +42,6 @@ import re
 import datetime
 from django.contrib.auth import get_user_model
 from decimal import Decimal
-from ondoc.matrix.tasks import push_appointment_to_matrix
 User = get_user_model()
 
 
@@ -401,8 +400,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
         appointment_data = self.form_lab_app_data(request, serializer.validated_data)
         resp = self.extract_payment_details(request, appointment_data, account_models.Order.LAB_PRODUCT_ID)
 
-        push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': resp.get('data').get('id'), 'product_id':4,
-                                                 'sub_product_id': 2}, ), countdown=5)
         return Response(data=resp)
 
     def form_lab_app_data(self, request, data):

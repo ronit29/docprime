@@ -39,6 +39,7 @@ from PIL import Image as Img
 from io import BytesIO
 import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
+from ondoc.matrix.tasks import push_appointment_to_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -1094,7 +1095,18 @@ class OpdAppointment(auth_model.TimeStampedModel):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
+
+        push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        if 'push_again_to_matrix' in kwargs.keys():
+            kwargs.pop('push_again_to_matrix')
+
         super().save(*args, **kwargs)
+
+        if push_to_matrix:
+            # Push the appointment data to the matrix .
+            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+
         if self.is_to_send_notification(database_instance):
             notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
         if not database_instance or database_instance.status != self.status:
