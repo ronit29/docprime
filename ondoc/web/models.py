@@ -2,6 +2,8 @@ from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.conf import settings
 from ondoc.authentication.models import TimeStampedModel
+from ondoc.common.models import Cities
+from ondoc.matrix.tasks import push_signup_lead_to_matrix
 import hashlib
 
 class OnlineLead(TimeStampedModel):
@@ -14,11 +16,30 @@ class OnlineLead(TimeStampedModel):
     name = models.CharField(max_length=255)
     speciality = models.CharField(max_length=255, blank=True, null=True)
     mobile = models.BigIntegerField(blank=False, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
-    city = models.CharField(max_length=255, blank=False, default='')
+    city = models.CharField(max_length=255, blank=True, null=True, default='')
+    city_name = models.ForeignKey(Cities, on_delete=models.SET_NULL, null=True)
     email = models.EmailField(blank=False)
+    matrix_lead_id = models.IntegerField(null=True)
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        if 'push_again_to_matrix' in kwargs.keys():
+            kwargs.pop('push_again_to_matrix')
+
+        super().save(*args, **kwargs)
+
+        if push_to_matrix:
+            product_id = 0
+            if self.member_type == 1:
+                product_id = 1
+            elif self.member_type == 2:
+                product_id = 4
+
+            push_signup_lead_to_matrix.apply_async(({'type': 'SIGNUP_LEAD', 'lead_id': self.id,
+                                                     'product_id': product_id, 'sub_product_id': 0}, ), countdown=5)
 
     class Meta:
         db_table = "online_lead"

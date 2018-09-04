@@ -7,6 +7,9 @@ from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
 
+from ondoc.common.models import Cities
+from import_export import resources, fields
+from import_export.admin import ImportMixin, base_formats, ImportExportMixin
 
 def practicing_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
@@ -190,3 +193,23 @@ class ActionAdmin(admin.ModelAdmin):
 
     class Meta:
         abstract = True
+
+
+class CitiesResource(resources.ModelResource):
+    name = fields.Field(attribute='name', column_name='City')
+
+    class Meta:
+        model = Cities
+        import_id_fields = ('id',)
+
+    def before_save_instance(self, instance, using_transactions, dry_run):
+        super().before_save_instance(instance, using_transactions, dry_run)
+
+
+class CitiesAdmin(ImportMixin, admin.ModelAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name',)
+    resource_class = CitiesResource
+
+
+

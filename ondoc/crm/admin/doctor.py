@@ -25,7 +25,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
-                                 OpdAppointment)
+                                 OpdAppointment, CompetitorInfo)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -631,6 +631,23 @@ class DoctorResource(resources.ModelResource):
 #     search_fields = ['merchant_id']
 
 
+class CompetitorInfoForm(forms.ModelForm):
+    hospital_name = forms.CharField(required=True)
+    fee = forms.CharField(required=True)
+    url = forms.URLField(required=True)
+    # processed_url = forms.URLField(required=True)
+
+
+class CompetitorInfoInline(nested_admin.NestedTabularInline):
+    model = CompetitorInfo
+    autocomplete_fields = ['hospital']
+    form = CompetitorInfoForm
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    fields = ['name', 'hospital', 'hospital_name', 'fee', 'url']
+
+
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -645,6 +662,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [
+        CompetitorInfoInline,
         DoctorMobileInline,
         DoctorEmailInline,
         DoctorSpecializationInline,
@@ -661,7 +679,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         GenericAdminInline,
         BillingAccountInline
     ]
-    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key']
+    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
+               'onboarded_at', 'qc_approved_at']
     search_fields = ['name']
 
     readonly_fields = ('lead_url', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live')
@@ -783,8 +802,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
-            # obj.is_live = True
             obj.update_live_status()
+            obj.qc_approved_at = datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 

@@ -35,6 +35,7 @@ from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from ondoc.matrix.tasks import push_appointment_to_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_ppc_radiology_enabled = models.BooleanField(verbose_name= 'Enabled for Radiology Pre Policy Checkup', default=False)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
     onboarding_status = models.PositiveSmallIntegerField(default=NOT_ONBOARDED, choices=ONBOARDING_STATUS)
+    onboarded_at = models.DateTimeField(null=True, blank=True)
     primary_email = models.EmailField(max_length=100, blank=True)
     primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MinValueValidator(1800)])
@@ -170,6 +172,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_home_collection_enabled = models.BooleanField(default=False)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
+    live_at = models.DateTimeField(null=True, blank=True)
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
@@ -612,6 +615,7 @@ class LabAppointment(TimeStampedModel):
     address = JSONField(blank=True, null=True)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    matrix_lead_id = models.IntegerField(null=True)
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -663,7 +667,18 @@ class LabAppointment(TimeStampedModel):
                 self.outstanding = out_obj
         except:
             pass
+
+        push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        if 'push_again_to_matrix' in kwargs.keys():
+            kwargs.pop('push_again_to_matrix')
+
         super().save(*args, **kwargs)
+
+        if push_to_matrix:
+            # Push the appointment data to the matrix
+            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':4,
+                                                     'sub_product_id': 2}, ), countdown=5)
+
         if self.is_to_send_notification(database_instance):
             notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
 

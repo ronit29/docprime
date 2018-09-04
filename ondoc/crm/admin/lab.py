@@ -1,6 +1,7 @@
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
 from django.conf.urls import url
 from django.conf import settings
+from datetime import datetime
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats
 from django.utils.safestring import mark_safe
@@ -388,7 +389,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter, CreatedByFilter)
 
     exclude = ('search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
-                   'radiology_deal_price_percentage', )
+                   'radiology_deal_price_percentage', 'live_at', 'onboarded_at', 'qc_approved_at' )
 
     def get_readonly_fields(self, request, obj=None):
         if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
@@ -479,6 +480,9 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
+            obj.is_live = True
+            obj.live_at = datetime.now()
+            obj.qc_approved_at = datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 

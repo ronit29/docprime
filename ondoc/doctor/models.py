@@ -39,6 +39,7 @@ from PIL import Image as Img
 from io import BytesIO
 import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
+from ondoc.matrix.tasks import push_appointment_to_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
     is_appointment_manager = models.BooleanField(verbose_name='Enabled for Managing Appointments', default=False)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
-    # generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
+    live_at = models.DateTimeField(null=True, blank=True)
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
 
@@ -246,6 +247,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     #                                                                            MinValueValidator(1000000000)])
     license = models.CharField(max_length=200, blank=True)
     onboarding_status = models.PositiveSmallIntegerField(default=NOT_ONBOARDED, choices=ONBOARDING_STATUS)
+    onboarded_at = models.DateTimeField(null=True, blank=True)
     additional_details = models.CharField(max_length=2000, blank=True)
     # email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name='Email Verified', default=False)
@@ -260,6 +262,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
                                                          default=False)
     online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
+    live_at = models.DateTimeField(null=True, blank=True)
     is_internal = models.BooleanField(verbose_name='Is Staff Doctor', default=False)
     is_test_doctor = models.BooleanField(verbose_name='Is Test Doctor', default=False)
     # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
@@ -316,6 +319,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
                                             Q(doctor__isnull=True, hospital__id__in=dochospitals)))
             if queryset.exists():
                 self.is_live = True
+                self.live_at = datetime.datetime.now()
 
 
     class Meta:
@@ -959,6 +963,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
+    matrix_lead_id = models.IntegerField(null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1093,7 +1098,18 @@ class OpdAppointment(auth_model.TimeStampedModel):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
+
+        push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        if 'push_again_to_matrix' in kwargs.keys():
+            kwargs.pop('push_again_to_matrix')
+
         super().save(*args, **kwargs)
+
+        if push_to_matrix:
+            # Push the appointment data to the matrix .
+            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+
         if self.is_to_send_notification(database_instance):
             notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
         if not database_instance or database_instance.status != self.status:
@@ -1357,4 +1373,32 @@ class DoctorMapping(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "doctor_mapping"
+
+
+class CompetitorInfo(auth_model.TimeStampedModel):
+    name = models.PositiveSmallIntegerField(blank=True, null=True,
+                                            choices=[("", "Select"), (1, "PRACTO"), (2, "LYBRATE")])
+
+    doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True, blank=True)
+    hospital = models.ForeignKey(Hospital, related_name="competitor_hospital", on_delete=models.CASCADE, null=True, blank=True)
+    hospital_name = models.CharField(max_length=200)
+    fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    url = models.URLField(null=True)
+    processed_url =models.URLField(null=True)
+
+    #
+    # url = url.replace("http://", "")
+
+    class Meta:
+        db_table = "competitor_info"
+
+    def save(self, *args, **kwargs):
+        url = self.url
+        if url:
+            url = url.split('//')[1];
+            url = url.split('?')[0];
+            self.processed_url = url
+        super().save(*args, **kwargs)
+
+
 

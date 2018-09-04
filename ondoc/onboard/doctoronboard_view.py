@@ -7,7 +7,7 @@ from .forms import  DoctorClinicFormSet, DoctorLanguageFormSet, DoctorAwardFormS
                      DoctorMobileFormSet, DoctorQualificationFormSet, DoctorServiceFormSet, \
                      DoctorEmailFormSet, DoctorClinicTimingFormSet, BaseDoctorEmailFormSet
 from django.db.models import Q
-
+from datetime import datetime
 # import models here
 from ondoc.doctor.models import DoctorOnboardingToken, Doctor, DoctorImage, DoctorDocument, DoctorClinic
 from random import randint
@@ -201,6 +201,7 @@ class DoctorOnboard(View):
 
         if action=='_submit':
             instance.onboarding_status = Doctor.ONBOARDED
+            instance.onboarded_at = datetime.now()
             instance.save()
             DoctorOnboardingToken.objects.filter(token = token).update(status=DoctorOnboardingToken.CONSUMED)
 
