@@ -9,7 +9,7 @@ from django.conf import settings
 
 class ArticleForm(forms.ModelForm):
     body = forms.CharField(widget=forms.Textarea, required=False)
-    category = forms.ModelMultipleChoiceField(queryset=ArticleCategory.objects.all(),widget=forms.CheckboxSelectMultiple)
+    category = forms.ModelChoiceField(queryset=ArticleCategory.objects.all(),widget=forms.Select)
 
     class Media:
         extend=False
@@ -17,8 +17,8 @@ class ArticleForm(forms.ModelForm):
         css = {'all':('articles/css/style.css',)}
 
 
-class ArticleCategoryInline(admin.TabularInline):
-    model = Article.category.through
+# class ArticleCategoryInline(admin.TabularInline):
+#     model = Article.category.through
 
 
 class ArticleAdmin(VersionAdmin):
@@ -26,7 +26,7 @@ class ArticleAdmin(VersionAdmin):
     model = Article
     list_display = ('title', 'updated_at', 'created_at', 'created_by')
     search_fields = ['title']
-    fields = ['body', 'title', 'category', 'url', 'icon_tag', 'icon', 'is_published', 'preview']
+    fields = ['title', 'body', 'header_image','header_image_alt', 'category', 'url', 'description', 'keywords', 'icon_tag', 'icon', 'is_published', 'preview']
     readonly_fields = ['icon_tag', 'preview']
     #inlines = [ArticleCategoryInline]
 
@@ -34,7 +34,7 @@ class ArticleAdmin(VersionAdmin):
         if instance.id:
             app_url = settings.CONSUMER_APP_DOMAIN
             if app_url:
-                html = '''<a href='%s/article/%s?preview=1' target=_blank>Preview</a>''' % (app_url, instance.id)
+                html = '''<a href='%s/%s' target=_blank>Preview</a>''' % (app_url, instance.url)
                 return mark_safe(html)
         else:
             return mark_safe('''<span></span>''')
@@ -43,12 +43,21 @@ class ArticleAdmin(VersionAdmin):
         if not obj.created_by:
             obj.created_by = request.user
 
+        if hasattr(obj, 'url'):
+            obj.url = obj.url.strip('/')
+            url_components = obj.url.split('-')
+            if ArticleCategory.objects.filter(identifier=url_components[len(url_components)-1]).exists():
+                pass
+            else:
+                identifier = obj.category.identifier
+                obj.url = '%s-%s' % (obj.url, identifier)
+
         super().save_model(request, obj, form, change)
 
 
 class ArticleImageAdmin(ModelAdmin):
-    fields = ['image_tag', 'height', 'width']
-    readonly_fields = ['image_tag', 'height', 'width']
+    fields = ['image_tag']
+    readonly_fields = ['image_tag']
 
 
 admin.site.register(Article, ArticleAdmin)

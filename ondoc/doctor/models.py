@@ -39,6 +39,7 @@ from PIL import Image as Img
 from io import BytesIO
 import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
+from ondoc.matrix.tasks import push_appointment_to_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -959,6 +960,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
+    matrix_lead_id = models.IntegerField(null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1094,22 +1096,33 @@ class OpdAppointment(auth_model.TimeStampedModel):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
+
+        push_to_matrix = kwargs.get('push_again_to_matrix', True)
+        if 'push_again_to_matrix' in kwargs.keys():
+            kwargs.pop('push_again_to_matrix')
+
         super().save(*args, **kwargs)
+
+        if push_to_matrix:
+            # Push the appointment data to the matrix .
+            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+
         if self.is_to_send_notification(database_instance):
             notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
         if not database_instance or database_instance.status != self.status:
             for e_id in settings.OPS_EMAIL_ID:
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
-        try:
-            if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
-                countdown = self.get_auto_cancel_delay(self)
-                doc_app_auto_cancel.apply_async(({
-                    "id": self.id,
-                    "status": self.status,
-                    "updated_at": int(self.updated_at.timestamp())
-                }, ), countdown=countdown)
-        except Exception as e:
-            logger.error("Error in auto cancel flow - " + str(e))
+        # try:
+        #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
+        #         countdown = self.get_auto_cancel_delay(self)
+        #         doc_app_auto_cancel.apply_async(({
+        #             "id": self.id,
+        #             "status": self.status,
+        #             "updated_at": int(self.updated_at.timestamp())
+        #         }, ), countdown=countdown)
+        # except Exception as e:
+        #     logger.error("Error in auto cancel flow - " + str(e))
 
     def doc_payout_amount(self):
         amount = 0

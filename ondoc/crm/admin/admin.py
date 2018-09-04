@@ -10,6 +10,7 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabSe
 from ondoc.lead.models import HospitalLead, DoctorLead
 from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
+from .common import Cities, CitiesAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -78,6 +79,7 @@ admin.site.register(LabTestType, LabTestTypeAdmin)
 admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
+admin.site.register(Cities, CitiesAdmin)
 admin.site.register(DoctorLead, DoctorLeadAdmin)
 
 admin.site.register(notifcation_model.EmailNotification, EmailNotificationAdmin)
