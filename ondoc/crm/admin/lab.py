@@ -1,7 +1,7 @@
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
 from django.conf.urls import url
 from django.conf import settings
-from datetime import datetime
+import datetime
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats
 from django.utils.safestring import mark_safe
@@ -481,8 +481,8 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         if '_qc_approve' in request.POST:
             obj.data_status = 3
             obj.is_live = True
-            obj.live_at = datetime.now()
-            obj.qc_approved_at = datetime.now()
+            obj.live_at = datetime.datetime.now()
+            obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 

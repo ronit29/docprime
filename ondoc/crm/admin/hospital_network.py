@@ -10,7 +10,7 @@ from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
     HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
     HospitalNetworkAward, HospitalNetworkCertification, HospitalNetworkDocument)
-from datetime import datetime
+import datetime
 from .common import *
 from ondoc.authentication.admin import BillingAccountInline
 
@@ -200,7 +200,7 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
-            obj.qc_approved_at = datetime.now()
+            obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 

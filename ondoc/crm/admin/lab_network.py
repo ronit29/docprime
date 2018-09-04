@@ -4,7 +4,7 @@ from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from django.db import models
-from datetime import datetime
+import datetime
 from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.crm.admin.lab import HomePickupChargesInline
 from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
@@ -234,7 +234,7 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
-            obj.qc_approved_at = datetime.now()
+            obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 
