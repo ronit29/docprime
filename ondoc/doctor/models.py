@@ -1374,3 +1374,31 @@ class DoctorMapping(auth_model.TimeStampedModel):
     class Meta:
         db_table = "doctor_mapping"
 
+
+class CompetitorInfo(auth_model.TimeStampedModel):
+    name = models.PositiveSmallIntegerField(blank=True, null=True,
+                                            choices=[("", "Select"), (1, "PRACTO"), (2, "LYBRATE")])
+
+    doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True, blank=True)
+    hospital = models.ForeignKey(Hospital, related_name="competitor_hospital", on_delete=models.CASCADE, null=True, blank=True)
+    hospital_name = models.CharField(max_length=200)
+    fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    url = models.URLField(null=True)
+    processed_url =models.URLField(null=True)
+
+    #
+    # url = url.replace("http://", "")
+
+    class Meta:
+        db_table = "competitor_info"
+
+    def save(self, *args, **kwargs):
+        url = self.url
+        if url:
+            url = url.split('//')[1];
+            url = url.split('?')[0];
+            self.processed_url = url
+        super().save(*args, **kwargs)
+
+
+

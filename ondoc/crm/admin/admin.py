@@ -4,7 +4,7 @@ from django.contrib.gis import admin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment, GeneralSpecialization,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
-                                 DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment)
+                                 DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup)
 from ondoc.lead.models import HospitalLead, DoctorLead
