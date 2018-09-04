@@ -671,15 +671,15 @@ class LabAppointment(TimeStampedModel):
             for e_id in settings.OPS_EMAIL_ID:
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
 
-        try:
-            prev_app_dict = {'id': self.id,
-                             'status': self.status,
-                             "updated_at": int(self.updated_at.timestamp())}
-            if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
-                countdown = self.get_auto_cancel_delay(self)
-                tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
-        except Exception as e:
-            logger.error("Error in auto cancel flow - " + str(e))
+        # try:
+        #     prev_app_dict = {'id': self.id,
+        #                      'status': self.status,
+        #                      "updated_at": int(self.updated_at.timestamp())}
+        #     if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
+        #         countdown = self.get_auto_cancel_delay(self)
+        #         tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
+        # except Exception as e:
+        #     logger.error("Error in auto cancel flow - " + str(e))
 
     def get_auto_cancel_delay(self, app_obj):
         delay = settings.AUTO_CANCEL_LAB_DELAY * 60
