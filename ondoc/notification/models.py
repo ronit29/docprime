@@ -526,12 +526,12 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
 
     @classmethod
     def send_app_download_link(cls, email, context):
-        html_body = render_to_string('email/doctor_onboarding/body.html', context=context)
+        email_body = render_to_string('email/doctor_onboarding/body.html', context=context)
         email_subject = render_to_string('email/doctor_onboarding/subject.txt', context=context)
         if email:
             email_notif = {
                 "email": email,
-                "content": html_body,
+                "content": email_body,
                 "email_subject": email_subject
             }
             message = {
@@ -663,11 +663,11 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
 
     @classmethod
     def send_app_download_link(cls, phone_number, context):
-        html_body = render_to_string('sms/doctor_onboarding.txt', context=context)
+        sms_body = render_to_string('sms/doctor_onboarding.txt', context=context)
         if phone_number:
             sms_noti = {
                 "phone_number": phone_number,
-                "content": html_body,
+                "content": sms_body,
             }
             message = {
                 "data": sms_noti,
