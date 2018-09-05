@@ -860,6 +860,8 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
+    cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
+                                                                  (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
 
     def clean(self):
         super().clean()
@@ -944,7 +946,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
             return ('booking_id', 'doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'start_date',
+                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type','start_date',
                     'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'hospital_name', 'contact_details', 'used_profile_name',
@@ -952,7 +954,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'default_profile_number', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'start_date', 'start_time')
+                    'status', 'cancel_type', 'start_date', 'start_time')
         else:
             return ()
 
@@ -1042,7 +1044,16 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     obj.time_slot_start = dt_field
             if request.POST.get('status') and int(request.POST['status']) == OpdAppointment.CANCELLED:
                 obj.cancellation_type = OpdAppointment.AGENT_CANCELLED
+                cancel_type = int(request.POST.get('cancel_type'))
+                if cancel_type is not None:
+                    obj.action_cancelled(cancel_type)
         super().save_model(request, obj, form, change)
+
+    class Media:
+        js = (
+            '//ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js',
+            'js/admin/ondoc.js',
+        )
 
 
 class SpecializationResource(resources.ModelResource):
