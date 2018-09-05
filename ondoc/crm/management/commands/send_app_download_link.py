@@ -3,6 +3,7 @@ from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
 from ondoc.doctor.models import Doctor, DoctorMobile, DoctorEmail
 from ondoc.notification.models import EmailNotification, SmsNotification
+import time
 
 
 class Command(BaseCommand):
@@ -25,8 +26,14 @@ class Command(BaseCommand):
         #         print(int(d.m)/1000)
         #     else:
         #         print("wrong query")
-        for doctor_email in DoctorEmail.objects.filter(doctor__in=doctors, is_primary=True):
-            EmailNotification.send_app_download_link(email=doctor_email.email, context={})
+        for doctor_email in DoctorEmail.objects.filter(doctor__in=doctors, is_primary=True).values_list(
+                'email', flat=True).distinct('email')[100:]:
+            print(doctor_email)
+            time.sleep(.2)
+            EmailNotification.send_app_download_link(email=doctor_email, context={})
 
-        for doctor_phone_number in DoctorMobile.objects.filter(doctor__in=doctors, is_primary=True):
-            SmsNotification.send_app_download_link(phone_number=str(doctor_phone_number.number), context={})
+        for doctor_phone_number in DoctorMobile.objects.filter(doctor__in=doctors, is_primary=True).values_list(
+                'number', flat=True).distinct('number'):
+            print(doctor_phone_number)
+            time.sleep(.2)
+            SmsNotification.send_app_download_link(phone_number=str(doctor_phone_number), context={})
