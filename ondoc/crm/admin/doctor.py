@@ -655,7 +655,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     change_list_template = 'superuser_import_export.html'
 
     list_display = (
-        'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to',
+        'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'registered',
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
@@ -684,7 +684,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                'onboarded_at', 'qc_approved_at']
     search_fields = ['name']
 
-    readonly_fields = ('lead_url', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live')
+    readonly_fields = ('lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live')
 
     def lead_url(self, instance):
         if instance.id:
@@ -694,6 +694,15 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                 return mark_safe(html)
         else:
             return mark_safe('''<span></span>''')
+
+    def registered(self, instance):
+        registered = None
+        if instance and instance.id:
+            registered = 'NO'
+            if instance.user is not None:
+                registered = 'YES'
+        return mark_safe('''<span>%s</span>'''%(registered))
+    registered.short_description = "Registered"
 
     def get_urls(self):
         urls = super().get_urls()
