@@ -539,7 +539,8 @@ class LabAppointmentForm(forms.ModelForm):
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-
+        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
+            raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
             date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
             dt_field = parse_datetime(date_time_field)
@@ -602,7 +603,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     get_lab.short_description = 'Lab Name'
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
-        allowed_status_for_agent = [(LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+        allowed_status_for_agent = [(LabAppointment.BOOKED, 'Booked'),
+                                    (LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
                                     (LabAppointment.ACCEPTED, 'Accepted'),
                                     (LabAppointment.CANCELLED, 'Cancelled')]
