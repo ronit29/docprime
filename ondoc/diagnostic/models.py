@@ -756,7 +756,7 @@ class LabAppointment(TimeStampedModel):
         data = dict()
         data["reference_id"] = self.id
         data["user"] = self.user
-        data["product_id"] = 1
+        data["product_id"] = account_model.Order.LAB_PRODUCT_ID
 
         cancel_amount = self.effective_price
         consumer_account.credit_cancellation(data, cancel_amount)
