@@ -591,23 +591,26 @@ class PrescriptionFileViewset(OndocViewSet):
         serializer = serializers.PrescriptionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        resp_data = list()
-        if self.prescription_permission(request.user, validated_data.get('appointment')):
-            if models.Prescription.objects.filter(appointment=validated_data.get('appointment')).exists():
-                prescription = models.Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
-            else:
-                prescription = models.Prescription.objects.create(appointment=validated_data.get('appointment'),
+        #resp_data = list()
+        if not self.prescription_permission(request.user, validated_data.get('appointment')):
+            return Response({'msg': "You don't have permissions to manage this appointment"},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        if models.Prescription.objects.filter(appointment=validated_data.get('appointment')).exists():
+            prescription = models.Prescription.objects.filter(appointment=validated_data.get('appointment')).first()
+        else:
+            prescription = models.Prescription.objects.create(appointment=validated_data.get('appointment'),
                                                                   prescription_details=validated_data.get(
                                                                       'prescription_details'))
-            prescription_file_data = {
-                "prescription": prescription.id,
-                "name": validated_data.get('name')
-            }
-            prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data,
+        prescription_file_data = {
+            "prescription": prescription.id,
+            "name": validated_data.get('name')
+        }
+        prescription_file_serializer = serializers.PrescriptionFileSerializer(data=prescription_file_data,
                                                                                   context={"request": request})
-            prescription_file_serializer.is_valid(raise_exception=True)
-            prescription_file_serializer.save()
-            resp_data = prescription_file_serializer.data
+        prescription_file_serializer.is_valid(raise_exception=True)
+        prescription_file_serializer.save()
+        resp_data = prescription_file_serializer.data
         return Response(resp_data)
 
     def remove(self, request):
@@ -749,3 +752,18 @@ class ConfigView(viewsets.GenericViewSet):
         serializer_data.is_valid(raise_exception=True)
         validated_data = serializer_data.validated_data
         return Response({})
+
+
+class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
+
+    def complete(self, request):
+        resp = {}
+        serializer = serializers.OpdAppointmentCompleteTempSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('opd_appointment'))
+        if opd_appointment:
+            opd_appointment.action_completed()
+
+            resp = {'success': 'Appointment Completed Successfullly!'}
+        return Response(resp)

@@ -179,7 +179,7 @@ class QCModel(models.Model):
     QC_APPROVED = 3
     DATA_STATUS_CHOICES = [(IN_PROGRESS, "In Progress"), (SUBMITTED_FOR_QC, "Submitted For QC Check"), (QC_APPROVED, "QC approved")]
     data_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=DATA_STATUS_CHOICES)
-
+    qc_approved_at = models.DateTimeField(null=True, blank=True)
     class Meta:
         abstract = True
 
@@ -860,7 +860,7 @@ class BillingAccount(models.Model):
     SAVINGS = 1
     CURRENT = 2
     merchant_id = models.BigIntegerField(null=True, default=None, blank=True)
-    account_number = models.BigIntegerField(null=True, default=None, blank=True)
+    account_number = models.CharField(max_length=50, null=True, default=None, blank=True)
     ifsc_code = models.CharField(max_length=128, null=True)
     pan_number = models.CharField(max_length=20, null=True)
     TYPE_CHOICES = (

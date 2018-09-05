@@ -7,7 +7,7 @@ from .forms import  DoctorClinicFormSet, DoctorLanguageFormSet, DoctorAwardFormS
                      DoctorMobileFormSet, DoctorQualificationFormSet, DoctorServiceFormSet, \
                      DoctorEmailFormSet, DoctorClinicTimingFormSet, BaseDoctorEmailFormSet
 from django.db.models import Q
-
+import datetime
 # import models here
 from ondoc.doctor.models import DoctorOnboardingToken, Doctor, DoctorImage, DoctorDocument, DoctorClinic
 from random import randint
@@ -20,7 +20,7 @@ class DoctorOnboard(View):
         token = request.GET.get('token')
 
         if not token:
-            return render(request, 'access_denied.html')
+            return render(request, 'onboard/access_denied.html')
 
         existing = None
 
@@ -30,16 +30,16 @@ class DoctorOnboard(View):
             pass
 
         if not existing:
-            return render(request,'access_denied.html')
+            return render(request,'onboard/access_denied.html')
 
         if not existing.doctor:
-            return render(request,'access_denied.html')
+            return render(request,'onboard/access_denied.html')
 
         if existing.status == DoctorOnboardingToken.CONSUMED:
-            return render(request, 'dsuccess.html')
+            return render(request, 'onboard/dsuccess.html')
 
         if existing.status != DoctorOnboardingToken.GENERATED:
-            return render(request,'access_denied.html')
+            return render(request,'onboard/access_denied.html')
 
         auth = request.session.get(token, False)
 
@@ -85,7 +85,7 @@ class DoctorOnboard(View):
         # image_formset = DoctorImageFormSet(instance = existing.doctor, prefix = 'doctorimage')
 
 
-        return render(request, 'doctor.html', {'doctor_form': doctor_form,
+        return render(request, 'onboard/doctor.html', {'doctor_form': doctor_form,
             'email_formset': email_formset,
             'mobile_formset': mobile_formset,
             'qualification_formset': qualification_formset,
@@ -163,7 +163,7 @@ class DoctorOnboard(View):
                 else:
                     doc_dict[id] = (id, value, None)
 
-            return render(request, 'doctor.html', {'doctor_form': doctor_form,
+            return render(request, 'onboard/doctor.html', {'doctor_form': doctor_form,
                 'mobile_formset': mobile_formset,
                 'email_formset': email_formset,
                 'qualification_formset': qualification_formset,
@@ -187,7 +187,10 @@ class DoctorOnboard(View):
         email_formset.save()
         qualification_formset.save()
         # hospital_formset.save()
-        language_formset.save()
+        try:
+            language_formset.save()
+        except:
+            pass
         award_formset.save()
         association_formset.save()
         experience_formset.save()
@@ -198,6 +201,7 @@ class DoctorOnboard(View):
 
         if action=='_submit':
             instance.onboarding_status = Doctor.ONBOARDED
+            instance.onboarded_at = datetime.datetime.now()
             instance.save()
             DoctorOnboardingToken.objects.filter(token = token).update(status=DoctorOnboardingToken.CONSUMED)
 
@@ -211,7 +215,7 @@ def otp(request):
 
     if not token:
         #return HttpResponse('Invalid URL. Token is required')
-        return render(request,'access_denied.html')
+        return render(request,'onboard/access_denied.html')
 
 
     existing = None
@@ -222,14 +226,14 @@ def otp(request):
         pass
 
     if not existing:
-        return render(request,'access_denied.html')
+        return render(request,'onboard/access_denied.html')
 
     if not existing.doctor:
-        return render(request,'access_denied.html')
+        return render(request,'onboard/access_denied.html')
 
 
     if existing.status != DoctorOnboardingToken.GENERATED:
-        return render(request,'access_denied.html')
+        return render(request,'onboard/access_denied.html')
 
     auth = request.session.get(token, False)
     if auth:
@@ -272,4 +276,4 @@ def otp(request):
             page = 'otp_verify'
             label = '6 Digit verification code has been send to your mobile number '+str(existing.doctor.mobiles.filter(is_primary=True)[0].number)
 
-    return render(request,'otp.html',{'label':label, 'page':page, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})
+    return render(request,'onboard/otp.html',{'label':label, 'page':page, 'otp_resent':otp_resent, 'otp_mismatch':otp_mismatch})

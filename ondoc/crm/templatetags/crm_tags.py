@@ -2,9 +2,17 @@ import datetime
 from django import template
 
 from ondoc.crm.constants import constants
-
+from django.contrib.auth.models import Group
 
 register = template.Library()
+
+@register.filter(name='has_group')
+def has_group(user, group_name):
+    group = Group.objects.filter(name=group_name).first()
+    if group and group in user.groups.all():
+        return True
+    else:
+        return False
 
 @register.inclusion_tag('custom_submit.html',takes_context=True)
 def show_actions(context, original):

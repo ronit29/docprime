@@ -4,6 +4,35 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from . import serializers
+from ondoc.api.pagination import paginate_queryset
+
+
+class ArticleCategoryViewSet(viewsets.GenericViewSet):
+
+    def get_queryset(self):
+        return article_models.ArticleCategory.objects.all()
+
+    def list(self, request):
+        queryset = paginate_queryset(self.get_queryset(), request, 10)
+        article_category_list = [serializers.ArticleCategoryListSerializer(category, context={'request': request}).data
+                                 for category in queryset]
+        return Response(article_category_list)
+
+
+class TopArticleCategoryViewSet(viewsets.GenericViewSet):
+
+    def get_queryset(self):
+        return article_models.ArticleCategory.objects.all()
+
+    def list(self, request):
+        response = list()
+        for category in self.get_queryset():
+            article_list = category.articles.filter(is_published=True).order_by('id')[:8]
+            resp = serializers.ArticleListSerializer(article_list, many=True,
+                                                     context={'request': request}).data
+            category_serialized = serializers.ArticleCategoryListSerializer(category, context={'request': request}).data
+            response.append({'articles': resp, 'name': category_serialized['name'], 'url': category_serialized['url']})
+        return Response(response)
 
 
 class ArticleViewSet(viewsets.GenericViewSet):
@@ -12,28 +41,29 @@ class ArticleViewSet(viewsets.GenericViewSet):
         return article_models.Article.objects.prefetch_related('category')
 
     def list(self, request):
-        resp = []
-        categories = article_models.ArticleCategory.objects.prefetch_related('articles').distinct()
-        for category in categories.all():
-            if category.articles:
-                article_data = []
-                for article in category.articles.all():
-                    if article.is_published:
-                        article_data.append(article)
-                cat_data = {}
-                if article_data:
-                    cat_data['title'] = category.name
-                    cat_data['data'] = serializers.ArticleListSerializer(article_data, many=True,
-                                                                 context={'request': request}).data
-                    resp.append(cat_data)
+        category_url = request.GET.get('categoryUrl', None)
+        if not category_url:
+            return Response({"error": "Missing Parameter: categoryUrl"}, status=status.HTTP_400_BAD_REQUEST)
+
+        category_list = article_models.ArticleCategory.objects.filter(url=category_url)
+        if not len(category_list) > 0:
+            return Response([])
+
+        category = category_list[0]
+        articles = category.articles.all()
+        article_data = list(filter(lambda article: article.is_published, articles))
+
+        article_data = paginate_queryset(article_data, request, 10)
+        resp = serializers.ArticleListSerializer(article_data, many=True,
+                                                 context={'request': request}).data
         return Response(resp)
 
-    def retrieve(self, request, pk=None):
-        response = {}
-        queryset = self.get_queryset().filter(pk=pk)
+    def retrieve(self, request):
         serializer = serializers.ArticlePreviewSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         preview = serializer.validated_data.get('preview')
+        article_url = serializer.validated_data.get('url')
+        queryset = self.get_queryset().filter(url=article_url)
         if not preview:
             queryset = queryset.filter(is_published=True)
         if queryset.exists():

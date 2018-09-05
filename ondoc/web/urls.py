@@ -15,4 +15,5 @@ urlpatterns = [
     url(r'^disclaimer/', views.disclaimer_page, name='disclaimer_page'),
     url(r'^howitworks/', views.howitworks_page, name='howitworks_page'),
     url(r'^admin/agent/', views.user_appointment_via_agent, name='agent_page'),
+    url(r'^short/(?P<hash>[a-zA-Z0-9]+)', views.redirect_to_original_url, name='redirect-original-url'),
 ]

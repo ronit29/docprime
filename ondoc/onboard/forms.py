@@ -15,7 +15,7 @@ from crispy_forms.utils import TEMPLATE_PACK
 class CustomField(Field):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.template = 'customfield.html'
+        self.template = 'onboard/customfield.html'
         # self.extra_context = kwargs.pop('extra_context', self.extra_context)
 
         # self.xlabel_class = 'col-md-2'

@@ -1,6 +1,8 @@
 from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
 from django.db.models import Q
+import datetime
+from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,Doctor,
     HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork, Hospital)
 from .common import *
@@ -167,9 +169,9 @@ class HospCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
-    list_filter = ('data_status', HospCityFilter)
+    list_filter = ('data_status', HospCityFilter, CreatedByFilter)
     readonly_fields = ('associated_doctors', 'is_live', )
-    exclude = ('search_key', )
+    exclude = ('search_key', 'live_at', 'qc_approved_at' )
 
     def associated_doctors(self, instance):
         if instance.id:
@@ -191,17 +193,20 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         if '_qc_approve' in request.POST:
             obj.data_status = 3
             obj.is_live = True
+            obj.live_at = datetime.datetime.now()
+            obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
         super().save_model(request, obj, form, change)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        parent_qs = super(QCPemAdmin, self).get_queryset(request)
-        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
-            return parent_qs.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user)).prefetch_related('assoc_doctors')
-        else:
-            return qs.prefetch_related('assoc_doctors')
+        # parent_qs = super(QCPemAdmin, self).get_queryset(request)
+        # if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
+        #     return parent_qs.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user)).prefetch_related('assoc_doctors')
+        # else:
+        #     return qs.prefetch_related('assoc_doctors')
+        return qs.prefetch_related('assoc_doctors')
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(HospitalAdmin, self).get_form(request, obj=obj, **kwargs)

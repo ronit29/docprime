@@ -1,6 +1,7 @@
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
 from django.conf.urls import url
 from django.conf import settings
+import datetime
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats
 from django.utils.safestring import mark_safe
@@ -23,13 +24,14 @@ from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment)
+    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
-from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget
+from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
+from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 
 
 class LabTestResource(resources.ModelResource):
@@ -168,6 +170,67 @@ class LabDoctorInline(admin.TabularInline):
 #     name = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'image/x-png,image/jpeg'}))
 
 
+class DistancePickerWidget(forms.TextInput):
+
+    def render(self, name, value, attrs=None):
+        htmlString = u''
+        htmlString += u'<div><select name="%s">' % (name)
+        instance = 0
+        if value:
+            instance = int(value)
+
+        for i in range(1, 100):
+            if i == instance:
+                htmlString += ('<option selected value="%d">%d KM</option>' % (i, i))
+            else:
+                htmlString += ('<option value="%d">%d KM</option>' % (i, i))
+
+        htmlString +='</select></div>'
+        return mark_safe(u''.join(htmlString))
+
+
+class HomePickupChargesForm(forms.ModelForm):
+    distance = forms.CharField(widget=DistancePickerWidget())
+
+
+class HomePickupChargesFormSet(BaseGenericInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        count = 0
+        charge_list = []
+        for value in self.cleaned_data:
+            count += 1
+            if value.get('distance') and value.get('home_pickup_charges'):
+                charge_list.append((value.get('home_pickup_charges'), int(value.get('distance'))))
+        if charge_list:
+            charge_list.sort(key=lambda t: t[1])
+
+            last_iter = None
+            for chg in charge_list:
+                if not last_iter:
+                    last_iter = chg[0]
+                else:
+                    if chg[0] < last_iter:
+                        raise forms.ValidationError("Please correct charges accordingly.")
+                    last_iter = chg[0]
+            unzip = list(zip(*charge_list))
+            if not len(set(unzip[1])) == len(unzip[1]):
+                raise forms.ValidationError("Duplicate prices found for same distance.")
+
+
+
+class HomePickupChargesInline(GenericTabularInline):
+    form = HomePickupChargesForm
+    formset = HomePickupChargesFormSet
+    model = HomePickupCharges
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
 class GenericLabAdminFormSet(forms.BaseInlineFormSet):
 
     def clean(self):
@@ -221,7 +284,6 @@ class LabDocumentFormSet(forms.BaseInlineFormSet):
                 for key, value in count.items():
                     if not key==LabDocument.GST and value<1:
                         raise forms.ValidationError(choices[key]+" is required")
-
 
 
 class LabDocumentInline(admin.TabularInline):
@@ -324,10 +386,10 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     list_display = ('name', 'updated_at', 'onboarding_status','data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
 
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter)
+    list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter, CreatedByFilter)
 
     exclude = ('search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
-                   'radiology_deal_price_percentage', )
+                   'radiology_deal_price_percentage', 'live_at', 'onboarded_at', 'qc_approved_at' )
 
     def get_readonly_fields(self, request, obj=None):
         if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
@@ -418,6 +480,9 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
+            obj.is_live = True
+            obj.live_at = datetime.datetime.now()
+            obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 
@@ -454,7 +519,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     form = LabForm
     search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, BillingAccountInline, GenericLabAdminInline]
+        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline, BillingAccountInline, GenericLabAdminInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
@@ -504,7 +569,7 @@ class LabAppointmentForm(forms.ModelForm):
         if self.instance.is_home_pickup or cleaned_data.get('is_home_pickup'):
             if not lab.is_home_collection_enabled:
                 raise forms.ValidationError("Home Pickup is disabled for the lab")
-            if self.instance.start_time < 7.0 or self.instance.start_time > 19.0:
+            if hour < 7.0 or hour > 19.0:
                 raise forms.ValidationError("No time slot available")
         else:
             if not lab.always_open and not is_lab_timing_available:
@@ -515,7 +580,7 @@ class LabAppointmentForm(forms.ModelForm):
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
-    list_display = ('get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -553,11 +618,11 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
+            return ('booking_id', 'lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+            return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'start_date', 'start_time')
@@ -566,14 +631,17 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ()
+            return ('booking_id',)
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+            return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
         else:
             return ()
+
+    def booking_id(self, obj):
+        return obj.id if obj.id else None
 
     def lab_name(self, obj):
         profile_link = "lab/{}".format(obj.lab.id)

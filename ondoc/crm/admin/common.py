@@ -7,6 +7,9 @@ from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
 
+from ondoc.common.models import Cities
+from import_export import resources, fields
+from import_export.admin import ImportMixin, base_formats, ImportExportMixin
 
 def practicing_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
@@ -67,12 +70,14 @@ class QCPemAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         final_qs = None
-        if request.user.is_superuser or request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
+        if request.user.is_superuser or \
+                request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or \
+                request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists() or \
+                request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
             final_qs = qs
-        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
-            final_qs = qs.filter(created_by=request.user)
         if final_qs:
-            final_qs = final_qs.prefetch_related('created_by', 'assigned_to', 'assigned_to__staffprofile', 'created_by__staffprofile')
+            final_qs = final_qs.prefetch_related('created_by', 'assigned_to', 'assigned_to__staffprofile',
+                                                 'created_by__staffprofile')
         return final_qs
 
     class Meta:
@@ -188,3 +193,23 @@ class ActionAdmin(admin.ModelAdmin):
 
     class Meta:
         abstract = True
+
+
+class CitiesResource(resources.ModelResource):
+    name = fields.Field(attribute='name', column_name='City')
+
+    class Meta:
+        model = Cities
+        import_id_fields = ('id',)
+
+    def before_save_instance(self, instance, using_transactions, dry_run):
+        super().before_save_instance(instance, using_transactions, dry_run)
+
+
+class CitiesAdmin(ImportMixin, admin.ModelAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name',)
+    resource_class = CitiesResource
+
+
+

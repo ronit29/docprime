@@ -4,7 +4,9 @@ from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 from django.db import models
-
+import datetime
+from ondoc.crm.admin.doctor import CreatedByFilter
+from ondoc.crm.admin.lab import HomePickupChargesInline
 from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabNetworkDocument)
@@ -188,9 +190,10 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         models.BigIntegerField: {'widget': forms.TextInput},
     }
     list_display = ('name', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
-    list_filter = ('data_status',)
+    list_filter = ('data_status', CreatedByFilter)
     search_fields = ['name']
     readonly_fields = ('associated_labs',)
+    exclude = ('qc_approved_at', )
 
     def associated_labs(self, instance):
         if instance.id:
@@ -208,17 +211,19 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
                LabNetworkAccreditationInline,
                LabNetworkAwardInline,
                LabNetworkCertificationInline,
+               HomePickupChargesInline,
                LabNetworkDocumentInline,
                GenericLabNetworkAdminInline,
                BillingAccountInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        parent_qs = super(QCPemAdmin, self).get_queryset(request)
-        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
-                return parent_qs.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user))
-        else:
-            return qs
+        # parent_qs = super(QCPemAdmin, self).get_queryset(request)
+        # if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
+        #         return parent_qs.filter(Q(data_status=2) | Q(data_status=3) | Q(created_by=request.user))
+        # else:
+        #     return qs
+        return qs
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
@@ -229,6 +234,7 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
+            obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 

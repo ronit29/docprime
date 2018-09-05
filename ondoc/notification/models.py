@@ -152,11 +152,10 @@ class NotificationAction:
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
                 "instance": instance,
-                "title": "Appointment Confirmed",
-                "body": "Appointment confirmed for {} at {}, {} with Dr. {}.".format(
+                "title": "New Appointment",
+                "body": "New Appointment for {} at {}, {} with Dr. {}. You will receive a confirmation as soon as it is accepted by the doctor.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
-                    time_slot_start.strftime("%d/%m/%y"), doctor_name
-                ),
+                    time_slot_start.strftime("%d/%m/%y"), doctor_name),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -525,6 +524,23 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             message = json.dumps(message)
             publish_message(message)
 
+    @classmethod
+    def send_app_download_link(cls, email, context):
+        email_body = render_to_string('email/doctor_onboarding/body.html', context=context)
+        email_subject = render_to_string('email/doctor_onboarding/subject.txt', context=context)
+        if email:
+            email_notif = {
+                "email": email,
+                "content": email_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_notif,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
 
 class SmsNotificationOpdMixin:
 
@@ -644,6 +660,21 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             message = json.dumps(message)
             publish_message(message)
         return booking_url
+
+    @classmethod
+    def send_app_download_link(cls, phone_number, context):
+        sms_body = render_to_string('sms/doctor_onboarding.txt', context=context)
+        if phone_number:
+            sms_noti = {
+                "phone_number": phone_number,
+                "content": sms_body,
+            }
+            message = {
+                "data": sms_noti,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
 
 
 class AppNotification(TimeStampedModel):
