@@ -14,6 +14,7 @@ from dateutil import tz
 from django.conf import settings
 from django.utils import timezone
 import pytz
+import datetime
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, BillingAccount
@@ -803,7 +804,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         if '_qc_approve' in request.POST:
             obj.data_status = 3
             obj.update_live_status()
-            obj.qc_approved_at = datetime.now()
+            obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 
