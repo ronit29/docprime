@@ -18,7 +18,7 @@ def refund_status_update(self):
     from ondoc.account.models import ConsumerRefund, PgTransaction
     SUCCESS_OK_STATUS = '1'
     FAILURE_OK_STATUS = '0'
-    refund_obj = ConsumerRefund.objects.select_for_update().filter(refund_state=ConsumerRefund.PENDING)
+    refund_obj = ConsumerRefund.objects.select_for_update().filter(refund_state=ConsumerRefund.REQUESTED)
     url = settings.PG_REFUND_STATUS_API_URL
     token = settings.PG_REFUND_AUTH_TOKEN
     headers = {
