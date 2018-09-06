@@ -311,15 +311,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     # @classmethod
     def update_live_status(self):
         if self.onboarding_status == self.ONBOARDED:
-            dochospitals = []
-            for hosp in self.hospitals.all():
-                dochospitals.append(hosp.id)
-            queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
-                                           (Q(doctor__isnull=False, doctor=self) |
-                                            Q(doctor__isnull=True, hospital__id__in=dochospitals)))
-            if queryset.exists():
-                self.is_live = True
-                self.live_at = datetime.datetime.now()
+            # dochospitals = []
+            # for hosp in self.hospitals.all():
+            #     dochospitals.append(hosp.id)
+            # queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
+            #                                (Q(doctor__isnull=False, doctor=self) |
+            #                                 Q(doctor__isnull=True, hospital__id__in=dochospitals)))
+            # if queryset.exists():
+            self.is_live = True
+            self.live_at = datetime.datetime.now()
 
 
     class Meta:
