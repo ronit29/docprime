@@ -1,5 +1,7 @@
 from django.contrib import admin
-from ondoc.web.models import Career, OnlineLead
+from ondoc.web.models import Career, OnlineLead, UploadImage
+from django.utils.safestring import mark_safe
+
 # Register your models here.
 
 
@@ -17,7 +19,18 @@ class OnlineLeadAdmin(admin.ModelAdmin):
     readonly_fields = ['name', 'city', 'city_name', 'mobile', 'email', 'member_type', 'created_at']
     fields = ['name', 'city', 'city_name', 'mobile', 'email', 'member_type', 'created_at']
 
+class UploadImageAdmin(admin.ModelAdmin):
+    date_hierarchy = 'created_at'
 
+    list_display = ('name', 'url', 'created_at')
+    #
+    def url(self, instance):
+        url = None
+        if instance and instance.id:
+            url = instance.image.path
+        return mark_safe('''<a href="%s" target='_blank'>%s</a>'''%(url, url))
+    url.short_description = "Url"
 
 admin.site.register(OnlineLead, OnlineLeadAdmin)
 admin.site.register(Career, CareerAdmin)
+admin.site.register(UploadImage, UploadImageAdmin)
