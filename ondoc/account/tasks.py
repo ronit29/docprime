@@ -77,7 +77,7 @@ def refund_curl_task(self, req_data):
                         refund_queryset.save()
                         print("Status Updated")
                 elif (resp_data.get("ok") is not None and str(resp_data["ok"]) == FAILURE_OK_STATUS and
-                      resp_data.get("status") and str(resp_data["status"]) == ALREADY_REQUESTED_STATUS):
+                      resp_data.get("status") is not None and str(resp_data["status"]) == ALREADY_REQUESTED_STATUS):
                     print("Already Requested")
                 elif (resp_data.get("ok") is None or
                       (str(resp_data["ok"]) == FAILURE_OK_STATUS and
