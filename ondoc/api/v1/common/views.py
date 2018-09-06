@@ -4,9 +4,14 @@ from django.utils import timezone
 from weasyprint import HTML
 from django.http import HttpResponse
 
+from ondoc.chat.models import ChatPrescription
 from ondoc.notification.rabbitmq_client import publish_message
 from . import serializers
 from ondoc.common.models import Cities
+from ondoc.common.utils import send_email
+from django.core.files.uploadedfile import SimpleUploadedFile
+import random
+import string
 import json
 
 
@@ -31,21 +36,30 @@ class ServicesViewSet(viewsets.GenericViewSet):
         if not content:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Content is required.'})
         pdf_file = HTML(string=content).write_pdf()
-        response = HttpResponse(pdf_file, content_type='application/pdf')
-        response['Content-Disposition'] = 'filename="home_page.pdf"'
-        return response
+        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+        name = random_string + '.pdf'
+        file = SimpleUploadedFile(name, pdf_file, content_type='application/pdf')
+        chat = ChatPrescription.objects.create(name=name, file=file)
+        return Response({"name": chat.name})
 
     def send_email(self, request):
+        resp = {}
         serializer = serializers.EmailServiceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        message = {
-            "data": dict(validated_data),
-            "type": "email"
-        }
-        message = json.dumps(message)
-        publish_message(message)
-        return Response(validated_data)
+        to = serializer.validated_data.get('to')
+        cc = serializer.validated_data.get('cc')
+        content = serializer.validated_data.get('content')
+        subject = serializer.validated_data.get('subject')
+        send_email(to, cc, subject, content)
+        resp['status'] = 'success'
+        return Response(resp)
 
-    def send_sms(self, request):
-        
+    # def send_sms(self, request):
+    #     resp = {}
+    #     serializer = serializers.SMSServiceSerializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     name = serializer.validated_data.get('name')
+    #     mobile = serializer.validated_data.get('mobile')
+    #     send_sms(name, mobile)
+    #     resp['status'] = 'success'
+
