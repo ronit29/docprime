@@ -14,4 +14,3 @@ class EmailServiceSerializer(serializers.Serializer):
 
 class SMSServiceSerializer(serializers.Serializer):
     text = serializers.CharField(max_length=500)
-    phone_number = serializers.ListField(child=serializers.CharField(max_length=15), min_length=1, max_length=10)
