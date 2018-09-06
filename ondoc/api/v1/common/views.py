@@ -3,8 +3,11 @@ from rest_framework.response import Response
 from django.utils import timezone
 from weasyprint import HTML
 from django.http import HttpResponse
+
+from ondoc.notification.rabbitmq_client import publish_message
 from . import serializers
 from ondoc.common.models import Cities
+import json
 
 
 class CitiesViewSet(viewsets.GenericViewSet):
@@ -21,9 +24,9 @@ class CitiesViewSet(viewsets.GenericViewSet):
         return Response(response)
 
 
-class PdfViewSet(viewsets.GenericViewSet):
+class ServicesViewSet(viewsets.GenericViewSet):
 
-    def generate(self, request):
+    def generatepdf(self, request):
         content = request.data.get('content')
         if not content:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Content is required.'})
@@ -31,3 +34,18 @@ class PdfViewSet(viewsets.GenericViewSet):
         response = HttpResponse(pdf_file, content_type='application/pdf')
         response['Content-Disposition'] = 'filename="home_page.pdf"'
         return response
+
+    def send_email(self, request):
+        serializer = serializers.EmailServiceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        message = {
+            "data": dict(validated_data),
+            "type": "email"
+        }
+        message = json.dumps(message)
+        publish_message(message)
+        return Response(validated_data)
+
+    def send_sms(self, request):
+        

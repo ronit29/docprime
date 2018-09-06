@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import CitiesViewSet, PdfViewSet
+from .views import CitiesViewSet, ServicesViewSet
 
 urlpatterns = [
     path('cities/list', CitiesViewSet.as_view({'get': 'list'}), name='cities-list'),
-    path('generate/pdf', PdfViewSet.as_view({'post': 'generate'},), name='generate-pdf'),
+    path('generate/pdf', ServicesViewSet.as_view({'post': 'generatepdf'}, ), name='generate-pdf'),
+    path('send/email', ServicesViewSet.as_view({'post': 'send_email'}, ), name='send-email'),
 ]
