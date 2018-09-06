@@ -47,8 +47,8 @@ class ServicesViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         to = serializer.validated_data.get('to')
         cc = serializer.validated_data.get('cc')
-        to = list(set(to))
-        cc = list(set(cc))
+        to = list(set(to)) if isinstance(to, list) else []
+        cc = list(set(cc)) if isinstance(cc, list) else []
         content = serializer.validated_data.get('content')
         subject = serializer.validated_data.get('subject')
         send_email(to, cc, subject, content)
