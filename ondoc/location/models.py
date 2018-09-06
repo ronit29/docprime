@@ -5,6 +5,7 @@ import logging
 from .service import get_meta_by_latlong
 import logging
 logger = logging.getLogger(__name__)
+from decimal import Decimal
 
 
 class Choices(object):
@@ -32,11 +33,14 @@ class EntityAddress(models.Model):
     class AllowedKeys(Choices):
         LOCALITY = 'LOCALITY'
         SUBLOCALITY = 'SUBLOCALITY'
-        ROUTE = 'ROUTE'
-        STREET_NUMBER = 'STREET_NUMBER'
+        ADMINISTRATIVE_AREA_LEVEL_1 = 'ADMINISTRATIVE_AREA_LEVEL_1'
+        ADMINISTRATIVE_AREA_LEVEL_2 = 'ADMINISTRATIVE_AREA_LEVEL_1'
+        COUNTRY = 'COUNTRY'
 
     type = models.CharField(max_length=128, blank=False, null=False, choices=AllowedKeys.as_choices())
     value = models.TextField()
+    centroid = models.DecimalField(default=Decimal(0.00000000), max_digits=10, decimal_places=8)
+    parent = models.IntegerField(null=True)
 
     # Generic relationship
 
@@ -50,13 +54,28 @@ class EntityAddress(models.Model):
         if not kwargs.get('content_object', None):
             raise ValueError('Missing parameter: content_object')
 
+        parent_id = None
         for meta in meta_data:
             if meta['key'] not in cls.AllowedKeys.availabilities():
                 logger.error("{key} is not the supported key ".format(key=meta['key']))
                 raise ValueError('Not a supported key')
 
-            entity_address = cls(type=meta['key'], value=meta['value'], content_object=kwargs.get('content_object'))
-            entity_address.save()
+            if meta['key'] in cls.AllowedKeys.availabilities():
+                saved_data = cls.objects.filter(type=meta['key'], value=meta['value'], parent=parent_id)
+                if len(saved_data) == 1:
+                    location = saved_data[0]
+                    parent_id = location.id
+                elif len(saved_data) == 0:
+                    entity_address = cls(type=meta['key'], value=meta['value'], content_object=kwargs.get('content_object'),
+                                         parent=parent_id)
+                    entity_address.save()
+                    parent_id = entity_address.id
+            else:
+                entity_address = cls(type=meta['key'], value=meta['value'], content_object=kwargs.get('content_object'),
+                                     parent=parent_id)
+                entity_address.save()
+                parent_id = entity_address.id
+
 
     class Meta:
         db_table = 'entity_address'
