@@ -1381,10 +1381,11 @@ class CompetitorInfo(auth_model.TimeStampedModel):
 
     def save(self, *args, **kwargs):
         url = self.url
-        if url:
+        if ('//') in url:
             url = url.split('//')[1]
+        if ('?') in url:
             url = url.split('?')[0]
-            self.processed_url = url
+        self.processed_url = url
         super().save(*args, **kwargs)
 
 
