@@ -98,3 +98,12 @@ class TinyUrl(TimeStampedModel):
 
     class Meta:
         db_table = 'tiny_url'
+
+
+class UploadImage(TimeStampedModel):
+    name = models.CharField(blank=True, max_length=84)
+    image = models.ImageField(upload_to='web/custom_images')
+
+    def __str__(self):
+        return "{}".format(self.name)
+
