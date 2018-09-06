@@ -8,7 +8,7 @@ from ondoc.chat.models import ChatPrescription
 from ondoc.notification.rabbitmq_client import publish_message
 from . import serializers
 from ondoc.common.models import Cities
-from ondoc.common.utils import send_email
+from ondoc.common.utils import send_email, send_sms
 from django.core.files.uploadedfile import SimpleUploadedFile
 import random
 import string
@@ -43,23 +43,33 @@ class ServicesViewSet(viewsets.GenericViewSet):
         return Response({"name": chat.name})
 
     def send_email(self, request):
-        resp = {}
         serializer = serializers.EmailServiceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         to = serializer.validated_data.get('to')
         cc = serializer.validated_data.get('cc')
+        to = list(set(to))
+        cc = list(set(cc))
         content = serializer.validated_data.get('content')
         subject = serializer.validated_data.get('subject')
         send_email(to, cc, subject, content)
-        resp['status'] = 'success'
-        return Response(resp)
+        return Response({"status": "success"})
 
-    # def send_sms(self, request):
-    #     resp = {}
-    #     serializer = serializers.SMSServiceSerializer(data=request.data)
-    #     serializer.is_valid(raise_exception=True)
-    #     name = serializer.validated_data.get('name')
-    #     mobile = serializer.validated_data.get('mobile')
-    #     send_sms(name, mobile)
-    #     resp['status'] = 'success'
+    def send_sms(self, request):
+        serializer = serializers.SMSServiceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        text = serializer.validated_data.get('text')
+        phone_number = serializer.validated_data.get('phone_number')
+        phone_number = list(set(phone_number))
+        send_sms(text, phone_number)
+        return Response({"status": "success"})
+
+    def download_pdf(self, request, name=None):
+        chat_prescription = ChatPrescription.objects.filter(name=name).first()
+        response = HttpResponse(chat_prescription.file, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename=%s' % chat_prescription.name
+        return response
+
+
+
+
 

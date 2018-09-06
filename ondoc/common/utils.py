@@ -21,14 +21,38 @@ def send_email(to=[], cc=[], subject=None, content=None):
     assert isinstance(cc, list) and all_emails(cc), 'cc must be a list of emails'
     assert subject and isinstance(subject, str), 'subject must be a non-empty string'
     assert content and isinstance(content, str), 'content must be a non-empty string'
-    message = {
-        "data": locals(),
-        "type": "email"
-    }
+    for email in to:
+        message = {
+            "data": {
+                "content": content,
+                "email": email,
+                "cc": cc,
+                "email_subject": subject
+            },
+            "type": "email"
+        }
 
-    message = json.dumps(message)
-    print(message)
-    publish_message(message)
+        message = json.dumps(message)
+        print(message)
+        publish_message(message)
 
 
 # send_email(["Bob_O'Reilly+tag@example.com"], subject='sub', content='c')
+
+def send_sms(text, phone_number=[]):
+    assert text and isinstance(text, str), 'text must be a non-empty string'
+    assert phone_number and isinstance(phone_number, list), 'phone_number must be a non-empty list'
+    for number in phone_number:
+        message = {
+            "data": {
+                "phone_number": number,
+                "content": text
+            },
+            "type": "sms"
+        }
+        message = json.dumps(message)
+        publish_message(message)
+
+
+
+

@@ -11,7 +11,7 @@ class EmailServiceSerializer(serializers.Serializer):
     to = serializers.ListField(child=serializers.EmailField(), min_length=1, max_length=10)
     cc = serializers.ListField(child=serializers.EmailField(), required=False, max_length=10)
 
-#
-# class SMSServiceSerializer(serializers.Serializer):
-#     name = serializers.CharField(max_length=500)
-#     mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
+
+class SMSServiceSerializer(serializers.Serializer):
+    text = serializers.CharField(max_length=500)
+    phone_number = serializers.ListField(child=serializers.CharField(max_length=15), min_length=1, max_length=10)
