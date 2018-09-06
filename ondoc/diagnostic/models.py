@@ -750,19 +750,20 @@ class LabAppointment(TimeStampedModel):
         self.status = self.CANCELLED
         self.save()
 
-        consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
-        consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
+        if self.payment_type == OpdAppointment.PREPAID:
+            consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
+            consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
 
-        data = dict()
-        data["reference_id"] = self.id
-        data["user"] = self.user
-        data["product_id"] = account_model.Order.LAB_PRODUCT_ID
+            data = dict()
+            data["reference_id"] = self.id
+            data["user"] = self.user
+            data["product_id"] = account_model.Order.LAB_PRODUCT_ID
 
-        cancel_amount = self.effective_price
-        consumer_account.credit_cancellation(data, cancel_amount)
-        if refund_flag:
-            ctx_obj = consumer_account.debit_refund()
-            account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            cancel_amount = self.effective_price
+            consumer_account.credit_cancellation(data, cancel_amount)
+            if refund_flag:
+                ctx_obj = consumer_account.debit_refund()
+                account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def action_completed(self):
         self.status = self.COMPLETED
