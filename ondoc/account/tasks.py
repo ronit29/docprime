@@ -18,33 +18,34 @@ def refund_status_update(self):
     from ondoc.account.models import ConsumerRefund, PgTransaction
     SUCCESS_OK_STATUS = '1'
     FAILURE_OK_STATUS = '0'
-    refund_obj = ConsumerRefund.objects.select_for_update().filter(refund_state=ConsumerRefund.REQUESTED)
-    url = settings.PG_REFUND_STATUS_API_URL
-    token = settings.PG_REFUND_AUTH_TOKEN
-    headers = {
-        "auth": token
-    }
-    for obj in refund_obj:
-        response = requests.get(url=url, params={"refId": obj.id}, headers=headers)
-        print(response.url)
-        print(response.status_code)
-        if response.status_code == status.HTTP_200_OK:
-            resp_data = response.json()
-            temp_data = resp_data.get("data")
-            code = None
-            try:
-                if temp_data:
-                    for d in temp_data:
-                        if "code" in d:
-                            code = d.get("code")
-            except:
-                pass
-            if resp_data.get("ok") and str(resp_data["ok"]) == SUCCESS_OK_STATUS and code is not None and code != PgTransaction.REFUND_FAILURE_STATUS:
-                obj.refund_state = ConsumerRefund.COMPLETED
-                obj.save()
-                print("status updated for - " + str(obj.id))
-            else:
-                logging.error("Invalid ok status or code mismatch - " + str(response.content))
+    if settings.AUTO_REFUND:
+        refund_obj = ConsumerRefund.objects.select_for_update().filter(refund_state=ConsumerRefund.REQUESTED)
+        url = settings.PG_REFUND_STATUS_API_URL
+        token = settings.PG_REFUND_AUTH_TOKEN
+        headers = {
+            "auth": token
+        }
+        for obj in refund_obj:
+            response = requests.get(url=url, params={"refId": obj.id}, headers=headers)
+            print(response.url)
+            print(response.status_code)
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
+                temp_data = resp_data.get("data")
+                code = None
+                try:
+                    if temp_data:
+                        for d in temp_data:
+                            if "code" in d:
+                                code = d.get("code")
+                except:
+                    pass
+                if resp_data.get("ok") and str(resp_data["ok"]) == SUCCESS_OK_STATUS and code is not None and code != PgTransaction.REFUND_FAILURE_STATUS:
+                    obj.refund_state = ConsumerRefund.COMPLETED
+                    obj.save()
+                    print("status updated for - " + str(obj.id))
+                else:
+                    logging.error("Invalid ok status or code mismatch - " + str(response.content))
 
 
 @task(bind=True, max_retries=6)
