@@ -71,6 +71,7 @@ def refund_curl_task(self, req_data):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
+                logging.error("Response content - " + str(response.content) + " with request data - " + json.dumps(req_data))
                 if resp_data.get("ok") is not None and str(resp_data["ok"]) == SUCCESS_OK_STATUS:
                     refund_queryset = ConsumerRefund.objects.select_for_update().filter(pk=req_data["refNo"]).first()
                     if refund_queryset:
