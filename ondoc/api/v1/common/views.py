@@ -1,5 +1,8 @@
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
+from django.utils import timezone
+from weasyprint import HTML
+from django.http import HttpResponse
 from . import serializers
 from ondoc.common.models import Cities
 
@@ -17,3 +20,14 @@ class CitiesViewSet(viewsets.GenericViewSet):
             response = [{'value': city.id, 'name': city.name} for city in self.get_queryset().filter(name__istartswith=filter_text)]
         return Response(response)
 
+
+class PdfViewSet(viewsets.GenericViewSet):
+
+    def generate(self, request):
+        content = request.data.get('content')
+        if not content:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Content is required.'})
+        pdf_file = HTML(string=content).write_pdf()
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response['Content-Disposition'] = 'filename="home_page.pdf"'
+        return response
