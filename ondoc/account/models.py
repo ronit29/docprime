@@ -373,7 +373,7 @@ class ConsumerRefund(TimeStampedModel):
     REQUESTED = 5
     COMPLETED = 10
     MAXREFUNDDAYS = 60
-    state_type = [(PENDING, "Pending"), (COMPLETED, "Completed")]
+    state_type = [(PENDING, "Pending"), (COMPLETED, "Completed"), (REQUESTED, "Requested")]
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     consumer_transaction = models.ForeignKey(ConsumerTransaction, on_delete=models.DO_NOTHING)
     refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
