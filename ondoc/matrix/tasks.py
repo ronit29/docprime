@@ -94,6 +94,9 @@ def push_appointment_to_matrix(self, data):
                                          OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.RESCHEDULED_DOCTOR]
 
             appointment = OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, pk=appointment_id).first()
+            if not appointment:
+                logger.error("Appointment could not be found with given id {id}".format(id=appointment_id))
+                raise ValueError()
             mobile_list = list()
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
@@ -105,6 +108,10 @@ def push_appointment_to_matrix(self, data):
             ACTIVE_APPOINTMENT_STATUS = [LabAppointment.BOOKED, LabAppointment.ACCEPTED,
                                          LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
             appointment = LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, pk=appointment_id).first()
+            if not appointment:
+                logger.error("Appointment could not be found with given id {id}".format(id=appointment_id))
+                raise ValueError()
+
 
             mobile_list = list()
             # User mobile number

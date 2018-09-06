@@ -45,7 +45,7 @@ def refund_status_update(self):
                     obj.save()
                     print("status updated for - " + str(obj.id))
                 else:
-                    logging.error("Invalid ok status or code mismatch - " + str(response.content))
+                    logger.error("Invalid ok status or code mismatch - " + str(response.content))
 
 
 @task(bind=True, max_retries=6)
@@ -71,7 +71,7 @@ def refund_curl_task(self, req_data):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
-                logging.error("Response content - " + str(response.content) + " with request data - " + json.dumps(req_data))
+                logger.error("Response content - " + str(response.content) + " with request data - " + json.dumps(req_data))
                 if resp_data.get("ok") is not None and str(resp_data["ok"]) == SUCCESS_OK_STATUS:
                     refund_queryset = ConsumerRefund.objects.select_for_update().filter(pk=req_data["refNo"]).first()
                     if refund_queryset:
@@ -93,5 +93,5 @@ def refund_curl_task(self, req_data):
                 raise Exception("Retry on invalid Http response status - " + str(response.content))
         except Exception as e:
             countdown_time = (2 ** self.request.retries) * 60 * 10
-            logging.error("Error in Refund with next retry countdown - " + str(countdown_time) + " of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
+            logger.error("Error in Refund with next retry countdown - " + str(countdown_time) + " of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
             self.retry([req_data], countdown=countdown_time)
