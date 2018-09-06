@@ -1376,8 +1376,11 @@ class DoctorMapping(auth_model.TimeStampedModel):
 
 
 class CompetitorInfo(auth_model.TimeStampedModel):
+    PRACTO =1
+    LYBRATE =2
+    NAME_TYPE_CHOICES = (("", "Select"), (PRACTO, 'Practo'), (LYBRATE, "Lybrate"),)
     name = models.PositiveSmallIntegerField(blank=True, null=True,
-                                            choices=[("", "Select"), (1, "PRACTO"), (2, "LYBRATE")])
+                                            choices=NAME_TYPE_CHOICES)
 
     doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True, blank=True)
     hospital = models.ForeignKey(Hospital, related_name="competitor_hospital", on_delete=models.CASCADE, null=True, blank=True)
@@ -1395,9 +1398,12 @@ class CompetitorInfo(auth_model.TimeStampedModel):
     def save(self, *args, **kwargs):
         url = self.url
         if url:
-            url = url.split('//')[1]
-            url = url.split('?')[0]
+            if ('//') in url:
+                url = url.split('//')[1]
+            if ('?') in url:
+                url = url.split('?')[0]
             self.processed_url = url
+
         super().save(*args, **kwargs)
 
 
