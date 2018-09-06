@@ -25,12 +25,12 @@ class Article(TimeStampedModel, CreatedByModel):
     url = models.CharField(blank=False, null=True, max_length=500, unique=True)
     body = models.CharField(blank=False, null=False, max_length=20000)
     category = models.ForeignKey(ArticleCategory, null=True, related_name='articles', on_delete=models.CASCADE)
-    header_image = models.ImageField(upload_to='articles/header/images', null=True)
+    header_image = models.ImageField(upload_to='articles/header/images', null=True, blank=True, default='')
     header_image_alt = models.CharField(max_length=512, blank=True, null=True, default='')
-    icon = models.ImageField(upload_to='articles/icons', null=True)
+    icon = models.ImageField(upload_to='articles/icons', null=True, blank=True, default='')
     is_published = models.BooleanField(default=False, verbose_name='Published')
-    description = models.CharField(max_length=500, blank=False, null=True)
-    keywords = models.CharField(max_length=256, blank=False, null=True)
+    description = models.CharField(max_length=500, blank=True, null=True)
+    keywords = models.CharField(max_length=256, blank=True, null=True)
 
     def icon_tag(self):
         if self.icon:

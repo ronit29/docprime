@@ -10,12 +10,13 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
 
     def get_icon(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') else None
+        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') and obj.icon.name else None
 
     def get_seo(self, obj):
         request = self.context.get('request')
         return {'description': obj.description, 'keywords': obj.keywords,
-                'image': request.build_absolute_uri(obj.header_image.url), 'title': obj.title}
+                'image': request.build_absolute_uri(obj.header_image.url)
+                if hasattr(obj, 'header_image') and obj.header_image.name else None, 'title': obj.title}
 
     class Meta:
         model = Article
@@ -29,7 +30,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
 
     def get_icon(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') else None
+        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') and obj.icon.name else None
 
     def get_url(self, obj):
         return obj.url if hasattr(obj, 'url') else None
