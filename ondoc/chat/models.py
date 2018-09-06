@@ -10,3 +10,11 @@ class ChatMedicalCondition(TimeStampedModel):
 
     class Meta:
         db_table = "chat_medical_condition"
+
+
+class ChatPrescription(TimeStampedModel):
+    name = models.CharField(max_length=16, unique=True)
+    file = models.FileField(upload_to='chat/prescription', blank=False, null=False)
+
+    class Meta:
+        db_table = "chat_prescription"
