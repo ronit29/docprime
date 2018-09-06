@@ -655,7 +655,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     change_list_template = 'superuser_import_export.html'
 
     list_display = (
-        'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to',
+        'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'registered',
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
@@ -684,7 +684,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                'onboarded_at', 'qc_approved_at']
     search_fields = ['name']
 
-    readonly_fields = ('lead_url', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live')
+    readonly_fields = ('lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live')
 
     def lead_url(self, instance):
         if instance.id:
@@ -694,6 +694,15 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                 return mark_safe(html)
         else:
             return mark_safe('''<span></span>''')
+
+    def registered(self, instance):
+        registered = None
+        if instance and instance.id:
+            registered = 'NO'
+            if instance.user is not None:
+                registered = 'YES'
+        return mark_safe('''<span>%s</span>'''%(registered))
+    registered.short_description = "Registered"
 
     def get_urls(self):
         urls = super().get_urls()
@@ -860,10 +869,14 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
+    cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
+                                                                  (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
 
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
+        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
+            raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
                 dt_field = parse_datetime(date_time_field)
@@ -923,7 +936,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     get_doctor.short_description = 'Doctor Name'
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
-        allowed_status_for_agent = [(OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+        allowed_status_for_agent = [(OpdAppointment.BOOKED, 'Booked'),
+                                    (OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (OpdAppointment.RESCHEDULED_DOCTOR, 'Rescheduled by doctor'),
                                     (OpdAppointment.ACCEPTED, 'Accepted'),
                                     (OpdAppointment.CANCELLED, 'Cancelled')]
@@ -944,7 +958,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
             return ('booking_id', 'doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'start_date',
+                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type','start_date',
                     'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'hospital_name', 'contact_details', 'used_profile_name',
@@ -952,7 +966,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'default_profile_number', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'start_date', 'start_time')
+                    'status', 'cancel_type', 'start_date', 'start_time')
         else:
             return ()
 
@@ -1042,7 +1056,16 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     obj.time_slot_start = dt_field
             if request.POST.get('status') and int(request.POST['status']) == OpdAppointment.CANCELLED:
                 obj.cancellation_type = OpdAppointment.AGENT_CANCELLED
+                cancel_type = int(request.POST.get('cancel_type'))
+                if cancel_type is not None:
+                    obj.action_cancelled(cancel_type)
         super().save_model(request, obj, form, change)
+
+    class Media:
+        js = (
+            '//ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js',
+            'js/admin/ondoc.js',
+        )
 
 
 class SpecializationResource(resources.ModelResource):

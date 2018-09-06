@@ -533,10 +533,14 @@ class LabAppointmentForm(forms.ModelForm):
 
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
+    cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
+                                                                  (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
 
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
+        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
+            raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
             date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
             dt_field = parse_datetime(date_time_field)
@@ -599,7 +603,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     get_lab.short_description = 'Lab Name'
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
-        allowed_status_for_agent = [(LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+        allowed_status_for_agent = [(LabAppointment.BOOKED, 'Booked'),
+                                    (LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
                                     (LabAppointment.ACCEPTED, 'Accepted'),
                                     (LabAppointment.CANCELLED, 'Cancelled')]
@@ -618,14 +623,14 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('booking_id', 'lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
+            return ('booking_id', 'lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'cancel_type', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
-                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'start_date', 'start_time')
+                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type','start_date', 'start_time')
         else:
             return ()
 
@@ -737,8 +742,16 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                     obj.time_slot_start = dt_field
             if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
+                cancel_type = int(request.POST.get('cancel_type'))
+                if cancel_type is not None:
+                    obj.action_cancelled(cancel_type)
         super().save_model(request, obj, form, change)
 
+    class Media:
+        js = (
+            '//ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js',
+            'js/admin/ondoc.js',
+        )
 
 
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
