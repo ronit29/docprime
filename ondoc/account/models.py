@@ -141,6 +141,8 @@ class Order(TimeStampedModel):
 
 
 class PgTransaction(TimeStampedModel):
+    REFUND_FAILURE_STATUS = 'REFUND_FAILURE_BY_PG'
+
     DOCTOR_APPOINTMENT = 1
     LAB_APPOINTMENT = 2
     CREDIT = 0
@@ -368,9 +370,10 @@ class ConsumerTransaction(TimeStampedModel):
 
 class ConsumerRefund(TimeStampedModel):
     PENDING = 1
-    COMPLETED = 2
+    REQUESTED = 5
+    COMPLETED = 10
     MAXREFUNDDAYS = 60
-    state_type = [(PENDING, "Pending"), (COMPLETED, "Completed")]
+    state_type = [(PENDING, "Pending"), (COMPLETED, "Completed"), (REQUESTED, "Requested")]
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     consumer_transaction = models.ForeignKey(ConsumerTransaction, on_delete=models.DO_NOTHING)
     refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
