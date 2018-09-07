@@ -7,6 +7,7 @@ import requests
 import json
 import time
 import logging
+from ondoc.authentication.models import Address
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def prepare_and_hit(self, data):
         'BookingType': 'DC' if task_data.get('type') == 'LAB_APPOINTMENT' else 'D',
         'AppointmentType': '',
         'PatientName': appointment.profile.name,
-        'PatientAddress': appointment.user.address_set.all().first().address if len(appointment.user.address_set.all()) else '',
+        'PatientAddress': Address.objects.get(id=appointment.address.id).address if hasattr(appointment, 'address') and appointment.address else '',
         'ProviderName': getattr(appointment, 'doctor').name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
         'ServiceName': appointment.lab_test.test.name if task_data.get('type') == 'LAB_APPOINTMENT' else '',
         'InsuranceCover': 1,
@@ -90,10 +91,7 @@ def push_appointment_to_matrix(self, data):
             raise ValueError()
 
         if data.get('type') == 'OPD_APPOINTMENT':
-            ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.BOOKED, OpdAppointment.ACCEPTED,
-                                         OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.RESCHEDULED_DOCTOR]
-
-            appointment = OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, pk=appointment_id).first()
+            appointment = OpdAppointment.objects.filter(pk=appointment_id).first()
             mobile_list = list()
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
@@ -102,9 +100,7 @@ def push_appointment_to_matrix(self, data):
             doctor_mobiles = [{'MobileNo': number, 'Name': appointment.doctor.name, 'Type': 2} for number in doctor_mobiles]
             mobile_list.extend(doctor_mobiles)
         elif data.get('type') == 'LAB_APPOINTMENT':
-            ACTIVE_APPOINTMENT_STATUS = [LabAppointment.BOOKED, LabAppointment.ACCEPTED,
-                                         LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
-            appointment = LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, pk=appointment_id).first()
+            appointment = LabAppointment.objects.filter(pk=appointment_id).first()
 
             mobile_list = list()
             # User mobile number
