@@ -6,7 +6,9 @@ from django.http import HttpResponseRedirect, HttpResponse, HttpResponsePermanen
 from django.conf import settings
 from ondoc.crm.constants import constants
 from ondoc.web import models as web_models
+from django.contrib.auth import get_user_model
 
+User = get_user_model()
 
 def index(request):
     if request.method == "POST":
@@ -55,7 +57,16 @@ def user_appointment_via_agent(request):
         return HttpResponseRedirect('%s' % settings.ADMIN_BASE_URL)
     api_domain = '%s%s' % ('', '/api/v1/admin/agent/user/login')
     appDomain = '%s%s' % (settings.CONSUMER_APP_DOMAIN, '/agent/login')
-    return render(request, 'agentLogin.html', {'apiDomain': api_domain, 'appDomain': appDomain})
+    return render(request, 'agentLogin.html', {'apiDomain': api_domain, 'appDomain': appDomain, 'user_type':User.CONSUMER})
+
+
+
+def doctor_login_via_agent(request):
+    if not (request.user.is_superuser):
+        return HttpResponseRedirect('%s' % settings.ADMIN_BASE_URL)
+    api_domain = '%s%s' % ('', '/api/v1/admin/agent/user/login')
+    appDomain = '%s%s' % (settings.PROVIDER_APP_DOMAIN, '/agent/login')
+    return render(request, 'agentLogin.html', {'apiDomain': api_domain, 'appDomain': appDomain, 'user_type':User.DOCTOR})
 
 
 def careers_page(request):

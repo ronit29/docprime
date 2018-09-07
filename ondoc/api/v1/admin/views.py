@@ -55,27 +55,36 @@ def userlogin_via_agent(request):
     if request.method != 'GET':
         return Response(status=405)
 
-    if request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists()  or \
-            request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        serializer = serializers.AgenctVerificationSerializer(data=request.GET)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        user = User.objects.filter(phone_number=data['phone_number'], user_type=User.CONSUMER).first()
-        if not user:
-            user = User.objects.create(phone_number=data['phone_number'],
-                                              is_phone_number_verified=False,
-                                              user_type=User.CONSUMER)
+    serializer = serializers.AgentVerificationSerializer(data=request.GET)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+    user_type = data["user_type"]
 
+    if user_type==User.DOCTOR and not request.user.is_superuser:
+        return Response(status=403)
 
-        user_key = UserSecretKey.objects.get_or_create(user=user)
-        payload = JWTAuthentication.appointment_agent_payload_handler(request, user)
-        token = jwt.encode(payload, user_key[0].key)
+    if not request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists()  and \
+           not request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+        return Response(status=403)
 
-        response = {
-            "login": 1,
-            "agent_id": request.user.id,
-            "token": str(token, 'utf-8'),
-            "expiration_time": payload['exp'],
-            "refresh": False
-        }
+    user = User.objects.filter(phone_number=data['phone_number'], user_type=user_type).first()
+    if not user and user_type==User.CONSUMER:
+        user = User.objects.create(phone_number=data['phone_number'],
+                                          is_phone_number_verified=False,
+                                          user_type=User.CONSUMER)
+
+    if not user:
+        return Response(status=400)
+
+    user_key = UserSecretKey.objects.get_or_create(user=user)
+    payload = JWTAuthentication.appointment_agent_payload_handler(request, user)
+    token = jwt.encode(payload, user_key[0].key)
+
+    response = {
+        "login": 1,
+        "agent_id": request.user.id,
+        "token": str(token, 'utf-8'),
+        "expiration_time": payload['exp'],
+        "refresh": False
+    }
     return JsonResponse(response)
