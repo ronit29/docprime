@@ -8,6 +8,7 @@ import json
 import time
 import logging
 from ondoc.authentication.models import Address
+from ondoc.api.v1.utils import resolve_address
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,13 @@ def prepare_and_hit(self, data):
     elif task_data.get('type') == 'LAB_APPOINTMENT':
         booking_url = '%s/admin/doctor/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
 
+    patient_address = ""
+    if hasattr(appointment, 'address') and appointment.address:
+        patient_address = resolve_address(appointment.address)
+    service_name = ""
+    if task_data.get('type') == 'LAB_APPOINTMENT':
+        service_name = ','.join([test_obj.test.name for test_obj in appointment.lab_test.all()])
+
     appointment_details = {
         'DocPrimeBookingID': appointment.id,
         'BookingDateTime': int(time.mktime(appointment.created_at.utctimetuple())),
@@ -28,9 +36,9 @@ def prepare_and_hit(self, data):
         'BookingType': 'DC' if task_data.get('type') == 'LAB_APPOINTMENT' else 'D',
         'AppointmentType': '',
         'PatientName': appointment.profile_detail.get("name", ''),
-        'PatientAddress': Address.objects.get(id=appointment.address.id).address if hasattr(appointment, 'address') and appointment.address else '',
+        'PatientAddress': patient_address,
         'ProviderName': getattr(appointment, 'doctor').name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
-        'ServiceName': appointment.lab_test.test.name if task_data.get('type') == 'LAB_APPOINTMENT' else '',
+        'ServiceName': service_name,
         'InsuranceCover': 0,
         'MobileList': data.get('mobile_list'),
         'BookingUrl': booking_url
