@@ -18,14 +18,14 @@ def refund_status_update(self):
     SUCCESS_OK_STATUS = '1'
     FAILURE_OK_STATUS = '0'
     if settings.AUTO_REFUND:
-        refund_obj = ConsumerRefund.objects.select_for_update().filter(refund_state=ConsumerRefund.REQUESTED)
+        refund_ids = ConsumerRefund.objects.filter(refund_state=ConsumerRefund.REQUESTED).values_list('id', flat=True)
         url = settings.PG_REFUND_STATUS_API_URL
         token = settings.PG_REFUND_AUTH_TOKEN
         headers = {
             "auth": token
         }
-        for obj in refund_obj:
-            response = requests.get(url=url, params={"refId": obj.id}, headers=headers)
+        for ref_id in refund_ids:
+            response = requests.get(url=url, params={"refId": ref_id}, headers=headers)
             print(response.url)
             print(response.status_code)
             if response.status_code == status.HTTP_200_OK:
@@ -40,9 +40,12 @@ def refund_status_update(self):
                 except:
                     pass
                 if resp_data.get("ok") and str(resp_data["ok"]) == SUCCESS_OK_STATUS and code is not None and code != PgTransaction.REFUND_FAILURE_STATUS:
-                    obj.refund_state = ConsumerRefund.COMPLETED
-                    obj.save()
-                    print("status updated for - " + str(obj.id))
+                    with transaction.atomic():
+                        obj = ConsumerRefund.objects.select_for_update().get(id=ref_id)
+                        if obj.refund_state != ConsumerRefund.COMPLETED:
+                            obj.refund_state = ConsumerRefund.COMPLETED
+                            obj.save()
+                            print("status updated for - " + str(obj.id))
                 else:
                     logger.error("Invalid ok status or code mismatch - " + str(response.content))
 
