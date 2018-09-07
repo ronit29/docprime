@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 @task(bind=True)
-@transaction.atomic
 def refund_status_update(self):
     from ondoc.account.models import ConsumerRefund, PgTransaction
     SUCCESS_OK_STATUS = '1'
@@ -49,7 +48,6 @@ def refund_status_update(self):
 
 
 @task(bind=True, max_retries=6)
-@transaction.atomic
 def refund_curl_task(self, req_data):
     from .models import ConsumerRefund
     SUCCESS_OK_STATUS = '1'
@@ -73,11 +71,12 @@ def refund_curl_task(self, req_data):
                 resp_data = response.json()
                 logger.error("Response content - " + str(response.content) + " with request data - " + json.dumps(req_data))
                 if resp_data.get("ok") is not None and str(resp_data["ok"]) == SUCCESS_OK_STATUS:
-                    refund_queryset = ConsumerRefund.objects.select_for_update().filter(pk=req_data["refNo"]).first()
-                    if refund_queryset:
-                        refund_queryset.refund_state = ConsumerRefund.REQUESTED
-                        refund_queryset.save()
-                        print("Status Updated")
+                    with transaction.atomic():
+                        refund_queryset = ConsumerRefund.objects.select_for_update().filter(pk=req_data["refNo"]).first()
+                        if refund_queryset:
+                            refund_queryset.refund_state = ConsumerRefund.REQUESTED
+                            refund_queryset.save()
+                            print("Status Updated")
                 elif (resp_data.get("ok") is not None and str(resp_data["ok"]) == FAILURE_OK_STATUS and
                       resp_data.get("status") is not None and str(resp_data["status"]) == ALREADY_REQUESTED_STATUS):
                     print("Already Requested")
