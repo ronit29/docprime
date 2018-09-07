@@ -19,7 +19,8 @@ class DoctorSearchHelper:
         hospital_type_mapping = {hospital_type[1]: hospital_type[0] for hospital_type in
                                  models.Hospital.HOSPITAL_TYPE_CHOICES}
 
-        filtering_params = ['d.is_test_doctor is False']
+        filtering_params = ['d.is_test_doctor is False',
+                            'd.is_internal is False']
         if self.query_params.get("specialization_ids"):
             filtering_params.append(
                 " gs.id IN({})".format(",".join(self.query_params.get("specialization_ids")))

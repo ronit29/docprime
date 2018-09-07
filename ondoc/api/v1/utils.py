@@ -165,6 +165,7 @@ def form_time_slot(timestamp, time):
     dt_field = timestamp.astimezone(to_zone).replace(hour=int(hour), minute=int(min), second=0, microsecond=0)
     return dt_field
 
+
 def get_previous_month_year(month, year):
     dt = "01" + str(month) + str(year)
     dt = datetime.datetime.strptime(dt, "%d%m%Y")
@@ -353,4 +354,29 @@ def aware_time_zone(date_time_field):
     return date
 
 
+def resolve_address(address_obj):
+    address_string = ""
+    address_dict = dict()
+    if not isinstance(address_obj, dict):
+        address_dict = vars(address_dict)
+    else:
+        address_dict = address_obj
 
+    if address_dict.get("address"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["address"])
+    if address_dict.get("land_mark"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["land_mark"])
+    if address_dict.get("locality"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["locality"])
+    if address_dict.get("pincode"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["pincode"])
+
+    return address_string
