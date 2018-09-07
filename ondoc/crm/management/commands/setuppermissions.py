@@ -15,7 +15,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkAccreditation, HospitalNetworkAward, HospitalNetworkDocument,
                                  HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor,
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization, MedicalCondition,
-                                 MedicalConditionSpecialization)
+                                 MedicalConditionSpecialization, CompetitorInfo)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -65,7 +65,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization)
+            HospitalNetworkCertification, DoctorSpecialization, CompetitorInfo)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -146,7 +146,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument)
+            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -203,7 +203,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument)
+            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
