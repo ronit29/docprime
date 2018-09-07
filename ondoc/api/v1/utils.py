@@ -261,7 +261,8 @@ def labappointment_transform(app_data):
 
 def refund_curl_request(req_data):
     for data in req_data:
-        refund_curl_task.delay(data)
+        refund_curl_task.apply_async((data, ), countdown=1)
+        # refund_curl_task.delay(data)
 
 
 def custom_form_datetime(time_str, to_zone, diff_days=0):
