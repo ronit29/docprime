@@ -36,3 +36,5 @@ def get_meta_by_latlong(lat, long):
         logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
         logger.info("[ERROR] %s", response.reason)
         return []
+
+

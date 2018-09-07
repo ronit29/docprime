@@ -280,11 +280,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
     billing_merchant = GenericRelation(auth_model.BillingAccount)
-    extras = GenericRelation(location_models.EntityAddress)
 
     def save(self, *args, **kwargs):
         super(Doctor, self).save(*args, **kwargs)
-        ea = location_models.EntityAddress.create(latitude='28.7196137', longitude='77.1063343', content_object=self)
+        ea = location_models.EntityLocationRelationship.create(latitude='28.573477', longitude='77.3662119', content_object=self)
+
+
 
     def __str__(self):
         return self.name

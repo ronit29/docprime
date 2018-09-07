@@ -5,6 +5,7 @@ import logging
 from .service import get_meta_by_latlong
 import logging
 logger = logging.getLogger(__name__)
+import json
 from decimal import Decimal
 
 
@@ -42,19 +43,14 @@ class EntityAddress(models.Model):
     centroid = models.DecimalField(default=Decimal(0.00000000), max_digits=10, decimal_places=8)
     parent = models.IntegerField(null=True)
 
-    # Generic relationship
-
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey()
-
     @classmethod
-    def create(cls, *args, **kwargs):
+    def get_or_create(cls, *args, **kwargs):
         meta_data = get_meta_by_latlong(kwargs.get('latitude'), kwargs.get('longitude'))
         if not kwargs.get('content_object', None):
             raise ValueError('Missing parameter: content_object')
 
         parent_id = None
+        ea_list = list()
         for meta in meta_data:
             if meta['key'] not in cls.AllowedKeys.availabilities():
                 logger.error("{key} is not the supported key ".format(key=meta['key']))
@@ -63,19 +59,61 @@ class EntityAddress(models.Model):
             if meta['key'] in cls.AllowedKeys.availabilities():
                 saved_data = cls.objects.filter(type=meta['key'], value=meta['value'], parent=parent_id)
                 if len(saved_data) == 1:
-                    location = saved_data[0]
-                    parent_id = location.id
+                    entity_address = saved_data[0]
+                    parent_id = entity_address.id
                 elif len(saved_data) == 0:
-                    entity_address = cls(type=meta['key'], value=meta['value'], content_object=kwargs.get('content_object'),
-                                         parent=parent_id)
+                    entity_address = cls(type=meta['key'], value=meta['value'], parent=parent_id)
                     entity_address.save()
                     parent_id = entity_address.id
-            else:
-                entity_address = cls(type=meta['key'], value=meta['value'], content_object=kwargs.get('content_object'),
-                                     parent=parent_id)
-                entity_address.save()
-                parent_id = entity_address.id
 
+            if entity_address.type in ['LOCALITY', 'SUBLOCALITY']:
+                ea_list.append(entity_address)
+
+        return ea_list
 
     class Meta:
         db_table = 'entity_address'
+
+
+class EntityLocationRelationship(models.Model):
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    location = models.ForeignKey(EntityAddress, on_delete=models.CASCADE)
+    type = models.CharField(max_length=128, blank=False, null=False, choices=EntityAddress.AllowedKeys.as_choices())
+
+    @classmethod
+    def create(cls, *args, **kwargs):
+        ea_list = EntityAddress.get_or_create(**kwargs)
+        for ea in ea_list:
+            entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
+            entity_location_relation.save()
+
+    class Meta:
+        db_table = 'entity_location_relations'
+
+
+class EntityUrls(models.Model):
+    url = models.CharField(blank=False, null=True, max_length=500, unique=True)
+    extras = models.TextField(default=json.dumps({}))
+    is_valid = models.BooleanField(default=True)
+    valid_reference = models.IntegerField(default=0)
+
+    def create(self, *args, **kwargs):
+
+
+    class Meta:
+        db_table = 'entity_urls'
+
+
+
+class DoctorsUrls(EntityUrls):
+
+    def create(self, *args, **kwargs):
+
+        pass
+
+    class Meta:
+        abstract = True

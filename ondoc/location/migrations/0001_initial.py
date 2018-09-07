@@ -19,8 +19,6 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('type', models.CharField(choices=[('LOCALITY', 'LOCALITY'), ('ZONE', 'ZONE')], max_length=128)),
                 ('value', models.TextField()),
-                ('object_id', models.PositiveIntegerField()),
-                ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.ContentType')),
             ],
             options={
                 'db_table': 'entity_address',
