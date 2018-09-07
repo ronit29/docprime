@@ -4,23 +4,10 @@ from django.contrib.postgres.fields import JSONField
 
 
 class Visitor(auth_models.TimeStampedModel):
-    device_info = models.BigIntegerField(null=True, default=None, blank=True)
+    device_info = JSONField(null=True, blank=True)
 
     def __str__(self):
-        return '{}'.format(self.device_info)
-
-    def save(self, *args, **kwargs):
-        self.device_info = self.get_device_info()
-        super(Visitor, self).save(*args, **kwargs)
-
-    def get_device_info(self):
-        from ondoc.api.v1.utils import RawSql
-        device_info = None
-        query = '''select nextval('device_info_seq') as inc'''
-        seq = RawSql(query).fetch_all()
-        if seq:
-            device_info = seq[0]['inc'] if seq[0]['inc'] else None
-        return device_info
+        return '{}'.format(self.id)
 
     @staticmethod
     def create_visitor():
@@ -33,14 +20,15 @@ class Visitor(auth_models.TimeStampedModel):
 
 
 class Visits(auth_models.TimeStampedModel):
+    ip_address = models.CharField(max_length=64, blank=True, null=True)
     visitor = models.ForeignKey(Visitor, on_delete=models.CASCADE)
 
     def __str__(self):
         return '{}'.format(self.visitor)
 
     @staticmethod
-    def create_visit(visitor_id):
-        visit = Visits(visitor_id=visitor_id)
+    def create_visit(visitor_id, ip=None):
+        visit = Visits(visitor_id=visitor_id, ip_address=ip)
         visit.save()
         return visit
 

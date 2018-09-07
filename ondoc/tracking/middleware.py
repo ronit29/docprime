@@ -1,6 +1,7 @@
 from ondoc.tracking import models as track_models
 import datetime
 from ondoc.api.v1.utils import get_time_delta_in_minutes, aware_time_zone
+from ipware import get_client_ip
 
 
 class InitiateSessionMiddleware:
@@ -18,7 +19,8 @@ class InitiateSessionMiddleware:
             request.session['visitor_id'] = visitor_id
 
         if not visit_id:
-            visit = track_models.Visits.create_visit(visitor_id)
+            client_ip, is_routable = get_client_ip(request)
+            visit = track_models.Visits.create_visit(visitor_id, client_ip)
             request.session['visit_id'] = visit.id
             visit_time = aware_time_zone(visit.created_at)
             request.session['last_visit_time'] = datetime.datetime.strftime(visit_time, '%Y-%m-%d %H:%M:%S')
