@@ -27,11 +27,11 @@ def prepare_and_hit(self, data):
         'AppointmentDateTime': int(time.mktime(appointment.time_slot_start.utctimetuple())),
         'BookingType': 'DC' if task_data.get('type') == 'LAB_APPOINTMENT' else 'D',
         'AppointmentType': '',
-        'PatientName': appointment.profile.name,
+        'PatientName': appointment.profile_detail.get("name", ''),
         'PatientAddress': Address.objects.get(id=appointment.address.id).address if hasattr(appointment, 'address') and appointment.address else '',
         'ProviderName': getattr(appointment, 'doctor').name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
         'ServiceName': appointment.lab_test.test.name if task_data.get('type') == 'LAB_APPOINTMENT' else '',
-        'InsuranceCover': 1,
+        'InsuranceCover': 0,
         'MobileList': data.get('mobile_list'),
         'BookingUrl': booking_url
     }
@@ -87,11 +87,13 @@ def push_appointment_to_matrix(self, data):
     try:
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
-            logger.error("[CELERY ERROR: Incorrect values provided.]")
-            raise ValueError()
+            # logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise Exception("Appointment id not found, could not push to Matrix")
 
         if data.get('type') == 'OPD_APPOINTMENT':
             appointment = OpdAppointment.objects.filter(pk=appointment_id).first()
+            if not appointment:
+                raise Exception("Appointment could not found against id - " + str(appointment_id))
             mobile_list = list()
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
@@ -101,6 +103,9 @@ def push_appointment_to_matrix(self, data):
             mobile_list.extend(doctor_mobiles)
         elif data.get('type') == 'LAB_APPOINTMENT':
             appointment = LabAppointment.objects.filter(pk=appointment_id).first()
+
+            if not appointment:
+                raise Exception("Appointment could not found against id - " + str(appointment_id))
 
             mobile_list = list()
             # User mobile number
