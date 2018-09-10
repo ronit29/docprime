@@ -759,6 +759,11 @@ class LabTestPackageInline(admin.TabularInline):
     fk_name = 'package'
     verbose_name = "Package Test"
     verbose_name_plural = "Package Tests"
+    # autocomplete_fields = ['lab_test']
+
+    def get_queryset(self, request):
+        return super(LabTestPackageInline, self).get_queryset(request).filter(
+            lab_test__is_package=False, package__is_package=True)
 
 
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
@@ -770,7 +775,7 @@ class LabTestAdmin(ImportExportMixin, VersionAdmin):
 
     def get_inline_instances(self, request, obj=None):
         inline_instance = super().get_inline_instances(request=request, obj=obj)
-        if obj and obj.is_package:
+        if obj and obj.is_package and LabTest.objects.filter(pk=obj.id, is_package=True):
             inline_instance.append(LabTestPackageInline(self.model, self.admin_site))
         return inline_instance
 
