@@ -14,8 +14,6 @@ class Command(BaseCommand):
             if not GenericLabAdmin.objects.filter(lab=lab, permission_type=GenericLabAdmin.APPOINTMENT,
                                                   phone_number=lab_manager.number).exists():
                 user = User.objects.filter(phone_number=lab_manager.number).first()
-                if not user.exists():
-                    user = None
                 network = lab.network
                 GenericLabAdmin.objects.create(
                     user=user,
