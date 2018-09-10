@@ -754,11 +754,25 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         )
 
 
+class LabTestPackageInline(admin.TabularInline):
+    model = LabTest.test.through
+    fk_name = 'package'
+    verbose_name = "Package Test"
+    verbose_name_plural = "Package Tests"
+
+
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
+    inlines = []
     search_fields = ['name']
     resource_class = LabTestResource
+
+    def get_inline_instances(self, request, obj=None):
+        inline_instance = super().get_inline_instances(request=request, obj=obj)
+        if obj and obj.is_package:
+            inline_instance.append(LabTestPackageInline(self.model, self.admin_site))
+        return inline_instance
 
 
 class LabTestTypeAdmin(VersionAdmin):

@@ -481,6 +481,9 @@ class LabTest(TimeStampedModel, SearchKey):
     excel_id = models.CharField(max_length=100, blank=True)
     sample_type = models.CharField(max_length=500, blank=True)
     home_collection_possible = models.BooleanField(default=False, verbose_name= 'Can sample be home collected for this test?')
+    test = models.ManyToManyField('self', through='LabTestPackage', symmetrical=False,
+                                  through_fields=('package', 'lab_test'))  # self reference
+
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
@@ -492,6 +495,17 @@ class LabTest(TimeStampedModel, SearchKey):
 
     class Meta:
         db_table = "lab_test"
+
+
+class LabTestPackage(TimeStampedModel):
+    package = models.ForeignKey(LabTest, related_name='packages', on_delete=models.CASCADE)
+    lab_test = models.ForeignKey(LabTest, related_name='lab_tests', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return "{}-{}".format(self.package.name, self.lab_test.name)
+
+    class Meta:
+        db_table = 'labtest_package'
 
 
 # class LabTestSubTypeMapping(TimeStampedModel):
