@@ -606,12 +606,20 @@ class DoctorResource(resources.ModelResource):
     city = fields.Field()
     specialization = fields.Field()
     qualification = fields.Field()
+    pan = fields.Field()
+    gst = fields.Field()
+    mci = fields.Field()
+    cheque = fields.Field()
+    aadhar = fields.Field()
+    fees = fields.Field()
 
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'city', 'gender', 'qualification', 'specialization', 'onboarding_status', 'data_status')
+        fields = ('id', 'name', 'city', 'gender', 'license', 'fees','qualification', 'specialization', 'onboarding_status', 'data_status', 'gst',
+        'pan', 'mci', 'cheque', 'aadhar')
         export_order = (
-            'id', 'name', 'city', 'gender', 'qualification', 'specialization', 'onboarding_status', 'data_status')
+            'id', 'name', 'city', 'gender', 'license', 'fees','qualification', 'specialization', 'onboarding_status', 'data_status', 'gst',
+        'pan', 'mci', 'cheque', 'aadhar')
 
     def dehydrate_data_status(self, doctor):
         return dict(Doctor.DATA_STATUS_CHOICES)[doctor.data_status]
@@ -623,13 +631,49 @@ class DoctorResource(resources.ModelResource):
         return ','.join([str(h.city) for h in doctor.hospitals.distinct('city')])
 
     def dehydrate_specialization(self, doctor):
-        return ','.join([str(h.specialization) for h in doctor.qualifications.all()])
+        return ','.join([str(h.specialization.name) for h in doctor.doctorspecializations.all()])
 
     def dehydrate_qualification(self, doctor):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
-# class BillingAccountAdmin(VersionAdmin):
-#     search_fields = ['merchant_id']
+    def dehydrate_fees(self, doctor):
+        return ', '.join([str(h.hospital.name + '-Rs.' + (str(h.availability.first().fees) if h.availability.first() else '')) for h in doctor.doctor_clinics.all()])
+
+    def dehydrate_gst(self, doctor):
+
+         status = 'Pending'
+         for doc in doctor.documents.all():
+             if doc.document_type == DoctorDocument.GST:
+                status = 'Submitted'
+         return status
+
+    def dehydrate_pan(self, doctor):
+        status = 'Pending'
+        for doc in doctor.documents.all():
+            if doc.document_type == DoctorDocument.PAN:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_mci(self, doctor):
+        status = 'Pending'
+        for doc in doctor.documents.all():
+            if doc.document_type == DoctorDocument.REGISTRATION:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_cheque(self, doctor):
+        status = 'Pending'
+        for doc in doctor.documents.all():
+            if doc.document_type == DoctorDocument.CHEQUE:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_aadhar(self, doctor):
+        status = 'Pending'
+        for doc in doctor.documents.all():
+            if doc.document_type == DoctorDocument.AADHAR:
+                status = 'Submitted'
+        return status
 
 
 class CompetitorInfoForm(forms.ModelForm):
