@@ -986,13 +986,13 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
 
     def doctor_id(self, obj):
-        doctor = obj.doctor
+        doctor = obj.doctor if obj and obj.doctor else None
         if doctor is not None:
             return doctor.id
         return None
 
     def doctor_details(self, obj):
-        doctor = obj.doctor
+        doctor = obj.doctor if obj and obj.doctor else None
         if doctor is not None:
             result = ''
             result += 'Name : ' + doctor.name
@@ -1015,7 +1015,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def contact_details(self, obj):
         details = ''
-        if obj.doctor:
+        if obj and obj.doctor:
             doctor_admins = GenericAdmin.get_appointment_admins(obj)
             if doctor_admins:
                 for doctor_admin in doctor_admins:
@@ -1028,7 +1028,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     contact_details.short_description = "Concerned Admin Details"
 
     def booking_id(self, obj):
-        return obj.id if obj.id else None
+        return obj.id if  obj and obj.id else None
 
     def doctor_name(self, obj):
         profile_link = "opd/doctor/{}".format(obj.doctor.id)
