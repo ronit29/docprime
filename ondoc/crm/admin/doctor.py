@@ -996,13 +996,13 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         if doctor is not None:
             result = ''
             result += 'Name : ' + doctor.name
-            mobile_numbers = DoctorMobile.objects.filter(doctor=doctor)
+            mobile_numbers = doctor.mobiles.all()
             if mobile_numbers.exists():
                 result += '<br>Number(s) :<br>'
                 for number in mobile_numbers:
                     result += '{0} (primary = {1}, verified = {2})'.format(number.number, number.is_primary, number.is_phone_number_verified)
 
-            mobile_emails = DoctorEmail.objects.filter(doctor=doctor)
+            mobile_emails = doctor.emails.all()
             if mobile_emails.exists():
                 result += '<br>Email(s) :<br>'
                 for email in mobile_emails:
@@ -1048,7 +1048,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         return obj.profile.name
 
     def used_profile_number(self, obj):
-        return obj.profile.phone_number
+        return obj.profile.phone_number if obj and obj.profile and obj.profile.phone_number else None
 
     def default_profile_name(self, obj):
         # return obj.profile.user.profiles.all()[:1][0].name
@@ -1067,10 +1067,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return ''
 
     def user_number(self, obj):
-        return obj.user.phone_number
+        return obj.user.phone_number if obj and obj.user and obj.user.phone_number else None
 
     def user_id(self, obj):
-        return obj.user.id
+        return obj.user.id if obj and obj.user and obj.user.id else None
 
     def admin_information(self, obj):
         doctor_admins = auth_model.GenericAdmin.get_appointment_admins(obj)

@@ -7,18 +7,18 @@ from ondoc.diagnostic.models import LabManager
 class Command(BaseCommand):
     help = 'Set lab managers as lab admins if he she is not a admin already.'
 
-    # lab or lab network
-
     def handle(self, *args, **options):
-        lab_managers = LabManager.objects.filter(contact_type=LabManager.SPOC)
+        lab_managers = LabManager.objects.select_related('lab', 'lab__network').filter(contact_type=LabManager.SPOC)
         for lab_manager in lab_managers:
             lab = lab_manager.lab
-            network = lab.network
             if not GenericLabAdmin.objects.filter(lab=lab, permission_type=GenericLabAdmin.APPOINTMENT,
                                                   phone_number=lab_manager.number).exists():
+                user = User.objects.filter(phone_number=lab_manager.number).first()
+                if not user.exists():
+                    user = None
+                network = lab.network
                 GenericLabAdmin.objects.create(
-                    user=User.objects.filter(phone_number=lab_manager.number).first() if User.objects.filter(
-                        phone_number=lab_manager.number).exists() else None,
+                    user=user,
                     phone_number=lab_manager.number,
                     lab_network=None,
                     lab=lab,
