@@ -45,7 +45,7 @@ class TrackingEvent(auth_models.TimeStampedModel):
     name = models.CharField(max_length=50, null=True, blank=True)
     data = JSONField(blank=True, null=True)
     visit = models.ForeignKey(TrackingVisit, on_delete=models.CASCADE)
-    user = models.OneToOneField(settings.AUTH_USER_MODEL,  on_delete=models.SET_NULL, default=None,
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,  on_delete=models.SET_NULL, default=None,
                                 blank=True, null=True)
 
     def __str__(self):
