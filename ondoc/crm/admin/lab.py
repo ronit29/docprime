@@ -623,12 +623,13 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('booking_id', 'lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'cancel_type', 'price', 'agreed_price',
+            return ('booking_id', 'lab', 'lab_id', 'lab_test', 'lab_contact_details', 'profile', 'user',
+                    'profile_detail', 'status', 'cancel_type', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
-                    'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
+            return ('booking_id', 'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type','start_date', 'start_time')
         else:
@@ -636,14 +637,20 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('booking_id',)
+            return ('booking_id', 'lab_id', 'lab_contact_details')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
-                    'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
+            return ('booking_id', 'lab_name', 'lab_id', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
         else:
             return ()
+
+    def lab_id(self, obj):
+        lab = obj.lab
+        if lab is not None:
+            return lab.id
+        return None
 
     def booking_id(self, obj):
         return obj.id if obj.id else None
@@ -726,6 +733,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def user_number(self, obj):
         return obj.user.phone_number
+
+    def user_id(self, obj):
+        return obj.user.id
 
     def save_model(self, request, obj, form, change):
         if obj:

@@ -957,13 +957,15 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
+            return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'profile',
+                    'profile_detail', 'user', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type','start_date',
                     'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'hospital_name', 'contact_details', 'used_profile_name',
+            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+                    'contact_details', 'used_profile_name',
                     'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_number', 'booked_by',
+                    'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
                     'status', 'cancel_type', 'start_date', 'start_time')
@@ -972,15 +974,44 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id',)
+            return ('booking_id', 'doctor_id', 'doctor_details')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'hospital_name', 'contact_details', 'used_profile_name',
-                    'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_number', 'booked_by',
+            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'contact_details',
+                    'used_profile_name', 'used_profile_number', 'default_profile_name',
+                    'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                     'admin_information', 'otp', 'insurance', 'outstanding')
         else:
             return ()
+
+
+    def doctor_id(self, obj):
+        doctor = obj.doctor
+        if doctor is not None:
+            return doctor.id
+        return None
+
+    def doctor_details(self, obj):
+        doctor = obj.doctor
+        if doctor is not None:
+            result = ''
+            result += 'Name : ' + doctor.name
+            mobile_numbers = DoctorMobile.objects.filter(doctor=doctor)
+            if mobile_numbers.exists():
+                result += '<br>Number(s) :<br>'
+                for number in mobile_numbers:
+                    result += '{0} (primary = {1}, verified = {2})'.format(number.number, number.is_primary, number.is_phone_number_verified)
+
+            mobile_emails = DoctorEmail.objects.filter(doctor=doctor)
+            if mobile_emails.exists():
+                result += '<br>Email(s) :<br>'
+                for email in mobile_emails:
+                    result += '{0} (primary = {1}, verified = {2})'.format(email.email, email.is_primary,
+                                                                           email.is_email_verified)
+
+            return mark_safe('<p>' + result + '</p>')
+
+        return None
 
     def contact_details(self, obj):
         details = ''
@@ -1037,6 +1068,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def user_number(self, obj):
         return obj.user.phone_number
+
+    def user_id(self, obj):
+        return obj.user.id
 
     def admin_information(self, obj):
         doctor_admins = auth_model.GenericAdmin.get_appointment_admins(obj)
