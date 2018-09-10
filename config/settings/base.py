@@ -103,7 +103,8 @@ THIRD_PARTY_APPS = (
     'dal_select2',
     'django_tables2',
     'anymail',
-    'nested_admin'
+    'nested_admin',
+    'ipware'
 )
 
 LOCAL_APPS = (
@@ -124,6 +125,7 @@ LOCAL_APPS = (
     'ondoc.articles',
     'ondoc.reports',
     'ondoc.common',
+    'ondoc.tracking',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -237,7 +239,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
     'COERCE_DECIMAL_TO_STRING': True,
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        #'rest_framework.authentication.SessionAuthentication',
+        # 'rest_framework.authentication.SessionAuthentication',
         # 'rest_framework.authentication.TokenAuthentication',
         # 'ondoc.authentication.auth.CustomAuthentication',
         # 'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
