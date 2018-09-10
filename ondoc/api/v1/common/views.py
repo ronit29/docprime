@@ -13,8 +13,10 @@ from ondoc.authentication.backends import JWTAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile
 import random
 import string
-import json
+import base64
+import logging
 
+logger = logging.getLogger(__name__)
 
 class CitiesViewSet(viewsets.GenericViewSet):
 
@@ -33,7 +35,16 @@ class CitiesViewSet(viewsets.GenericViewSet):
 class ServicesViewSet(viewsets.GenericViewSet):
 
     def generatepdf(self, request):
-        content = request.data.get('content')
+        content = None
+        try:
+            coded_data = request.data.get('content')
+            if isinstance(coded_data, list):
+                coded_data = coded_data[0]
+            coded_data += "=="
+            content = base64.b64decode(coded_data).decode()
+        except Exception as e:
+            logger.error("Error in decoding base64 content with exception - " + str(e))
+
         if not content:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Content is required.'})
         pdf_file = HTML(string=content).write_pdf()

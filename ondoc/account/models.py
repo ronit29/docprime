@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile
+from ondoc.account.tasks import refund_curl_task
 # from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
@@ -408,9 +409,10 @@ class ConsumerRefund(TimeStampedModel):
 
         try:
             pg_data = PgTransaction.form_pg_refund_data(consumer_refund_objs)
-            refund_curl_request(pg_data)
+            # refund_curl_request(pg_data)
+            for data in pg_data:
+                refund_curl_task.apply_async((data,), countdown=1)
         except Exception as e:
-            print(e)
             logger.error("Error in refund celery - " + str(e))
 
     class Meta:
