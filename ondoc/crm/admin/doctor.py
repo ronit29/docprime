@@ -306,7 +306,7 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
                 Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=self.instance)).exists():
             if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
                 for key, value in count.items():
-                    if not key == DoctorDocument.GST and value < 1:
+                    if key == DoctorDocument.REGISTRATION and value < 1:
                         raise forms.ValidationError(choices[key] + " is required")
 
 
