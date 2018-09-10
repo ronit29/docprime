@@ -411,6 +411,7 @@ class ConsumerRefund(TimeStampedModel):
             refund_curl_request(pg_data)
         except Exception as e:
             print(e)
+            logger.error("Error in refund celery - " + str(e))
 
     class Meta:
         db_table = "consumer_refund"

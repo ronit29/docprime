@@ -19,6 +19,7 @@ import json
 from django.conf import settings
 from dateutil.parser import parse
 from dateutil import tz
+from django.utils.dateparse import parse_datetime
 User = get_user_model()
 
 
@@ -335,6 +336,24 @@ def get_location(lat, long):
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
     return pnt
+
+
+def get_time_delta_in_minutes(last_visit_time):
+    minutes = None
+    time_format = '%Y-%m-%d %H:%M:%S'
+    current_time_string = datetime.datetime.strftime(datetime.datetime.now(), time_format)
+    last_time_object = datetime.datetime.strptime(last_visit_time, time_format)
+    current_object = datetime.datetime.strptime(current_time_string, time_format)
+    delta = current_object - last_time_object
+    #print(delta)
+    #if delta:
+    minutes = delta.seconds / 60
+    return minutes
+
+
+def aware_time_zone(date_time_field):
+    date = timezone.localtime(date_time_field, pytz.timezone(settings.TIME_ZONE))
+    return date
 
 
 def resolve_address(address_obj):
