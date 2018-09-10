@@ -2,6 +2,7 @@ from django.db import models
 import uuid
 from ondoc.authentication import models as auth_models
 from django.contrib.postgres.fields import JSONField
+from django.conf import settings
 
 
 class TrackingVisitor(auth_models.TimeStampedModel):
@@ -44,6 +45,8 @@ class TrackingEvent(auth_models.TimeStampedModel):
     name = models.CharField(max_length=50, null=True, blank=True)
     data = JSONField(blank=True, null=True)
     visit = models.ForeignKey(TrackingVisit, on_delete=models.CASCADE)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL,  on_delete=models.SET_NULL, default=None,
+                                blank=True, null=True)
 
     def __str__(self):
         return '{}'.format(self.name)
