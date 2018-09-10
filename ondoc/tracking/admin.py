@@ -1,6 +1,6 @@
 from django.contrib import admin
-from .models import Visitor, Visits, VisitorEvents
+from .models import TrackingVisitor, TrackingVisit, TrackingEvent
 # Register your models here.
-admin.site.register(Visitor)
-admin.site.register(Visits)
-admin.site.register(VisitorEvents)
+admin.site.register(TrackingVisitor)
+admin.site.register(TrackingVisit)
+admin.site.register(TrackingEvent)
