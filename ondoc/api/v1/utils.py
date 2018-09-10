@@ -345,8 +345,9 @@ def get_time_delta_in_minutes(last_visit_time):
     last_time_object = datetime.datetime.strptime(last_visit_time, time_format)
     current_object = datetime.datetime.strptime(current_time_string, time_format)
     delta = current_object - last_time_object
-    if delta:
-        minutes = delta.seconds / 60
+    #print(delta)
+    #if delta:
+    minutes = delta.seconds / 60
     return minutes
 
 

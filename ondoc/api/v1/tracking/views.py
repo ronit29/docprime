@@ -63,6 +63,8 @@ class EventCreateViewSet(GenericViewSet):
 
         if last_visit_time:
             get_time_diff = get_time_delta_in_minutes(last_visit_time)
+            # if not get_time_diff:
+            #     print('error')
             if int(get_time_diff) > 30:
                 visit_expired = True
         else:
