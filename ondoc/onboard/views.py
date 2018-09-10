@@ -135,7 +135,7 @@ def generate_doctor(request):
     p_mobile = doctor.mobiles.filter(is_primary=True)[0]
     token = DoctorOnboardingToken(status=1,email=p_email.email, mobile=p_mobile.number,doctor_id=doctor_id, token=randint(1000000000, 9000000000))
     token.save()
-    url = str(host) + '/onboard/doctor?token='+str(token.token)
+    url = 'https://' + str(host) + '/onboard/doctor?token='+str(token.token)
 
     message = '''Dear Sir/Mam,
                  \n\nPlease find below the enrolment URL Link:-
