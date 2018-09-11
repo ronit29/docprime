@@ -460,6 +460,13 @@ class LabTestSubType(TimeStampedModel):
 #         db_table = "radiology_test_type"
 
 
+class TestParameter(TimeStampedModel):
+    name = models.CharField(max_length=200)
+
+    class Meta:
+        db_table = "test_parameter"
+
+
 class LabTest(TimeStampedModel, SearchKey):
     RADIOLOGY = 1
     PATHOLOGY = 2
@@ -467,6 +474,7 @@ class LabTest(TimeStampedModel, SearchKey):
         (RADIOLOGY, "Radiology"),
         (PATHOLOGY, "Pathology"),
     )
+    parameter = models.ForeignKey(TestParameter, null=True, blank=True, on_delete=models.SET_NULL)
     name = models.CharField(max_length=200, unique=True)
     test_type = models.PositiveIntegerField(choices=TEST_TYPE_CHOICES, blank=True, null=True)
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
