@@ -1059,7 +1059,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
                     obj.action_cancelled(cancel_type)
-        super().save_model(request, obj, form, change)
+            else:        
+                super().save_model(request, obj, form, change)
 
     class Media:
         js = (
