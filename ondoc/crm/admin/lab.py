@@ -390,14 +390,14 @@ class LabResource(resources.ModelResource):
 
     class Meta:
         model = Lab
-        fields = ('id', 'name', 'license', 'is_insurance_enabled', 'is_retail_enabled', 'is_ppc_pathology_enabled', 'is_ppc_radiology_enabled',
+        fields = ('id', 'name', 'license', 'data_status','is_insurance_enabled', 'is_retail_enabled', 'is_ppc_pathology_enabled', 'is_ppc_radiology_enabled',
                   'onboarding_status', 'is_billing_enabled', 'primary_email',  'primary_mobile', 'hospital', 'network',
                   'pin_code', 'city', 'state', 'country', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                   'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'lab_pricing_group', 'assigned_to',
                   'matrix_reference_id', 'matrix_lead_id', 'is_home_collection_enabled', 'home_pickup_charges', 'is_live',
                   'is_test_lab', 'gst', 'pan', 'registration', 'cheque', 'logo', 'email_confirmation')
 
-        export_order = ('id', 'name', 'license', 'is_insurance_enabled', 'is_retail_enabled', 'is_ppc_pathology_enabled', 'is_ppc_radiology_enabled',
+        export_order = ('id', 'name', 'license', 'data_status', 'is_insurance_enabled', 'is_retail_enabled', 'is_ppc_pathology_enabled', 'is_ppc_radiology_enabled',
                   'onboarding_status', 'is_billing_enabled', 'primary_email',  'primary_mobile', 'hospital', 'network',
                   'pin_code', 'city', 'state', 'country', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                   'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'lab_pricing_group', 'assigned_to',
