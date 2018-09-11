@@ -786,7 +786,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                 errors.append(req + ' is required')
 
         length_required = ['mobiles', 'emails', 'qualifications', 'hospitals',
-                           'languages', 'experiences', 'images']
+                           'languages', 'experiences']
 
         for req in length_required:
             if not len(getattr(doctor, req).all()):
