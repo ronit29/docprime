@@ -16,6 +16,8 @@ from ondoc.account.tasks import refund_curl_task
 from ondoc.crm.constants import constants
 import requests
 import json
+import random
+import string
 from django.conf import settings
 from dateutil.parser import parse
 from dateutil import tz
@@ -382,3 +384,14 @@ def resolve_address(address_obj):
         address_string += str(address_dict["pincode"])
 
     return address_string
+
+
+def generate_short_url(url):
+    from ondoc.web import models as web_models
+    random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
+    tiny_url = web_models.TinyUrl.objects.filter(short_code=random_string).first()
+    if tiny_url:
+        return tiny_url
+    tiny_url = web_models.TinyUrl.objects.create(original_url=url, short_code=random_string)
+    return tiny_url.get_tiny_url()
+
