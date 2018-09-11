@@ -755,10 +755,25 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         )
 
 
+
+
 class TestParameterInline(admin.TabularInline):
     model = TestParameter
     verbose_name = 'Parameter'
     verbose_name_plural = 'Parameters'
+
+
+class TestPackageFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        for data in self.cleaned_data:
+            lab_test = data.get('lab_test')
+            if not lab_test:
+                continue
+            if self.instance.test_type != LabTest.OTHER and self.instance.test_type != lab_test.test_type:
+                raise forms.ValidationError('Test-{} is not correct for the Package.'.format(lab_test.name))
+            if lab_test.is_package is True:
+                raise forms.ValidationError('{} is a test package'.format(lab_test.name))
 
 
 class LabTestPackageInline(admin.TabularInline):
@@ -766,6 +781,7 @@ class LabTestPackageInline(admin.TabularInline):
     fk_name = 'package'
     verbose_name = "Package Test"
     verbose_name_plural = "Package Tests"
+    formset = TestPackageFormSet
     # autocomplete_fields = ['lab_test']
 
     def get_queryset(self, request):
@@ -785,6 +801,8 @@ class LabTestAdmin(ImportExportMixin, VersionAdmin):
         if obj and obj.is_package and LabTest.objects.filter(pk=obj.id, is_package=True):
             inline_instance.append(LabTestPackageInline(self.model, self.admin_site))
         return inline_instance
+
+
 
 
 class LabTestTypeAdmin(VersionAdmin):

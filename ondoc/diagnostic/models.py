@@ -516,6 +516,7 @@ class LabTestPackage(TimeStampedModel):
 
     class Meta:
         db_table = 'labtest_package'
+        unique_together = (("package", "lab_test"))
 
 
 # class LabTestSubTypeMapping(TimeStampedModel):
