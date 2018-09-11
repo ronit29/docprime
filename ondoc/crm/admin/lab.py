@@ -379,10 +379,94 @@ class LabCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 
+class LabResource(resources.ModelResource):
+    city = fields.Field()
+    pan = fields.Field()
+    gst = fields.Field()
+    registration = fields.Field()
+    cheque = fields.Field()
+    email_confirmation = fields.Field()
+    logo = fields.Field()
+
+    class Meta:
+        model = Lab
+        fields = ('id', 'name', 'license', 'is_insurance_enabled', 'is_retail_enabled', 'is_ppc_pathology_enabled', 'is_ppc_radiology_enabled',
+                  'onboarding_status', 'is_billing_enabled', 'primary_email',  'primary_mobile', 'hospital', 'network',
+                  'pin_code', 'city', 'state', 'country', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
+                  'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'lab_pricing_group', 'assigned_to',
+                  'matrix_reference_id', 'matrix_lead_id', 'is_home_collection_enabled', 'home_pickup_charges', 'is_live',
+                  'is_test_lab', 'gst', 'pan', 'registration', 'cheque', 'logo', 'email_confirmation')
+
+        export_order = ('id', 'name', 'license', 'is_insurance_enabled', 'is_retail_enabled', 'is_ppc_pathology_enabled', 'is_ppc_radiology_enabled',
+                  'onboarding_status', 'is_billing_enabled', 'primary_email',  'primary_mobile', 'hospital', 'network',
+                  'pin_code', 'city', 'state', 'country', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
+                  'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'lab_pricing_group', 'assigned_to',
+                  'matrix_reference_id', 'matrix_lead_id', 'is_home_collection_enabled', 'home_pickup_charges', 'is_live',
+                  'is_test_lab', 'gst', 'pan', 'registration', 'cheque', 'logo', 'email_confirmation')
+
+    def dehydrate_data_status(self, lab):
+        return dict(Lab.DATA_STATUS_CHOICES)[lab.data_status]
+
+    def dehydrate_onboarding_status(self, lab):
+        return dict(Lab.ONBOARDING_STATUS)[lab.onboarding_status]
+
+    def dehydrate_hospital(self, lab):
+        return (str(lab.hospital.name) if lab.hospital else '')
+
+    def dehydrate_network(self, lab):
+        return (str(lab.network.name) if lab.network else '')
+
+    def dehydrate_assigned_to(self, lab):
+        return (str(lab.assigned_to.phone_number) if lab.assigned_to else '')
+
+    def dehydrate_gst(self, lab):
+
+         status = 'Pending'
+         for l in lab.lab_documents.all():
+             if l.document_type == LabDocument.GST:
+                status = 'Submitted'
+         return status
+
+    def dehydrate_pan(self, lab):
+        status = 'Pending'
+        for l in lab.lab_documents.all():
+            if l.document_type == LabDocument.PAN:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_registration(self, lab):
+        status = 'Pending'
+        for l in lab.lab_documents.all():
+            if l.document_type == LabDocument.REGISTRATION:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_cheque(self, lab):
+        status = 'Pending'
+        for l in lab.lab_documents.all():
+            if l.document_type == LabDocument.CHEQUE:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_logo(self, lab):
+        status = 'Pending'
+        for l in lab.lab_documents.all():
+            if l.document_type == LabDocument.LOGO:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_email_confirmation(self, lab):
+        status = 'Pending'
+        for l in lab.lab_documents.all():
+            if l.document_type == LabDocument.EMAIL_CONFIRMATION:
+                status = 'Submitted'
+        return status
+
+
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     change_list_template = 'superuser_import_export.html'
-
+    resource_class = LabResource
     list_display = ('name', 'updated_at', 'onboarding_status','data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
 
     # readonly_fields=('onboarding_status', )
