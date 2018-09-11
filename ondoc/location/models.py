@@ -142,7 +142,7 @@ class EntityUrls(models.Model):
                 entity_url_objs = cls.objects.filter(entity_id=entity_object.id, is_valid=True)
                 if not entity_url_objs.exists():
                     entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
-                                         url_type=cls.UrlType.PAGEURL, extras=json.dumps(extra), entity_id=entity_object.id)
+                                         url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id)
                     entity_url_obj.save()
                 else:
                     entity_url_obj = entity_url_objs.first()
