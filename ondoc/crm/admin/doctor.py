@@ -269,7 +269,7 @@ class DoctorImageFormSet(forms.BaseInlineFormSet):
 
 class DoctorImageInline(nested_admin.NestedTabularInline):
     model = DoctorImage
-    formset = DoctorImageFormSet
+    # formset = DoctorImageFormSet
     template = 'imageinline.html'
     extra = 0
     can_delete = True
@@ -330,13 +330,13 @@ class HospitalDocumentFormSet(forms.BaseInlineFormSet):
         for key, value in count.items():
             if not key == HospitalDocument.ADDRESS and value > 1:
                 raise forms.ValidationError("Only one " + choices[key] + " is allowed")
-
-        if (
-                not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
-            if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
-                for key, value in count.items():
-                    if not key == HospitalDocument.GST and value < 1:
-                        raise forms.ValidationError(choices[key] + " is required")
+        #
+        # if (
+        #         not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
+        #     if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+        #         for key, value in count.items():
+        #             if not key == HospitalDocument.GST and value < 1:
+        #                 raise forms.ValidationError(choices[key] + " is required")
 
 
 class DoctorDocumentInline(nested_admin.NestedTabularInline):
@@ -453,12 +453,12 @@ class DoctorForm(FormCleanMixin):
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
         # (network is null or network billing is false)
 
-        if DoctorClinic.objects.filter(
-                Q(hospital__network__is_billing_enabled=False, hospital__is_billing_enabled=False, doctor=self.instance)|
-                Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=self.instance)).exists():
-            qc_required.update({
-                'documents': 'count'
-            })
+        # if DoctorClinic.objects.filter(
+        #         Q(hospital__network__is_billing_enabled=False, hospital__is_billing_enabled=False, doctor=self.instance)|
+        #         Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=self.instance)).exists():
+        #     qc_required.update({
+        #         'documents': 'count'
+        #     })
 
         for key, value in qc_required.items():
             if value == 'req' and not self.cleaned_data[key]:
