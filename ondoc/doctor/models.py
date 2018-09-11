@@ -453,7 +453,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "doctor_clinic_timing"
-        unique_together = (("start", "end", "day", "doctor_clinic",),)
+        # unique_together = (("start", "end", "day", "doctor_clinic",),)
 
     def save(self, *args, **kwargs):
         if self.mrp!=None:

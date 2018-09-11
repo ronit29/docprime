@@ -126,9 +126,26 @@ class DoctorClinicFormSet(forms.BaseInlineFormSet):
 #         return super(DoctorHospitalInline, self).get_queryset(request).select_related('doctor', 'hospital')
 
 
+class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        temp = set()
+
+        for value in self.cleaned_data:
+            if not value.get("DELETE"):
+                t = tuple([value.get("day"), value.get("start"), value.get("end")])
+                if t not in temp:
+                    temp.add(t)
+                else:
+                    raise forms.ValidationError("Duplicacy in the record not allowed")
+
+
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     model = DoctorClinicTiming
     form = DoctorClinicTimingForm
+    formset = DoctorClinicTimingFormSet
     extra = 0
     can_delete = True
     show_change_link = False
