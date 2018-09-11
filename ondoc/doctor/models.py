@@ -130,6 +130,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     live_at = models.DateTimeField(null=True, blank=True)
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
+    entity = GenericRelation(location_models.EntityLocationRelationship)
 
     def __str__(self):
         return self.name
@@ -154,6 +155,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         else:
             auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
+
+        if self.data_status == 3:
+            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+            # location_models.EntityUrls.create(self)
 
 
 class HospitalAward(auth_model.TimeStampedModel):
@@ -283,9 +288,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         super(Doctor, self).save(*args, **kwargs)
-        ea = location_models.EntityLocationRelationship.create(latitude='28.573477', longitude='77.3662119', content_object=self)
-
-
+        if self.data_status == 3:
+            location_models.EntityUrls.create(self)
 
     def __str__(self):
         return self.name
