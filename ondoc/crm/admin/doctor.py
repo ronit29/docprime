@@ -448,7 +448,7 @@ class DoctorForm(FormCleanMixin):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
                        'raw_about': 'req', 'license': 'req', 'mobiles': 'count', 'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
-                       'images': 'count', 'doctorspecializations': 'count'}
+                       'doctorspecializations': 'count'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
         # (network is null or network billing is false)
