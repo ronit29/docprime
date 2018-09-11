@@ -24,7 +24,8 @@ from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges)
+    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges,
+                                     TestParameter)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
@@ -754,6 +755,12 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         )
 
 
+class TestParameterInline(admin.TabularInline):
+    model = TestParameter
+    verbose_name = 'Parameter'
+    verbose_name_plural = 'Parameters'
+
+
 class LabTestPackageInline(admin.TabularInline):
     model = LabTest.test.through
     fk_name = 'package'
@@ -769,7 +776,7 @@ class LabTestPackageInline(admin.TabularInline):
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
-    inlines = []
+    inlines = [TestParameterInline]
     search_fields = ['name']
     resource_class = LabTestResource
 
