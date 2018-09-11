@@ -7,6 +7,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
 
     icon = serializers.SerializerMethodField()
     seo = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -18,9 +19,12 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
                 'image': request.build_absolute_uri(obj.header_image.url)
                 if hasattr(obj, 'header_image') and obj.header_image.name else None, 'title': obj.title}
 
+    def get_category(self, obj):
+        return {'name': obj.category.name, 'url': obj.category.url}
+
     class Meta:
         model = Article
-        fields = ('title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt')
+        fields = ('title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
