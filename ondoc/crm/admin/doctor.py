@@ -94,18 +94,6 @@ class DoctorClinicTimingForm(forms.ModelForm):
             raise forms.ValidationError("MRP cannot be less than fees")
 
 
-# class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
-#     def clean(self):
-#         super().clean()
-#         if any(self.errors):
-#             return
-#         count = 0
-#         formsets = []
-#         for value in self.cleaned_data:
-#             tup = (value.get('start'), value.get('end'), value.get('day'))
-#             formsets.append(tup)
-#
-
 class DoctorClinicFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -123,9 +111,26 @@ class DoctorClinicFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Hospital is required")
 
 
+class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        temp = set()
+
+        for value in self.cleaned_data:
+            if not value.get("DELETE"):
+                t = tuple([value.get("day"), value.get("start"), value.get("end")])
+                if t not in temp:
+                    temp.add(t)
+                else:
+                    raise forms.ValidationError("Duplicacy in the record not allowed")
+
+
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     model = DoctorClinicTiming
     form = DoctorClinicTimingForm
+    formset = DoctorClinicTimingFormSet
     extra = 0
     can_delete = True
     show_change_link = False
@@ -443,7 +448,7 @@ class DoctorForm(FormCleanMixin):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
                        'raw_about': 'req', 'license': 'req', 'mobiles': 'count', 'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
-                       'doctorspecializations': 'count'}
+                       'images': 'count', 'doctorspecializations': 'count'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
         # (network is null or network billing is false)
