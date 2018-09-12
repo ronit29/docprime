@@ -1,5 +1,6 @@
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
+from django.conf import settings
 from django.utils import timezone
 from weasyprint import HTML
 from django.http import HttpResponse
@@ -35,6 +36,7 @@ class CitiesViewSet(viewsets.GenericViewSet):
 class ServicesViewSet(viewsets.GenericViewSet):
 
     def generatepdf(self, request):
+        from ondoc.api.v1.utils import generate_short_url
         content = None
         try:
             coded_data = request.data.get('content')
@@ -52,7 +54,11 @@ class ServicesViewSet(viewsets.GenericViewSet):
         name = random_string + '.pdf'
         file = SimpleUploadedFile(name, pdf_file, content_type='application/pdf')
         chat = ChatPrescription.objects.create(name=name, file=file)
-        return Response({"name": chat.name})
+        prescription_url = "{}{}{}".format(settings.BASE_URL,
+                                           "/api/v1/common/chat_prescription/",
+                                           chat.name)
+        short_url = generate_short_url(prescription_url)
+        return Response({"url": short_url})
 
     def send_email(self, request):
         serializer = serializers.EmailServiceSerializer(data=request.data)

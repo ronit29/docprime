@@ -300,9 +300,9 @@
         <span>IMAGES</span></div>
       <div class="panel-body">
 
-      <div class='upload-container' data-media='image' data-type='' data-url='/onboard/doctor-upload' data-max='5'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+      <div class='upload-container not-required' data-media='image' data-type='' data-url='/onboard/doctor-upload' data-max='5'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
         <div>
-        <span class='image-required-message'> (Required)</span>
+        <!--<span class='image-required-message'> (Required)</span>-->
         </div>
         {% for img in doc_images %}
             <div class="existing-image" style="position:relative;vertical-align: top; margin: 10px 10px 0 0; display: inline-block;">
@@ -341,12 +341,11 @@
                 {% with results=data.2 %}
 
                 {% if id == DoctorDocument.ADDRESS %}
-                    <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='3'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
-                {% elif id == DoctorDocument.GST %}
-                   <div class='upload-container not-required' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
-
+                    <div class='upload-container not-required' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='3'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+                {% elif id == DoctorDocument.REGISTRATION %}
+                   <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
                 {% else %}
-                    <div class='upload-container' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
+                    <div class='upload-container not-required' data-media='document' data-type='{{id}}' data-url='/onboard/doctor-upload' data-max='1'  style='text-align: left;display: inline-block;min-width: 33%;vertical-align: top;margin-bottom: 30px;'>
                 {% endif %}
 
                 {% if results %}
