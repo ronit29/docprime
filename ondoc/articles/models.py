@@ -16,7 +16,7 @@ class ArticleCategory(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if hasattr(self, 'url'):
-            self.url = self.url.strip('/')
+            self.url = self.url.strip('/').lower()
         super(ArticleCategory, self).save(*args, **kwargs)
 
 
@@ -31,11 +31,18 @@ class Article(TimeStampedModel, CreatedByModel):
     is_published = models.BooleanField(default=False, verbose_name='Published')
     description = models.CharField(max_length=500, blank=True, null=True)
     keywords = models.CharField(max_length=256, blank=True, null=True)
+    author_name = models.CharField(max_length=256, null=True, blank=False)
+    published_date = models.DateField(null=True)
 
     def icon_tag(self):
         if self.icon:
             return mark_safe('<img src="%s" width="150" height="150" />' % (self.icon.url))
         return ""
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'url'):
+            self.url = self.url.strip('/').lower()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title

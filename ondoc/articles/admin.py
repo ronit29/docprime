@@ -24,7 +24,7 @@ class ArticleForm(forms.ModelForm):
 class ArticleAdmin(VersionAdmin):
     form = ArticleForm
     model = Article
-    list_display = ('title', 'updated_at', 'created_at', 'created_by')
+    list_display = ('title', 'updated_at', 'created_at', 'created_by', 'preview')
     search_fields = ['title']
     fields = ['title', 'body', 'header_image','header_image_alt', 'category', 'url', 'description', 'keywords', 'icon_tag', 'icon', 'is_published', 'preview']
     readonly_fields = ['icon_tag', 'preview']
@@ -46,7 +46,7 @@ class ArticleAdmin(VersionAdmin):
         if hasattr(obj, 'url'):
             obj.url = obj.url.strip('/')
             url_components = obj.url.split('-')
-            if ArticleCategory.objects.filter(identifier=url_components[len(url_components)-1]).exists():
+            if ArticleCategory.objects.filter(identifier=url_components[-1]).exists():
                 pass
             else:
                 identifier = obj.category.identifier
