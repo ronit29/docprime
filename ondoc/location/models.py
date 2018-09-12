@@ -92,10 +92,14 @@ class EntityLocationRelationship(models.Model):
 
     @classmethod
     def create(cls, *args, **kwargs):
-        ea_list = EntityAddress.get_or_create(**kwargs)
-        for ea in ea_list:
-            entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
-            entity_location_relation.save()
+        try:
+            ea_list = EntityAddress.get_or_create(**kwargs)
+            for ea in ea_list:
+                entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
+                entity_location_relation.save()
+            return True
+        except Exception as e:
+            return False
 
     class Meta:
         db_table = 'entity_location_relations'
