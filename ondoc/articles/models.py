@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils.safestring import mark_safe
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image
+import datetime
 
 
 class ArticleCategory(TimeStampedModel):
@@ -32,7 +33,7 @@ class Article(TimeStampedModel, CreatedByModel):
     description = models.CharField(max_length=500, blank=True, null=True)
     keywords = models.CharField(max_length=256, blank=True, null=True)
     author_name = models.CharField(max_length=256, null=True, blank=False)
-    published_date = models.DateField(null=True)
+    published_date = models.DateField(default=datetime.date.today)
 
     def icon_tag(self):
         if self.icon:
@@ -40,6 +41,7 @@ class Article(TimeStampedModel, CreatedByModel):
         return ""
 
     def save(self, *args, **kwargs):
+        self.published_date = datetime.date.today()
         if hasattr(self, 'url'):
             self.url = self.url.strip('/').lower()
         super().save(*args, **kwargs)
