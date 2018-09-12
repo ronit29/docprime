@@ -31,6 +31,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
 
     icon = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
+    articleTeaser = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -39,9 +40,19 @@ class ArticleListSerializer(serializers.ModelSerializer):
     def get_url(self, obj):
         return obj.url if hasattr(obj, 'url') else None
 
+    def get_articleTeaser(self, obj):
+        import re
+        value = re.sub(r'<h.*?>.*?</h.*?>|<ol>.*?</ol>|<ul>.*?<ul>', '', obj.body)
+        cleanr = re.compile('<.*?>')
+        cleantext = re.sub(cleanr, '', value)
+        chunks = cleantext.split(" ")
+        value = " ".join(chunks[:100])
+        value = value.replace('&nbsp;', '')
+        return value
+
     class Meta:
         model = Article
-        fields = ('title', 'url', 'icon', 'header_image', 'header_image_alt')
+        fields = ('title', 'url', 'icon', 'header_image', 'header_image_alt', 'articleTeaser')
 
 
 class ArticlePreviewSerializer(serializers.Serializer):
