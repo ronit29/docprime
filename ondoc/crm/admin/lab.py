@@ -19,6 +19,8 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.html import format_html_join
 import pytz
+
+from ondoc.account.models import Order
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
@@ -707,12 +709,13 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('booking_id', 'lab', 'lab_id', 'lab_test', 'lab_contact_details', 'profile', 'user',
+            return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_test', 'lab_contact_details', 'profile', 'user',
                     'profile_detail', 'status', 'cancel_type', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+            return ('booking_id', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
+                    'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type','start_date', 'start_time')
@@ -721,14 +724,23 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('booking_id', 'lab_id', 'lab_contact_details')
+            return ('booking_id', 'order_id', 'lab_id', 'lab_contact_details')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'lab_name', 'lab_id', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
+            return ('booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test',
+                    'lab_contact_details', 'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
         else:
             return ()
+
+    def order_id(self, obj):
+        if obj and obj.id:
+            ids = Order.objects.filter(product_id=Order.LAB_PRODUCT_ID, reference_id=obj.id).values_list('id', flat=True)
+            if ids:
+                return ', '.join([str(id_) for id_ in ids])
+        return None
+    order_id.short_description = 'Order Id(s)'
 
     def lab_id(self, obj):
         lab = obj.lab
