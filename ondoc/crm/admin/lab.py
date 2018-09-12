@@ -736,9 +736,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def order_id(self, obj):
         if obj and obj.id:
-            ids = Order.objects.filter(product_id=Order.LAB_PRODUCT_ID, reference_id=obj.id).values_list('id', flat=True)
-            if ids:
-                return ', '.join([str(id_) for id_ in ids])
+            order_ids = Order.objects.filter(product_id=Order.LAB_PRODUCT_ID, reference_id=obj.id).values_list('id', flat=True)
+            if order_ids:
+                return ', '.join([str(order_id) for order_id in order_ids])
         return None
     order_id.short_description = 'Order Id(s)'
 
