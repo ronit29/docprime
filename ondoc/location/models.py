@@ -113,6 +113,10 @@ class EntityUrls(models.Model):
     entity_id = models.PositiveIntegerField(null=True, default=None)
     is_valid = models.BooleanField(default=True)
 
+    @property
+    def additional_info(self):
+        return json.loads(self.extras)
+
     @classmethod
     def create(cls, entity_object):
         entity_helper = entity_as_mapping[entity_object.__class__.__name__.upper()]
@@ -232,7 +236,7 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
 
                         if url:
                             search_urls.append({'url': url.lower(), 'specialization': specialization.name,
-                                                'specialization_id': specialization.id, 'location_id': location.id})
+                                                'specialization_id': specialization.id, 'location_id': location.location_id})
 
         urls['search_urls'] = {
             'urls': search_urls,
