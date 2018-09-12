@@ -20,6 +20,10 @@ class ArticleForm(forms.ModelForm):
 # class ArticleCategoryInline(admin.TabularInline):
 #     model = Article.category.through
 
+def bulk_publishing(modeladmin, request, queryset):
+    queryset.update(is_published=True)
+    bulk_publishing.short_description = "Publish selected articles"
+
 
 class ArticleAdmin(VersionAdmin):
     form = ArticleForm
@@ -29,6 +33,7 @@ class ArticleAdmin(VersionAdmin):
     fields = ['title', 'body', 'header_image','header_image_alt', 'category', 'url', 'description', 'keywords', 'icon_tag', 'icon', 'is_published', 'preview']
     readonly_fields = ['icon_tag', 'preview']
     #inlines = [ArticleCategoryInline]
+    actions = [bulk_publishing]
 
     def preview(self, instance):
         if instance.id:
