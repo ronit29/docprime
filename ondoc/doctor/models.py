@@ -1023,6 +1023,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
+        logger.error("Entered action_cancelled  - " + str(self.id) + " timezone - " + str(timezone.now()))
         self.status = self.CANCELLED
         self.save()
 
