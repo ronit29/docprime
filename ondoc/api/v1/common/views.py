@@ -113,7 +113,7 @@ class UpdateXlsViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         file = validated_data.get('file')
         wb = load_workbook(file)
-        sheet = wb.get_active_sheet()
+        sheet = wb.active
         rows = [row for row in sheet.rows]
         columns = {i+1: column.value.strip().lower() for i, column in enumerate(rows[0])}
         for key in columns.keys():
@@ -166,11 +166,11 @@ class UpdateXlsViewSet(viewsets.GenericViewSet):
                 is_live=True,
                 is_test_doctor=False,
                 is_internal=False,
-                hospitals__is_live=True).count()
+                hospitals__is_live=True).distinct().count()
         else:
             query.update({
                 'location__distance_lte': (Point(longitude, latitude), max_distance)
             })
             search_count = Lab.objects.filter(is_test_lab=False, is_live=True,
-                                              lab_pricing_group__isnull=False).filter(**query).count()
+                                              lab_pricing_group__isnull=False).filter(**query).distinct().count()
         return search_count
