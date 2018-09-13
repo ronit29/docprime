@@ -16,6 +16,10 @@ from django.utils import timezone
 import pytz
 import datetime
 from django.db import transaction
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 from ondoc.account.models import Order
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
@@ -1147,7 +1151,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 obj.cancellation_type = OpdAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
+                    logger.error("Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
+                    logger.error("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
+
             else:        
                 super().save_model(request, obj, form, change)
 
