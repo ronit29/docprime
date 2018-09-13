@@ -42,7 +42,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
 
     def get_articleTeaser(self, obj):
         import re
-        value = re.sub(r'<h.*?>.*?</h.*?>|<ol>.*?</ol>|<ul>.*?<ul>', '', obj.body)
+        value = re.sub(r'<h.*?>.*?</h.*?>|<ol>.*?</ol>|<ul>.*?<ul>|<img.*?>', '', obj.body)
         cleanr = re.compile('<.*?>')
         cleantext = re.sub(cleanr, '', value)
         chunks = cleantext.split(" ")

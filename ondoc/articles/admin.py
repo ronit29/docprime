@@ -22,7 +22,9 @@ class ArticleForm(forms.ModelForm):
 
 def bulk_publishing(modeladmin, request, queryset):
     queryset.update(is_published=True)
-    bulk_publishing.short_description = "Publish selected articles"
+
+
+bulk_publishing.short_description = "Publish selected articles"
 
 
 class ArticleAdmin(VersionAdmin):
