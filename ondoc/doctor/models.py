@@ -1110,6 +1110,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
 
     def save(self, *args, **kwargs):
+        logger.error("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
@@ -1121,7 +1122,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
-
+        logger.error("opd save completed - " + str(self.id) + " timezone - " + str(timezone.now()))
 
         # if push_to_matrix:
         #     # Push the appointment data to the matrix .
