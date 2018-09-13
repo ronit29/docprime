@@ -152,7 +152,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     state = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
-    agreed_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
+    agreed_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
+                                        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])])
+    ppc_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
+                                    validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])])
     pathology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None,max_digits=7,
                                                          decimal_places=2)
     pathology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
@@ -349,6 +352,12 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab_networks')
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
+
+    def all_associated_labs(self):
+        if self.id:
+            return Lab.objects.filter(network=self.id).distinct()
+        return None
+
 
     def __str__(self):
         return self.name + " (" + self.city + ")"
