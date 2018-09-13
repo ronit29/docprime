@@ -124,7 +124,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
     is_appointment_manager = models.BooleanField(verbose_name='Enabled for Managing Appointments', default=False)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
-    # generic_hospital_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospitals')
+    live_at = models.DateTimeField(null=True, blank=True)
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
 
@@ -247,6 +247,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     #                                                                            MinValueValidator(1000000000)])
     license = models.CharField(max_length=200, blank=True)
     onboarding_status = models.PositiveSmallIntegerField(default=NOT_ONBOARDED, choices=ONBOARDING_STATUS)
+    onboarded_at = models.DateTimeField(null=True, blank=True)
     additional_details = models.CharField(max_length=2000, blank=True)
     # email = models.EmailField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(verbose_name='Email Verified', default=False)
@@ -261,6 +262,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
                                                          default=False)
     online_consultation_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
+    live_at = models.DateTimeField(null=True, blank=True)
     is_internal = models.BooleanField(verbose_name='Is Staff Doctor', default=False)
     is_test_doctor = models.BooleanField(verbose_name='Is Test Doctor', default=False)
     # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
@@ -309,14 +311,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     # @classmethod
     def update_live_status(self):
         if self.onboarding_status == self.ONBOARDED:
-            dochospitals = []
-            for hosp in self.hospitals.all():
-                dochospitals.append(hosp.id)
-            queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
-                                           (Q(doctor__isnull=False, doctor=self) |
-                                            Q(doctor__isnull=True, hospital__id__in=dochospitals)))
-            if queryset.exists():
-                self.is_live = True
+            # dochospitals = []
+            # for hosp in self.hospitals.all():
+            #     dochospitals.append(hosp.id)
+            # queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
+            #                                (Q(doctor__isnull=False, doctor=self) |
+            #                                 Q(doctor__isnull=True, hospital__id__in=dochospitals)))
+            # if queryset.exists():
+            self.is_live = True
+            self.live_at = datetime.datetime.now()
 
 
     class Meta:
@@ -450,7 +453,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "doctor_clinic_timing"
-        unique_together = (("start", "end", "day", "doctor_clinic",),)
+        # unique_together = (("start", "end", "day", "doctor_clinic",),)
 
     def save(self, *args, **kwargs):
         if self.mrp!=None:
@@ -1024,9 +1027,10 @@ class OpdAppointment(auth_model.TimeStampedModel):
         self.save()
 
         if self.payment_type == self.PREPAID:
+            logger.error("Before Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
             consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-
+            logger.error("After Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
             data = dict()
             data["reference_id"] = self.id
             data["user"] = self.user
@@ -1092,6 +1096,20 @@ class OpdAppointment(auth_model.TimeStampedModel):
             return True
         return False
 
+    def after_commit_tasks(self, old_instance, push_to_matrix):
+        if push_to_matrix:
+        # Push the appointment data to the matrix .
+            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+
+        if self.is_to_send_notification(old_instance):
+            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+        if not old_instance or old_instance.status != self.status:
+            for e_id in settings.OPS_EMAIL_ID:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+        print('all ops tasks completed')
+
+
     def save(self, *args, **kwargs):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
@@ -1103,16 +1121,20 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
         super().save(*args, **kwargs)
 
-        if push_to_matrix:
-            # Push the appointment data to the matrix .
-            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+        transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
 
-        if self.is_to_send_notification(database_instance):
-            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
-        if not database_instance or database_instance.status != self.status:
-            for e_id in settings.OPS_EMAIL_ID:
-                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+
+        # if push_to_matrix:
+        #     # Push the appointment data to the matrix .
+        #     push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+        #                                              'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+
+        # if self.is_to_send_notification(database_instance):
+        #     notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+        # if not database_instance or database_instance.status != self.status:
+        #     for e_id in settings.OPS_EMAIL_ID:
+        #         notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
@@ -1371,4 +1393,38 @@ class DoctorMapping(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "doctor_mapping"
+
+
+class CompetitorInfo(auth_model.TimeStampedModel):
+    PRACTO =1
+    LYBRATE =2
+    NAME_TYPE_CHOICES = (("", "Select"), (PRACTO, 'Practo'), (LYBRATE, "Lybrate"),)
+    name = models.PositiveSmallIntegerField(blank=True, null=True,
+                                            choices=NAME_TYPE_CHOICES)
+
+    doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True, blank=True)
+    hospital = models.ForeignKey(Hospital, related_name="competitor_hospital", on_delete=models.CASCADE, null=True, blank=True)
+    hospital_name = models.CharField(max_length=200)
+    fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    url = models.URLField(null=True)
+    processed_url =models.URLField(null=True)
+
+    #
+    # url = url.replace("http://", "")
+
+    class Meta:
+        db_table = "competitor_info"
+
+    def save(self, *args, **kwargs):
+        url = self.url
+        if url:
+            if ('//') in url:
+                url = url.split('//')[1]
+            if ('?') in url:
+                url = url.split('?')[0]
+            self.processed_url = url
+
+        super().save(*args, **kwargs)
+
+
 

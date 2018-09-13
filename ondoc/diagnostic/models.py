@@ -134,6 +134,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_ppc_radiology_enabled = models.BooleanField(verbose_name= 'Enabled for Radiology Pre Policy Checkup', default=False)
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
     onboarding_status = models.PositiveSmallIntegerField(default=NOT_ONBOARDED, choices=ONBOARDING_STATUS)
+    onboarded_at = models.DateTimeField(null=True, blank=True)
     primary_email = models.EmailField(max_length=100, blank=True)
     primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MinValueValidator(1800)])
@@ -171,6 +172,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_home_collection_enabled = models.BooleanField(default=False)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_live = models.BooleanField(verbose_name='Is Live', default=False)
+    live_at = models.DateTimeField(null=True, blank=True)
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
@@ -748,13 +750,14 @@ class LabAppointment(TimeStampedModel):
         self.status = self.CANCELLED
         self.save()
 
-        consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
-        consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
+        if self.payment_type == OpdAppointment.PREPAID:
+            consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
+            consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
 
-        data = dict()
-        data["reference_id"] = self.id
-        data["user"] = self.user
-        data["product_id"] = 1
+            data = dict()
+            data["reference_id"] = self.id
+            data["user"] = self.user
+            data["product_id"] = account_model.Order.LAB_PRODUCT_ID
 
         cancel_amount = self.effective_price
         consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)

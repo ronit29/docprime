@@ -219,11 +219,13 @@ class UserViewset(GenericViewSet):
                     if not admin.doctor.is_live:
                         if admin.doctor.data_status == Doctor.QC_APPROVED and admin.doctor.onboarding_status == Doctor.ONBOARDED:
                             admin.doctor.is_live = True
+                            admin.doctor.live_at = datetime.datetime.now()
                             admin.doctor.save()
                 elif admin.hospital:
                     for hosp_doc in admin.hospital.assoc_doctors.all():
                         if hosp_doc.data_status == Doctor.QC_APPROVED and hosp_doc.onboarding_status == Doctor.ONBOARDED:
                             hosp_doc.is_live = True
+                            hosp_doc.live_at= datetime.datetime.now()
                             hosp_doc.save()
 
 
@@ -414,6 +416,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         else:
             return Response({'Error': 'Invalid Request Type'})
 
+    @transaction.non_atomic_requests
     def update(self, request, pk=None):
         serializer = UpdateStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -513,8 +516,11 @@ class UserAppointmentsViewSet(OndocViewSet):
             resp = dict()
             resp["status"] = 1
             if validated_data['status'] == OpdAppointment.CANCELLED:
+                logger.error("Starting to cancel for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))
                 opd_appointment.cancellation_type = OpdAppointment.PATIENT_CANCELLED
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
+                logger.error(
+                    "Ending for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):

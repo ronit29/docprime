@@ -352,9 +352,9 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
             raise serializers.ValidationError("Invalid profile id")
 
-        if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"], lab=data[
-            "lab"]).exists():
-            raise serializers.ValidationError("A previous appointment with this lab already exists. Cancel it before booking new Appointment.")
+        # if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"], lab=data[
+        #     "lab"]).exists():
+        #     raise serializers.ValidationError("A previous appointment with this lab already exists. Cancel it before booking new Appointment.")
 
         if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"]).count() >= MAX_APPOINTMENTS_ALLOWED:
             raise serializers.ValidationError('Max '+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')

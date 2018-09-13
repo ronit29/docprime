@@ -646,11 +646,14 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         name = request.query_params.get("name")
         if not name:
             return Response({"conditions": [], "specializations": []})
-        medical_conditions = models.MedicalCondition.objects.filter(
-            Q(search_key__icontains=name) |
-            Q(search_key__icontains=' ' + name) |
-            Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
-            'search_index').values("id", "name")[:5]
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').filter(
+            Q(condition__search_key__icontains=name) |
+            Q(condition__search_key__icontains=' ' + name) |
+            Q(condition__search_key__istartswith=name)
+        ).annotate(search_index=StrIndex('condition__search_key',
+                                         Value(name))).order_by('search_index')[:5]
+        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions,
+                                                                       many=True, context={'request': request})
 
         specializations = models.GeneralSpecialization.objects.filter(
             Q(search_key__icontains=name) |
@@ -658,7 +661,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
             'search_index').values("id", "name")[:5]
 
-        return Response({"conditions": medical_conditions, "specializations": specializations})
+        return Response({"conditions": conditions_serializer.data, "specializations": specializations})
 
     def common_conditions(self, request):
         count = request.query_params.get('count', 10)

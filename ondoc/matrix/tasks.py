@@ -7,6 +7,8 @@ import requests
 import json
 import time
 import logging
+from ondoc.authentication.models import Address
+from ondoc.api.v1.utils import resolve_address
 
 logger = logging.getLogger(__name__)
 
@@ -20,17 +22,24 @@ def prepare_and_hit(self, data):
     elif task_data.get('type') == 'LAB_APPOINTMENT':
         booking_url = '%s/admin/doctor/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
 
+    patient_address = ""
+    if hasattr(appointment, 'address') and appointment.address:
+        patient_address = resolve_address(appointment.address)
+    service_name = ""
+    if task_data.get('type') == 'LAB_APPOINTMENT':
+        service_name = ','.join([test_obj.test.name for test_obj in appointment.lab_test.all()])
+
     appointment_details = {
         'DocPrimeBookingID': appointment.id,
         'BookingDateTime': int(time.mktime(appointment.created_at.utctimetuple())),
         'AppointmentDateTime': int(time.mktime(appointment.time_slot_start.utctimetuple())),
         'BookingType': 'DC' if task_data.get('type') == 'LAB_APPOINTMENT' else 'D',
         'AppointmentType': '',
-        'PatientName': appointment.profile.name,
-        'PatientAddress': appointment.user.address_set.all().first().address if len(appointment.user.address_set.all()) else '',
+        'PatientName': appointment.profile_detail.get("name", ''),
+        'PatientAddress': patient_address,
         'ProviderName': getattr(appointment, 'doctor').name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
-        'ServiceName': appointment.lab_test.test.name if task_data.get('type') == 'LAB_APPOINTMENT' else '',
-        'InsuranceCover': 1,
+        'ServiceName': service_name,
+        'InsuranceCover': 0,
         'MobileList': data.get('mobile_list'),
         'BookingUrl': booking_url
     }
@@ -86,14 +95,13 @@ def push_appointment_to_matrix(self, data):
     try:
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
-            logger.error("[CELERY ERROR: Incorrect values provided.]")
-            raise ValueError()
+            # logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise Exception("Appointment id not found, could not push to Matrix")
 
         if data.get('type') == 'OPD_APPOINTMENT':
-            ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.BOOKED, OpdAppointment.ACCEPTED,
-                                         OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.RESCHEDULED_DOCTOR]
-
-            appointment = OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, pk=appointment_id).first()
+            appointment = OpdAppointment.objects.filter(pk=appointment_id).first()
+            if not appointment:
+                raise Exception("Appointment could not found against id - " + str(appointment_id))
             mobile_list = list()
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
@@ -102,9 +110,10 @@ def push_appointment_to_matrix(self, data):
             doctor_mobiles = [{'MobileNo': number, 'Name': appointment.doctor.name, 'Type': 2} for number in doctor_mobiles]
             mobile_list.extend(doctor_mobiles)
         elif data.get('type') == 'LAB_APPOINTMENT':
-            ACTIVE_APPOINTMENT_STATUS = [LabAppointment.BOOKED, LabAppointment.ACCEPTED,
-                                         LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
-            appointment = LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, pk=appointment_id).first()
+            appointment = LabAppointment.objects.filter(pk=appointment_id).first()
+
+            if not appointment:
+                raise Exception("Appointment could not found against id - " + str(appointment_id))
 
             mobile_list = list()
             # User mobile number
@@ -127,6 +136,9 @@ def push_signup_lead_to_matrix(self, data):
             raise ValueError()
 
         online_lead_obj = OnlineLead.objects.get(id=lead_id)
+
+        if not online_lead_obj:
+            raise Exception("Online lead could not found against id - " + str(lead_id))
 
         request_data = {
             'Name': online_lead_obj.name,

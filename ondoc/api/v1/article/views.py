@@ -38,20 +38,17 @@ class TopArticleCategoryViewSet(viewsets.GenericViewSet):
 class ArticleViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
-        return article_models.Article.objects.prefetch_related('category')
+        return article_models.Article.objects.prefetch_related('category').filter(is_published=True)
 
     def list(self, request):
         category_url = request.GET.get('categoryUrl', None)
         if not category_url:
             return Response({"error": "Missing Parameter: categoryUrl"}, status=status.HTTP_400_BAD_REQUEST)
 
-        category_list = article_models.ArticleCategory.objects.filter(url=category_url)
-        if not len(category_list) > 0:
-            return Response([])
-
-        category = category_list[0]
-        articles = category.articles.all()
-        article_data = list(filter(lambda article: article.is_published, articles))
+        article_start = request.GET.get('startsWith', None)
+        article_data = self.get_queryset().filter(category__url=category_url)
+        if article_start:
+            article_data = article_data.filter(title__istartswith=article_start)
 
         article_data = paginate_queryset(article_data, request, 10)
         resp = serializers.ArticleListSerializer(article_data, many=True,

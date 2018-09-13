@@ -14,6 +14,14 @@ from dateutil import tz
 from django.conf import settings
 from django.utils import timezone
 import pytz
+import datetime
+from django.db import transaction
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+from ondoc.account.models import Order
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, BillingAccount
@@ -25,7 +33,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
-                                 OpdAppointment)
+                                 OpdAppointment, CompetitorInfo)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -110,24 +118,26 @@ class DoctorClinicFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Hospital is required")
 
 
-# class DoctorHospitalInline(admin.TabularInline):
-#     model = DoctorHospital
-#     form = DoctorHospitalForm
-#     formset = DoctorHospitalFormSet
-#     extra = 0
-#     # min_num = 1
-#     can_delete = True
-#     show_change_link = False
-#     autocomplete_fields = ['hospital']
-#     readonly_fields = ['deal_price']
-#
-#     def get_queryset(self, request):
-#         return super(DoctorHospitalInline, self).get_queryset(request).select_related('doctor', 'hospital')
+class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        temp = set()
+
+        for value in self.cleaned_data:
+            if not value.get("DELETE"):
+                t = tuple([value.get("day"), value.get("start"), value.get("end")])
+                if t not in temp:
+                    temp.add(t)
+                else:
+                    raise forms.ValidationError("Duplicacy in the record not allowed")
 
 
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     model = DoctorClinicTiming
     form = DoctorClinicTimingForm
+    formset = DoctorClinicTimingFormSet
     extra = 0
     can_delete = True
     show_change_link = False
@@ -266,7 +276,7 @@ class DoctorImageFormSet(forms.BaseInlineFormSet):
 
 class DoctorImageInline(nested_admin.NestedTabularInline):
     model = DoctorImage
-    formset = DoctorImageFormSet
+    # formset = DoctorImageFormSet
     template = 'imageinline.html'
     extra = 0
     can_delete = True
@@ -305,7 +315,7 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
                 Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=self.instance)).exists():
             if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
                 for key, value in count.items():
-                    if not key == DoctorDocument.GST and value < 1:
+                    if key == DoctorDocument.REGISTRATION and value < 1:
                         raise forms.ValidationError(choices[key] + " is required")
 
 
@@ -327,13 +337,13 @@ class HospitalDocumentFormSet(forms.BaseInlineFormSet):
         for key, value in count.items():
             if not key == HospitalDocument.ADDRESS and value > 1:
                 raise forms.ValidationError("Only one " + choices[key] + " is allowed")
-
-        if (
-                not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
-            if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
-                for key, value in count.items():
-                    if not key == HospitalDocument.GST and value < 1:
-                        raise forms.ValidationError(choices[key] + " is required")
+        #
+        # if (
+        #         not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
+        #     if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+        #         for key, value in count.items():
+        #             if not key == HospitalDocument.GST and value < 1:
+        #                 raise forms.ValidationError(choices[key] + " is required")
 
 
 class DoctorDocumentInline(nested_admin.NestedTabularInline):
@@ -445,17 +455,17 @@ class DoctorForm(FormCleanMixin):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
                        'raw_about': 'req', 'license': 'req', 'mobiles': 'count', 'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
-                       'images': 'count', 'doctorspecializations': 'count'}
+                       'doctorspecializations': 'count'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
         # (network is null or network billing is false)
 
-        if DoctorClinic.objects.filter(
-                Q(hospital__network__is_billing_enabled=False, hospital__is_billing_enabled=False, doctor=self.instance)|
-                Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=self.instance)).exists():
-            qc_required.update({
-                'documents': 'count'
-            })
+        # if DoctorClinic.objects.filter(
+        #         Q(hospital__network__is_billing_enabled=False, hospital__is_billing_enabled=False, doctor=self.instance)|
+        #         Q(hospital__network__isnull=True, hospital__is_billing_enabled=False, doctor=self.instance)).exists():
+        #     qc_required.update({
+        #         'documents': 'count'
+        #     })
 
         for key, value in qc_required.items():
             if value == 'req' and not self.cleaned_data[key]:
@@ -605,12 +615,20 @@ class DoctorResource(resources.ModelResource):
     city = fields.Field()
     specialization = fields.Field()
     qualification = fields.Field()
+    pan = fields.Field()
+    gst = fields.Field()
+    mci = fields.Field()
+    cheque = fields.Field()
+    aadhar = fields.Field()
+    fees = fields.Field()
 
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'city', 'gender', 'qualification', 'specialization', 'onboarding_status', 'data_status')
+        fields = ('id', 'name', 'city', 'gender', 'license', 'fees','qualification', 'specialization', 'onboarding_status', 'data_status', 'gst',
+        'pan', 'mci', 'cheque', 'aadhar')
         export_order = (
-            'id', 'name', 'city', 'gender', 'qualification', 'specialization', 'onboarding_status', 'data_status')
+            'id', 'name', 'city', 'gender', 'license', 'fees','qualification', 'specialization', 'onboarding_status', 'data_status', 'gst',
+        'pan', 'mci', 'cheque', 'aadhar')
 
     def dehydrate_data_status(self, doctor):
         return dict(Doctor.DATA_STATUS_CHOICES)[doctor.data_status]
@@ -622,13 +640,66 @@ class DoctorResource(resources.ModelResource):
         return ','.join([str(h.city) for h in doctor.hospitals.distinct('city')])
 
     def dehydrate_specialization(self, doctor):
-        return ','.join([str(h.specialization) for h in doctor.qualifications.all()])
+        return ','.join([str(h.specialization.name) for h in doctor.doctorspecializations.all()])
 
     def dehydrate_qualification(self, doctor):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
-# class BillingAccountAdmin(VersionAdmin):
-#     search_fields = ['merchant_id']
+    def dehydrate_fees(self, doctor):
+        return ', '.join([str(h.hospital.name + '-Rs.' + (str(h.availability.first().fees) if h.availability.first() else '')) for h in doctor.doctor_clinics.all()])
+
+    def dehydrate_gst(self, doctor):
+
+         status = 'Pending'
+         for doc in doctor.documents.all():
+             if doc.document_type == DoctorDocument.GST:
+                status = 'Submitted'
+         return status
+
+    def dehydrate_pan(self, doctor):
+        status = 'Pending'
+        for doc in doctor.documents.all():
+            if doc.document_type == DoctorDocument.PAN:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_mci(self, doctor):
+        status = 'Pending'
+        for doc in doctor.documents.all():
+            if doc.document_type == DoctorDocument.REGISTRATION:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_cheque(self, doctor):
+        status = 'Pending'
+        for doc in doctor.documents.all():
+            if doc.document_type == DoctorDocument.CHEQUE:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_aadhar(self, doctor):
+        status = 'Pending'
+        for doc in doctor.documents.all():
+            if doc.document_type == DoctorDocument.AADHAR:
+                status = 'Submitted'
+        return status
+
+
+class CompetitorInfoForm(forms.ModelForm):
+    hospital_name = forms.CharField(required=True)
+    fee = forms.CharField(required=True)
+    url = forms.URLField(required=True)
+    # processed_url = forms.URLField(required=True)
+
+
+class CompetitorInfoInline(nested_admin.NestedTabularInline):
+    model = CompetitorInfo
+    autocomplete_fields = ['hospital']
+    form = CompetitorInfoForm
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    fields = ['name', 'hospital', 'hospital_name', 'fee', 'url']
 
 
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
@@ -637,7 +708,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     change_list_template = 'superuser_import_export.html'
 
     list_display = (
-        'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to',
+        'name', 'updated_at', 'data_status', 'onboarding_status', 'list_created_by', 'list_assigned_to', 'registered',
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
@@ -645,6 +716,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [
+        CompetitorInfoInline,
         DoctorMobileInline,
         DoctorEmailInline,
         DoctorSpecializationInline,
@@ -661,10 +733,11 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         GenericAdminInline,
         BillingAccountInline
     ]
-    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key']
+    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
+               'onboarded_at', 'qc_approved_at']
     search_fields = ['name']
 
-    readonly_fields = ('lead_url', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live')
+    readonly_fields = ('lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live')
 
     def lead_url(self, instance):
         if instance.id:
@@ -674,6 +747,15 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                 return mark_safe(html)
         else:
             return mark_safe('''<span></span>''')
+
+    def registered(self, instance):
+        registered = None
+        if instance and instance.id:
+            registered = 'NO'
+            if instance.user is not None:
+                registered = 'YES'
+        return mark_safe('''<span>%s</span>'''%(registered))
+    registered.short_description = "Registered"
 
     def get_urls(self):
         urls = super().get_urls()
@@ -711,7 +793,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                 errors.append(req + ' is required')
 
         length_required = ['mobiles', 'emails', 'qualifications', 'hospitals',
-                           'languages', 'experiences', 'images']
+                           'languages', 'experiences']
 
         for req in length_required:
             if not len(getattr(doctor, req).all()):
@@ -783,8 +865,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
-            # obj.is_live = True
             obj.update_live_status()
+            obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
 
@@ -840,10 +922,14 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
+    cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
+                                                                  (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
 
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
+        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
+            raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
                 dt_field = parse_datetime(date_time_field)
@@ -888,6 +974,12 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
+    @transaction.non_atomic_requests
+    def change_view(self, request, object_id, form_url='', extra_context=None):        
+        resp = super().change_view(request, object_id, form_url, extra_context=None)
+        return resp
+
+
     def get_profile(self, obj):
         if not obj.profile_detail:
             return ''
@@ -903,7 +995,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     get_doctor.short_description = 'Doctor Name'
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
-        allowed_status_for_agent = [(OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+        allowed_status_for_agent = [(OpdAppointment.BOOKED, 'Booked'),
+                                    (OpdAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (OpdAppointment.RESCHEDULED_DOCTOR, 'Rescheduled by doctor'),
                                     (OpdAppointment.ACCEPTED, 'Accepted'),
                                     (OpdAppointment.CANCELLED, 'Cancelled')]
@@ -923,34 +1016,65 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor', 'hospital', 'profile', 'profile_detail', 'user', 'booked_by',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'start_date',
+            return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'profile',
+                    'profile_detail', 'user', 'booked_by',
+                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type','start_date',
                     'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'hospital_name', 'contact_details', 'used_profile_name',
+            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+                    'contact_details', 'used_profile_name',
                     'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_number', 'booked_by',
+                    'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'start_date', 'start_time')
+                    'status', 'cancel_type', 'start_date', 'start_time')
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id',)
+            return ('booking_id', 'doctor_id', 'doctor_details')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'hospital_name', 'contact_details', 'used_profile_name',
-                    'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_number', 'booked_by',
+            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'contact_details',
+                    'used_profile_name', 'used_profile_number', 'default_profile_name',
+                    'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                     'admin_information', 'otp', 'insurance', 'outstanding')
         else:
             return ()
 
+
+    def doctor_id(self, obj):
+        doctor = obj.doctor if obj and obj.doctor else None
+        if doctor is not None:
+            return doctor.id
+        return None
+
+    def doctor_details(self, obj):
+        doctor = obj.doctor if obj and obj.doctor else None
+        if doctor is not None:
+            result = ''
+            result += 'Name : ' + doctor.name
+            mobile_numbers = doctor.mobiles.all()
+            if mobile_numbers.exists():
+                result += '<br>Number(s) :<br>'
+                for number in mobile_numbers:
+                    result += '{0} (primary = {1}, verified = {2})'.format(number.number, number.is_primary, number.is_phone_number_verified)
+
+            mobile_emails = doctor.emails.all()
+            if mobile_emails.exists():
+                result += '<br>Email(s) :<br>'
+                for email in mobile_emails:
+                    result += '{0} (primary = {1}, verified = {2})'.format(email.email, email.is_primary,
+                                                                           email.is_email_verified)
+
+            return mark_safe('<p>' + result + '</p>')
+
+        return None
+
     def contact_details(self, obj):
         details = ''
-        if obj.doctor:
+        if obj and obj.doctor:
             doctor_admins = GenericAdmin.get_appointment_admins(obj)
             if doctor_admins:
                 for doctor_admin in doctor_admins:
@@ -963,7 +1087,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     contact_details.short_description = "Concerned Admin Details"
 
     def booking_id(self, obj):
-        return obj.id if obj.id else None
+        return obj.id if  obj and obj.id else None
 
     def doctor_name(self, obj):
         profile_link = "opd/doctor/{}".format(obj.doctor.id)
@@ -983,7 +1107,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         return obj.profile.name
 
     def used_profile_number(self, obj):
-        return obj.profile.phone_number
+        return obj.profile.phone_number if obj and obj.profile and obj.profile.phone_number else None
 
     def default_profile_name(self, obj):
         # return obj.profile.user.profiles.all()[:1][0].name
@@ -1002,7 +1126,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return ''
 
     def user_number(self, obj):
-        return obj.user.phone_number
+        return obj.user.phone_number if obj and obj.user and obj.user.phone_number else None
+
+    def user_id(self, obj):
+        return obj.user.id if obj and obj.user and obj.user.id else None
 
     def admin_information(self, obj):
         doctor_admins = auth_model.GenericAdmin.get_appointment_admins(obj)
@@ -1022,7 +1149,20 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     obj.time_slot_start = dt_field
             if request.POST.get('status') and int(request.POST['status']) == OpdAppointment.CANCELLED:
                 obj.cancellation_type = OpdAppointment.AGENT_CANCELLED
-        super().save_model(request, obj, form, change)
+                cancel_type = int(request.POST.get('cancel_type'))
+                if cancel_type is not None:
+                    logger.error("Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
+                    obj.action_cancelled(cancel_type)
+                    logger.error("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
+
+            else:        
+                super().save_model(request, obj, form, change)
+
+    class Media:
+        js = (
+            '//ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js',
+            'js/admin/ondoc.js',
+        )
 
 
 class SpecializationResource(resources.ModelResource):

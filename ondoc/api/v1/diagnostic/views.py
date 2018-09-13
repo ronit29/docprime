@@ -854,9 +854,9 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
         lab_appointment = validated_data.get('lab_appointment')
         if lab_appointment:
             lab_appointment.action_completed()
-            lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
-                                                                                                    context={
-                                                                                                        'request': request})
-            resp = lab_appointment_serializer.data
+            # lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
+            #                                                                                         context={
+            #                                                                                             'request': request})
+            resp = {'success':'LabAppointment Updated Successfully!'}
         return Response(resp)
 
