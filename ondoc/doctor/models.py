@@ -1120,7 +1120,10 @@ class OpdAppointment(auth_model.TimeStampedModel):
         if 'push_again_to_matrix' in kwargs.keys():
             kwargs.pop('push_again_to_matrix')
 
+        logger.error("before super save  - " + str(self.id) + " timezone - " + str(timezone.now()))    
         super().save(*args, **kwargs)
+        logger.error("after super save - " + str(self.id) + " timezone - " + str(timezone.now()))
+
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
         logger.error("opd save completed - " + str(self.id) + " timezone - " + str(timezone.now()))
