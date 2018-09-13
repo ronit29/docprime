@@ -14,3 +14,7 @@ class EmailServiceSerializer(serializers.Serializer):
 
 class SMSServiceSerializer(serializers.Serializer):
     text = serializers.CharField(max_length=500)
+
+
+class XlsSerializer(serializers.Serializer):
+    file = serializers.FileField()
