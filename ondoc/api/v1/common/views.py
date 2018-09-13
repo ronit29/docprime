@@ -127,20 +127,20 @@ class UpdateXlsViewSet(viewsets.GenericViewSet):
         return response
 
     def prepare_query(self, column, value, query):
-        if column == 'test_id':
+        if column == 'test_id' and value is not None and value != '':
             query.update({
                 'lab_pricing_group__available_lab_tests__test_id__in': [int(value.strip()) for value in
                                                                         str(value).split(",")],
                 'lab_pricing_group__available_lab_tests__enabled': True
             })
-        elif column.strip().lower() == 'lab_id':
+        elif column == 'lab_id' and value is not None and value != '':
             query.update({
                 'id': int(value)
             })
         return query
 
     def get_result_count(self, row, columns, sheet):
-        longitude, latitude, max_distance, search_count_column = None, None, None, None
+        longitude, latitude, max_distance, search_count_column, report_type = None, None, None, None, None
         query = {}
         for key in columns.keys():
             cell_value = str(sheet.cell(row=row, column=key).value).strip() if sheet.cell(row=row,
@@ -153,11 +153,15 @@ class UpdateXlsViewSet(viewsets.GenericViewSet):
                 max_distance = int(cell_value) * 1000 if cell_value else None
             elif columns.get(key) == 'specialization_ids':
                 specialization_ids = [int(value.strip()) for value in cell_value.split(",")] if cell_value else []
+            elif columns.get(key) == 'type':
+                report_type = cell_value
             self.prepare_query(columns.get(key), sheet.cell(row=row, column=key).value, query)
 
-        if specialization_ids:
-            search_count = Doctor.objects.filter(
-                doctorspecializations__specialization__in=specialization_ids,
+        if report_type == 'doctor':
+            results = (Doctor.objects.filter(
+                doctorspecializations__specialization__in=specialization_ids
+            ) if specialization_ids else Doctor.objects.all())
+            search_count = results.filter(
                 hospitals__location__distance_lte=(Point(longitude, latitude), max_distance),
                 is_live=True,
                 is_test_doctor=False,
