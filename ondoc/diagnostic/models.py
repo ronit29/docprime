@@ -355,7 +355,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
 
     def all_associated_labs(self):
         if self.id:
-            return Lab.objects.filter(network=self.id).distinct()
+            return self.lab_set.all()
         return None
 
 

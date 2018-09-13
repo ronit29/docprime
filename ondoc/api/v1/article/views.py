@@ -46,10 +46,12 @@ class ArticleViewSet(viewsets.GenericViewSet):
             return Response({"error": "Missing Parameter: categoryUrl"}, status=status.HTTP_400_BAD_REQUEST)
 
         article_start = request.GET.get('startsWith', None)
+        article_contains = request.GET.get('contains', None)
         article_data = self.get_queryset().filter(category__url=category_url)
         if article_start:
             article_data = article_data.filter(title__istartswith=article_start)
-
+        if article_contains and len(article_contains) > 2:
+            article_data = article_data.filter(title__icontains=article_contains)
         article_data = paginate_queryset(article_data, request, 10)
         resp = serializers.ArticleListSerializer(article_data, many=True,
                                                  context={'request': request}).data
