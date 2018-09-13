@@ -1027,9 +1027,10 @@ class OpdAppointment(auth_model.TimeStampedModel):
         self.save()
 
         if self.payment_type == self.PREPAID:
+            logger.error("Before Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
             consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-
+            logger.error("After Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
             data = dict()
             data["reference_id"] = self.id
             data["user"] = self.user
