@@ -970,6 +970,12 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
+    @transaction.non_atomic_requests
+    def change_view(self, request, object_id, form_url='', extra_context=None):        
+        resp = super().change_view(request, object_id, form_url, extra_context=None)
+        return resp
+
+
     def get_profile(self, obj):
         if not obj.profile_detail:
             return ''
