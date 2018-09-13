@@ -137,6 +137,9 @@ def push_signup_lead_to_matrix(self, data):
 
         online_lead_obj = OnlineLead.objects.get(id=lead_id)
 
+        if not online_lead_obj:
+            raise Exception("Online lead could not found against id - " + str(lead_id))
+
         request_data = {
             'Name': online_lead_obj.name,
             'PrimaryNo': online_lead_obj.mobile,
