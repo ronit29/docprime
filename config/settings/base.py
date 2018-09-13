@@ -103,7 +103,8 @@ THIRD_PARTY_APPS = (
     'dal_select2',
     'django_tables2',
     'anymail',
-    'nested_admin'
+    'nested_admin',
+    'ipware'
 )
 
 LOCAL_APPS = (
@@ -125,6 +126,7 @@ LOCAL_APPS = (
     'ondoc.reports',
     'ondoc.location',
     'ondoc.common',
+    'ondoc.tracking',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -238,7 +240,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
     'COERCE_DECIMAL_TO_STRING': True,
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        #'rest_framework.authentication.SessionAuthentication',
+        # 'rest_framework.authentication.SessionAuthentication',
         # 'rest_framework.authentication.TokenAuthentication',
         # 'ondoc.authentication.auth.CustomAuthentication',
         # 'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
@@ -275,6 +277,8 @@ CELERY_BROKER_URL = env('RABBITMQ_CONNECTION_URL')
 BASE_URL = env('BASE_URL')
 ADMIN_BASE_URL = env('ADMIN_BASE_URL')
 CONSUMER_APP_DOMAIN = env('CONSUMER_APP_DOMAIN')
+PROVIDER_APP_DOMAIN = env('PROVIDER_APP_DOMAIN')
+
 API_BASE_URL = env('API_BASE_URL')
 REVERSE_GEOCODING_API_KEY= env('REVERSE_GEOCODING_API_KEY')
 MATRIX_API_URL= env('MATRIX_API_URL')
@@ -289,6 +293,8 @@ PG_SECRET_KEY_REFUND = env('PG_SECRET_KEY_REFUND')
 PG_CLIENT_KEY_REFUND = env('PG_CLIENT_KEY_REFUND')
 PG_REFUND_URL = env('PG_REFUND_URL')
 PG_REFUND_AUTH_TOKEN = env('PG_REFUND_AUTH_TOKEN')
+PG_REFUND_STATUS_API_URL = env('PG_REFUND_STATUS_API_URL')
+PG_REFUND_STATUS_POLL_TIME = 60  # In min
 AUTO_CANCEL_OPD_DELAY = 3000  # In min
 AUTO_CANCEL_LAB_DELAY = 30  # In min
 OPS_EMAIL_ID = env.list('OPS_EMAIL_ID')

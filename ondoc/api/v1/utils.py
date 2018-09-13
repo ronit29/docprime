@@ -16,9 +16,12 @@ from ondoc.account.tasks import refund_curl_task
 from ondoc.crm.constants import constants
 import requests
 import json
+import random
+import string
 from django.conf import settings
 from dateutil.parser import parse
 from dateutil import tz
+from django.utils.dateparse import parse_datetime
 User = get_user_model()
 
 
@@ -260,7 +263,8 @@ def labappointment_transform(app_data):
 
 def refund_curl_request(req_data):
     for data in req_data:
-        refund_curl_task.delay(data)
+        refund_curl_task.apply_async((data, ), countdown=1)
+        # refund_curl_task.delay(data)
 
 
 def custom_form_datetime(time_str, to_zone, diff_days=0):
@@ -334,4 +338,60 @@ def get_location(lat, long):
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
     return pnt
+
+
+def get_time_delta_in_minutes(last_visit_time):
+    minutes = None
+    time_format = '%Y-%m-%d %H:%M:%S'
+    current_time_string = datetime.datetime.strftime(datetime.datetime.now(), time_format)
+    last_time_object = datetime.datetime.strptime(last_visit_time, time_format)
+    current_object = datetime.datetime.strptime(current_time_string, time_format)
+    delta = current_object - last_time_object
+    #print(delta)
+    #if delta:
+    minutes = delta.seconds / 60
+    return minutes
+
+
+def aware_time_zone(date_time_field):
+    date = timezone.localtime(date_time_field, pytz.timezone(settings.TIME_ZONE))
+    return date
+
+
+def resolve_address(address_obj):
+    address_string = ""
+    address_dict = dict()
+    if not isinstance(address_obj, dict):
+        address_dict = vars(address_dict)
+    else:
+        address_dict = address_obj
+
+    if address_dict.get("address"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["address"])
+    if address_dict.get("land_mark"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["land_mark"])
+    if address_dict.get("locality"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["locality"])
+    if address_dict.get("pincode"):
+        if address_string:
+            address_string += ", "
+        address_string += str(address_dict["pincode"])
+
+    return address_string
+
+
+def generate_short_url(url):
+    from ondoc.web import models as web_models
+    random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
+    tiny_url = web_models.TinyUrl.objects.filter(short_code=random_string).first()
+    if tiny_url:
+        return tiny_url
+    tiny_url = web_models.TinyUrl.objects.create(original_url=url, short_code=random_string)
+    return tiny_url.get_tiny_url()
 

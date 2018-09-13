@@ -107,8 +107,8 @@ class FormCleanMixin(forms.ModelForm):
                        raise forms.ValidationError("Cannot submit for QC without submitting associated " + class_name.rstrip('Form')+ ": " + self.instance.network.name)
            if '_qc_approve' in self.data:
                self.validate_qc()
-               if hasattr(self.instance,'availability') and self.instance.availability is not None:
-                   for h in self.instance.availability.all():
+               if hasattr(self.instance,'doctor_clinics') and self.instance.doctor_clinics is not None:
+                   for h in self.instance.doctor_clinics.all():
                        if (h.hospital.data_status < 3):
                            raise forms.ValidationError(
                                 "Cannot approve QC check without approving associated Hospitals: " + h.hospital.name)

@@ -323,15 +323,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     # @classmethod
     def update_live_status(self):
         if self.onboarding_status == self.ONBOARDED:
-            dochospitals = []
-            for hosp in self.hospitals.all():
-                dochospitals.append(hosp.id)
-            queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
-                                           (Q(doctor__isnull=False, doctor=self) |
-                                            Q(doctor__isnull=True, hospital__id__in=dochospitals)))
-            if queryset.exists():
-                self.is_live = True
-                self.live_at = datetime.datetime.now()
+            # dochospitals = []
+            # for hosp in self.hospitals.all():
+            #     dochospitals.append(hosp.id)
+            # queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
+            #                                (Q(doctor__isnull=False, doctor=self) |
+            #                                 Q(doctor__isnull=True, hospital__id__in=dochospitals)))
+            # if queryset.exists():
+            self.is_live = True
+            self.live_at = datetime.datetime.now()
 
 
     class Meta:
@@ -465,7 +465,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "doctor_clinic_timing"
-        unique_together = (("start", "end", "day", "doctor_clinic",),)
+        # unique_together = (("start", "end", "day", "doctor_clinic",),)
 
     def save(self, *args, **kwargs):
         if self.mrp!=None:
@@ -1106,6 +1106,20 @@ class OpdAppointment(auth_model.TimeStampedModel):
             return True
         return False
 
+    def after_commit_tasks(self, old_instance, push_to_matrix):
+        if push_to_matrix:
+        # Push the appointment data to the matrix .
+            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+
+        if self.is_to_send_notification(old_instance):
+            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+        if not old_instance or old_instance.status != self.status:
+            for e_id in settings.OPS_EMAIL_ID:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+        print('all ops tasks completed')
+
+
     def save(self, *args, **kwargs):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
@@ -1117,16 +1131,20 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
         super().save(*args, **kwargs)
 
-        if push_to_matrix:
-            # Push the appointment data to the matrix .
-            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+        transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
 
-        if self.is_to_send_notification(database_instance):
-            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
-        if not database_instance or database_instance.status != self.status:
-            for e_id in settings.OPS_EMAIL_ID:
-                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+
+        # if push_to_matrix:
+        #     # Push the appointment data to the matrix .
+        #     push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+        #                                              'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+
+        # if self.is_to_send_notification(database_instance):
+        #     notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+        # if not database_instance or database_instance.status != self.status:
+        #     for e_id in settings.OPS_EMAIL_ID:
+        #         notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
@@ -1388,8 +1406,11 @@ class DoctorMapping(auth_model.TimeStampedModel):
 
 
 class CompetitorInfo(auth_model.TimeStampedModel):
+    PRACTO =1
+    LYBRATE =2
+    NAME_TYPE_CHOICES = (("", "Select"), (PRACTO, 'Practo'), (LYBRATE, "Lybrate"),)
     name = models.PositiveSmallIntegerField(blank=True, null=True,
-                                            choices=[("", "Select"), (1, "PRACTO"), (2, "LYBRATE")])
+                                            choices=NAME_TYPE_CHOICES)
 
     doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True, blank=True)
     hospital = models.ForeignKey(Hospital, related_name="competitor_hospital", on_delete=models.CASCADE, null=True, blank=True)
@@ -1407,8 +1428,11 @@ class CompetitorInfo(auth_model.TimeStampedModel):
     def save(self, *args, **kwargs):
         url = self.url
         if url:
-            url = url.split('//')[1]
-            url = url.split('?')[0]
+            if ('//') in url:
+                url = url.split('//')[1]
+            if ('?') in url:
+                url = url.split('?')[0]
             self.processed_url = url
+
         super().save(*args, **kwargs)
 

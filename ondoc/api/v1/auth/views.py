@@ -416,6 +416,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         else:
             return Response({'Error': 'Invalid Request Type'})
 
+    @transaction.non_atomic_requests
     def update(self, request, pk=None):
         serializer = UpdateStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

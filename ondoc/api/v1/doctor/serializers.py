@@ -207,8 +207,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
                     request.data))
             raise serializers.ValidationError("Invalid Time slot")
 
-        if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
-            raise serializers.ValidationError('A previous appointment with this doctor already exists. Cancel it before booking new Appointment.')
+        # if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
+        #     raise serializers.ValidationError('A previous appointment with this doctor already exists. Cancel it before booking new Appointment.')
 
         if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile = data.get('profile')).count()>=MAX_APPOINTMENTS_ALLOWED:
             logger.error(
@@ -667,8 +667,8 @@ class DoctorTimeSlotSerializer(serializers.Serializer):
 class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'gender', 'images', 'about', 'practicing_since',
-                  'qualifications', 'general_specialization', 'mobiles', 'display_name')
+        fields = ('id', 'name', 'gender', 'about', 'practicing_since',
+                  'qualifications', 'general_specialization', 'display_name')
 
 
 class OpdAppointmentBillingSerializer(OpdAppointmentSerializer):

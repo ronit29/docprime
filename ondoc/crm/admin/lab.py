@@ -19,6 +19,8 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.html import format_html_join
 import pytz
+
+from ondoc.account.models import Order
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
@@ -379,10 +381,94 @@ class LabCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 
+class LabResource(resources.ModelResource):
+    city = fields.Field()
+    pan = fields.Field()
+    gst = fields.Field()
+    registration = fields.Field()
+    cheque = fields.Field()
+    email_confirmation = fields.Field()
+    logo = fields.Field()
+
+    class Meta:
+        model = Lab
+        fields = ('id', 'name', 'license', 'data_status','is_insurance_enabled', 'is_retail_enabled', 'is_ppc_pathology_enabled', 'is_ppc_radiology_enabled',
+                  'onboarding_status', 'is_billing_enabled', 'primary_email',  'primary_mobile', 'hospital', 'network',
+                  'pin_code', 'city', 'state', 'country', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
+                  'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'lab_pricing_group', 'assigned_to',
+                  'matrix_reference_id', 'matrix_lead_id', 'is_home_collection_enabled', 'home_pickup_charges', 'is_live',
+                  'is_test_lab', 'gst', 'pan', 'registration', 'cheque', 'logo', 'email_confirmation')
+
+        export_order = ('id', 'name', 'license', 'data_status', 'is_insurance_enabled', 'is_retail_enabled', 'is_ppc_pathology_enabled', 'is_ppc_radiology_enabled',
+                  'onboarding_status', 'is_billing_enabled', 'primary_email',  'primary_mobile', 'hospital', 'network',
+                  'pin_code', 'city', 'state', 'country', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
+                  'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'lab_pricing_group', 'assigned_to',
+                  'matrix_reference_id', 'matrix_lead_id', 'is_home_collection_enabled', 'home_pickup_charges', 'is_live',
+                  'is_test_lab', 'gst', 'pan', 'registration', 'cheque', 'logo', 'email_confirmation')
+
+    def dehydrate_data_status(self, lab):
+        return dict(Lab.DATA_STATUS_CHOICES)[lab.data_status]
+
+    def dehydrate_onboarding_status(self, lab):
+        return dict(Lab.ONBOARDING_STATUS)[lab.onboarding_status]
+
+    def dehydrate_hospital(self, lab):
+        return (str(lab.hospital.name) if lab.hospital else '')
+
+    def dehydrate_network(self, lab):
+        return (str(lab.network.name) if lab.network else '')
+
+    def dehydrate_assigned_to(self, lab):
+        return (str(lab.assigned_to.phone_number) if lab.assigned_to else '')
+
+    def dehydrate_gst(self, lab):
+
+         status = 'Pending'
+         for l in lab.lab_documents.all():
+             if l.document_type == LabDocument.GST:
+                status = 'Submitted'
+         return status
+
+    def dehydrate_pan(self, lab):
+        status = 'Pending'
+        for l in lab.lab_documents.all():
+            if l.document_type == LabDocument.PAN:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_registration(self, lab):
+        status = 'Pending'
+        for l in lab.lab_documents.all():
+            if l.document_type == LabDocument.REGISTRATION:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_cheque(self, lab):
+        status = 'Pending'
+        for l in lab.lab_documents.all():
+            if l.document_type == LabDocument.CHEQUE:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_logo(self, lab):
+        status = 'Pending'
+        for l in lab.lab_documents.all():
+            if l.document_type == LabDocument.LOGO:
+                status = 'Submitted'
+        return status
+
+    def dehydrate_email_confirmation(self, lab):
+        status = 'Pending'
+        for l in lab.lab_documents.all():
+            if l.document_type == LabDocument.EMAIL_CONFIRMATION:
+                status = 'Submitted'
+        return status
+
+
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     change_list_template = 'superuser_import_export.html'
-
+    resource_class = LabResource
     list_display = ('name', 'updated_at', 'onboarding_status','data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
 
     # readonly_fields=('onboarding_status', )
@@ -533,10 +619,14 @@ class LabAppointmentForm(forms.ModelForm):
 
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
+    cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
+                                                                  (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
 
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
+        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
+            raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
             date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
             dt_field = parse_datetime(date_time_field)
@@ -599,7 +689,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     get_lab.short_description = 'Lab Name'
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
-        allowed_status_for_agent = [(LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+        allowed_status_for_agent = [(LabAppointment.BOOKED, 'Booked'),
+                                    (LabAppointment.RESCHEDULED_PATIENT, 'Rescheduled by patient'),
                                     (LabAppointment.RESCHEDULED_LAB, 'Rescheduled by lab'),
                                     (LabAppointment.ACCEPTED, 'Accepted'),
                                     (LabAppointment.CANCELLED, 'Cancelled')]
@@ -618,27 +709,44 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('booking_id', 'lab', 'lab_test', 'profile', 'user', 'profile_detail', 'status', 'price', 'agreed_price',
+            return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_test', 'lab_contact_details', 'profile', 'user',
+                    'profile_detail', 'status', 'cancel_type', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
-                    'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
+            return ('booking_id', 'order_id',  'lab_id', 'lab_name', 'get_lab_test', 'lab_contact_details',
+                    'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
-                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'start_date', 'start_time')
+                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type','start_date', 'start_time')
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
-            return ('booking_id',)
+            return ('booking_id', 'order_id', 'lab_id', 'lab_contact_details')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'lab_name', 'get_lab_test', 'lab_contact_details', 'used_profile_name', 'used_profile_number',
-                    'default_profile_name', 'default_profile_number', 'user_number', 'price', 'agreed_price',
+            return ('booking_id', 'order_id', 'lab_name', 'lab_id', 'get_lab_test',
+                    'lab_contact_details', 'used_profile_name', 'used_profile_number',
+                    'default_profile_name', 'default_profile_number', 'user_number', 'user_id', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address', 'outstanding')
         else:
             return ()
+
+    def order_id(self, obj):
+        if obj and obj.id:
+            order_ids = Order.objects.filter(product_id=Order.LAB_PRODUCT_ID, reference_id=obj.id).values_list('id', flat=True)
+            if order_ids:
+                return ', '.join([str(order_id) for order_id in order_ids])
+        return None
+    order_id.short_description = 'Order Id(s)'
+
+    def lab_id(self, obj):
+        lab = obj.lab
+        if lab is not None:
+            return lab.id
+        return None
 
     def booking_id(self, obj):
         return obj.id if obj.id else None
@@ -722,6 +830,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     def user_number(self, obj):
         return obj.user.phone_number
 
+    def user_id(self, obj):
+        return obj.user.id
+
     def save_model(self, request, obj, form, change):
         if obj:
             # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
@@ -737,8 +848,16 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                     obj.time_slot_start = dt_field
             if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
+                cancel_type = int(request.POST.get('cancel_type'))
+                if cancel_type is not None:
+                    obj.action_cancelled(cancel_type)
         super().save_model(request, obj, form, change)
 
+    class Media:
+        js = (
+            '//ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js',
+            'js/admin/ondoc.js',
+        )
 
 
 class LabTestAdmin(ImportExportMixin, VersionAdmin):

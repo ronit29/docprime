@@ -38,8 +38,9 @@ class OnlineLead(TimeStampedModel):
             elif self.member_type == 2:
                 product_id = 4
 
-            push_signup_lead_to_matrix.apply_async(({'type': 'SIGNUP_LEAD', 'lead_id': self.id,
-                                                     'product_id': product_id, 'sub_product_id': 0}, ), countdown=5)
+            if push_to_matrix:
+                push_signup_lead_to_matrix.apply_async(({'type': 'SIGNUP_LEAD', 'lead_id': self.id,
+                                                         'product_id': product_id, 'sub_product_id': 0}, ), countdown=5)
 
     class Meta:
         db_table = "online_lead"
@@ -98,3 +99,12 @@ class TinyUrl(TimeStampedModel):
 
     class Meta:
         db_table = 'tiny_url'
+
+
+class UploadImage(TimeStampedModel):
+    name = models.CharField(blank=True, max_length=84)
+    image = models.ImageField(upload_to='web/custom_images')
+
+    def __str__(self):
+        return "{}".format(self.name)
+

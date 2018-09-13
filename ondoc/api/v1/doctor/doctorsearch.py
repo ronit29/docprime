@@ -20,8 +20,7 @@ class DoctorSearchHelper:
                                  models.Hospital.HOSPITAL_TYPE_CHOICES}
 
         filtering_params = ['d.is_test_doctor is False',
-                            'd.data_status={}'.format(QCModel.QC_APPROVED),
-                            'onboarding_status={}'.format(Doctor.ONBOARDED)]
+                            'd.is_internal is False']
         if self.query_params.get("specialization_ids"):
             filtering_params.append(
                 " gs.id IN({})".format(",".join(self.query_params.get("specialization_ids")))
@@ -102,7 +101,7 @@ class DoctorSearchHelper:
         return query_string
 
     def count_hospitals(self, doctor):
-        return len(doctor.hospitals.all())
+        return len([h for h in doctor.hospitals.all() if h.is_live == True])
 
     def get_distance(self, doctor, doctor_clinic_mapping):
         current_location = Point(self.query_params.get("longitude"), self.query_params.get("latitude"),
