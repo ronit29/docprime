@@ -123,45 +123,51 @@ class EntityUrls(models.Model):
 
     @classmethod
     def create(cls, entity_object):
-        entity_helper = entity_as_mapping[entity_object.__class__.__name__.upper()]
-        entity_helper_obj = entity_helper()
-        url_dict = entity_helper_obj.create_return_urls(entity_object)
+        try:
+            entity_helper = entity_as_mapping[entity_object.__class__.__name__.upper()]
+            entity_helper_obj = entity_helper()
+            url_dict = entity_helper_obj.create_return_urls(entity_object)
 
-        if isinstance(url_dict, dict):
-            if url_dict.get('search_urls'):
-                search_url_dict = url_dict['search_urls']
-                urls = search_url_dict.get('urls', [])
-                for url in urls:
-                    extra = {'specialization': url['specialization'], 'location_id': url['location_id'],
-                             'specialization_id': url['specialization_id']}
-                    url = url['url']
-                    if not cls.objects.filter(url=url).exists():
+            if isinstance(url_dict, dict):
+                if url_dict.get('search_urls'):
+                    search_url_dict = url_dict['search_urls']
+                    urls = search_url_dict.get('urls', [])
+                    for url in urls:
+                        extra = {'specialization': url['specialization'], 'location_id': url['location_id'],
+                                 'specialization_id': url['specialization_id']}
+                        url = url['url']
+                        if not cls.objects.filter(url=url).exists():
+                            entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
+                                                 url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                            entity_url_obj.save()
+
+                if url_dict.get('page_urls'):
+                    page_url_dict = url_dict['page_urls']
+                    url = page_url_dict.get('urls')
+                    if not url:
+                        return
+
+                    extra = {'related_entity_id': entity_object.id}
+                    entity_url_objs = cls.objects.filter(entity_id=entity_object.id, is_valid=True)
+                    if not entity_url_objs.exists():
                         entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
-                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                                             url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id)
                         entity_url_obj.save()
+                    else:
+                        entity_url_obj = entity_url_objs.first()
+                        if entity_url_obj.url != url:
+                            entity_url_obj.is_valid = False
+                            entity_url_obj.save()
 
-            if url_dict.get('page_urls'):
-                page_url_dict = url_dict['page_urls']
-                url = page_url_dict.get('urls')
-                if not url:
-                    return
+                            entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
+                                                 url_type=cls.UrlType.PAGEURL, extras=json.dumps(extra),
+                                                 entity_id=entity_object.id)
+                            entity_url_obj.save()
+            return True
 
-                extra = {'related_entity_id': entity_object.id}
-                entity_url_objs = cls.objects.filter(entity_id=entity_object.id, is_valid=True)
-                if not entity_url_objs.exists():
-                    entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
-                                         url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id)
-                    entity_url_obj.save()
-                else:
-                    entity_url_obj = entity_url_objs.first()
-                    if entity_url_obj.url != url:
-                        entity_url_obj.is_valid = False
-                        entity_url_obj.save()
-
-                        entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
-                                             url_type=cls.UrlType.PAGEURL, extras=json.dumps(extra),
-                                             entity_id=entity_object.id)
-                        entity_url_obj.save()
+        except Exception as e:
+            print(str(e))
+            return False
 
     class Meta:
         db_table = 'entity_urls'

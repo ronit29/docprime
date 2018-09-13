@@ -16,6 +16,7 @@ urlpatterns = [
     path('profile',
          DoctorProfileView.as_view({'get': 'retrieve'}), name='doctor-profile'),
     path('profileuserview/<int:pk>', DoctorProfileUserViewSet.as_view({'get': 'retrieve'}), name='doctor-profile-user-view'),
+    path('profileuserviewbyurl', DoctorProfileUserViewSet.as_view({'get': 'retrieve_by_url'}), name='doctor-profile-user-view'),
     path('clinic',
          DoctorHospitalView.as_view({'get': 'list'}), name='doctor-hospital'),
     path('clinic/<int:pk>',

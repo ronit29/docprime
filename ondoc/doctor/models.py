@@ -158,7 +158,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         if self.data_status == 3:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
-            # location_models.EntityUrls.create(self)
 
 
 class HospitalAward(auth_model.TimeStampedModel):

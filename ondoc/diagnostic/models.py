@@ -36,6 +36,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.location import models as location_models
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +202,9 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             original = Lab.objects.get(pk=self.id)
 
         super(Lab, self).save(*args, **kwargs)
+
+        if self.data_status == 3:
+            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
         if edit_instance is not None:
             id = self.id

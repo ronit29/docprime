@@ -8,3 +8,11 @@ class DoctorListSerializer(serializers.ModelSerializer):
     class Meta:
         model = doctor_models.Doctor
         fields = ('name', 'gender', 'practicing_since', 'online_consultation_fees')
+
+
+
+class EntityDetailSerializer(serializers.Serializer):
+    pageUrl = serializers.CharField(required=True)
+
+    def validate(self, data):
+        return data

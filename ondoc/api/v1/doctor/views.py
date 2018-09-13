@@ -35,6 +35,7 @@ import datetime
 import copy
 import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
+from ondoc.location import models as location_models
 User = get_user_model()
 
 
@@ -425,6 +426,19 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             availability.append(hospital)
         response_data['hospitals'] = availability
         return response_data
+
+    def retrieve_by_url(self, request):
+        url = request.GET.get('url')
+        if not url:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        if location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL').exists():
+            entity_url_obj = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
+            entity_id = entity_url_obj.entity_id
+            response = self.retrieve(request, entity_id)
+            return response
+
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, pk):
         response_data = []
