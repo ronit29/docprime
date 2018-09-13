@@ -15,6 +15,8 @@ from django.conf import settings
 from django.utils import timezone
 import pytz
 import datetime
+
+from ondoc.account.models import Order
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, BillingAccount
@@ -1003,12 +1005,12 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'profile',
+            return ('booking_id', 'order_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'profile',
                     'profile_detail', 'user', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type','start_date',
                     'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+            return ('booking_id', 'order_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'contact_details', 'used_profile_name',
                     'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
@@ -1020,9 +1022,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor_id', 'doctor_details')
+            return ('booking_id', 'order_id', 'doctor_id', 'doctor_details')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'contact_details',
+            return ('booking_id', 'order_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
@@ -1030,6 +1032,13 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         else:
             return ()
 
+    def order_id(self, obj):
+        if obj and obj.id:
+            order_ids = Order.objects.filter(product_id=Order.DOCTOR_PRODUCT_ID, reference_id=obj.id).values_list('id', flat=True)
+            if order_ids:
+                return ', '.join([str(order_id) for order_id in order_ids])
+        return None
+    order_id.short_description = 'Order Id(s)'
 
     def doctor_id(self, obj):
         doctor = obj.doctor if obj and obj.doctor else None
