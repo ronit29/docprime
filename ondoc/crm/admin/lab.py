@@ -332,7 +332,7 @@ class LabForm(FormCleanMixin):
     primary_email = forms.EmailField(required=True)
     city = forms.CharField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
-    onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
+    # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
     # agreed_rate_list = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'application/pdf'}))
 
     class Meta:
@@ -392,7 +392,7 @@ class LabResource(resources.ModelResource):
 
     class Meta:
         model = Lab
-        fields = ('id', 'name', 'license', 'data_status','is_insurance_enabled', 'is_retail_enabled', 'is_ppc_pathology_enabled', 'is_ppc_radiology_enabled',
+        fields = ('id', 'name', 'license', 'data_status', 'is_insurance_enabled', 'is_retail_enabled', 'is_ppc_pathology_enabled', 'is_ppc_radiology_enabled',
                   'onboarding_status', 'is_billing_enabled', 'primary_email',  'primary_mobile', 'hospital', 'network',
                   'pin_code', 'city', 'state', 'country', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                   'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'lab_pricing_group', 'assigned_to',
@@ -469,7 +469,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
-    list_display = ('name', 'updated_at', 'onboarding_status','data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
+    list_display = ('name', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
 
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter, CreatedByFilter)
@@ -478,9 +478,12 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
                    'radiology_deal_price_percentage', 'live_at', 'onboarded_at', 'qc_approved_at' )
 
     def get_readonly_fields(self, request, obj=None):
+        read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
         if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
-            return ('lead_url','matrix_lead_id','matrix_reference_id', 'lab_pricing_group', 'is_live')
-        return ('lead_url','matrix_lead_id','matrix_reference_id', 'is_live')
+            read_only_fields += ['lab_pricing_group']
+        if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
+            read_only_fields += ['onboarding_status']
+        return read_only_fields
 
     def lead_url(self, instance):
         if instance.id:
@@ -520,7 +523,9 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
         # check for errors
         errors = []
-        required = ['name','about','license','primary_email','primary_mobile','operational_since', 'parking', 'network_type', 'location','building','city','state','country','pin_code','agreed_rate_list']
+        required = ['name', 'about', 'license', 'primary_email', 'primary_mobile', 'operational_since', 'parking',
+                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list',
+                    'ppc_rate_list']
         for req in required:
             if not getattr(lab_obj, req):
                 errors.append(req+' is required')

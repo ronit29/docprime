@@ -449,7 +449,7 @@ class DoctorForm(FormCleanMixin):
     # primary_mobile = forms.CharField(required=True)
     # email = forms.EmailField(required=True)
     practicing_since = forms.ChoiceField(required=False, choices=practicing_since_choices)
-    onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Doctor.ONBOARDING_STATUS)
+    # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Doctor.ONBOARDING_STATUS)
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
@@ -737,7 +737,11 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                'onboarded_at', 'qc_approved_at']
     search_fields = ['name']
 
-    readonly_fields = ('lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live')
+    def get_readonly_fields(self, request, obj=None):
+        read_only_fields = ['lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live']
+        if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
+            read_only_fields += ['onboarding_status']
+        return read_only_fields
 
     def lead_url(self, instance):
         if instance.id:
