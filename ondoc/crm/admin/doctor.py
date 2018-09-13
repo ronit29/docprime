@@ -15,6 +15,8 @@ from django.conf import settings
 from django.utils import timezone
 import pytz
 import datetime
+from django.db import transaction
+
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, BillingAccount
@@ -966,6 +968,11 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'created_at',)
     list_filter = ('status', )
     date_hierarchy = 'created_at'
+
+    @transaction.non_atomic_requests
+    def change_view(self, request, object_id, form_url='', extra_context=None):        
+        resp = super().change_view(request, object_id, form_url, extra_context=None)
+        return resp
 
     def get_profile(self, obj):
         if not obj.profile_detail:
