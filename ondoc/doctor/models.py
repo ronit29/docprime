@@ -1094,6 +1094,20 @@ class OpdAppointment(auth_model.TimeStampedModel):
             return True
         return False
 
+    def after_commit_tasks(self, old_instance, push_to_matrix):
+        if push_to_matrix:
+        # Push the appointment data to the matrix .
+            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+
+        if self.is_to_send_notification(old_instance):
+            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+        if not old_instance or old_instance.status != self.status:
+            for e_id in settings.OPS_EMAIL_ID:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+        print('all ops tasks completed')
+
+
     def save(self, *args, **kwargs):
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
@@ -1105,16 +1119,20 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
         super().save(*args, **kwargs)
 
-        if push_to_matrix:
-            # Push the appointment data to the matrix .
-            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+        transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
 
-        if self.is_to_send_notification(database_instance):
-            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
-        if not database_instance or database_instance.status != self.status:
-            for e_id in settings.OPS_EMAIL_ID:
-                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+
+        # if push_to_matrix:
+        #     # Push the appointment data to the matrix .
+        #     push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+        #                                              'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+
+        # if self.is_to_send_notification(database_instance):
+        #     notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+        # if not database_instance or database_instance.status != self.status:
+        #     for e_id in settings.OPS_EMAIL_ID:
+        #         notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
