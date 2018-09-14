@@ -182,7 +182,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
-    enabled = models.BooleanField(verbose_name='Is Enabled', default=False)
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
 
 
     def __str__(self):
@@ -202,10 +202,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     def update_live_status(self):
 
         if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
-
             self.is_live = True
             if not self.live_at:
                 self.live_at = datetime.datetime.now()
+
+        if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
+            self.is_live = False
 
     def save(self, *args, **kwargs):
         self.clean()
