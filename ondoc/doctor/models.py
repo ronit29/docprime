@@ -1023,6 +1023,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
+        logger.error("Entered action_cancelled  - " + str(self.id) + " timezone - " + str(timezone.now()))
         self.status = self.CANCELLED
         self.save()
 
@@ -1111,6 +1112,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
 
     def save(self, *args, **kwargs):
+        logger.error("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
@@ -1119,10 +1121,13 @@ class OpdAppointment(auth_model.TimeStampedModel):
         if 'push_again_to_matrix' in kwargs.keys():
             kwargs.pop('push_again_to_matrix')
 
+        logger.error("before super save  - " + str(self.id) + " timezone - " + str(timezone.now()))    
         super().save(*args, **kwargs)
+        logger.error("after super save - " + str(self.id) + " timezone - " + str(timezone.now()))
+
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
-
+        logger.error("opd save completed - " + str(self.id) + " timezone - " + str(timezone.now()))
 
         # if push_to_matrix:
         #     # Push the appointment data to the matrix .
