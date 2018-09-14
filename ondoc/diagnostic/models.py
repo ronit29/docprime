@@ -710,7 +710,7 @@ class LabAppointment(TimeStampedModel):
 
         super().save(*args, **kwargs)
 
-        transaction.on_commit(lambda:self.app_commit_tasks(database_instance, push_to_matrix))
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 
         # if push_to_matrix:
         #     # Push the appointment data to the matrix
