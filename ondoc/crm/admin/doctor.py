@@ -938,10 +938,12 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
                 dt_field = parse_datetime(date_time_field)
                 time_slot_start = make_aware(dt_field)
+        else:
+            raise forms.ValidationError("Enter valid start date and time.")
         if time_slot_start:
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         else:
-            raise forms.ValidationError("Enter valid start date and time.")
+            raise forms.ValidationError("Invalid start date and time.")
 
         if cleaned_data.get('doctor') and cleaned_data.get('hospital'):
             doctor = cleaned_data.get('doctor')
