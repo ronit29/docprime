@@ -105,26 +105,29 @@ class SmsServiceViewSet(viewsets.GenericViewSet):
         return Response({"status": "success"})
 
 
-class UpdateXlsViewSet(viewsets.GenericViewSet):
+class UpdateXlsViewSet():
 
     def update(self, request):
-        serializer = serializers.XlsSerializer(data=request.data)
+        search_count_column = None
+        serializer = serializers.XlsSerializer(data=request.FILES)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         file = validated_data.get('file')
         wb = load_workbook(file)
         sheet = wb.active
         rows = [row for row in sheet.rows]
-        columns = {i+1: column.value.strip().lower() for i, column in enumerate(rows[0])}
+        columns = {i+1: column.value.strip().lower() for i, column in enumerate(rows[0]) if column.value}
         for key in columns.keys():
             if columns.get(key) == 'number_of_results_on_search_page':
                 search_count_column = key
-        for i in range(2, len(rows)+1):
-            sheet.cell(row=i, column=search_count_column).value = self.get_result_count(i, columns, sheet)
-        response = HttpResponse(content=save_virtual_workbook(wb),
-                                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename=myexport.xlsx'
-        return response
+        if search_count_column:
+            for i in range(2, len(rows)+1):
+                sheet.cell(row=i, column=search_count_column).value = self.get_result_count(i, columns, sheet)
+            response = HttpResponse(content=save_virtual_workbook(wb),
+                                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = 'attachment; filename=myexport.xlsx'
+            return response
+        return None
 
     def prepare_query(self, column, value, query):
         if column == 'test_id' and value is not None and value != '':

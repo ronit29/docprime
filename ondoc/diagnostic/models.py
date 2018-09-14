@@ -179,6 +179,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=False)
 
 
     def __str__(self):
@@ -195,6 +196,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return None
         # return static('lab_images/lab_default.png')
 
+    def update_live_status(self):
+
+        if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
+
+            self.is_live = True
+            if not self.live_at:
+                self.live_at = datetime.datetime.now()
+
     def save(self, *args, **kwargs):
         self.clean()
         
@@ -203,6 +212,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             edit_instance = 1
             original = Lab.objects.get(pk=self.id)
 
+        self.update_live_status()
         super(Lab, self).save(*args, **kwargs)
 
         if edit_instance is not None:

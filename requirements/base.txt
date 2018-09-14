@@ -28,3 +28,4 @@ django-silk==3.0.1
 celery==4.2.1
 PyJWT
 django-ipware
+openpyxl==2.5.6

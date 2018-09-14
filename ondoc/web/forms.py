@@ -48,3 +48,7 @@ class CareersForm(ModelForm):
             'resume': FileInput(attrs={'id': 'upload-resume'}),
         }
         fields = ['profile_type', 'name', 'mobile', 'email', 'resume']
+
+class SearchDataForm(forms.Form):
+
+    file = forms.FileField()
