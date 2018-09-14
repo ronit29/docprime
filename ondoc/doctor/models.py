@@ -1109,6 +1109,16 @@ class OpdAppointment(auth_model.TimeStampedModel):
         if not old_instance or old_instance.status != self.status:
             for e_id in settings.OPS_EMAIL_ID:
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+        # try:
+        #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
+        #         countdown = self.get_auto_cancel_delay(self)
+        #         doc_app_auto_cancel.apply_async(({
+        #             "id": self.id,
+        #             "status": self.status,
+        #             "updated_at": int(self.updated_at.timestamp())
+        #         }, ), countdown=countdown)
+        # except Exception as e:
+        #     logger.error("Error in auto cancel flow - " + str(e))
         print('all ops tasks completed')
 
     def save(self, *args, **kwargs):

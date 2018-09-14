@@ -671,6 +671,30 @@ class LabAppointment(TimeStampedModel):
             return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
                     if admin.user]
 
+    def app_commit_tasks(self, old_instance, push_to_matrix):
+        if push_to_matrix:
+            # Push the appointment data to the matrix
+            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':4,
+                                                     'sub_product_id': 2}, ), countdown=5)
+
+        if self.is_to_send_notification(old_instance):
+            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+
+        if not old_instance or old_instance.status != self.status:
+            for e_id in settings.OPS_EMAIL_ID:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
+
+        # try:
+        #     prev_app_dict = {'id': self.id,
+        #                      'status': self.status,
+        #                      "updated_at": int(self.updated_at.timestamp())}
+        #     if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
+        #         countdown = self.get_auto_cancel_delay(self)
+        #         tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
+        # except Exception as e:
+        #     logger.error("Error in auto cancel flow - " + str(e))
+        print('all lab appointment tasks completed')
+
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
         try:
@@ -686,17 +710,19 @@ class LabAppointment(TimeStampedModel):
 
         super().save(*args, **kwargs)
 
-        if push_to_matrix:
-            # Push the appointment data to the matrix
-            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':4,
-                                                     'sub_product_id': 2}, ), countdown=5)
+        transaction.on_commit(lambda:self.app_commit_tasks(database_instance, push_to_matrix))
 
-        if self.is_to_send_notification(database_instance):
-            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
-
-        if not database_instance or database_instance.status != self.status:
-            for e_id in settings.OPS_EMAIL_ID:
-                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
+        # if push_to_matrix:
+        #     # Push the appointment data to the matrix
+        #     push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':4,
+        #                                              'sub_product_id': 2}, ), countdown=5)
+        #
+        # if self.is_to_send_notification(database_instance):
+        #     notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+        #
+        # if not database_instance or database_instance.status != self.status:
+        #     for e_id in settings.OPS_EMAIL_ID:
+        #         notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
 
         # try:
         #     prev_app_dict = {'id': self.id,
