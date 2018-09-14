@@ -1439,6 +1439,7 @@ class UserTokenViewSet(GenericViewSet):
         else:
             return Response({"status": 0}, status=status.HTTP_400_BAD_REQUEST)
 
+
 class ContactUsViewSet(GenericViewSet):
 
     def create(self, request):

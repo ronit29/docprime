@@ -428,9 +428,6 @@ class ConsumerRefund(TimeStampedModel):
         try:
             pg_data = PgTransaction.form_pg_refund_data(consumer_refund_objs)
             transaction.on_commit(lambda: refund_curl_request(pg_data))
-            #refund_curl_request(pg_data)
-            # for data in pg_data:
-            #     refund_curl_task.apply_async((data,), countdown=1)
         except Exception as e:
             logger.error("Error in refund celery - " + str(e))
 
@@ -441,6 +438,12 @@ class ConsumerRefund(TimeStampedModel):
     def schedule_refund(cls, consumer_tx):
         consumer_refund_obj = cls.objects.filter(consumer_transaction=consumer_tx)
         pg_data = PgTransaction.form_pg_refund_data(consumer_refund_obj)
+        refund_curl_request(pg_data)
+
+    @classmethod
+    def request_pending_refunds(cls):
+        consumer_refund_objs = cls.objects.filter(refund_state=cls.PENDING)
+        pg_data = PgTransaction.form_pg_refund_data(consumer_refund_objs)
         refund_curl_request(pg_data)
 
 
