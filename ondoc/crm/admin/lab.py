@@ -352,6 +352,11 @@ class LabForm(FormCleanMixin):
             return None
         return data
 
+    def clean_home_pickup_charges(self):
+        data = self.cleaned_data.get('home_pickup_charges')
+        if not data:
+            data = 0
+        return data
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
