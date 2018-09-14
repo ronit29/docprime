@@ -1,6 +1,7 @@
 from config.settings.production import *
 
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['qa.panaceatechno.com', 'crmqa.panaceatechno.com', 'docqa.panaceatechno.com', 'qa.docprime.com', 'crmqa.docprime.com', 'docqa.docprime.com','liveqa.docprime.com','livecrm.docprime.com','local.docprime.com'])
+# ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['qa.panaceatechno.com', 'crmqa.panaceatechno.com', 'docqa.panaceatechno.com', 'qa.docprime.com', 'crmqa.docprime.com', 'docqa.docprime.com','liveqa.docprime.com','livecrm.docprime.com','local.docprime.com'])
+ALLOWED_HOSTS = ['*']
 EMAIL_BACKEND = 'ondoc.sendemail.backends.backend.WhiteListedEmailBackend'
 SMS_BACKEND = 'ondoc.sms.backends.backend.WhitelistedSmsBackend'
 
