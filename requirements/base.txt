@@ -19,7 +19,6 @@ coreapi==2.3.3
 pika==0.11.2
 django-autocomplete-light==3.2.10
 django-tables2==1.21.2
-openpyxl==2.4.9
 django-anymail[mailgun]==3.0
 WeasyPrint==0.42.3
 Collectfast==0.6.2
