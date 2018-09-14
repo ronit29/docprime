@@ -138,10 +138,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     primary_email = models.EmailField(max_length=100, blank=True)
     primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MinValueValidator(1800)])
-    parking = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Easy"), (2,"Difficult")])
-    always_open = models.BooleanField(verbose_name= 'Is lab open 24X7', default=False)
-    hospital = models.ForeignKey(Hospital, blank = True, null = True, on_delete=models.SET_NULL)
-    network_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Non Network Lab"), (2,"Network Lab")])
+    parking = models.PositiveSmallIntegerField(blank=True, null=True,
+                                               choices=[("", "Select"), (1, "Easy"), (2, "Difficult")])
+    always_open = models.BooleanField(verbose_name='Is lab open 24X7', default=False)
+    hospital = models.ForeignKey(Hospital, blank=True, null=True, on_delete=models.SET_NULL)
+    network_type = models.PositiveSmallIntegerField(blank=True, null=True,
+                                                    choices=[("", "Select"), (1, "Non Network Lab"),
+                                                             (2, "Network Lab")])
     network = models.ForeignKey('LabNetwork', null=True, blank=True, on_delete=models.SET_NULL)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)

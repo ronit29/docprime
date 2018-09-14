@@ -332,12 +332,17 @@ class LabForm(FormCleanMixin):
     primary_email = forms.EmailField(required=True)
     city = forms.CharField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
+    home_pickup_charges = forms.DecimalField(required=False, initial=0)
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
     # agreed_rate_list = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'application/pdf'}))
 
     class Meta:
         model = Lab
-        exclude=()
+        exclude = ()
+        help_texts = {
+            'agreed_rate_list': 'Supported formats : pdf, xls, xlsx',
+            'ppc_rate_list': 'Supported formats : pdf, xls, xlsx'
+        }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
 
@@ -347,10 +352,16 @@ class LabForm(FormCleanMixin):
             return None
         return data
 
+    def clean_home_pickup_charges(self):
+        data = self.cleaned_data.get('home_pickup_charges')
+        if not data:
+            data = 0
+        return data
+
     def validate_qc(self):
-        qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
-            'license':'req','building':'req','locality':'req','city':'req','state':'req',
-            'country':'req','pin_code':'req','network_type':'req','lab_image':'count'}
+        qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
+                       'license': 'req', 'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
+                       'country': 'req', 'pin_code': 'req', 'network_type': 'req', 'lab_image': 'count'}
 
         if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
             raise forms.ValidationError("Lab Network is not QC approved.")
@@ -364,7 +375,7 @@ class LabForm(FormCleanMixin):
                 raise forms.ValidationError(key+" is required for Quality Check")
             if value=='count' and int(self.data[key+'-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
-        if self.cleaned_data['network_type']==2 and not self.cleaned_data['network']:
+        if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Lab")
 
 
@@ -373,7 +384,8 @@ class LabCityFilter(SimpleListFilter):
     parameter_name = 'city'
 
     def lookups(self, request, model_admin):
-        cities = set([(c['city'].upper(),c['city'].upper()) if(c.get('city')) else ('','') for c in Lab.objects.values('city')])
+        cities = set([(c['city'].upper(), c['city'].upper()) if (c.get('city')) else ('', '') for c in
+                      Lab.objects.values('city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -466,16 +478,31 @@ class LabResource(resources.ModelResource):
 
 
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
-
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
-    list_display = ('name', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
+    list_display = ('name', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to',
+                    'get_onboard_link',)
 
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter, CreatedByFilter)
 
-    exclude = ('search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
-                   'radiology_deal_price_percentage', 'live_at', 'onboarded_at', 'qc_approved_at' )
+    exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
+               'radiology_agreed_price_percentage',
+               'radiology_deal_price_percentage', 'live_at', 'onboarded_at', 'qc_approved_at')
+
+    form = LabForm
+    search_fields = ['name', 'lab_pricing_group__group_name', ]
+    inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
+               LabAccreditationInline,
+               LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
+               BillingAccountInline, GenericLabAdminInline]
+    autocomplete_fields = ['lab_pricing_group', ]
+
+    map_width = 200
+    map_template = 'admin/gis/gmap.html'
+
+    class Media:
+        js = ('js/admin/ondoc.js',)
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
@@ -504,7 +531,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     def onboardlab_admin(self, request, userid):
         host = request.get_host()
         try:
-            lab_obj = Lab.objects.get(id = userid)
+            lab_obj = Lab.objects.get(id=userid)
         except Exception as e:
             return HttpResponse('invalid lab')
 
@@ -524,8 +551,9 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         # check for errors
         errors = []
         required = ['name', 'about', 'license', 'primary_email', 'primary_mobile', 'operational_since', 'parking',
-                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list',
-                    'ppc_rate_list']
+                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list']
+        if lab_obj.is_ppc_pathology_enabled or lab_obj.is_ppc_radiology_enabled:
+            required += ['ppc_rate_list']
         for req in required:
             if not getattr(lab_obj, req):
                 errors.append(req+' is required')
@@ -534,13 +562,13 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             errors.append('locality or sublocality is required')
 
         length_required = ['labservice', 'labdoctoravailability', 'labmanager', 'labaccreditation']
-        if lab_obj.labservice_set.filter(service = LabService.RADIOLOGY).exists():
+        if lab_obj.labservice_set.filter(service=LabService.RADIOLOGY).exists():
             length_required.append('labdoctor')
         for req in length_required:
             if not len(getattr(lab_obj, req+'_set').all()):
                 errors.append(req + ' is required')
-        if not lab_obj.lab_timings.exists():
-            errors.append('Lab Timings is required')
+        # if not lab_obj.lab_timings.exists():
+        #     errors.append('Lab Timings is required')
 
         #if not lab_obj.lab_services_set:
             # errors.append('lab services are required')
@@ -605,18 +633,6 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             form.base_fields['assigned_to'].disabled = True
         return form
 
-    form = LabForm
-    search_fields = ['name', 'lab_pricing_group__group_name', ]
-    inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline, BillingAccountInline, GenericLabAdminInline]
-    autocomplete_fields = ['lab_pricing_group', ]
-
-    map_width = 200
-    map_template = 'admin/gis/gmap.html'
-
-    class Media:
-        js = ('js/admin/ondoc.js',)
-
 
 class LabAppointmentForm(forms.ModelForm):
 
@@ -634,10 +650,12 @@ class LabAppointmentForm(forms.ModelForm):
             date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
             dt_field = parse_datetime(date_time_field)
             time_slot_start = make_aware(dt_field)
+        else:
+            raise forms.ValidationError("Enter valid start date and time.")
         if time_slot_start:
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         else:
-            raise forms.ValidationError("Enter valid start date and time.")
+            raise forms.ValidationError("Invalid start date and time.")
         if self.instance.id:
             lab_test = self.instance.lab_test.all()
             lab = self.instance.lab
