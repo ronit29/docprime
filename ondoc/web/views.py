@@ -1,12 +1,13 @@
 from rest_framework import status
 from django.shortcuts import render
 from django.contrib import messages
-from .forms import OnlineLeadsForm, CareersForm
-from django.http import HttpResponseRedirect, HttpResponse, HttpResponsePermanentRedirect
+from .forms import OnlineLeadsForm, CareersForm, SearchDataForm
+from django.http import HttpResponseRedirect, HttpResponse, HttpResponsePermanentRedirect, JsonResponse
 from django.conf import settings
 from ondoc.crm.constants import constants
 from ondoc.web import models as web_models
 from django.contrib.auth import get_user_model
+from django import forms
 
 User = get_user_model()
 
@@ -88,3 +89,19 @@ def redirect_to_original_url(request, hash):
         return HttpResponse(status=status.HTTP_404_NOT_FOUND)
     original_url = tiny_url.original_url
     return HttpResponseRedirect(original_url)
+
+
+def upload_search_data(request):
+    from ondoc.api.v1.common.views import UpdateXlsViewSet
+    form = SearchDataForm()
+    error = False
+    if request.method == "POST" and request.FILES.get('file'):
+        call_csv_up = UpdateXlsViewSet()
+        file = call_csv_up.update(request)
+        if file:
+            request.FILES.pop('file')
+            return file
+        else:
+            error = True
+
+    return render(request, 'search-data.html', {'form': form, 'error': error})

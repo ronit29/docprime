@@ -160,8 +160,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             if (not self.id) or (not Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists()):
                 ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
-
         super(Hospital, self).save(*args, **kwargs)
+
 
 class HospitalAward(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
@@ -287,11 +287,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
     billing_merchant = GenericRelation(auth_model.BillingAccount)
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
 
     def save(self, *args, **kwargs):
         super(Doctor, self).save(*args, **kwargs)
-        if self.data_status == 3:
-            location_models.EntityUrls.create(self)
+        # if self.is_live:
+        #     location_models.EntityUrls.create(self)
 
     def __str__(self):
         return self.name
@@ -322,18 +323,26 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         #     return self.images.all()[0].name.url
         return None
 
-    # @classmethod
     def update_live_status(self):
-        if self.onboarding_status == self.ONBOARDED:
+
+        if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
             # dochospitals = []
             # for hosp in self.hospitals.all():
             #     dochospitals.append(hosp.id)
             # queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
             #                                (Q(doctor__isnull=False, doctor=self) |
             #                                 Q(doctor__isnull=True, hospital__id__in=dochospitals)))
-            # if queryset.exists():
+
             self.is_live = True
-            self.live_at = datetime.datetime.now()
+            if not self.live_at:
+                self.live_at = datetime.datetime.now()
+        if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
+            self.is_live = False
+
+    def save(self, *args, **kwargs):
+        self.update_live_status()
+        super(Doctor, self).save(*args, **kwargs)
+
 
 
     class Meta:
