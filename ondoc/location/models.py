@@ -43,10 +43,12 @@ class EntityAddress(models.Model):
         ADMINISTRATIVE_AREA_LEVEL_1 = 'ADMINISTRATIVE_AREA_LEVEL_1'
         ADMINISTRATIVE_AREA_LEVEL_2 = 'ADMINISTRATIVE_AREA_LEVEL_1'
         COUNTRY = 'COUNTRY'
+        RAW_JSON = 'RAW_JSON'
 
     type = models.CharField(max_length=128, blank=False, null=False, choices=AllowedKeys.as_choices())
     value = models.TextField()
-    centroid = models.DecimalField(default=Decimal(0.00000000), max_digits=10, decimal_places=8)
+    latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
     parent = models.IntegerField(null=True)
 
     @classmethod
@@ -58,6 +60,14 @@ class EntityAddress(models.Model):
         parent_id = None
         ea_list = list()
         for meta in meta_data:
+
+            if meta['key'] == cls.AllowedKeys.RAW_JSON:
+                saved_json = cls.objects.filter(type=cls.AllowedKeys.RAW_JSON, latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'), parent=None)
+                if not saved_json.exists():
+                    cls(type=meta['key'], value=meta['value'], parent=None, latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude')).save()
+
+                continue
+
             if meta['key'] not in cls.AllowedKeys.availabilities():
                 logger.error("{key} is not the supported key ".format(key=meta['key']))
                 raise ValueError('Not a supported key')
@@ -95,8 +105,10 @@ class EntityLocationRelationship(models.Model):
         try:
             ea_list = EntityAddress.get_or_create(**kwargs)
             for ea in ea_list:
-                entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
-                entity_location_relation.save()
+                if not cls.objects.filter(content_type=ContentType.objects.get_for_model(kwargs.get('content_object')),
+                                          object_id=kwargs.get('content_object').id, type=ea.type).exists():
+                    entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
+                    entity_location_relation.save()
             return True
         except Exception as e:
             return False
@@ -133,11 +145,10 @@ class EntityUrls(models.Model):
                     search_url_dict = url_dict['search_urls']
                     urls = search_url_dict.get('urls', [])
                     for url in urls:
-                        extra = {'specialization': url['specialization'], 'location_id': url['location_id'],
-                                 'specialization_id': url['specialization_id']}
-                        url = url['url']
-                        if not cls.objects.filter(url=url).exists():
-                            entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
+                        finalized_url = url.pop('url')
+                        extra = url
+                        if not cls.objects.filter(url=finalized_url).exists():
+                            entity_url_obj = cls(url=finalized_url.lower(), entity_type=entity_object.__class__.__name__,
                                                  url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
                             entity_url_obj.save()
 
@@ -148,7 +159,7 @@ class EntityUrls(models.Model):
                         return
 
                     extra = {'related_entity_id': entity_object.id}
-                    entity_url_objs = cls.objects.filter(entity_id=entity_object.id, is_valid=True)
+                    entity_url_objs = cls.objects.filter(entity_id=entity_object.id, entity_type=entity_object.__class__.__name__, url_type='PAGEURL', is_valid=True)
                     if not entity_url_objs.exists():
                         entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
                                              url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id)
@@ -274,6 +285,40 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
         return urls
 
 
+class EntityHelperAsLab(EntityUrlsHelper):
+
+    def _create_return_urls(self, entity_object):
+        urls = dict()
+        search_urls = list()
+
+        if entity_object.data_status == 3:
+            lab_locations = entity_object.entity.all()
+            for location in lab_locations:
+                url = self.build_url('labs', location)
+                if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
+                    url = "%s-%s" % (url, 'lblitcit')
+                elif location.type == EntityAddress.AllowedKeys.LOCALITY:
+                    url = "%s-%s" % (url, 'lbcit')
+                if url:
+                    search_urls.append({'url': url.lower(), 'location_id': location.location_id})
+
+        urls['search_urls'] = {
+            'urls': search_urls,
+        }
+
+        lab_page_url = self.build_url("%s" % entity_object.name,
+                                      entity_object.entity.all().filter(type="SUBLOCALITY").first())
+        if lab_page_url:
+            lab_page_url = "%s-%s" % (lab_page_url, 'lab')
+        urls['page_urls'] = {
+            'urls': lab_page_url.lower(),
+        }
+
+        print(urls)
+        return urls
+
+
 entity_as_mapping = {
-    'DOCTOR': EntityHelperAsDoctor
+    'DOCTOR': EntityHelperAsDoctor,
+    'LAB': EntityHelperAsLab
 }

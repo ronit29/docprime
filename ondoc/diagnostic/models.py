@@ -177,7 +177,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
-
+    entity = GenericRelation(location_models.EntityLocationRelationship)
 
     def __str__(self):
         return self.name
@@ -205,6 +205,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
         if self.data_status == 3:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+            if ea:
+                location_models.EntityUrls.create(self)
 
         if edit_instance is not None:
             id = self.id
