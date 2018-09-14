@@ -24,7 +24,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabNetworkHelpline, LabNetworkManager, LabTest,
                                      LabTestType, LabService, LabAppointment,LabDoctorAvailability,
                                      LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument, CommonTest,
-                                     CommonDiagnosticCondition, DiagnosticConditionLabTest)
+                                     CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges)
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -91,7 +91,7 @@ class Command(BaseCommand):
                                                            LabNetworkCertification, LabNetworkAward,
                                                            LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
                                                            LabNetworkManager, LabService, LabDoctorAvailability,
-                                                           LabDoctor, LabDocument)
+                                                           LabDoctor, LabDocument, HomePickupCharges)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -159,7 +159,7 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(LabTiming, LabImage,
         LabManager,LabAccreditation, LabAward, LabCertification,
-        LabNetworkCertification, LabNetworkAward,
+        LabNetworkCertification, LabNetworkAward, HomePickupCharges,
         LabNetworkAccreditation, LabNetworkEmail, LabNetworkHelpline,
         LabNetworkManager,LabService,LabDoctorAvailability,LabDoctor, LabDocument, LabNetworkDocument)
 
@@ -218,7 +218,7 @@ class Command(BaseCommand):
                                                            LabManager, LabAccreditation, LabAward, LabCertification,
                                                            LabNetworkCertification, LabNetworkAward,
                                                            LabNetworkAccreditation, LabNetworkEmail,
-                                                           LabNetworkHelpline,
+                                                           LabNetworkHelpline, HomePickupCharges, 
                                                            LabNetworkManager, LabService, LabDoctorAvailability,
                                                            LabDoctor, LabDocument, LabNetworkDocument)
 

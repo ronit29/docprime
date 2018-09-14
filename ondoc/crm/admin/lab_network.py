@@ -192,13 +192,18 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     list_display = ('name', 'updated_at', 'data_status', 'list_created_by', 'list_assigned_to')
     list_filter = ('data_status', CreatedByFilter)
     search_fields = ['name']
-    readonly_fields = ('associated_labs',)
+    readonly_fields = ('no_of_associated_labs', 'associated_labs')
     exclude = ('qc_approved_at', )
+
+    def no_of_associated_labs(self, instance):
+        if instance.id:
+            return instance.all_associated_labs().count()
+    no_of_associated_labs.short_description = 'No. of associated lab(s)'
 
     def associated_labs(self, instance):
         if instance.id:
             html = "<ul style='margin-left:0px !important'>"
-            for lab in Lab.objects.filter(network=instance.id).distinct():
+            for lab in instance.all_associated_labs():
                 html += "<li><a target='_blank' href='/admin/diagnostic/lab/%s/change'>%s</a></li>" % (lab.id, lab.name)
             html += "</ul>"
             return mark_safe(html)

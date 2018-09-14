@@ -516,8 +516,11 @@ class UserAppointmentsViewSet(OndocViewSet):
             resp = dict()
             resp["status"] = 1
             if validated_data['status'] == OpdAppointment.CANCELLED:
+                logger.error("Starting to cancel for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))
                 opd_appointment.cancellation_type = OpdAppointment.PATIENT_CANCELLED
                 opd_appointment.action_cancelled(request.data.get("refund", 1))
+                logger.error(
+                    "Ending for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
             if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):

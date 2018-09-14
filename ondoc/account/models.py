@@ -409,7 +409,7 @@ class ConsumerRefund(TimeStampedModel):
 
         try:
             pg_data = PgTransaction.form_pg_refund_data(consumer_refund_objs)
-            refund_curl_request(pg_data)
+            #refund_curl_request(pg_data)
             # for data in pg_data:
             #     refund_curl_task.apply_async((data,), countdown=1)
         except Exception as e:

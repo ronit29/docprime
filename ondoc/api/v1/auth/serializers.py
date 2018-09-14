@@ -15,6 +15,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 import jwt
 from django.conf import settings
 from ondoc.authentication.backends import JWTAuthentication
+from ondoc.common import models as common_models
 
 User = get_user_model()
 
@@ -360,12 +361,20 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
     name = serializers.CharField(max_length=255)
     speciality = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
     mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
-    city = serializers.CharField(max_length=255, default='')
+    city_name = serializers.IntegerField()
     email = serializers.EmailField()
+
+    def validate(self, attrs):
+        if not common_models.Cities.objects.filter(id=attrs['city_name']).exists():
+            raise serializers.ValidationError('city_name should be integer.')
+
+        attrs['city_name'] = common_models.Cities.objects.filter(id=attrs['city_name']).first()
+
+        return attrs
 
     class Meta:
         model = OnlineLead
-        fields = ('member_type', 'name', 'speciality', 'mobile', 'city', 'email')
+        fields = ('member_type', 'name', 'speciality', 'mobile', 'city_name', 'email')
 
 
 class CareerSerializer(serializers.ModelSerializer):

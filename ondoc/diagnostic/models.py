@@ -139,10 +139,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     primary_email = models.EmailField(max_length=100, blank=True)
     primary_mobile = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True,  validators=[MinValueValidator(1800)])
-    parking = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Easy"), (2,"Difficult")])
-    always_open = models.BooleanField(verbose_name= 'Is lab open 24X7', default=False)
-    hospital = models.ForeignKey(Hospital, blank = True, null = True, on_delete=models.SET_NULL)
-    network_type = models.PositiveSmallIntegerField(blank = True, null = True, choices=[("","Select"), (1,"Non Network Lab"), (2,"Network Lab")])
+    parking = models.PositiveSmallIntegerField(blank=True, null=True,
+                                               choices=[("", "Select"), (1, "Easy"), (2, "Difficult")])
+    always_open = models.BooleanField(verbose_name='Is lab open 24X7', default=False)
+    hospital = models.ForeignKey(Hospital, blank=True, null=True, on_delete=models.SET_NULL)
+    network_type = models.PositiveSmallIntegerField(blank=True, null=True,
+                                                    choices=[("", "Select"), (1, "Non Network Lab"),
+                                                             (2, "Network Lab")])
     network = models.ForeignKey('LabNetwork', null=True, blank=True, on_delete=models.SET_NULL)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
@@ -153,7 +156,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     state = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
-    agreed_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True, validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
+    agreed_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
+                                        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])])
+    ppc_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
+                                    validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])])
     pathology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None,max_digits=7,
                                                          decimal_places=2)
     pathology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
@@ -355,6 +361,12 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab_networks')
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
+
+    def all_associated_labs(self):
+        if self.id:
+            return self.lab_set.all()
+        return None
+
 
     def __str__(self):
         return self.name + " (" + self.city + ")"

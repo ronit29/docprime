@@ -23,7 +23,7 @@ class ArticleCategory(TimeStampedModel):
 class Article(TimeStampedModel, CreatedByModel):
     title = models.CharField(blank=False, null=False, max_length=500, unique=True)
     url = models.CharField(blank=False, null=True, max_length=500, unique=True)
-    body = models.CharField(blank=False, null=False, max_length=20000)
+    body = models.CharField(blank=False, null=False, max_length=200000)
     category = models.ForeignKey(ArticleCategory, null=True, related_name='articles', on_delete=models.CASCADE)
     header_image = models.ImageField(upload_to='articles/header/images', null=True, blank=True, default='')
     header_image_alt = models.CharField(max_length=512, blank=True, null=True, default='')
