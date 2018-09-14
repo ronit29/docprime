@@ -1024,25 +1024,28 @@ class OpdAppointment(auth_model.TimeStampedModel):
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
         logger.error("Entered action_cancelled  - " + str(self.id) + " timezone - " + str(timezone.now()))
-        self.status = self.CANCELLED
-        self.save()
 
+        # Taking Lock first
+        consumer_account = None
         if self.payment_type == self.PREPAID:
             logger.error("Before Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
-            consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+            temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
             logger.error("After Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
-            data = dict()
-            data["reference_id"] = self.id
-            data["user"] = self.user
-            data["product_id"] = Order.DOCTOR_PRODUCT_ID
 
-            cancel_amount = self.effective_price
-            consumer_account.credit_cancellation(self, Order.DOCTOR_PRODUCT_ID, cancel_amount)
-            # consumer_account.credit_cancellation(data, cancel_amount)
-            if refund_flag:
-                ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj)
+        old_instance = OpdAppointment.objects.get(pk=self.id)
+        if old_instance.status != self.CANCELLED:
+            self.status = self.CANCELLED
+            self.save()
+            product_id = Order.DOCTOR_PRODUCT_ID
+            if self.payment_type == self.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id,
+                                                                                                            product_id):
+                cancel_amount = self.effective_price
+                consumer_account.credit_cancellation(self, product_id, cancel_amount)
+
+                if refund_flag:
+                    ctx_obj = consumer_account.debit_refund()
+                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def action_completed(self):
         self.status = self.COMPLETED
@@ -1055,7 +1058,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
     def generate_invoice(self):
         pass
-
 
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
@@ -1073,7 +1075,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                                                         action=ConsumerTransaction.SALE).
                        order_by("created_at").last())
         return consumer_tx.amount
-
 
     def is_doctor_available(self):
         if DoctorLeave.objects.filter(start_date__lte=self.time_slot_start.date(),
@@ -1109,7 +1110,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
             for e_id in settings.OPS_EMAIL_ID:
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
         print('all ops tasks completed')
-
 
     def save(self, *args, **kwargs):
         logger.error("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
