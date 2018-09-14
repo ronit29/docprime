@@ -26,10 +26,12 @@ from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges)
+    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges,
+                                     TestParameter)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
+from ondoc.crm.admin.autocomplete import PackageAutoCompleteView
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
@@ -881,11 +883,59 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         )
 
 
-class LabTestAdmin(ImportExportMixin, VersionAdmin):
+
+
+class TestParameterInline(admin.TabularInline):
+    model = TestParameter
+    verbose_name = 'Parameter'
+    verbose_name_plural = 'Parameters'
+
+
+class TestPackageFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        for data in self.cleaned_data:
+            lab_test = data.get('lab_test')
+            if not lab_test:
+                continue
+            if self.instance.test_type != LabTest.OTHER and self.instance.test_type != lab_test.test_type:
+                raise forms.ValidationError('Test-{} is not correct for the Package.'.format(lab_test.name))
+            if lab_test.is_package is True:
+                raise forms.ValidationError('{} is a test package'.format(lab_test.name))
+
+
+class LabTestPackageInline(admin.TabularInline):
+    model = LabTest.test.through
+    fk_name = 'package'
+    verbose_name = "Package Test"
+    verbose_name_plural = "Package Tests"
+    formset = TestPackageFormSet
+    autocomplete_fields = ['lab_test']
+
+    def get_queryset(self, request):
+        return super(LabTestPackageInline, self).get_queryset(request).filter(
+            lab_test__is_package=False, package__is_package=True)
+
+
+class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
+    inlines = []
     search_fields = ['name']
-    resource_class = LabTestResource
+
+    def get_fields(self, request, obj=None):
+        fields = super().get_fields(request, obj)
+        if obj and not obj.is_package:
+            return [value for value in fields if value != 'number_of_tests']
+        return fields
+
+    def get_inline_instances(self, request, obj=None):
+        inline_instance = super().get_inline_instances(request=request, obj=obj)
+        if obj and obj.is_package and LabTest.objects.filter(pk=obj.id, is_package=True).exists():
+            inline_instance.append(LabTestPackageInline(self.model, self.admin_site))
+        if obj and LabTest.objects.filter(pk=obj.id, is_package=False).exists():
+            inline_instance.append(TestParameterInline(self.model, self.admin_site))
+        return inline_instance
 
 
 class LabTestTypeAdmin(VersionAdmin):
