@@ -183,8 +183,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data['lab'] = lab_serializable_data
         temp_data['tests'] = test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
+        entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Lab').values('url')
+
+        temp_data['url'] = entity[0]['url']
 
         return Response(temp_data)
+
 
     def get_lab_timing(self, queryset):
         lab_timing = ''

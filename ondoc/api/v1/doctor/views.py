@@ -456,7 +456,11 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if doctor:
             serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                      context={"request": request})
+
+            entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
+                                                entity_type__iexact='Doctor').values('url')
             response_data = self.prepare_response(serializer.data)
+            response_data['url'] = entity[0]['url']
         return Response(response_data)
 
 
@@ -734,7 +738,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 resp['url'] = id_url_dict[resp['id']]
             else:
                 resp['url'] = None
-
 
         return Response({"result": response, "count": saved_search_result.result_count,
                          "search_id": saved_search_result.id})
