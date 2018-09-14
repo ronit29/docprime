@@ -461,7 +461,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                                 entity_type__iexact='Doctor').values('url')
             response_data = self.prepare_response(serializer.data)
 
-            response_data['url'] = entity[0]['url'] if len(entity) == 1 else None
+            response_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         return Response(response_data)
 
 
