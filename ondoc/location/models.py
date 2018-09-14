@@ -102,7 +102,7 @@ class EntityLocationRelationship(models.Model):
             ea_list = EntityAddress.get_or_create(**kwargs)
             for ea in ea_list:
                 if not cls.objects.filter(content_type=ContentType.objects.get_for_model(kwargs.get('content_object')),
-                                          object_id=kwargs.get('content_object').id, type=ea.type).exists():
+                                          object_id=kwargs.get('content_object').id, type=ea.type, location=ea).exists():
                     entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
                     entity_location_relation.save()
             return True
