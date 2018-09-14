@@ -337,7 +337,11 @@ class LabForm(FormCleanMixin):
 
     class Meta:
         model = Lab
-        exclude=()
+        exclude = ()
+        help_texts = {
+            'agreed_rate_list': 'Supported formats : pdf, xls, xlsx',
+            'ppc_rate_list': 'Supported formats : pdf, xls, xlsx'
+        }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
 
@@ -348,9 +352,9 @@ class LabForm(FormCleanMixin):
         return data
 
     def validate_qc(self):
-        qc_required = {'name':'req','location':'req','operational_since':'req','parking':'req',
-            'license':'req','building':'req','locality':'req','city':'req','state':'req',
-            'country':'req','pin_code':'req','network_type':'req','lab_image':'count'}
+        qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
+                       'license': 'req', 'building': 'req', 'locality': 'req', 'city': 'req', 'state': 'req',
+                       'country': 'req', 'pin_code': 'req', 'network_type': 'req', 'lab_image': 'count'}
 
         if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
             raise forms.ValidationError("Lab Network is not QC approved.")
@@ -364,7 +368,7 @@ class LabForm(FormCleanMixin):
                 raise forms.ValidationError(key+" is required for Quality Check")
             if value=='count' and int(self.data[key+'-TOTAL_FORMS'])<=0:
                 raise forms.ValidationError("Atleast one entry of "+key+" is required for Quality Check")
-        if self.cleaned_data['network_type']==2 and not self.cleaned_data['network']:
+        if self.cleaned_data['network_type'] == 2 and not self.cleaned_data['network']:
             raise forms.ValidationError("Network cannot be empty for Network Lab")
 
 
@@ -373,7 +377,8 @@ class LabCityFilter(SimpleListFilter):
     parameter_name = 'city'
 
     def lookups(self, request, model_admin):
-        cities = set([(c['city'].upper(),c['city'].upper()) if(c.get('city')) else ('','') for c in Lab.objects.values('city')])
+        cities = set([(c['city'].upper(), c['city'].upper()) if (c.get('city')) else ('', '') for c in
+                      Lab.objects.values('city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -466,16 +471,31 @@ class LabResource(resources.ModelResource):
 
 
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
-
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
-    list_display = ('name', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to', 'get_onboard_link',)
+    list_display = ('name', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to',
+                    'get_onboard_link',)
 
     # readonly_fields=('onboarding_status', )
     list_filter = ('data_status', 'onboarding_status', 'is_insurance_enabled', LabCityFilter, CreatedByFilter)
 
-    exclude = ('search_key','pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
-                   'radiology_deal_price_percentage', 'live_at', 'onboarded_at', 'qc_approved_at' )
+    exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
+               'radiology_agreed_price_percentage',
+               'radiology_deal_price_percentage', 'live_at', 'onboarded_at', 'qc_approved_at')
+
+    form = LabForm
+    search_fields = ['name', 'lab_pricing_group__group_name', ]
+    inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
+               LabAccreditationInline,
+               LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
+               BillingAccountInline, GenericLabAdminInline]
+    autocomplete_fields = ['lab_pricing_group', ]
+
+    map_width = 200
+    map_template = 'admin/gis/gmap.html'
+
+    class Media:
+        js = ('js/admin/ondoc.js',)
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
@@ -606,18 +626,6 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
             form.base_fields['assigned_to'].disabled = True
         return form
-
-    form = LabForm
-    search_fields = ['name', 'lab_pricing_group__group_name', ]
-    inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline, LabAccreditationInline,
-        LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline, BillingAccountInline, GenericLabAdminInline]
-    autocomplete_fields = ['lab_pricing_group', ]
-
-    map_width = 200
-    map_template = 'admin/gis/gmap.html'
-
-    class Media:
-        js = ('js/admin/ondoc.js',)
 
 
 class LabAppointmentForm(forms.ModelForm):
