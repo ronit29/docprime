@@ -332,7 +332,7 @@ class LabForm(FormCleanMixin):
     primary_email = forms.EmailField(required=True)
     city = forms.CharField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
-    home_pickup_charges = forms.DecimalField(required=False)
+    home_pickup_charges = forms.DecimalField(required=False, initial=0)
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
     # agreed_rate_list = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'application/pdf'}))
 
@@ -352,11 +352,6 @@ class LabForm(FormCleanMixin):
             return None
         return data
 
-    def clean_home_pickup_charges(self):
-        data = self.cleaned_data['home_pickup_charges']
-        if not data:
-            data = 0
-        return data
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
@@ -552,7 +547,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         errors = []
         required = ['name', 'about', 'license', 'primary_email', 'primary_mobile', 'operational_since', 'parking',
                     'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list']
-        if getattr(lab_obj, 'is_ppc_pathology_enabled') or getattr(lab_obj, 'is_ppc_radiology_enabled'):
+        if lab_obj.is_ppc_pathology_enabled or lab_obj.is_ppc_radiology_enabled:
             required += ['ppc_rate_list']
         for req in required:
             if not getattr(lab_obj, req):
