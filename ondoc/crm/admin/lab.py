@@ -332,6 +332,7 @@ class LabForm(FormCleanMixin):
     primary_email = forms.EmailField(required=True)
     city = forms.CharField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
+    home_pickup_charges = forms.DecimalField(required=False, initial=0)
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
     # agreed_rate_list = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'application/pdf'}))
 
@@ -349,6 +350,12 @@ class LabForm(FormCleanMixin):
         data = self.cleaned_data['operational_since']
         if data == '':
             return None
+        return data
+
+    def clean_home_pickup_charges(self):
+        data = self.cleaned_data.get('home_pickup_charges')
+        if not data:
+            data = 0
         return data
 
     def validate_qc(self):
@@ -524,7 +531,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     def onboardlab_admin(self, request, userid):
         host = request.get_host()
         try:
-            lab_obj = Lab.objects.get(id = userid)
+            lab_obj = Lab.objects.get(id=userid)
         except Exception as e:
             return HttpResponse('invalid lab')
 
@@ -544,8 +551,9 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         # check for errors
         errors = []
         required = ['name', 'about', 'license', 'primary_email', 'primary_mobile', 'operational_since', 'parking',
-                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list',
-                    'ppc_rate_list']
+                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list']
+        if lab_obj.is_ppc_pathology_enabled or lab_obj.is_ppc_radiology_enabled:
+            required += ['ppc_rate_list']
         for req in required:
             if not getattr(lab_obj, req):
                 errors.append(req+' is required')
@@ -554,13 +562,13 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             errors.append('locality or sublocality is required')
 
         length_required = ['labservice', 'labdoctoravailability', 'labmanager', 'labaccreditation']
-        if lab_obj.labservice_set.filter(service = LabService.RADIOLOGY).exists():
+        if lab_obj.labservice_set.filter(service=LabService.RADIOLOGY).exists():
             length_required.append('labdoctor')
         for req in length_required:
             if not len(getattr(lab_obj, req+'_set').all()):
                 errors.append(req + ' is required')
-        if not lab_obj.lab_timings.exists():
-            errors.append('Lab Timings is required')
+        # if not lab_obj.lab_timings.exists():
+        #     errors.append('Lab Timings is required')
 
         #if not lab_obj.lab_services_set:
             # errors.append('lab services are required')
