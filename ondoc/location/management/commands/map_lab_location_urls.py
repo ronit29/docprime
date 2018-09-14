@@ -1,10 +1,13 @@
 from django.core.management.base import BaseCommand
 from ondoc.diagnostic.models import Lab
 from ondoc.location.models import EntityLocationRelationship, EntityUrls
+from django.contrib.gis.geos import Point
+
+from django.contrib.gis.db.models.functions import Distance
 
 
 def map_lab_location_urls():
-    all_labs = Lab.objects.all()
+    all_labs = Lab.objects.all().annotate(distance=Distance('location', Point(float(77.0694707),float(28.4502948), srid=4326))).order_by('distance')[:50]
     for lab in all_labs:
         if lab.data_status == 3:
             success = EntityLocationRelationship.create(latitude=lab.location.y, longitude=lab.location.x, content_object=lab)
@@ -17,7 +20,6 @@ def map_lab_location_urls():
             else:
                 print("Location parsing of lab {name} failed".format(name=lab.name))
                 break
-
 
 
 class Command(BaseCommand):

@@ -51,7 +51,7 @@ class EntityAddress(models.Model):
         LOCALITY = 'LOCALITY'
         SUBLOCALITY = 'SUBLOCALITY'
         ADMINISTRATIVE_AREA_LEVEL_1 = 'ADMINISTRATIVE_AREA_LEVEL_1'
-        ADMINISTRATIVE_AREA_LEVEL_2 = 'ADMINISTRATIVE_AREA_LEVEL_1'
+        ADMINISTRATIVE_AREA_LEVEL_2 = 'ADMINISTRATIVE_AREA_LEVEL_2'
         COUNTRY = 'COUNTRY'
 
     type = models.CharField(max_length=128, blank=False, null=False, choices=AllowedKeys.as_choices())
@@ -67,17 +67,6 @@ class EntityAddress(models.Model):
         parent_id = None
         ea_list = list()
         for meta in meta_data:
-
-            if meta['key'] == 'RAW_JSON':
-                saved_json = GeoIpResults.objects.filter(latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'))
-                if not saved_json.exists():
-                    GeoIpResults(value=meta['value'], latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude')).save()
-
-                continue
-
-            if meta['key'] not in cls.AllowedKeys.availabilities():
-                logger.error("{key} is not the supported key ".format(key=meta['key']))
-                raise ValueError('Not a supported key')
 
             if meta['key'] in cls.AllowedKeys.availabilities():
                 saved_data = cls.objects.filter(type=meta['key'], value=meta['value'], parent=parent_id)
@@ -249,27 +238,28 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
         specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
 
         # Finding all the hospitals and appending along with the specializations.
-        doctor_realted_hospitals = entity_object.hospitals.all().filter(data_status=3)
+        doctor_realted_hospitals = entity_object.hospitals.all().filter(is_live=True)
 
-        for hospital in doctor_realted_hospitals:
-            if hospital.data_status == 3:
-                hospital_locations = hospital.entity.all()
-                for location in hospital_locations:
-                    for specialization in specializations:
-                        url = self.build_url(specialization.name, location)
-
-                        if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
-                            url = "%s-%s" % (url, 'sptlitcit')
-                        elif location.type == EntityAddress.AllowedKeys.LOCALITY:
-                            url = "%s-%s" % (url, 'sptcit')
-
-                        if url:
-                            search_urls.append({'url': url.lower(), 'specialization': specialization.name,
-                                                'specialization_id': specialization.id, 'location_id': location.location_id})
-
-        urls['search_urls'] = {
-            'urls': search_urls,
-        }
+        # for hospital in doctor_realted_hospitals:
+        #     if hospital.data_status == 3:
+        #
+        #         hospital_locations = hospital.entity.all()
+        #         for location in hospital_locations:
+        #             for specialization in specializations:
+        #                 url = self.build_url(specialization.name, location)
+        #
+        #                 if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
+        #                     url = "%s-%s" % (url, 'sptlitcit')
+        #                 elif location.type == EntityAddress.AllowedKeys.LOCALITY:
+        #                     url = "%s-%s" % (url, 'sptcit')
+        #
+        #                 if url:
+        #                     search_urls.append({'url': url.lower(), 'specialization': specialization.name,
+        #                                         'specialization_id': specialization.id, 'location_id': location.location_id})
+        #
+        # urls['search_urls'] = {
+        #     'urls': search_urls,
+        # }
 
         hospital_for_doctor_page = None
 
@@ -297,30 +287,34 @@ class EntityHelperAsLab(EntityUrlsHelper):
 
     def _create_return_urls(self, entity_object):
         urls = dict()
-        search_urls = list()
+        # search_urls = list()
 
-        if entity_object.data_status == 3:
-            lab_locations = entity_object.entity.all()
-            for location in lab_locations:
-                url = self.build_url('labs', location)
-                if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
-                    url = "%s-%s" % (url, 'lblitcit')
-                elif location.type == EntityAddress.AllowedKeys.LOCALITY:
-                    url = "%s-%s" % (url, 'lbcit')
-                if url:
-                    search_urls.append({'url': url.lower(), 'location_id': location.location_id})
+        # lab_locations = entity_object.entity.filter(is_live=True).all()
 
-        urls['search_urls'] = {
-            'urls': search_urls,
-        }
+        # if entity_object.data_status == 3:
+        #     for location in lab_locations:
+        #         url = self.build_url('labs', location)
+        #         if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
+        #             url = "%s-%s" % (url, 'lblitcit')
+        #         elif location.type == EntityAddress.AllowedKeys.LOCALITY:
+        #             url = "%s-%s" % (url, 'lbcit')
+        #         if url:
+        #             search_urls.append({'url': url.lower(), 'location_id': location.location_id})
+        #
+        # urls['search_urls'] = {
+        #     'urls': search_urls,
+        # }
 
-        lab_page_url = self.build_url("%s" % entity_object.name,
-                                      entity_object.entity.all().filter(type="SUBLOCALITY").first())
+        lab_page_url = None
+        if entity_object.entity.all().filter(type="SUBLOCALITY").exists():
+            lab_page_url = self.build_url("%s" % entity_object.name,
+                                          entity_object.entity.all().filter(type="SUBLOCALITY").first())
         if lab_page_url:
             lab_page_url = "%s-%s" % (lab_page_url, 'lab')
-        urls['page_urls'] = {
-            'urls': lab_page_url.lower(),
-        }
+
+            urls['page_urls'] = {
+                'urls': lab_page_url.lower(),
+            }
 
         print(urls)
         return urls

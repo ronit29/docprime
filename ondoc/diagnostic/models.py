@@ -209,7 +209,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
         super(Lab, self).save(*args, **kwargs)
 
-        if self.data_status == 3:
+        if self.is_live:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
             if ea:
                 location_models.EntityUrls.create(self)

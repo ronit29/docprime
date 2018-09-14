@@ -156,7 +156,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
 
-        if self.data_status == 3:
+        if self.is_live:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
 
@@ -287,8 +287,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         super(Doctor, self).save(*args, **kwargs)
-        if self.data_status == 3:
-            location_models.EntityUrls.create(self)
+        # if self.is_live:
+        #     location_models.EntityUrls.create(self)
 
     def __str__(self):
         return self.name

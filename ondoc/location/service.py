@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 import json
 
+
 def get_meta_by_latlong(lat, long):
     from .models import GeoIpResults
     saved_json = GeoIpResults.objects.filter(latitude=lat, longitude=long)
@@ -19,13 +20,12 @@ def get_meta_by_latlong(lat, long):
             return []
 
         resp_data = response.json()
+        GeoIpResults(value=json.dumps(resp_data), latitude=lat, longitude=long).save()
 
     else:
         resp_data = json.loads(saved_json.first().value)
 
-    raw_response_json = resp_data
-
-    if resp_data.get('status',None) == 'OK' and len(resp_data.get('results', [])) > 0:
+    if resp_data.get('status', None) == 'OK' and len(resp_data.get('results', [])) > 0:
         obj = resp_data['results'][0]
         address_component = obj.get('address_components', [])
         resp_data = dict()
@@ -41,8 +41,6 @@ def get_meta_by_latlong(lat, long):
             if type.upper() in resp_data.keys():
                 result_list.append({'key': type, 'value': resp_data[type.upper()]})
 
-        # Also storing the raw json response for future use to avoid hitting the geoip google api.
-        result_list.append({'key': 'RAW_JSON', 'value': json.dumps(raw_response_json)})
         return result_list
 
     else:
