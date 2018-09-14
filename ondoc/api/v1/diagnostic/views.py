@@ -36,6 +36,8 @@ from ondoc.diagnostic import models
 from ondoc.authentication import models as auth_models
 from django.db.models import Q, Value
 from django.db.models.functions import StrIndex
+
+from ondoc.location.models import EntityUrls
 from . import serializers
 import copy
 import re
@@ -109,6 +111,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
+    def retrieve_by_url(self, request):
+        url = request.GET.get('url')
+        if not url:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        if EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Lab').exists():
+            entity_url_obj = EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
+            entity_id = entity_url_obj.entity_id
+            response = self.retrieve(request, entity_id)
+            return response
+
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
     def list(self, request, **kwargs):
         parameters = request.query_params
         queryset = self.get_lab_list(parameters)
@@ -117,8 +132,26 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         response_queryset = self.form_lab_whole_data(paginated_queryset)
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset, many=True,
                                          context={"request": request})
+
+        entity_ids = [lab_data['id'] for lab_data in response_queryset]
+
+        id_url_dict = dict()
+        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Lab').values('entity_id', 'url')
+        for data in entity:
+            id_url_dict[data['entity_id']] = data['url']
+
+        for resp in serializer.data:
+            if id_url_dict.get(resp['lab']['id']):
+                resp['url'] = id_url_dict[resp['lab']['id']]
+            else:
+                resp['url'] = None
+
         return Response({"result": serializer.data,
-                         "count": count})
+                         "count": count
+                         })
+
+    # queryset[0].get('name')
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])

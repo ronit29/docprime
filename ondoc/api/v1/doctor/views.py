@@ -3,6 +3,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
+from ondoc.location.models import EntityUrls
 from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
@@ -432,7 +433,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if not url:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        if location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL').exists():
+        if location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL',entity_type__iexact='Doctor').exists():
             entity_url_obj = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
             entity_id = entity_url_obj.entity_id
             response = self.retrieve(request, entity_id)
@@ -717,7 +718,24 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "experiences", "images", "qualifications",
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
+
         response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
+
+        entity_ids = [doctor_data['id'] for doctor_data in response]
+
+        id_url_dict = dict()
+        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Doctor').values('entity_id', 'url')
+        for data in entity:
+            id_url_dict[data['entity_id']] = data['url']
+
+        for resp in response:
+            if id_url_dict.get(resp['id']):
+                resp['url'] = id_url_dict[resp['id']]
+            else:
+                resp['url'] = None
+
+
         return Response({"result": response, "count": saved_search_result.result_count,
                          "search_id": saved_search_result.id})
 
