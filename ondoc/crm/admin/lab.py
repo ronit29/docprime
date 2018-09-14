@@ -567,8 +567,8 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         for req in length_required:
             if not len(getattr(lab_obj, req+'_set').all()):
                 errors.append(req + ' is required')
-        if not lab_obj.lab_timings.exists():
-            errors.append('Lab Timings is required')
+        # if not lab_obj.lab_timings.exists():
+        #     errors.append('Lab Timings is required')
 
         #if not lab_obj.lab_services_set:
             # errors.append('lab services are required')
