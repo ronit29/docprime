@@ -16,5 +16,6 @@ urlpatterns = [
     url(r'^howitworks/', views.howitworks_page, name='howitworks_page'),
     url(r'^admin/agent/doctor', views.doctor_login_via_agent, name='agent_doctor_page'),
     url(r'^admin/agent/', views.user_appointment_via_agent, name='agent_page'),
+    url(r'^admin/search-data/', views.upload_search_data, name='search_data'),
     url(r'^short/(?P<hash>[a-zA-Z0-9]+)', views.redirect_to_original_url, name='redirect-original-url'),
 ]
