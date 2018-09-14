@@ -148,6 +148,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return ", ".join(address_items)
 
     def save(self, *args, **kwargs):
+        build_url = True
+        if self.is_live:
+            if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
+                build_url = False
+
+        super(Hospital, self).save(*args, **kwargs)
 
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
@@ -156,12 +162,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
 
-        if self.is_live:
-            if (not self.id) or (not Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists()):
-                ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
-
-        super(Hospital, self).save(*args, **kwargs)
-
+        if build_url:
+            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
 class HospitalAward(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
