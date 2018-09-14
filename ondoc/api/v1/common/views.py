@@ -9,6 +9,7 @@ from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import Doctor
 from ondoc.chat.models import ChatPrescription
 from ondoc.notification.rabbitmq_client import publish_message
+from django.template.loader import render_to_string
 from . import serializers
 from ondoc.common.models import Cities
 from ondoc.common.utils import send_email, send_sms
@@ -64,14 +65,30 @@ class ServicesViewSet(viewsets.GenericViewSet):
         short_url = generate_short_url(prescription_url)
         return Response({"url": short_url})
 
+    def generate_pdf_template(self, request):
+        from ondoc.api.v1.utils import generate_short_url
+        context = {key: value for key, value in request.data.items()}
+        content = render_to_string("email/chat_prescription/body.html", context=context)
+        pdf_file = HTML(string=content).write_pdf()
+        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+        name = random_string + '.pdf'
+        file = SimpleUploadedFile(name, pdf_file, content_type='application/pdf')
+        chat = ChatPrescription.objects.create(name=name, file=file)
+        prescription_url = "{}{}{}".format(settings.BASE_URL,
+                                           "/api/v1/common/chat_prescription/",
+                                           chat.name)
+        short_url = generate_short_url(prescription_url)
+        return Response({"url": short_url})
+
     def send_email(self, request):
+        context = {key: value for key, value in request.data.items()}
         serializer = serializers.EmailServiceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         to = serializer.validated_data.get('to')
         cc = serializer.validated_data.get('cc')
         to = list(set(to)) if isinstance(to, list) else []
         cc = list(set(cc)) if isinstance(cc, list) else []
-        content = serializer.validated_data.get('content')
+        content = render_to_string("email/chat_prescription/body.html", context=context)
         subject = serializer.validated_data.get('subject')
         send_email(to, cc, subject, content)
         return Response({"status": "success"})
