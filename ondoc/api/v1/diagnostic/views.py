@@ -186,7 +186,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
                                            entity_type__iexact='Lab').values('url')
 
-        temp_data['url'] = entity[0]['url']
+        temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
 
         return Response(temp_data)
 
