@@ -184,6 +184,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
     entity = GenericRelation(location_models.EntityLocationRelationship)
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
 
     def __str__(self):
         return self.name
@@ -199,6 +200,16 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return None
         # return static('lab_images/lab_default.png')
 
+    def update_live_status(self):
+
+        if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
+            self.is_live = True
+            if not self.live_at:
+                self.live_at = datetime.datetime.now()
+
+        if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
+            self.is_live = False
+
     def save(self, *args, **kwargs):
         self.clean()
         
@@ -207,6 +218,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
             edit_instance = 1
             original = Lab.objects.get(pk=self.id)
 
+        self.update_live_status()
         super(Lab, self).save(*args, **kwargs)
 
         if self.is_live:
@@ -478,16 +490,27 @@ class LabTestSubType(TimeStampedModel):
 #         db_table = "radiology_test_type"
 
 
+class TestParameter(TimeStampedModel):
+    name = models.CharField(max_length=200)
+    lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, null=True, blank=True)
+
+    class Meta:
+        db_table = "test_parameter"
+
+
 class LabTest(TimeStampedModel, SearchKey):
     RADIOLOGY = 1
     PATHOLOGY = 2
+    OTHER = 3
     TEST_TYPE_CHOICES = (
         (RADIOLOGY, "Radiology"),
         (PATHOLOGY, "Pathology"),
+        (OTHER, 'Other')
     )
     name = models.CharField(max_length=200, unique=True)
     test_type = models.PositiveIntegerField(choices=TEST_TYPE_CHOICES, blank=True, null=True)
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
+    number_of_tests = models.PositiveIntegerField(blank=True, null=True)
     why = models.TextField(blank=True)
     pre_test_info = models.CharField(max_length=1000, blank=True)
     sample_handling_instructions = models.CharField(max_length=1000, blank=True)
@@ -499,6 +522,9 @@ class LabTest(TimeStampedModel, SearchKey):
     excel_id = models.CharField(max_length=100, blank=True)
     sample_type = models.CharField(max_length=500, blank=True)
     home_collection_possible = models.BooleanField(default=False, verbose_name= 'Can sample be home collected for this test?')
+    test = models.ManyToManyField('self', through='LabTestPackage', symmetrical=False,
+                                  through_fields=('package', 'lab_test'))  # self reference
+
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
     #     through='LabTestSubTypeMapping',
@@ -510,6 +536,18 @@ class LabTest(TimeStampedModel, SearchKey):
 
     class Meta:
         db_table = "lab_test"
+
+
+class LabTestPackage(TimeStampedModel):
+    package = models.ForeignKey(LabTest, related_name='packages', on_delete=models.CASCADE)
+    lab_test = models.ForeignKey(LabTest, related_name='lab_tests', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return "{}-{}".format(self.package.name, self.lab_test.name)
+
+    class Meta:
+        db_table = 'labtest_package'
+        unique_together = (("package", "lab_test"))
 
 
 # class LabTestSubTypeMapping(TimeStampedModel):

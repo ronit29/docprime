@@ -26,10 +26,12 @@ from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges)
+    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges,
+                                     TestParameter)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
+from ondoc.crm.admin.autocomplete import PackageAutoCompleteView
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
@@ -332,6 +334,7 @@ class LabForm(FormCleanMixin):
     primary_email = forms.EmailField(required=True)
     city = forms.CharField(required=True)
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
+    home_pickup_charges = forms.DecimalField(required=False, initial=0)
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Lab.ONBOARDING_STATUS)
     # agreed_rate_list = forms.FileField(required=False, widget=forms.FileInput(attrs={'accept':'application/pdf'}))
 
@@ -349,6 +352,12 @@ class LabForm(FormCleanMixin):
         data = self.cleaned_data['operational_since']
         if data == '':
             return None
+        return data
+
+    def clean_home_pickup_charges(self):
+        data = self.cleaned_data.get('home_pickup_charges')
+        if not data:
+            data = 0
         return data
 
     def validate_qc(self):
@@ -524,7 +533,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     def onboardlab_admin(self, request, userid):
         host = request.get_host()
         try:
-            lab_obj = Lab.objects.get(id = userid)
+            lab_obj = Lab.objects.get(id=userid)
         except Exception as e:
             return HttpResponse('invalid lab')
 
@@ -544,8 +553,9 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         # check for errors
         errors = []
         required = ['name', 'about', 'license', 'primary_email', 'primary_mobile', 'operational_since', 'parking',
-                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list',
-                    'ppc_rate_list']
+                    'network_type', 'location', 'building', 'city', 'state', 'country', 'pin_code', 'agreed_rate_list']
+        if lab_obj.is_ppc_pathology_enabled or lab_obj.is_ppc_radiology_enabled:
+            required += ['ppc_rate_list']
         for req in required:
             if not getattr(lab_obj, req):
                 errors.append(req+' is required')
@@ -554,13 +564,13 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             errors.append('locality or sublocality is required')
 
         length_required = ['labservice', 'labdoctoravailability', 'labmanager', 'labaccreditation']
-        if lab_obj.labservice_set.filter(service = LabService.RADIOLOGY).exists():
+        if lab_obj.labservice_set.filter(service=LabService.RADIOLOGY).exists():
             length_required.append('labdoctor')
         for req in length_required:
             if not len(getattr(lab_obj, req+'_set').all()):
                 errors.append(req + ' is required')
-        if not lab_obj.lab_timings.exists():
-            errors.append('Lab Timings is required')
+        # if not lab_obj.lab_timings.exists():
+        #     errors.append('Lab Timings is required')
 
         #if not lab_obj.lab_services_set:
             # errors.append('lab services are required')
@@ -591,8 +601,6 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
-            obj.is_live = True
-            obj.live_at = datetime.datetime.now()
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
@@ -875,11 +883,59 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         )
 
 
-class LabTestAdmin(ImportExportMixin, VersionAdmin):
+
+
+class TestParameterInline(admin.TabularInline):
+    model = TestParameter
+    verbose_name = 'Parameter'
+    verbose_name_plural = 'Parameters'
+
+
+class TestPackageFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        for data in self.cleaned_data:
+            lab_test = data.get('lab_test')
+            if not lab_test:
+                continue
+            if self.instance.test_type != LabTest.OTHER and self.instance.test_type != lab_test.test_type:
+                raise forms.ValidationError('Test-{} is not correct for the Package.'.format(lab_test.name))
+            if lab_test.is_package is True:
+                raise forms.ValidationError('{} is a test package'.format(lab_test.name))
+
+
+class LabTestPackageInline(admin.TabularInline):
+    model = LabTest.test.through
+    fk_name = 'package'
+    verbose_name = "Package Test"
+    verbose_name_plural = "Package Tests"
+    formset = TestPackageFormSet
+    autocomplete_fields = ['lab_test']
+
+    def get_queryset(self, request):
+        return super(LabTestPackageInline, self).get_queryset(request).filter(
+            lab_test__is_package=False, package__is_package=True)
+
+
+class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
+    inlines = []
     search_fields = ['name']
-    resource_class = LabTestResource
+
+    def get_fields(self, request, obj=None):
+        fields = super().get_fields(request, obj)
+        if obj and not obj.is_package:
+            return [value for value in fields if value != 'number_of_tests']
+        return fields
+
+    def get_inline_instances(self, request, obj=None):
+        inline_instance = super().get_inline_instances(request=request, obj=obj)
+        if obj and obj.is_package and LabTest.objects.filter(pk=obj.id, is_package=True).exists():
+            inline_instance.append(LabTestPackageInline(self.model, self.admin_site))
+        if obj and LabTest.objects.filter(pk=obj.id, is_package=False).exists():
+            inline_instance.append(TestParameterInline(self.model, self.admin_site))
+        return inline_instance
 
 
 class LabTestTypeAdmin(VersionAdmin):
