@@ -792,17 +792,22 @@ class LabTestPackageInline(admin.TabularInline):
 class LabTestAdmin(ImportExportMixin, VersionAdmin):
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
-    inlines = [TestParameterInline]
+    inlines = []
     search_fields = ['name']
-    resource_class = LabTestResource
+
+    def get_fields(self, request, obj=None):
+        fields = super().get_fields(request, obj)
+        if obj and not obj.is_package:
+            return [value for value in fields if value != 'number_of_tests']
+        return fields
 
     def get_inline_instances(self, request, obj=None):
         inline_instance = super().get_inline_instances(request=request, obj=obj)
-        if obj and obj.is_package and LabTest.objects.filter(pk=obj.id, is_package=True):
+        if obj and obj.is_package and LabTest.objects.filter(pk=obj.id, is_package=True).exists():
             inline_instance.append(LabTestPackageInline(self.model, self.admin_site))
+        if obj and LabTest.objects.filter(pk=obj.id, is_package=False).exists():
+            inline_instance.append(TestParameterInline(self.model, self.admin_site))
         return inline_instance
-
-
 
 
 class LabTestTypeAdmin(VersionAdmin):

@@ -480,6 +480,7 @@ class LabTest(TimeStampedModel, SearchKey):
     name = models.CharField(max_length=200, unique=True)
     test_type = models.PositiveIntegerField(choices=TEST_TYPE_CHOICES, blank=True, null=True)
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
+    number_of_tests = models.PositiveIntegerField(blank=True, null=True)
     why = models.TextField(blank=True)
     pre_test_info = models.CharField(max_length=1000, blank=True)
     sample_handling_instructions = models.CharField(max_length=1000, blank=True)
