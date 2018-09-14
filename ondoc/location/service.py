@@ -7,8 +7,8 @@ logger = logging.getLogger(__name__)
 import json
 
 def get_meta_by_latlong(lat, long):
-    from .models import EntityAddress
-    saved_json = EntityAddress.objects.filter(type=EntityAddress.AllowedKeys.RAW_JSON, latitude=lat, longitude=long, parent=None)
+    from .models import GeoIpResults
+    saved_json = GeoIpResults.objects.filter(latitude=lat, longitude=long)
 
     if not saved_json.exists():
         response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?sensor=false',

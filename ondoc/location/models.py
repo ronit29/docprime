@@ -35,6 +35,16 @@ class Choices(object):
         return props
 
 
+class GeoIpResults(models.Model):
+
+    value = models.TextField()
+    latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+
+    class Meta:
+        db_table = 'geo_ip_results'
+
+
 class EntityAddress(models.Model):
 
     class AllowedKeys(Choices):
@@ -43,12 +53,9 @@ class EntityAddress(models.Model):
         ADMINISTRATIVE_AREA_LEVEL_1 = 'ADMINISTRATIVE_AREA_LEVEL_1'
         ADMINISTRATIVE_AREA_LEVEL_2 = 'ADMINISTRATIVE_AREA_LEVEL_1'
         COUNTRY = 'COUNTRY'
-        RAW_JSON = 'RAW_JSON'
 
     type = models.CharField(max_length=128, blank=False, null=False, choices=AllowedKeys.as_choices())
     value = models.TextField()
-    latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
-    longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
     parent = models.IntegerField(null=True)
 
     @classmethod
@@ -61,10 +68,10 @@ class EntityAddress(models.Model):
         ea_list = list()
         for meta in meta_data:
 
-            if meta['key'] == cls.AllowedKeys.RAW_JSON:
-                saved_json = cls.objects.filter(type=cls.AllowedKeys.RAW_JSON, latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'), parent=None)
+            if meta['key'] == 'RAW_JSON':
+                saved_json = GeoIpResults.objects.filter(latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'))
                 if not saved_json.exists():
-                    cls(type=meta['key'], value=meta['value'], parent=None, latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude')).save()
+                    GeoIpResults(value=meta['value'], latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude')).save()
 
                 continue
 
@@ -111,6 +118,7 @@ class EntityLocationRelationship(models.Model):
                     entity_location_relation.save()
             return True
         except Exception as e:
+            print(str(e))
             return False
 
     class Meta:
