@@ -134,6 +134,7 @@ class DoctorSearchHelper:
                                        doctor_search_result}
         response = []
         for doctor in doctor_data:
+
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
@@ -157,6 +158,9 @@ class DoctorSearchHelper:
                 hospitals = [{
                     "hospital_name": doctor_clinic.hospital.name,
                     "address": ", ".join(
+                        [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
+                         value]),
+                    "locality": ", ".join(
                         [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
                          value]),
                     "doctor": doctor.name,
@@ -186,6 +190,7 @@ class DoctorSearchHelper:
                                                                                      many=True).data,
                 "distance": self.get_distance(doctor, doctor_clinic_mapping),
                 "name": doctor.name,
+                "display_name": doctor.get_display_name(),
                 "gender": doctor.gender,
                 "images": serializers.DoctorImageSerializer(doctor.images.all(), many=True,
                                                             context={"request": request}).data,
