@@ -192,9 +192,9 @@ class UpdateXlsViewSet():
             is_test_doctor=False,
             is_internal=False,
             hospitals__is_live=True).distinct().count()
-        url = "{domain}/opd/searchresults?specializations={specialty_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, specialty_id=','.join([str(x) for x in specialty_id]),latitude=str(latitude), longitude=str(longitude))
+        url = "{domain}/opd/searchresults?min_fees=0&max_fees=1500&sort_on=distance&is_available=false&is_female=false&doctor_name=&hospital_name=&conditions=&specializations={specialty_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, specialty_id=','.join([str(x) for x in specialty_id]),latitude=str(latitude), longitude=str(longitude))
         validation_url = url+"&max_distance={max_distance}".format(max_distance=max_distance/1000)
-
+        url = url + "&max_distance=20"
         return (search_count, url, validation_url)
 
     def get_lab_count(self, data):
@@ -214,9 +214,9 @@ class UpdateXlsViewSet():
         search_count = Lab.objects.filter(is_test_lab=False, is_live=True,
                                           lab_pricing_group__isnull=False).filter(**filter).distinct().count()
 
-        url = "{domain}/lab/searchresults?test_id={test_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, test_id=','.join([str(x) for x in test_id]),latitude=str(latitude), longitude=str(longitude))
+        url = "{domain}/lab/searchresults?min_distance=0&min_price=0&max_price=20000&order_by=distancel&lab_name=&test_id={test_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, test_id=','.join([str(x) for x in test_id]),latitude=str(latitude), longitude=str(longitude))
         validation_url = url+"&max_distance={max_distance}".format(max_distance=max_distance/1000)
-
+        url = url + "&max_distance=20"
         return (search_count, url, validation_url)
 
 class UpdateXlsViewSet1():
