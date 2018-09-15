@@ -160,9 +160,7 @@ class DoctorSearchHelper:
                     "address": ", ".join(
                         [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
                          value]),
-                    "locality": ", ".join(
-                        [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
-                         value]),
+                    "short_address": doctor_clinic.hospital.get_short_address(),
                     "doctor": doctor.name,
                     "display_name": doctor.get_display_name(),
                     "hospital_id": doctor_clinic.hospital.id,
