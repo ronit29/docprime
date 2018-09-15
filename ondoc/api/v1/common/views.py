@@ -21,6 +21,7 @@ import random
 import string
 import base64
 import logging
+from django.db.models import Count
 
 logger = logging.getLogger(__name__)
 
@@ -210,14 +211,20 @@ class UpdateXlsViewSet():
                 'lab_pricing_group__available_lab_tests__test_id__in': test_id,
                 'lab_pricing_group__available_lab_tests__enabled': True
             })
+        count = 0
 
-        search_count = Lab.objects.filter(is_test_lab=False, is_live=True,
-                                          lab_pricing_group__isnull=False).filter(**filter).distinct().count()
+        search = Lab.objects.filter(is_test_lab=False, is_live=True,
+                                          lab_pricing_group__isnull=False).filter(**filter)
+
+        if len(test_id)>0:
+            count = search.annotate(count=Count('id')).filter(count__gte=len(test_id)).count()
+        else :
+            count = search.count()
 
         url = "{domain}/lab/searchresults?min_distance=0&min_price=0&max_price=20000&order_by=distancel&lab_name=&test_id={test_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, test_id=','.join([str(x) for x in test_id]),latitude=str(latitude), longitude=str(longitude))
         validation_url = url+"&max_distance={max_distance}".format(max_distance=max_distance/1000)
         url = url + "&max_distance=20"
-        return (search_count, url, validation_url)
+        return (count, url, validation_url)
 
 class UpdateXlsViewSet1():
 
