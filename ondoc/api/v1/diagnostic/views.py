@@ -111,14 +111,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, **kwargs):
         parameters = request.query_params
+        serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
+        serializer.is_valid(raise_exception=True)
+        parameters = serializer.validated_data
+
         queryset = self.get_lab_list(parameters)
         count = queryset.count()
         paginated_queryset = paginate_queryset(queryset, request)
         response_queryset = self.form_lab_whole_data(paginated_queryset)
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset, many=True,
                                          context={"request": request})
+        test_ids = parameters.get('ids',[])
+
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'));
+
         return Response({"result": serializer.data,
-                         "count": count})
+                         "count": count,'tests':tests})
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
@@ -201,9 +209,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def get_lab_list(self, parameters):
         # distance in meters
-        serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
-        serializer.is_valid(raise_exception=True)
-        parameters = serializer.validated_data
 
         DEFAULT_DISTANCE = 20000
         MAX_SEARCHABLE_DISTANCE = 50000
