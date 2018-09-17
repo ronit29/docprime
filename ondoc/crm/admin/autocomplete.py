@@ -10,7 +10,7 @@ class CustomAutoComplete(AutocompleteJsonView):
 class PackageAutoComplete(AutocompleteJsonView):
 
     def get_queryset(self):
-        return super().get_queryset().filter(lab_test__is_package=False, package__is_package=True)
+        return super().get_queryset().filter(is_package=False)
 
 
 class PackageAutoCompleteView:

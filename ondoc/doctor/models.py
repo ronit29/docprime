@@ -147,6 +147,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                          [self.building, self.sublocality, self.locality, self.city, self.state, self.country] if value]
         return ", ".join(address_items)
 
+    def get_short_address(self):
+        address_items = [value for value in
+                         [self.sublocality, self.locality] if value]
+        return ", ".join(address_items)
+
+
     def save(self, *args, **kwargs):
         build_url = True
         if self.is_live:

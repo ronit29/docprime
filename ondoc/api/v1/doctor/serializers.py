@@ -301,6 +301,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     doctor = serializers.ReadOnlyField(source='doctor_clinic.doctor.name')
     hospital_name = serializers.ReadOnlyField(source='doctor_clinic.hospital.name')
     address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_address')
+    short_address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_short_address')
     hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     hospital_thumbnail = serializers.SerializerMethodField()
     day = serializers.SerializerMethodField()
@@ -335,7 +336,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorClinicTiming
-        fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
+        fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
                   'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id', )
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
@@ -597,7 +598,8 @@ class PrescriptionSerializer(serializers.Serializer):
 class DoctorListSerializer(serializers.Serializer):
     SORT_CHOICES = ('fees', 'experience', 'distance', )
     SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
-    specialization_ids = CommaSepratedToListField(required=False, max_length=100, typecast_to=str)
+    specialization_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
+    condition_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
     sits_at = CommaSepratedToListField(required=False, max_length=100, typecast_to=str)

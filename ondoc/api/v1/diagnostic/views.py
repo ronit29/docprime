@@ -126,6 +126,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, **kwargs):
         parameters = request.query_params
+        serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
+        serializer.is_valid(raise_exception=True)
+        parameters = serializer.validated_data
+
         queryset = self.get_lab_list(parameters)
         count = queryset.count()
         paginated_queryset = paginate_queryset(queryset, request)
@@ -147,11 +151,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             else:
                 resp['url'] = None
 
-        return Response({"result": serializer.data,
-                         "count": count
-                         })
+        test_ids = parameters.get('ids',[])
 
-    # queryset[0].get('name')
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'));
+
+        return Response({"result": serializer.data,
+                         "count": count,'tests':tests})
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
@@ -239,9 +244,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def get_lab_list(self, parameters):
         # distance in meters
-        serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
-        serializer.is_valid(raise_exception=True)
-        parameters = serializer.validated_data
 
         DEFAULT_DISTANCE = 20000
         MAX_SEARCHABLE_DISTANCE = 50000
@@ -310,7 +312,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @staticmethod
     def apply_sort(queryset, parameters):
-        order_by = parameters.get("order_by")
+        order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
                 queryset = queryset.order_by("price", "distance")
