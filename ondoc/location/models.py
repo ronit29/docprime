@@ -84,7 +84,7 @@ class EntityAddress(TimeStampedModel):
                     entity_address.save()
                     parent_id = entity_address.id
 
-            if entity_address.type in ['LOCALITY', 'SUBLOCALITY']:
+            if entity_address.type in ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2', 'LOCALITY', 'SUBLOCALITY']:
                 ea_list.append(entity_address)
 
         return ea_list
