@@ -445,7 +445,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             if not opd_appointment:
                 resp["status"] = 0
                 resp["message"] = "Invalid appointment Id"
-                return Response(resp, status.HTTP_400_BAD_REQUEST)
+                return Response(resp, status.HTTP_404_NOT_FOUND)
             allowed = opd_appointment.allowed_action(request.user.user_type, request)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
