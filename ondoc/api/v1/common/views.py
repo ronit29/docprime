@@ -221,7 +221,7 @@ class UpdateXlsViewSet():
         else :
             count = search.count()
 
-        url = "{domain}/lab/searchresults?min_distance=0&min_price=0&max_price=20000&order_by=distancel&lab_name=&test_ids={test_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, test_id=','.join([str(x) for x in test_id]),latitude=str(latitude), longitude=str(longitude))
+        url = "{domain}/lab/searchresults?min_distance=0&min_price=0&max_price=20000&sort_on=distancel&lab_name=&test_ids={test_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, test_id=','.join([str(x) for x in test_id]),latitude=str(latitude), longitude=str(longitude))
         validation_url = url+"&max_distance={max_distance}".format(max_distance=max_distance/1000)
         url = url + "&max_distance=20"
         return (count, url, validation_url)
