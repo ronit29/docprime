@@ -950,10 +950,11 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         elif self.instance.id:
             doctor = self.instance.doctor
             hospital = self.instance.hospital
-            if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and cleaned_data.get('status'):
-                raise forms.ValidationError("Status can not be changed.")
         else:
             raise forms.ValidationError("Doctor and hospital details not entered.")
+
+        if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and len(cleaned_data):
+            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
 
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                  doctor_clinic__hospital=hospital,
