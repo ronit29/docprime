@@ -136,7 +136,7 @@ class HospitalNetworkDocumentFormSet(forms.BaseInlineFormSet):
 
 
 class HospitalNetworkDocumentInline(admin.TabularInline):
-    formset = HospitalNetworkDocumentFormSet
+    # formset = HospitalNetworkDocumentFormSet
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj=obj, **kwargs)
