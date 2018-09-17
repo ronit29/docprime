@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 import json
 from decimal import Decimal
 from ondoc.doctor import models as doc_models
+from ondoc.authentication.models import TimeStampedModel
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -35,7 +36,7 @@ class Choices(object):
         return props
 
 
-class GeoIpResults(models.Model):
+class GeoIpResults(TimeStampedModel):
 
     value = models.TextField()
     latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
@@ -45,7 +46,7 @@ class GeoIpResults(models.Model):
         db_table = 'geo_ip_results'
 
 
-class EntityAddress(models.Model):
+class EntityAddress(TimeStampedModel):
 
     class AllowedKeys(Choices):
         LOCALITY = 'LOCALITY'
@@ -92,7 +93,7 @@ class EntityAddress(models.Model):
         db_table = 'entity_address'
 
 
-class EntityLocationRelationship(models.Model):
+class EntityLocationRelationship(TimeStampedModel):
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
@@ -119,7 +120,7 @@ class EntityLocationRelationship(models.Model):
         db_table = 'entity_location_relations'
 
 
-class EntityUrls(models.Model):
+class EntityUrls(TimeStampedModel):
     class UrlType(Choices):
         PAGEURL = 'PAGEURL'
         SEARCHURL = 'SEARCHURL'
@@ -186,15 +187,15 @@ class EntityUrls(models.Model):
         db_table = 'entity_urls'
 
 
-class EntityUrlsRelation(models.Model):
-
-    url = models.ForeignKey(EntityUrls, on_delete=models.CASCADE)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey()
-
-    class Meta:
-        db_table = 'entity_url_relations'
+# class EntityUrlsRelation(models.Model):
+#
+#     url = models.ForeignKey(EntityUrls, on_delete=models.CASCADE)
+#     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+#     object_id = models.PositiveIntegerField()
+#     content_object = GenericForeignKey()
+#
+#     class Meta:
+#         db_table = 'entity_url_relations'
 
 
 class EntityUrlsHelper(object):
@@ -268,21 +269,27 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
 
         hospital_for_doctor_page = None
 
-        if doctor_realted_hospitals.filter(hospital_type=1).exists():
-            hospital_for_doctor_page = doctor_realted_hospitals.filter(hospital_type=1).first()
-        elif doctor_realted_hospitals.filter(hospital_type=2).exists():
-            hospital_for_doctor_page = doctor_realted_hospitals.filter(hospital_type=2).first()
-        elif doctor_realted_hospitals.filter(hospital_type=3).exists():
-            hospital_for_doctor_page = doctor_realted_hospitals.filter(hospital_type=3).first()
+        if doctor_realted_hospitals.filter(is_live=True, hospital_type=1).exists():
+            hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True, hospital_type=1).first()
+        elif doctor_realted_hospitals.filter(is_live=True, hospital_type=2).exists():
+            hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True, hospital_type=2).first()
+        elif doctor_realted_hospitals.filter(is_live=True, hospital_type=3).exists():
+            hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True, hospital_type=3).first()
 
         if hospital_for_doctor_page:
-            specialization_name = [specialization.name for specialization in specializations]
-            doctor_page_url = self.build_url("dr-%s-%s" %(entity_object.name, "-".join(specialization_name)),
-                                             hospital_for_doctor_page.entity.all().filter(type="SUBLOCALITY").first())
 
-            urls['page_urls'] = {
-                'urls': doctor_page_url.lower(),
-            }
+            query_set_for_personal_url = hospital_for_doctor_page.entity.all().filter(type="SUBLOCALITY", valid=True)
+            if not query_set_for_personal_url.exists():
+                query_set_for_personal_url = hospital_for_doctor_page.entity.all().filter(type="LOCALITY", valid=True)
+
+            if query_set_for_personal_url.exists():
+                specialization_name = [specialization.name for specialization in specializations]
+                doctor_page_url = self.build_url("dr-%s-%s" %(entity_object.name, "-".join(specialization_name)),
+                                                 query_set_for_personal_url.first())
+
+                urls['page_urls'] = {
+                    'urls': doctor_page_url.lower(),
+                }
 
         print(urls)
         return urls

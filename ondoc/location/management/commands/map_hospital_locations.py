@@ -4,13 +4,12 @@ from ondoc.location.models import EntityLocationRelationship
 
 
 def map_hospital_locations():
-    pass
-    # all_hospitals = Hospital.objects.all()
-    # for hospital in all_hospitals:
-    #     if hospital.data_status == 3:
-    #         success = EntityLocationRelationship.create(latitude=hospital.location.y, longitude=hospital.location.x, content_object=hospital)
-    #         if not success:
-    #             break
+    all_hospitals = Hospital.objects.all()
+    for hospital in all_hospitals:
+        if hospital.data_status == 3:
+            success = EntityLocationRelationship.create(latitude=hospital.location.y, longitude=hospital.location.x, content_object=hospital)
+            if not success:
+                break
 
 
 class Command(BaseCommand):

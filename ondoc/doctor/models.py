@@ -301,7 +301,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def save(self, *args, **kwargs):
         super(Doctor, self).save(*args, **kwargs)
         # if self.is_live:
-        #     location_models.EntityUrls.create(self)
+        location_models.EntityUrls.create(self)
 
     def __str__(self):
         return self.name
