@@ -341,10 +341,6 @@ class LabForm(FormCleanMixin):
     class Meta:
         model = Lab
         exclude = ()
-        help_texts = {
-            'agreed_rate_list': 'Supported formats : pdf, xls, xlsx',
-            'ppc_rate_list': 'Supported formats : pdf, xls, xlsx'
-        }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
 

@@ -944,14 +944,15 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         else:
             raise forms.ValidationError("Invalid start date and time.")
 
-        if cleaned_data.get('doctor') and cleaned_data.get('hospital'):
-            doctor = cleaned_data.get('doctor')
-            hospital = cleaned_data.get('hospital')
-        elif self.instance.id:
+        if self.instance.id:
             doctor = self.instance.doctor
             hospital = self.instance.hospital
-            if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and cleaned_data.get('status'):
+            if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and cleaned_data.get(
+                    'status'):
                 raise forms.ValidationError("Status can not be changed.")
+        elif cleaned_data.get('doctor') and cleaned_data.get('hospital'):
+            doctor = cleaned_data.get('doctor')
+            hospital = cleaned_data.get('hospital')
         else:
             raise forms.ValidationError("Doctor and hospital details not entered.")
 
