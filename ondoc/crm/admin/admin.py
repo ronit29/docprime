@@ -14,7 +14,8 @@ from .common import Cities, CitiesAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
-                     DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin)
+                     DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
+                     CompetitorInfoImportAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -91,3 +92,5 @@ admin.site.register(report_models.Report)
 admin.site.register(report_models.GeneratedReport, ReportAdmin)
 
 admin.site.register(ConsumerAccount)
+
+admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
