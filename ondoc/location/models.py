@@ -287,6 +287,9 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
                 doctor_page_url = self.build_url("dr-%s-%s" %(entity_object.name, "-".join(specialization_name)),
                                                  query_set_for_personal_url.first())
 
+                if doctor_page_url:
+                    doctor_page_url = "%s-%s" % (doctor_page_url, 'dpp')
+
                 urls['page_urls'] = {
                     'urls': doctor_page_url.lower(),
                 }
@@ -324,7 +327,7 @@ class EntityHelperAsLab(EntityUrlsHelper):
         if query_set_for_personal_url.exists():
             lab_page_url = self.build_url("%s" % entity_object.name, query_set_for_personal_url.first())
             if lab_page_url:
-                lab_page_url = "%s-%s" % (lab_page_url, 'lab')
+                lab_page_url = "%s-%s" % (lab_page_url, 'lpp')
 
                 urls['page_urls'] = {
                     'urls': lab_page_url.lower(),
