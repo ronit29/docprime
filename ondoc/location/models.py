@@ -56,6 +56,8 @@ class EntityAddress(models.Model):
 
     type = models.CharField(max_length=128, blank=False, null=False, choices=AllowedKeys.as_choices())
     value = models.TextField()
+    type_blueprint = models.CharField(max_length=128, blank=False, null=True)
+    postal_code = models.PositiveIntegerField(null=True)
     parent = models.IntegerField(null=True)
 
     @classmethod
@@ -65,16 +67,19 @@ class EntityAddress(models.Model):
             raise ValueError('Missing parameter: content_object')
 
         parent_id = None
+        postal_code = None
         ea_list = list()
         for meta in meta_data:
 
             if meta['key'] in cls.AllowedKeys.availabilities():
-                saved_data = cls.objects.filter(type=meta['key'], value=meta['value'], parent=parent_id)
+                if meta['key'].startswith('SUBLOCALITY'):
+                    postal_code = meta['POSTAL_CODE']
+                saved_data = cls.objects.filter(type=meta['key'], postal_code=postal_code, type_blueprint=meta['type'], value=meta['value'], parent=parent_id)
                 if len(saved_data) == 1:
                     entity_address = saved_data[0]
                     parent_id = entity_address.id
                 elif len(saved_data) == 0:
-                    entity_address = cls(type=meta['key'], value=meta['value'], parent=parent_id)
+                    entity_address = cls(type=meta['key'], postal_code=postal_code, type_blueprint=meta['type'], value=meta['value'], parent=parent_id)
                     entity_address.save()
                     parent_id = entity_address.id
 
@@ -92,7 +97,7 @@ class EntityLocationRelationship(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
-
+    valid = models.BooleanField(default=True)
     location = models.ForeignKey(EntityAddress, on_delete=models.CASCADE)
     type = models.CharField(max_length=128, blank=False, null=False, choices=EntityAddress.AllowedKeys.as_choices())
 
@@ -305,16 +310,18 @@ class EntityHelperAsLab(EntityUrlsHelper):
         #     'urls': search_urls,
         # }
 
-        lab_page_url = None
-        if entity_object.entity.all().filter(type="SUBLOCALITY").exists():
-            lab_page_url = self.build_url("%s" % entity_object.name,
-                                          entity_object.entity.all().filter(type="SUBLOCALITY").first())
-        if lab_page_url:
-            lab_page_url = "%s-%s" % (lab_page_url, 'lab')
+        query_set_for_personal_url = entity_object.entity.all().filter(type="SUBLOCALITY", valid=True)
+        if not query_set_for_personal_url.exists():
+            query_set_for_personal_url = entity_object.entity.all().filter(type="LOCALITY", valid=True)
 
-            urls['page_urls'] = {
-                'urls': lab_page_url.lower(),
-            }
+        if query_set_for_personal_url.exists():
+            lab_page_url = self.build_url("%s" % entity_object.name, query_set_for_personal_url.first())
+            if lab_page_url:
+                lab_page_url = "%s-%s" % (lab_page_url, 'lab')
+
+                urls['page_urls'] = {
+                    'urls': lab_page_url.lower(),
+                }
 
         print(urls)
         return urls
