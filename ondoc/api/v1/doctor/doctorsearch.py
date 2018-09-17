@@ -25,13 +25,13 @@ class DoctorSearchHelper:
         specialization_ids = self.query_params.get("specialization_ids",[])
         condition_ids = self.query_params.get("condition_ids", [])
         if len(condition_ids)>0:
-            cs = list(models.MedicalConditionSpecialization.objects.filter(id__in=condition_ids).values_list('specialization_id', flat=True));
+            cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
             cs = [str(i) for i in cs]
             specialization_ids.extend(cs)
 
         if len(specialization_ids)>0:
             filtering_params.append(
-                " gs.id IN({})".format(",".join(self.query_params.get("specialization_ids")))
+                " gs.id IN({})".format(",".join(specialization_ids))
             )
         if self.query_params.get("sits_at"):
             filtering_params.append(
