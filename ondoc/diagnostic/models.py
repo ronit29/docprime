@@ -156,11 +156,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     agreed_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
-                                        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])])
-    agreed_rate_list.help_text = 'Supported formats : pdf, xls, xlsx'
+                                        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])],
+                                        help_text='Supported formats : pdf, xls, xlsx')
     ppc_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
-                                    validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])])
-    ppc_rate_list.help_text = 'Supported formats : pdf, xls, xlsx'
+                                    validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])],
+                                     help_text='Supported formats : pdf, xls, xlsx')
     pathology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None,max_digits=7,
                                                          decimal_places=2)
     pathology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
