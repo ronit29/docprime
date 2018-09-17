@@ -705,8 +705,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
         response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
+        specializations = list(models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+        conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
-                         "search_id": saved_search_result.id})
+                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):

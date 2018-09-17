@@ -21,9 +21,17 @@ class DoctorSearchHelper:
 
         filtering_params = ['d.is_test_doctor is False',
                             'd.is_internal is False']
-        if self.query_params.get("specialization_ids"):
+
+        specialization_ids = self.query_params.get("specialization_ids",[])
+        condition_ids = self.query_params.get("condition_ids", [])
+        if len(condition_ids)>0:
+            cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
+            cs = [str(i) for i in cs]
+            specialization_ids.extend(cs)
+
+        if len(specialization_ids)>0:
             filtering_params.append(
-                " gs.id IN({})".format(",".join(self.query_params.get("specialization_ids")))
+                " gs.id IN({})".format(",".join(specialization_ids))
             )
         if self.query_params.get("sits_at"):
             filtering_params.append(
@@ -126,6 +134,7 @@ class DoctorSearchHelper:
                                        doctor_search_result}
         response = []
         for doctor in doctor_data:
+
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
@@ -151,6 +160,7 @@ class DoctorSearchHelper:
                     "address": ", ".join(
                         [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if
                          value]),
+                    "short_address": doctor_clinic.hospital.get_short_address(),
                     "doctor": doctor.name,
                     "display_name": doctor.get_display_name(),
                     "hospital_id": doctor_clinic.hospital.id,
@@ -178,6 +188,7 @@ class DoctorSearchHelper:
                                                                                      many=True).data,
                 "distance": self.get_distance(doctor, doctor_clinic_mapping),
                 "name": doctor.name,
+                "display_name": doctor.get_display_name(),
                 "gender": doctor.gender,
                 "images": serializers.DoctorImageSerializer(doctor.images.all(), many=True,
                                                             context={"request": request}).data,

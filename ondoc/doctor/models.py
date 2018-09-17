@@ -143,6 +143,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                          [self.building, self.sublocality, self.locality, self.city, self.state, self.country] if value]
         return ", ".join(address_items)
 
+    def get_short_address(self):
+        address_items = [value for value in
+                         [self.sublocality, self.locality] if value]
+        return ", ".join(address_items)
+
+
     def save(self, *args, **kwargs):
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:

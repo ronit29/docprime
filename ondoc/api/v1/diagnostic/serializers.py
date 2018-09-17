@@ -553,7 +553,7 @@ class SearchLabListSerializer(serializers.Serializer):
     long = serializers.FloatField(required=False)
     lat = serializers.FloatField(required=False)
     ids = IdListField(required=False)
-    order_by = serializers.CharField(required=False)
+    sort_on = serializers.CharField(required=False)
     name = serializers.CharField(required=False)
 
 
