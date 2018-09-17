@@ -134,8 +134,7 @@ class HospitalForm(FormCleanMixin):
         qc_required = {'name': 'req', 'location': 'req', 'operational_since': 'req', 'parking': 'req',
                        'registration_number': 'req', 'building': 'req', 'locality': 'req', 'city': 'req',
                        'state': 'req',
-                       'country': 'req', 'pin_code': 'req', 'hospital_type': 'req', 'network_type': 'req',
-                       'hospitalimage': 'count'}
+                       'country': 'req', 'pin_code': 'req', 'hospital_type': 'req', 'network_type': 'req'}
 
         # if (not self.instance.network or not self.instance.network.is_billing_enabled) and self.instance.is_billing_enabled:
         #     qc_required.update({
