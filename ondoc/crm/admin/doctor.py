@@ -6,7 +6,7 @@ from django.conf.urls import url
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.db.models import Q
-from import_export.admin import ImportExportMixin
+from import_export.admin import ImportExportMixin, ImportExportModelAdmin
 from import_export import fields, resources
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import make_aware
@@ -700,6 +700,22 @@ class CompetitorInfoInline(nested_admin.NestedTabularInline):
     can_delete = True
     show_change_link = False
     fields = ['name', 'hospital', 'hospital_name', 'fee', 'url']
+
+
+class CompetitorInfoResource(resources.ModelResource):
+    class Meta:
+        model = CompetitorInfo
+        fields = ('id', 'doctor', 'hospital_name', 'fee', 'url')
+
+    def init_instance(self, row=None):
+        ins = super().init_instance(row)
+        ins.name = CompetitorInfo.PRACTO
+        return ins
+
+
+class CompetitorInfoImportAdmin(ImportExportModelAdmin):
+    resource_class = CompetitorInfoResource
+    list_display = ('id', 'doctor', 'hospital_name', 'fee', 'url')
 
 
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
