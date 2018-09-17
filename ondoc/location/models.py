@@ -73,7 +73,7 @@ class EntityAddress(TimeStampedModel):
         for meta in meta_data:
 
             if meta['key'] in cls.AllowedKeys.availabilities():
-                if meta['key'].startswith('SUBLOCALITY_'):
+                if meta['key'].startswith('SUBLOCALITY'):
                     postal_code = meta['postal_code']
                 saved_data = cls.objects.filter(type=meta['key'], postal_code=postal_code, type_blueprint=meta['type'], value=meta['value'], parent=parent_id)
                 if len(saved_data) == 1:

@@ -59,10 +59,10 @@ def get_meta_by_latlong(lat, long):
         if type.upper() in resp_data.keys():
 
             if type.upper().startswith('SUBLOCALITY_LEVEL'):
-                response_list.append({'key': 'SUBLOCALITY', 'type': type, 'postal_code': resp_data['POSTAL_CODE'],
+                response_list.append({'key': 'SUBLOCALITY', 'type': type, 'postal_code': resp_data.get('POSTAL_CODE', None),
                                       'value': resp_data[type.upper()]})
             else:
-                response_list.append({'key': type, 'type': type, 'postal_code': resp_data['POSTAL_CODE'],
+                response_list.append({'key': type, 'type': type, 'postal_code': resp_data.get('POSTAL_CODE', None),
                                       'value': resp_data[type.upper()]})
     return response_list
 
