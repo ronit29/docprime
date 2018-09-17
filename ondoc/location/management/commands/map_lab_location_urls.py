@@ -7,19 +7,18 @@ from django.contrib.gis.db.models.functions import Distance
 
 
 def map_lab_location_urls():
-    all_labs = Lab.objects.all().annotate(distance=Distance('location', Point(float(77.0694707),float(28.4502948), srid=4326))).order_by('distance')[:50]
+    all_labs = Lab.objects.filter(is_live=True).all().annotate(distance=Distance('location', Point(float(77.0694707),float(28.4502948), srid=4326))).order_by('distance')[:50]
     for lab in all_labs:
-        if lab.data_status == 3:
-            success = EntityLocationRelationship.create(latitude=lab.location.y, longitude=lab.location.x, content_object=lab)
-            if success:
-                response = EntityUrls.create(lab)
-                if response:
-                    print("Url creation of lab {name} success".format(name=lab.name))
-                else:
-                    print("Url creation of lab {name} failed".format(name=lab.name))
+        success = EntityLocationRelationship.create(latitude=lab.location.y, longitude=lab.location.x, content_object=lab)
+        if success:
+            response = EntityUrls.create(lab)
+            if response:
+                print("Url creation of lab {name} success".format(name=lab.name))
             else:
-                print("Location parsing of lab {name} failed".format(name=lab.name))
-                break
+                print("Url creation of lab {name} failed".format(name=lab.name))
+        else:
+            print("Location parsing of lab {name} failed".format(name=lab.name))
+            break
 
 
 class Command(BaseCommand):
