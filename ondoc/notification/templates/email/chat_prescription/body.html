@@ -33,22 +33,22 @@
                         <br>
                         <span style="font-size: 13px;">
                             <span style="font-weight: bold">Name</span> -
-                            <span >{{customer.name}}</span>
+                            <span >{{profile.name}}</span>
                         </span>
                         <br>
                         <span style="font-size: 13px;">
                             <span style="font-weight: bold">Age</span> -
-                            <span>{{age}}</span>
+                            <span>{{profile.age}}</span>
                         </span>
                         <br>
                         <span style="font-size: 13px;">
                             <span style="font-weight: bold">Gender</span> -
-                            <span>{{customer.gender}}</span>
+                            <span>{{profile.gender}}</span>
                         </span>
                         <br>
                         <br>
                         <br>
-                        {% if IsSymptoms %}
+                        {% if symptoms %}
                         <span style="font-size: 13px; font-weight: bold; padding-bottom: 10px; display: inline-block">Symptoms</span>
                         <ul style="font-size: 13px;">
                             {% for value in symptoms %}
@@ -57,8 +57,7 @@
                         </ul>
                         {% endif %}
                         <br>
-                        {% if Showdiagnosis %}
-                            {% if prodiagnosisType %}
+                            {% if prodiagnosis %}
                                 <span style="font-size: 13px; font-weight: bold; padding-bottom: 10px; display: inline-block">Provisional
                                 Diagnosis</span>
                                 <br>
@@ -68,15 +67,16 @@
                                 {% endfor %}
                                 </ul>
                             {% else %}
-                                <span style="font-size: 13px;font-weight: bold;padding-bottom: 10px;display: inline-block">Diagnosis</span>
-                                <br>
-                                <ul style="font-size: 13px;">
-                                    {% for value in diagnosis %}
-                                        <li style="padding: 2px 0px">{{value}}</li>
-                                    {% endfor %}
-                                </ul>
+                                {% if diagnosis %}
+                                    <span style="font-size: 13px;font-weight: bold;padding-bottom: 10px;display: inline-block">Diagnosis</span>
+                                    <br>
+                                    <ul style="font-size: 13px;">
+                                        {% for value in diagnosis %}
+                                            <li style="padding: 2px 0px">{{value}}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
                             {% endif %}
-                        {% endif %}
                     </div>
                     <div style="float: right; text-align: left; width:45%">
                         {% if medicines %}
