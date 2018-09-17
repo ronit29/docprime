@@ -664,8 +664,8 @@ class LabAppointmentForm(forms.ModelForm):
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
 
-        if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and cleaned_data.get('status'):
-            raise forms.ValidationError("Status can not be changed.")
+        if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
+            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
 
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
