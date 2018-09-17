@@ -427,7 +427,8 @@ class ConsumerRefund(TimeStampedModel):
 
         try:
             pg_data = PgTransaction.form_pg_refund_data(consumer_refund_objs)
-            transaction.on_commit(lambda: refund_curl_request(pg_data))
+            logger.error(pg_data)
+            # transaction.on_commit(lambda: refund_curl_request(pg_data))
         except Exception as e:
             logger.error("Error in refund celery - " + str(e))
 
