@@ -485,11 +485,23 @@ class LabTestSubType(TimeStampedModel):
 
 
 class TestParameter(TimeStampedModel):
-    name = models.CharField(max_length=200)
-    lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, null=True, blank=True)
+    name = models.CharField(max_length=200, unique=True)
+    # lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, null=True, blank=True)
 
     class Meta:
         db_table = "test_parameter"
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+
+class ParameterLabTest(TimeStampedModel):
+    parameter = models.ForeignKey(TestParameter, on_delete=models.DO_NOTHING, related_name='test_parameters')
+    lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, related_name='labtests')
+
+    class Meta:
+        db_table = 'parameter_lab_test'
+        unique_together = (("parameter", "lab_test"), )
 
 
 class LabTest(TimeStampedModel, SearchKey):
@@ -518,6 +530,10 @@ class LabTest(TimeStampedModel, SearchKey):
     home_collection_possible = models.BooleanField(default=False, verbose_name= 'Can sample be home collected for this test?')
     test = models.ManyToManyField('self', through='LabTestPackage', symmetrical=False,
                                   through_fields=('package', 'lab_test'))  # self reference
+    parameter = models.ManyToManyField(
+        'TestParameter', through=ParameterLabTest,
+        through_fields=('lab_test', 'parameter')
+    )
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
