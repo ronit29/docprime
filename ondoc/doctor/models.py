@@ -1434,6 +1434,7 @@ class CompetitorInfo(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "competitor_info"
+        unique_together = ('name', 'hospital_name', 'doctor')
 
     def save(self, *args, **kwargs):
         url = self.url
