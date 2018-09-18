@@ -27,7 +27,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges,
-                                     TestParameter)
+                                     TestParameter, ParameterLabTest)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
@@ -341,10 +341,6 @@ class LabForm(FormCleanMixin):
     class Meta:
         model = Lab
         exclude = ()
-        help_texts = {
-            'agreed_rate_list': 'Supported formats : pdf, xls, xlsx',
-            'ppc_rate_list': 'Supported formats : pdf, xls, xlsx'
-        }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
 
@@ -658,16 +654,19 @@ class LabAppointmentForm(forms.ModelForm):
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         else:
             raise forms.ValidationError("Invalid start date and time.")
-        if self.instance.id:
-            lab_test = self.instance.lab_test.all()
-            lab = self.instance.lab
-            if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and cleaned_data.get('status'):
-                raise forms.ValidationError("Status can not be changed.")
-        elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
+
+        if cleaned_data.get('lab') and cleaned_data.get('lab_test'):
             lab_test = cleaned_data.get('lab_test').all()
             lab = cleaned_data.get('lab')
+        elif self.instance.id:
+            lab_test = self.instance.lab_test.all()
+            lab = self.instance.lab
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
+
+        if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
+            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
 
@@ -883,17 +882,24 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         )
 
 
-
-
-class TestParameterInline(admin.TabularInline):
-    model = TestParameter
+class ParameterLabTestInline(admin.TabularInline):
+    model = LabTest.parameter.through
+    fk_name = 'lab_test'
     verbose_name = 'Parameter'
     verbose_name_plural = 'Parameters'
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['parameter']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request)
 
 
 class TestPackageFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
         for data in self.cleaned_data:
             lab_test = data.get('lab_test')
             if not lab_test:
@@ -902,6 +908,10 @@ class TestPackageFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError('Test-{} is not correct for the Package.'.format(lab_test.name))
             if lab_test.is_package is True:
                 raise forms.ValidationError('{} is a test package'.format(lab_test.name))
+
+
+class TestParameterAdmin(VersionAdmin):
+    search_fields = ['name']
 
 
 class LabTestPackageInline(admin.TabularInline):
@@ -934,7 +944,7 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
         if obj and obj.is_package and LabTest.objects.filter(pk=obj.id, is_package=True).exists():
             inline_instance.append(LabTestPackageInline(self.model, self.admin_site))
         if obj and LabTest.objects.filter(pk=obj.id, is_package=False).exists():
-            inline_instance.append(TestParameterInline(self.model, self.admin_site))
+            inline_instance.append(ParameterLabTestInline(self.model, self.admin_site))
         return inline_instance
 
 

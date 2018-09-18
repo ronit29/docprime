@@ -6,7 +6,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
-                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup)
+                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
+                                     TestParameter)
 from ondoc.lead.models import HospitalLead, DoctorLead
 from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
@@ -14,13 +15,14 @@ from .common import Cities, CitiesAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
-                     DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin)
+                     DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
+                     CompetitorInfoImportAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
-    LabAppointmentAdmin, CommonTestAdmin
+    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -91,3 +93,5 @@ admin.site.register(report_models.Report)
 admin.site.register(report_models.GeneratedReport, ReportAdmin)
 
 admin.site.register(ConsumerAccount)
+admin.site.register(TestParameter, TestParameterAdmin)
+admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)

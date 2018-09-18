@@ -614,6 +614,7 @@ class DoctorListSerializer(serializers.Serializer):
     search_id = serializers.IntegerField(required=False, allow_null=True)
     doctor_name = serializers.CharField(required=False)
     hospital_name = serializers.CharField(required=False)
+    max_distance = serializers.IntegerField(required=False, allow_null=True)
 
     def validate_specialization_id(self, value):
         request = self.context.get("request")
