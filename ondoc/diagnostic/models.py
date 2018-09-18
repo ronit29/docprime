@@ -110,7 +110,6 @@ class LabTestPricingGroup(LabPricingGroup):
         default_permissions = []
 
 
-
 class HomePickupCharges(models.Model):
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     distance = models.PositiveIntegerField()
@@ -186,7 +185,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     home_collection_charges = GenericRelation(HomePickupCharges)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
 
-
     def __str__(self):
         return self.name
 
@@ -197,7 +195,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         all_documents = self.lab_documents.all()
         for document in all_documents:
             if document.document_type == LabDocument.LOGO:
-                return document.get_thumbnail_path(document.name.url,'90x60')
+                return document.get_thumbnail_path(document.name.url, '90x60')
         return None
         # return static('lab_images/lab_default.png')
 
@@ -253,7 +251,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
                     update(computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
-
 
 
 class LabCertification(TimeStampedModel):
@@ -487,11 +484,26 @@ class LabTestSubType(TimeStampedModel):
 
 
 class TestParameter(TimeStampedModel):
-    name = models.CharField(max_length=200)
-    lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, null=True, blank=True)
+    name = models.CharField(max_length=200, unique=True)
+    # lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, null=True, blank=True)
 
     class Meta:
         db_table = "test_parameter"
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+
+class ParameterLabTest(TimeStampedModel):
+    parameter = models.ForeignKey(TestParameter, on_delete=models.DO_NOTHING, related_name='test_parameters')
+    lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, related_name='labtests')
+
+    class Meta:
+        db_table = 'parameter_lab_test'
+        unique_together = (("parameter", "lab_test"), )
+
+    def __str__(self):
+        return "{}".format(self.parameter.name)
 
 
 class LabTest(TimeStampedModel, SearchKey):
@@ -520,6 +532,10 @@ class LabTest(TimeStampedModel, SearchKey):
     home_collection_possible = models.BooleanField(default=False, verbose_name= 'Can sample be home collected for this test?')
     test = models.ManyToManyField('self', through='LabTestPackage', symmetrical=False,
                                   through_fields=('package', 'lab_test'))  # self reference
+    parameter = models.ManyToManyField(
+        'TestParameter', through=ParameterLabTest,
+        through_fields=('lab_test', 'parameter')
+    )
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -1188,6 +1204,7 @@ class LabOnboardingToken(TimeStampedModel):
     class Meta:
         db_table = "lab_onboarding_token"
 
+
 # Used to display pricing in admin
 class LabPricing(Lab):
     class Meta:
@@ -1233,5 +1250,12 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
         db_table = "lab_report_file"
 
 
+class LabTestGroup(auth_model.TimeStampedModel):
+    TEST_TYPE_CHOICES = LabTest.TEST_TYPE_CHOICES
+    name = models.CharField(max_length=200)
+    tests = models.ManyToManyField(LabTest)
+    type = models.PositiveSmallIntegerField(choices=TEST_TYPE_CHOICES)
 
+    class Meta:
+        db_table = 'lab_test_group'
 

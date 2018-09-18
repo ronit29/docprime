@@ -126,6 +126,8 @@ LOCAL_APPS = (
     'ondoc.reports',
     'ondoc.common',
     'ondoc.tracking',
+    'ondoc.seo',
+    'ondoc.geoip',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -297,6 +299,12 @@ AUTO_CANCEL_OPD_DELAY = 3000  # In min
 AUTO_CANCEL_LAB_DELAY = 30  # In min
 OPS_EMAIL_ID = env.list('OPS_EMAIL_ID')
 AUTO_REFUND = env.bool('AUTO_REFUND')
+HARD_CODED_OTP = '357237'
+MAX_DIST_USER = 50  # In KM
+MAXMIND_ACCOUNT_ID = env('MAXMIND_ACCOUNT_ID')
+MAXMIND_LICENSE_KEY = env('MAXMIND_LICENSE_KEY')
+MAXMIND_CITY_API_URL = env('MAXMIND_CITY_API_URL')
+OTP_BYPASS_NUMBERS = env.list('OTP_BYPASS_NUMBERS')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),

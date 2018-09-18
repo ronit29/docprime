@@ -33,7 +33,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
-                                 OpdAppointment, CompetitorInfo)
+                                 OpdAppointment, CompetitorInfo, CompetitorHit)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -718,6 +718,32 @@ class CompetitorInfoImportAdmin(ImportExportModelAdmin):
     list_display = ('id', 'doctor', 'hospital_name', 'fee', 'url')
 
 
+class CompetitorHitFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        counter = {}
+        for values in self.cleaned_data:
+            competitor_name = values.get('name')
+            if competitor_name:
+                if counter.get(competitor_name):
+                    counter[competitor_name] = counter.get(competitor_name) + 1
+                else:
+                    counter[competitor_name] = 1
+
+        if any((x > 1 for x in counter.values())):
+            raise forms.ValidationError('Cannot have duplicate record for any competitor.')
+
+
+class CompetitorHitsInline(nested_admin.NestedTabularInline):
+    model = CompetitorHit
+    formset = CompetitorHitFormSet
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -733,6 +759,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     form = DoctorForm
     inlines = [
         CompetitorInfoInline,
+        CompetitorHitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
         DoctorSpecializationInline,
