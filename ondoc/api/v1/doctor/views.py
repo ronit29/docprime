@@ -434,6 +434,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if not url:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
+        url = url.lower()
         if location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL',entity_type__iexact='Doctor').exists():
             entity_url_obj = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
             entity_id = entity_url_obj.entity_id

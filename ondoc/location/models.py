@@ -10,6 +10,7 @@ from decimal import Decimal
 from ondoc.doctor import models as doc_models
 from ondoc.authentication.models import TimeStampedModel
 from django.contrib.gis.geos import Point
+from django.template.defaultfilters import slugify
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -235,8 +236,9 @@ class EntityUrlsHelper(object):
             url = "{prefix}-in-{sublocality}-{locality}"\
                 .format(prefix=prefix, sublocality=ea_sublocality.value, locality=ea_locality.value)
 
-        url = split_and_append(url, ' ', '-')
-        url = split_and_append(url, '/', '-')
+        url = slugify(url)
+        # url = split_and_append(url, ' ', '-')
+        # url = split_and_append(url, '/', '-')
 
         if not url:
             url = None
