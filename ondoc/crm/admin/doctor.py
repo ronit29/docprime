@@ -1187,8 +1187,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             doctor_admins_phone_numbers.append(doctor_admin.phone_number)
         return mark_safe(','.join(doctor_admins_phone_numbers))
 
+    @transaction.atomic
     def save_model(self, request, obj, form, change):
         if obj:
+            opd_obj = OpdAppointment.objects.select_for_update().get(pk=obj.id)
             if request.POST.get('start_date') and request.POST.get('start_time'):
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)

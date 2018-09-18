@@ -287,7 +287,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     "product_id": product_id,
                     "reference_id": opd_obj.id
                 }
-                consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
+                consumer_account.debit_schedule(opd_obj, product_id, appointment_details.get("effective_price"))
+                # consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
             resp["status"] = 1
             resp["payment_required"] = False
             resp["data"] = {"id": opd_obj.id, "type": serializers.OpdAppointmentSerializer.DOCTOR_TYPE}
