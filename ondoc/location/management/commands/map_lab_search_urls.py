@@ -5,21 +5,16 @@ from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
 
 
-def map_lab_location_urls():
+def map_lab_search_urls():
     all_labs = Lab.objects.filter(is_live=True).all().annotate(distance=Distance('location', Point(float(77.0694707),float(28.4502948), srid=4326))).order_by('distance')[:50]
     for lab in all_labs:
-        success = EntityLocationRelationship.create(latitude=lab.location.y, longitude=lab.location.x, content_object=lab)
+        success = EntityUrls.create_search_urls(lab)
         if success:
-            response = EntityUrls.create_page_url(lab)
-            if response:
-                print("Url creation of lab {name} success".format(name=lab.name))
-            else:
-                print("Url creation of lab {name} failed".format(name=lab.name))
+            print("Successfull for ", lab.id)
         else:
-            print("Location parsing of lab {name} failed".format(name=lab.name))
-            break
+            print("Failed for ", lab.id)
 
 
 class Command(BaseCommand):
     def handle(self, **options):
-        map_lab_location_urls()
+        map_lab_search_urls()
