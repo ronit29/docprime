@@ -110,7 +110,6 @@ class LabTestPricingGroup(LabPricingGroup):
         default_permissions = []
 
 
-
 class HomePickupCharges(models.Model):
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     distance = models.PositiveIntegerField()
@@ -186,7 +185,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     home_collection_charges = GenericRelation(HomePickupCharges)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
 
-
     def __str__(self):
         return self.name
 
@@ -197,7 +195,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         all_documents = self.lab_documents.all()
         for document in all_documents:
             if document.document_type == LabDocument.LOGO:
-                return document.get_thumbnail_path(document.name.url,'90x60')
+                return document.get_thumbnail_path(document.name.url, '90x60')
         return None
         # return static('lab_images/lab_default.png')
 
@@ -253,7 +251,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
                     update(computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
-
 
 
 class LabCertification(TimeStampedModel):
@@ -1177,6 +1174,7 @@ class LabOnboardingToken(TimeStampedModel):
     class Meta:
         db_table = "lab_onboarding_token"
 
+
 # Used to display pricing in admin
 class LabPricing(Lab):
     class Meta:
@@ -1222,5 +1220,12 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
         db_table = "lab_report_file"
 
 
+class LabTestGroup(auth_model.TimeStampedModel):
+    TEST_TYPE_CHOICES = LabTest.TEST_TYPE_CHOICES
+    name = models.CharField(max_length=200)
+    tests = models.ManyToManyField(LabTest)
+    type = models.PositiveSmallIntegerField(choices=TEST_TYPE_CHOICES)
 
+    class Meta:
+        db_table = 'lab_test_group'
 
