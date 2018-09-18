@@ -502,6 +502,9 @@ class ParameterLabTest(TimeStampedModel):
         db_table = 'parameter_lab_test'
         unique_together = (("parameter", "lab_test"), )
 
+    def __str__(self):
+        return "{}".format(self.parameter.name)
+
 
 class LabTest(TimeStampedModel, SearchKey):
     RADIOLOGY = 1
