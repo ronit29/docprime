@@ -341,10 +341,6 @@ class LabForm(FormCleanMixin):
     class Meta:
         model = Lab
         exclude = ()
-        help_texts = {
-            'agreed_rate_list': 'Supported formats : pdf, xls, xlsx',
-            'ppc_rate_list': 'Supported formats : pdf, xls, xlsx'
-        }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
 
@@ -658,16 +654,19 @@ class LabAppointmentForm(forms.ModelForm):
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         else:
             raise forms.ValidationError("Invalid start date and time.")
-        if self.instance.id:
-            lab_test = self.instance.lab_test.all()
-            lab = self.instance.lab
-            if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and cleaned_data.get('status'):
-                raise forms.ValidationError("Status can not be changed.")
-        elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
+
+        if cleaned_data.get('lab') and cleaned_data.get('lab_test'):
             lab_test = cleaned_data.get('lab_test').all()
             lab = cleaned_data.get('lab')
+        elif self.instance.id:
+            lab_test = self.instance.lab_test.all()
+            lab = self.instance.lab
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
+
+        if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
+            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
 

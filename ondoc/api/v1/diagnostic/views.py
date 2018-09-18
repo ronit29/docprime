@@ -277,7 +277,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @staticmethod
     def apply_sort(queryset, parameters):
-        order_by = parameters.get("order_by")
+        order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
                 queryset = queryset.order_by("price", "distance")
