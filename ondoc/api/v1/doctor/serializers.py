@@ -647,18 +647,18 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         clinics = [clinic_hospital for clinic_hospital in clinic]
         entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
                                                 entity_type__iexact='Doctor')
+        sublocality = ''
+        locality=''
         if entity.exists():
             location_id = entity.first().additional_info.get('location_id')
             type = EntityAddress.objects.filter(id=location_id).values('type','value')
             if type.first().get('type') == 'LOCALITY':
                 locality = type.first().get('value')
-                sublocality =''
 
             if type == 'SUBLOCALITY':
                 sublocality = type.first().get('value')
                 parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
                 locality = ', ' + parent.first().get('value')
-
 
         title = obj.name + ' - '
         description = obj.name + ': ' + obj.name +' is '
@@ -668,7 +668,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             doc_spec_list.append(str(name))
 
         title += ', '.join(doc_spec_list)
-        title += ' in' + sublocality + " " +locality+ ' - Consult Online'
+        title += ' in' + sublocality + " " + locality + ' - Consult Online'
 
         description += ', '.join(doc_spec_list)
         description += ' in' + sublocality + " " + locality
