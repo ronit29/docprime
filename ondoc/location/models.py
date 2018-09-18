@@ -106,11 +106,25 @@ class EntityLocationRelationship(TimeStampedModel):
     def create(cls, *args, **kwargs):
         try:
             ea_list = EntityAddress.get_or_create(**kwargs)
+
+            entity_object_queryset = cls.objects.filter(content_type=ContentType.objects.get_for_model(
+                kwargs.get('content_object')), object_id=kwargs.get('content_object').id, valid=True)
+
             for ea in ea_list:
-                if not cls.objects.filter(content_type=ContentType.objects.get_for_model(kwargs.get('content_object')),
-                                          object_id=kwargs.get('content_object').id, type=ea.type, location=ea).exists():
+                # Create if entity not have any associated relationship else will discard previously saved ones and
+                # then create new relationships.
+                if entity_object_queryset.filter(type=ea.type).exists():
+                    previously_saved_relations = entity_object_queryset.filter(type=ea.type, location=ea)
+                    if not previously_saved_relations.exists():
+                        # Marking the previous one invalid.
+                        previously_saved_relations.update(valid=False)
+                        # Creating new relation.
+                        entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
+                        entity_location_relation.save()
+                else:
                     entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
                     entity_location_relation.save()
+
             return True
         except Exception as e:
             print(str(e))
@@ -219,6 +233,7 @@ class EntityUrlsHelper(object):
                 .format(prefix=prefix, sublocality=ea_sublocality.value, locality=ea_locality.value)
 
         url = split_and_append(url, ' ', '-')
+        url = split_and_append(url, '/', '-')
 
         if not url:
             url = None
