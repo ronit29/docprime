@@ -27,7 +27,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges,
-                                     TestParameter)
+                                     TestParameter, ParameterLabTest)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
@@ -882,12 +882,17 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         )
 
 
-
-
-class TestParameterInline(admin.TabularInline):
-    model = TestParameter
+class ParameterLabTestInline(admin.TabularInline):
+    model = LabTest.parameter.through
+    fk_name = 'lab_test'
     verbose_name = 'Parameter'
     verbose_name_plural = 'Parameters'
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['parameter']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request)
 
 
 class TestPackageFormSet(forms.BaseInlineFormSet):
@@ -901,6 +906,10 @@ class TestPackageFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError('Test-{} is not correct for the Package.'.format(lab_test.name))
             if lab_test.is_package is True:
                 raise forms.ValidationError('{} is a test package'.format(lab_test.name))
+
+
+class TestParameterAdmin(VersionAdmin):
+    search_fields = ['name']
 
 
 class LabTestPackageInline(admin.TabularInline):
@@ -933,7 +942,7 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
         if obj and obj.is_package and LabTest.objects.filter(pk=obj.id, is_package=True).exists():
             inline_instance.append(LabTestPackageInline(self.model, self.admin_site))
         if obj and LabTest.objects.filter(pk=obj.id, is_package=False).exists():
-            inline_instance.append(TestParameterInline(self.model, self.admin_site))
+            inline_instance.append(ParameterLabTestInline(self.model, self.admin_site))
         return inline_instance
 
 
