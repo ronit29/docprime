@@ -744,7 +744,7 @@ class LabAppointment(TimeStampedModel):
 
         if push_to_matrix:
             # Push the appointment data to the matrix
-            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':4,
+            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':5,
                                                      'sub_product_id': 2}, ), countdown=5)
 
         if self.is_to_send_notification(database_instance):

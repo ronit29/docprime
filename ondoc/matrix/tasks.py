@@ -20,7 +20,7 @@ def prepare_and_hit(self, data):
     if task_data.get('type') == 'OPD_APPOINTMENT':
         booking_url = '%s/admin/doctor/opdappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
     elif task_data.get('type') == 'LAB_APPOINTMENT':
-        booking_url = '%s/admin/doctor/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
+        booking_url = '%s/admin/diagnostic/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
 
     patient_address = ""
     if hasattr(appointment, 'address') and appointment.address:
