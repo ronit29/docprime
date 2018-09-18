@@ -344,10 +344,10 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             self.is_live = False
 
     def save(self, *args, **kwargs):
-        location_models.EntityUrls.create_search_urls(self)
         self.update_live_status()
         super(Doctor, self).save(*args, **kwargs)
-        location_models.EntityUrls.create_page_url(self)
+        if self.is_live:
+            location_models.EntityUrls.create_page_url(self)
 
 
 

@@ -212,8 +212,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.clean()
-        location_models.EntityUrls.create_search_urls(self)
-        
+
         edit_instance = None
         if self.id is not None:
             edit_instance = 1
