@@ -24,7 +24,8 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabNetworkHelpline, LabNetworkManager, LabTest,
                                      LabTestType, LabService, LabAppointment,LabDoctorAvailability,
                                      LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument, CommonTest,
-                                     CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges)
+                                     CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges,
+                                     TestParameter, ParameterLabTest)
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -129,7 +130,8 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(LabTest,
-                                                           LabTestType, LabService)
+                                                           LabTestType, LabService,
+                                                           TestParameter, ParameterLabTest)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -185,7 +187,7 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(
             Qualification, Specialization, Language, MedicalService, College, GeneralSpecialization, LabTest,
-            LabTestType, LabService)
+            LabTestType, LabService, TestParameter, ParameterLabTest)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
