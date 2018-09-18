@@ -184,14 +184,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 lab_timing, lab_timing_data = self.get_lab_timing(timing_queryset)
             lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
             lab_serializable_data = lab_serializer.data
+
+        entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Lab').values('url')
+        lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
         temp_data['tests'] = test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
-        entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Lab').values('url')
 
-        temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+        # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
 
         return Response(temp_data)
 
