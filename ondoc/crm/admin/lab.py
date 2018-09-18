@@ -898,6 +898,8 @@ class ParameterLabTestInline(admin.TabularInline):
 class TestPackageFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
         for data in self.cleaned_data:
             lab_test = data.get('lab_test')
             if not lab_test:
