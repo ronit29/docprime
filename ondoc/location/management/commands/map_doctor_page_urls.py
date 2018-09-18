@@ -9,7 +9,8 @@ def map_doctor_urls():
         success = EntityUrls.create_page_url(doctor)
         print("success is", success)
         if not success:
-            break
+            print("Failed for id", doctor.id)
+
 
 
 class Command(BaseCommand):

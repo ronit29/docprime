@@ -12,7 +12,7 @@ def map_hospital_locations():
     for hospital in all_hospitals:
         success = EntityLocationRelationship.create(latitude=hospital.location.y, longitude=hospital.location.x, content_object=hospital)
         if not success:
-            break
+            print("Failed for id", hospital.id)
 
 
 class Command(BaseCommand):
