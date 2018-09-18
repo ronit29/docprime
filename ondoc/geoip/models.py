@@ -55,6 +55,7 @@ class GeoIPEntries(auth_model.TimeStampedModel):
         resp["access_url"] = self.SEARCH_URL_LIST[val]
         resp["latitude"] = lat
         resp["longitude"] = long
+        resp["city_name"] = self.location_detail["city"]["names"]["en"]
         return resp
 
     def get_rand_weighted_number(self, is_inside):
