@@ -212,6 +212,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.clean()
+        location_models.EntityUrls.create_search_urls(self)
         
         edit_instance = None
         if self.id is not None:
@@ -224,7 +225,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         if self.is_live:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
             if ea:
-                location_models.EntityUrls.create(self)
+                location_models.EntityUrls.create_page_url(self)
 
         if edit_instance is not None:
             id = self.id

@@ -298,11 +298,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
 
-    def save(self, *args, **kwargs):
-        super(Doctor, self).save(*args, **kwargs)
-        # if self.is_live:
-        location_models.EntityUrls.create(self)
-
     def __str__(self):
         return self.name
 
@@ -349,8 +344,10 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             self.is_live = False
 
     def save(self, *args, **kwargs):
+        location_models.EntityUrls.create_search_urls(self)
         self.update_live_status()
         super(Doctor, self).save(*args, **kwargs)
+        location_models.EntityUrls.create_page_url(self)
 
 
 

@@ -655,8 +655,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         description += ', '.join(doc_spec_list)
         description += ' consulting patients at '
         hospital = []
-        for clinic_name in clinics:
-            hospital.append(str(clinic_name.hospital))
+        for hospital_name in clinics:
+            hospital.append(str(hospital_name.hospital))
 
         description += ', '.join(hospital)
         description +='. Book appointments online, check fees, address and more.'

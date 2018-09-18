@@ -1,4 +1,4 @@
-from django.db import models
+from django.contrib.gis.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import logging
@@ -60,6 +60,7 @@ class EntityAddress(TimeStampedModel):
     type_blueprint = models.CharField(max_length=128, blank=False, null=True)
     postal_code = models.PositiveIntegerField(null=True)
     parent = models.IntegerField(null=True)
+    centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
 
     @classmethod
     def get_or_create(cls, *args, **kwargs):
@@ -106,25 +107,11 @@ class EntityLocationRelationship(TimeStampedModel):
     def create(cls, *args, **kwargs):
         try:
             ea_list = EntityAddress.get_or_create(**kwargs)
-
-            entity_object_queryset = cls.objects.filter(content_type=ContentType.objects.get_for_model(
-                kwargs.get('content_object')), object_id=kwargs.get('content_object').id, valid=True)
-
             for ea in ea_list:
-                # Create if entity not have any associated relationship else will discard previously saved ones and
-                # then create new relationships.
-                if entity_object_queryset.filter(type=ea.type).exists():
-                    previously_saved_relations = entity_object_queryset.filter(type=ea.type, location=ea)
-                    if not previously_saved_relations.exists():
-                        # Marking the previous one invalid.
-                        previously_saved_relations.update(valid=False)
-                        # Creating new relation.
-                        entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
-                        entity_location_relation.save()
-                else:
+                if not cls.objects.filter(content_type=ContentType.objects.get_for_model(kwargs.get('content_object')),
+                                          object_id=kwargs.get('content_object').id, type=ea.type, location=ea).exists():
                     entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
                     entity_location_relation.save()
-
             return True
         except Exception as e:
             print(str(e))
@@ -151,11 +138,11 @@ class EntityUrls(TimeStampedModel):
         return json.loads(self.extras)
 
     @classmethod
-    def create(cls, entity_object):
+    def create_search_urls(cls, entity_object):
         try:
             entity_helper = entity_as_mapping[entity_object.__class__.__name__.upper()]
             entity_helper_obj = entity_helper()
-            url_dict = entity_helper_obj.create_return_urls(entity_object)
+            url_dict = entity_helper_obj.create_return_search_urls(entity_object)
 
             if isinstance(url_dict, dict):
                 if url_dict.get('search_urls'):
@@ -169,6 +156,20 @@ class EntityUrls(TimeStampedModel):
                                                  url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
                             entity_url_obj.save()
 
+            return True
+
+        except Exception as e:
+            print(str(e))
+            return False
+
+    @classmethod
+    def create_page_url(cls, entity_object):
+        try:
+            entity_helper = entity_as_mapping[entity_object.__class__.__name__.upper()]
+            entity_helper_obj = entity_helper()
+            url_dict = entity_helper_obj.create_return_personal_urls(entity_object)
+
+            if isinstance(url_dict, dict):
                 if url_dict.get('page_urls'):
                     page_url_dict = url_dict['page_urls']
                     url = page_url_dict.get('urls')
@@ -201,26 +202,23 @@ class EntityUrls(TimeStampedModel):
         db_table = 'entity_urls'
 
 
-# class EntityUrlsRelation(models.Model):
-#
-#     url = models.ForeignKey(EntityUrls, on_delete=models.CASCADE)
-#     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-#     object_id = models.PositiveIntegerField()
-#     content_object = GenericForeignKey()
-#
-#     class Meta:
-#         db_table = 'entity_url_relations'
-
-
 class EntityUrlsHelper(object):
 
-    def _create_return_urls(self, entity_object):
+    def _create_return_personal_urls(self, entity_object):
         raise NotImplemented()
 
-    def create_return_urls(self, entity_object):
-        urls = self._create_return_urls(entity_object)
+    def create_return_personal_urls(self, entity_object):
+        urls = self._create_return_personal_urls(entity_object)
         return urls
 
+    def _create_return_search_urls(self, entity_object):
+        raise NotImplemented()
+
+    def create_return_search_urls(self, entity_object):
+        urls = self._create_return_search_urls(entity_object)
+        return urls
+
+    # @staticmethod
     def build_url(self, prefix, location):
         url = ''
         if location.type == 'LOCALITY':
@@ -240,17 +238,10 @@ class EntityUrlsHelper(object):
 
         return url
 
-    def _get_entities(self):
-        raise NotImplemented()
-
-    def get_entities(self):
-        entities = self._get_entities()
-        return entities
-
 
 class EntityHelperAsDoctor(EntityUrlsHelper):
 
-    def _create_return_urls(self, entity_object):
+    def _create_return_search_urls(self, entity_object):
         urls = dict()
         search_urls = list()
 
@@ -261,26 +252,41 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
         # Finding all the hospitals and appending along with the specializations.
         doctor_realted_hospitals = entity_object.hospitals.all().filter(is_live=True)
 
-        # for hospital in doctor_realted_hospitals:
-        #     if hospital.data_status == 3:
-        #
-        #         hospital_locations = hospital.entity.all()
-        #         for location in hospital_locations:
-        #             for specialization in specializations:
-        #                 url = self.build_url(specialization.name, location)
-        #
-        #                 if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
-        #                     url = "%s-%s" % (url, 'sptlitcit')
-        #                 elif location.type == EntityAddress.AllowedKeys.LOCALITY:
-        #                     url = "%s-%s" % (url, 'sptcit')
-        #
-        #                 if url:
-        #                     search_urls.append({'url': url.lower(), 'specialization': specialization.name,
-        #                                         'specialization_id': specialization.id, 'location_id': location.location_id})
-        #
-        # urls['search_urls'] = {
-        #     'urls': search_urls,
-        # }
+        for hospital in doctor_realted_hospitals:
+            related_hospital_locations = list()
+
+            hospital_locations = hospital.entity.all()
+            for type in [EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY]:
+                if hospital_locations.filter(type=type).exists():
+                    related_hospital_locations.append(hospital_locations.filter(type=type).first())
+
+            for location in related_hospital_locations:
+                for specialization in specializations:
+                    url = self.build_url(specialization.name, location)
+                    if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
+                        url = "%s-%s" % (url, 'sptlitcit')
+                    elif location.type == EntityAddress.AllowedKeys.LOCALITY:
+                        url = "%s-%s" % (url, 'sptcit')
+                    if url:
+                        search_urls.append({'url': url.lower(), 'specialization': specialization.name,
+                                            'specialization_id': specialization.id, 'location_id': location.location_id})
+
+        urls['search_urls'] = {
+            'urls': search_urls,
+        }
+
+        return urls
+
+    def _create_return_personal_urls(self, entity_object):
+        urls = dict()
+        search_urls = list()
+
+        # Finding all the doctor specialization for appending in to the url.
+        doctor_specializations = doc_models.DoctorSpecialization.objects.filter(doctor=entity_object).all()
+        specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
+
+        # Finding all the hospitals and appending along with the specializations.
+        doctor_realted_hospitals = entity_object.hospitals.all().filter(is_live=True)
 
         hospital_for_doctor_page = None
 
@@ -315,25 +321,35 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
 
 class EntityHelperAsLab(EntityUrlsHelper):
 
-    def _create_return_urls(self, entity_object):
+    def _create_return_search_urls(self, entity_object):
         urls = dict()
-        # search_urls = list()
+        search_urls = list()
 
-        # lab_locations = entity_object.entity.filter(is_live=True).all()
+        lab_locations = entity_object.entity.all()
+        related_lab_locations = list()
 
-        # if entity_object.data_status == 3:
-        #     for location in lab_locations:
-        #         url = self.build_url('labs', location)
-        #         if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
-        #             url = "%s-%s" % (url, 'lblitcit')
-        #         elif location.type == EntityAddress.AllowedKeys.LOCALITY:
-        #             url = "%s-%s" % (url, 'lbcit')
-        #         if url:
-        #             search_urls.append({'url': url.lower(), 'location_id': location.location_id})
-        #
-        # urls['search_urls'] = {
-        #     'urls': search_urls,
-        # }
+        for type in [EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY]:
+            if lab_locations.filter(type=type).exists():
+                related_lab_locations.append(lab_locations.filter(type=type).first())
+
+        if entity_object.is_live:
+            for location in related_lab_locations:
+                url = self.build_url('labs', location)
+                if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
+                    url = "%s-%s" % (url, 'lblitcit')
+                elif location.type == EntityAddress.AllowedKeys.LOCALITY:
+                    url = "%s-%s" % (url, 'lbcit')
+                if url:
+                    search_urls.append({'url': url.lower(), 'location_id': location.location_id})
+
+        urls['search_urls'] = {
+            'urls': search_urls,
+        }
+
+        return urls
+
+    def _create_return_personal_urls(self, entity_object):
+        urls = dict()
 
         query_set_for_personal_url = entity_object.entity.all().filter(type="SUBLOCALITY", valid=True)
         if not query_set_for_personal_url.exists():
