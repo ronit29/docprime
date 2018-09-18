@@ -1,12 +1,13 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q
-from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming, DoctorAssociation,
+from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
+                                 DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
-                                 CommonMedicalCondition,CommonSpecialization, DoctorSpecialization,
-                                 GeneralSpecialization)
+                                 CommonMedicalCondition, CommonSpecialization, DoctorSpecialization,
+                                 GeneralSpecialization, DoctorClinic)
 from ondoc.authentication.models import UserProfile
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -634,6 +635,34 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     hospitals = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
     availability = None
+    seo = serializers.SerializerMethodField()
+
+    def get_seo(self, obj):
+        request = self.context.get('request')
+        doctor_specializations = DoctorSpecialization.objects.filter(doctor=obj).all()
+        specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
+        clinic = DoctorClinic.objects.filter(doctor=obj).all()
+        clinics = [clinic_hospital for clinic_hospital in clinic]
+
+        title = obj.name + ' - '
+        description = obj.name + ': ' + obj.name +' is '
+        doc_spec_list = []
+
+        for name in specializations:
+            doc_spec_list.append(str(name))
+
+        title += ', '.join(doc_spec_list)
+        description += ', '.join(doc_spec_list)
+        description += ' consulting patients at '
+        hospital = []
+        for clinic_name in clinics:
+            hospital.append(str(clinic_name.hospital))
+
+        description += ', '.join(hospital)
+        description +='. Book appointments online, check fees, address and more.'
+
+
+        return {'title': title, "description": description}
 
     def get_hospitals(self, obj):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
@@ -647,7 +676,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'thumbnail', 'license', 'is_live')
+                  'general_specialization', 'thumbnail', 'license', 'is_live','seo')
 
 
 
@@ -695,7 +724,6 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',)
-
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
