@@ -9,6 +9,7 @@ import json
 from decimal import Decimal
 from ondoc.doctor import models as doc_models
 from ondoc.authentication.models import TimeStampedModel
+from django.contrib.gis.geos import Point
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -71,17 +72,21 @@ class EntityAddress(TimeStampedModel):
         parent_id = None
         postal_code = None
         ea_list = list()
-        for meta in meta_data:
 
+        for meta in meta_data:
+            point = None
             if meta['key'] in cls.AllowedKeys.availabilities():
                 if meta['key'].startswith('SUBLOCALITY'):
                     postal_code = meta['postal_code']
+                if meta['key'] not in [cls.AllowedKeys.COUNTRY, cls.AllowedKeys.ADMINISTRATIVE_AREA_LEVEL_1,
+                                       cls.AllowedKeys.ADMINISTRATIVE_AREA_LEVEL_2]:
+                    point = Point(kwargs.get('longitude'), kwargs.get('latitude'))
                 saved_data = cls.objects.filter(type=meta['key'], postal_code=postal_code, type_blueprint=meta['type'], value=meta['value'], parent=parent_id)
                 if len(saved_data) == 1:
                     entity_address = saved_data[0]
                     parent_id = entity_address.id
                 elif len(saved_data) == 0:
-                    entity_address = cls(type=meta['key'], postal_code=postal_code, type_blueprint=meta['type'], value=meta['value'], parent=parent_id)
+                    entity_address = cls(type=meta['key'], centroid=point, postal_code=postal_code, type_blueprint=meta['type'], value=meta['value'], parent=parent_id)
                     entity_address.save()
                     parent_id = entity_address.id
 
@@ -176,11 +181,11 @@ class EntityUrls(TimeStampedModel):
                     if not url:
                         return
 
-                    extra = {'related_entity_id': entity_object.id}
+                    extra = {'related_entity_id': entity_object.id, 'location_id': page_url_dict.get('location_id')}
                     entity_url_objs = cls.objects.filter(entity_id=entity_object.id, entity_type=entity_object.__class__.__name__, url_type='PAGEURL', is_valid=True)
                     if not entity_url_objs.exists():
                         entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
-                                             url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id)
+                                             url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id, extras=json.dumps(extra))
                         entity_url_obj.save()
                     else:
                         entity_url_obj = entity_url_objs.first()
@@ -313,6 +318,7 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
 
                 urls['page_urls'] = {
                     'urls': doctor_page_url.lower(),
+                    'location_id': query_set_for_personal_url.first().location.id
                 }
 
         print(urls)
@@ -362,6 +368,7 @@ class EntityHelperAsLab(EntityUrlsHelper):
 
                 urls['page_urls'] = {
                     'urls': lab_page_url.lower(),
+                    'location_id': query_set_for_personal_url.first().location.id
                 }
 
         print(urls)
