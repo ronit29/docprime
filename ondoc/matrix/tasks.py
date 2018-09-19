@@ -153,10 +153,10 @@ def push_signup_lead_to_matrix(self, data):
             'ProductId': data.get('product_id'),
             'SubProductId': data.get('sub_product_id'),
             'CreatedOn': int(time.mktime(online_lead_obj.created_at.utctimetuple())),
-            'UtmCampaign': utm.get('utmCampaign', ''),
-            'UTMMedium': utm.get('utmMedium', ''),
-            'UtmSource': utm.get('utmSource', ''),
-            'UtmTerm': utm.get('utmTerm', ''),
+            'UtmCampaign': utm.get('utm_campaign', ''),
+            'UTMMedium': utm.get('utm_medium', ''),
+            'UtmSource': utm.get('utm_source', ''),
+            'UtmTerm': utm.get('utm_term', ''),
         }
 
         url = settings.MATRIX_API_URL
