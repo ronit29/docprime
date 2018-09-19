@@ -59,15 +59,15 @@ class GeoIPEntries(auth_model.TimeStampedModel):
         return resp
 
     def get_rand_weighted_number(self, is_inside):
-        x = 4
+        x = 3
         if not is_inside:
-            x = 3
+            x = 2
         rand_val = randint(100000, 999999)
         value = rand_val % x
         resp = None
-        if value <= 1:
+        if value <= 0:
             resp = self.CHAT_VALUE
-        elif value <= 2:
+        elif value <= 1:
             resp = self.LAB_QUERY_VALUE
         else:
             resp = self.DOCTOR_QUERY_VALUE
