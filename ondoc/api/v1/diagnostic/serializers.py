@@ -19,6 +19,8 @@ import random
 import logging
 import json
 
+from ondoc.location.models import EntityUrls, EntityAddress
+
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
 User = get_user_model()
@@ -58,6 +60,23 @@ class LabModelSerializer(serializers.ModelSerializer):
     lab_image = LabImageModelSerializer(many=True)
     lab_thumbnail = serializers.SerializerMethodField()
     home_pickup_charges = serializers.ReadOnlyField()
+    seo = serializers.SerializerMethodField()
+
+    def get_seo(self, obj):
+
+        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Lab')
+        locality = ''
+        if entity.exists():
+            location_id = entity.first().additional_info.get('location_id')
+            type = EntityAddress.objects.filter(id=location_id).values('type', 'value')
+            if type.first().get('type') == 'LOCALITY':
+                locality = type.first().get('value')
+
+        title = obj.name + '  - Diagnostic Centre in '+ locality + '  |DocPrime'
+        description = obj.name + ': Book test at  ' + obj.name + '  online, check fees, packages prices and more at DocPrime. '
+        return {'title': title, "description": description}
+
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
@@ -93,7 +112,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         model = Lab
         fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', )
+                  'is_home_collection_enabled', 'seo')
 
 
 class LabProfileSerializer(LabModelSerializer):

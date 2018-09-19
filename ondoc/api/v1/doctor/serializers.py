@@ -640,7 +640,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     seo = serializers.SerializerMethodField()
 
     def get_seo(self, obj):
-        request = self.context.get('request')
+
         doctor_specializations = DoctorSpecialization.objects.filter(doctor=obj).all()
         specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
         clinic = DoctorClinic.objects.filter(doctor=obj).all()
@@ -648,14 +648,14 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
                                                 entity_type__iexact='Doctor')
         sublocality = ''
-        locality=''
+        locality = ''
         if entity.exists():
             location_id = entity.first().additional_info.get('location_id')
             type = EntityAddress.objects.filter(id=location_id).values('type','value')
             if type.first().get('type') == 'LOCALITY':
                 locality = type.first().get('value')
 
-            if type == 'SUBLOCALITY':
+            if type.first().get('type') == 'SUBLOCALITY':
                 sublocality = type.first().get('value')
                 parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
                 locality = ', ' + parent.first().get('value')
@@ -679,8 +679,6 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         description += ', '.join(hospital)
         description +='. Book appointments online, check fees, address and more.'
-
-
         return {'title': title, "description": description}
 
     def get_hospitals(self, obj):
@@ -696,7 +694,6 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live','seo')
-
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
