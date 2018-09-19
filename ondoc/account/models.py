@@ -387,7 +387,7 @@ class ConsumerTransaction(TimeStampedModel):
 
     @classmethod
     def valid_appointment_for_cancellation(cls, app_id, product_id):
-        return not cls.objects.filter(type=0, reference_id=app_id, product_id=product_id,
+        return not cls.objects.filter(type=PgTransaction.CREDIT, reference_id=app_id, product_id=product_id,
                                       action=cls.CANCELLATION).exists()
 
     class Meta:

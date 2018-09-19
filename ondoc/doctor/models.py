@@ -1052,15 +1052,12 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-        logger.error("Entered action_cancelled  - " + str(self.id) + " timezone - " + str(timezone.now()))
 
         # Taking Lock first
         consumer_account = None
         if self.payment_type == self.PREPAID:
-            logger.error("Before Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
             temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-            logger.error("After Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
 
         old_instance = OpdAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
