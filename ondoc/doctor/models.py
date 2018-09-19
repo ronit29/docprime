@@ -14,6 +14,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
+from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund
 from ondoc.payout.models import Outstanding
 from ondoc.doctor.tasks import doc_app_auto_cancel
@@ -39,6 +40,8 @@ from PIL import Image as Img
 from io import BytesIO
 import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
 
 logger = logging.getLogger(__name__)
@@ -127,6 +130,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     live_at = models.DateTimeField(null=True, blank=True)
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
+    entity = GenericRelation(location_models.EntityLocationRelationship)
 
     def __str__(self):
         return self.name
@@ -150,13 +154,22 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
 
     def save(self, *args, **kwargs):
+        build_url = True
+        if self.is_live:
+            if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
+                build_url = False
+
         super(Hospital, self).save(*args, **kwargs)
+
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=True)
         else:
             auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
+
+        if build_url:
+            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
 
 class HospitalAward(auth_model.TimeStampedModel):
@@ -333,6 +346,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def save(self, *args, **kwargs):
         self.update_live_status()
         super(Doctor, self).save(*args, **kwargs)
+        if self.is_live:
+            location_models.EntityUrls.create_page_url(self)
 
 
 

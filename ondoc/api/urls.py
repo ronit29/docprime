@@ -11,6 +11,7 @@ from .v1.article.router import urlpatterns as article_url
 from .v1.admin.router import urlpatterns as admin_url
 from .v1.web.router import urlpatterns as web_url
 from .v1.common.router import urlpatterns as common_url
+from .v1.location.router import urlpatterns as location_url
 from .v1.tracking.router import urlpatterns as track_url
 from .v1.geoip.router import urlpatterns as geoip_url
 # from .v1.account.router import urlpatterns as acct_url
@@ -28,6 +29,7 @@ urlpatterns = [
     path('v1/web/', include(web_url)),
     path('v1/admin/', include(admin_url)),
     path('v1/common/', include(common_url)),
+    path('v1/location/', include(location_url)),
     path('v1/tracking/', include(track_url)),
     path('v1/geoip/', include(geoip_url)),
 ]
