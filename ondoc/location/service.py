@@ -53,6 +53,7 @@ def get_meta_by_latlong(lat, long):
         for key in component.get('types', []):
             resp_data[key.upper()] = component['long_name']
 
+    # never change the order. As it could affect the parsed address.
     for type in ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2', 'LOCALITY', 'SUBLOCALITY',
                  'SUBLOCALITY_LEVEL_1', 'SUBLOCALITY_LEVEL_2', 'SUBLOCALITY_LEVEL_3']:
 
