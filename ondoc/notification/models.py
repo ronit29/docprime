@@ -411,6 +411,9 @@ class EmailNotificationLabMixin:
 
 
 class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotificationLabMixin):
+    OPS_APPOINTMENT_NOTIFICATION = 1
+    OPS_PAYMENT_NOTIFICATION = 2
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
     email_subject = models.TextField(blank=True, null=True)
@@ -494,6 +497,22 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         email_subject = "Change in appointment of user - {username} and id - {id}".format(
             username=instance.profile.name, id=instance.id
         )
+        if email_list:
+            cls.publish_ops_email(email_list, html_body, email_subject)
+            # email_notif = {
+            #     "email": email_list,
+            #     "content": html_body,
+            #     "email_subject": email_subject
+            # }
+            # message = {
+            #     "data": email_notif,
+            #     "type": "email"
+            # }
+            # message = json.dumps(message)
+            # publish_message(message)
+
+    @classmethod
+    def publish_ops_email(cls, email_list, html_body, email_subject):
         if email_list:
             email_notif = {
                 "email": email_list,
