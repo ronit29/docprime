@@ -174,6 +174,7 @@ def push_signup_lead_to_matrix(self, data):
             self.retry([data], countdown=countdown_time)
 
         resp_data = response.json()
+        logger.error(response.text)
 
         # save the appointment with the matrix lead id.
         online_lead_obj.matrix_lead_id = resp_data.get('Id', None)

@@ -363,7 +363,7 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
     mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
     city_name = serializers.IntegerField()
     email = serializers.EmailField()
-    utm_params = serializers.JSONField()
+    utm_params = serializers.JSONField(required=False)
 
     def validate(self, attrs):
         if not common_models.Cities.objects.filter(id=attrs['city_name']).exists():
