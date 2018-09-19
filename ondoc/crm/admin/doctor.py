@@ -6,6 +6,7 @@ from django.conf.urls import url
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.db.models import Q
+from import_export.fields import Field
 from import_export.admin import ImportExportMixin
 from import_export import fields, resources
 from django.utils.dateparse import parse_datetime
@@ -33,7 +34,8 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
-                                 OpdAppointment, CompetitorInfo)
+                                 OpdAppointment, CompetitorInfo, SpecializationDepartment,
+                                 SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -1289,3 +1291,105 @@ class DoctorMappingAdmin(VersionAdmin):
 
 class CommonSpecializationAdmin(VersionAdmin):
     autocomplete_fields = ['specialization']
+
+
+class SpecializationDepartmentResource(resources.ModelResource):
+
+    def skip_row(self, instance, original):
+        if SpecializationDepartment.objects.filter(name=instance.name).exists():
+            return True
+        super().skip_row(instance, original)
+
+    class Meta:
+        model = SpecializationDepartment
+        fields = ('id', 'name')
+
+
+class SpecializationFieldResource(resources.ModelResource):
+
+    def skip_row(self, instance, original):
+        if SpecializationField.objects.filter(name=instance.name).exists():
+            return True
+        super().skip_row(instance, original)
+
+    class Meta:
+        model = SpecializationField
+        fields = ('id', 'name')
+
+
+class PracticeSpecializationResource(resources.ModelResource):
+    name = Field(attribute='name', column_name='modified_name')
+    field_medicine = Field(column_name='field_medicine')
+    department = Field(column_name='department')
+    general_specialization_id = Field(column_name='general_specialization_id')
+
+    class Meta:
+        model = PracticeSpecialization
+        fields = ('id', 'name')
+
+    def skip_row(self, instance, original):
+        database_instance = PracticeSpecialization.objects.filter(name=instance.name).first()
+        if database_instance:
+            if not PracticeSpecialization.objects.filter(
+                    general_specialization_ids__contains=[instance._general_specialization_id]).exists():
+                if database_instance.general_specialization_ids:
+                    database_instance.general_specialization_ids.append(instance._general_specialization_id)
+                else:
+                    database_instance.general_specialization_ids = [instance._general_specialization_id]
+            if not database_instance.specialization_field:
+                database_instance.specialization_field = instance.specialization_field
+            SpecializationDepartmentMapping.objects.get_or_create(specialization=database_instance,
+                                                                  department=instance._department)
+            database_instance.save()
+            return True
+        return False
+
+    def get_or_init_instance(self, instance_loader, row):
+        instance, created = super().get_or_init_instance(instance_loader, row)
+        specialization_field, is_field_created = SpecializationField.objects.get_or_create(name=row.get('field_medicine'))
+        _department, is_dept_created = SpecializationDepartment.objects.get_or_create(name=row.get('department'))
+        _general_specialization_id = int(row.get('general_specialization_id'))
+        instance._department = _department
+        instance._general_specialization_id = _general_specialization_id
+        instance.specialization_field = specialization_field
+
+        return instance, created
+
+
+    def after_save_instance(self, instance, using_transactions, dry_run):
+        if instance.general_specialization_ids:
+            instance.general_specialization_ids.append(instance._general_specialization_id)
+        else:
+            instance.general_specialization_ids = [instance._general_specialization_id]
+        SpecializationDepartmentMapping.objects.get_or_create(specialization=instance, department=instance._department)
+        instance.save()
+        super().after_save_instance(instance, using_transactions, dry_run)
+
+
+class SpecializationDepartmentAdmin(ImportExportMixin, VersionAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name', )
+    date_hierarchy = 'created_at'
+    resource_class = SpecializationDepartmentResource
+
+
+class SpecializationFieldAdmin(ImportExportMixin, VersionAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name', )
+    date_hierarchy = 'created_at'
+    resource_class = SpecializationFieldResource
+
+
+class PracticeSpecializationDepartmentMappingInline(admin.TabularInline):
+    model = SpecializationDepartmentMapping
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
+class PracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name', )
+    date_hierarchy = 'created_at'
+    inlines = [PracticeSpecializationDepartmentMappingInline, ]
+    resource_class = PracticeSpecializationResource

@@ -3,7 +3,7 @@ from django.db import migrations, transaction
 from django.db.models import Count, Sum, When, Case, Q, F
 from django.contrib.postgres.operations import CreateExtension
 from django.contrib.staticfiles.templatetags.staticfiles import static
-from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.fields import JSONField, ArrayField
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
@@ -1445,4 +1445,42 @@ class CompetitorInfo(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class SpecializationDepartment(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200, unique=True)
 
+    class Meta:
+        db_table = 'specialization_department'
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+
+class SpecializationField(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200, unique=True)
+
+    class Meta:
+        db_table = 'specialization_field'
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+
+class SpecializationDepartmentMapping(auth_model.TimeStampedModel):
+    specialization = models.ForeignKey('PracticeSpecialization', on_delete=models.DO_NOTHING)
+    department = models.ForeignKey(SpecializationDepartment, on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'specialization_department_mapping'
+
+
+class PracticeSpecialization(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200, unique=True)
+    department = models.ManyToManyField(SpecializationDepartment, through=SpecializationDepartmentMapping,
+                                        through_fields=('specialization', 'department'),
+                                        related_name='departments')
+    specialization_field = models.ForeignKey(SpecializationField, on_delete=models.DO_NOTHING)
+    general_specialization_ids = ArrayField(models.IntegerField(blank=True, null=True), size=100,
+                                            null=True, blank=True)
+
+    class Meta:
+        db_table = 'practice_specialization'
