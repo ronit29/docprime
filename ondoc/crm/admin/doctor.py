@@ -1338,16 +1338,20 @@ class PracticeSpecializationResource(resources.ModelResource):
                     database_instance.general_specialization_ids = [instance._general_specialization_id]
             if not database_instance.specialization_field:
                 database_instance.specialization_field = instance.specialization_field
+            database_instance.save()
+            if not instance._department:
+                return True
             SpecializationDepartmentMapping.objects.get_or_create(specialization=database_instance,
                                                                   department=instance._department)
-            database_instance.save()
             return True
         return False
 
     def get_or_init_instance(self, instance_loader, row):
         instance, created = super().get_or_init_instance(instance_loader, row)
-        specialization_field, is_field_created = SpecializationField.objects.get_or_create(name=row.get('field_medicine'))
-        _department, is_dept_created = SpecializationDepartment.objects.get_or_create(name=row.get('department'))
+        specialization_field, is_field_created = SpecializationField.objects.get_or_create(
+            name=row.get('field_medicine')) if row.get('field_medicine') else (None, False)
+        _department, is_dept_created = SpecializationDepartment.objects.get_or_create(
+            name=row.get('department')) if row.get('department') else (None, False)
         _general_specialization_id = int(row.get('general_specialization_id'))
         instance._department = _department
         instance._general_specialization_id = _general_specialization_id
@@ -1359,8 +1363,10 @@ class PracticeSpecializationResource(resources.ModelResource):
             instance.general_specialization_ids.append(instance._general_specialization_id)
         else:
             instance.general_specialization_ids = [instance._general_specialization_id]
-        SpecializationDepartmentMapping.objects.get_or_create(specialization=instance, department=instance._department)
         instance.save()
+        if instance._department:
+            SpecializationDepartmentMapping.objects.get_or_create(specialization=instance,
+                                                                  department=instance._department)
         super().after_save_instance(instance, using_transactions, dry_run)
 
 
