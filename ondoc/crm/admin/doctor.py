@@ -1352,9 +1352,7 @@ class PracticeSpecializationResource(resources.ModelResource):
         instance._department = _department
         instance._general_specialization_id = _general_specialization_id
         instance.specialization_field = specialization_field
-
         return instance, created
-
 
     def after_save_instance(self, instance, using_transactions, dry_run):
         if instance.general_specialization_ids:

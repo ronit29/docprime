@@ -1484,3 +1484,6 @@ class PracticeSpecialization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'practice_specialization'
+
+    def __str__(self):
+        return "{}".format(self.name)
