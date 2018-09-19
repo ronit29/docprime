@@ -6,7 +6,7 @@ from django.conf.urls import url
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.db.models import Q
-from import_export.admin import ImportExportMixin
+from import_export.admin import ImportExportMixin, ImportExportModelAdmin
 from import_export import fields, resources
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import make_aware
@@ -33,7 +33,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
-                                 OpdAppointment, CompetitorInfo)
+                                 OpdAppointment, CompetitorInfo, CompetitorHit)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -702,6 +702,48 @@ class CompetitorInfoInline(nested_admin.NestedTabularInline):
     fields = ['name', 'hospital', 'hospital_name', 'fee', 'url']
 
 
+class CompetitorInfoResource(resources.ModelResource):
+    class Meta:
+        model = CompetitorInfo
+        fields = ('id', 'doctor', 'hospital_name', 'fee', 'url')
+
+    def init_instance(self, row=None):
+        ins = super().init_instance(row)
+        ins.name = CompetitorInfo.PRACTO
+        return ins
+
+
+class CompetitorInfoImportAdmin(ImportExportModelAdmin):
+    resource_class = CompetitorInfoResource
+    list_display = ('id', 'doctor', 'hospital_name', 'fee', 'url')
+
+
+class CompetitorHitFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        counter = {}
+        for values in self.cleaned_data:
+            competitor_name = values.get('name')
+            if competitor_name:
+                if counter.get(competitor_name):
+                    counter[competitor_name] = counter.get(competitor_name) + 1
+                else:
+                    counter[competitor_name] = 1
+
+        if any((x > 1 for x in counter.values())):
+            raise forms.ValidationError('Cannot have duplicate record for any competitor.')
+
+
+class CompetitorHitsInline(nested_admin.NestedTabularInline):
+    model = CompetitorHit
+    formset = CompetitorHitFormSet
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -717,6 +759,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     form = DoctorForm
     inlines = [
         CompetitorInfoInline,
+        CompetitorHitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
         DoctorSpecializationInline,
@@ -950,10 +993,11 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         elif self.instance.id:
             doctor = self.instance.doctor
             hospital = self.instance.hospital
-            if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and cleaned_data.get('status'):
-                raise forms.ValidationError("Status can not be changed.")
         else:
             raise forms.ValidationError("Doctor and hospital details not entered.")
+
+        if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and len(cleaned_data):
+            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
 
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                  doctor_clinic__hospital=hospital,

@@ -86,6 +86,10 @@ class DoctorSearchHelper:
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
+        max_distance = str(
+            self.query_params.get('max_distance') * 1000 if self.query_params.get(
+                'max_distance') and self.query_params.get(
+                'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
@@ -105,7 +109,7 @@ class DoctorSearchHelper:
                        "where distance < %s and %s" % (longitude, latitude,
                                                        longitude, latitude,
                                                        filtering_params, order_by_field,
-                                                       DoctorSearchHelper.MAX_DISTANCE, rank_by)
+                                                       max_distance, rank_by)
         return query_string
 
     def count_hospitals(self, doctor):

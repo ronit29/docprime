@@ -395,8 +395,13 @@ class UserAppointmentsViewSet(OndocViewSet):
             else:
                 temp_dict[data["status"]].append(data)
         combined_data = list()
+        status_six_data = list()
         for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
-            combined_data.extend(v)
+            if k==6:
+                status_six_data.extend(v)
+            else:
+                combined_data.extend(v)
+        combined_data.extend(status_six_data)
         combined_data = combined_data[:80]
         return Response(combined_data)
 

@@ -48,7 +48,8 @@ urlpatterns = [
     path('', include('ondoc.web.urls', namespace='web')),
     path('', include('ondoc.matrix.urls', namespace='matrix')),
     path('', include('ondoc.doctor.urls', namespace='doctor')),
-    path('onboard/',include('ondoc.onboard.urls', namespace='onboard')),
+    path('onboard/', include('ondoc.onboard.urls', namespace='onboard')),
+    path('', include('ondoc.seo.urls')),
 ] + additional_urls + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 

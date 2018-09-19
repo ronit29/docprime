@@ -17,7 +17,6 @@ def map_lab_location_urls():
                 print("Url creation of lab {name} failed".format(name=lab.name))
         else:
             print("Location parsing of lab {name} failed".format(name=lab.name))
-            break
 
 
 class Command(BaseCommand):

@@ -344,10 +344,10 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             self.is_live = False
 
     def save(self, *args, **kwargs):
-        location_models.EntityUrls.create_search_urls(self)
         self.update_live_status()
         super(Doctor, self).save(*args, **kwargs)
-        location_models.EntityUrls.create_page_url(self)
+        if self.is_live:
+            location_models.EntityUrls.create_page_url(self)
 
 
 
@@ -1440,24 +1440,27 @@ class DoctorMapping(auth_model.TimeStampedModel):
 
 
 class CompetitorInfo(auth_model.TimeStampedModel):
-    PRACTO =1
-    LYBRATE =2
+    PRACTO = 1
+    LYBRATE = 2
     NAME_TYPE_CHOICES = (("", "Select"), (PRACTO, 'Practo'), (LYBRATE, "Lybrate"),)
     name = models.PositiveSmallIntegerField(blank=True, null=True,
                                             choices=NAME_TYPE_CHOICES)
 
-    doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True, blank=True)
-    hospital = models.ForeignKey(Hospital, related_name="competitor_hospital", on_delete=models.CASCADE, null=True, blank=True)
+    doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True,
+                               blank=True)
+    hospital = models.ForeignKey(Hospital, related_name="competitor_hospital", on_delete=models.CASCADE, null=True,
+                                 blank=True)
     hospital_name = models.CharField(max_length=200)
     fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     url = models.URLField(null=True)
-    processed_url =models.URLField(null=True)
+    processed_url = models.URLField(null=True)
 
     #
     # url = url.replace("http://", "")
 
     class Meta:
         db_table = "competitor_info"
+        #unique_together = ('name', 'hospital_name', 'doctor')
 
     def save(self, *args, **kwargs):
         url = self.url
@@ -1470,3 +1473,12 @@ class CompetitorInfo(auth_model.TimeStampedModel):
 
         super().save(*args, **kwargs)
 
+
+class CompetitorHit(models.Model):
+    NAME_TYPE_CHOICES = CompetitorInfo.NAME_TYPE_CHOICES
+    doctor = models.ForeignKey(Doctor, related_name="competitor_doctor_hits", on_delete=models.CASCADE)
+    name = models.PositiveSmallIntegerField(choices=NAME_TYPE_CHOICES)
+    hits = models.BigIntegerField()
+
+    class Meta:
+        db_table = "competitor_hit"

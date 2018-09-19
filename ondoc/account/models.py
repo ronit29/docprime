@@ -10,10 +10,12 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request
 from django.conf import settings
+from rest_framework import status
 import hashlib
 import copy
 import json
 import logging
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +143,12 @@ class Order(TimeStampedModel):
 
 
 class PgTransaction(TimeStampedModel):
-    REFUND_FAILURE_STATUS = 'REFUND_FAILURE_BY_PG'
+    PG_REFUND_SUCCESS_OK_STATUS = '1'
+    PG_REFUND_FAILURE_OK_STATUS = '0'
+    PG_REFUND_FAILURE_STATUS = 'FAIL'
+    PG_REFUND_ALREADY_REQUESTED_STATUS = 'ALREADY_REQUESTED'
+
+    REFUND_UPDATE_FAILURE_STATUS = 'REFUND_FAILURE_BY_PG'
 
     DOCTOR_APPOINTMENT = 1
     LAB_APPOINTMENT = 2
@@ -436,16 +443,61 @@ class ConsumerRefund(TimeStampedModel):
         db_table = "consumer_refund"
 
     @classmethod
-    def schedule_refund(cls, consumer_tx):
-        consumer_refund_obj = cls.objects.filter(consumer_transaction=consumer_tx)
-        pg_data = PgTransaction.form_pg_refund_data(consumer_refund_obj)
+    def schedule_refund_task(cls, consumer_refund_objs):
+        pg_data = PgTransaction.form_pg_refund_data(consumer_refund_objs)
         refund_curl_request(pg_data)
+
+    def schedule_refund(self):
+        pg_data = PgTransaction.form_pg_refund_data([self, ])
+        for req_data in pg_data:
+            if settings.AUTO_REFUND:
+                try:
+                    token = settings.PG_REFUND_AUTH_TOKEN
+                    headers = {
+                        "auth": token,
+                        "Content-Type": "application/json"
+                    }
+                    url = settings.PG_REFUND_URL
+                    # For test only
+                    # url = 'http://localhost:8000/api/v1/doctor/test'
+                    print(url)
+                    response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                    if response.status_code == status.HTTP_200_OK:
+                        resp_data = response.json()
+                        if resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_SUCCESS_OK_STATUS:
+                            self.update_refund_status_on_resp(req_data["refNo"])
+                        elif (resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_FAILURE_OK_STATUS and
+                              resp_data.get("status") is not None and str(
+                                    resp_data["status"]) == PgTransaction.PG_REFUND_ALREADY_REQUESTED_STATUS):
+                            self.update_refund_status_on_resp(req_data["refNo"])
+                            print("Already Requested")
+                        elif (resp_data.get("ok") is None or
+                              (str(resp_data["ok"]) == PgTransaction.PG_REFUND_FAILURE_OK_STATUS and
+                               (resp_data.get("status") is None or str(resp_data["status"]) == PgTransaction.PG_REFUND_FAILURE_STATUS))):
+                            print("Refund Failure")
+                            raise Exception("Wrong response - " + str(response.content))
+                        else:
+                            print("Incorrect response")
+                            raise Exception("Wrong response - " + str(response.content))
+                    else:
+                        raise Exception("Invalid Http response status - " + str(response.content))
+                except Exception as e:
+                    logger.error("Error in Refund of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
 
     @classmethod
     def request_pending_refunds(cls):
         consumer_refund_objs = cls.objects.filter(refund_state=cls.PENDING)
-        pg_data = PgTransaction.form_pg_refund_data(consumer_refund_objs)
-        refund_curl_request(pg_data)
+        for obj in consumer_refund_objs:
+            obj.schedule_refund()
+
+    @classmethod
+    def update_refund_status_on_resp(cls, pk):
+        with transaction.atomic():
+            refund_queryset = cls.objects.select_for_update().filter(pk=pk).first()
+            if refund_queryset:
+                refund_queryset.refund_state = ConsumerRefund.REQUESTED
+                refund_queryset.save()
+                print("Status Updated")
 
 
 class Invoice(TimeStampedModel):

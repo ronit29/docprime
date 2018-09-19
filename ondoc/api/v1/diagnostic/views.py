@@ -116,6 +116,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if not url:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
+        url = url.lower()
         if EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Lab').exists():
             entity_url_obj = EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
             entity_id = entity_url_obj.entity_id
@@ -147,9 +148,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         for resp in serializer.data:
             if id_url_dict.get(resp['lab']['id']):
-                resp['url'] = id_url_dict[resp['lab']['id']]
+                resp['lab']['url'] = id_url_dict[resp['lab']['id']]
             else:
-                resp['url'] = None
+                resp['lab']['url'] = None
 
         test_ids = parameters.get('ids',[])
 

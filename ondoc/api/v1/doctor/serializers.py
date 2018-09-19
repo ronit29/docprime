@@ -614,6 +614,7 @@ class DoctorListSerializer(serializers.Serializer):
     search_id = serializers.IntegerField(required=False, allow_null=True)
     doctor_name = serializers.CharField(required=False)
     hospital_name = serializers.CharField(required=False)
+    max_distance = serializers.IntegerField(required=False, allow_null=True)
 
     def validate_specialization_id(self, value):
         request = self.context.get("request")
@@ -651,7 +652,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         locality = ''
         if entity.exists():
             location_id = entity.first().additional_info.get('location_id')
-            type = EntityAddress.objects.filter(id=location_id).values('type','value')
+            type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
             if type.first().get('type') == 'LOCALITY':
                 locality = type.first().get('value')
 
@@ -668,10 +669,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             doc_spec_list.append(str(name))
 
         title += ', '.join(doc_spec_list)
-        title += ' in' + sublocality + " " + locality + ' - Consult Online'
+        title += ' in ' + sublocality + " " + locality + ' - Consult Online'
 
         description += ', '.join(doc_spec_list)
-        description += ' in' + sublocality + " " + locality
+        description += ' in ' + sublocality + " " + locality
         description += ' consulting patients at '
         hospital = []
         for hospital_name in clinics:
