@@ -363,6 +363,7 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
     mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
     city_name = serializers.IntegerField()
     email = serializers.EmailField()
+    utm_params = serializers.JSONField()
 
     def validate(self, attrs):
         if not common_models.Cities.objects.filter(id=attrs['city_name']).exists():
@@ -374,7 +375,7 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OnlineLead
-        fields = ('member_type', 'name', 'speciality', 'mobile', 'city_name', 'email')
+        fields = ('member_type', 'name', 'speciality', 'mobile', 'city_name', 'email', 'utm_params')
 
 
 class CareerSerializer(serializers.ModelSerializer):

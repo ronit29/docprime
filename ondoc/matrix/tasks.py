@@ -140,6 +140,8 @@ def push_signup_lead_to_matrix(self, data):
         if not online_lead_obj:
             raise Exception("Online lead could not found against id - " + str(lead_id))
 
+        utm = online_lead_obj.utm_params if online_lead_obj.utm_params else {}
+
         request_data = {
             'Name': online_lead_obj.name,
             'PrimaryNo': online_lead_obj.mobile,
@@ -150,7 +152,11 @@ def push_signup_lead_to_matrix(self, data):
             'CityId': online_lead_obj.city_name.id if online_lead_obj.city_name.id else 0,
             'ProductId': data.get('product_id'),
             'SubProductId': data.get('sub_product_id'),
-            'CreatedOn': int(time.mktime(online_lead_obj.created_at.utctimetuple()))
+            'CreatedOn': int(time.mktime(online_lead_obj.created_at.utctimetuple())),
+            'UtmCampaign': utm.get('utmCampaign', ''),
+            'UTMMedium': utm.get('utmMedium', ''),
+            'UtmSource': utm.get('utmSource', ''),
+            'UtmTerm': utm.get('utmTerm', ''),
         }
 
         url = settings.MATRIX_API_URL

@@ -4,6 +4,8 @@ from django.conf import settings
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.common.models import Cities
 from ondoc.matrix.tasks import push_signup_lead_to_matrix
+import json
+from django.contrib.postgres.fields import JSONField
 import hashlib
 
 class OnlineLead(TimeStampedModel):
@@ -20,6 +22,7 @@ class OnlineLead(TimeStampedModel):
     city_name = models.ForeignKey(Cities, on_delete=models.SET_NULL, null=True)
     email = models.EmailField(blank=False)
     matrix_lead_id = models.IntegerField(null=True)
+    utm_params = JSONField(blank=True, null=True)
 
     def __str__(self):
         return self.name
