@@ -106,7 +106,7 @@ class EntityLocationRelationship(TimeStampedModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     valid = models.BooleanField(default=True)
-    location = models.ForeignKey(EntityAddress, on_delete=models.CASCADE)
+    location = models.ForeignKey(EntityAddress, related_name='associated_relations', on_delete=models.CASCADE)
     type = models.CharField(max_length=128, blank=False, null=False, choices=EntityAddress.AllowedKeys.as_choices())
 
     @classmethod
