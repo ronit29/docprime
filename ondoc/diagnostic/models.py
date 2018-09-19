@@ -213,6 +213,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.clean()
+        build_url = True
+        if self.is_live and self.location:
+            if Lab.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
+                build_url = False
 
         edit_instance = None
         if self.id is not None:
@@ -222,7 +226,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         self.update_live_status()
         super(Lab, self).save(*args, **kwargs)
 
-        if self.is_live:
+        if self.is_live and self.location and build_url:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
             if ea:
                 location_models.EntityUrls.create_page_url(self)
