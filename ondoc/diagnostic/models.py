@@ -36,6 +36,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.location import models as location_models
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +184,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
+    entity = GenericRelation(location_models.EntityLocationRelationship)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
 
     def __str__(self):
@@ -211,7 +213,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.clean()
-        
+
         edit_instance = None
         if self.id is not None:
             edit_instance = 1
@@ -219,6 +221,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
         self.update_live_status()
         super(Lab, self).save(*args, **kwargs)
+
+        if self.is_live:
+            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+            if ea:
+                location_models.EntityUrls.create_page_url(self)
 
         if edit_instance is not None:
             id = self.id
@@ -730,7 +737,7 @@ class LabAppointment(TimeStampedModel):
     def app_commit_tasks(self, old_instance, push_to_matrix):
         if push_to_matrix:
             # Push the appointment data to the matrix
-            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':4,
+            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':5,
                                                      'sub_product_id': 2}, ), countdown=5)
 
         if self.is_to_send_notification(old_instance):

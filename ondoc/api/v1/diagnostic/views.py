@@ -36,6 +36,8 @@ from ondoc.diagnostic import models
 from ondoc.authentication import models as auth_models
 from django.db.models import Q, Value
 from django.db.models.functions import StrIndex
+
+from ondoc.location.models import EntityUrls
 from . import serializers
 import copy
 import re
@@ -109,6 +111,20 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
+    def retrieve_by_url(self, request):
+        url = request.GET.get('url')
+        if not url:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        url = url.lower()
+        if EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Lab').exists():
+            entity_url_obj = EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
+            entity_id = entity_url_obj.entity_id
+            response = self.retrieve(request, entity_id)
+            return response
+
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
     def list(self, request, **kwargs):
         parameters = request.query_params
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
@@ -121,6 +137,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         response_queryset = self.form_lab_whole_data(paginated_queryset)
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset, many=True,
                                          context={"request": request})
+
+        entity_ids = [lab_data['id'] for lab_data in response_queryset]
+
+        id_url_dict = dict()
+        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Lab').values('entity_id', 'url')
+        for data in entity:
+            id_url_dict[data['entity_id']] = data['url']
+
+        for resp in serializer.data:
+            if id_url_dict.get(resp['lab']['id']):
+                resp['lab']['url'] = id_url_dict[resp['lab']['id']]
+            else:
+                resp['lab']['url'] = None
+
         test_ids = parameters.get('ids',[])
 
         tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'));
@@ -154,12 +185,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 lab_timing, lab_timing_data = self.get_lab_timing(timing_queryset)
             lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
             lab_serializable_data = lab_serializer.data
+
+        entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Lab').values('url')
+        lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
         temp_data['tests'] = test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
 
+        # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+
         return Response(temp_data)
+
 
     def get_lab_timing(self, queryset):
         lab_timing = ''
