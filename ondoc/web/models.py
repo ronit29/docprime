@@ -36,7 +36,7 @@ class OnlineLead(TimeStampedModel):
 
         if push_to_matrix:
             product_id = 0
-            if self.member_type == 1:
+            if self.member_type == 1 or self.member_type == 3:
                 product_id = 1
             elif self.member_type == 2:
                 product_id = 4
