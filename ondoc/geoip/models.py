@@ -29,11 +29,11 @@ class GeoIPEntries(auth_model.TimeStampedModel):
 
     CDN_BASE_IMAGE_URL = 'https://cdn.docprime.com/static/web/images/'
     HOME_PRODUCTION_URL = 'https://docprime.com/'
-    MOBILE_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_mobile_pb1.svg",
-                             CDN_BASE_IMAGE_URL + "lab_mobile_pb1.svg",
-                             CDN_BASE_IMAGE_URL + "doctor_mobile_pb1.svg"]
-    WEB_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_pb2.svg", CDN_BASE_IMAGE_URL + "lab_pb1.svg",
-                          CDN_BASE_IMAGE_URL + "doctor_pb1.svg"]
+    MOBILE_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_mobile_pb.png",
+                             CDN_BASE_IMAGE_URL + "lab_mobile_pb.png",
+                             CDN_BASE_IMAGE_URL + "doctor_mobile_pb.png"]
+    WEB_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_pb.png", CDN_BASE_IMAGE_URL + "lab_pb.png",
+                          CDN_BASE_IMAGE_URL + "doctor_pb.png"]
     SEARCH_URL_LIST = [HOME_PRODUCTION_URL, HOME_PRODUCTION_URL, HOME_PRODUCTION_URL]
 
     ip_address = models.CharField(max_length=50)
