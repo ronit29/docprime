@@ -156,27 +156,27 @@ class EntityUrls(TimeStampedModel):
                 (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
             for location in locations_set:
                 for specialization in specializations:
-                    url = "{specialization}-in-{location}".format(specialization=specialization.name, location=location.value)
-                    if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
-                        url = "%s-%s" % (url, 'sptlitcit')
-                    elif location.type == EntityAddress.AllowedKeys.LOCALITY:
-                        url = "%s-%s" % (url, 'sptcit')
+                    if location.type == 'LOCALITY':
+                        url = "{prefix}-in-{locality}-sptcit".format(prefix=specialization.name, locality=location.value)
+                    elif location.type == 'SUBLOCALITY':
+                        ea_locality = EntityAddress.objects.get(id=location.parent)
+                        url = "{prefix}-in-{sublocality}-{locality}-sptlitcit".format(prefix=specialization.name, sublocality=location.value, locality=ea_locality.value)
 
-                    if url:
-                        url = url.lower()
-                        extra = {'specialization': specialization.name, 'specialization_id': specialization.id,
-                                  'location_id': location.id}
+                    url = slugify(url)
 
-                        if not cls.objects.filter(url=url).exists():
-                            entity_url_obj = cls(url=url,
-                                                 entity_type='Doctor',
-                                                 url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
-                            entity_url_obj.save()
-                            print(url)
+                    url = url.lower()
+                    extra = {'specialization': specialization.name, 'specialization_id': specialization.id,
+                             'location_id': location.id}
+
+                    if not cls.objects.filter(url=url).exists():
+                        entity_url_obj = cls(url=url,entity_type='Doctor',
+                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                        entity_url_obj.save()
+                        print(url)
 
                 doctor_in_city_url = "doctor-in-{location}".format(location=location.value)
                 if doctor_in_city_url:
-                    doctor_in_city_url = doctor_in_city_url.lower()
+                    doctor_in_city_url = slugify(doctor_in_city_url)
                     extra = {'location_id': location.id}
                     if not cls.objects.filter(url=doctor_in_city_url).exists():
                         entity_url_obj = cls(url=doctor_in_city_url,
@@ -298,7 +298,7 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
 
             for location in related_hospital_locations:
                 for specialization in specializations:
-                    url = build_url(specialization.name, location)
+                    url = self.build_url(specialization.name, location)
                     if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
                         url = "%s-%s" % (url, 'sptlitcit')
                     elif location.type == EntityAddress.AllowedKeys.LOCALITY:
@@ -371,7 +371,7 @@ class EntityHelperAsLab(EntityUrlsHelper):
 
         if entity_object.is_live:
             for location in related_lab_locations:
-                url = build_url('labs', location)
+                url = self.build_url('labs', location)
                 if location.type == EntityAddress.AllowedKeys.SUBLOCALITY:
                     url = "%s-%s" % (url, 'lblitcit')
                 elif location.type == EntityAddress.AllowedKeys.LOCALITY:
