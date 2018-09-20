@@ -36,6 +36,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.location import models as location_models
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +184,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
+    entity = GenericRelation(location_models.EntityLocationRelationship)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
 
     def __str__(self):
@@ -211,7 +213,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.clean()
-        
+        build_url = True
+        if self.is_live and self.location:
+            if Lab.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
+                build_url = False
+
         edit_instance = None
         if self.id is not None:
             edit_instance = 1
@@ -219,6 +225,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
         self.update_live_status()
         super(Lab, self).save(*args, **kwargs)
+
+        if self.is_live and self.location and build_url:
+            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+            if ea:
+                location_models.EntityUrls.create_page_url(self)
 
         if edit_instance is not None:
             id = self.id
@@ -730,15 +741,16 @@ class LabAppointment(TimeStampedModel):
     def app_commit_tasks(self, old_instance, push_to_matrix):
         if push_to_matrix:
             # Push the appointment data to the matrix
-            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':4,
+            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':5,
                                                      'sub_product_id': 2}, ), countdown=5)
 
         if self.is_to_send_notification(old_instance):
             notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
 
         if not old_instance or old_instance.status != self.status:
-            for e_id in settings.OPS_EMAIL_ID:
-                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
+            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
+                                                                         product=account_model.Order.LAB_PRODUCT_ID,
+                                                                         alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
 
         # try:
         #     prev_app_dict = {'id': self.id,
@@ -841,24 +853,29 @@ class LabAppointment(TimeStampedModel):
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-        self.status = self.CANCELLED
-        self.save()
 
+        # Taking Lock first
+        consumer_account = None
         if self.payment_type == OpdAppointment.PREPAID:
-            consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
+            logger.error("Before Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
+            temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
+            logger.error("After Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
 
-            data = dict()
-            data["reference_id"] = self.id
-            data["user"] = self.user
-            data["product_id"] = account_model.Order.LAB_PRODUCT_ID
+        old_instance = LabAppointment.objects.get(pk=self.id)
+        if old_instance.status != self.CANCELLED:
+            self.status = self.CANCELLED
+            self.save()
+            product_id = account_model.Order.LAB_PRODUCT_ID
 
-        cancel_amount = self.effective_price
-        consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
-        # consumer_account.credit_cancellation(data, cancel_amount)
-        if refund_flag:
-            ctx_obj = consumer_account.debit_refund()
-            account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
+                    self.id, product_id):
+                cancel_amount = self.effective_price
+                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
+                # consumer_account.credit_cancellation(data, cancel_amount)
+                if refund_flag:
+                    ctx_obj = consumer_account.debit_refund()
+                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def action_completed(self):
         self.status = self.COMPLETED

@@ -11,7 +11,7 @@ from django.contrib.admin import SimpleListFilter
 from reversion.admin import VersionAdmin
 from import_export.admin import ImportExportMixin
 from django.db.models import Q
-from django.db import models
+from django.db import models, transaction
 from django.utils.dateparse import parse_datetime
 from dateutil import tz
 from django.conf import settings
@@ -36,6 +36,9 @@ from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class LabTestResource(resources.ModelResource):
@@ -855,8 +858,10 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     def user_id(self, obj):
         return obj.user.id
 
+    @transaction.atomic
     def save_model(self, request, obj, form, change):
         if obj:
+            lab_app_obj = LabAppointment.objects.select_for_update().get(pk=obj.id)
             # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
             #
@@ -872,8 +877,11 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
+                    logger.error("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
-        super().save_model(request, obj, form, change)
+                    logger.error("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
+            else:
+                super().save_model(request, obj, form, change)
 
     class Media:
         js = (

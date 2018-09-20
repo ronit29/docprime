@@ -29,11 +29,11 @@ class GeoIPEntries(auth_model.TimeStampedModel):
 
     CDN_BASE_IMAGE_URL = 'https://cdn.docprime.com/static/web/images/'
     HOME_PRODUCTION_URL = 'https://docprime.com/'
-    MOBILE_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_mobile_pb.svg",
-                             CDN_BASE_IMAGE_URL + "lab_mobile_pb.svg",
-                             CDN_BASE_IMAGE_URL + "doctor_mobile_pb.svg"]
-    WEB_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_pb.svg", CDN_BASE_IMAGE_URL + "lab_pb.svg",
-                          CDN_BASE_IMAGE_URL + "doctor_pb.svg"]
+    MOBILE_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_mobile_pb1.png",
+                             CDN_BASE_IMAGE_URL + "lab_mobile_pb1.png",
+                             CDN_BASE_IMAGE_URL + "doctor_mobile_pb1.png"]
+    WEB_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_pb1.png", CDN_BASE_IMAGE_URL + "lab_pb1.png",
+                          CDN_BASE_IMAGE_URL + "doctor_pb1.png"]
     SEARCH_URL_LIST = [HOME_PRODUCTION_URL, HOME_PRODUCTION_URL, HOME_PRODUCTION_URL]
 
     ip_address = models.CharField(max_length=50)
@@ -59,15 +59,15 @@ class GeoIPEntries(auth_model.TimeStampedModel):
         return resp
 
     def get_rand_weighted_number(self, is_inside):
-        x = 4
+        x = 3
         if not is_inside:
-            x = 3
+            x = 2
         rand_val = randint(100000, 999999)
         value = rand_val % x
         resp = None
-        if value <= 1:
+        if value <= 0:
             resp = self.CHAT_VALUE
-        elif value <= 2:
+        elif value <= 1:
             resp = self.LAB_QUERY_VALUE
         else:
             resp = self.DOCTOR_QUERY_VALUE

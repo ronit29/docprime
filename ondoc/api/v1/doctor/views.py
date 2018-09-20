@@ -3,6 +3,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
+from ondoc.location.models import EntityUrls
 from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
@@ -35,6 +36,7 @@ import datetime
 import copy
 import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
+from ondoc.location import models as location_models
 User = get_user_model()
 
 
@@ -427,6 +429,20 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         response_data['hospitals'] = availability
         return response_data
 
+    def retrieve_by_url(self, request):
+        url = request.GET.get('url')
+        if not url:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        url = url.lower()
+        if location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL',entity_type__iexact='Doctor').exists():
+            entity_url_obj = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
+            entity_id = entity_url_obj.entity_id
+            response = self.retrieve(request, entity_id)
+            return response
+
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
     def retrieve(self, request, pk):
         response_data = []
         doctor = (models.Doctor.objects
@@ -442,7 +458,12 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if doctor:
             serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                      context={"request": request})
+
+            entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
+                                                entity_type__iexact='Doctor').values('url')
             response_data = self.prepare_response(serializer.data)
+
+            response_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         return Response(response_data)
 
 
@@ -704,7 +725,23 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "experiences", "images", "qualifications",
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
+
         response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
+
+        entity_ids = [doctor_data['id'] for doctor_data in response]
+
+        id_url_dict = dict()
+        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Doctor').values('entity_id', 'url')
+        for data in entity:
+            id_url_dict[data['entity_id']] = data['url']
+
+        for resp in response:
+            if id_url_dict.get(resp['id']):
+                resp['url'] = id_url_dict[resp['id']]
+            else:
+                resp['url'] = None
+
         specializations = list(models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,

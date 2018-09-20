@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.postgres.fields import JSONField
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile
 from ondoc.account.tasks import refund_curl_task
-# from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
 from django.db.models import Sum, Q, F, Max
@@ -137,6 +136,64 @@ class Order(TimeStampedModel):
             "reference_id": app_obj.id
         }
         consumer_account.debit_schedule(debit_data, amount)
+
+    def appointment_details(self):
+        from ondoc.doctor.models import Doctor
+        from ondoc.diagnostic.models import AvailableLabTest, Lab
+        ops_data = dict()
+        user = User.objects.filter(pk=self.action_data.get("user")).first()
+        user_number = None
+        user_id = None
+        if user:
+            user_number = user.phone_number
+            user_id = user.id
+        if self.product_id == self.LAB_PRODUCT_ID:
+            lab_name = None
+            test_names = None
+            lab = Lab.objects.filter(pk=self.action_data.get("lab")).first()
+            available_lab_test = AvailableLabTest.objects.filter(pk__in=self.action_data.get("lab_test"))
+            if lab:
+                lab_name = lab.name
+
+            if available_lab_test:
+                test_names = ""
+                for obj in available_lab_test:
+                    if test_names:
+                        test_names += ", "
+                    test_names += obj.test.name
+
+            ops_data = {
+                "time_of_appointment": self.action_data.get("time_slot_start"),
+                "lab_name": lab_name,
+                "test_names": test_names,
+                "profile_name": self.action_data.get("profile_detail").get("name"),
+                "user_number": user_number,
+                "user_id": user_id,
+                "order_id": self.id
+            }
+        elif self.product_id == self.DOCTOR_PRODUCT_ID:
+            doctor_name = None
+            hospital_name = None
+            profile_name = None
+            doctor = Doctor.objects.filter(pk=self.action_data.get("doctor")).first()
+            if doctor:
+                doctor_name = doctor.name
+                hospital = doctor.hospitals.filter(pk=self.action_data.get("hospital")).first()
+                if hospital:
+                    hospital_name = hospital.name
+            if user:
+                user_number = user.phone_number
+            ops_data = {
+                "time_of_appointment": self.action_data.get("time_slot_start"),
+                "doctor_name": doctor_name,
+                "hospital_name": hospital_name,
+                "profile_name": self.action_data.get("profile_detail").get("name"),
+                "user_number": user_number,
+                "user_id": user_id,
+                "order_id": self.id
+            }
+
+        return ops_data
 
     class Meta:
         db_table = "order"
@@ -387,7 +444,7 @@ class ConsumerTransaction(TimeStampedModel):
 
     @classmethod
     def valid_appointment_for_cancellation(cls, app_id, product_id):
-        return not cls.objects.filter(type=0, reference_id=app_id, product_id=product_id,
+        return not cls.objects.filter(type=PgTransaction.CREDIT, reference_id=app_id, product_id=product_id,
                                       action=cls.CANCELLATION).exists()
 
     class Meta:

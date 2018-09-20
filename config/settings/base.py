@@ -124,6 +124,7 @@ LOCAL_APPS = (
     'ondoc.matrix',
     'ondoc.articles',
     'ondoc.reports',
+    'ondoc.location',
     'ondoc.common',
     'ondoc.tracking',
     'ondoc.seo',
@@ -281,6 +282,7 @@ CONSUMER_APP_DOMAIN = env('CONSUMER_APP_DOMAIN')
 PROVIDER_APP_DOMAIN = env('PROVIDER_APP_DOMAIN')
 
 API_BASE_URL = env('API_BASE_URL')
+REVERSE_GEOCODING_API_KEY= env('REVERSE_GEOCODING_API_KEY')
 MATRIX_API_URL= env('MATRIX_API_URL')
 MATRIX_API_TOKEN = env('MATRIX_API_TOKEN')
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
