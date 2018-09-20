@@ -201,6 +201,34 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return None
         # return static('lab_images/lab_default.png')
 
+    def get_lab_address(self):
+        address = []
+
+        if self.building:
+            address.append(self.ad_str(self.building))
+        if self.locality:
+            address.append(self.ad_str(self.locality))
+        if self.sublocality:
+            address.append(self.ad_str(self.sublocality))
+        if self.city:
+            address.append(self.ad_str(self.city))
+        if self.state:
+            address.append(self.ad_str(self.state))
+        if self.country:
+            address.append(self.ad_str(self.country))
+        result = []
+        ad_uinq = set()
+        for ad in address:
+            ad_lc = ad.lower()
+            if ad_lc not in ad_uinq:
+                ad_uinq.add(ad_lc)
+                result.append(ad)
+
+        return ", ".join(result)
+
+    def ad_str(self, string):
+        return str(string).strip().replace(',', '')
+
     def update_live_status(self):
 
         if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
