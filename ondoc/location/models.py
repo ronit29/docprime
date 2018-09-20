@@ -149,26 +149,51 @@ class EntityUrls(TimeStampedModel):
         return json.loads(self.extras)
 
     @classmethod
-    def create_search_urls(cls, entity_object):
+    def create_doctor_search_urls(cls):
         try:
-            entity_helper = entity_as_mapping[entity_object.__class__.__name__.upper()]
-            entity_helper_obj = entity_helper()
-            url_dict = entity_helper_obj.create_return_search_urls(entity_object)
+            specializations = doc_models.GeneralSpecialization.objects.all()
+            locations_set = EntityAddress.objects.filter\
+                (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
+            for location in locations_set:
+                for specialization in specializations:
+                    if location.type == 'LOCALITY':
+                        url = "{prefix}-in-{locality}-sptcit".format(prefix=specialization.name, locality=location.value)
+                    elif location.type == 'SUBLOCALITY':
+                        ea_locality = EntityAddress.objects.get(id=location.parent)
+                        url = "{prefix}-in-{sublocality}-{locality}-sptlitcit".format(prefix=specialization.name, sublocality=location.value, locality=ea_locality.value)
 
-            if isinstance(url_dict, dict):
-                if url_dict.get('search_urls'):
-                    search_url_dict = url_dict['search_urls']
-                    urls = search_url_dict.get('urls', [])
-                    for url in urls:
-                        finalized_url = url.pop('url')
-                        extra = url
-                        if not cls.objects.filter(url=finalized_url).exists():
-                            entity_url_obj = cls(url=finalized_url.lower(), entity_type=entity_object.__class__.__name__,
-                                                 url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
-                            entity_url_obj.save()
+                    url = slugify(url)
+
+                    url = url.lower()
+                    extra = {'specialization': specialization.name, 'specialization_id': specialization.id,
+                             'location_id': location.id}
+
+                    if not cls.objects.filter(url=url).exists():
+                        entity_url_obj = cls(url=url,entity_type='Doctor',
+                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                        entity_url_obj.save()
+                        print(url)
+
+                doctor_in_city_url = "doctor-in-{location}".format(location=location.value)
+                if doctor_in_city_url:
+                    doctor_in_city_url = slugify(doctor_in_city_url)
+                    extra = {'location_id': location.id}
+                    if not cls.objects.filter(url=doctor_in_city_url).exists():
+                        entity_url_obj = cls(url=doctor_in_city_url,
+                                             entity_type='Doctor',
+                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                        entity_url_obj.save()
+                    print(doctor_in_city_url)
 
             return True
+        except Exception as e:
+            print(str(e))
+            return False
 
+    @classmethod
+    def create_lab_search_urls(cls):
+        try:
+            pass
         except Exception as e:
             print(str(e))
             return False
@@ -229,7 +254,6 @@ class EntityUrlsHelper(object):
         urls = self._create_return_search_urls(entity_object)
         return urls
 
-    # @staticmethod
     def build_url(self, prefix, location):
         url = ''
         if location.type == 'LOCALITY':

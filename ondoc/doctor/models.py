@@ -142,10 +142,33 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return None
         # return static("hospital_images/hospital_default.png")
 
-    def get_address(self):
-        address_items = [value for value in
-                         [self.building, self.sublocality, self.locality, self.city, self.state, self.country] if value]
-        return ", ".join(address_items)
+    def get_hos_address(self):
+        address = []
+
+        if self.building:
+            address.append(self.ad_str(self.building))
+        if self.sublocality:
+            address.append(self.ad_str(self.sublocality))
+        if self.locality:
+            address.append(self.ad_str(self.locality))
+        if self.city:
+            address.append(self.ad_str(self.city))
+        # if self.state:
+        #     address.append(self.ad_str(self.state))
+        # if self.country:
+        #     address.append(self.ad_str(self.country))
+        result = []
+        ad_uinq = set()
+        for ad in address:
+            ad_lc = ad.lower()
+            if ad_lc not in ad_uinq:
+                ad_uinq.add(ad_lc)
+                result.append(ad)
+
+        return ", ".join(result)
+
+    def ad_str(self, string):
+        return str(string).strip().replace(',', '')
 
     def get_short_address(self):
         address_items = [value for value in
