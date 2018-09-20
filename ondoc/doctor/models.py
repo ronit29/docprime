@@ -1343,7 +1343,7 @@ class PrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
 class MedicalCondition(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=100, verbose_name="Name")
     specialization = models.ManyToManyField(
-        GeneralSpecialization,
+        'PracticeSpecialization',
         through='MedicalConditionSpecialization',
         through_fields=('medical_condition', 'specialization'),
     )
@@ -1357,7 +1357,8 @@ class MedicalCondition(auth_model.TimeStampedModel, SearchKey):
 
 class MedicalConditionSpecialization(auth_model.TimeStampedModel):
     medical_condition = models.ForeignKey(MedicalCondition, on_delete=models.CASCADE)
-    specialization = models.ForeignKey(GeneralSpecialization, on_delete=models.CASCADE)
+    specialization = models.ForeignKey('PracticeSpecialization', on_delete=models.CASCADE, null=True,
+                                       blank=True)
 
     def __str__(self):
         return self.medical_condition.name + " " + self.specialization.name
@@ -1393,7 +1394,8 @@ class CommonMedicalCondition(auth_model.TimeStampedModel):
 
 
 class CommonSpecialization(auth_model.TimeStampedModel):
-    specialization = models.OneToOneField(GeneralSpecialization, related_name="common_specialization", on_delete=models.CASCADE)
+    specialization = models.OneToOneField('PracticeSpecialization', related_name="common_specialization", on_delete=models.CASCADE,
+                                          null=True, blank=True)
     icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
     priority = models.PositiveIntegerField(default=0)
 

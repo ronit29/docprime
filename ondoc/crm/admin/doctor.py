@@ -1397,3 +1397,4 @@ class PracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
     date_hierarchy = 'created_at'
     inlines = [PracticeSpecializationDepartmentMappingInline, ]
     resource_class = PracticeSpecializationResource
+    search_fields = ['name', ]
