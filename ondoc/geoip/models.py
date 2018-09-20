@@ -32,7 +32,7 @@ class GeoIPEntries(auth_model.TimeStampedModel):
     MOBILE_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_mobile_pb1.svg",
                              CDN_BASE_IMAGE_URL + "lab_mobile_pb1.svg",
                              CDN_BASE_IMAGE_URL + "doctor_mobile_pb1.svg"]
-    WEB_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_pb1.svg", CDN_BASE_IMAGE_URL + "lab_pb1.svg",
+    WEB_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_pb2.svg", CDN_BASE_IMAGE_URL + "lab_pb1.svg",
                           CDN_BASE_IMAGE_URL + "doctor_pb1.svg"]
     SEARCH_URL_LIST = [HOME_PRODUCTION_URL, HOME_PRODUCTION_URL, HOME_PRODUCTION_URL]
 
