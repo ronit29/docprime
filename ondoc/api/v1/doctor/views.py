@@ -721,7 +721,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         doctor_data = models.Doctor.objects.filter(
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
                                                 "doctor_clinics__hospital",
-                                                "doctorspecializations", "doctorspecializations__specialization",
+                                                "doctorpracticespecializations", "doctorpracticespecializations__specialization",
                                                 "experiences", "images", "qualifications",
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
@@ -742,7 +742,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             else:
                 resp['url'] = None
 
-        specializations = list(models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+        specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
                          "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions})
