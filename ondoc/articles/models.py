@@ -73,7 +73,7 @@ class ArticleImage(TimeStampedModel, CreatedByModel):
 
 class ArticleLinkedUrl(TimeStampedModel):
     article = models.ForeignKey(Article, on_delete=models.CASCADE)
-    url = models.URLField(unique=True)
+    url = models.CharField(max_length=2000, unique=True)
     title = models.CharField(max_length=500)
 
     def __str__(self):
