@@ -1487,3 +1487,15 @@ class PracticeSpecialization(auth_model.TimeStampedModel):
 
     def __str__(self):
         return "{}".format(self.name)
+
+
+class DoctorPracticeSpecialization(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, related_name="doctorpracticespecializations", on_delete=models.CASCADE)
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False)
+
+    def __str__(self):
+        return "{}-{}".format(self.doctor.name, self.specialization.name)
+
+    class Meta:
+        db_table = "doctor_practice_specialization"
+        unique_together = ("doctor", "specialization")
