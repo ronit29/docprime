@@ -147,16 +147,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         if self.building:
             address.append(self.ad_str(self.building))
-        if self.locality:
-            address.append(self.ad_str(self.locality))
         if self.sublocality:
             address.append(self.ad_str(self.sublocality))
+        if self.locality:
+            address.append(self.ad_str(self.locality))
         if self.city:
             address.append(self.ad_str(self.city))
-        if self.state:
-            address.append(self.ad_str(self.state))
-        if self.country:
-            address.append(self.ad_str(self.country))
+        # if self.state:
+        #     address.append(self.ad_str(self.state))
+        # if self.country:
+        #     address.append(self.ad_str(self.country))
         result = []
         ad_uinq = set()
         for ad in address:
