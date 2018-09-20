@@ -32,7 +32,7 @@ class GeoIPEntries(auth_model.TimeStampedModel):
     MOBILE_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_mobile_pb1.svg",
                              CDN_BASE_IMAGE_URL + "lab_mobile_pb1.svg",
                              CDN_BASE_IMAGE_URL + "doctor_mobile_pb1.svg"]
-    WEB_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_pb1.svg", CDN_BASE_IMAGE_URL + "lab_pb1.svg",
+    WEB_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_pb2.svg", CDN_BASE_IMAGE_URL + "lab_pb1.svg",
                           CDN_BASE_IMAGE_URL + "doctor_pb1.svg"]
     SEARCH_URL_LIST = [HOME_PRODUCTION_URL, HOME_PRODUCTION_URL, HOME_PRODUCTION_URL]
 
@@ -59,15 +59,15 @@ class GeoIPEntries(auth_model.TimeStampedModel):
         return resp
 
     def get_rand_weighted_number(self, is_inside):
-        x = 4
+        x = 3
         if not is_inside:
-            x = 3
+            x = 2
         rand_val = randint(100000, 999999)
         value = rand_val % x
         resp = None
-        if value <= 1:
+        if value <= 0:
             resp = self.CHAT_VALUE
-        elif value <= 2:
+        elif value <= 1:
             resp = self.LAB_QUERY_VALUE
         else:
             resp = self.DOCTOR_QUERY_VALUE

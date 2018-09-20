@@ -641,7 +641,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     seo = serializers.SerializerMethodField()
 
     def get_seo(self, obj):
-        request = self.context.get('request')
+
         doctor_specializations = DoctorSpecialization.objects.filter(doctor=obj).all()
         specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
         clinic = DoctorClinic.objects.filter(doctor=obj).all()
@@ -649,7 +649,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
                                                 entity_type__iexact='Doctor')
         sublocality = ''
-        locality=''
+        locality = ''
         if entity.exists():
             location_id = entity.first().additional_info.get('location_id')
             type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
@@ -661,27 +661,28 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
                 locality = ', ' + parent.first().get('value')
 
-        title = obj.name + ' - '
-        description = obj.name + ': ' + obj.name +' is '
+        title = obj.name
+        description = obj.name + ': ' + obj.name
         doc_spec_list = []
 
         for name in specializations:
             doc_spec_list.append(str(name))
+        if len(doc_spec_list)>=1:
+            title +=  ' - '+', '.join(doc_spec_list)
+            description += ' is ' + ', '.join(doc_spec_list)
+        if not (sublocality == '') or not (locality == ''):
+            title += ' in ' + sublocality + " " + locality + ' - Consult Online'
+            description += ' in ' + sublocality + " " + locality
+        else:
+            title += ' - Consult Online'
 
-        title += ', '.join(doc_spec_list)
-        title += ' in ' + sublocality + " " + locality + ' - Consult Online'
-
-        description += ', '.join(doc_spec_list)
-        description += ' in ' + sublocality + " " + locality
-        description += ' consulting patients at '
         hospital = []
         for hospital_name in clinics:
             hospital.append(str(hospital_name.hospital))
+        if len(hospital) >= 1:
+            description += ' consulting patients at '+', '.join(hospital)
 
-        description += ', '.join(hospital)
-        description +='. Book appointments online, check fees, address and more.'
-
-
+        description += '. Book appointments online, check fees, address and more.'
         return {'title': title, "description": description}
 
     def get_hospitals(self, obj):
@@ -697,7 +698,6 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live','seo')
-
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):

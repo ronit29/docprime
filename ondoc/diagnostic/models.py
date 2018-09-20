@@ -213,6 +213,10 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.clean()
+        build_url = True
+        if self.is_live and self.location:
+            if Lab.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
+                build_url = False
 
         edit_instance = None
         if self.id is not None:
@@ -222,7 +226,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         self.update_live_status()
         super(Lab, self).save(*args, **kwargs)
 
-        if self.is_live:
+        if self.is_live and self.location and build_url:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
             if ea:
                 location_models.EntityUrls.create_page_url(self)
@@ -849,24 +853,29 @@ class LabAppointment(TimeStampedModel):
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-        self.status = self.CANCELLED
-        self.save()
 
+        # Taking Lock first
+        consumer_account = None
         if self.payment_type == OpdAppointment.PREPAID:
-            consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
+            logger.error("Before Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
+            temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
+            logger.error("After Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
 
-            data = dict()
-            data["reference_id"] = self.id
-            data["user"] = self.user
-            data["product_id"] = account_model.Order.LAB_PRODUCT_ID
+        old_instance = LabAppointment.objects.get(pk=self.id)
+        if old_instance.status != self.CANCELLED:
+            self.status = self.CANCELLED
+            self.save()
+            product_id = account_model.Order.LAB_PRODUCT_ID
 
-            cancel_amount = self.effective_price
-            consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
-            # consumer_account.credit_cancellation(data, cancel_amount)
-            if refund_flag:
-                ctx_obj = consumer_account.debit_refund()
-                account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
+                    self.id, product_id):
+                cancel_amount = self.effective_price
+                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
+                # consumer_account.credit_cancellation(data, cancel_amount)
+                if refund_flag:
+                    ctx_obj = consumer_account.debit_refund()
+                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def action_completed(self):
         self.status = self.COMPLETED
