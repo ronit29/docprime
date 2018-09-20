@@ -6,7 +6,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
                                  CommonMedicalCondition,CommonSpecialization, DoctorSpecialization,
-                                 GeneralSpecialization)
+                                 GeneralSpecialization, DoctorPracticeSpecialization)
 from ondoc.authentication.models import UserProfile
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -399,6 +399,14 @@ class DoctorSpecializationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DoctorSpecialization
+        fields = ('name', )
+
+
+class DoctorPracticeSpecializationSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(read_only=True, source='specialization.name')
+
+    class Meta:
+        model = DoctorPracticeSpecialization
         fields = ('name', )
 
 

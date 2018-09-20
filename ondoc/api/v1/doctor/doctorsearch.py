@@ -99,7 +99,7 @@ class DoctorSearchHelper:
                        "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
                        "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                        "LEFT JOIN doctor_specialization ds on ds.doctor_id = d.id " \
-                       "LEFT JOIN general_specialization gs on ds.specialization_id = gs.id " \
+                       "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
                        "WHERE d.is_live=true and %s " \
                        "ORDER  BY %s ) x " \
                        "where distance < %s and %s" % (longitude, latitude,
@@ -184,8 +184,9 @@ class DoctorSearchHelper:
                 "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(),
                                                                             many=True).data,
-                "general_specialization": serializers.DoctorSpecializationSerializer(doctor.doctorspecializations.all(),
-                                                                                     many=True).data,
+                "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
+                    doctor.doctorpracticespecializations.all(),
+                    many=True).data,
                 "distance": self.get_distance(doctor, doctor_clinic_mapping),
                 "name": doctor.name,
                 "display_name": doctor.get_display_name(),

@@ -1475,7 +1475,7 @@ class SpecializationDepartmentMapping(auth_model.TimeStampedModel):
         db_table = 'specialization_department_mapping'
 
 
-class PracticeSpecialization(auth_model.TimeStampedModel):
+class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=200, unique=True)
     department = models.ManyToManyField(SpecializationDepartment, through=SpecializationDepartmentMapping,
                                         through_fields=('specialization', 'department'),

@@ -35,7 +35,8 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
-                                 SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping)
+                                 SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
+                                 DoctorPracticeSpecialization)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -520,6 +521,16 @@ class DoctorSpecializationInline(nested_admin.NestedTabularInline):
     autocomplete_fields = ['specialization']
 
 
+class DoctorPracticeSpecializationInline(nested_admin.NestedTabularInline):
+    model = DoctorPracticeSpecialization
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    min_num = 0
+    max_num = 4
+    autocomplete_fields = ['specialization']
+
+
 class GenericAdminFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -722,6 +733,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         DoctorMobileInline,
         DoctorEmailInline,
         DoctorSpecializationInline,
+        DoctorPracticeSpecializationInline,
         DoctorQualificationInline,
         # DoctorHospitalInline,
         DoctorClinicInline,
