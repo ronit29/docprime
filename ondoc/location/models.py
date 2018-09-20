@@ -113,9 +113,14 @@ class EntityLocationRelationship(TimeStampedModel):
     def create(cls, *args, **kwargs):
         try:
             ea_list = EntityAddress.get_or_create(**kwargs)
-            for ea in ea_list:
-                if not cls.objects.filter(content_type=ContentType.objects.get_for_model(kwargs.get('content_object')),
-                                          object_id=kwargs.get('content_object').id, type=ea.type, location=ea).exists():
+            if len(ea_list) >= 1:
+                entity_location_qs = cls.objects.filter(
+                    content_type=ContentType.objects.get_for_model(kwargs.get('content_object')),
+                    object_id=kwargs.get('content_object').id)
+                if entity_location_qs.exists():
+                    entity_location_qs.update(valid=False)
+
+                for ea in ea_list:
                     entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
                     entity_location_relation.save()
             return True
@@ -262,7 +267,7 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
         for hospital in doctor_realted_hospitals:
             related_hospital_locations = list()
 
-            hospital_locations = hospital.entity.all()
+            hospital_locations = hospital.entity.all().filter(valid=True)
             for type in [EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY]:
                 if hospital_locations.filter(type=type).exists():
                     related_hospital_locations.append(hospital_locations.filter(type=type).first())
@@ -333,7 +338,7 @@ class EntityHelperAsLab(EntityUrlsHelper):
         urls = dict()
         search_urls = list()
 
-        lab_locations = entity_object.entity.all()
+        lab_locations = entity_object.entity.all().filter(valid=True)
         related_lab_locations = list()
 
         for type in [EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY]:
