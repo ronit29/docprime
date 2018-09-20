@@ -6,11 +6,12 @@ from django.forms.models import model_to_dict
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.authentication.models import NotificationEndpoint
 from ondoc.authentication.models import UserProfile
+from ondoc.account import models as account_model
+from ondoc.api.v1.utils import readable_status_choices
 from .rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.utils import timezone
-from ondoc.account import models as account_model
 from weasyprint import HTML
 from django.conf import settings
 import pytz
@@ -478,38 +479,51 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             publish_message(message)
 
     @classmethod
-    def ops_notification_alert(cls, instance, email_list, product):
-        from ondoc.doctor.models import OpdAppointment
-        from ondoc.diagnostic.models import LabAppointment
-        status_choices = dict()
-        if product == account_model.Order.DOCTOR_PRODUCT_ID:
-            for k, v in OpdAppointment.STATUS_CHOICES:
-                status_choices[k] = v
-            url = settings.ADMIN_BASE_URL + "/admin/doctor/opdappointment/" + str(instance.id) + "/change"
-        elif product == account_model.Order.LAB_PRODUCT_ID:
-            for k, v in LabAppointment.STATUS_CHOICES:
-                status_choices[k] = v
-            url = settings.ADMIN_BASE_URL + "/admin/diagnostic/labappointment/" + str(instance.id) + "/change"
+    def ops_notification_alert(cls, data_obj, email_list, product, alert_type):
+        status_choices = readable_status_choices(product)
 
-        html_body = "status - {status}, user - {username}, url - {url}".format(
-            status=status_choices[instance.status], username=instance.profile.name, url=url
-        )
-        email_subject = "Change in appointment of user - {username} and id - {id}".format(
-            username=instance.profile.name, id=instance.id
-        )
+        html_body = None
+        email_subject = None
+        if alert_type == cls.OPS_APPOINTMENT_NOTIFICATION:
+            if product == account_model.Order.DOCTOR_PRODUCT_ID:
+                url = settings.ADMIN_BASE_URL + "/admin/doctor/opdappointment/" + str(data_obj.id) + "/change"
+            elif product == account_model.Order.LAB_PRODUCT_ID:
+                url = settings.ADMIN_BASE_URL + "/admin/diagnostic/labappointment/" + str(data_obj.id) + "/change"
+            html_body = "status - {status}, user - {username}, url - {url}".format(
+                status=status_choices[data_obj.status], username=data_obj.profile.name, url=url
+            )
+            email_subject = "Change in appointment of user - {username} and id - {id}".format(
+                username=data_obj.profile.name, id=data_obj.id
+            )
+        elif alert_type == cls.OPS_PAYMENT_NOTIFICATION:
+            email_subject = "Payment failure for user name - {user_name} and id - {user_id}".format(
+                user_name=data_obj.get("profile_name"),
+                user_id=data_obj.get("user_id")
+            )
+            if product == account_model.Order.DOCTOR_PRODUCT_ID:
+                html_body = "Failure in payment for user name - {user_name}, " \
+                            "user id - {user_id} and phone number - {user_number} " \
+                            "while booking appointment for doctor name -{doctor_name} , " \
+                            "hospital name - {hospital_name} and appointment time - {time_of_appointment} " \
+                            "with order id - {order_id} on transaction time - {transaction_time}".format(
+                    user_name=data_obj.get("profile_name"), user_id=data_obj.get("user_id"),
+                    user_number=data_obj.get("user_number"), doctor_name=data_obj.get("doctor_name"),
+                    hospital_name=data_obj.get("hospital_name"), time_of_appointment=data_obj.get("time_of_appointment"),
+                    order_id=data_obj.get("order_id"), transaction_time=data_obj.get("transaction_time"))
+            elif product == account_model.Order.LAB_PRODUCT_ID:
+                html_body = "Failure in payment for user name - {user_name}, " \
+                            "user id - {user_id} and phone number - {user_number} " \
+                            "while booking appointment for lab name - {lab_name} , " \
+                            "test names - ({test_names}) and appointment time - {time_of_appointment} " \
+                            "with order id - {order_id} on transaction time - {transaction_time}".format(
+                    user_name=data_obj.get("profile_name"), user_id=data_obj.get("user_id"),
+                    user_number=data_obj.get("user_number"), lab_name=data_obj.get("lab_name"),
+                    test_names=data_obj.get("test_names"), time_of_appointment=data_obj.get("time_of_appointment"),
+                    order_id=data_obj.get("order_id"), transaction_time=data_obj.get("transaction_time"))
+
         if email_list:
-            cls.publish_ops_email(email_list, html_body, email_subject)
-            # email_notif = {
-            #     "email": email_list,
-            #     "content": html_body,
-            #     "email_subject": email_subject
-            # }
-            # message = {
-            #     "data": email_notif,
-            #     "type": "email"
-            # }
-            # message = json.dumps(message)
-            # publish_message(message)
+            for e_id in email_list:
+                cls.publish_ops_email(e_id, html_body, email_subject)
 
     @classmethod
     def publish_ops_email(cls, email_list, html_body, email_subject):

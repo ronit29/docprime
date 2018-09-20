@@ -956,6 +956,13 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
                 else:
+                    ops_email_data = dict()
+                    ops_email_data.update(order_obj.appointment_details())
+                    if response.get("txDate"):
+                        ops_email_data["transaction_time"] = parse(response.get("txDate"))
+                    else:
+                        ops_email_data["transaction_time"] = timezone.now()
+
                     if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
                         REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
                         order_obj.action_data.get("lab"), response.get('statusCode'))
@@ -963,6 +970,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                    order_obj.action_data.get("hospital"),
                                                                    response.get('statusCode'))
+                    EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                                                             order_obj.product_id,
+                                                             EmailNotification.OPS_PAYMENT_NOTIFICATION)
         except Exception as e:
             logger.error("Error - " + str(e))
 
