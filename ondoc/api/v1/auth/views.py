@@ -969,6 +969,18 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                    order_obj.action_data.get("hospital"),
                                                                    response.get('statusCode'))
+                    try:
+                        ops_email_data = dict()
+                        ops_email_data.update(order_obj.appointment_details())
+                        if response.get("txDate"):
+                            ops_email_data["transaction_time"] = parse(response.get("txDate"))
+                        else:
+                            ops_email_data["transaction_time"] = timezone.now()
+                        EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                                                                 order_obj.product_id,
+                                                                 EmailNotification.OPS_PAYMENT_NOTIFICATION)
+                    except:
+                        pass
         except Exception as e:
             logger.error("Error - " + str(e))
 

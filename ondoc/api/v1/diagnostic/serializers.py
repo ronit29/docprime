@@ -78,14 +78,13 @@ class LabModelSerializer(serializers.ModelSerializer):
                 sublocality = type.first().get('value')
                 parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
                 locality = ', ' + parent.first().get('value')
-        if not(sublocality == '') or not(locality == ''):
+        if not(sublocality == '') or not(locality ==''):
             title = obj.name + ' - Diagnostic Centre in '+ sublocality + locality + ' |DocPrime'
         else:
             title = obj.name + ' - Diagnostic Centre |DocPrime'
 
         description = obj.name + ': Book test at ' + obj.name + ' online, check fees, packages prices and more at DocPrime. '
         return {'title': title, "description": description}
-
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")

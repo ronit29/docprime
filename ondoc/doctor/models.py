@@ -1133,8 +1133,9 @@ class OpdAppointment(auth_model.TimeStampedModel):
         if self.is_to_send_notification(old_instance):
             notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
         if not old_instance or old_instance.status != self.status:
-            for e_id in settings.OPS_EMAIL_ID:
-                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
+                                                                         product=Order.DOCTOR_PRODUCT_ID,
+                                                                         alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
