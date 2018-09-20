@@ -395,8 +395,13 @@ class UserAppointmentsViewSet(OndocViewSet):
             else:
                 temp_dict[data["status"]].append(data)
         combined_data = list()
+        status_six_data = list()
         for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
-            combined_data.extend(v)
+            if k==6:
+                status_six_data.extend(v)
+            else:
+                combined_data.extend(v)
+        combined_data.extend(status_six_data)
         combined_data = combined_data[:80]
         return Response(combined_data)
 
@@ -416,7 +421,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         else:
             return Response({'Error': 'Invalid Request Type'})
 
-    @transaction.non_atomic_requests
+    @transaction.atomic
     def update(self, request, pk=None):
         serializer = UpdateStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -425,7 +430,13 @@ class UserAppointmentsViewSet(OndocViewSet):
         query_input_serializer.is_valid(raise_exception=True)
         appointment_type = query_input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
-            lab_appointment = get_object_or_404(LabAppointment, pk=pk)
+            # lab_appointment = get_object_or_404(LabAppointment, pk=pk)
+            lab_appointment = LabAppointment.objects.select_for_update().filter(pk=pk).first()
+            resp = dict()
+            if not lab_appointment:
+                resp["status"] = 0
+                resp["message"] = "Invalid appointment Id"
+                return Response(resp, status.HTTP_404_NOT_FOUND)
             allowed = lab_appointment.allowed_action(request.user.user_type, request)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
@@ -439,11 +450,16 @@ class UserAppointmentsViewSet(OndocViewSet):
             else:
                 return Response(updated_lab_appointment)
         elif appointment_type == 'doctor':
-            opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
+            # opd_appointment = get_object_or_404(OpdAppointment, pk=pk)
+            opd_appointment = OpdAppointment.objects.select_for_update().filter(pk=pk).first()
+            resp = dict()
+            if not opd_appointment:
+                resp["status"] = 0
+                resp["message"] = "Invalid appointment Id"
+                return Response(resp, status.HTTP_404_NOT_FOUND)
             allowed = opd_appointment.allowed_action(request.user.user_type, request)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
-                resp = dict()
                 resp['allowed'] = allowed
                 return Response(resp, status=status.HTTP_400_BAD_REQUEST)
             updated_opd_appointment = self.doctor_appointment_update(request, opd_appointment, validated_data)
@@ -461,7 +477,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
-            if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
+            elif validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = utils.form_time_slot(
                         validated_data.get("start_date"),
@@ -511,6 +527,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                                         account_models.Order.LAB_PRODUCT_ID)
         return resp
 
+    @transaction.atomic
     def doctor_appointment_update(self, request, opd_appointment, validated_data):
         if validated_data.get('status'):
             resp = dict()
@@ -522,7 +539,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 logger.error(
                     "Ending for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
-            if validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
+            elif validated_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = utils.form_time_slot(
                         validated_data.get("start_date"),
@@ -574,68 +591,80 @@ class UserAppointmentsViewSet(OndocViewSet):
 
     @transaction.atomic
     def extract_payment_details(self, request, appointment_details, new_appointment_details, product_id):
-        remaining_amount = 0
-        resp = {}
+        resp = dict()
         user = request.user
-        user_account_data = {
-            "user": user,
-            "product_id": product_id,
-            "reference_id": appointment_details.id
-        }
-        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
-        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
-        balance = consumer_account.balance
 
-        resp["is_agent"] = False
-        if hasattr(request, 'agent') and request.agent:
-            resp["is_agent"] = True
-            balance = 0
+        if appointment_details.payment_type == OpdAppointment.PREPAID:
+            remaining_amount = 0
+            consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+            consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+            balance = consumer_account.balance
 
-        if balance + appointment_details.effective_price >= new_appointment_details.get('effective_price'):
-            # Debit or Refund/Credit in Account
-            if appointment_details.effective_price > new_appointment_details.get('effective_price'):
-                #TODO PM - Refund difference b/w effective price
-                consumer_account.credit_schedule(user_account_data, appointment_details.effective_price - new_appointment_details.get('effective_price'))
+            resp["is_agent"] = False
+            if hasattr(request, 'agent') and request.agent:
+                resp["is_agent"] = True
+                balance = 0
+
+            if balance + appointment_details.effective_price >= new_appointment_details.get('effective_price'):
+                # Debit or Refund/Credit in Account
+                if appointment_details.effective_price > new_appointment_details.get('effective_price'):
+                    # TODO PM - Refund difference b/w effective price
+                    consumer_account.credit_schedule(appointment_details, product_id, appointment_details.effective_price - new_appointment_details.get('effective_price'))
+                    # consumer_account.credit_schedule(user_account_data, appointment_details.effective_price - new_appointment_details.get('effective_price'))
+                else:
+                    debit_balance = new_appointment_details.get('effective_price') - appointment_details.effective_price
+                    if debit_balance:
+                        consumer_account.debit_schedule(appointment_details, product_id, debit_balance)
+                        # consumer_account.debit_schedule(user_account_data, debit_balance)
+
+                # Update appointment
+                if product_id == account_models.Order.DOCTOR_PRODUCT_ID:
+                    appointment_details.action_rescheduled_patient(new_appointment_details)
+                    appointment_serializer = AppointmentRetrieveSerializer(appointment_details, context={"request": request})
+                if product_id == account_models.Order.LAB_PRODUCT_ID:
+                    appointment_details.action_rescheduled_patient(new_appointment_details)
+                    appointment_serializer = LabAppointmentRetrieveSerializer(appointment_details, context={"request": request})
+                resp['status'] = 1
+                resp['data'] = appointment_serializer.data
+                resp['payment_required'] = False
+                return resp
             else:
-                debit_balance = new_appointment_details.get('effective_price') - appointment_details.effective_price
-                if debit_balance:
-                    consumer_account.debit_schedule(user_account_data, debit_balance)
+                balance = consumer_account.balance + appointment_details.effective_price
+                new_appointment_details['time_slot_start'] = str(new_appointment_details['time_slot_start'])
+                action = ''
+                temp_app_details = copy.deepcopy(new_appointment_details)
 
-            # Update appointment
+                if product_id == account_models.Order.DOCTOR_PRODUCT_ID:
+                    action = account_models.Order.OPD_APPOINTMENT_RESCHEDULE
+                    opdappointment_transform(temp_app_details)
+                elif product_id == account_models.Order.LAB_PRODUCT_ID:
+                    action = Order.LAB_APPOINTMENT_RESCHEDULE
+                    labappointment_transform(temp_app_details)
+
+                order = account_models.Order.objects.create(
+                    product_id=product_id,
+                    action=action,
+                    action_data=temp_app_details,
+                    amount=new_appointment_details.get('effective_price') - balance,
+                    reference_id=appointment_details.id,
+                    payment_status=account_models.Order.PAYMENT_PENDING
+                )
+                new_appointment_details["payable_amount"] = new_appointment_details.get('effective_price') - balance
+                resp['status'] = 1
+                resp['data'], resp['payment_required'] = self.payment_details(request, new_appointment_details, product_id, order.id)
+                return resp
+        else:
             if product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                 appointment_details.action_rescheduled_patient(new_appointment_details)
-                appointment_serializer = AppointmentRetrieveSerializer(appointment_details, context={"request": request})
+                appointment_serializer = AppointmentRetrieveSerializer(appointment_details,
+                                                                       context={"request": request})
             if product_id == account_models.Order.LAB_PRODUCT_ID:
                 appointment_details.action_rescheduled_patient(new_appointment_details)
-                appointment_serializer = LabAppointmentRetrieveSerializer(appointment_details, context={"request": request})
+                appointment_serializer = LabAppointmentRetrieveSerializer(appointment_details,
+                                                                          context={"request": request})
             resp['status'] = 1
             resp['data'] = appointment_serializer.data
             resp['payment_required'] = False
-            return resp
-        else:
-            balance = consumer_account.balance + appointment_details.effective_price
-            new_appointment_details['time_slot_start'] = str(new_appointment_details['time_slot_start'])
-            action = ''
-            temp_app_details = copy.deepcopy(new_appointment_details)
-
-            if product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                action = account_models.Order.OPD_APPOINTMENT_RESCHEDULE
-                opdappointment_transform(temp_app_details)
-            elif product_id == account_models.Order.LAB_PRODUCT_ID:
-                action = Order.LAB_APPOINTMENT_RESCHEDULE
-                labappointment_transform(temp_app_details)
-
-            order = account_models.Order.objects.create(
-                product_id=product_id,
-                action=action,
-                action_data=temp_app_details,
-                amount=new_appointment_details.get('effective_price') - balance,
-                reference_id=appointment_details.id,
-                payment_status=account_models.Order.PAYMENT_PENDING
-            )
-            new_appointment_details["payable_amount"] = new_appointment_details.get('effective_price') - balance
-            resp['status'] = 1
-            resp['data'], resp['payment_required'] = self.payment_details(request, new_appointment_details, product_id, order.id)
             return resp
 
     def payment_details(self, request, appointment_details, product_id, order_id):
@@ -903,6 +932,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     if resp_serializer.is_valid():
                         response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                         if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                            pg_tx_queryset = None
                             try:
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)
                             except Exception as e:
@@ -939,6 +969,18 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                    order_obj.action_data.get("hospital"),
                                                                    response.get('statusCode'))
+                    try:
+                        ops_email_data = dict()
+                        ops_email_data.update(order_obj.appointment_details())
+                        if response.get("txDate"):
+                            ops_email_data["transaction_time"] = parse(response.get("txDate"))
+                        else:
+                            ops_email_data["transaction_time"] = timezone.now()
+                        EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                                                                 order_obj.product_id,
+                                                                 EmailNotification.OPS_PAYMENT_NOTIFICATION)
+                    except:
+                        pass
         except Exception as e:
             logger.error("Error - " + str(e))
 
@@ -994,6 +1036,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 appointment_data = serializer.validated_data
 
             appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
+            # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
         except:
             pass
 
@@ -1418,6 +1461,7 @@ class UserTokenViewSet(GenericViewSet):
             return Response({"status": 1, "token": token_object['token'], 'order_id': agent_token.order_id})
         else:
             return Response({"status": 0}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ContactUsViewSet(GenericViewSet):
 

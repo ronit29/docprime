@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.db.models import Q
 from import_export.fields import Field
-from import_export.admin import ImportExportMixin
+from import_export.admin import ImportExportMixin, ImportExportModelAdmin
 from import_export import fields, resources
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import make_aware
@@ -36,7 +36,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
-                                 DoctorPracticeSpecialization)
+                                 DoctorPracticeSpecialization, CompetitorHit)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -635,13 +635,19 @@ class DoctorResource(resources.ModelResource):
     aadhar = fields.Field()
     fees = fields.Field()
 
+    def get_queryset(self):
+        return Doctor.objects.all().prefetch_related('hospitals', 'doctorspecializations', 'qualifications',
+                                                     'doctor_clinics__hospital',
+                                                     'doctor_clinics__availability',
+                                                     'documents')
+
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'city', 'gender', 'license', 'fees','qualification', 'specialization', 'onboarding_status', 'data_status', 'gst',
-        'pan', 'mci', 'cheque', 'aadhar')
-        export_order = (
-            'id', 'name', 'city', 'gender', 'license', 'fees','qualification', 'specialization', 'onboarding_status', 'data_status', 'gst',
-        'pan', 'mci', 'cheque', 'aadhar')
+        fields = ('id', 'name', 'city', 'gender', 'license', 'fees', 'qualification', 'specialization',
+                  'onboarding_status', 'data_status', 'gst', 'pan', 'mci', 'cheque', 'aadhar')
+        export_order = ('id', 'name', 'city', 'gender', 'license', 'fees', 'qualification',
+                        'specialization', 'onboarding_status', 'data_status', 'gst',
+                        'pan', 'mci', 'cheque', 'aadhar')
 
     def dehydrate_data_status(self, doctor):
         return dict(Doctor.DATA_STATUS_CHOICES)[doctor.data_status]
@@ -715,6 +721,45 @@ class CompetitorInfoInline(nested_admin.NestedTabularInline):
     fields = ['name', 'hospital', 'hospital_name', 'fee', 'url']
 
 
+class CompetitorInfoResource(resources.ModelResource):
+    class Meta:
+        model = CompetitorInfo
+        fields = ('id', 'doctor', 'hospital_name', 'fee', 'url')
+
+    def init_instance(self, row=None):
+        ins = super().init_instance(row)
+        ins.name = CompetitorInfo.PRACTO
+        return ins
+
+
+class CompetitorInfoImportAdmin(ImportExportModelAdmin):
+    resource_class = CompetitorInfoResource
+    list_display = ('id', 'doctor', 'hospital_name', 'fee', 'url')
+
+
+class CompetitorHitFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        counter = {}
+        for values in self.cleaned_data:
+            competitor_name = values.get('name')
+            if competitor_name:
+                if counter.get(competitor_name):
+                    raise forms.ValidationError('Cannot have duplicate record for any competitor.')
+                else:
+                    counter[competitor_name] = 1
+
+
+class CompetitorHitsInline(nested_admin.NestedTabularInline):
+    model = CompetitorHit
+    formset = CompetitorHitFormSet
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -730,6 +775,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     form = DoctorForm
     inlines = [
         CompetitorInfoInline,
+        CompetitorHitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
         DoctorSpecializationInline,
@@ -964,10 +1010,11 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         elif self.instance.id:
             doctor = self.instance.doctor
             hospital = self.instance.hospital
-            if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and cleaned_data.get('status'):
-                raise forms.ValidationError("Status can not be changed.")
         else:
             raise forms.ValidationError("Doctor and hospital details not entered.")
+
+        if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and len(cleaned_data):
+            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
 
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                  doctor_clinic__hospital=hospital,
@@ -1157,8 +1204,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             doctor_admins_phone_numbers.append(doctor_admin.phone_number)
         return mark_safe(','.join(doctor_admins_phone_numbers))
 
+    @transaction.atomic
     def save_model(self, request, obj, form, change):
         if obj:
+            opd_obj = OpdAppointment.objects.select_for_update().get(pk=obj.id)
             if request.POST.get('start_date') and request.POST.get('start_time'):
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)

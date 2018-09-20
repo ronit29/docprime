@@ -14,6 +14,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
+from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund
 from ondoc.payout.models import Outstanding
 from ondoc.doctor.tasks import doc_app_auto_cancel
@@ -39,6 +40,8 @@ from PIL import Image as Img
 from io import BytesIO
 import hashlib
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
 
 logger = logging.getLogger(__name__)
@@ -127,6 +130,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     live_at = models.DateTimeField(null=True, blank=True)
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
+    entity = GenericRelation(location_models.EntityLocationRelationship)
 
     def __str__(self):
         return self.name
@@ -150,13 +154,22 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
 
     def save(self, *args, **kwargs):
+        build_url = True
+        if self.is_live:
+            if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
+                build_url = False
+
         super(Hospital, self).save(*args, **kwargs)
+
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=True)
         else:
             auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
+
+        if build_url and self.location and self.is_live:
+            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
 
 class HospitalAward(auth_model.TimeStampedModel):
@@ -333,6 +346,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def save(self, *args, **kwargs):
         self.update_live_status()
         super(Doctor, self).save(*args, **kwargs)
+        if self.is_live:
+            location_models.EntityUrls.create_page_url(self)
 
 
 
@@ -1037,25 +1052,26 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-        logger.error("Entered action_cancelled  - " + str(self.id) + " timezone - " + str(timezone.now()))
-        self.status = self.CANCELLED
-        self.save()
 
+        # Taking Lock first
+        consumer_account = None
         if self.payment_type == self.PREPAID:
-            logger.error("Before Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
-            consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+            temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-            logger.error("After Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
-            data = dict()
-            data["reference_id"] = self.id
-            data["user"] = self.user
-            data["product_id"] = Order.DOCTOR_PRODUCT_ID
 
-            cancel_amount = self.effective_price
-            consumer_account.credit_cancellation(data, cancel_amount)
-            if refund_flag:
-                ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj)
+        old_instance = OpdAppointment.objects.get(pk=self.id)
+        if old_instance.status != self.CANCELLED:
+            self.status = self.CANCELLED
+            self.save()
+            product_id = Order.DOCTOR_PRODUCT_ID
+            if self.payment_type == self.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id,
+                                                                                                            product_id):
+                cancel_amount = self.effective_price
+                consumer_account.credit_cancellation(self, product_id, cancel_amount)
+
+                if refund_flag:
+                    ctx_obj = consumer_account.debit_refund()
+                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def action_completed(self):
         self.status = self.COMPLETED
@@ -1068,7 +1084,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
     def generate_invoice(self):
         pass
-
 
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
@@ -1086,7 +1101,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                                                         action=ConsumerTransaction.SALE).
                        order_by("created_at").last())
         return consumer_tx.amount
-
 
     def is_doctor_available(self):
         if DoctorLeave.objects.filter(start_date__lte=self.time_slot_start.date(),
@@ -1119,10 +1133,20 @@ class OpdAppointment(auth_model.TimeStampedModel):
         if self.is_to_send_notification(old_instance):
             notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
         if not old_instance or old_instance.status != self.status:
-            for e_id in settings.OPS_EMAIL_ID:
-                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
+            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
+                                                                         product=Order.DOCTOR_PRODUCT_ID,
+                                                                         alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+        # try:
+        #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
+        #         countdown = self.get_auto_cancel_delay(self)
+        #         doc_app_auto_cancel.apply_async(({
+        #             "id": self.id,
+        #             "status": self.status,
+        #             "updated_at": int(self.updated_at.timestamp())
+        #         }, ), countdown=countdown)
+        # except Exception as e:
+        #     logger.error("Error in auto cancel flow - " + str(e))
         print('all ops tasks completed')
-
 
     def save(self, *args, **kwargs):
         logger.error("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
@@ -1416,24 +1440,27 @@ class DoctorMapping(auth_model.TimeStampedModel):
 
 
 class CompetitorInfo(auth_model.TimeStampedModel):
-    PRACTO =1
-    LYBRATE =2
+    PRACTO = 1
+    LYBRATE = 2
     NAME_TYPE_CHOICES = (("", "Select"), (PRACTO, 'Practo'), (LYBRATE, "Lybrate"),)
     name = models.PositiveSmallIntegerField(blank=True, null=True,
                                             choices=NAME_TYPE_CHOICES)
 
-    doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True, blank=True)
-    hospital = models.ForeignKey(Hospital, related_name="competitor_hospital", on_delete=models.CASCADE, null=True, blank=True)
+    doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True,
+                               blank=True)
+    hospital = models.ForeignKey(Hospital, related_name="competitor_hospital", on_delete=models.CASCADE, null=True,
+                                 blank=True)
     hospital_name = models.CharField(max_length=200)
     fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     url = models.URLField(null=True)
-    processed_url =models.URLField(null=True)
+    processed_url = models.URLField(null=True)
 
     #
     # url = url.replace("http://", "")
 
     class Meta:
         db_table = "competitor_info"
+        #unique_together = ('name', 'hospital_name', 'doctor')
 
     def save(self, *args, **kwargs):
         url = self.url
@@ -1501,3 +1528,13 @@ class DoctorPracticeSpecialization(auth_model.TimeStampedModel):
     class Meta:
         db_table = "doctor_practice_specialization"
         unique_together = ("doctor", "specialization")
+
+
+class CompetitorHit(models.Model):
+    NAME_TYPE_CHOICES = CompetitorInfo.NAME_TYPE_CHOICES
+    doctor = models.ForeignKey(Doctor, related_name="competitor_doctor_hits", on_delete=models.CASCADE)
+    name = models.PositiveSmallIntegerField(choices=NAME_TYPE_CHOICES)
+    hits = models.BigIntegerField()
+
+    class Meta:
+        db_table = "competitor_hit"

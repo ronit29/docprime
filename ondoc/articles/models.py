@@ -3,7 +3,6 @@ from django.utils.safestring import mark_safe
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image
 import datetime
 
-
 class ArticleCategory(TimeStampedModel):
     name = models.CharField(blank=False, null=False, max_length=500)
     identifier = models.CharField(max_length=48, blank=False, null=True)

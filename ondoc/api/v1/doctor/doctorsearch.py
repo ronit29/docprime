@@ -25,13 +25,13 @@ class DoctorSearchHelper:
         specialization_ids = self.query_params.get("specialization_ids",[])
         condition_ids = self.query_params.get("condition_ids", [])
         if len(condition_ids)>0:
-            cs = list(models.MedicalConditionSpecialization.objects.filter(id__in=condition_ids).values_list('specialization_id', flat=True));
+            cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
             cs = [str(i) for i in cs]
             specialization_ids.extend(cs)
 
         if len(specialization_ids)>0:
             filtering_params.append(
-                " gs.id IN({})".format(",".join(self.query_params.get("specialization_ids")))
+                " gs.id IN({})".format(",".join(specialization_ids))
             )
         if self.query_params.get("sits_at"):
             filtering_params.append(
@@ -86,6 +86,10 @@ class DoctorSearchHelper:
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
+        max_distance = str(
+            self.query_params.get('max_distance') * 1000 if self.query_params.get(
+                'max_distance') and self.query_params.get(
+                'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
@@ -105,7 +109,7 @@ class DoctorSearchHelper:
                        "where distance < %s and %s" % (longitude, latitude,
                                                        longitude, latitude,
                                                        filtering_params, order_by_field,
-                                                       DoctorSearchHelper.MAX_DISTANCE, rank_by)
+                                                       max_distance, rank_by)
         return query_string
 
     def count_hospitals(self, doctor):

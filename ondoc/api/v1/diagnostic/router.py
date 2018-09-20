@@ -16,6 +16,7 @@ urlpatterns = [
     # path('test/<int:id>/', LabTestList.as_view({'get': 'retrieve'}), name='test-detail'),
     path('lablist', LabList.as_view({'get': 'list'}), name='lab-list'),
     path('lablist/<int:lab_id>', LabList.as_view({'get': 'retrieve'}), name='lab-list-detail'),
+    path('lablistbyurl', LabList.as_view({'get': 'retrieve_by_url'}), name='lab-list-by-url'),
     # path('lab/appointment', LabAppointmentsViewSet.as_view({'get': 'list'}), name='lab-appointment-list'),
     path('labappointment/create', LabAppointmentView.as_view({'post': 'create'}),
          name='lab-create-appointment'),

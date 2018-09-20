@@ -395,3 +395,16 @@ def generate_short_url(url):
     tiny_url = web_models.TinyUrl.objects.create(original_url=url, short_code=random_string)
     return tiny_url.get_tiny_url()
 
+
+def readable_status_choices(product):
+    from ondoc.account.models import Order
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    status_choices = dict()
+    if product == Order.DOCTOR_PRODUCT_ID:
+        for k, v in OpdAppointment.STATUS_CHOICES:
+            status_choices[k] = v
+    elif product == Order.LAB_PRODUCT_ID:
+        for k, v in LabAppointment.STATUS_CHOICES:
+            status_choices[k] = v
+    return status_choices
