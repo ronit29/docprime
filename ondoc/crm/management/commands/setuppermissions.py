@@ -15,8 +15,9 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkAccreditation, HospitalNetworkAward, HospitalNetworkDocument,
                                  HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor,
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization,
-                                 MedicalCondition,
-                                 MedicalConditionSpecialization, CompetitorInfo, CompetitorHit)
+                                 MedicalCondition, PracticeSpecialization, SpecializationDepartment, SpecializationField,
+                                 MedicalConditionSpecialization, CompetitorInfo, CompetitorHit,
+                                 SpecializationDepartmentMapping)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -121,7 +122,11 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(BillingAccount,
-            Qualification, Specialization, Language, MedicalService, College, GeneralSpecialization)
+                                                           Qualification, Specialization, Language, MedicalService,
+                                                           College, GeneralSpecialization, SpecializationDepartment,
+                                                           SpecializationField, PracticeSpecialization,
+                                                           SpecializationDepartmentMapping,
+                                                           )
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -185,10 +190,10 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-
         content_types = ContentType.objects.get_for_models(
             Qualification, Specialization, Language, MedicalService, College, GeneralSpecialization, LabTest,
-            LabTestType, LabService, TestParameter, ParameterLabTest, LabTestPackage)
+            LabTestType, LabService, TestParameter, ParameterLabTest, LabTestPackage, PracticeSpecialization,
+            SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
