@@ -416,7 +416,7 @@ class DoctorPracticeSpecializationSerializer(serializers.ModelSerializer):
 class DoctorProfileSerializer(serializers.ModelSerializer):
     images = DoctorImageSerializer(read_only=True, many=True)
     qualifications = DoctorQualificationSerializer(read_only=True, many=True)
-    general_specialization = DoctorSpecializationSerializer(read_only=True, many=True, source='doctorspecializations')
+    general_specialization = DoctorPracticeSpecializationSerializer(read_only=True, many=True, source='doctorpracticespecializations')
     languages = DoctorLanguageSerializer(read_only=True, many=True)
     availability = serializers.SerializerMethodField(read_only=True)
     emails = DoctorEmailSerializer(read_only=True, many=True)

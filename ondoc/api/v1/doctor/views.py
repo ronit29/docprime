@@ -450,7 +450,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'doctor_clinics__hospital',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
-                                    'doctorspecializations__specialization'
+                                    'doctorpracticespecializations__specialization'
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
