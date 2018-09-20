@@ -7,6 +7,8 @@ from ondoc.doctor.models import Doctor
 from datetime import datetime
 import re
 
+from ondoc.location.models import EntityAddress
+
 
 class DoctorSearchHelper:
     MAX_DISTANCE = "20000"
@@ -132,7 +134,7 @@ class DoctorSearchHelper:
                 # return doctor_hospital.deal_price
         return None
 
-    def prepare_search_response(self, doctor_data, doctor_search_result, request):
+    def prepare_search_response(self, doctor_data, doctor_search_result, request, validated_data):
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
@@ -172,7 +174,28 @@ class DoctorSearchHelper:
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False)
                 }]
+
             thumbnail = doctor.get_thumbnail()
+            locality =''
+            if validated_data.get('type') == 'LOCALITY':
+                locality = validated_data.get('value')
+
+            if validated_data.get('type') == 'SUBLOCALITY':
+
+                parent = EntityAddress.objects.filter(id=validated_data.get('parent')).values('value')
+                locality = ', ' + parent.first().get('value')
+            specialization_name_list = [
+                models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids', [])).values(
+                    'name')]
+            specialization = []
+
+            for name in specialization_name_list:
+                specialization.append(name[0].get('name'))
+
+            specialist = ', '.join(specialization)
+            title = specialist + ' in ' + locality + '- Book Best ' + specialist + ' Instantly | DocPrime'
+            description = specialist + ' in ' + locality + ': Book best ' + specialist + 's appointment online in ' + locality + '. View Address, fees and more for doctors in '+ locality +'.'
+
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),
@@ -198,7 +221,13 @@ class DoctorSearchHelper:
                                                             context={"request": request}).data,
                 "hospitals": hospitals,
                 "thumbnail": (
-                    request.build_absolute_uri(thumbnail) if thumbnail else None)
+                    request.build_absolute_uri(thumbnail) if thumbnail else None),
+                "seo": {
+                    "title": title,
+                "description": description
+
+                }
+
             }
             response.append(temp)
         return response

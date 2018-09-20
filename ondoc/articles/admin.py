@@ -32,6 +32,8 @@ class ArticleLinkedUrlInline(TabularInline):
     model = ArticleLinkedUrl
     extra = 0
     can_delete = True
+    verbose_name = "Linked Url"
+    verbose_name_plural = "Linked Urls"
 
 
 class LinkedArticleInline(TabularInline):
@@ -71,10 +73,13 @@ class ArticleAdmin(VersionAdmin):
         if hasattr(obj, 'url'):
             obj.url = obj.url.strip('/')
             url_components = obj.url.split('-')
+            identifier = obj.category.identifier
             if ArticleCategory.objects.filter(identifier=url_components[-1]).exists():
-                pass
+                    if url_components[-1] == identifier:
+                        pass
+                    else:
+                        obj.url = '%s-%s' % ('-'.join(url_components[:-1]), identifier)
             else:
-                identifier = obj.category.identifier
                 obj.url = '%s-%s' % (obj.url, identifier)
 
         super().save_model(request, obj, form, change)

@@ -1495,11 +1495,12 @@ class CompetitorInfo(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
 
-class CompetitorHit(models.Model):
+class CompetitorMonthlyVisit(models.Model):
     NAME_TYPE_CHOICES = CompetitorInfo.NAME_TYPE_CHOICES
     doctor = models.ForeignKey(Doctor, related_name="competitor_doctor_hits", on_delete=models.CASCADE)
     name = models.PositiveSmallIntegerField(choices=NAME_TYPE_CHOICES)
-    hits = models.BigIntegerField()
+    monthly_visit = models.BigIntegerField(verbose_name='Monthly Visits through Competitor')
 
     class Meta:
-        db_table = "competitor_hit"
+        db_table = "competitor_monthly_visits"
+        unique_together = ('doctor', 'name')
