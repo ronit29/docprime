@@ -1,7 +1,8 @@
+import nested_admin
 from django.contrib.gis import admin
-from .models import Article, ArticleImage, ArticleCategory
+from .models import Article, ArticleImage, ArticleCategory, ArticleLinkedUrl, LinkedArticle
 from reversion.admin import VersionAdmin
-from django.contrib.admin import ModelAdmin
+from django.contrib.admin import ModelAdmin, TabularInline
 from django.utils.safestring import mark_safe
 from django import forms
 from django.conf import settings
@@ -27,14 +28,31 @@ def bulk_publishing(modeladmin, request, queryset):
 bulk_publishing.short_description = "Publish selected articles"
 
 
+class ArticleLinkedUrlInline(TabularInline):
+    model = ArticleLinkedUrl
+    extra = 0
+    can_delete = True
+
+
+class LinkedArticleInline(TabularInline):
+    model = LinkedArticle
+    fk_name = 'article'
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['linked_article']
+    verbose_name = "Linked Article"
+    verbose_name_plural = "Linked Articles"
+
+
 class ArticleAdmin(VersionAdmin):
     form = ArticleForm
     model = Article
     list_display = ('title', 'updated_at', 'created_at', 'created_by', 'preview')
     search_fields = ['title']
-    fields = ['title', 'body', 'header_image','header_image_alt', 'category', 'url', 'description', 'keywords', 'icon_tag', 'icon', 'author_name', 'is_published', 'preview']
+    fields = ['title', 'body', 'header_image', 'header_image_alt', 'category', 'url', 'description', 'keywords',
+              'icon_tag', 'icon', 'author_name', 'is_published', 'preview']
     readonly_fields = ['icon_tag', 'preview']
-    #inlines = [ArticleCategoryInline]
+    inlines = [ArticleLinkedUrlInline, LinkedArticleInline]
     actions = [bulk_publishing]
 
     def preview(self, instance):
