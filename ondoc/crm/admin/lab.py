@@ -506,12 +506,18 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         js = ('js/admin/ondoc.js',)
 
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
+        read_only_fields = ['lab_icon', 'lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
         if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
             read_only_fields += ['lab_pricing_group']
         if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         return read_only_fields
+
+    def lab_icon(self, instance):
+        lab_logo = instance.lab_documents.filter(document_type=LabDocument.LOGO).first()
+        if lab_logo:
+            return mark_safe("<img src='{}'".format(lab_logo.name.url))
+        return None
 
     def lead_url(self, instance):
         if instance.id:

@@ -4,7 +4,7 @@ from ondoc.diagnostic import models as lab_models
 from ondoc.notification.models import EmailNotification
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, EntityAddress
 from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
@@ -701,10 +701,46 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 class DoctorListViewSet(viewsets.GenericViewSet):
     queryset = models.Doctor.objects.all()
 
+    def list_by_url(self, request, *args, **kwargs):
+        url = request.GET.get('url', None)
+        if not url:
+            return Response({})
+
+        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
+                                           entity_type__iexact='Doctor')
+        if entity.exists():
+            extras = entity.first().additional_info
+            location_id = extras.get('location_id')
+            specialization_id = extras.get('specialization_id')
+            if location_id and specialization_id:
+                entity_address = EntityAddress.objects.get(id=location_id)
+                result = EntityAddress.objects.filter(id=location_id).values('type', 'value', 'parent')
+                latitude = entity_address.centroid.y
+                longitude = entity_address.centroid.x
+                kwargs['latitude'] = latitude
+                kwargs['longitude'] = longitude
+                kwargs['specialization_ids'] = [str(specialization_id)]
+                kwargs["type"] = result.first().get('type')
+                kwargs["value"] = result.first().get('value')
+                kwargs['parent'] = result.first().get('parent')
+
+                response = self.list(request, *args, **kwargs)
+                return response
+
+        return Response({})
+
     def list(self, request, *args, **kwargs):
         serializer = serializers.DoctorListSerializer(data=request.query_params, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        if kwargs.get('latitude') and kwargs.get('longitude') and kwargs.get('specialization_ids'):
+            validated_data['latitude'] = kwargs['latitude']
+            validated_data['longitude'] = kwargs['longitude']
+            validated_data['specialization_ids'] = kwargs['specialization_ids']
+            validated_data['type'] = kwargs['type']
+            validated_data['value'] = kwargs['value']
+            validated_data['parent'] = kwargs['parent']
+
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
             filtering_params = doctor_search_helper.get_filtering_params()
@@ -727,7 +763,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
 
-        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
+        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request, validated_data)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 

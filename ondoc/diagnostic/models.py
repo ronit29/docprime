@@ -201,6 +201,34 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return None
         # return static('lab_images/lab_default.png')
 
+    def get_lab_address(self):
+        address = []
+
+        if self.building:
+            address.append(self.ad_str(self.building))
+        if self.sublocality:
+            address.append(self.ad_str(self.sublocality))
+        if self.locality:
+            address.append(self.ad_str(self.locality))
+        if self.city:
+            address.append(self.ad_str(self.city))
+        # if self.state:
+        #     address.append(self.ad_str(self.state))
+        # if self.country:
+        #     address.append(self.ad_str(self.country))
+        result = []
+        ad_uinq = set()
+        for ad in address:
+            ad_lc = ad.lower()
+            if ad_lc not in ad_uinq:
+                ad_uinq.add(ad_lc)
+                result.append(ad)
+
+        return ", ".join(result)
+
+    def ad_str(self, string):
+        return str(string).strip().replace(',', '')
+
     def update_live_status(self):
 
         if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
@@ -604,8 +632,10 @@ class AvailableLabTest(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.mrp:
-            self.computed_deal_price = self.get_computed_deal_price()
             self.computed_agreed_price = self.get_computed_agreed_price()
+            # self.computed_deal_price = self.get_computed_deal_price()
+            self.computed_deal_price = self.computed_agreed_price
+
         super(AvailableLabTest, self).save(*args, **kwargs)
 
     def get_computed_deal_price(self):
@@ -1080,6 +1110,11 @@ class LabDocument(TimeStampedModel, Document):
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.FileField(upload_to='lab/images', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+
+    def __str__(self):
+        if self.document_type:
+            return '{}'.format(dict(LabDocument.CHOICES)[self.document_type])
+        return None
 
     def extension(self):
         name, extension = os.path.splitext(self.name.name)

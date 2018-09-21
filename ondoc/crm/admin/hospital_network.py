@@ -89,10 +89,10 @@ class HospitalNetworkForm(FormCleanMixin):
                        'country': 'req', 'pin_code': 'req', 'hospitalnetworkmanager': 'count',
                        'hospitalnetworkhelpline': 'count', 'hospitalnetworkemail': 'count'}
 
-        if self.instance.is_billing_enabled:
-            qc_required.update({
-                'hospital_network_documents': 'count'
-            })
+        # if self.instance.is_billing_enabled:
+        #     qc_required.update({
+        #         'hospital_network_documents': 'count'
+        #     })
 
         for key, value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:

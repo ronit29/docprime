@@ -33,6 +33,8 @@ class Article(TimeStampedModel, CreatedByModel):
     keywords = models.CharField(max_length=256, blank=True, null=True)
     author_name = models.CharField(max_length=256, null=True, blank=False)
     published_date = models.DateField(default=datetime.date.today)
+    linked_articles = models.ManyToManyField('self', symmetrical=False, through='LinkedArticle',
+                                             through_fields=('article', 'linked_article'))
 
     def icon_tag(self):
         if self.icon:
@@ -67,3 +69,28 @@ class ArticleImage(TimeStampedModel, CreatedByModel):
 
     class Meta:
         db_table = "article_image"
+
+
+class ArticleLinkedUrl(TimeStampedModel):
+    article = models.ForeignKey(Article, on_delete=models.CASCADE)
+    url = models.CharField(max_length=2000, unique=True)
+    title = models.CharField(max_length=500)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        db_table = 'article_linked_urls'
+
+
+class LinkedArticle(TimeStampedModel):
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_article')
+    linked_article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_articles')
+
+    def __str__(self):
+        return "{}-{}".format(self.article.title, self.linked_article.title)
+
+    class Meta:
+        db_table = 'linked_articles'
+        unique_together = (('article', 'linked_article'),)
+
