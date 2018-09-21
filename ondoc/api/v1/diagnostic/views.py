@@ -38,7 +38,7 @@ from ondoc.authentication import models as auth_models
 from django.db.models import Q, Value
 from django.db.models.functions import StrIndex
 
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, EntityAddress
 from . import serializers
 import copy
 import re
@@ -112,6 +112,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
+    def list_by_url(self, request, *args, **kwargs):
+        url = request.GET.get('url', None)
+        if not url:
+            return Response({})
+
+        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
+                                           entity_type__iexact='Lab')
+        if entity.exists():
+            extras = entity.first().additional_info
+            if extras.get('location_json'):
+                kwargs['location_json'] = extras.get('location_json')
+                response = self.list(request, **kwargs)
+                return response
+
+        return Response({})
+
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
         if not url:
@@ -129,15 +145,20 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def list(self, request, **kwargs):
         parameters = request.query_params
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
+
         serializer.is_valid(raise_exception=True)
+        if kwargs.get('location_json'):
+            serializer.validated_data['location_json'] = kwargs['location_json']
+
         parameters = serializer.validated_data
 
         queryset = self.get_lab_list(parameters)
         count = queryset.count()
         paginated_queryset = paginate_queryset(queryset, request)
         response_queryset = self.form_lab_whole_data(paginated_queryset)
-        serializer = diagnostic_serializer.LabCustomSerializer(response_queryset, many=True,
-                                         context={"request": request})
+
+        serializer = diagnostic_serializer.LabCustomSerializer(response_queryset,  many=True,
+                                         context={"request": request, 'parameters': parameters})
 
         entity_ids = [lab_data['id'] for lab_data in response_queryset]
 
@@ -155,7 +176,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids',[])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'));
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
 
         return Response({"result": serializer.data,
                          "count": count,'tests':tests})

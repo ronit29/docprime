@@ -3,7 +3,7 @@ from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, GeneralSpecialization
 from datetime import datetime
 import re
 
@@ -92,6 +92,8 @@ class DoctorSearchHelper:
             self.query_params.get('max_distance') * 1000 if self.query_params.get(
                 'max_distance') and self.query_params.get(
                 'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+        # max_distance = 10000000000000000000000
+
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
@@ -176,25 +178,53 @@ class DoctorSearchHelper:
                 }]
 
             thumbnail = doctor.get_thumbnail()
-            locality =''
-            if validated_data.get('type') == 'LOCALITY':
-                locality = validated_data.get('value')
+            title = ''
+            description = ''
+            if validated_data.get('extras') or validated_data.get('specialization_ids'):
+                locality = ''
+                sublocality = ''
+                specializations = ''
+                if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
+                    if validated_data.get('extras').get('location_json').get('locality_value'):
+                        locality = validated_data.get('extras').get('location_json').get('locality_value')
+                    if validated_data.get('extras').get('location_json').get('sublocality_value'):
+                        sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
+                        if sublocality:
+                            locality = sublocality + ', ' + locality
 
-            if validated_data.get('type') == 'SUBLOCALITY':
+                if validated_data.get('specialization_ids'):
+                    specialization_name_obj= GeneralSpecialization.objects.filter(
+                        id__in=validated_data.get('specialization_ids', [])).values(
+                        'name')
+                    specialization_list = []
 
-                parent = EntityAddress.objects.filter(id=validated_data.get('parent')).values('value')
-                locality = ', ' + parent.first().get('value')
-            specialization_name_list = [
-                models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids', [])).values(
-                    'name')]
-            specialization = []
+                    for names in specialization_name_obj:
+                        specialization_list.append(names.get('name'))
 
-            for name in specialization_name_list:
-                specialization.append(name[0].get('name'))
+                    specializations = ', '.join(specialization_list)
+                else:
+                    if validated_data.get('extras').get('specialization'):
+                        specializations = validated_data.get('extras').get('specialization')
+                    else:
+                        specializations = ''
 
-            specialist = ', '.join(specialization)
-            title = specialist + ' in ' + locality + '- Book Best ' + specialist + ' Instantly | DocPrime'
-            description = specialist + ' in ' + locality + ': Book best ' + specialist + 's appointment online in ' + locality + '. View Address, fees and more for doctors in '+ locality +'.'
+                if specializations:
+                    title = specializations
+                    description = specializations
+                if locality:
+                    title += ' in '  + locality
+                    description += ' in ' +locality
+                if specializations:
+                    title += '- Book Best ' + specializations
+                    description += ': Book best ' + specializations + '\'s appointment online '
+                if locality:
+                    description += 'in ' + locality
+                title += ' Instantly | DocPrime'
+
+                description += '. View Address, fees and more for doctors'
+                if locality:
+                    description += 'in '+ locality
+                description += '.'
 
             temp = {
                 "doctor_id": doctor.id,
@@ -222,12 +252,16 @@ class DoctorSearchHelper:
                 "hospitals": hospitals,
                 "thumbnail": (
                     request.build_absolute_uri(thumbnail) if thumbnail else None),
-                "seo": {
-                    "title": title,
-                "description": description
-
-                }
-
+                # "seo": {
+                #     "title": title,
+                #     "description": description
+                #
+                # }
             }
+            if title or description:
+                temp["seo"] = {
+                    "title": title,
+                    "description": description
+                }
             response.append(temp)
         return response
