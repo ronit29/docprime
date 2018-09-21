@@ -19,31 +19,48 @@ class EventCreateViewSet(GenericViewSet):
     def create(self, request):
         visitor_id, visit_id = self.get_visit(request)
         resp = {}
-        if request.data and isinstance(request.data, dict):
-            event_name = request.data.get('event')
+        data = request.data
+        del data['visitor_info']
+        if data and isinstance(data, dict):
+            event_name = data.get('event')
             if event_name:
                 try:
                     user = None
                     if request.user.is_authenticated:
                         user = request.user
-                    event = track_models.TrackingEvent(name=event_name, data=request.data, visit_id=visit_id, user=user)
+                    event = track_models.TrackingEvent(name=event_name, data=data, visit_id=visit_id, user=user)
                     event.save()
                     resp['success'] = "Event Saved Successfully!"
-                except Exception:
+                except Exception as e:
                     resp['error'] = "Error Processing Event Data!"
             else:
                 resp['error'] = "Event name not Found!"
         else:
             resp['error'] = "Invalid Data"
 
-        cookie = self.get_cookie(visitor_id, visit_id)    
+        #cookie = self.get_cookie(visitor_id, visit_id)
         response = JsonResponse(resp)
-        response.set_signed_cookie('visit', value=cookie, max_age=365*24*60*60, path='/')
+        #response.set_signed_cookie('visit', value=cookie, max_age=365*24*60*60, path='/')
         return response
 
     def get_visit(self, request):
 
-        cookie = request.get_signed_cookie('visit', None)
+        #cookie = request.get_signed_cookie('visit', None)
+        visit_id = None
+        visitor_id = None
+
+        data=request.data.get('visitor_info')
+        if data:
+            visit_id = data.get('visitor_id')
+            visitor_id = data.get('visitor_id')
+        if visitor_id and not track_models.TrackingVisitor.objects.filter(id=visitor_id).exists():
+            track_models.TrackingVisitor.objects.create(id=visitor_id)
+        if visitor_id and visit_id and not track_models.TrackingVisit.objects.filter(id=visit_id).exists():
+            track_models.TrackingVisit.objects.create(id=visit_id,visitor_id=visitor_id)
+
+
+        return (visitor_id, visit_id)
+
         visitor_id = None
         visit_id = None
         last_visit_time = None
