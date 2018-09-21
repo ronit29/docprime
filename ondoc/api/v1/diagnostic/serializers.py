@@ -161,6 +161,9 @@ class LabCustomSerializer(serializers.Serializer):
     seo = serializers.SerializerMethodField()
 
     def get_seo(self, obj):
+        if self.parent:
+            return None
+
         request = self.context.get('parameters')
         locality = ''
         sublocality = ''
