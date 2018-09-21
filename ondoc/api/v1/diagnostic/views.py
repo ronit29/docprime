@@ -123,7 +123,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             extras = entity.first().additional_info
             if extras.get('location_json'):
                 kwargs['location_json'] = extras.get('location_json')
-                kwargs['parameters'] = self.get_lab_search_details(extras, request.query_params)
+                kwargs['parameters'] = get_lab_search_details(extras, request.query_params)
                 response = self.list(request, **kwargs)
                 return response
         return Response({})

@@ -720,8 +720,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         parameters = request.query_params
-        if kwargs.get("parameter"):
-            parameters = kwargs.get("parameter")
+        if kwargs.get("parameters"):
+            parameters = kwargs.get("parameters")
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data

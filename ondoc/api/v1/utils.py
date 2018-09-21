@@ -440,5 +440,5 @@ def doctor_query_parameters(entity_params, req_params):
         elif entity_params["location_json"].get("locality_longitude"):
             params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
     if entity_params.get("specialization_id"):
-        params_dict["specialization_ids"] = [entity_params["specialization_id"], ]
+        params_dict["specialization_ids"] = str(entity_params["specialization_id"])
     return params_dict
