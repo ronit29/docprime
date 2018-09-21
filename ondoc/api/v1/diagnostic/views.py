@@ -265,11 +265,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
         name = parameters.get('name')
+        network_id = parameters.get("network_id")
 
         # queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
         #                                                                                         lab_pricing_group__labs__is_test_lab=False)
         queryset = Lab.objects.select_related().filter(is_test_lab=False, is_live=True,
                                                        lab_pricing_group__isnull=False)
+
+        if network_id:
+            queryset = queryset.filter(network=network_id)
 
         if lat is not None and long is not None:
             point_string = 'POINT('+str(long)+' '+str(lat)+')'

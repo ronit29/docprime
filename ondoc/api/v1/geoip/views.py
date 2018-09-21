@@ -1,8 +1,8 @@
-from ondoc.api.v1.utils import get_request_ip
 from ondoc.geoip.models import GeoIPEntries, VisitorIpAddress
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django.conf import settings
+from ipware import get_client_ip
 import requests
 import logging
 
@@ -16,7 +16,7 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
         req_data = request.query_params
         ip_address = req_data.get("address")
         if req_data.get("detect_ip") == "1":
-            ip_address = get_request_ip(request)
+            ip_address, is_routable = get_client_ip(request)
         if not ip_address:
             resp["message"] = "Address Field is required"
             resp["status"] = 0
