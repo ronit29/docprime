@@ -1444,8 +1444,7 @@ class CompetitorInfo(auth_model.TimeStampedModel):
     PRACTO = 1
     LYBRATE = 2
     NAME_TYPE_CHOICES = (("", "Select"), (PRACTO, 'Practo'), (LYBRATE, "Lybrate"),)
-    name = models.PositiveSmallIntegerField(blank=True, null=True,
-                                            choices=NAME_TYPE_CHOICES)
+    name = models.PositiveSmallIntegerField(choices=NAME_TYPE_CHOICES, default=PRACTO)
 
     doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True,
                                blank=True)
@@ -1461,7 +1460,7 @@ class CompetitorInfo(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "competitor_info"
-        #unique_together = ('name', 'hospital_name', 'doctor')
+        # unique_together = ('name', 'hospital_name', 'doctor')
 
     def save(self, *args, **kwargs):
         url = self.url
