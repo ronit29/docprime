@@ -496,12 +496,12 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
                 username=data_obj.profile.name, id=data_obj.id
             )
         elif alert_type == cls.OPS_PAYMENT_NOTIFICATION:
-            email_subject = "Payment failure for user name - {user_name} and id - {user_id}".format(
+            email_subject = "Order created for user name - {user_name} and id - {user_id}".format(
                 user_name=data_obj.get("profile_name"),
                 user_id=data_obj.get("user_id")
             )
             if product == account_model.Order.DOCTOR_PRODUCT_ID:
-                html_body = "Failure in payment for user name - {user_name}, " \
+                html_body = "Order created for user name - {user_name}, " \
                             "user id - {user_id} and phone number - {user_number} " \
                             "while booking appointment for doctor name -{doctor_name} , " \
                             "hospital name - {hospital_name} and appointment time - {time_of_appointment} " \
@@ -511,7 +511,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
                     hospital_name=data_obj.get("hospital_name"), time_of_appointment=data_obj.get("time_of_appointment"),
                     order_id=data_obj.get("order_id"), transaction_time=data_obj.get("transaction_time"))
             elif product == account_model.Order.LAB_PRODUCT_ID:
-                html_body = "Failure in payment for user name - {user_name}, " \
+                html_body = "Order created for user name - {user_name}, " \
                             "user id - {user_id} and phone number - {user_number} " \
                             "while booking appointment for lab name - {lab_name} , " \
                             "test names - ({test_names}) and appointment time - {time_of_appointment} " \
