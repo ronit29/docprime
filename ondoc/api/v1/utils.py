@@ -16,6 +16,7 @@ from ondoc.account.tasks import refund_curl_task
 from ondoc.crm.constants import constants
 import requests
 import json
+import copy
 import random
 import string
 from django.conf import settings
@@ -408,3 +409,20 @@ def readable_status_choices(product):
         for k, v in LabAppointment.STATUS_CHOICES:
             status_choices[k] = v
     return status_choices
+
+
+def doctor_query_parameters(entity_params, req_params):
+    params_dict = copy.deepcopy(req_params)
+    if entity_params.get("location_json"):
+        if entity_params["location_json"].get("sublocality_latitude"):
+            params_dict["latitude"] = entity_params["location_json"]["sublocality_latitude"]
+        elif entity_params["location_json"].get("locality_latitude"):
+            params_dict["latitude"] = entity_params["location_json"]["locality_latitude"]
+
+        if entity_params["location_json"].get("sublocality_longitude"):
+            params_dict["longitude"] = entity_params["location_json"]["sublocality_longitude"]
+        elif entity_params["location_json"].get("locality_longitude"):
+            params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
+    if entity_params.get("specialization_id"):
+        params_dict["specialization_ids"] = [entity_params["specialization_id"], ]
+    return params_dict
