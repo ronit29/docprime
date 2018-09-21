@@ -54,6 +54,7 @@ class LabImageModelSerializer(serializers.ModelSerializer):
 
 class LabModelSerializer(serializers.ModelSerializer):
 
+
     lat = serializers.SerializerMethodField()
     long = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
@@ -64,6 +65,8 @@ class LabModelSerializer(serializers.ModelSerializer):
 
     def get_seo(self, obj):
 
+        if self.parent:
+            return None
         entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
                                            entity_type__iexact='Lab')
         locality = ''
@@ -155,6 +158,29 @@ class LabCustomSerializer(serializers.Serializer):
     pickup_available = serializers.IntegerField(default=0)
     lab_timing = serializers.CharField(max_length=200)
     lab_timing_data = serializers.ListField()
+    seo = serializers.SerializerMethodField()
+
+    def get_seo(self, obj):
+        request = self.context.get('parameters')
+        locality = ''
+        sublocality = ''
+
+        if request.get('location_json') and request.get('location_json').get('locality_value'):
+            locality = request.get('location_json').get('locality_value')
+
+        if request.get('location_json') and request.get('location_json').get('sublocality_value'):
+            sublocality = request.get('location_json').get('sublocality_value') + ', '
+
+        title = "Diagnostic Centres & Labs "
+        if locality:
+            title += "in " + sublocality + locality
+        title += " | Books Tests"
+        description = "Find best Diagnostic Centres and Labs"
+        if locality:
+            description += " in " + sublocality + locality
+        description += " and book test online, check fees, packages prices and more at DocPrime."
+        return {'title': title, "description": description}
+
 
     # def get_lab(self, obj):
     #     queryset = Lab.objects.get(pk=obj['lab'])
@@ -570,6 +596,7 @@ class SearchLabListSerializer(serializers.Serializer):
     ids = IdListField(required=False)
     sort_on = serializers.CharField(required=False)
     name = serializers.CharField(required=False)
+    network_id = serializers.IntegerField(required=False)
 
 
 class UpdateStatusSerializer(serializers.Serializer):

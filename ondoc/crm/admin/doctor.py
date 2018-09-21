@@ -691,6 +691,23 @@ class DoctorResource(resources.ModelResource):
         return status
 
 
+class CompetitorInfoFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        prev_compe_infos = {}
+        for item in self.cleaned_data:
+            req_set = (item.get('name'), item.get('hospital_name'), item.get('doctor'))
+            if req_set in prev_compe_infos:
+                raise forms.ValidationError('Cannot have duplicate competitor info.')
+            else:
+                prev_compe_infos[req_set] = True
+
+
+
+
+
 class CompetitorInfoForm(forms.ModelForm):
     hospital_name = forms.CharField(required=True)
     fee = forms.CharField(required=True)
@@ -702,6 +719,7 @@ class CompetitorInfoInline(nested_admin.NestedTabularInline):
     model = CompetitorInfo
     autocomplete_fields = ['hospital']
     form = CompetitorInfoForm
+    formset = CompetitorInfoFormSet
     extra = 0
     can_delete = True
     show_change_link = False
