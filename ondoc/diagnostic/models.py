@@ -1136,6 +1136,11 @@ class LabDocument(TimeStampedModel, Document):
     name = models.FileField(upload_to='lab/images', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
+    def __str__(self):
+        if self.document_type:
+            return '{}'.format(dict(LabDocument.CHOICES)[self.document_type])
+        return None
+
     def extension(self):
         name, extension = os.path.splitext(self.name.name)
         return extension

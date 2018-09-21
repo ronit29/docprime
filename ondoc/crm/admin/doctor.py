@@ -1017,7 +1017,6 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         resp = super().change_view(request, object_id, form_url, extra_context=None)
         return resp
 
-
     def get_profile(self, obj):
         if not obj.profile_detail:
             return ''
