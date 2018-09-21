@@ -6,9 +6,10 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      CommonDiagnosticCondition, CommonTest)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
+from ondoc.notification.models import EmailNotification
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -285,11 +286,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
         name = parameters.get('name')
+        network_id = parameters.get("network_id")
 
         # queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
         #                                                                                         lab_pricing_group__labs__is_test_lab=False)
         queryset = Lab.objects.select_related().filter(is_test_lab=False, is_live=True,
                                                        lab_pricing_group__isnull=False)
+
+        if network_id:
+            queryset = queryset.filter(network=network_id)
 
         if lat is not None and long is not None:
             point_string = 'POINT('+str(long)+' '+str(lat)+')'
@@ -596,17 +601,19 @@ class LabAppointmentView(mixins.CreateModelMixin,
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
             resp['data'], resp['payment_required'] = payment_details(request, order)
-            # resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id, order.id)
+            try:
+                ops_email_data = dict()
+                ops_email_data.update(order.appointment_details())
+                ops_email_data["transaction_time"] = aware_time_zone(timezone.now())
+                EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                                                         order.product_id,
+                                                         EmailNotification.OPS_PAYMENT_NOTIFICATION)
+            except:
+                pass
         else:
             lab_appointment = LabAppointment.create_appointment(appointment_details)
             if appointment_details["payment_type"] == doctor_model.OpdAppointment.PREPAID:
-                user_account_data = {
-                    "user": user,
-                    "product_id": product_id,
-                    "reference_id": lab_appointment.id
-                }
                 consumer_account.debit_schedule(lab_appointment, product_id, appointment_details.get("effective_price"))
-                # consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
             resp["status"] = 1
             resp["payment_required"] = False
             resp["data"] = {"id": lab_appointment.id,

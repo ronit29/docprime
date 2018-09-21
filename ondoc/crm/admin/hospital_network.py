@@ -58,7 +58,6 @@ class HospitalNetworkHelplineInline(admin.TabularInline):
     }
 
 
-
 class HospitalNetworkManagerInline(admin.TabularInline):
     model = HospitalNetworkManager
     formfield_overrides = {
