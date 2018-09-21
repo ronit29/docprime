@@ -1,13 +1,14 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
+from ondoc.notification.models import EmailNotification
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
-from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details
+from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min
@@ -278,19 +279,19 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
             resp['data'], resp["payment_required"] = payment_details(request, order)
-            # resp['data'], resp["payment_required"] = self.payment_details(request, appointment_details, product_id, order.id)
-
+            try:
+                ops_email_data = dict()
+                ops_email_data.update(order.appointment_details())
+                ops_email_data["transaction_time"] = aware_time_zone(timezone.now())
+                EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                                                         order.product_id,
+                                                         EmailNotification.OPS_PAYMENT_NOTIFICATION)
+            except:
+                pass
         else:
             opd_obj = models.OpdAppointment.create_appointment(appointment_details)
-
             if appointment_details["payment_type"] == models.OpdAppointment.PREPAID:
-                user_account_data = {
-                    "user": user,
-                    "product_id": product_id,
-                    "reference_id": opd_obj.id
-                }
                 consumer_account.debit_schedule(opd_obj, product_id, appointment_details.get("effective_price"))
-                # consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
             resp["status"] = 1
             resp["payment_required"] = False
             resp["data"] = {"id": opd_obj.id, "type": serializers.OpdAppointmentSerializer.DOCTOR_TYPE}
