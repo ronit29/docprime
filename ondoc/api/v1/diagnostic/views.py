@@ -9,7 +9,7 @@ from ondoc.authentication.models import UserProfile, Address
 from ondoc.notification.models import EmailNotification
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone, get_lab_search_details
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -123,10 +123,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             extras = entity.first().additional_info
             if extras.get('location_json'):
                 kwargs['location_json'] = extras.get('location_json')
+                kwargs['parameters'] = get_lab_search_details(extras, request.query_params)
                 response = self.list(request, **kwargs)
                 return response
-
         return Response({})
+
 
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
@@ -144,6 +145,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, **kwargs):
         parameters = request.query_params
+        if kwargs.get('parameters'):
+            parameters = kwargs.get('parameters')
+
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
 
         serializer.is_valid(raise_exception=True)
