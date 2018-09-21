@@ -37,7 +37,7 @@ from ondoc.authentication import models as auth_models
 from django.db.models import Q, Value
 from django.db.models.functions import StrIndex
 
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, EntityAddress
 from . import serializers
 import copy
 import re
@@ -111,6 +111,32 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
+    def list_by_url(self, request, *args, **kwargs):
+        url = request.GET.get('url', None)
+        if not url:
+            return Response({})
+
+        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
+                                           entity_type__iexact='Lab')
+        if entity.exists():
+            extras = entity.first().additional_info
+            location_id = extras.get('location_id')
+
+            if location_id:
+                entity_address = EntityAddress.objects.get(id=location_id)
+                result = EntityAddress.objects.filter(id=location_id).values('type', 'value', 'parent')
+                latitude = entity_address.centroid.y
+                longitude = entity_address.centroid.x
+                kwargs['latitude'] = latitude
+                kwargs['longitude'] = longitude
+                kwargs["type"] = result.first().get('type')
+                kwargs["value"] = result.first().get('value')
+                kwargs['parent'] = result.first().get('parent')
+                response = self.list(request, **kwargs)
+                return response
+
+        return Response({})
+
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
         if not url:
@@ -128,15 +154,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def list(self, request, **kwargs):
         parameters = request.query_params
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
+
         serializer.is_valid(raise_exception=True)
+        if kwargs.get('latitude') and kwargs.get('longitude'):
+            serializer.validated_data['latitude'] = kwargs['latitude']
+            serializer.validated_data['longitude'] = kwargs['longitude']
+            serializer.validated_data['type'] = kwargs['type']
+            serializer.validated_data['value'] = kwargs['value']
+            serializer.validated_data['parent'] = kwargs['parent']
         parameters = serializer.validated_data
 
         queryset = self.get_lab_list(parameters)
         count = queryset.count()
         paginated_queryset = paginate_queryset(queryset, request)
         response_queryset = self.form_lab_whole_data(paginated_queryset)
-        serializer = diagnostic_serializer.LabCustomSerializer(response_queryset, many=True,
-                                         context={"request": request})
+
+        serializer = diagnostic_serializer.LabCustomSerializer(response_queryset,  many=True,
+                                         context={"request": request, 'parameters': parameters})
 
         entity_ids = [lab_data['id'] for lab_data in response_queryset]
 

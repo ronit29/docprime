@@ -92,6 +92,7 @@ class DoctorSearchHelper:
             self.query_params.get('max_distance') * 1000 if self.query_params.get(
                 'max_distance') and self.query_params.get(
                 'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
@@ -176,25 +177,45 @@ class DoctorSearchHelper:
                 }]
 
             thumbnail = doctor.get_thumbnail()
-            locality =''
-            if validated_data.get('type') == 'LOCALITY':
-                locality = validated_data.get('value')
+            title = ''
+            description = ''
+            if validated_data.get('type') or validated_data.get('specialization_ids'):
+                locality = ''
+                sublocality = ''
+                if validated_data.get('type') == 'LOCALITY':
+                    locality = validated_data.get('value')
 
-            if validated_data.get('type') == 'SUBLOCALITY':
+                if validated_data.get('type') == 'SUBLOCALITY':
+                    sublocality = type.first().get('value')
+                    parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
+                    locality = sublocality + ', ' + parent.first().get('value')
+                specialization_name_list = [
+                    models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids', [])).values(
+                        'name')]
+                specialization = []
 
-                parent = EntityAddress.objects.filter(id=validated_data.get('parent')).values('value')
-                locality = ', ' + parent.first().get('value')
-            specialization_name_list = [
-                models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids', [])).values(
-                    'name')]
-            specialization = []
+                for name in specialization_name_list:
+                    specialization.append(name[0].get('name'))
 
-            for name in specialization_name_list:
-                specialization.append(name[0].get('name'))
+                specialist = ', '.join(specialization)
 
-            specialist = ', '.join(specialization)
-            title = specialist + ' in ' + locality + '- Book Best ' + specialist + ' Instantly | DocPrime'
-            description = specialist + ' in ' + locality + ': Book best ' + specialist + 's appointment online in ' + locality + '. View Address, fees and more for doctors in '+ locality +'.'
+                if len(specialist) >= 1:
+                    title = specialist
+                    description = specialist
+                if len(locality) >= 1:
+                    title += ' in ' + locality
+                    description += ' in ' + locality
+                if len(specialist) >= 1:
+                    title += '- Book Best ' + specialist
+                    description += ': Book best ' + specialist + '\'s appointment online '
+                if len(locality) >= 1:
+                    description += 'in ' + locality
+                title += ' Instantly | DocPrime'
+
+                description += '. View Address, fees and more for doctors'
+                if len(locality) >= 1:
+                    description += 'in '+ locality
+                description += '.'
 
             temp = {
                 "doctor_id": doctor.id,
@@ -224,7 +245,7 @@ class DoctorSearchHelper:
                     request.build_absolute_uri(thumbnail) if thumbnail else None),
                 "seo": {
                     "title": title,
-                "description": description
+                    "description": description
 
                 }
 
