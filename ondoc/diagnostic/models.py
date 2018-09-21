@@ -780,28 +780,6 @@ class LabAppointment(TimeStampedModel):
 
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 
-        # if push_to_matrix:
-        #     # Push the appointment data to the matrix
-        #     push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':4,
-        #                                              'sub_product_id': 2}, ), countdown=5)
-        #
-        # if self.is_to_send_notification(database_instance):
-        #     notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
-        #
-        # if not database_instance or database_instance.status != self.status:
-        #     for e_id in settings.OPS_EMAIL_ID:
-        #         notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
-
-        # try:
-        #     prev_app_dict = {'id': self.id,
-        #                      'status': self.status,
-        #                      "updated_at": int(self.updated_at.timestamp())}
-        #     if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
-        #         countdown = self.get_auto_cancel_delay(self)
-        #         tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
-        # except Exception as e:
-        #     logger.error("Error in auto cancel flow - " + str(e))
-
     def get_auto_cancel_delay(self, app_obj):
         delay = settings.AUTO_CANCEL_LAB_DELAY * 60
         to_zone = tz.gettz(settings.TIME_ZONE)
@@ -857,10 +835,8 @@ class LabAppointment(TimeStampedModel):
         # Taking Lock first
         consumer_account = None
         if self.payment_type == OpdAppointment.PREPAID:
-            logger.error("Before Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
             temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
-            logger.error("After Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
 
         old_instance = LabAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
@@ -872,7 +848,6 @@ class LabAppointment(TimeStampedModel):
                     self.id, product_id):
                 cancel_amount = self.effective_price
                 consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
-                # consumer_account.credit_cancellation(data, cancel_amount)
                 if refund_flag:
                     ctx_obj = consumer_account.debit_refund()
                     account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
