@@ -37,9 +37,9 @@
 						<tbody>
 							<tr>
 								<td>
-									<p style="margin: 0; font-size: 12px; color: #757575; font-weight: 500;">{% if instance.lab.building %}{{instance.lab.building}}, {% endif %}{% if instance.lab.sublocality %}{{instance.lab.sublocality}} {% endif %}</p>
-									<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{% if instance.lab.locality %}{{instance.lab.locality}}, {% endif %}{% if instance.lab.city %}{{instance.lab.city}}{% endif %}</p>
-									<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{% if instance.lab.state %}{{instance.lab.state}} {% endif %}{% if instance.lab.pin_code %}{{instance.lab.pin_code}}{% endif %}</p>
+									<p style="margin: 0; font-size: 12px; color: #757575; font-weight: 500;">{{instance.lab.get_lab_address}}</p>
+									<!--<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{% if instance.lab.locality %}{{instance.lab.locality}}, {% endif %}{% if instance.lab.city %}{{instance.lab.city}}{% endif %}</p>-->
+									<!--<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{% if instance.lab.state %}{{instance.lab.state}} {% endif %}{% if instance.lab.pin_code %}{{instance.lab.pin_code}}{% endif %}</p>-->
 								</td>
 								<!--<td style="text-align: right;">-->
 									<!--<p style="margin: 0; font-size: 12px; color: #757575; font-weight: 500;">Phone: 022-25308722/41318723</p>-->
