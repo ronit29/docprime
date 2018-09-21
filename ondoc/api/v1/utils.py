@@ -14,6 +14,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
 from ondoc.crm.constants import constants
+import copy
 import requests
 import json
 import random
@@ -408,3 +409,19 @@ def readable_status_choices(product):
         for k, v in LabAppointment.STATUS_CHOICES:
             status_choices[k] = v
     return status_choices
+
+
+def get_lab_search_details(entity, req_params):
+    params_dict = copy.deepcopy(req_params)
+    if entity.get('location_json'):
+            if entity.get('location_json').get('sublocality_longitude'):
+                params_dict['long'] = entity.get('location_json').get('sublocality_longitude')
+            elif entity.get('location_json').get('locality_longitude'):
+                params_dict['long'] = entity.get('location_json').get('locality_longitude')
+
+            if entity.get('location_json').get('sublocality_latitude'):
+                params_dict['lat'] = entity.get('location_json').get('sublocality_latitude')
+            elif entity.get('location_json').get('locality_latitude'):
+                params_dict['lat'] = entity.get('location_json').get('locality_latitude')
+
+    return params_dict
