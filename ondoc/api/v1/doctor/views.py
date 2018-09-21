@@ -709,21 +709,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                            entity_type__iexact='Doctor')
         if entity.exists():
             extras = entity.first().additional_info
-            location_id = extras.get('location_id')
-            specialization_id = extras.get('specialization_id')
-            if location_id and specialization_id:
-                entity_address = EntityAddress.objects.get(id=location_id)
-                result = EntityAddress.objects.filter(id=location_id).values('type', 'value', 'parent')
-                latitude = entity_address.centroid.y
-                longitude = entity_address.centroid.x
-                kwargs['latitude'] = latitude
-                kwargs['longitude'] = longitude
-                kwargs['specialization_ids'] = [str(specialization_id)]
-                kwargs["type"] = result.first().get('type')
-                kwargs["value"] = result.first().get('value')
-                kwargs['parent'] = result.first().get('parent')
-
-                response = self.list(request, *args, **kwargs)
+            if extras:
+                kwargs['extras'] = extras
+                response = self.list(request, **kwargs)
                 return response
 
         return Response({})
@@ -732,13 +720,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         serializer = serializers.DoctorListSerializer(data=request.query_params, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        if kwargs.get('latitude') and kwargs.get('longitude') and kwargs.get('specialization_ids'):
-            validated_data['latitude'] = kwargs['latitude']
-            validated_data['longitude'] = kwargs['longitude']
-            validated_data['specialization_ids'] = kwargs['specialization_ids']
-            validated_data['type'] = kwargs['type']
-            validated_data['value'] = kwargs['value']
-            validated_data['parent'] = kwargs['parent']
+        if kwargs.get('extras'):
+            validated_data['extras'] = kwargs['extras']
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):

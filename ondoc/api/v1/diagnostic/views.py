@@ -120,18 +120,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                            entity_type__iexact='Lab')
         if entity.exists():
             extras = entity.first().additional_info
-            location_id = extras.get('location_id')
-
-            if location_id:
-                entity_address = EntityAddress.objects.get(id=location_id)
-                result = EntityAddress.objects.filter(id=location_id).values('type', 'value', 'parent')
-                latitude = entity_address.centroid.y
-                longitude = entity_address.centroid.x
-                kwargs['latitude'] = latitude
-                kwargs['longitude'] = longitude
-                kwargs["type"] = result.first().get('type')
-                kwargs["value"] = result.first().get('value')
-                kwargs['parent'] = result.first().get('parent')
+            if extras.get('location_json'):
+                kwargs['location_json'] = extras.get('location_json')
                 response = self.list(request, **kwargs)
                 return response
 
@@ -156,12 +146,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
 
         serializer.is_valid(raise_exception=True)
-        if kwargs.get('latitude') and kwargs.get('longitude'):
-            serializer.validated_data['latitude'] = kwargs['latitude']
-            serializer.validated_data['longitude'] = kwargs['longitude']
-            serializer.validated_data['type'] = kwargs['type']
-            serializer.validated_data['value'] = kwargs['value']
-            serializer.validated_data['parent'] = kwargs['parent']
+        if kwargs.get('location_json'):
+            serializer.validated_data['location_json'] = kwargs['location_json']
+
         parameters = serializer.validated_data
 
         queryset = self.get_lab_list(parameters)
@@ -188,7 +175,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids',[])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'));
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
 
         return Response({"result": serializer.data,
                          "count": count,'tests':tests})

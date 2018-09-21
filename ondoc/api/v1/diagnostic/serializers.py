@@ -165,21 +165,19 @@ class LabCustomSerializer(serializers.Serializer):
         locality = ''
         sublocality = ''
 
-        if request.get('type') == 'LOCALITY':
-            locality = request.get('value')
+        if request.get('location_json') and request.get('location_json').get('locality_value'):
+            locality = request.get('location_json').get('locality_value')
 
-        if request.get('type') == 'SUBLOCALITY':
-            sublocality = request.get('value')
-            parent = EntityAddress.objects.filter(id=request.get('parent')).values('value')
-            locality = sublocality + ',' + parent.first().get('value')
+        if request.get('location_json') and request.get('location_json').get('sublocality_value'):
+            sublocality = request.get('location_json').get('sublocality_value') + ', '
 
         title = "Diagnostic Centres & Labs "
-        if len(locality) > 1:
-            title += "in " + locality
+        if locality:
+            title += "in " + sublocality + locality
         title += " | Books Tests"
-        description = "Find best Diagnostic Centres and Labs "
-        if len(locality)>1:
-            description += " in " + locality
+        description = "Find best Diagnostic Centres and Labs"
+        if locality:
+            description += " in " + sublocality + locality
         description += " and book test online, check fees, packages prices and more at DocPrime."
         return {'title': title, "description": description}
 
