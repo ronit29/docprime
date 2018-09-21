@@ -180,7 +180,7 @@ class DoctorSearchHelper:
             thumbnail = doctor.get_thumbnail()
             title = ''
             description = ''
-            if False and validated_data.get('extras') or validated_data.get('specialization_ids'):
+            if False or validated_data.get('extras') or validated_data.get('specialization_ids'):
                 locality = ''
                 sublocality = ''
                 specializations = ''
@@ -258,7 +258,7 @@ class DoctorSearchHelper:
                 #
                 # }
             }
-            if title or description:
+            if False or title or description:
                 temp["seo"] = {
                     "title": title,
                     "description": description
