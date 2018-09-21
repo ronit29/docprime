@@ -11,7 +11,7 @@ from django.contrib.admin import SimpleListFilter
 from reversion.admin import VersionAdmin
 from import_export.admin import ImportExportMixin
 from django.db.models import Q
-from django.db import models
+from django.db import models, transaction
 from django.utils.dateparse import parse_datetime
 from dateutil import tz
 from django.conf import settings
@@ -36,6 +36,9 @@ from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class LabTestResource(resources.ModelResource):
@@ -503,12 +506,18 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         js = ('js/admin/ondoc.js',)
 
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
+        read_only_fields = ['lab_icon', 'lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
         if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
             read_only_fields += ['lab_pricing_group']
         if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         return read_only_fields
+
+    def lab_icon(self, instance):
+        lab_logo = instance.lab_documents.filter(document_type=LabDocument.LOGO).first()
+        if lab_logo:
+            return mark_safe("<img src='{}'".format(lab_logo.name.url))
+        return None
 
     def lead_url(self, instance):
         if instance.id:
@@ -855,8 +864,10 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     def user_id(self, obj):
         return obj.user.id
 
+    @transaction.atomic
     def save_model(self, request, obj, form, change):
         if obj:
+            lab_app_obj = LabAppointment.objects.select_for_update().get(pk=obj.id)
             # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
             #
@@ -872,8 +883,11 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
+                    logger.error("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
-        super().save_model(request, obj, form, change)
+                    logger.error("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
+            else:
+                super().save_model(request, obj, form, change)
 
     class Media:
         js = (

@@ -33,7 +33,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
-                                 OpdAppointment, CompetitorInfo, CompetitorHit)
+                                 OpdAppointment, CompetitorInfo, CompetitorMonthlyVisit)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -622,13 +622,19 @@ class DoctorResource(resources.ModelResource):
     aadhar = fields.Field()
     fees = fields.Field()
 
+    def get_queryset(self):
+        return Doctor.objects.all().prefetch_related('hospitals', 'doctorspecializations', 'qualifications',
+                                                     'doctor_clinics__hospital',
+                                                     'doctor_clinics__availability',
+                                                     'documents')
+
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'city', 'gender', 'license', 'fees','qualification', 'specialization', 'onboarding_status', 'data_status', 'gst',
-        'pan', 'mci', 'cheque', 'aadhar')
-        export_order = (
-            'id', 'name', 'city', 'gender', 'license', 'fees','qualification', 'specialization', 'onboarding_status', 'data_status', 'gst',
-        'pan', 'mci', 'cheque', 'aadhar')
+        fields = ('id', 'name', 'city', 'gender', 'license', 'fees', 'qualification', 'specialization',
+                  'onboarding_status', 'data_status', 'gst', 'pan', 'mci', 'cheque', 'aadhar')
+        export_order = ('id', 'name', 'city', 'gender', 'license', 'fees', 'qualification',
+                        'specialization', 'onboarding_status', 'data_status', 'gst',
+                        'pan', 'mci', 'cheque', 'aadhar')
 
     def dehydrate_data_status(self, doctor):
         return dict(Doctor.DATA_STATUS_CHOICES)[doctor.data_status]
@@ -718,30 +724,13 @@ class CompetitorInfoImportAdmin(ImportExportModelAdmin):
     list_display = ('id', 'doctor', 'hospital_name', 'fee', 'url')
 
 
-class CompetitorHitFormSet(forms.BaseInlineFormSet):
-    def clean(self):
-        super().clean()
-        if any(self.errors):
-            return
-        counter = {}
-        for values in self.cleaned_data:
-            competitor_name = values.get('name')
-            if competitor_name:
-                if counter.get(competitor_name):
-                    counter[competitor_name] = counter.get(competitor_name) + 1
-                else:
-                    counter[competitor_name] = 1
-
-        if any((x > 1 for x in counter.values())):
-            raise forms.ValidationError('Cannot have duplicate record for any competitor.')
-
-
-class CompetitorHitsInline(nested_admin.NestedTabularInline):
-    model = CompetitorHit
-    formset = CompetitorHitFormSet
+class CompetitorMonthlyVisitsInline(nested_admin.NestedTabularInline):
+    model = CompetitorMonthlyVisit
     extra = 0
     can_delete = True
     show_change_link = False
+    verbose_name = 'Monthly Visit through Competitor Info'
+    verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
@@ -759,7 +748,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     form = DoctorForm
     inlines = [
         CompetitorInfoInline,
-        CompetitorHitsInline,
+        CompetitorMonthlyVisitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
         DoctorSpecializationInline,
@@ -1027,7 +1016,6 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def change_view(self, request, object_id, form_url='', extra_context=None):        
         resp = super().change_view(request, object_id, form_url, extra_context=None)
         return resp
-
 
     def get_profile(self, obj):
         if not obj.profile_detail:

@@ -95,6 +95,9 @@ class LabModelSerializer(serializers.ModelSerializer):
             raise ValueError("request is not passed in serializer.")
         return request.build_absolute_uri(obj.get_thumbnail()) if obj.get_thumbnail() else None
 
+    def get_address(self, obj):
+        return obj.get_lab_address() if obj.get_lab_address() else None
+
     def get_lat(self,obj):
         if obj.location:
             return obj.location.y
@@ -103,25 +106,10 @@ class LabModelSerializer(serializers.ModelSerializer):
         if obj.location:
             return obj.location.x
 
-    def get_address(self, obj):
-        address = ''
-        if obj.building:
-            address += str(obj.building)
-        if obj.locality:
-            address += str(obj.locality) + ' , '
-        if obj.sublocality:
-            address += str(obj.sublocality) + ' , '
-        if obj.city:
-            address += str(obj.city) + ' , '
-        if obj.state:
-            address += str(obj.state) + ' , '
-        if obj.country:
-            address += str(obj.country)
-        return address
 
     class Meta:
         model = Lab
-        fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
+        fields = ('id', 'lat', 'long', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
                   'is_home_collection_enabled', 'seo')
 
@@ -631,7 +619,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
         resp_address = ""
         if obj.address:
             if obj.address.get("address"):
-                resp_address += str(obj.address.get("address"))
+                resp_address += str(obj.address.get("address")).strip().replace(',','')
             if obj.address.get("land_mark"):
                 if resp_address:
                     resp_address += ", "

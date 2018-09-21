@@ -16,7 +16,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor,
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization,
                                  MedicalCondition,
-                                 MedicalConditionSpecialization, CompetitorInfo, CompetitorHit)
+                                 MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -33,10 +33,11 @@ from ondoc.diagnostic.models import LabPricing
 
 from ondoc.web.models import Career, OnlineLead
 
-from ondoc.articles.models import Article
+from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 
 from ondoc.authentication.models import BillingAccount
 
+from ondoc.seo.models import Sitemap
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
@@ -67,7 +68,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization, CompetitorInfo, CompetitorHit)
+            HospitalNetworkCertification, DoctorSpecialization, CompetitorInfo, CompetitorMonthlyVisit)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -149,7 +150,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo, CompetitorHit)
+            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo, CompetitorMonthlyVisit)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -206,7 +207,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo, CompetitorHit)
+            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo, CompetitorMonthlyVisit)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -302,7 +303,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Article)
+        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleLinkedUrl, LinkedArticle)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

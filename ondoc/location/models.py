@@ -106,7 +106,7 @@ class EntityLocationRelationship(TimeStampedModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     valid = models.BooleanField(default=True)
-    location = models.ForeignKey(EntityAddress, on_delete=models.CASCADE)
+    location = models.ForeignKey(EntityAddress, related_name='associated_relations', on_delete=models.CASCADE)
     type = models.CharField(max_length=128, blank=False, null=False, choices=EntityAddress.AllowedKeys.as_choices())
 
     @classmethod
@@ -149,26 +149,98 @@ class EntityUrls(TimeStampedModel):
         return json.loads(self.extras)
 
     @classmethod
-    def create_search_urls(cls, entity_object):
+    def create_doctor_search_urls(cls):
         try:
-            entity_helper = entity_as_mapping[entity_object.__class__.__name__.upper()]
-            entity_helper_obj = entity_helper()
-            url_dict = entity_helper_obj.create_return_search_urls(entity_object)
+            specializations = doc_models.GeneralSpecialization.objects.all()
+            locations_set = EntityAddress.objects.filter\
+                (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
+            for location in locations_set:
+                for specialization in specializations:
+                    location_json = {}
+                    if location.type == 'LOCALITY':
+                        url = "{prefix}-in-{locality}-sptcit".format(prefix=specialization.name, locality=location.value)
 
-            if isinstance(url_dict, dict):
-                if url_dict.get('search_urls'):
-                    search_url_dict = url_dict['search_urls']
-                    urls = search_url_dict.get('urls', [])
-                    for url in urls:
-                        finalized_url = url.pop('url')
-                        extra = url
-                        if not cls.objects.filter(url=finalized_url).exists():
-                            entity_url_obj = cls(url=finalized_url.lower(), entity_type=entity_object.__class__.__name__,
-                                                 url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
-                            entity_url_obj.save()
+                        # Storing the locality data for fallback cases.
+                        location_json['locality_id'] = location.id
+                        location_json['locality_value'] = location.value
+                        location_json['locality_latitude'] = location.centroid.y
+                        location_json['locality_longitude'] = location.centroid.x
+                    elif location.type == 'SUBLOCALITY':
+                        ea_locality = EntityAddress.objects.get(id=location.parent)
+                        url = "{prefix}-in-{sublocality}-{locality}-sptlitcit".format(prefix=specialization.name, sublocality=location.value, locality=ea_locality.value)
+
+                        # storing the sublocality and locality data for fallback cases.
+                        location_json['sublocality_id'] = location.id
+                        location_json['sublocality_value'] = location.value
+                        location_json['sublocality_latitude'] = location.centroid.y
+                        location_json['sublocality_longitude'] = location.centroid.x
+                        location_json['locality_id'] = ea_locality.id
+                        location_json['locality_value'] = ea_locality.value
+                        location_json['locality_latitude'] = ea_locality.centroid.y
+                        location_json['locality_longitude'] = ea_locality.centroid.x
+                    url = slugify(url)
+
+                    url = url.lower()
+                    extra = {'specialization': specialization.name, 'specialization_id': specialization.id,
+                             'location_json': location_json}
+
+                    if not cls.objects.filter(url=url).exists():
+                        entity_url_obj = cls(url=url, entity_type='Doctor',
+                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                        entity_url_obj.save()
+                        print(url)
+
+                doctor_in_city_url = "doctor-in-{location}".format(location=location.value)
+                if doctor_in_city_url:
+                    doctor_in_city_url = slugify(doctor_in_city_url)
+                    extra = {'location_id': location.id, 'location_json': location_json}
+                    if not cls.objects.filter(url=doctor_in_city_url).exists():
+                        entity_url_obj = cls(url=doctor_in_city_url,
+                                             entity_type='Doctor',
+                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                        entity_url_obj.save()
+                        print(doctor_in_city_url)
 
             return True
+        except Exception as e:
+            print(str(e))
+            return False
 
+    @classmethod
+    def create_lab_search_urls(cls):
+        try:
+            locations_set = EntityAddress.objects.filter \
+                (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
+            for location in locations_set:
+                location_json = {}
+                if location.type == 'LOCALITY':
+                    url = "labs-in-{locality}-lbcit".format(locality=location.value)
+                    # Storing the locality data for fallback cases.
+                    location_json['locality_id'] = location.id
+                    location_json['locality_value'] = location.value
+                    location_json['locality_latitude'] = location.centroid.y
+                    location_json['locality_longitude'] = location.centroid.x
+                elif location.type == 'SUBLOCALITY':
+                    ea_locality = EntityAddress.objects.get(id=location.parent)
+                    url = "labs-in-{sublocality}-{locality}-lblitcit".format(sublocality=location.value, locality=ea_locality.value)
+                    # storing the sublocality and locality data for fallback cases.
+                    location_json['sublocality_id'] = location.id
+                    location_json['sublocality_value'] = location.value
+                    location_json['sublocality_latitude'] = location.centroid.y
+                    location_json['sublocality_longitude'] = location.centroid.x
+                    location_json['locality_id'] = ea_locality.id
+                    location_json['locality_value'] = ea_locality.value
+                    location_json['locality_latitude'] = ea_locality.centroid.y
+                    location_json['locality_longitude'] = ea_locality.centroid.x
+                url = slugify(url)
+                url = url.lower()
+                extra = {'location_json': location_json}
+                if not cls.objects.filter(url=url).exists():
+                    entity_url_obj = cls(url=url, entity_type='Lab',
+                                         url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                    entity_url_obj.save()
+                    print(url)
+            return True
         except Exception as e:
             print(str(e))
             return False
@@ -229,7 +301,6 @@ class EntityUrlsHelper(object):
         urls = self._create_return_search_urls(entity_object)
         return urls
 
-    # @staticmethod
     def build_url(self, prefix, location):
         url = ''
         if location.type == 'LOCALITY':

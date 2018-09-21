@@ -430,7 +430,13 @@ class UserAppointmentsViewSet(OndocViewSet):
         query_input_serializer.is_valid(raise_exception=True)
         appointment_type = query_input_serializer.validated_data.get('type')
         if appointment_type == 'lab':
-            lab_appointment = get_object_or_404(LabAppointment, pk=pk)
+            # lab_appointment = get_object_or_404(LabAppointment, pk=pk)
+            lab_appointment = LabAppointment.objects.select_for_update().filter(pk=pk).first()
+            resp = dict()
+            if not lab_appointment:
+                resp["status"] = 0
+                resp["message"] = "Invalid appointment Id"
+                return Response(resp, status.HTTP_404_NOT_FOUND)
             allowed = lab_appointment.allowed_action(request.user.user_type, request)
             appt_status = validated_data.get('status')
             if appt_status not in allowed:
@@ -471,7 +477,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
-            if validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
+            elif validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
                     time_slot_start = utils.form_time_slot(
                         validated_data.get("start_date"),
@@ -963,6 +969,18 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                    order_obj.action_data.get("hospital"),
                                                                    response.get('statusCode'))
+                    try:
+                        ops_email_data = dict()
+                        ops_email_data.update(order_obj.appointment_details())
+                        if response.get("txDate"):
+                            ops_email_data["transaction_time"] = parse(response.get("txDate"))
+                        else:
+                            ops_email_data["transaction_time"] = timezone.now()
+                        EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                                                                 order_obj.product_id,
+                                                                 EmailNotification.OPS_PAYMENT_NOTIFICATION)
+                    except:
+                        pass
         except Exception as e:
             logger.error("Error - " + str(e))
 

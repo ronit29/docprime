@@ -21,7 +21,7 @@
                         <br>
                         <span  style="display: inline-block; font-size: 12px; padding:0px 10px 0px 0px; color: #806c6c">Online
                         consultation</span>
-                        <span style="color:#191616; float:right; font-weight: bold; font-size: 12px; padding:0px 15px 0px 0px;">{{currentDate}}</span>
+                        <span style="color:#191616; float:right; font-weight: bold; font-size: 12px; padding:0px 15px 0px 0px;">{{updated_at|date:'l, F jS Y'}}</span>
                     </div>
                     <hr style="display:block; background:#000000; height:1px; clear:both; margin:0px -15px;">
                 </td>
@@ -57,7 +57,7 @@
                         </ul>
                         {% endif %}
                         <br>
-                            {% if prodiagnosis %}
+                            {% if prodiagnosis and prodiagnosisType %}
                                 <span style="font-size: 13px; font-weight: bold; padding-bottom: 10px; display: inline-block">Provisional
                                 Diagnosis</span>
                                 <br>
@@ -85,7 +85,7 @@
                             <ul style="font-size: 13px;">
                                 {% for value in medicines %}
                                     <li style="padding: 2px 0px; font-weight: 600;">{{value.MedicineName}}
-                                        <p style="    margin-top: 0px;color: #7f7979; font-weight: 500;">{{value.qunatity}}, {{value.selectedNoOfTimes}} ({{value.mealtimes}}) {{value.selectedmedDays}}</p>
+                                        <p style="    margin-top: 0px;color: #7f7979; font-weight: 500;">{{value.qunatity}}, {{value.selectedNoOfTimes}}{% if value.times %}, {{value.times|join:"| "}}{% endif %} {% if value.mealtimes %}({{value.mealtimes}}){% endif %} {{value.selectedmedDays}}</p>
                                     </li>
                                 {% endfor %}
                             </ul>
@@ -156,7 +156,7 @@
                                 <table style="width: 100%">
                                     <tr>
                                         <td valign="top" ><span style="padding-top: 5px; display: inline-block;">
-                                            <img src="http://telemed.docprime.com/images/healthservices/forma-1%20(3).svg" width="16px" height="16px">
+                                            <img src="http://telemed.docprime.com/images/healthservices/online_consultation.svg"/>
                                         </span></td>
                                         <td><label style="font-size: 11px;">Talk to our in-house doctors for free consultation</label></td>
                                     </tr>
@@ -166,7 +166,7 @@
                                 <table style="width: 100%">
                                     <tr>
                                         <td valign="top" ><span style="padding-top: 5px; display: inline-block;">
-                                            <img src="http://telemed.docprime.com/images/healthservices/forma-1%20(3).svg" width="16px" height="16px">
+                                            <img src="http://telemed.docprime.com/images/healthservices/find_doctor_near_u.svg" />
                                         </span></td>
                                         <td><label style="font-size: 11px;">Book appointment with doctors near you</label></td>
                                     </tr>
@@ -176,7 +176,7 @@
                                 <table style="width: 100%">
                                     <tr>
                                         <td valign="top" ><span style="padding-top: 5px; display: inline-block;">
-                                            <img src="http://telemed.docprime.com/images/healthservices/forma-1%20(3).svg" width="16px" height="16px">
+                                            <img src="http://telemed.docprime.com/images/healthservices/forma-1%20(3).svg" />
                                         </span></td>
                                         <td><label style="font-size: 11px;">Book
                                         test with labs</label></td>

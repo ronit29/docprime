@@ -201,6 +201,34 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         return None
         # return static('lab_images/lab_default.png')
 
+    def get_lab_address(self):
+        address = []
+
+        if self.building:
+            address.append(self.ad_str(self.building))
+        if self.sublocality:
+            address.append(self.ad_str(self.sublocality))
+        if self.locality:
+            address.append(self.ad_str(self.locality))
+        if self.city:
+            address.append(self.ad_str(self.city))
+        # if self.state:
+        #     address.append(self.ad_str(self.state))
+        # if self.country:
+        #     address.append(self.ad_str(self.country))
+        result = []
+        ad_uinq = set()
+        for ad in address:
+            ad_lc = ad.lower()
+            if ad_lc not in ad_uinq:
+                ad_uinq.add(ad_lc)
+                result.append(ad)
+
+        return ", ".join(result)
+
+    def ad_str(self, string):
+        return str(string).strip().replace(',', '')
+
     def update_live_status(self):
 
         if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
@@ -604,8 +632,10 @@ class AvailableLabTest(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.mrp:
-            self.computed_deal_price = self.get_computed_deal_price()
             self.computed_agreed_price = self.get_computed_agreed_price()
+            # self.computed_deal_price = self.get_computed_deal_price()
+            self.computed_deal_price = self.computed_agreed_price
+
         super(AvailableLabTest, self).save(*args, **kwargs)
 
     def get_computed_deal_price(self):
@@ -748,8 +778,9 @@ class LabAppointment(TimeStampedModel):
             notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
 
         if not old_instance or old_instance.status != self.status:
-            for e_id in settings.OPS_EMAIL_ID:
-                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
+            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
+                                                                         product=account_model.Order.LAB_PRODUCT_ID,
+                                                                         alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
 
         # try:
         #     prev_app_dict = {'id': self.id,
@@ -852,24 +883,29 @@ class LabAppointment(TimeStampedModel):
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-        self.status = self.CANCELLED
-        self.save()
 
+        # Taking Lock first
+        consumer_account = None
         if self.payment_type == OpdAppointment.PREPAID:
-            consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
+            logger.error("Before Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
+            temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
+            logger.error("After Lock - " + str(self.id) + " timezone - " + str(timezone.now()))
 
-            data = dict()
-            data["reference_id"] = self.id
-            data["user"] = self.user
-            data["product_id"] = account_model.Order.LAB_PRODUCT_ID
+        old_instance = LabAppointment.objects.get(pk=self.id)
+        if old_instance.status != self.CANCELLED:
+            self.status = self.CANCELLED
+            self.save()
+            product_id = account_model.Order.LAB_PRODUCT_ID
 
-        cancel_amount = self.effective_price
-        consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
-        # consumer_account.credit_cancellation(data, cancel_amount)
-        if refund_flag:
-            ctx_obj = consumer_account.debit_refund()
-            account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
+                    self.id, product_id):
+                cancel_amount = self.effective_price
+                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
+                # consumer_account.credit_cancellation(data, cancel_amount)
+                if refund_flag:
+                    ctx_obj = consumer_account.debit_refund()
+                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def action_completed(self):
         self.status = self.COMPLETED
@@ -1099,6 +1135,11 @@ class LabDocument(TimeStampedModel, Document):
     document_type = models.PositiveSmallIntegerField(choices=CHOICES)
     name = models.FileField(upload_to='lab/images', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
+
+    def __str__(self):
+        if self.document_type:
+            return '{}'.format(dict(LabDocument.CHOICES)[self.document_type])
+        return None
 
     def extension(self):
         name, extension = os.path.splitext(self.name.name)
