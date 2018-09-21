@@ -86,6 +86,12 @@ class SearchKey(models.Model):
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             self.search_key = search_key
+        if hasattr(self, 'synonyms'):
+            synonyms = self.synonyms.split(",")
+            if synonyms:
+                synonyms = " ".join(synonyms)
+            if synonyms:
+                self.search_key = self.search_key + " " + synonyms
         super().save(*args, **kwargs)
 
 
@@ -435,6 +441,7 @@ class DoctorQualification(auth_model.TimeStampedModel):
 
 class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
     name = models.CharField(max_length=200)
+    synonyms = models.CharField(max_length=4000, blank=True, null=True)
 
     def __str__(self):
         return self.name

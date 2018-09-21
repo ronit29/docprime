@@ -555,6 +555,7 @@ class LabTest(TimeStampedModel, SearchKey):
         (OTHER, 'Other')
     )
     name = models.CharField(max_length=200, unique=True)
+    synonyms = models.CharField(max_length=4000, null=True, blank=True)
     test_type = models.PositiveIntegerField(choices=TEST_TYPE_CHOICES, blank=True, null=True)
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
     number_of_tests = models.PositiveIntegerField(blank=True, null=True)
