@@ -33,7 +33,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
-                                 OpdAppointment, CompetitorInfo, CompetitorHit)
+                                 OpdAppointment, CompetitorInfo, CompetitorMonthlyVisit)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -724,27 +724,13 @@ class CompetitorInfoImportAdmin(ImportExportModelAdmin):
     list_display = ('id', 'doctor', 'hospital_name', 'fee', 'url')
 
 
-class CompetitorHitFormSet(forms.BaseInlineFormSet):
-    def clean(self):
-        super().clean()
-        if any(self.errors):
-            return
-        counter = {}
-        for values in self.cleaned_data:
-            competitor_name = values.get('name')
-            if competitor_name:
-                if counter.get(competitor_name):
-                    raise forms.ValidationError('Cannot have duplicate record for any competitor.')
-                else:
-                    counter[competitor_name] = 1
-
-
-class CompetitorHitsInline(nested_admin.NestedTabularInline):
-    model = CompetitorHit
-    formset = CompetitorHitFormSet
+class CompetitorMonthlyVisitsInline(nested_admin.NestedTabularInline):
+    model = CompetitorMonthlyVisit
     extra = 0
     can_delete = True
     show_change_link = False
+    verbose_name = 'Monthly Visit through Competitor Info'
+    verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
@@ -762,7 +748,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     form = DoctorForm
     inlines = [
         CompetitorInfoInline,
-        CompetitorHitsInline,
+        CompetitorMonthlyVisitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
         DoctorSpecializationInline,

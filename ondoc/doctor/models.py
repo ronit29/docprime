@@ -508,17 +508,17 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
         # unique_together = (("start", "end", "day", "doctor_clinic",),)
 
     def save(self, *args, **kwargs):
-        if self.mrp!=None:
-            deal_price = math.ceil(self.fees + (self.mrp - self.fees)*.1)
-            deal_price = math.ceil(deal_price/10)*10
-            if deal_price<self.fees:
-                deal_price = self.fees
-
-            deal_price = max(deal_price, 100)
-            deal_price = min(self.mrp, deal_price)
+        if self.fees != None:
+            # deal_price = math.ceil(self.fees + (self.mrp - self.fees)*.1)
+            # deal_price = math.ceil(deal_price/10)*10
+            # if deal_price<self.fees:
+            #     deal_price = self.fees
+            #
+            # deal_price = max(deal_price, 100)
+            # deal_price = min(self.mrp, deal_price)
             #if deal_price>self.mrp:
             #    deal_price = self.mrp
-            self.deal_price = deal_price
+            self.deal_price = self.fees
         super().save(*args, **kwargs)
 
 
@@ -1495,11 +1495,12 @@ class CompetitorInfo(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
 
-class CompetitorHit(models.Model):
+class CompetitorMonthlyVisit(models.Model):
     NAME_TYPE_CHOICES = CompetitorInfo.NAME_TYPE_CHOICES
     doctor = models.ForeignKey(Doctor, related_name="competitor_doctor_hits", on_delete=models.CASCADE)
     name = models.PositiveSmallIntegerField(choices=NAME_TYPE_CHOICES)
-    hits = models.BigIntegerField()
+    monthly_visit = models.BigIntegerField(verbose_name='Monthly Visits through Competitor')
 
     class Meta:
-        db_table = "competitor_hit"
+        db_table = "competitor_monthly_visits"
+        unique_together = ('doctor', 'name')

@@ -632,8 +632,10 @@ class AvailableLabTest(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.mrp:
-            self.computed_deal_price = self.get_computed_deal_price()
             self.computed_agreed_price = self.get_computed_agreed_price()
+            # self.computed_deal_price = self.get_computed_deal_price()
+            self.computed_deal_price = self.computed_agreed_price
+
         super(AvailableLabTest, self).save(*args, **kwargs)
 
     def get_computed_deal_price(self):
