@@ -199,7 +199,7 @@ class EntityUrls(TimeStampedModel):
                                              entity_type='Doctor',
                                              url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
                         entity_url_obj.save()
-                    print(doctor_in_city_url)
+                        print(doctor_in_city_url)
 
             return True
         except Exception as e:
