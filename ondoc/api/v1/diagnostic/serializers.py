@@ -596,6 +596,7 @@ class SearchLabListSerializer(serializers.Serializer):
     ids = IdListField(required=False)
     sort_on = serializers.CharField(required=False)
     name = serializers.CharField(required=False)
+    network_id = serializers.IntegerField(required=False)
 
 
 class UpdateStatusSerializer(serializers.Serializer):

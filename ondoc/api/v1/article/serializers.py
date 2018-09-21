@@ -30,7 +30,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
         return serializer.data
 
     def get_linked_articles(self, obj):
-        serializer = LinkedArticleSerializer(obj.linked_articles.all(), many=True)
+        serializer = LinkedArticleSerializer(obj.linked_articles.filter(is_published=True), many=True)
         return serializer.data
 
     def get_icon(self, obj):
