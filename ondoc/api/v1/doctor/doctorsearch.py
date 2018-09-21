@@ -122,7 +122,7 @@ class DoctorSearchHelper:
                                 srid=4326)
         for hospital in doctor.hospitals.all():
             if hospital.id == doctor_clinic_mapping[doctor.id]:
-                return current_location.distance(hospital.location)*100*1000
+                return current_location.distance(hospital.location)*100
         return ""
 
     def get_doctor_fees(self, doctor_clinic, doctor_availability_mapping):
