@@ -28,7 +28,7 @@ from django.db.models import Q, Value
 from django.db.models import Case, When
 from operator import itemgetter
 from itertools import groupby
-from ondoc.api.v1.utils import RawSql, is_valid_testing_data
+from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_parameters
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F
@@ -712,13 +712,17 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             extras = entity.first().additional_info
             if extras:
                 kwargs['extras'] = extras
+                kwargs['parameters'] = doctor_query_parameters(extras, request.query_params)
                 response = self.list(request, **kwargs)
                 return response
 
         return Response({})
 
     def list(self, request, *args, **kwargs):
-        serializer = serializers.DoctorListSerializer(data=request.query_params, context={"request": request})
+        parameters = request.query_params
+        if kwargs.get("parameter"):
+            parameters = kwargs.get("parameter")
+        serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         if kwargs.get('extras'):
