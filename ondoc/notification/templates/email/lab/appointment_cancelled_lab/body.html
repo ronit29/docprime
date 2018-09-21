@@ -158,19 +158,19 @@
 												{% endif %}
 												<tr>
 													<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-														{% if instance.lab.building %}{{instance.lab.building}}, {% endif %}{% if instance.lab.sublocality %}{{instance.lab.sublocality}}, {% endif %}{% if instance.hospital.locality %}{{instance.hospital.locality}}{% endif %}
+													{{instance.lab.get_lab_address}}
 													</td>
 												</tr>
-												<tr>
-													<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
-														{% if instance.hospital.city %}{{instance.lab.city}} {% endif %}{% if instance.lab.state%}{{instance.lab.state}}{% endif %}
-													</td>
-												</tr>
-												<tr>
-													<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
-													{% if instance.lab.city %} {{instance.lab.pin_code}}{% endif %}
-													</td>
-												</tr>
+												<!--<tr>-->
+													<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
+														<!--{% if instance.hospital.city %}{{instance.lab.city}} {% endif %}{% if instance.lab.state%}{{instance.lab.state}}{% endif %}-->
+													<!--</td>-->
+												<!--</tr>-->
+												<!--<tr>-->
+													<!--<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">-->
+													<!--{% if instance.lab.city %} {{instance.lab.pin_code}}{% endif %}-->
+													<!--</td>-->
+												<!--</tr>-->
 											</tbody>
 										</table>
 									</td>

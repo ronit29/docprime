@@ -65,11 +65,11 @@
 							<tr>
 								{% if instance.cancellation_type == 3 %}
 									<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
-										Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - Dr. {{lab_name|capfirst}} has been cancelled due to unavailability of the lab manager.
+										Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - {{lab_name|capfirst}} has been cancelled due to unavailability of the lab manager.
 									</td>
 								{% else %}
 									<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
-										Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - Dr. {{lab_name|capfirst}} has been cancelled as requested by you.
+										Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - {{lab_name|capfirst}} has been cancelled as requested by you.
 									</td>
 								{% endif %}
 							</tr>
