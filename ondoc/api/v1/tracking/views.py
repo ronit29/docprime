@@ -53,11 +53,10 @@ class EventCreateViewSet(GenericViewSet):
         if data:
             visit_id = data.get('visitor_id')
             visitor_id = data.get('visitor_id')
-        if visitor_id and not track_models.TrackingVisitor.objects.filter(id=visitor_id).exists():
-            track_models.TrackingVisitor.objects.create(id=visitor_id)
-        if visitor_id and visit_id and not track_models.TrackingVisit.objects.filter(id=visit_id).exists():
-            track_models.TrackingVisit.objects.create(id=visit_id,visitor_id=visitor_id)
-
+            if visitor_id:
+                track_models.TrackingVisitor.objects.get_or_create(id=visitor_id)
+            if visit_id:
+                track_models.TrackingVisit.objects.get_or_create(id=visit_id,visitor_id=visitor_id)
 
         return (visitor_id, visit_id)
 
