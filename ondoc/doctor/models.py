@@ -86,7 +86,7 @@ class SearchKey(models.Model):
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             self.search_key = search_key
-        if hasattr(self, 'synonyms'):
+        if hasattr(self, 'synonyms') and self.synonyms:
             synonyms = self.synonyms.split(",")
             if synonyms:
                 synonyms = " ".join(synonyms)

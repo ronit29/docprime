@@ -60,12 +60,10 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
                     geo_ip_obj = GeoIPEntries.objects.create(ip_address=ip_address, location_detail=resp_data)
                     resp = self.form_response(resp_data, resp)
                 else:
-                    logger.error(
-                        "Cannot get details from Max Mind for ip address - " + ip_address)
+                    pass
             except Exception as e:
-                logger.error(
-                    "Exception while getting details from Max Mind for ip address - " + ip_address + " with exception - " + str(
-                        e))
+                pass
+                
         else:
             resp = self.form_response(geo_ip_obj.location_detail, resp)
             resp["status"] = 1
@@ -94,10 +92,8 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
             resp["access_url"] = self.SEARCH_URL_LIST[val]
             resp["city_name"] = city_name
             resp["status"] = 1
-        except Exception as e:
-            logger.error(
-                "Exception while processing maxmind data - " + str(
-                    e))
+        except Exception:
+            pass
 
         return resp
 
