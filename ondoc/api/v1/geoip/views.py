@@ -48,7 +48,8 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
             return Response(resp)
 
         visitor_ip_add_obj = VisitorIpAddress.objects.create(ip_address=ip_address, visitor_id=req_data.get("visitor_id"), visit_id=req_data.get("visit_id"))
-
+        if ip_address.startswith('10.'):
+            return Response(resp)
         geo_ip_obj = GeoIPEntries.objects.filter(ip_address=ip_address).first()
         url = settings.MAXMIND_CITY_API_URL + str(ip_address)
         if not geo_ip_obj:
