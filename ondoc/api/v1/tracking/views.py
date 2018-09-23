@@ -50,13 +50,15 @@ class EventCreateViewSet(GenericViewSet):
         visitor_id = None
 
         data=request.data.get('visitor_info')
+        client_ip, is_routable = get_client_ip(request)
         if data:
-            visit_id = data.get('visitor_id')
+            visit_id = data.get('visit_id')
             visitor_id = data.get('visitor_id')
             if visitor_id:
                 track_models.TrackingVisitor.objects.get_or_create(id=visitor_id)
             if visit_id:
-                track_models.TrackingVisit.objects.get_or_create(id=visit_id,visitor_id=visitor_id)
+                track_models.TrackingVisit.objects.get_or_create(id=visit_id,
+                    defaults={'visitor_id': visitor_id, 'ip_address': client_ip})
 
         return (visitor_id, visit_id)
 
