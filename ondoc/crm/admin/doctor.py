@@ -696,13 +696,14 @@ class CompetitorInfoFormSet(forms.BaseInlineFormSet):
         super().clean()
         if any(self.errors):
             return
-        prev_compe_infos = {}
-        for item in self.cleaned_data:
-            req_set = (item.get('name'), item.get('hospital_name'), item.get('doctor'))
-            if req_set in prev_compe_infos:
-                raise forms.ValidationError('Cannot have duplicate competitor info.')
-            else:
-                prev_compe_infos[req_set] = True
+            
+        # prev_compe_infos = {}
+        # for item in self.cleaned_data:
+        #     req_set = (item.get('name'), item.get('hospital_name'), item.get('doctor'))
+        #     if req_set in prev_compe_infos:
+        #         raise forms.ValidationError('Cannot have duplicate competitor info.')
+        #     else:
+        #         prev_compe_infos[req_set] = True
 
 
 

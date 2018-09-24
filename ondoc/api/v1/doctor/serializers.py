@@ -628,6 +628,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     seo = serializers.SerializerMethodField()
 
     def get_seo(self, obj):
+        if self.parent:
+            return None
 
         doctor_specializations = DoctorSpecialization.objects.filter(doctor=obj).all()
         specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
