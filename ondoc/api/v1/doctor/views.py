@@ -1,6 +1,7 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
+from ondoc.doctor.models import GeneralSpecialization
 from ondoc.notification.models import EmailNotification
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
@@ -769,16 +770,79 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         for data in entity:
             id_url_dict[data['entity_id']] = data['url']
 
+        title = ''
+        description = ''
+        seo = None
+        # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
+        if validated_data.get('extras') or validated_data.get('specialization_ids'):
+            locality = ''
+            sublocality = ''
+            specializations = ''
+            if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
+                if validated_data.get('extras').get('location_json').get('locality_value'):
+                    locality = validated_data.get('extras').get('location_json').get('locality_value')
+                if validated_data.get('extras').get('location_json').get('sublocality_value'):
+                    sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
+                    if sublocality:
+                        locality = sublocality + ', ' + locality
+
+            if validated_data.get('specialization_ids'):
+                specialization_name_obj = GeneralSpecialization.objects.filter(
+                    id__in=validated_data.get('specialization_ids', [])).values(
+                    'name')
+                specialization_list = []
+
+                for names in specialization_name_obj:
+                    specialization_list.append(names.get('name'))
+
+                specializations = ', '.join(specialization_list)
+            else:
+                if validated_data.get('extras').get('specialization'):
+                    specializations = validated_data.get('extras').get('specialization')
+                else:
+                    specializations = ''
+
+            if specializations:
+                title = specializations
+                description = specializations
+            if locality:
+                title += ' in '  + locality
+                description += ' in ' +locality
+            if specializations:
+                title += '- Book Best ' + specializations
+                description += ': Book best ' + specializations + '\'s appointment online '
+            if locality:
+                description += 'in ' + locality
+            title += ' Instantly | DocPrime'
+
+            description += '. View Address, fees and more for doctors '
+            if locality:
+                description += 'in '+ locality
+            description += '.'
+
+            if title or description:
+                seo = {
+                    "title": title,
+                    "description": description
+                }
+
+                # response[0]['seo'] = seo
+
+
         for resp in response:
             if id_url_dict.get(resp['id']):
                 resp['url'] = id_url_dict[resp['id']]
             else:
                 resp['url'] = None
 
+
+
+
+
         specializations = list(models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
-                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions})
+                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
