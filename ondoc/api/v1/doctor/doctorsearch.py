@@ -179,7 +179,6 @@ class DoctorSearchHelper:
 
             thumbnail = doctor.get_thumbnail()
 
-
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),
@@ -206,12 +205,6 @@ class DoctorSearchHelper:
                 "hospitals": hospitals,
                 "thumbnail": (
                     request.build_absolute_uri(thumbnail) if thumbnail else None),
-                # "seo": {
-                #     "title": title,
-                #     "description": description
-                #
-                # }
             }
-
             response.append(temp)
         return response

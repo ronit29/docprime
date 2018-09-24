@@ -135,9 +135,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         url = url.lower()
-        if EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Lab').exists():
-            entity_url_obj = EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
-            entity_id = entity_url_obj.entity_id
+        entity = EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Lab')
+        if entity.exists():
+            entity = entity.first()
+            if not entity.is_valid:
+                valid_entity_url_qs = EntityUrls.objects.filter(url_type='PAGEURL',
+                                                                                entity_id=entity.entity_id,
+                                                                                entity_type__iexact='Lab',
+                                                                                is_valid='t')
+                if valid_entity_url_qs.exists():
+                    corrected_url = valid_entity_url_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            entity_id = entity.entity_id
             response = self.retrieve(request, entity_id)
             return response
 

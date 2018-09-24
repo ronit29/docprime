@@ -160,7 +160,6 @@ class LabCustomSerializer(serializers.Serializer):
     lab_timing_data = serializers.ListField()
 
 
-
     # def get_lab(self, obj):
     #     queryset = Lab.objects.get(pk=obj['lab'])
     #     serializer = LabModelSerializer(queryset)
