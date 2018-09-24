@@ -786,7 +786,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if validated_data.get('extras').get('location_json').get('sublocality_value'):
                     sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
                     if sublocality:
-                        locality = sublocality + ', ' + locality
+                        locality = sublocality + ' ' + locality
 
             if validated_data.get('specialization_ids'):
                 specialization_name_obj = GeneralSpecialization.objects.filter(

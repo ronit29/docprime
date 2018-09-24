@@ -80,7 +80,7 @@ class LabModelSerializer(serializers.ModelSerializer):
                 sublocality = type.first().get('value')
                 parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
                 if sublocality:
-                    locality = ', ' + parent.first().get('value')
+                    locality = ' ' + parent.first().get('value')
         if not(sublocality == '') or not(locality == ''):
             title = obj.name + ' - Diagnostic Centre in '+ sublocality + locality + ' |DocPrime'
         else:
