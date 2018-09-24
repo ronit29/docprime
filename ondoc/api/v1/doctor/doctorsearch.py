@@ -221,7 +221,7 @@ class DoctorSearchHelper:
                     description += 'in ' + locality
                 title += ' Instantly | DocPrime'
 
-                description += '. View Address, fees and more for doctors'
+                description += '. View Address, fees and more for doctors '
                 if locality:
                     description += 'in '+ locality
                 description += '.'
