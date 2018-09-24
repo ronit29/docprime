@@ -11,7 +11,7 @@ from django.contrib.admin import SimpleListFilter
 from reversion.admin import VersionAdmin
 from import_export.admin import ImportExportMixin
 from django.db.models import Q
-from django.db import models
+from django.db import models, transaction
 from django.utils.dateparse import parse_datetime
 from dateutil import tz
 from django.conf import settings
@@ -27,7 +27,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges,
-                                     TestParameter)
+                                     TestParameter, ParameterLabTest)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
@@ -36,6 +36,9 @@ from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class LabTestResource(resources.ModelResource):
@@ -341,10 +344,6 @@ class LabForm(FormCleanMixin):
     class Meta:
         model = Lab
         exclude = ()
-        help_texts = {
-            'agreed_rate_list': 'Supported formats : pdf, xls, xlsx',
-            'ppc_rate_list': 'Supported formats : pdf, xls, xlsx'
-        }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
 
@@ -482,7 +481,7 @@ class LabResource(resources.ModelResource):
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
-    list_display = ('name', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to',
+    list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to',
                     'get_onboard_link',)
 
     # readonly_fields=('onboarding_status', )
@@ -506,6 +505,9 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     class Media:
         js = ('js/admin/ondoc.js',)
 
+    def get_queryset(self, request):
+        return Lab.objects.all().prefetch_related('lab_documents')
+
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
         if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
@@ -513,6 +515,14 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         return read_only_fields
+
+    def lab_logo(self, instance):
+        lab_documents = instance.lab_documents.all()
+        for lab_document in lab_documents:
+            if lab_document.document_type == LabDocument.LOGO:
+                return mark_safe("<a href={} target='_blank'>View</a> ".format(lab_document.name.url))
+        return None
+    lab_logo.short_description = 'Logo'
 
     def lead_url(self, instance):
         if instance.id:
@@ -658,16 +668,19 @@ class LabAppointmentForm(forms.ModelForm):
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         else:
             raise forms.ValidationError("Invalid start date and time.")
-        if self.instance.id:
-            lab_test = self.instance.lab_test.all()
-            lab = self.instance.lab
-            if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and cleaned_data.get('status'):
-                raise forms.ValidationError("Status can not be changed.")
-        elif cleaned_data.get('lab') and cleaned_data.get('lab_test'):
+
+        if cleaned_data.get('lab') and cleaned_data.get('lab_test'):
             lab_test = cleaned_data.get('lab_test').all()
             lab = cleaned_data.get('lab')
+        elif self.instance.id:
+            lab_test = self.instance.lab_test.all()
+            lab = self.instance.lab
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
+
+        if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
+            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
 
@@ -856,8 +869,10 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     def user_id(self, obj):
         return obj.user.id
 
+    @transaction.atomic
     def save_model(self, request, obj, form, change):
         if obj:
+            lab_app_obj = LabAppointment.objects.select_for_update().get(pk=obj.id)
             # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
             #
@@ -873,8 +888,11 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
+                    logger.error("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
-        super().save_model(request, obj, form, change)
+                    logger.error("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
+            else:
+                super().save_model(request, obj, form, change)
 
     class Media:
         js = (
@@ -883,17 +901,24 @@ class LabAppointmentAdmin(admin.ModelAdmin):
         )
 
 
-
-
-class TestParameterInline(admin.TabularInline):
-    model = TestParameter
+class ParameterLabTestInline(admin.TabularInline):
+    model = LabTest.parameter.through
+    fk_name = 'lab_test'
     verbose_name = 'Parameter'
     verbose_name_plural = 'Parameters'
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['parameter']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request)
 
 
 class TestPackageFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
         for data in self.cleaned_data:
             lab_test = data.get('lab_test')
             if not lab_test:
@@ -902,6 +927,10 @@ class TestPackageFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError('Test-{} is not correct for the Package.'.format(lab_test.name))
             if lab_test.is_package is True:
                 raise forms.ValidationError('{} is a test package'.format(lab_test.name))
+
+
+class TestParameterAdmin(VersionAdmin):
+    search_fields = ['name']
 
 
 class LabTestPackageInline(admin.TabularInline):
@@ -934,7 +963,7 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
         if obj and obj.is_package and LabTest.objects.filter(pk=obj.id, is_package=True).exists():
             inline_instance.append(LabTestPackageInline(self.model, self.admin_site))
         if obj and LabTest.objects.filter(pk=obj.id, is_package=False).exists():
-            inline_instance.append(TestParameterInline(self.model, self.admin_site))
+            inline_instance.append(ParameterLabTestInline(self.model, self.admin_site))
         return inline_instance
 
 

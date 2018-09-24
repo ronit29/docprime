@@ -3,9 +3,11 @@ from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, GeneralSpecialization
 from datetime import datetime
 import re
+
+from ondoc.location.models import EntityAddress
 
 
 class DoctorSearchHelper:
@@ -25,13 +27,13 @@ class DoctorSearchHelper:
         specialization_ids = self.query_params.get("specialization_ids",[])
         condition_ids = self.query_params.get("condition_ids", [])
         if len(condition_ids)>0:
-            cs = list(models.MedicalConditionSpecialization.objects.filter(id__in=condition_ids).values_list('specialization_id', flat=True));
+            cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
             cs = [str(i) for i in cs]
             specialization_ids.extend(cs)
 
         if len(specialization_ids)>0:
             filtering_params.append(
-                " gs.id IN({})".format(",".join(self.query_params.get("specialization_ids")))
+                " gs.id IN({})".format(",".join(specialization_ids))
             )
         if self.query_params.get("sits_at"):
             filtering_params.append(
@@ -86,6 +88,12 @@ class DoctorSearchHelper:
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
+        max_distance = str(
+            self.query_params.get('max_distance') * 1000 if self.query_params.get(
+                'max_distance') and self.query_params.get(
+                'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+        # max_distance = 10000000000000000000000
+
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
@@ -101,11 +109,13 @@ class DoctorSearchHelper:
                        "LEFT JOIN doctor_specialization ds on ds.doctor_id = d.id " \
                        "LEFT JOIN general_specialization gs on ds.specialization_id = gs.id " \
                        "WHERE d.is_live=true and %s " \
+                       "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) < %s " \
                        "ORDER  BY %s ) x " \
-                       "where distance < %s and %s" % (longitude, latitude,
-                                                       longitude, latitude,
-                                                       filtering_params, order_by_field,
-                                                       DoctorSearchHelper.MAX_DISTANCE, rank_by)
+                       "where %s" % (longitude, latitude,
+                                     longitude, latitude,
+                                     filtering_params,
+                                     longitude, latitude,max_distance,
+                                     order_by_field, rank_by)
         return query_string
 
     def count_hospitals(self, doctor):
@@ -116,7 +126,7 @@ class DoctorSearchHelper:
                                 srid=4326)
         for hospital in doctor.hospitals.all():
             if hospital.id == doctor_clinic_mapping[doctor.id]:
-                return current_location.distance(hospital.location)*100*1000
+                return current_location.distance(hospital.location)*100
         return ""
 
     def get_doctor_fees(self, doctor_clinic, doctor_availability_mapping):
@@ -168,7 +178,9 @@ class DoctorSearchHelper:
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False)
                 }]
+
             thumbnail = doctor.get_thumbnail()
+
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),
@@ -194,7 +206,7 @@ class DoctorSearchHelper:
                                                             context={"request": request}).data,
                 "hospitals": hospitals,
                 "thumbnail": (
-                    request.build_absolute_uri(thumbnail) if thumbnail else None)
+                    request.build_absolute_uri(thumbnail) if thumbnail else None),
             }
             response.append(temp)
         return response

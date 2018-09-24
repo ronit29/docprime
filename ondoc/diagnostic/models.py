@@ -36,6 +36,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.location import models as location_models
 
 logger = logging.getLogger(__name__)
 
@@ -86,10 +87,14 @@ class LabPricingGroup(TimeStampedModel, CreatedByModel):
                     filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
                     update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), path_agreed_price_prcnt))
 
+                # AvailableLabTest.objects. \
+                #     filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
+                #     update(
+                #     computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), path_deal_price_prcnt))
                 AvailableLabTest.objects. \
                     filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
                     update(
-                    computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), path_deal_price_prcnt))
+                    computed_deal_price=F('computed_agreed_price'))
 
             if not original.radiology_agreed_price_percentage == self.radiology_agreed_price_percentage \
                     or not original.radiology_deal_price_percentage == self.radiology_deal_price_percentage:
@@ -97,18 +102,20 @@ class LabPricingGroup(TimeStampedModel, CreatedByModel):
                     filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
                     update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), rad_agreed_price_prcnt))
 
+                # AvailableLabTest.objects. \
+                #     filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
+                #     update(
+                #     computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
                 AvailableLabTest.objects. \
                     filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
                     update(
-                    computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
-
+                    computed_deal_price=F('computed_agreed_price'))
 
 class LabTestPricingGroup(LabPricingGroup):
 
     class Meta:
         proxy = True
         default_permissions = []
-
 
 
 class HomePickupCharges(models.Model):
@@ -156,9 +163,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     country = models.CharField(max_length=100, blank=True)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     agreed_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
-                                        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])])
+                                        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])],
+                                        help_text='Supported formats : pdf, xls, xlsx')
     ppc_rate_list = models.FileField(upload_to='lab/docs', max_length=200, null=True, blank=True,
-                                    validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])])
+                                    validators=[FileExtensionValidator(allowed_extensions=['pdf', 'xls', 'xlsx'])],
+                                     help_text='Supported formats : pdf, xls, xlsx')
     pathology_agreed_price_percentage = models.DecimalField(blank=True, null=True, default=None,max_digits=7,
                                                          decimal_places=2)
     pathology_deal_price_percentage = models.DecimalField(blank=True, null=True, default=None, max_digits=7,
@@ -182,8 +191,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     is_test_lab = models.BooleanField(verbose_name='Is Test Lab', default=False)
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
+    entity = GenericRelation(location_models.EntityLocationRelationship)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
-
 
     def __str__(self):
         return self.name
@@ -195,9 +204,37 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
         all_documents = self.lab_documents.all()
         for document in all_documents:
             if document.document_type == LabDocument.LOGO:
-                return document.get_thumbnail_path(document.name.url,'90x60')
+                return document.get_thumbnail_path(document.name.url, '90x60')
         return None
         # return static('lab_images/lab_default.png')
+
+    def get_lab_address(self):
+        address = []
+
+        if self.building:
+            address.append(self.ad_str(self.building))
+        if self.sublocality:
+            address.append(self.ad_str(self.sublocality))
+        if self.locality:
+            address.append(self.ad_str(self.locality))
+        if self.city:
+            address.append(self.ad_str(self.city))
+        # if self.state:
+        #     address.append(self.ad_str(self.state))
+        # if self.country:
+        #     address.append(self.ad_str(self.country))
+        result = []
+        ad_uinq = set()
+        for ad in address:
+            ad_lc = ad.lower()
+            if ad_lc not in ad_uinq:
+                ad_uinq.add(ad_lc)
+                result.append(ad)
+
+        return ", ".join(result)
+
+    def ad_str(self, string):
+        return str(string).strip().replace(',', '')
 
     def update_live_status(self):
 
@@ -211,7 +248,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.clean()
-        
+        build_url = True
+        if self.is_live and self.location:
+            if Lab.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
+                build_url = False
+
         edit_instance = None
         if self.id is not None:
             edit_instance = 1
@@ -219,6 +260,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
         self.update_live_status()
         super(Lab, self).save(*args, **kwargs)
+
+        if self.is_live and self.location and build_url:
+            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+            if ea:
+                location_models.EntityUrls.create_page_url(self)
 
         if edit_instance is not None:
             id = self.id
@@ -251,7 +297,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
                 AvailableLabTest.objects.\
                     filter(lab=id, test__test_type=LabTest.RADIOLOGY).\
                     update(computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
-
 
 
 class LabCertification(TimeStampedModel):
@@ -485,11 +530,26 @@ class LabTestSubType(TimeStampedModel):
 
 
 class TestParameter(TimeStampedModel):
-    name = models.CharField(max_length=200)
-    lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, null=True, blank=True)
+    name = models.CharField(max_length=200, unique=True)
+    # lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, null=True, blank=True)
 
     class Meta:
         db_table = "test_parameter"
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+
+class ParameterLabTest(TimeStampedModel):
+    parameter = models.ForeignKey(TestParameter, on_delete=models.DO_NOTHING, related_name='test_parameters')
+    lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, related_name='labtests')
+
+    class Meta:
+        db_table = 'parameter_lab_test'
+        unique_together = (("parameter", "lab_test"), )
+
+    def __str__(self):
+        return "{}".format(self.parameter.name)
 
 
 class LabTest(TimeStampedModel, SearchKey):
@@ -502,6 +562,7 @@ class LabTest(TimeStampedModel, SearchKey):
         (OTHER, 'Other')
     )
     name = models.CharField(max_length=200, unique=True)
+    synonyms = models.CharField(max_length=4000, null=True, blank=True)
     test_type = models.PositiveIntegerField(choices=TEST_TYPE_CHOICES, blank=True, null=True)
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
     number_of_tests = models.PositiveIntegerField(blank=True, null=True)
@@ -518,6 +579,10 @@ class LabTest(TimeStampedModel, SearchKey):
     home_collection_possible = models.BooleanField(default=False, verbose_name= 'Can sample be home collected for this test?')
     test = models.ManyToManyField('self', through='LabTestPackage', symmetrical=False,
                                   through_fields=('package', 'lab_test'))  # self reference
+    parameter = models.ManyToManyField(
+        'TestParameter', through=ParameterLabTest,
+        through_fields=('lab_test', 'parameter')
+    )
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -575,8 +640,10 @@ class AvailableLabTest(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.mrp:
-            self.computed_deal_price = self.get_computed_deal_price()
             self.computed_agreed_price = self.get_computed_agreed_price()
+            # self.computed_deal_price = self.get_computed_deal_price()
+            self.computed_deal_price = self.computed_agreed_price
+
         super(AvailableLabTest, self).save(*args, **kwargs)
 
     def get_computed_deal_price(self):
@@ -709,6 +776,31 @@ class LabAppointment(TimeStampedModel):
             return [admin.user for admin in self.lab.manageable_lab_admins.filter(is_disabled=False)
                     if admin.user]
 
+    def app_commit_tasks(self, old_instance, push_to_matrix):
+        if push_to_matrix:
+            # Push the appointment data to the matrix
+            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':5,
+                                                     'sub_product_id': 2}, ), countdown=5)
+
+        if self.is_to_send_notification(old_instance):
+            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+
+        if not old_instance or old_instance.status != self.status:
+            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
+                                                                         product=account_model.Order.LAB_PRODUCT_ID,
+                                                                         alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+
+        # try:
+        #     prev_app_dict = {'id': self.id,
+        #                      'status': self.status,
+        #                      "updated_at": int(self.updated_at.timestamp())}
+        #     if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
+        #         countdown = self.get_auto_cancel_delay(self)
+        #         tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
+        # except Exception as e:
+        #     logger.error("Error in auto cancel flow - " + str(e))
+        print('all lab appointment tasks completed')
+
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
         try:
@@ -724,27 +816,7 @@ class LabAppointment(TimeStampedModel):
 
         super().save(*args, **kwargs)
 
-        if push_to_matrix:
-            # Push the appointment data to the matrix
-            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':4,
-                                                     'sub_product_id': 2}, ), countdown=5)
-
-        if self.is_to_send_notification(database_instance):
-            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
-
-        if not database_instance or database_instance.status != self.status:
-            for e_id in settings.OPS_EMAIL_ID:
-                notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=account_model.Order.LAB_PRODUCT_ID)
-
-        # try:
-        #     prev_app_dict = {'id': self.id,
-        #                      'status': self.status,
-        #                      "updated_at": int(self.updated_at.timestamp())}
-        #     if prev_app_dict['status'] not in [LabAppointment.COMPLETED, LabAppointment.CANCELLED, LabAppointment.ACCEPTED]:
-        #         countdown = self.get_auto_cancel_delay(self)
-        #         tasks.lab_app_auto_cancel.apply_async((prev_app_dict, ), countdown=countdown)
-        # except Exception as e:
-        #     logger.error("Error in auto cancel flow - " + str(e))
+        transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
 
     def get_auto_cancel_delay(self, app_obj):
         delay = settings.AUTO_CANCEL_LAB_DELAY * 60
@@ -797,23 +869,26 @@ class LabAppointment(TimeStampedModel):
 
     @transaction.atomic
     def action_cancelled(self, refund_flag=1):
-        self.status = self.CANCELLED
-        self.save()
 
+        # Taking Lock first
+        consumer_account = None
         if self.payment_type == OpdAppointment.PREPAID:
-            consumer_account = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
+            temp_list = account_model.ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = account_model.ConsumerAccount.objects.select_for_update().get(user=self.user)
 
-            data = dict()
-            data["reference_id"] = self.id
-            data["user"] = self.user
-            data["product_id"] = account_model.Order.LAB_PRODUCT_ID
+        old_instance = LabAppointment.objects.get(pk=self.id)
+        if old_instance.status != self.CANCELLED:
+            self.status = self.CANCELLED
+            self.save()
+            product_id = account_model.Order.LAB_PRODUCT_ID
 
-            cancel_amount = self.effective_price
-            consumer_account.credit_cancellation(data, cancel_amount)
-            if refund_flag:
-                ctx_obj = consumer_account.debit_refund()
-                account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            if self.payment_type == OpdAppointment.PREPAID and account_model.ConsumerTransaction.valid_appointment_for_cancellation(
+                    self.id, product_id):
+                cancel_amount = self.effective_price
+                consumer_account.credit_cancellation(self, account_model.Order.LAB_PRODUCT_ID, cancel_amount)
+                if refund_flag:
+                    ctx_obj = consumer_account.debit_refund()
+                    account_model.ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def action_completed(self):
         self.status = self.COMPLETED
@@ -1044,6 +1119,11 @@ class LabDocument(TimeStampedModel, Document):
     name = models.FileField(upload_to='lab/images', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
+    def __str__(self):
+        if self.document_type:
+            return '{}'.format(dict(LabDocument.CHOICES)[self.document_type])
+        return None
+
     def extension(self):
         name, extension = os.path.splitext(self.name.name)
         return extension
@@ -1159,6 +1239,7 @@ class LabOnboardingToken(TimeStampedModel):
     class Meta:
         db_table = "lab_onboarding_token"
 
+
 # Used to display pricing in admin
 class LabPricing(Lab):
     class Meta:
@@ -1204,5 +1285,12 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
         db_table = "lab_report_file"
 
 
+class LabTestGroup(auth_model.TimeStampedModel):
+    TEST_TYPE_CHOICES = LabTest.TEST_TYPE_CHOICES
+    name = models.CharField(max_length=200)
+    tests = models.ManyToManyField(LabTest)
+    type = models.PositiveSmallIntegerField(choices=TEST_TYPE_CHOICES)
 
+    class Meta:
+        db_table = 'lab_test_group'
 

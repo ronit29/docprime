@@ -63,10 +63,12 @@ def labajaxmodelsave(request):
 
         multiplier = Decimal(1.2)
         if pap:
-            model_instance.pathology_deal_price_percentage = min(math.ceil(multiplier*pap),100.0)
+            # model_instance.pathology_deal_price_percentage = min(math.ceil(multiplier*pap), 100.0)
+            model_instance.pathology_deal_price_percentage = pap
 
         if rap:
-            model_instance.radiology_deal_price_percentage = min(math.ceil(multiplier*rap),100.0)
+            # model_instance.radiology_deal_price_percentage = min(math.ceil(multiplier*rap), 100.0)
+            model_instance.radiology_deal_price_percentage = rap
 
         model_instance.save()
         return HttpResponseRedirect('/admin/diagnostic/labpricinggroup/'+id+'/change/')

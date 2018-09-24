@@ -34,10 +34,10 @@ class OTPVerificationSerializer(serializers.Serializer):
         #     raise serializers.ValidationError('User does not exist')
 
         if (not OtpVerifications
-                .objects
-                .filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False,
-                        created_at__gte=timezone.now() - relativedelta(minutes=OtpVerifications.OTP_EXPIRY_TIME))
-                .exists()):
+                .objects.filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False,
+                                created_at__gte=timezone.now() - relativedelta(
+                                    minutes=OtpVerifications.OTP_EXPIRY_TIME)).exists() and
+                not (str(attrs['phone_number']) in settings.OTP_BYPASS_NUMBERS and str(attrs['otp']) == settings.HARD_CODED_OTP)):
             raise serializers.ValidationError("Invalid OTP")
         return attrs
 
@@ -363,6 +363,7 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
     mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
     city_name = serializers.IntegerField()
     email = serializers.EmailField()
+    utm_params = serializers.JSONField(required=False)
 
     def validate(self, attrs):
         if not common_models.Cities.objects.filter(id=attrs['city_name']).exists():
@@ -374,7 +375,7 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OnlineLead
-        fields = ('member_type', 'name', 'speciality', 'mobile', 'city_name', 'email')
+        fields = ('member_type', 'name', 'speciality', 'mobile', 'city_name', 'email', 'utm_params')
 
 
 class CareerSerializer(serializers.ModelSerializer):

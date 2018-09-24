@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from django.contrib.gis.geos import Point
 from django.conf import settings
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
 from ondoc.diagnostic.models import Lab
@@ -69,6 +70,8 @@ class ServicesViewSet(viewsets.GenericViewSet):
     def generate_pdf_template(self, request):
         from ondoc.api.v1.utils import generate_short_url
         context = {key: value for key, value in request.data.items()}
+        if context.get('_updatedAt'):
+            context['updated_at'] = parse_datetime(context.get('_updatedAt'))
         content = render_to_string("email/chat_prescription/body.html", context=context)
         pdf_file = HTML(string=content).write_pdf()
         random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
@@ -83,6 +86,8 @@ class ServicesViewSet(viewsets.GenericViewSet):
 
     def send_email(self, request):
         context = {key: value for key, value in request.data.items()}
+        if context.get('_updatedAt'):
+            context['updated_at'] = parse_datetime(context.get('_updatedAt'))
         serializer = serializers.EmailServiceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         to = serializer.validated_data.get('to')
@@ -221,7 +226,7 @@ class UpdateXlsViewSet():
         else :
             count = search.count()
 
-        url = "{domain}/lab/searchresults?min_distance=0&min_price=0&max_price=20000&order_by=distancel&lab_name=&test_ids={test_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, test_id=','.join([str(x) for x in test_id]),latitude=str(latitude), longitude=str(longitude))
+        url = "{domain}/lab/searchresults?min_distance=0&min_price=0&max_price=20000&sort_on=distancel&lab_name=&test_ids={test_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, test_id=','.join([str(x) for x in test_id]),latitude=str(latitude), longitude=str(longitude))
         validation_url = url+"&max_distance={max_distance}".format(max_distance=max_distance/1000)
         url = url + "&max_distance=20"
         return (count, url, validation_url)
