@@ -109,11 +109,13 @@ class DoctorSearchHelper:
                        "LEFT JOIN doctor_specialization ds on ds.doctor_id = d.id " \
                        "LEFT JOIN general_specialization gs on ds.specialization_id = gs.id " \
                        "WHERE d.is_live=true and %s " \
+                       "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) < %s " \
                        "ORDER  BY %s ) x " \
-                       "where distance < %s and %s" % (longitude, latitude,
-                                                       longitude, latitude,
-                                                       filtering_params, order_by_field,
-                                                       max_distance, rank_by)
+                       "where %s" % (longitude, latitude,
+                                     longitude, latitude,
+                                     filtering_params,
+                                     longitude, latitude,max_distance,
+                                     order_by_field, rank_by)
         return query_string
 
     def count_hospitals(self, doctor):
