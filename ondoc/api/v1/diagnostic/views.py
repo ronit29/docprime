@@ -204,7 +204,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             if parameters.get('location_json') and parameters.get('location_json').get('sublocality_value'):
                 sublocality = parameters.get('location_json').get('sublocality_value')
                 if sublocality:
-                    sublocality += ', '
+                    sublocality += ' '
 
             title = "Diagnostic Centres & Labs "
             if locality:
@@ -260,7 +260,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
 
         return Response(temp_data)
-
 
     def get_lab_timing(self, queryset):
         lab_timing = ''
