@@ -436,10 +436,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         url = url.lower()
-        entity = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Doctor').exists()
-        if entity:
+        entity = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Doctor')
+        if entity.exists():
             entity = entity.first()
-            if entity.is_valid == 'f':
+            if not entity.is_valid:
                 valid_entity_url_qs = location_models.EntityUrls.objects.filter(url_type='PAGEURL',
                                                                            entity_id=entity.entity_id,
                                                                            entity_type__iexact='Doctor', is_valid='t')
