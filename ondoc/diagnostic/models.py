@@ -87,10 +87,14 @@ class LabPricingGroup(TimeStampedModel, CreatedByModel):
                     filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
                     update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), path_agreed_price_prcnt))
 
+                # AvailableLabTest.objects. \
+                #     filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
+                #     update(
+                #     computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), path_deal_price_prcnt))
                 AvailableLabTest.objects. \
                     filter(lab_pricing_group__id=id, test__test_type=LabTest.PATHOLOGY). \
                     update(
-                    computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), path_deal_price_prcnt))
+                    computed_deal_price=F('computed_agreed_price'))
 
             if not original.radiology_agreed_price_percentage == self.radiology_agreed_price_percentage \
                     or not original.radiology_deal_price_percentage == self.radiology_deal_price_percentage:
@@ -98,11 +102,14 @@ class LabPricingGroup(TimeStampedModel, CreatedByModel):
                     filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
                     update(computed_agreed_price=AgreedPriceCalculate(F('mrp'), rad_agreed_price_prcnt))
 
+                # AvailableLabTest.objects. \
+                #     filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
+                #     update(
+                #     computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
                 AvailableLabTest.objects. \
                     filter(lab_pricing_group__id=id, test__test_type=LabTest.RADIOLOGY). \
                     update(
-                    computed_deal_price=DealPriceCalculate(F('mrp'), F('computed_agreed_price'), rad_deal_price_prcnt))
-
+                    computed_deal_price=F('computed_agreed_price'))
 
 class LabTestPricingGroup(LabPricingGroup):
 
