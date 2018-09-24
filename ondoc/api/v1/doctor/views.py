@@ -436,9 +436,18 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         url = url.lower()
-        if location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL',entity_type__iexact='Doctor').exists():
-            entity_url_obj = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
-            entity_id = entity_url_obj.entity_id
+        entity = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Doctor').exists()
+        if entity:
+            entity = entity.first()
+            if entity.is_valid == 'f':
+                valid_entity_url_qs = location_models.EntityUrls.objects.filter(url_type='PAGEURL',
+                                                                           entity_id=entity.entity_id,
+                                                                           entity_type__iexact='Doctor', is_valid='t')
+                if valid_entity_url_qs.exists():
+                    corrected_url = valid_entity_url_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+
+            entity_id = entity.entity_id
             response = self.retrieve(request, entity_id)
             return response
 
