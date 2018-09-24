@@ -3,7 +3,7 @@ from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, GeneralSpecialization
 from datetime import datetime
 import re
 
@@ -92,6 +92,8 @@ class DoctorSearchHelper:
             self.query_params.get('max_distance') * 1000 if self.query_params.get(
                 'max_distance') and self.query_params.get(
                 'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+        # max_distance = 10000000000000000000000
+
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
@@ -134,7 +136,7 @@ class DoctorSearchHelper:
                 # return doctor_hospital.deal_price
         return None
 
-    def prepare_search_response(self, doctor_data, doctor_search_result, request, validated_data):
+    def prepare_search_response(self, doctor_data, doctor_search_result, request):
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
@@ -176,25 +178,6 @@ class DoctorSearchHelper:
                 }]
 
             thumbnail = doctor.get_thumbnail()
-            locality =''
-            if validated_data.get('type') == 'LOCALITY':
-                locality = validated_data.get('value')
-
-            if validated_data.get('type') == 'SUBLOCALITY':
-
-                parent = EntityAddress.objects.filter(id=validated_data.get('parent')).values('value')
-                locality = ', ' + parent.first().get('value')
-            specialization_name_list = [
-                models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids', [])).values(
-                    'name')]
-            specialization = []
-
-            for name in specialization_name_list:
-                specialization.append(name[0].get('name'))
-
-            specialist = ', '.join(specialization)
-            title = specialist + ' in ' + locality + '- Book Best ' + specialist + ' Instantly | DocPrime'
-            description = specialist + ' in ' + locality + ': Book best ' + specialist + 's appointment online in ' + locality + '. View Address, fees and more for doctors in '+ locality +'.'
 
             temp = {
                 "doctor_id": doctor.id,
@@ -222,12 +205,6 @@ class DoctorSearchHelper:
                 "hospitals": hospitals,
                 "thumbnail": (
                     request.build_absolute_uri(thumbnail) if thumbnail else None),
-                "seo": {
-                    "title": title,
-                "description": description
-
-                }
-
             }
             response.append(temp)
         return response

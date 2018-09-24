@@ -86,6 +86,12 @@ class SearchKey(models.Model):
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             self.search_key = search_key
+        if hasattr(self, 'synonyms') and self.synonyms:
+            synonyms = self.synonyms.split(",")
+            if synonyms:
+                synonyms = " ".join(synonyms)
+            if synonyms:
+                self.search_key = self.search_key + " " + synonyms
         super().save(*args, **kwargs)
 
 
@@ -435,6 +441,7 @@ class DoctorQualification(auth_model.TimeStampedModel):
 
 class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
     name = models.CharField(max_length=200)
+    synonyms = models.CharField(max_length=4000, blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -1172,7 +1179,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
         print('all ops tasks completed')
 
     def save(self, *args, **kwargs):
-        logger.error("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
@@ -1181,35 +1187,9 @@ class OpdAppointment(auth_model.TimeStampedModel):
         if 'push_again_to_matrix' in kwargs.keys():
             kwargs.pop('push_again_to_matrix')
 
-        logger.error("before super save  - " + str(self.id) + " timezone - " + str(timezone.now()))    
         super().save(*args, **kwargs)
-        logger.error("after super save - " + str(self.id) + " timezone - " + str(timezone.now()))
-
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
-        logger.error("opd save completed - " + str(self.id) + " timezone - " + str(timezone.now()))
-
-        # if push_to_matrix:
-        #     # Push the appointment data to the matrix .
-        #     push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-        #                                              'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
-
-        # if self.is_to_send_notification(database_instance):
-        #     notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
-        # if not database_instance or database_instance.status != self.status:
-        #     for e_id in settings.OPS_EMAIL_ID:
-        #         notification_models.EmailNotification.ops_notification_alert(self, email_list=e_id, product=Order.DOCTOR_PRODUCT_ID)
-
-        # try:
-        #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
-        #         countdown = self.get_auto_cancel_delay(self)
-        #         doc_app_auto_cancel.apply_async(({
-        #             "id": self.id,
-        #             "status": self.status,
-        #             "updated_at": int(self.updated_at.timestamp())
-        #         }, ), countdown=countdown)
-        # except Exception as e:
-        #     logger.error("Error in auto cancel flow - " + str(e))
 
     def doc_payout_amount(self):
         amount = 0
@@ -1464,8 +1444,7 @@ class CompetitorInfo(auth_model.TimeStampedModel):
     PRACTO = 1
     LYBRATE = 2
     NAME_TYPE_CHOICES = (("", "Select"), (PRACTO, 'Practo'), (LYBRATE, "Lybrate"),)
-    name = models.PositiveSmallIntegerField(blank=True, null=True,
-                                            choices=NAME_TYPE_CHOICES)
+    name = models.PositiveSmallIntegerField(choices=NAME_TYPE_CHOICES, default=PRACTO)
 
     doctor = models.ForeignKey(Doctor, related_name="competitor_doctor", on_delete=models.CASCADE, null=True,
                                blank=True)
@@ -1481,7 +1460,7 @@ class CompetitorInfo(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "competitor_info"
-        #unique_together = ('name', 'hospital_name', 'doctor')
+        # unique_together = ('name', 'hospital_name', 'doctor')
 
     def save(self, *args, **kwargs):
         url = self.url

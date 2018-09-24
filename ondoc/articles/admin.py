@@ -11,6 +11,7 @@ from django.conf import settings
 class ArticleForm(forms.ModelForm):
     body = forms.CharField(widget=forms.Textarea, required=False)
     category = forms.ModelChoiceField(queryset=ArticleCategory.objects.all(),widget=forms.Select)
+    author_name = forms.CharField(required=False)
 
     class Media:
         extend=False
@@ -52,7 +53,7 @@ class ArticleAdmin(VersionAdmin):
     list_display = ('title', 'updated_at', 'created_at', 'created_by', 'preview')
     search_fields = ['title']
     fields = ['title', 'body', 'header_image', 'header_image_alt', 'category', 'url', 'description', 'keywords',
-              'icon_tag', 'icon', 'author_name', 'is_published', 'preview']
+              'icon_tag', 'icon', 'author_name', 'published_date', 'is_published', 'preview']
     readonly_fields = ['icon_tag', 'preview']
     inlines = [ArticleLinkedUrlInline, LinkedArticleInline]
     actions = [bulk_publishing]

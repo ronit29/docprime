@@ -64,6 +64,8 @@ class LabModelSerializer(serializers.ModelSerializer):
 
     def get_seo(self, obj):
 
+        if self.parent:
+            return None
         entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
                                            entity_type__iexact='Lab')
         locality = ''
@@ -77,8 +79,9 @@ class LabModelSerializer(serializers.ModelSerializer):
             if type.first().get('type') == 'SUBLOCALITY':
                 sublocality = type.first().get('value')
                 parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-                locality = ', ' + parent.first().get('value')
-        if not(sublocality == '') or not(locality ==''):
+                if sublocality:
+                    locality = ', ' + parent.first().get('value')
+        if not(sublocality == '') or not(locality == ''):
             title = obj.name + ' - Diagnostic Centre in '+ sublocality + locality + ' |DocPrime'
         else:
             title = obj.name + ' - Diagnostic Centre |DocPrime'
@@ -155,6 +158,7 @@ class LabCustomSerializer(serializers.Serializer):
     pickup_available = serializers.IntegerField(default=0)
     lab_timing = serializers.CharField(max_length=200)
     lab_timing_data = serializers.ListField()
+
 
     # def get_lab(self, obj):
     #     queryset = Lab.objects.get(pk=obj['lab'])
@@ -570,6 +574,7 @@ class SearchLabListSerializer(serializers.Serializer):
     ids = IdListField(required=False)
     sort_on = serializers.CharField(required=False)
     name = serializers.CharField(required=False)
+    network_id = serializers.IntegerField(required=False)
 
 
 class UpdateStatusSerializer(serializers.Serializer):
