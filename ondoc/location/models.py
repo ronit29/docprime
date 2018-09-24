@@ -163,8 +163,8 @@ class EntityUrls(TimeStampedModel):
                         # Storing the locality data for fallback cases.
                         location_json['locality_id'] = location.id
                         location_json['locality_value'] = location.value
-                        location_json['locality_latitude'] = location.centroid.y
-                        location_json['locality_longitude'] = location.centroid.x
+                        location_json['locality_latitude'] = location.centroid.y if location.centroid is not None and hasattr(location.centroid, 'y') else 0.0
+                        location_json['locality_longitude'] = location.centroid.x if location.centroid is not None and hasattr(location.centroid, 'x') else 0.0
                     elif location.type == 'SUBLOCALITY':
                         ea_locality = EntityAddress.objects.get(id=location.parent)
                         url = "{prefix}-in-{sublocality}-{locality}-sptlitcit".format(prefix=specialization.name, sublocality=location.value, locality=ea_locality.value)
@@ -172,12 +172,12 @@ class EntityUrls(TimeStampedModel):
                         # storing the sublocality and locality data for fallback cases.
                         location_json['sublocality_id'] = location.id
                         location_json['sublocality_value'] = location.value
-                        location_json['sublocality_latitude'] = location.centroid.y
-                        location_json['sublocality_longitude'] = location.centroid.x
+                        location_json['sublocality_latitude'] = location.centroid.y if location.centroid is not None and hasattr(location.centroid, 'y') else 0.0
+                        location_json['sublocality_longitude'] = location.centroid.x if location.centroid is not None and hasattr(location.centroid, 'x') else 0.0
                         location_json['locality_id'] = ea_locality.id
                         location_json['locality_value'] = ea_locality.value
-                        location_json['locality_latitude'] = ea_locality.centroid.y
-                        location_json['locality_longitude'] = ea_locality.centroid.x
+                        location_json['locality_latitude'] = ea_locality.centroid.y if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'y') else 0.0
+                        location_json['locality_longitude'] = ea_locality.centroid.x if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'x') else 0.0
                     url = slugify(url)
 
                     url = url.lower()
@@ -218,20 +218,20 @@ class EntityUrls(TimeStampedModel):
                     # Storing the locality data for fallback cases.
                     location_json['locality_id'] = location.id
                     location_json['locality_value'] = location.value
-                    location_json['locality_latitude'] = location.centroid.y
-                    location_json['locality_longitude'] = location.centroid.x
+                    location_json['locality_latitude'] = location.centroid.y if location.centroid is not None and hasattr(location.centroid, 'y') else 0.0
+                    location_json['locality_longitude'] = location.centroid.x if location.centroid is not None and hasattr(location.centroid, 'x') else 0.0
                 elif location.type == 'SUBLOCALITY':
                     ea_locality = EntityAddress.objects.get(id=location.parent)
                     url = "labs-in-{sublocality}-{locality}-lblitcit".format(sublocality=location.value, locality=ea_locality.value)
                     # storing the sublocality and locality data for fallback cases.
                     location_json['sublocality_id'] = location.id
                     location_json['sublocality_value'] = location.value
-                    location_json['sublocality_latitude'] = location.centroid.y
-                    location_json['sublocality_longitude'] = location.centroid.x
+                    location_json['sublocality_latitude'] = location.centroid.y if location.centroid is not None and hasattr(location.centroid, 'y') else 0.0
+                    location_json['sublocality_longitude'] = location.centroid.x if location.centroid is not None and hasattr(location.centroid, 'x') else 0.0
                     location_json['locality_id'] = ea_locality.id
                     location_json['locality_value'] = ea_locality.value
-                    location_json['locality_latitude'] = ea_locality.centroid.y
-                    location_json['locality_longitude'] = ea_locality.centroid.x
+                    location_json['locality_latitude'] = ea_locality.centroid.y if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'y') else 0.0
+                    location_json['locality_longitude'] = ea_locality.centroid.x if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'x') else 0.0
                 url = slugify(url)
                 url = url.lower()
                 extra = {'location_json': location_json}
