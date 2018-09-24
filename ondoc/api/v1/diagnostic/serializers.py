@@ -54,7 +54,6 @@ class LabImageModelSerializer(serializers.ModelSerializer):
 
 class LabModelSerializer(serializers.ModelSerializer):
 
-
     lat = serializers.SerializerMethodField()
     long = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
@@ -80,8 +79,9 @@ class LabModelSerializer(serializers.ModelSerializer):
             if type.first().get('type') == 'SUBLOCALITY':
                 sublocality = type.first().get('value')
                 parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-                locality = ', ' + parent.first().get('value')
-        if not(sublocality == '') or not(locality ==''):
+                if sublocality:
+                    locality = ', ' + parent.first().get('value')
+        if not(sublocality == '') or not(locality == ''):
             title = obj.name + ' - Diagnostic Centre in '+ sublocality + locality + ' |DocPrime'
         else:
             title = obj.name + ' - Diagnostic Centre |DocPrime'
@@ -158,31 +158,6 @@ class LabCustomSerializer(serializers.Serializer):
     pickup_available = serializers.IntegerField(default=0)
     lab_timing = serializers.CharField(max_length=200)
     lab_timing_data = serializers.ListField()
-    seo = serializers.SerializerMethodField()
-
-    def get_seo(self, obj):
-        if self.parent:
-            return None
-
-        request = self.context.get('parameters')
-        locality = ''
-        sublocality = ''
-
-        if request.get('location_json') and request.get('location_json').get('locality_value'):
-            locality = request.get('location_json').get('locality_value')
-
-        if request.get('location_json') and request.get('location_json').get('sublocality_value'):
-            sublocality = request.get('location_json').get('sublocality_value') + ', '
-
-        title = "Diagnostic Centres & Labs "
-        if locality:
-            title += "in " + sublocality + locality
-        title += " | Books Tests"
-        description = "Find best Diagnostic Centres and Labs"
-        if locality:
-            description += " in " + sublocality + locality
-        description += " and book test online, check fees, packages prices and more at DocPrime."
-        return {'title': title, "description": description}
 
 
     # def get_lab(self, obj):

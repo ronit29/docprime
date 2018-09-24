@@ -42,7 +42,7 @@ class Article(TimeStampedModel, CreatedByModel):
         return ""
 
     def save(self, *args, **kwargs):
-        self.published_date = datetime.date.today()
+        self.published_date = self.published_date if self.published_date else datetime.date.today()
         if hasattr(self, 'url'):
             self.url = self.url.strip('/').lower()
         super().save(*args, **kwargs)

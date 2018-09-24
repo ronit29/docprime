@@ -136,7 +136,7 @@ class DoctorSearchHelper:
                 # return doctor_hospital.deal_price
         return None
 
-    def prepare_search_response(self, doctor_data, doctor_search_result, request, validated_data):
+    def prepare_search_response(self, doctor_data, doctor_search_result, request):
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
@@ -178,53 +178,6 @@ class DoctorSearchHelper:
                 }]
 
             thumbnail = doctor.get_thumbnail()
-            title = ''
-            description = ''
-            if False and  (validated_data.get('extras') or validated_data.get('specialization_ids')):
-                locality = ''
-                sublocality = ''
-                specializations = ''
-                if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
-                    if validated_data.get('extras').get('location_json').get('locality_value'):
-                        locality = validated_data.get('extras').get('location_json').get('locality_value')
-                    if validated_data.get('extras').get('location_json').get('sublocality_value'):
-                        sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
-                        if sublocality:
-                            locality = sublocality + ', ' + locality
-
-                if validated_data.get('specialization_ids'):
-                    specialization_name_obj= GeneralSpecialization.objects.filter(
-                        id__in=validated_data.get('specialization_ids', [])).values(
-                        'name')
-                    specialization_list = []
-
-                    for names in specialization_name_obj:
-                        specialization_list.append(names.get('name'))
-
-                    specializations = ', '.join(specialization_list)
-                else:
-                    if validated_data.get('extras').get('specialization'):
-                        specializations = validated_data.get('extras').get('specialization')
-                    else:
-                        specializations = ''
-
-                if specializations:
-                    title = specializations
-                    description = specializations
-                if locality:
-                    title += ' in '  + locality
-                    description += ' in ' +locality
-                if specializations:
-                    title += '- Book Best ' + specializations
-                    description += ': Book best ' + specializations + '\'s appointment online '
-                if locality:
-                    description += 'in ' + locality
-                title += ' Instantly | DocPrime'
-
-                description += '. View Address, fees and more for doctors'
-                if locality:
-                    description += 'in '+ locality
-                description += '.'
 
             temp = {
                 "doctor_id": doctor.id,
@@ -252,16 +205,6 @@ class DoctorSearchHelper:
                 "hospitals": hospitals,
                 "thumbnail": (
                     request.build_absolute_uri(thumbnail) if thumbnail else None),
-                # "seo": {
-                #     "title": title,
-                #     "description": description
-                #
-                # }
             }
-            if False and (title or description):
-                temp["seo"] = {
-                    "title": title,
-                    "description": description
-                }
             response.append(temp)
         return response
