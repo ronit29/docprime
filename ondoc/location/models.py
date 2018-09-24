@@ -190,7 +190,7 @@ class EntityUrls(TimeStampedModel):
                         entity_url_obj.save()
                         print(url)
 
-                doctor_in_city_url = "doctor-in-{location}-sptcit".format(location=location.value)
+                doctor_in_city_url = "doctors-in-{location}-sptcit".format(location=location.value)
                 if doctor_in_city_url:
                     doctor_in_city_url = slugify(doctor_in_city_url)
                     extra = {'location_id': location.id, 'location_json': location_json}
