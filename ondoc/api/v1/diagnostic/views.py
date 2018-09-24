@@ -128,8 +128,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 return response
         return Response({})
 
-
     def retrieve_by_url(self, request):
+
         url = request.GET.get('url')
         if not url:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -162,7 +162,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         response_queryset = self.form_lab_whole_data(paginated_queryset)
 
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset,  many=True,
-                                         context={"request": request, 'parameters': parameters})
+                                         context={"request": request})
 
         entity_ids = [lab_data['id'] for lab_data in response_queryset]
 
@@ -181,9 +181,32 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         test_ids = parameters.get('ids',[])
 
         tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
+        seo = None
+        if parameters.get('location_json'):
+            locality = ''
+            sublocality = ''
+
+            if parameters.get('location_json') and parameters.get('location_json').get('locality_value'):
+                locality = parameters.get('location_json').get('locality_value')
+
+            if parameters.get('location_json') and parameters.get('location_json').get('sublocality_value'):
+                sublocality = parameters.get('location_json').get('sublocality_value')
+                if sublocality:
+                    sublocality += ', '
+
+            title = "Diagnostic Centres & Labs "
+            if locality:
+                title += "in " + sublocality + locality
+            title += " | Books Tests"
+            description = "Find best Diagnostic Centres and Labs"
+            if locality:
+                description += " in " + sublocality + locality
+            description += " and book test online, check fees, packages prices and more at DocPrime."
+            seo = {'title': title, "description": description}
 
         return Response({"result": serializer.data,
-                         "count": count,'tests':tests})
+                         "count": count,'tests':tests,
+                         "seo": seo})
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])

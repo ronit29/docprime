@@ -760,7 +760,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
 
-        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request, validated_data)
+        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
