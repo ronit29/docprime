@@ -101,6 +101,7 @@ class ArticleCategoryListSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.url) if hasattr(obj, 'url') else None
 
+
     class Meta:
         model = ArticleCategory
-        fields = ('name', 'url')
+        fields = ('name', 'url', 'title', 'description')
