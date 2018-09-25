@@ -123,10 +123,14 @@
         </tr>
         <tr>
             <td align="center" valign="top" style="text-align: center;">
-                {% if physicalexamination %}
+
+                {% if physicalexamination and specialization %}
                     <div style="float: left;text-align: center;font-size: 13px;padding:0 10px;margin-top:20px;margin-bottom: 10px;">
-                        <b>Important:</b> Basis your symptoms, a visit for a physical examination is recommended
-                        <br>
+                        <b>Recommendation:</b> Basis your symptoms, we recommend you to visit
+
+                       <b style="padding: 2px 0px; font-weight: 600;">{{specialization|join:", "}}</b> for a physical examination.
+                       <br>
+
                     </div>
                 {% endif %}
             </td>

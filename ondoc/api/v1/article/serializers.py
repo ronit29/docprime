@@ -1,13 +1,18 @@
 from rest_framework import serializers
-from ondoc.articles.models import Article, ArticleLinkedUrl
+from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 from ondoc.articles.models import ArticleCategory
 
 
 class LinkedArticleSerializer(serializers.ModelSerializer):
 
+    url = serializers.SerializerMethodField()
+
     class Meta:
-        model = Article
-        fields = ('url', 'title')
+        model = LinkedArticle
+        fields = ('title', 'url')
+
+    def get_url(self, obj):
+        return obj.linked_article.url
 
 
 class LinkedUrlSerializer(serializers.ModelSerializer):
@@ -31,7 +36,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
         return serializer.data
 
     def get_linked_articles(self, obj):
-        serializer = LinkedArticleSerializer(obj.linked_articles.filter(is_published=True), many=True)
+        serializer = LinkedArticleSerializer(obj.related_articles.all(), many=True)
         return serializer.data
 
     def get_icon(self, obj):
@@ -100,6 +105,7 @@ class ArticleCategoryListSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.url) if hasattr(obj, 'url') else None
 
+
     class Meta:
         model = ArticleCategory
-        fields = ('name', 'url')
+        fields = ('name', 'url', 'title', 'description')

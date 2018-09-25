@@ -3,10 +3,13 @@ from django.utils.safestring import mark_safe
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image
 import datetime
 
+
 class ArticleCategory(TimeStampedModel):
     name = models.CharField(blank=False, null=False, max_length=500)
     identifier = models.CharField(max_length=48, blank=False, null=True)
     url = models.CharField(blank=False, null=True, max_length=500, unique=True)
+    title = models.CharField(max_length=500, null=True, blank=True)
+    description = models.CharField(max_length=200000, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -84,8 +87,9 @@ class ArticleLinkedUrl(TimeStampedModel):
 
 
 class LinkedArticle(TimeStampedModel):
-    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_article')
-    linked_article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_articles')
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_articles')
+    linked_article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_article')
+    title = models.CharField(max_length=500, null=True, blank=False)
 
     def __str__(self):
         return "{}-{}".format(self.article.title, self.linked_article.title)
@@ -93,4 +97,3 @@ class LinkedArticle(TimeStampedModel):
     class Meta:
         db_table = 'linked_articles'
         unique_together = (('article', 'linked_article'),)
-
