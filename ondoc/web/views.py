@@ -7,7 +7,11 @@ from django.conf import settings
 from ondoc.crm.constants import constants
 from ondoc.web import models as web_models
 from django.contrib.auth import get_user_model
+from ipware import get_client_ip
 from django import forms
+import logging
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -88,6 +92,11 @@ def redirect_to_original_url(request, hash):
     if not tiny_url:
         return HttpResponse(status=status.HTTP_404_NOT_FOUND)
     original_url = tiny_url.original_url
+    try:
+        ip_address, is_routable = get_client_ip(request)
+        tiny_url_hit = web_models.TinyUrlHits.objects.create(tiny_url=tiny_url, ip_address=ip_address)
+    except:
+        logger.error("Error in inserting into TinyUrlHit table")
     return HttpResponseRedirect(original_url)
 
 

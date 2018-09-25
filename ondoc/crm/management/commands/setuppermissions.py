@@ -17,7 +17,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization,
                                  MedicalCondition, PracticeSpecialization, SpecializationDepartment, SpecializationField,
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
-                                 SpecializationDepartmentMapping, DoctorProcedure)
+                                 SpecializationDepartmentMapping, DoctorProcedure, DoctorClinicProcedure, Procedure)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -69,7 +69,8 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization, CompetitorInfo, CompetitorMonthlyVisit, DoctorProcedure)
+            HospitalNetworkCertification, DoctorSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
+            DoctorClinicProcedure)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -126,7 +127,7 @@ class Command(BaseCommand):
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, GeneralSpecialization, SpecializationDepartment,
                                                            SpecializationField, PracticeSpecialization,
-                                                           SpecializationDepartmentMapping,
+                                                           SpecializationDepartmentMapping,Procedure
                                                            )
 
         for cl, ct in content_types.items():
@@ -156,7 +157,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, DoctorProcedure)
+            CompetitorMonthlyVisit, DoctorClinicProcedure)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -196,7 +197,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(
             Qualification, Specialization, Language, MedicalService, College, GeneralSpecialization, LabTest,
             LabTestType, LabService, TestParameter, ParameterLabTest, LabTestPackage, PracticeSpecialization,
-            SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping)
+            SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping, Procedure)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -215,7 +216,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, DoctorProcedure)
+            CompetitorMonthlyVisit, DoctorClinicProcedure)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -344,6 +345,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(AboutDoctor, DoctorSpecialization, DoctorQualification,
                                                            DoctorClinicTiming, DoctorClinic, DoctorLanguage,
                                                            DoctorAward, DoctorAssociation, DoctorExperience,
+                                                           DoctorClinicProcedure,
                                                            for_concrete_models=False)
 
         for cl, ct in content_types.items():

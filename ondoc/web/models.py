@@ -104,6 +104,11 @@ class TinyUrl(TimeStampedModel):
         db_table = 'tiny_url'
 
 
+class TinyUrlHits(TimeStampedModel):
+    tiny_url = models.ForeignKey(TinyUrl, blank=True, null=True, on_delete=models.SET_NULL)
+    ip_address = models.CharField(max_length=500, blank=True, null=True)
+
+
 class UploadImage(TimeStampedModel):
     name = models.CharField(blank=True, max_length=84)
     image = models.ImageField(upload_to='web/custom_images')
