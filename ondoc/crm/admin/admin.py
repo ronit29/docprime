@@ -17,7 +17,7 @@ from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
                      DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
-                     SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,CompetitorInfoImportAdmin, ProcedureAdmin)
+                     SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,CompetitorInfoImportAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -98,4 +98,4 @@ admin.site.register(PracticeSpecialization, PracticeSpecializationAdmin)
 admin.site.register(ConsumerAccount)
 admin.site.register(TestParameter, TestParameterAdmin)
 admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
-admin.site.register(Procedure, ProcedureAdmin)
+#admin.site.register(Procedure, ProcedureAdmin)

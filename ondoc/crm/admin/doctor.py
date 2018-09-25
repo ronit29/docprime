@@ -794,7 +794,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         DoctorMobileInline,
         DoctorEmailInline,
         # DoctorSpecializationInline,
-        ProcedureInline,
+        #ProcedureInline,
         DoctorPracticeSpecializationInline,
         DoctorQualificationInline,
         # DoctorHospitalInline,
