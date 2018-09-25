@@ -181,10 +181,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                          [self.sublocality, self.locality] if value]
         return ", ".join(address_items)
 
-
     def save(self, *args, **kwargs):
         build_url = True
-        if self.is_live:
+        if self.is_live and self.id and self.location:
             if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
                 build_url = False
 
