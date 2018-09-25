@@ -24,9 +24,9 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
     REDIRECT_PRODUCTION_URL_DOCTOR = 'https://docprime.com?journey_type=doctor&utm_source=pb&utm_medium=link&utm_content=doctor'
     REDIRECT_PRODUCTION_URL_LAB = 'https://docprime.com?journey_type=lab&utm_source=pb&utm_medium=link&utm_content=lab'
     REDIRECT_PRODUCTION_URL_CHAT = 'https://docprime.com?journey_type=consult&utm_source=pb&utm_medium=link&utm_content=consult'
-    ALT_TEXT_DOCTOR = 'Book Online Doctor Appointment '
+    ALT_TEXT_DOCTOR = 'Book Online Doctor Appointment'
     ALT_TEXT_LAB = 'Book Lab Tests'
-    ALT_TEXT_CHAT = 'Online Doctor Consultation '
+    ALT_TEXT_CHAT = 'Online Doctor Consultation'
     MOBILE_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_mobile_pb2.png",
                              CDN_BASE_IMAGE_URL + "lab_mobile_pb2.png",
                              CDN_BASE_IMAGE_URL + "doctor_mobile_pb2.png"]
