@@ -434,7 +434,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
         if not url:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
         entity = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Doctor')
@@ -454,7 +454,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             response = self.retrieve(request, entity_id)
             return response
 
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_404_NOT_FOUND)
 
     def retrieve(self, request, pk):
         response_data = []
@@ -716,7 +716,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
     def list_by_url(self, request, *args, **kwargs):
         url = request.GET.get('url', None)
         if not url:
-            return Response({})
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
                                            entity_type__iexact='Doctor')
@@ -786,7 +786,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if validated_data.get('extras').get('location_json').get('sublocality_value'):
                     sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
                     if sublocality:
-                        locality = sublocality + ', ' + locality
+                        locality = sublocality + ' ' + locality
 
             if validated_data.get('specialization_ids'):
                 specialization_name_obj = GeneralSpecialization.objects.filter(

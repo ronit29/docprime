@@ -249,7 +249,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     def save(self, *args, **kwargs):
         self.clean()
         build_url = True
-        if self.is_live and self.location:
+        if self.is_live and self.location and self.id:
             if Lab.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
                 build_url = False
 

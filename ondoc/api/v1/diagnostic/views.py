@@ -115,7 +115,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def list_by_url(self, request, *args, **kwargs):
         url = request.GET.get('url', None)
         if not url:
-            return Response({})
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
                                            entity_type__iexact='Lab')
@@ -132,7 +132,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         url = request.GET.get('url')
         if not url:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
         entity = EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Lab')
@@ -204,7 +204,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             if parameters.get('location_json') and parameters.get('location_json').get('sublocality_value'):
                 sublocality = parameters.get('location_json').get('sublocality_value')
                 if sublocality:
-                    sublocality += ', '
+                    sublocality += ' '
 
             title = "Diagnostic Centres & Labs "
             if locality:
@@ -260,7 +260,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
 
         return Response(temp_data)
-
 
     def get_lab_timing(self, queryset):
         lab_timing = ''
