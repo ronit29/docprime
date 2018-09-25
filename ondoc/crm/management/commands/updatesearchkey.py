@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from ondoc.doctor.models import Doctor, Hospital, MedicalCondition, GeneralSpecialization, PracticeSpecialization
+from ondoc.doctor.models import Doctor, Hospital, MedicalCondition, PracticeSpecialization
 from ondoc.diagnostic.models import Lab, LabTest
 
 

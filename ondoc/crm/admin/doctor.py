@@ -31,7 +31,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
                                  DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
-                                 DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
+                                 DoctorEmail, College, 
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
@@ -521,16 +521,6 @@ class CreatedByFilter(SimpleListFilter):
         return queryset
 
 
-class DoctorSpecializationInline(nested_admin.NestedTabularInline):
-    model = DoctorSpecialization
-    extra = 0
-    can_delete = True
-    show_change_link = False
-    min_num = 0
-    max_num = 4
-    autocomplete_fields = ['specialization']
-
-
 class DoctorPracticeSpecializationInline(nested_admin.NestedTabularInline):
     model = DoctorPracticeSpecialization
     extra = 0
@@ -793,7 +783,6 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         CompetitorMonthlyVisitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
-        # DoctorSpecializationInline,
         #ProcedureInline,
         DoctorPracticeSpecializationInline,
         DoctorQualificationInline,
@@ -1273,21 +1262,9 @@ class QualificationResource(resources.ModelResource):
         fields = ('id', 'name')
 
 
-class GeneralSpecializationResource(resources.ModelResource):
-    class Meta:
-        model = GeneralSpecialization
-        fields = ('id', 'name')
-
-
 class SpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
     resource_class = SpecializationResource
-    change_list_template = 'superuser_import_export.html'
-
-
-class GeneralSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
-    search_fields = ['name']
-    resource_class = GeneralSpecializationResource
     change_list_template = 'superuser_import_export.html'
 
 

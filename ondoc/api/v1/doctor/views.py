@@ -1,7 +1,6 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
-from ondoc.doctor.models import GeneralSpecialization
 from ondoc.notification.models import EmailNotification
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
@@ -789,7 +788,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         locality = sublocality + ' ' + locality
 
             if validated_data.get('specialization_ids'):
-                specialization_name_obj = GeneralSpecialization.objects.filter(
+                specialization_name_obj = PracticeSpecialization.objects.filter(
                     id__in=validated_data.get('specialization_ids', [])).values(
                     'name')
                 specialization_list = []

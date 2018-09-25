@@ -151,7 +151,7 @@ class EntityUrls(TimeStampedModel):
     @classmethod
     def create_doctor_search_urls(cls):
         try:
-            specializations = doc_models.GeneralSpecialization.objects.all()
+            specializations = doc_models.PracticeSpecialization.objects.all()
             locations_set = EntityAddress.objects.filter\
                 (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
             for location in locations_set:
@@ -329,7 +329,7 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
         search_urls = list()
 
         # Finding all the doctor specialization for appending in to the url.
-        doctor_specializations = doc_models.DoctorSpecialization.objects.filter(doctor=entity_object).all()
+        doctor_specializations = doc_models.DoctorPracticeSpecialization.objects.filter(doctor=entity_object).all()
         specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
 
         # Finding all the hospitals and appending along with the specializations.
@@ -365,7 +365,7 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
         search_urls = list()
 
         # Finding all the doctor specialization for appending in to the url.
-        doctor_specializations = doc_models.DoctorSpecialization.objects.filter(doctor=entity_object).all()
+        doctor_specializations = doc_models.DoctorPracticeSpecialization.objects.filter(doctor=entity_object).all()
         specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
 
         # Finding all the hospitals and appending along with the specializations.
