@@ -303,7 +303,7 @@ class DoctorLanguageSerializer(serializers.ModelSerializer):
 class DoctorHospitalSerializer(serializers.ModelSerializer):
     doctor = serializers.ReadOnlyField(source='doctor_clinic.doctor.name')
     hospital_name = serializers.ReadOnlyField(source='doctor_clinic.hospital.name')
-    address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_address')
+    address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_hos_address')
     short_address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_short_address')
     hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     hospital_thumbnail = serializers.SerializerMethodField()
@@ -470,20 +470,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
     address = serializers.SerializerMethodField()
 
     def get_address(self, obj):
-        address = ''
-        if obj.building:
-            address += str(obj.building)
-        if obj.locality:
-            address += str(obj.locality) + ' , '
-        if obj.sublocality:
-            address += str(obj.sublocality) + ' , '
-        if obj.city:
-            address += str(obj.city) + ' , '
-        if obj.state:
-            address += str(obj.state) + ' , '
-        if obj.country:
-            address += str(obj.country)
-        return address
+        return obj.get_hos_address() if obj.get_hos_address() else None
 
     def get_lat(self, obj):
         loc = obj.location
@@ -649,6 +636,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     seo = serializers.SerializerMethodField()
 
     def get_seo(self, obj):
+        if self.parent:
+            return None
 
         doctor_specializations = DoctorSpecialization.objects.filter(doctor=obj).all()
         specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
@@ -667,7 +656,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             if type.first().get('type') == 'SUBLOCALITY':
                 sublocality = type.first().get('value')
                 parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-                locality = ', ' + parent.first().get('value')
+                locality = ' ' + parent.first().get('value')
 
         title = obj.name
         description = obj.name + ': ' + obj.name

@@ -31,6 +31,7 @@ urlpatterns = [
     path('searcheditems', SearchedItemsViewSet.as_view({'get': 'list'}), name='searched-items'),
     path('commonconditions', SearchedItemsViewSet.as_view({'get': 'common_conditions'}), name='common-conditions'),
     path('doctorsearch', DoctorListViewSet.as_view({'get': 'list'}), name='search-doctor'),
+    path('doctorsearch_by_url', DoctorListViewSet.as_view({'get':'list_by_url'}), name='search_by_specializaton'),
     path('doctortiming', DoctorAvailabilityTimingViewSet.as_view({'get': 'list'}), name='doctor-timing-availability'),
     path('healthtips', HealthTipView.as_view({'get': 'list'}), name='health-tip'),
     path('config', ConfigView.as_view({'post': 'retrieve'}), name='config'),
