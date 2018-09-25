@@ -29,6 +29,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     category = serializers.SerializerMethodField()
     linked_urls = serializers.SerializerMethodField()
     linked_articles = serializers.SerializerMethodField()
+    published_date = serializers.SerializerMethodField()
 
     def get_linked_urls(self, obj):
         serializer = LinkedUrlSerializer(obj.articlelinkedurl_set.all(), many=True)
@@ -51,10 +52,13 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     def get_category(self, obj):
         return {'name': obj.category.name, 'url': obj.category.url}
 
+    def get_published_date(self, obj):
+        return '{:%d-%m-%Y}'.format(obj.published_date) if obj.published_date else None
+
     class Meta:
         model = Article
         fields = ('title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
-                  'linked_urls', 'linked_articles')
+                  'linked_urls', 'linked_articles', 'author_name', 'published_date')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):

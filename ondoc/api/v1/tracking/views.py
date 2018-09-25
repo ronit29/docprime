@@ -33,6 +33,27 @@ class EventCreateViewSet(GenericViewSet):
                     resp['success'] = "Event Saved Successfully!"
                 except Exception as e:
                     resp['error'] = "Error Processing Event Data!"
+
+                if event_name=='utm-events':
+                    visit = track_models.TrackingVisit.objects.get(pk=visit_id)
+                    if not visit.data:
+                        ud = {}
+                        ud['utm_campaign'] = data.get('utm_campaign')
+                        ud['utm_medium'] = data.get('utm_medium')
+                        ud['utm_source'] = data.get('utm_source')
+                        ud['utm_term'] = data.get('utm_term')
+                        visit.data = ud
+                        visit.save()
+                elif event_name=='visitor-info':
+                    visitor = track_models.TrackingVisitor.objects.get(pk=visitor_id)
+                    if not visitor.device_info:
+                        ud = {}
+                        ud['Device'] = data.get('device')
+                        ud['Mobile'] = data.get('mobile')
+                        ud['platform'] = data.get('platform')
+                        visitor.device_info = ud
+                        visitor.save()
+
             else:
                 resp['error'] = "Event name not Found!"
         else:

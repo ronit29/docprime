@@ -183,7 +183,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def save(self, *args, **kwargs):
         build_url = True
-        if self.is_live:
+        if self.is_live and self.id and self.location:
             if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
                 build_url = False
 
@@ -1482,3 +1482,19 @@ class CompetitorMonthlyVisit(models.Model):
     class Meta:
         db_table = "competitor_monthly_visits"
         unique_together = ('doctor', 'name')
+
+
+class DoctorProcedure(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=500)
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True)
+    mrp = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    listing_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    details = models.CharField(max_length=2000)
+    duration = models.IntegerField()
+
+    class Meta:
+        db_table = "doctor_procedure"
+        unique_together = ('name', 'doctor', 'hospital')
+

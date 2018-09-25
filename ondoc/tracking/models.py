@@ -26,6 +26,7 @@ class TrackingVisit(auth_models.TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ip_address = models.CharField(max_length=64, blank=True, null=True)
     visitor = models.ForeignKey(TrackingVisitor, on_delete=models.CASCADE)
+    data = JSONField(blank=True, null=True)
 
     def __str__(self):
         return '{}'.format(self.visitor)

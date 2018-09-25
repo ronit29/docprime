@@ -16,7 +16,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HospitalNetworkCertification, DoctorSpecialization, GeneralSpecialization, AboutDoctor,
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization,
                                  MedicalCondition,
-                                 MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit)
+                                 MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit, DoctorProcedure)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -68,7 +68,7 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization, CompetitorInfo, CompetitorMonthlyVisit)
+            HospitalNetworkCertification, DoctorSpecialization, CompetitorInfo, CompetitorMonthlyVisit, DoctorProcedure)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -150,7 +150,8 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo, CompetitorMonthlyVisit)
+            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo,
+            CompetitorMonthlyVisit, DoctorProcedure)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -207,7 +208,8 @@ class Command(BaseCommand):
             HospitalAward, HospitalAccreditation, HospitalImage, HospitalDocument,
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
-            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo, CompetitorMonthlyVisit)
+            HospitalNetworkCertification, DoctorSpecialization, HospitalNetworkDocument, CompetitorInfo,
+            CompetitorMonthlyVisit, DoctorProcedure)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

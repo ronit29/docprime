@@ -648,7 +648,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             if type.first().get('type') == 'SUBLOCALITY':
                 sublocality = type.first().get('value')
                 parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-                locality = ', ' + parent.first().get('value')
+                locality = ' ' + parent.first().get('value')
 
         title = obj.name
         description = obj.name + ': ' + obj.name
