@@ -33,7 +33,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
-                                 OpdAppointment, CompetitorInfo, CompetitorMonthlyVisit, DoctorProcedure)
+                                 OpdAppointment, CompetitorInfo, CompetitorMonthlyVisit, DoctorClinicProcedure)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -131,7 +131,17 @@ class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
                 if t not in temp:
                     temp.add(t)
                 else:
-                    raise forms.ValidationError("Duplicacy in the record not allowed")
+                    raise forms.ValidationError("Duplicate records not allowed.")
+
+
+class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
+    model = DoctorClinicProcedure
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    verbose_name = 'Procedure'
+    verbose_name_plural = 'Procedures'
+    autocomplete_fields = ['procedure']
 
 
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
@@ -151,7 +161,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     formset = DoctorClinicFormSet
     show_change_link = False
     autocomplete_fields = ['hospital']
-    inlines = [DoctorClinicTimingInline]
+    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline]
 
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
@@ -752,16 +762,6 @@ class CompetitorMonthlyVisitsInline(nested_admin.NestedTabularInline):
     verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
-class ProcedureInline(nested_admin.NestedTabularInline):
-    model = DoctorProcedure
-    extra = 0
-    can_delete = True
-    show_change_link = False
-    verbose_name = 'Procedure'
-    verbose_name_plural = 'Procedures'
-    autocomplete_fields = ['hospital']
-
-
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -780,7 +780,6 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         CompetitorMonthlyVisitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
-        ProcedureInline,
         DoctorSpecializationInline,
         DoctorQualificationInline,
         # DoctorHospitalInline,
@@ -1353,3 +1352,8 @@ class DoctorMappingAdmin(VersionAdmin):
 
 class CommonSpecializationAdmin(VersionAdmin):
     autocomplete_fields = ['specialization']
+
+
+class ProcedureAdmin(AutoComplete, VersionAdmin):
+    list_display = ('name', 'duration')
+    search_fields = ['name']
