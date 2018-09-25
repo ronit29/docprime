@@ -249,7 +249,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     def save(self, *args, **kwargs):
         self.clean()
         build_url = True
-        if self.is_live and self.location:
+        if self.is_live and self.location and self.id:
             if Lab.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
                 build_url = False
 
@@ -800,6 +800,34 @@ class LabAppointment(TimeStampedModel):
         # except Exception as e:
         #     logger.error("Error in auto cancel flow - " + str(e))
         print('all lab appointment tasks completed')
+
+    def get_pickup_address(self):
+        if not self.address:
+            return ""
+        address_string = ""
+        address_dict = dict()
+        if not isinstance(self.address, dict):
+            address_dict = vars(address_dict)
+        else:
+            address_dict = self.address
+
+        if address_dict.get("address"):
+            if address_string:
+                address_string += ", "
+            address_string += str(address_dict["address"])
+        if address_dict.get("land_mark"):
+            if address_string:
+                address_string += ", "
+            address_string += str(address_dict["land_mark"])
+        if address_dict.get("locality"):
+            if address_string:
+                address_string += ", "
+            address_string += str(address_dict["locality"])
+        if address_dict.get("pincode"):
+            if address_string:
+                address_string += ", "
+            address_string += str(address_dict["pincode"])
+        return address_string
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
