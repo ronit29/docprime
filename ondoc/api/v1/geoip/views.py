@@ -41,7 +41,7 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
         resp["web_image_url"] = self.WEB_IMAGE_URL_LIST[0]
         resp["mobile_image_url"] = self.MOBILE_IMAGE_URL_LIST[0]
         resp["alt_text"] = self.ALT_TEXT_LIST[0]
-        resp["access_url"] = 'https://docprime.com'
+        resp["access_url"] = self.REDIRECT_PRODUCTION_URL_CHAT
         resp["latitude"] = self.DELHI_CENTRE_LAT
         resp["longitude"] = self.DELHI_CENTRE_LONG
         resp["city_name"] = 'Delhi'
