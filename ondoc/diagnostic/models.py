@@ -801,6 +801,34 @@ class LabAppointment(TimeStampedModel):
         #     logger.error("Error in auto cancel flow - " + str(e))
         print('all lab appointment tasks completed')
 
+    def get_pickup_address(self):
+        if not self.address:
+            return ""
+        address_string = ""
+        address_dict = dict()
+        if not isinstance(self.address, dict):
+            address_dict = vars(address_dict)
+        else:
+            address_dict = self.address
+
+        if address_dict.get("address"):
+            if address_string:
+                address_string += ", "
+            address_string += str(address_dict["address"])
+        if address_dict.get("land_mark"):
+            if address_string:
+                address_string += ", "
+            address_string += str(address_dict["land_mark"])
+        if address_dict.get("locality"):
+            if address_string:
+                address_string += ", "
+            address_string += str(address_dict["locality"])
+        if address_dict.get("pincode"):
+            if address_string:
+                address_string += ", "
+            address_string += str(address_dict["pincode"])
+        return address_string
+
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
         try:
