@@ -31,7 +31,8 @@ class TopArticleCategoryViewSet(viewsets.GenericViewSet):
             resp = serializers.ArticleListSerializer(article_list, many=True,
                                                      context={'request': request}).data
             category_serialized = serializers.ArticleCategoryListSerializer(category, context={'request': request}).data
-            response.append({'articles': resp, 'name': category_serialized['name'], 'url': category_serialized['url']})
+            response.append({'articles': resp, 'name': category_serialized['name'], 'url': category_serialized['url'],
+                             'title': category_serialized['title'], 'description': category_serialized['description']})
         return Response(response)
 
 

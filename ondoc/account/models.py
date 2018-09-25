@@ -452,6 +452,9 @@ class ConsumerTransaction(TimeStampedModel):
 
 
 class ConsumerRefund(TimeStampedModel):
+    SUCCESS_OK_STATUS = '1'
+    FAILURE_OK_STATUS = '0'
+
     PENDING = 1
     REQUESTED = 5
     COMPLETED = 10
@@ -554,6 +557,45 @@ class ConsumerRefund(TimeStampedModel):
                 refund_queryset.refund_state = ConsumerRefund.REQUESTED
                 refund_queryset.save()
                 print("Status Updated")
+
+    @classmethod
+    def refund_status_request(cls, ref_id):
+        if settings.AUTO_REFUND:
+            url = settings.PG_REFUND_STATUS_API_URL
+            token = settings.PG_REFUND_AUTH_TOKEN
+            headers = {
+                "auth": token
+            }
+            response = requests.get(url=url, params={"refId": ref_id}, headers=headers)
+            print(response.url)
+            print(response.status_code)
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
+                temp_data = resp_data.get("data")
+                code = None
+                try:
+                    if temp_data:
+                        for d in temp_data:
+                            if "code" in d:
+                                code = d.get("code")
+                except:
+                    pass
+                if resp_data.get("ok") and str(resp_data["ok"]) == cls.SUCCESS_OK_STATUS and code is not None and \
+                        code != PgTransaction.REFUND_UPDATE_FAILURE_STATUS:
+                    with transaction.atomic():
+                        obj = cls.objects.select_for_update().get(id=ref_id)
+                        if obj.refund_state != cls.COMPLETED:
+                            obj.refund_state = cls.COMPLETED
+                            obj.save()
+                            print("status updated for - " + str(obj.id))
+                else:
+                    logger.error("Invalid ok status or code mismatch - " + str(response.content))
+
+    @classmethod
+    def update_refund_status(cls):
+        refund_ids = cls.objects.filter(refund_state=cls.REQUESTED).values_list('id', flat=True)
+        for ref_id in refund_ids:
+            cls.refund_status_request(ref_id)
 
 
 class Invoice(TimeStampedModel):
