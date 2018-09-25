@@ -1,6 +1,7 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
+from ondoc.doctor.models import GeneralSpecialization
 from ondoc.notification.models import EmailNotification
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
@@ -433,16 +434,27 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
         if not url:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
-        if location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL',entity_type__iexact='Doctor').exists():
-            entity_url_obj = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
-            entity_id = entity_url_obj.entity_id
+        entity = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Doctor')
+        if entity.exists():
+            entity = entity.first()
+            if not entity.is_valid:
+                valid_entity_url_qs = location_models.EntityUrls.objects.filter(url_type='PAGEURL',
+                                                                           entity_id=entity.entity_id,
+                                                                           entity_type__iexact='Doctor', is_valid='t')
+                if valid_entity_url_qs.exists():
+                    corrected_url = valid_entity_url_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            entity_id = entity.entity_id
             response = self.retrieve(request, entity_id)
             return response
 
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_404_NOT_FOUND)
 
     def retrieve(self, request, pk):
         response_data = []
@@ -704,7 +716,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
     def list_by_url(self, request, *args, **kwargs):
         url = request.GET.get('url', None)
         if not url:
-            return Response({})
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
                                            entity_type__iexact='Doctor')
@@ -750,7 +762,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
 
-        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request, validated_data)
+        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
@@ -760,16 +772,79 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         for data in entity:
             id_url_dict[data['entity_id']] = data['url']
 
+        title = ''
+        description = ''
+        seo = None
+        # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
+        if validated_data.get('extras') or validated_data.get('specialization_ids'):
+            locality = ''
+            sublocality = ''
+            specializations = ''
+            if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
+                if validated_data.get('extras').get('location_json').get('locality_value'):
+                    locality = validated_data.get('extras').get('location_json').get('locality_value')
+                if validated_data.get('extras').get('location_json').get('sublocality_value'):
+                    sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
+                    if sublocality:
+                        locality = sublocality + ' ' + locality
+
+            if validated_data.get('specialization_ids'):
+                specialization_name_obj = GeneralSpecialization.objects.filter(
+                    id__in=validated_data.get('specialization_ids', [])).values(
+                    'name')
+                specialization_list = []
+
+                for names in specialization_name_obj:
+                    specialization_list.append(names.get('name'))
+
+                specializations = ', '.join(specialization_list)
+            else:
+                if validated_data.get('extras').get('specialization'):
+                    specializations = validated_data.get('extras').get('specialization')
+                else:
+                    specializations = ''
+
+            if specializations:
+                title = specializations
+                description = specializations
+            if locality:
+                title += ' in '  + locality
+                description += ' in ' +locality
+            if specializations:
+                title += '- Book Best ' + specializations
+                description += ': Book best ' + specializations + '\'s appointment online '
+            if locality:
+                description += 'in ' + locality
+            title += ' Instantly | DocPrime'
+
+            description += '. View Address, fees and more for doctors '
+            if locality:
+                description += 'in '+ locality
+            description += '.'
+
+            if title or description:
+                seo = {
+                    "title": title,
+                    "description": description
+                }
+
+                # response[0]['seo'] = seo
+
+
         for resp in response:
             if id_url_dict.get(resp['id']):
                 resp['url'] = id_url_dict[resp['id']]
             else:
                 resp['url'] = None
 
+
+
+
+
         specializations = list(models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
-                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions})
+                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):

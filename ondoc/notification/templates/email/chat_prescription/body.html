@@ -1,3 +1,5 @@
+{% load static %}
+{% load invoice_tags %}
     <table  border="0" align="center" cellpadding="0" cellspacing="0" style="font-family: verdana; background:#ffffff; border: 2px solid #d7d7d7; width:100%; padding: 0px 15px 40px 15px;">
             <tr style="text-align: center">
                 <td align="center" valign="top" style="padding:10px 0; text-align: center">
@@ -156,7 +158,7 @@
                                 <table style="width: 100%">
                                     <tr>
                                         <td valign="top" ><span style="padding-top: 5px; display: inline-block;">
-                                            <img src="http://telemed.docprime.com/images/healthservices/online_consultation.svg"/>
+                                            <img style="width:20px;" src="{{'notification/images/consultation.png'|get_absolute_url}}"/>
                                         </span></td>
                                         <td><label style="font-size: 11px;">Talk to our in-house doctors for free consultation</label></td>
                                     </tr>
@@ -166,7 +168,7 @@
                                 <table style="width: 100%">
                                     <tr>
                                         <td valign="top" ><span style="padding-top: 5px; display: inline-block;">
-                                            <img src="http://telemed.docprime.com/images/healthservices/find_doctor_near_u.svg" />
+                                            <img style="width:20px;" src="{{'notification/images/doctor.png'|get_absolute_url}}" />
                                         </span></td>
                                         <td><label style="font-size: 11px;">Book appointment with doctors near you</label></td>
                                     </tr>
@@ -176,7 +178,7 @@
                                 <table style="width: 100%">
                                     <tr>
                                         <td valign="top" ><span style="padding-top: 5px; display: inline-block;">
-                                            <img src="http://telemed.docprime.com/images/healthservices/forma-1%20(3).svg" />
+                                            <img style="width:20px;" src="{{'notification/images/lab.png'|get_absolute_url}}" />
                                         </span></td>
                                         <td><label style="font-size: 11px;">Book
                                         test with labs</label></td>
