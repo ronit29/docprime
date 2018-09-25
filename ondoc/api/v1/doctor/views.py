@@ -1,13 +1,15 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
+from ondoc.doctor.models import GeneralSpecialization
+from ondoc.notification.models import EmailNotification
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, EntityAddress
 from . import serializers
 from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
-from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details
+from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min
@@ -27,7 +29,7 @@ from django.db.models import Q, Value
 from django.db.models import Case, When
 from operator import itemgetter
 from itertools import groupby
-from ondoc.api.v1.utils import RawSql, is_valid_testing_data
+from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_parameters
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F
@@ -278,19 +280,19 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
             resp['data'], resp["payment_required"] = payment_details(request, order)
-            # resp['data'], resp["payment_required"] = self.payment_details(request, appointment_details, product_id, order.id)
-
+            try:
+                ops_email_data = dict()
+                ops_email_data.update(order.appointment_details())
+                ops_email_data["transaction_time"] = aware_time_zone(timezone.now())
+                EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                                                         order.product_id,
+                                                         EmailNotification.OPS_PAYMENT_NOTIFICATION)
+            except:
+                pass
         else:
             opd_obj = models.OpdAppointment.create_appointment(appointment_details)
-
             if appointment_details["payment_type"] == models.OpdAppointment.PREPAID:
-                user_account_data = {
-                    "user": user,
-                    "product_id": product_id,
-                    "reference_id": opd_obj.id
-                }
                 consumer_account.debit_schedule(opd_obj, product_id, appointment_details.get("effective_price"))
-                # consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
             resp["status"] = 1
             resp["payment_required"] = False
             resp["data"] = {"id": opd_obj.id, "type": serializers.OpdAppointmentSerializer.DOCTOR_TYPE}
@@ -432,16 +434,27 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
         if not url:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
-        if location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL',entity_type__iexact='Doctor').exists():
-            entity_url_obj = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
-            entity_id = entity_url_obj.entity_id
+        entity = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Doctor')
+        if entity.exists():
+            entity = entity.first()
+            if not entity.is_valid:
+                valid_entity_url_qs = location_models.EntityUrls.objects.filter(url_type='PAGEURL',
+                                                                           entity_id=entity.entity_id,
+                                                                           entity_type__iexact='Doctor', is_valid='t')
+                if valid_entity_url_qs.exists():
+                    corrected_url = valid_entity_url_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            entity_id = entity.entity_id
             response = self.retrieve(request, entity_id)
             return response
 
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_404_NOT_FOUND)
 
     def retrieve(self, request, pk):
         response_data = []
@@ -700,10 +713,33 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 class DoctorListViewSet(viewsets.GenericViewSet):
     queryset = models.Doctor.objects.all()
 
+    def list_by_url(self, request, *args, **kwargs):
+        url = request.GET.get('url', None)
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
+                                           entity_type__iexact='Doctor')
+        if entity.exists():
+            extras = entity.first().additional_info
+            if extras:
+                kwargs['extras'] = extras
+                kwargs['parameters'] = doctor_query_parameters(extras, request.query_params)
+                response = self.list(request, **kwargs)
+                return response
+
+        return Response({})
+
     def list(self, request, *args, **kwargs):
-        serializer = serializers.DoctorListSerializer(data=request.query_params, context={"request": request})
+        parameters = request.query_params
+        if kwargs.get("parameters"):
+            parameters = kwargs.get("parameters")
+        serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        if kwargs.get('extras'):
+            validated_data['extras'] = kwargs['extras']
+
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
             filtering_params = doctor_search_helper.get_filtering_params()
@@ -736,6 +772,65 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         for data in entity:
             id_url_dict[data['entity_id']] = data['url']
 
+        title = ''
+        description = ''
+        seo = None
+        # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
+        if validated_data.get('extras') or validated_data.get('specialization_ids'):
+            locality = ''
+            sublocality = ''
+            specializations = ''
+            if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
+                if validated_data.get('extras').get('location_json').get('locality_value'):
+                    locality = validated_data.get('extras').get('location_json').get('locality_value')
+                if validated_data.get('extras').get('location_json').get('sublocality_value'):
+                    sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
+                    if sublocality:
+                        locality = sublocality + ' ' + locality
+
+            if validated_data.get('specialization_ids'):
+                specialization_name_obj = GeneralSpecialization.objects.filter(
+                    id__in=validated_data.get('specialization_ids', [])).values(
+                    'name')
+                specialization_list = []
+
+                for names in specialization_name_obj:
+                    specialization_list.append(names.get('name'))
+
+                specializations = ', '.join(specialization_list)
+            else:
+                if validated_data.get('extras').get('specialization'):
+                    specializations = validated_data.get('extras').get('specialization')
+                else:
+                    specializations = ''
+
+            if specializations:
+                title = specializations
+                description = specializations
+            if locality:
+                title += ' in '  + locality
+                description += ' in ' +locality
+            if specializations:
+                title += '- Book Best ' + specializations
+                description += ': Book best ' + specializations + '\'s appointment online '
+            if locality:
+                description += 'in ' + locality
+            title += ' Instantly | DocPrime'
+
+            description += '. View Address, fees and more for doctors '
+            if locality:
+                description += 'in '+ locality
+            description += '.'
+
+            if title or description:
+                seo = {
+                    "title": title,
+                    "description": description
+                }
+
+                # response[0]['seo'] = seo
+
+
         for resp in response:
             if id_url_dict.get(resp['id']):
                 resp['url'] = id_url_dict[resp['id']]
@@ -745,7 +840,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
-                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions})
+                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):

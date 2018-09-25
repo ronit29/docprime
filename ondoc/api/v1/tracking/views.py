@@ -19,31 +19,70 @@ class EventCreateViewSet(GenericViewSet):
     def create(self, request):
         visitor_id, visit_id = self.get_visit(request)
         resp = {}
-        if request.data and isinstance(request.data, dict):
-            event_name = request.data.get('event')
+        data = request.data
+        del data['visitor_info']
+        if data and isinstance(data, dict):
+            event_name = data.get('event')
             if event_name:
                 try:
                     user = None
                     if request.user.is_authenticated:
                         user = request.user
-                    event = track_models.TrackingEvent(name=event_name, data=request.data, visit_id=visit_id, user=user)
+                    event = track_models.TrackingEvent(name=event_name, data=data, visit_id=visit_id, user=user)
                     event.save()
                     resp['success'] = "Event Saved Successfully!"
-                except Exception:
+                except Exception as e:
                     resp['error'] = "Error Processing Event Data!"
+
+                if event_name=='utm-events':
+                    visit = track_models.TrackingVisit.objects.get(pk=visit_id)
+                    if not visit.data:
+                        ud = {}
+                        ud['utm_campaign'] = data.get('utm_campaign')
+                        ud['utm_medium'] = data.get('utm_medium')
+                        ud['utm_source'] = data.get('utm_source')
+                        ud['utm_term'] = data.get('utm_term')
+                        visit.data = ud
+                        visit.save()
+                elif event_name=='visitor-info':
+                    visitor = track_models.TrackingVisitor.objects.get(pk=visitor_id)
+                    if not visitor.device_info:
+                        ud = {}
+                        ud['Device'] = data.get('device')
+                        ud['Mobile'] = data.get('mobile')
+                        ud['platform'] = data.get('platform')
+                        visitor.device_info = ud
+                        visitor.save()
+
             else:
                 resp['error'] = "Event name not Found!"
         else:
             resp['error'] = "Invalid Data"
 
-        cookie = self.get_cookie(visitor_id, visit_id)    
+        #cookie = self.get_cookie(visitor_id, visit_id)
         response = JsonResponse(resp)
-        response.set_signed_cookie('visit', value=cookie, max_age=365*24*60*60, path='/')
+        #response.set_signed_cookie('visit', value=cookie, max_age=365*24*60*60, path='/')
         return response
 
     def get_visit(self, request):
 
-        cookie = request.get_signed_cookie('visit', None)
+        #cookie = request.get_signed_cookie('visit', None)
+        visit_id = None
+        visitor_id = None
+
+        data=request.data.get('visitor_info')
+        client_ip, is_routable = get_client_ip(request)
+        if data:
+            visit_id = data.get('visit_id')
+            visitor_id = data.get('visitor_id')
+            if visitor_id:
+                track_models.TrackingVisitor.objects.get_or_create(id=visitor_id)
+            if visit_id:
+                track_models.TrackingVisit.objects.get_or_create(id=visit_id,
+                    defaults={'visitor_id': visitor_id, 'ip_address': client_ip})
+
+        return (visitor_id, visit_id)
+
         visitor_id = None
         visit_id = None
         last_visit_time = None

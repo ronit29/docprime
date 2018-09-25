@@ -6,9 +6,10 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      CommonDiagnosticCondition, CommonTest)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
+from ondoc.notification.models import EmailNotification
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone, get_lab_search_details
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -37,7 +38,7 @@ from ondoc.authentication import models as auth_models
 from django.db.models import Q, Value
 from django.db.models.functions import StrIndex
 
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, EntityAddress
 from . import serializers
 import copy
 import re
@@ -111,15 +112,44 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
+    def list_by_url(self, request, *args, **kwargs):
+        url = request.GET.get('url', None)
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
+                                           entity_type__iexact='Lab')
+        if entity.exists():
+            extras = entity.first().additional_info
+            if extras.get('location_json'):
+                kwargs['location_json'] = extras.get('location_json')
+                kwargs['parameters'] = get_lab_search_details(extras, request.query_params)
+                response = self.list(request, **kwargs)
+                return response
+        return Response({})
+
     def retrieve_by_url(self, request):
+
         url = request.GET.get('url')
         if not url:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
-        if EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Lab').exists():
-            entity_url_obj = EntityUrls.objects.filter(url=url, url_type='PAGEURL').first()
-            entity_id = entity_url_obj.entity_id
+        entity = EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Lab')
+        if entity.exists():
+            entity = entity.first()
+            if not entity.is_valid:
+                valid_entity_url_qs = EntityUrls.objects.filter(url_type='PAGEURL',
+                                                                                entity_id=entity.entity_id,
+                                                                                entity_type__iexact='Lab',
+                                                                                is_valid='t')
+                if valid_entity_url_qs.exists():
+                    corrected_url = valid_entity_url_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            entity_id = entity.entity_id
             response = self.retrieve(request, entity_id)
             return response
 
@@ -127,15 +157,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, **kwargs):
         parameters = request.query_params
+        if kwargs.get('parameters'):
+            parameters = kwargs.get('parameters')
+
         serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
+
         serializer.is_valid(raise_exception=True)
+        if kwargs.get('location_json'):
+            serializer.validated_data['location_json'] = kwargs['location_json']
+
         parameters = serializer.validated_data
 
         queryset = self.get_lab_list(parameters)
         count = queryset.count()
         paginated_queryset = paginate_queryset(queryset, request)
         response_queryset = self.form_lab_whole_data(paginated_queryset)
-        serializer = diagnostic_serializer.LabCustomSerializer(response_queryset, many=True,
+
+        serializer = diagnostic_serializer.LabCustomSerializer(response_queryset,  many=True,
                                          context={"request": request})
 
         entity_ids = [lab_data['id'] for lab_data in response_queryset]
@@ -154,10 +192,33 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids',[])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'));
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
+        seo = None
+        if parameters.get('location_json'):
+            locality = ''
+            sublocality = ''
+
+            if parameters.get('location_json') and parameters.get('location_json').get('locality_value'):
+                locality = parameters.get('location_json').get('locality_value')
+
+            if parameters.get('location_json') and parameters.get('location_json').get('sublocality_value'):
+                sublocality = parameters.get('location_json').get('sublocality_value')
+                if sublocality:
+                    sublocality += ' '
+
+            title = "Diagnostic Centres & Labs "
+            if locality:
+                title += "in " + sublocality + locality
+            title += " | Books Tests"
+            description = "Find best Diagnostic Centres and Labs"
+            if locality:
+                description += " in " + sublocality + locality
+            description += " and book test online, check fees, packages prices and more at DocPrime."
+            seo = {'title': title, "description": description}
 
         return Response({"result": serializer.data,
-                         "count": count,'tests':tests})
+                         "count": count,'tests':tests,
+                         "seo": seo})
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
@@ -199,7 +260,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
 
         return Response(temp_data)
-
 
     def get_lab_timing(self, queryset):
         lab_timing = ''
@@ -264,11 +324,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         min_price = parameters.get('min_price')
         max_price = parameters.get('max_price')
         name = parameters.get('name')
+        network_id = parameters.get("network_id")
 
         # queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
         #                                                                                         lab_pricing_group__labs__is_test_lab=False)
         queryset = Lab.objects.select_related().filter(is_test_lab=False, is_live=True,
                                                        lab_pricing_group__isnull=False)
+
+        if network_id:
+            queryset = queryset.filter(network=network_id)
 
         if lat is not None and long is not None:
             point_string = 'POINT('+str(long)+' '+str(lat)+')'
@@ -575,17 +639,19 @@ class LabAppointmentView(mixins.CreateModelMixin,
             appointment_details["payable_amount"] = payable_amount
             resp["status"] = 1
             resp['data'], resp['payment_required'] = payment_details(request, order)
-            # resp['data'], resp['payment_required'] = self.get_payment_details(request, appointment_details, product_id, order.id)
+            try:
+                ops_email_data = dict()
+                ops_email_data.update(order.appointment_details())
+                ops_email_data["transaction_time"] = aware_time_zone(timezone.now())
+                EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
+                                                         order.product_id,
+                                                         EmailNotification.OPS_PAYMENT_NOTIFICATION)
+            except:
+                pass
         else:
             lab_appointment = LabAppointment.create_appointment(appointment_details)
             if appointment_details["payment_type"] == doctor_model.OpdAppointment.PREPAID:
-                user_account_data = {
-                    "user": user,
-                    "product_id": product_id,
-                    "reference_id": lab_appointment.id
-                }
                 consumer_account.debit_schedule(lab_appointment, product_id, appointment_details.get("effective_price"))
-                # consumer_account.debit_schedule(user_account_data, appointment_details.get("effective_price"))
             resp["status"] = 1
             resp["payment_required"] = False
             resp["data"] = {"id": lab_appointment.id,

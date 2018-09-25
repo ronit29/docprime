@@ -481,7 +481,7 @@ class LabResource(resources.ModelResource):
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
-    list_display = ('name', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to',
+    list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'list_created_by', 'list_assigned_to',
                     'get_onboard_link',)
 
     # readonly_fields=('onboarding_status', )
@@ -505,6 +505,9 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     class Media:
         js = ('js/admin/ondoc.js',)
 
+    def get_queryset(self, request):
+        return Lab.objects.all().prefetch_related('lab_documents')
+
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
         if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
@@ -512,6 +515,14 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         return read_only_fields
+
+    def lab_logo(self, instance):
+        lab_documents = instance.lab_documents.all()
+        for lab_document in lab_documents:
+            if lab_document.document_type == LabDocument.LOGO:
+                return mark_safe("<a href={} target='_blank'>View</a> ".format(lab_document.name.url))
+        return None
+    lab_logo.short_description = 'Logo'
 
     def lead_url(self, instance):
         if instance.id:
