@@ -652,7 +652,8 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
                 "type": "sms"
             }
             message = json.dumps(message)
-            publish_message(message)
+            if phone_number not in settings.OTP_BYPASS_NUMBERS:
+                publish_message(message)
 
     @classmethod
     def send_to_manager(cls, phone_number, notification_type, context):

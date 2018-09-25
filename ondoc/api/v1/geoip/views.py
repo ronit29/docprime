@@ -21,20 +21,26 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
     DOCTOR_QUERY_VALUE = 2
 
     CDN_BASE_IMAGE_URL = 'https://cdn.docprime.com/static/web/images/'
-    HOME_PRODUCTION_URL = 'https://docprime.com/'
-    MOBILE_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_mobile_pb1.png",
-                             CDN_BASE_IMAGE_URL + "lab_mobile_pb1.png",
-                             CDN_BASE_IMAGE_URL + "doctor_mobile_pb1.png"]
+    REDIRECT_PRODUCTION_URL_DOCTOR = 'https://docprime.com?journey_type=doctor&utm_source=pb&utm_medium=link&utm_content=doctor'
+    REDIRECT_PRODUCTION_URL_LAB = 'https://docprime.com?journey_type=lab&utm_source=pb&utm_medium=link&utm_content=lab'
+    REDIRECT_PRODUCTION_URL_CHAT = 'https://docprime.com?journey_type=consult&utm_source=pb&utm_medium=link&utm_content=consult'
+    ALT_TEXT_DOCTOR = 'Book Online Doctor Appointment '
+    ALT_TEXT_LAB = 'Book Lab Tests'
+    ALT_TEXT_CHAT = 'Online Doctor Consultation '
+    MOBILE_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_mobile_pb2.png",
+                             CDN_BASE_IMAGE_URL + "lab_mobile_pb2.png",
+                             CDN_BASE_IMAGE_URL + "doctor_mobile_pb2.png"]
     WEB_IMAGE_URL_LIST = [CDN_BASE_IMAGE_URL + "chat_pb1.png", CDN_BASE_IMAGE_URL + "lab_pb1.png",
                           CDN_BASE_IMAGE_URL + "doctor_pb1.png"]
-    SEARCH_URL_LIST = [HOME_PRODUCTION_URL, HOME_PRODUCTION_URL, HOME_PRODUCTION_URL]
-
+    ALT_TEXT_LIST = [ALT_TEXT_CHAT, ALT_TEXT_LAB, ALT_TEXT_DOCTOR]
+    SEARCH_URL_LIST = [REDIRECT_PRODUCTION_URL_CHAT, REDIRECT_PRODUCTION_URL_LAB, REDIRECT_PRODUCTION_URL_DOCTOR]
 
     def ip_details(self, request):
         resp = dict()
         resp["status"] = 1
         resp["web_image_url"] = self.WEB_IMAGE_URL_LIST[0]
         resp["mobile_image_url"] = self.MOBILE_IMAGE_URL_LIST[0]
+        resp["alt_text"] = self.ALT_TEXT_LIST[0]
         resp["access_url"] = 'https://docprime.com'
         resp["latitude"] = self.DELHI_CENTRE_LAT
         resp["longitude"] = self.DELHI_CENTRE_LONG
@@ -70,7 +76,7 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
 
         return Response(resp)
 
-    def form_response(self,location, resp):
+    def form_response(self, location, resp):
 
         try:
             lat = location["location"]["latitude"]
@@ -90,6 +96,7 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
             resp["web_image_url"] = self.WEB_IMAGE_URL_LIST[val]
             resp["mobile_image_url"] = self.MOBILE_IMAGE_URL_LIST[val]
             resp["access_url"] = self.SEARCH_URL_LIST[val]
+            resp["alt_text"] = self.ALT_TEXT_LIST[val]
             resp["city_name"] = city_name
             resp["status"] = 1
         except Exception:
