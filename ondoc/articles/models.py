@@ -86,7 +86,7 @@ class ArticleLinkedUrl(TimeStampedModel):
 class LinkedArticle(TimeStampedModel):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_articles')
     linked_article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_article')
-    title = models.CharField(max_length=500, null=True, blank=True)
+    title = models.CharField(max_length=500, null=True, blank=False)
 
     def __str__(self):
         return "{}-{}".format(self.article.title, self.linked_article.title)
