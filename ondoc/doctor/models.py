@@ -1482,3 +1482,19 @@ class CompetitorMonthlyVisit(models.Model):
     class Meta:
         db_table = "competitor_monthly_visits"
         unique_together = ('doctor', 'name')
+
+
+class DoctorProcedure(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=500)
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True)
+    mrp = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    listing_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    details = models.CharField(max_length=2000)
+    duration = models.IntegerField()
+
+    class Meta:
+        db_table = "doctor_procedure"
+        unique_together = ('name', 'doctor', 'hospital')
+
