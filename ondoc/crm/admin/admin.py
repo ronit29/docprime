@@ -66,7 +66,7 @@ admin.site.register(MedicalService, MedicalServiceAdmin)
 admin.site.register(CommonMedicalCondition)
 admin.site.register(CommonSpecialization, CommonSpecializationAdmin)
 admin.site.register(Specialization, SpecializationAdmin)
-admin.site.register(GeneralSpecialization, GeneralSpecializationAdmin)
+# admin.site.register(GeneralSpecialization, GeneralSpecializationAdmin)
 admin.site.register(MedicalCondition, MedicalConditionAdmin)
 admin.site.register(HealthTip, HealthTipAdmin)
 

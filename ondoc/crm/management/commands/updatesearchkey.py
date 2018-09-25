@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from ondoc.doctor.models import Doctor, Hospital, MedicalCondition, GeneralSpecialization
+from ondoc.doctor.models import Doctor, Hospital, MedicalCondition, GeneralSpecialization, PracticeSpecialization
 from ondoc.diagnostic.models import Lab, LabTest
 
 
@@ -8,7 +8,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-        for sp in GeneralSpecialization.objects.all():
+        for sp in PracticeSpecialization.objects.all():
             sp.save()
         for mc in MedicalCondition.objects.all():
             mc.save()

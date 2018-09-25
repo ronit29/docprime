@@ -676,7 +676,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions,
                                                                        many=True, context={'request': request})
 
-        specializations = models.GeneralSpecialization.objects.filter(
+        specializations = models.PracticeSpecialization.objects.filter(
             Q(search_key__icontains=name) |
             Q(search_key__icontains=' ' + name) |
             Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(

@@ -458,7 +458,7 @@ class DoctorForm(FormCleanMixin):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
                        'raw_about': 'req', 'license': 'req', 'mobiles': 'count', 'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
-                       'doctorspecializations': 'count'}
+                       'doctorpracticespecializations': 'count'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
         # (network is null or network billing is false)
@@ -636,7 +636,7 @@ class DoctorResource(resources.ModelResource):
     fees = fields.Field()
 
     def get_queryset(self):
-        return Doctor.objects.all().prefetch_related('hospitals', 'doctorspecializations', 'qualifications',
+        return Doctor.objects.all().prefetch_related('hospitals', 'doctorpracticespecializations', 'qualifications',
                                                      'doctor_clinics__hospital',
                                                      'doctor_clinics__availability',
                                                      'documents')
@@ -659,7 +659,7 @@ class DoctorResource(resources.ModelResource):
         return ','.join([str(h.city) for h in doctor.hospitals.distinct('city')])
 
     def dehydrate_specialization(self, doctor):
-        return ','.join([str(h.specialization.name) for h in doctor.doctorspecializations.all()])
+        return ','.join([str(h.specialization.name) for h in doctor.doctorpracticespecializations.all()])
 
     def dehydrate_qualification(self, doctor):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
@@ -770,7 +770,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
-        'data_status', 'onboarding_status', 'is_insurance_enabled', 'doctorspecializations__specialization',
+        'data_status', 'onboarding_status', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [
@@ -778,7 +778,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         CompetitorHitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
-        DoctorSpecializationInline,
+        # DoctorSpecializationInline,
         DoctorPracticeSpecializationInline,
         DoctorQualificationInline,
         # DoctorHospitalInline,
