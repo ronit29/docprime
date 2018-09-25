@@ -788,7 +788,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         locality = sublocality + ' ' + locality
 
             if validated_data.get('specialization_ids'):
-                specialization_name_obj = PracticeSpecialization.objects.filter(
+                specialization_name_obj = models.PracticeSpecialization.objects.filter(
                     id__in=validated_data.get('specialization_ids', [])).values(
                     'name')
                 specialization_list = []

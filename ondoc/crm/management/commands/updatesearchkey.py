@@ -12,11 +12,11 @@ class Command(BaseCommand):
             sp.save()
         for mc in MedicalCondition.objects.all():
             mc.save()
-        for hospital in Hospital.objects.all():
-            hospital.save()
-        for doctor in Doctor.objects.all():
-            doctor.save()
-        for lab in Lab.objects.all():
-            lab.save()
+        # for hospital in Hospital.objects.all():
+        #     hospital.save()
+        # for doctor in Doctor.objects.all():
+        #     doctor.save()
+        # for lab in Lab.objects.all():
+        #     lab.save()
         for lab_test in LabTest.objects.all():
             lab_test.save()
