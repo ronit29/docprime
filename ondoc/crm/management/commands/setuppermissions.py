@@ -17,7 +17,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization,
                                  MedicalCondition, PracticeSpecialization, SpecializationDepartment, SpecializationField,
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
-                                 SpecializationDepartmentMapping, DoctorProcedure, DoctorClinicProcedure, Procedure)
+                                 SpecializationDepartmentMapping, DoctorClinicProcedure, Procedure)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
