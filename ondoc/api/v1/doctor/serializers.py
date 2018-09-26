@@ -1,12 +1,13 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q
-from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming, DoctorAssociation,
+from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
+                                 DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
-                                 CommonMedicalCondition,CommonSpecialization, DoctorSpecialization,
-                                 GeneralSpecialization)
+                                 CommonMedicalCondition,CommonSpecialization, 
+                                 DoctorPracticeSpecialization, DoctorClinic)
 from ondoc.authentication.models import UserProfile
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -20,6 +21,8 @@ import json
 import logging
 from dateutil import tz
 from django.conf import settings
+
+from ondoc.location.models import EntityUrls, EntityAddress
 
 logger = logging.getLogger(__name__)
 
@@ -300,7 +303,7 @@ class DoctorLanguageSerializer(serializers.ModelSerializer):
 class DoctorHospitalSerializer(serializers.ModelSerializer):
     doctor = serializers.ReadOnlyField(source='doctor_clinic.doctor.name')
     hospital_name = serializers.ReadOnlyField(source='doctor_clinic.hospital.name')
-    address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_address')
+    address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_hos_address')
     short_address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_short_address')
     hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     hospital_thumbnail = serializers.SerializerMethodField()
@@ -387,25 +390,18 @@ class MedicalServiceSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'description')
 
 
-class GeneralSpecializationSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = GeneralSpecialization
-        fields = ('name', )
-
-
-class DoctorSpecializationSerializer(serializers.ModelSerializer):
+class DoctorPracticeSpecializationSerializer(serializers.ModelSerializer):
     name = serializers.CharField(read_only=True, source='specialization.name')
 
     class Meta:
-        model = DoctorSpecialization
+        model = DoctorPracticeSpecialization
         fields = ('name', )
 
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
     images = DoctorImageSerializer(read_only=True, many=True)
     qualifications = DoctorQualificationSerializer(read_only=True, many=True)
-    general_specialization = DoctorSpecializationSerializer(read_only=True, many=True, source='doctorspecializations')
+    general_specialization = DoctorPracticeSpecializationSerializer(read_only=True, many=True, source='doctorpracticespecializations')
     languages = DoctorLanguageSerializer(read_only=True, many=True)
     availability = serializers.SerializerMethodField(read_only=True)
     emails = DoctorEmailSerializer(read_only=True, many=True)
@@ -417,8 +413,6 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     display_name = serializers.ReadOnlyField(source='get_display_name')
     thumbnail = serializers.SerializerMethodField()
 
-    # def get_general_specialization(self, obj):
-    #     return DoctorSpecializationSerializer(obj.doctorspecializations.all(), many=True).data
 
     def get_availability(self, obj):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj).select_related("doctor_clinic__doctor",
@@ -459,20 +453,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
     address = serializers.SerializerMethodField()
 
     def get_address(self, obj):
-        address = ''
-        if obj.building:
-            address += str(obj.building)
-        if obj.locality:
-            address += str(obj.locality) + ' , '
-        if obj.sublocality:
-            address += str(obj.sublocality) + ' , '
-        if obj.city:
-            address += str(obj.city) + ' , '
-        if obj.state:
-            address += str(obj.state) + ' , '
-        if obj.country:
-            address += str(obj.country)
-        return address
+        return obj.get_hos_address() if obj.get_hos_address() else None
 
     def get_lat(self, obj):
         loc = obj.location
@@ -611,6 +592,7 @@ class DoctorListSerializer(serializers.Serializer):
     search_id = serializers.IntegerField(required=False, allow_null=True)
     doctor_name = serializers.CharField(required=False)
     hospital_name = serializers.CharField(required=False)
+    max_distance = serializers.IntegerField(required=False, allow_null=True)
 
     def validate_specialization_id(self, value):
         request = self.context.get("request")
@@ -634,6 +616,54 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     hospitals = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
     availability = None
+    seo = serializers.SerializerMethodField()
+
+    def get_seo(self, obj):
+        if self.parent:
+            return None
+
+        doctor_specializations = DoctorPracticeSpecialization.objects.filter(doctor=obj).all()
+        specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
+        clinic = DoctorClinic.objects.filter(doctor=obj).all()
+        clinics = [clinic_hospital for clinic_hospital in clinic]
+        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+                                                entity_type__iexact='Doctor')
+        sublocality = ''
+        locality = ''
+        if entity.exists():
+            location_id = entity.first().additional_info.get('location_id')
+            type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
+            if type.first().get('type') == 'LOCALITY':
+                locality = type.first().get('value')
+
+            if type.first().get('type') == 'SUBLOCALITY':
+                sublocality = type.first().get('value')
+                parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
+                locality = ' ' + parent.first().get('value')
+
+        title = obj.name
+        description = obj.name + ': ' + obj.name
+        doc_spec_list = []
+
+        for name in specializations:
+            doc_spec_list.append(str(name))
+        if len(doc_spec_list)>=1:
+            title +=  ' - '+', '.join(doc_spec_list)
+            description += ' is ' + ', '.join(doc_spec_list)
+        if not (sublocality == '') or not (locality == ''):
+            title += ' in ' + sublocality + " " + locality + ' - Consult Online'
+            description += ' in ' + sublocality + " " + locality
+        else:
+            title += ' - Consult Online'
+
+        hospital = []
+        for hospital_name in clinics:
+            hospital.append(str(hospital_name.hospital))
+        if len(hospital) >= 1:
+            description += ' consulting patients at '+', '.join(hospital)
+
+        description += '. Book appointments online, check fees, address and more.'
+        return {'title': title, "description": description}
 
     def get_hospitals(self, obj):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
@@ -647,8 +677,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'thumbnail', 'license', 'is_live')
-
+                  'general_specialization', 'thumbnail', 'license', 'is_live','seo')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
@@ -659,7 +688,7 @@ class DoctorAvailabilityTimingSerializer(serializers.Serializer):
 class DoctorTimeSlotSerializer(serializers.Serializer):
     images = DoctorImageSerializer(read_only=True, many=True)
     qualifications = DoctorQualificationSerializer(read_only=True, many=True)
-    general_specialization = DoctorSpecializationSerializer(read_only=True, many=True, source='doctorspecializations')
+    general_specialization = DoctorPracticeSpecializationSerializer(read_only=True, many=True, source='doctorpracticespecializations')
 
     class Meta:
         model = Doctor
@@ -695,7 +724,6 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',)
-
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):

@@ -4,6 +4,8 @@ from django.conf import settings
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.common.models import Cities
 from ondoc.matrix.tasks import push_signup_lead_to_matrix
+import json
+from django.contrib.postgres.fields import JSONField
 import hashlib
 
 class OnlineLead(TimeStampedModel):
@@ -20,6 +22,7 @@ class OnlineLead(TimeStampedModel):
     city_name = models.ForeignKey(Cities, on_delete=models.SET_NULL, null=True)
     email = models.EmailField(blank=False)
     matrix_lead_id = models.IntegerField(null=True)
+    utm_params = JSONField(blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -33,7 +36,7 @@ class OnlineLead(TimeStampedModel):
 
         if push_to_matrix:
             product_id = 0
-            if self.member_type == 1:
+            if self.member_type == 1 or self.member_type == 3:
                 product_id = 1
             elif self.member_type == 2:
                 product_id = 4
@@ -99,6 +102,11 @@ class TinyUrl(TimeStampedModel):
 
     class Meta:
         db_table = 'tiny_url'
+
+
+class TinyUrlHits(TimeStampedModel):
+    tiny_url = models.ForeignKey(TinyUrl, blank=True, null=True, on_delete=models.SET_NULL)
+    ip_address = models.CharField(max_length=500, blank=True, null=True)
 
 
 class UploadImage(TimeStampedModel):

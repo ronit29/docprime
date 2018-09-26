@@ -12,7 +12,7 @@ class AboutDoctorForm(forms.ModelForm):
 
 
 class ReadOnlySpecializationInline(nested_admin.NestedTabularInline):
-    model = doctor_model.DoctorSpecialization
+    model = doctor_model.DoctorPracticeSpecialization
     can_delete = False
     readonly_fields = ['doctor', 'specialization']
 

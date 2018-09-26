@@ -3,6 +3,8 @@ from rest_framework import mixins, viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
+
+from ondoc.articles.models import ArticleCategory
 from . import serializers
 from ondoc.api.pagination import paginate_queryset
 
@@ -31,7 +33,8 @@ class TopArticleCategoryViewSet(viewsets.GenericViewSet):
             resp = serializers.ArticleListSerializer(article_list, many=True,
                                                      context={'request': request}).data
             category_serialized = serializers.ArticleCategoryListSerializer(category, context={'request': request}).data
-            response.append({'articles': resp, 'name': category_serialized['name'], 'url': category_serialized['url']})
+            response.append({'articles': resp, 'name': category_serialized['name'], 'url': category_serialized['url'],
+                             'title': category_serialized['title'], 'description': category_serialized['description']})
         return Response(response)
 
 
@@ -55,7 +58,19 @@ class ArticleViewSet(viewsets.GenericViewSet):
         article_data = paginate_queryset(article_data, request, 10)
         resp = serializers.ArticleListSerializer(article_data, many=True,
                                                  context={'request': request}).data
-        return Response(resp)
+        title = ''
+        description = ''
+        title_description = ArticleCategory.objects.filter(url=category_url).values('title', 'description')
+        if title_description.exists():
+            title = title_description.first().get('title')
+            description = title_description.first().get('description')
+
+        category_seo = {
+            "title": title,
+            "description": description
+        }
+
+        return Response({'result': resp, 'category_seo': category_seo})
 
     def retrieve(self, request):
         serializer = serializers.ArticlePreviewSerializer(data=request.query_params)

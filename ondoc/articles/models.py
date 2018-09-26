@@ -8,6 +8,8 @@ class ArticleCategory(TimeStampedModel):
     name = models.CharField(blank=False, null=False, max_length=500)
     identifier = models.CharField(max_length=48, blank=False, null=True)
     url = models.CharField(blank=False, null=True, max_length=500, unique=True)
+    title = models.CharField(max_length=500, null=True, blank=True)
+    description = models.CharField(max_length=200000, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -32,8 +34,10 @@ class Article(TimeStampedModel, CreatedByModel):
     is_published = models.BooleanField(default=False, verbose_name='Published')
     description = models.CharField(max_length=500, blank=True, null=True)
     keywords = models.CharField(max_length=256, blank=True, null=True)
-    author_name = models.CharField(max_length=256, null=True, blank=False)
+    author_name = models.CharField(max_length=256, null=True, blank=True)
     published_date = models.DateField(default=datetime.date.today)
+    linked_articles = models.ManyToManyField('self', symmetrical=False, through='LinkedArticle',
+                                             through_fields=('article', 'linked_article'))
 
     def icon_tag(self):
         if self.icon:
@@ -41,7 +45,7 @@ class Article(TimeStampedModel, CreatedByModel):
         return ""
 
     def save(self, *args, **kwargs):
-        self.published_date = datetime.date.today()
+        self.published_date = self.published_date if self.published_date else datetime.date.today()
         if hasattr(self, 'url'):
             self.url = self.url.strip('/').lower()
         super().save(*args, **kwargs)
@@ -68,3 +72,28 @@ class ArticleImage(TimeStampedModel, CreatedByModel):
 
     class Meta:
         db_table = "article_image"
+
+
+class ArticleLinkedUrl(TimeStampedModel):
+    article = models.ForeignKey(Article, on_delete=models.CASCADE)
+    url = models.CharField(max_length=2000, unique=True)
+    title = models.CharField(max_length=500)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        db_table = 'article_linked_urls'
+
+
+class LinkedArticle(TimeStampedModel):
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_articles')
+    linked_article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_article')
+    title = models.CharField(max_length=500, null=True, blank=False)
+
+    def __str__(self):
+        return "{}-{}".format(self.article.title, self.linked_article.title)
+
+    class Meta:
+        db_table = 'linked_articles'
+        unique_together = (('article', 'linked_article'),)

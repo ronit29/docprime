@@ -39,7 +39,7 @@ def refund_status_update(self):
                                 code = d.get("code")
                 except:
                     pass
-                if resp_data.get("ok") and str(resp_data["ok"]) == SUCCESS_OK_STATUS and code is not None and code != PgTransaction.REFUND_FAILURE_STATUS:
+                if resp_data.get("ok") and str(resp_data["ok"]) == SUCCESS_OK_STATUS and code is not None and code != PgTransaction.REFUND_UPDATE_FAILURE_STATUS:
                     with transaction.atomic():
                         obj = ConsumerRefund.objects.select_for_update().get(id=ref_id)
                         if obj.refund_state != ConsumerRefund.COMPLETED:
@@ -52,11 +52,7 @@ def refund_status_update(self):
 
 @task(bind=True, max_retries=6)
 def refund_curl_task(self, req_data):
-    from .models import ConsumerRefund
-    SUCCESS_OK_STATUS = '1'
-    FAILURE_OK_STATUS = '0'
-    FAILURE_STATUS = 'FAIL'
-    ALREADY_REQUESTED_STATUS = 'ALREADY_REQUESTED'
+    from .models import ConsumerRefund, PgTransaction
     if settings.AUTO_REFUND:
         print(req_data)
         try:
@@ -73,19 +69,15 @@ def refund_curl_task(self, req_data):
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 logger.error("Response content - " + str(response.content) + " with request data - " + json.dumps(req_data))
-                if resp_data.get("ok") is not None and str(resp_data["ok"]) == SUCCESS_OK_STATUS:
-                    with transaction.atomic():
-                        refund_queryset = ConsumerRefund.objects.select_for_update().filter(pk=req_data["refNo"]).first()
-                        if refund_queryset:
-                            refund_queryset.refund_state = ConsumerRefund.REQUESTED
-                            refund_queryset.save()
-                            print("Status Updated")
-                elif (resp_data.get("ok") is not None and str(resp_data["ok"]) == FAILURE_OK_STATUS and
-                      resp_data.get("status") is not None and str(resp_data["status"]) == ALREADY_REQUESTED_STATUS):
+                if resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_FAILURE_OK_STATUS:
+                    ConsumerRefund.update_refund_status_on_resp(req_data["refNo"])
+                elif (resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_FAILURE_OK_STATUS and
+                      resp_data.get("status") is not None and str(resp_data["status"]) == PgTransaction.PG_REFUND_ALREADY_REQUESTED_STATUS):
+                    ConsumerRefund.update_refund_status_on_resp(req_data["refNo"])
                     print("Already Requested")
                 elif (resp_data.get("ok") is None or
-                      (str(resp_data["ok"]) == FAILURE_OK_STATUS and
-                       (resp_data.get("status") is None or str(resp_data["status"]) == FAILURE_STATUS))):
+                      (str(resp_data["ok"]) == PgTransaction.PG_REFUND_FAILURE_OK_STATUS and
+                       (resp_data.get("status") is None or str(resp_data["status"]) == PgTransaction.PG_REFUND_FAILURE_STATUS))):
                     print("Refund Failure")
                     raise Exception("Retry on wrong response - " + str(response.content))
                 else:

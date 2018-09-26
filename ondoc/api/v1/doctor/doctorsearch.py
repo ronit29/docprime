@@ -7,6 +7,8 @@ from ondoc.doctor.models import Doctor
 from datetime import datetime
 import re
 
+from ondoc.location.models import EntityAddress
+
 
 class DoctorSearchHelper:
     MAX_DISTANCE = "20000"
@@ -86,6 +88,12 @@ class DoctorSearchHelper:
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
         longitude = str(self.query_params["longitude"])
         latitude = str(self.query_params["latitude"])
+        max_distance = str(
+            self.query_params.get('max_distance') * 1000 if self.query_params.get(
+                'max_distance') and self.query_params.get(
+                'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+        # max_distance = 10000000000000000000000
+
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
@@ -98,14 +106,16 @@ class DoctorSearchHelper:
                        "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
                        "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
                        "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
-                       "LEFT JOIN doctor_specialization ds on ds.doctor_id = d.id " \
-                       "LEFT JOIN general_specialization gs on ds.specialization_id = gs.id " \
+                       "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
+                       "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
                        "WHERE d.is_live=true and %s " \
+                       "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) < %s " \
                        "ORDER  BY %s ) x " \
-                       "where distance < %s and %s" % (longitude, latitude,
-                                                       longitude, latitude,
-                                                       filtering_params, order_by_field,
-                                                       DoctorSearchHelper.MAX_DISTANCE, rank_by)
+                       "where %s" % (longitude, latitude,
+                                     longitude, latitude,
+                                     filtering_params,
+                                     longitude, latitude,max_distance,
+                                     order_by_field, rank_by)
         return query_string
 
     def count_hospitals(self, doctor):
@@ -116,7 +126,7 @@ class DoctorSearchHelper:
                                 srid=4326)
         for hospital in doctor.hospitals.all():
             if hospital.id == doctor_clinic_mapping[doctor.id]:
-                return current_location.distance(hospital.location)*100*1000
+                return current_location.distance(hospital.location)*100
         return ""
 
     def get_doctor_fees(self, doctor_clinic, doctor_availability_mapping):
@@ -168,7 +178,9 @@ class DoctorSearchHelper:
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False)
                 }]
+
             thumbnail = doctor.get_thumbnail()
+
             temp = {
                 "doctor_id": doctor.id,
                 "hospital_count": self.count_hospitals(doctor),
@@ -184,8 +196,9 @@ class DoctorSearchHelper:
                 "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(),
                                                                             many=True).data,
-                "general_specialization": serializers.DoctorSpecializationSerializer(doctor.doctorspecializations.all(),
-                                                                                     many=True).data,
+                "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
+                    doctor.doctorpracticespecializations.all(),
+                    many=True).data,
                 "distance": self.get_distance(doctor, doctor_clinic_mapping),
                 "name": doctor.name,
                 "display_name": doctor.get_display_name(),
@@ -194,7 +207,7 @@ class DoctorSearchHelper:
                                                             context={"request": request}).data,
                 "hospitals": hospitals,
                 "thumbnail": (
-                    request.build_absolute_uri(thumbnail) if thumbnail else None)
+                    request.build_absolute_uri(thumbnail) if thumbnail else None),
             }
             response.append(temp)
         return response

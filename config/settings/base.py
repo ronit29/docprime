@@ -124,10 +124,12 @@ LOCAL_APPS = (
     'ondoc.matrix',
     'ondoc.articles',
     'ondoc.reports',
+    'ondoc.location',
     'ondoc.common',
     'ondoc.tracking',
     'ondoc.seo',
     'ondoc.ratings_review',
+    'ondoc.geoip',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -281,6 +283,7 @@ CONSUMER_APP_DOMAIN = env('CONSUMER_APP_DOMAIN')
 PROVIDER_APP_DOMAIN = env('PROVIDER_APP_DOMAIN')
 
 API_BASE_URL = env('API_BASE_URL')
+REVERSE_GEOCODING_API_KEY= env('REVERSE_GEOCODING_API_KEY')
 MATRIX_API_URL= env('MATRIX_API_URL')
 MATRIX_API_TOKEN = env('MATRIX_API_TOKEN')
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
@@ -299,6 +302,12 @@ AUTO_CANCEL_OPD_DELAY = 3000  # In min
 AUTO_CANCEL_LAB_DELAY = 30  # In min
 OPS_EMAIL_ID = env.list('OPS_EMAIL_ID')
 AUTO_REFUND = env.bool('AUTO_REFUND')
+HARD_CODED_OTP = '357237'
+MAX_DIST_USER = 50  # In KM
+MAXMIND_ACCOUNT_ID = env('MAXMIND_ACCOUNT_ID')
+MAXMIND_LICENSE_KEY = env('MAXMIND_LICENSE_KEY')
+MAXMIND_CITY_API_URL = env('MAXMIND_CITY_API_URL')
+OTP_BYPASS_NUMBERS = env.list('OTP_BYPASS_NUMBERS')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
@@ -328,3 +337,4 @@ SEND_THROUGH_NODEJS_ENABLED = env.bool('SEND_THROUGH_NODEJS_ENABLED', default=Fa
 #
 #DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'
 #DJANGO_TABLES2_TEMPLATE = 'django_tables2/bootstrap.html'
+DATA_UPLOAD_MAX_NUMBER_FIELDS=10000

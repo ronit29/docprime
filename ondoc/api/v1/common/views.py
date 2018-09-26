@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from django.contrib.gis.geos import Point
 from django.conf import settings
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
 from ondoc.diagnostic.models import Lab
@@ -69,6 +70,8 @@ class ServicesViewSet(viewsets.GenericViewSet):
     def generate_pdf_template(self, request):
         from ondoc.api.v1.utils import generate_short_url
         context = {key: value for key, value in request.data.items()}
+        if context.get('_updatedAt'):
+            context['updated_at'] = parse_datetime(context.get('_updatedAt'))
         content = render_to_string("email/chat_prescription/body.html", context=context)
         pdf_file = HTML(string=content).write_pdf()
         random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
@@ -83,6 +86,8 @@ class ServicesViewSet(viewsets.GenericViewSet):
 
     def send_email(self, request):
         context = {key: value for key, value in request.data.items()}
+        if context.get('_updatedAt'):
+            context['updated_at'] = parse_datetime(context.get('_updatedAt'))
         serializer = serializers.EmailServiceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         to = serializer.validated_data.get('to')
@@ -184,7 +189,7 @@ class UpdateXlsViewSet():
 
         results = Doctor.objects.all()
         results = (Doctor.objects.filter(
-                doctorspecializations__specialization__in=specialty_id
+            doctorpracticespecializations__specialization__in=specialty_id
             ) if len(specialty_id)>0 else Doctor.objects.all())
 
         search_count = results.filter(
@@ -283,7 +288,7 @@ class UpdateXlsViewSet1():
 
         if report_type == 'doctor':
             results = (Doctor.objects.filter(
-                doctorspecializations__specialization__in=specialization_ids
+                doctorpracticespecializations__specialization__in=specialization_ids
             ) if specialization_ids else Doctor.objects.all())
             search_count = results.filter(
                 hospitals__location__distance_lte=(Point(longitude, latitude), max_distance),
