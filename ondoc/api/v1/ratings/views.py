@@ -1,40 +1,38 @@
-from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonDiagnosticCondition, CommonTest)
+from ondoc.diagnostic import models as lab_models
 from ondoc.ratings_review.models import (RatingsReview)
 from ondoc.authentication.models import UserProfile, Address, User
-from ondoc.doctor.models import (Doctor)
-from rest_framework.viewsets import GenericViewSet
+from ondoc.doctor import models as doc_models
 from rest_framework.response import Response
-import json
-from django.http import JsonResponse
 from rest_framework import viewsets, mixins
+from ondoc.authentication.backends import JWTAuthentication
+from rest_framework.permissions import IsAuthenticated
+from ondoc.api.v1.utils import IsConsumer
+from .serializers import RatingBodySerializer
 
 
 class SubmitRatingViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsConsumer)
 
     def create(self, request):
-        user_id = request.data.get('user')
-        user_details = User.objects.get(id=user_id)
-        rating = request.data.get('rating')
-        review = request.data.get('review')
-        profile = request.data.get('profile')
-        concern_id = request.data.get('concern_id')
-        resp={}
-        if profile:
-            try:
-                if profile=='Doctor':
-                    content_data = Doctor.objects.get(pk=concern_id)
-                    rating_review = RatingsReview(user=user_details, ratings=rating, review=review,
-                                                  content_object=content_data)
-                    rating_review.save()
-                else:
-                    content_data = Lab.objects.get(pk=concern_id)
-                    rating_review = RatingsReview(user=user_details, ratings=rating, review=review,
-                                                  content_object=content_data)
-                    rating_review.save()
-                    resp['success'] = "Rating have been processed successfully!!"
-            except Exception:
-                resp['error'] = "Error Processing Rating Data!"
+        serializer = RatingBodySerializer(data= request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
 
-        response = JsonResponse(resp)
-        return response
+        resp={}
+        try:
+            if valid_data.get('appointment_type') == RatingsReview.OPD:
+                content_data = doc_models.OpdAppointment.objects.filter(id=valid_data.get('apoointment_id')).first()
+            else:
+                content_data = lab_models.LabAppointment.objects.filter(id=valid_data.get('apoointment_id')).first()
+            if content_data:
+                rating_review = RatingsReview(user=request.user, ratings=valid_data.get('rating'),
+                                              appointment_type=valid_data.get('appointment_type'),
+                                              appointment_id=valid_data.get('appointment_id'),
+                                              review=valid_data.get('review'),
+                                              content_object=content_data)
+                rating_review.save()
+                resp['ratings'] = "Rating have been processed successfully!!"
+        except Exception as e:
+            resp['error'] = e
+        return Response(resp)
