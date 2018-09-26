@@ -2,6 +2,9 @@ from django.contrib.gis.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import logging
+
+from django.contrib.gis.measure import D
+
 from .service import get_meta_by_latlong
 import logging
 logger = logging.getLogger(__name__)
@@ -9,8 +12,9 @@ import json
 from decimal import Decimal
 from ondoc.doctor import models as doc_models
 from ondoc.authentication.models import TimeStampedModel
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import Point, GEOSGeometry
 from django.template.defaultfilters import slugify
+# from ondoc.diagnostic.models import Lab
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -143,6 +147,7 @@ class EntityUrls(TimeStampedModel):
     extras = models.TextField(default=json.dumps({}))
     entity_id = models.PositiveIntegerField(null=True, default=None)
     is_valid = models.BooleanField(default=True)
+    count = models.IntegerField(max_length=30, null=True)
 
     @property
     def additional_info(self):
@@ -209,9 +214,11 @@ class EntityUrls(TimeStampedModel):
     @classmethod
     def create_lab_search_urls(cls):
         try:
+
             locations_set = EntityAddress.objects.filter \
                 (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
             for location in locations_set:
+                count = 0
                 location_json = {}
                 if location.type == 'LOCALITY':
                     url = "labs-in-{locality}-lbcit".format(locality=location.value)
@@ -220,6 +227,8 @@ class EntityUrls(TimeStampedModel):
                     location_json['locality_value'] = location.value
                     location_json['locality_latitude'] = location.centroid.y if location.centroid is not None and hasattr(location.centroid, 'y') else 0.0
                     location_json['locality_longitude'] = location.centroid.x if location.centroid is not None and hasattr(location.centroid, 'x') else 0.0
+
+
                 elif location.type == 'SUBLOCALITY':
                     ea_locality = EntityAddress.objects.get(id=location.parent)
                     url = "labs-in-{sublocality}-{locality}-lblitcit".format(sublocality=location.value, locality=ea_locality.value)
@@ -232,6 +241,21 @@ class EntityUrls(TimeStampedModel):
                     location_json['locality_value'] = ea_locality.value
                     location_json['locality_latitude'] = ea_locality.centroid.y if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'y') else 0.0
                     location_json['locality_longitude'] = ea_locality.centroid.x if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'x') else 0.0
+
+                    ref_location = Point(float(location_json['sublocality_longitude']),
+                                         float(location_json['sublocality_latitude']))
+
+                    pnt = GEOSGeometry(ref_location, srid=4326)
+                    from ondoc.diagnostic.models import Lab
+                    qs = Lab.objects.filter(location__distance_lte=(pnt, 5000))
+                    if qs.exists():
+                        entity = EntityUrls.objects.filter(url=url)
+                        count = qs.count()
+                        if entity.exists():
+                            entity = entity.first()
+                            entity.count = count
+                            entity.save()
+
                 url = slugify(url)
                 url = url.lower()
                 extra = {'location_json': location_json}
