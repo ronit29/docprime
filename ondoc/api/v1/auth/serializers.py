@@ -347,7 +347,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         try:
             payload = jwt.decode(token, user_key)
         except jwt.ExpiredSignature:
-            msg = _('Token has expired.')
+            msg = ('Token has expired.')
             raise serializers.ValidationError(msg)
         except jwt.DecodeError:
             msg = ('Error decoding signature.')
