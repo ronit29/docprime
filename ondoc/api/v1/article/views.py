@@ -70,7 +70,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
             "description": description
         }
 
-        return Response({'result': resp, 'category_seo': category_seo})
+        return Response({'result': resp, 'seo': category_seo})
 
     def retrieve(self, request):
         serializer = serializers.ArticlePreviewSerializer(data=request.query_params)
