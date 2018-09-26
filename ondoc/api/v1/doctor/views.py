@@ -830,16 +830,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
                 # response[0]['seo'] = seo
 
-
         for resp in response:
             if id_url_dict.get(resp['id']):
                 resp['url'] = id_url_dict[resp['id']]
             else:
                 resp['url'] = None
-
-
-
-
 
         specializations = list(models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
