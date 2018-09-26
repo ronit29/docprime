@@ -11,6 +11,7 @@ from ondoc.doctor import models as doc_models
 from ondoc.authentication.models import TimeStampedModel
 from django.contrib.gis.geos import Point
 from django.template.defaultfilters import slugify
+import datetime
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -151,6 +152,7 @@ class EntityUrls(TimeStampedModel):
     @classmethod
     def create_doctor_search_urls(cls):
         try:
+            current_timestamp = datetime.datetime.now()
             specializations = doc_models.PracticeSpecialization.objects.all()
             locations_set = EntityAddress.objects.filter\
                 (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
@@ -184,7 +186,12 @@ class EntityUrls(TimeStampedModel):
                     extra = {'specialization': specialization.name, 'specialization_id': specialization.id,
                              'location_json': location_json}
 
-                    if not cls.objects.filter(url=url).exists():
+                    url_qs = cls.objects.filter(url=url)
+                    if url_qs.exists():
+                        url_obj = url_qs.first()
+                        url_obj.extras = json.dumps(extra)
+                        url_obj.save()
+                    else:
                         entity_url_obj = cls(url=url, entity_type='Doctor',
                                              url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
                         entity_url_obj.save()
@@ -194,12 +201,22 @@ class EntityUrls(TimeStampedModel):
                 if doctor_in_city_url:
                     doctor_in_city_url = slugify(doctor_in_city_url)
                     extra = {'location_id': location.id, 'location_json': location_json}
-                    if not cls.objects.filter(url=doctor_in_city_url).exists():
+                    url_qs = cls.objects.filter(url=doctor_in_city_url)
+                    if url_qs.exists():
+                        url_obj = url_qs.first()
+                        url_obj.extras = json.dumps(extra)
+                        url_obj.save()
+                    else:
                         entity_url_obj = cls(url=doctor_in_city_url,
                                              entity_type='Doctor',
                                              url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
                         entity_url_obj.save()
                         print(doctor_in_city_url)
+
+            undesirable_urls_qs = cls.objects.filter(updated_at__lte=current_timestamp, url_type=cls.UrlType.SEARCHURL,
+                                                     entity_type='Doctor')
+            if undesirable_urls_qs.exists():
+                undesirable_urls_qs.delete()
 
             return True
         except Exception as e:
@@ -209,6 +226,7 @@ class EntityUrls(TimeStampedModel):
     @classmethod
     def create_lab_search_urls(cls):
         try:
+            current_timestamp = datetime.datetime.now()
             locations_set = EntityAddress.objects.filter \
                 (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
             for location in locations_set:
@@ -235,11 +253,21 @@ class EntityUrls(TimeStampedModel):
                 url = slugify(url)
                 url = url.lower()
                 extra = {'location_json': location_json}
-                if not cls.objects.filter(url=url).exists():
+                url_qs = cls.objects.filter(url=url)
+                if url_qs.exists():
+                    url_obj = url_qs.first()
+                    url_obj.extras = json.dumps(extra)
+                    url_obj.save()
+                else:
                     entity_url_obj = cls(url=url, entity_type='Lab',
                                          url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
                     entity_url_obj.save()
                     print(url)
+
+            undesirable_urls_qs = cls.objects.filter(updated_at__lte=current_timestamp, url_type=cls.UrlType.SEARCHURL,
+                                                     entity_type='Lab')
+            if undesirable_urls_qs.exists():
+                undesirable_urls_qs.delete()
             return True
         except Exception as e:
             print(str(e))
