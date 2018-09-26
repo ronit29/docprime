@@ -62,8 +62,8 @@ class ArticleViewSet(viewsets.GenericViewSet):
         description = ''
         title_description = ArticleCategory.objects.filter(url=category_url).values('title', 'description')
         if title_description.exists():
-            title = title_description.first().get('title')
-            description = title_description.first().get('description')
+            title = title_description.first().get('title', '')
+            description = title_description.first().get('description', '')
 
         category_seo = {
             "title": title,
