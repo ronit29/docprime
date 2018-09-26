@@ -3,7 +3,7 @@ from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
-from ondoc.doctor.models import Doctor, GeneralSpecialization
+from ondoc.doctor.models import Doctor
 from datetime import datetime
 import re
 
@@ -106,8 +106,8 @@ class DoctorSearchHelper:
                        "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
                        "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
                        "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
-                       "LEFT JOIN doctor_specialization ds on ds.doctor_id = d.id " \
-                       "LEFT JOIN general_specialization gs on ds.specialization_id = gs.id " \
+                       "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
+                       "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
                        "WHERE d.is_live=true and %s " \
                        "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) < %s " \
                        "ORDER  BY %s ) x " \
@@ -196,8 +196,9 @@ class DoctorSearchHelper:
                 "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
                 "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(),
                                                                             many=True).data,
-                "general_specialization": serializers.DoctorSpecializationSerializer(doctor.doctorspecializations.all(),
-                                                                                     many=True).data,
+                "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
+                    doctor.doctorpracticespecializations.all(),
+                    many=True).data,
                 "distance": self.get_distance(doctor, doctor_clinic_mapping),
                 "name": doctor.name,
                 "display_name": doctor.get_display_name(),

@@ -2,9 +2,10 @@
 from django.contrib.gis import admin
 
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
-                                 HospitalNetwork, DoctorOnboardingToken, OpdAppointment, GeneralSpecialization,
+                                 HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
-                                 DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo, Procedure)
+                                 DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
+                                 SpecializationDepartment, SpecializationField, PracticeSpecialization, Procedure)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter)
@@ -14,9 +15,9 @@ from ondoc.notification import models as notifcation_model
 from .common import Cities, CitiesAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
-                     CollegeAdmin, GeneralSpecializationAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
+                     CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
                      DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
-                     CompetitorInfoImportAdmin, ProcedureAdmin)
+                     SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,CompetitorInfoImportAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -64,7 +65,6 @@ admin.site.register(MedicalService, MedicalServiceAdmin)
 admin.site.register(CommonMedicalCondition)
 admin.site.register(CommonSpecialization, CommonSpecializationAdmin)
 admin.site.register(Specialization, SpecializationAdmin)
-admin.site.register(GeneralSpecialization, GeneralSpecializationAdmin)
 admin.site.register(MedicalCondition, MedicalConditionAdmin)
 admin.site.register(HealthTip, HealthTipAdmin)
 
@@ -91,8 +91,10 @@ admin.site.register(notifcation_model.AppNotification, AppNotificationAdmin)
 admin.site.register(OpdAppointment, DoctorOpdAppointmentAdmin)
 admin.site.register(report_models.Report)
 admin.site.register(report_models.GeneratedReport, ReportAdmin)
-
+admin.site.register(SpecializationField, SpecializationFieldAdmin)
+admin.site.register(SpecializationDepartment, SpecializationDepartmentAdmin)
+admin.site.register(PracticeSpecialization, PracticeSpecializationAdmin)
 admin.site.register(ConsumerAccount)
 admin.site.register(TestParameter, TestParameterAdmin)
 admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
-admin.site.register(Procedure, ProcedureAdmin)
+#admin.site.register(Procedure, ProcedureAdmin)

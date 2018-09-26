@@ -52,7 +52,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                         if related_entity_url_obj.entity_type.upper() == 'DOCTOR':
                             associated_doctors = obj.assoc_doctors.all()
                             for doctor in associated_doctors:
-                                if doctor.doctorspecializations.all().filter(specialization__id=extra_info_dict['specialization_id']).exists():
+                                if doctor.doctorpracticespecializations.all().filter(specialization__id=extra_info_dict['specialization_id']).exists():
                                     entities.append(doctor)
 
                 entities_list = list()
