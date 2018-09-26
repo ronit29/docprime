@@ -437,6 +437,7 @@ class DoctorQualification(auth_model.TimeStampedModel):
     class Meta:
         db_table = "doctor_qualification"
         unique_together = (("doctor", "qualification", "specialization", "college"),)
+        ordering = ('created_at', )
 
 
 class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
