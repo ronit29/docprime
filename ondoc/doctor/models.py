@@ -43,6 +43,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.ratings_review import models as ratings_models
 
 logger = logging.getLogger(__name__)
 
@@ -326,6 +327,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
+    rating = GenericRelation(ratings_models.RatingsReview)
 
     def __str__(self):
         return self.name
