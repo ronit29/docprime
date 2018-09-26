@@ -775,7 +775,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
-        'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorspecializations__specialization',
+        'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [
