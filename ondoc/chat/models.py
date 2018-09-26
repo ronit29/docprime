@@ -13,7 +13,7 @@ class ChatMedicalCondition(TimeStampedModel):
 
 
 class ChatPrescription(TimeStampedModel):
-    name = models.CharField(max_length=16, unique=True)
+    name = models.CharField(max_length=100, unique=True)
     file = models.FileField(upload_to='chat/prescription', blank=False, null=False)
 
     class Meta:
