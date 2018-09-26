@@ -3,7 +3,7 @@ from django.db import migrations, transaction
 from django.db.models import Count, Sum, When, Case, Q, F
 from django.contrib.postgres.operations import CreateExtension
 from django.contrib.staticfiles.templatetags.staticfiles import static
-from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.fields import JSONField, ArrayField
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.exceptions import NON_FIELD_ERRORS
@@ -180,6 +180,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         address_items = [value for value in
                          [self.sublocality, self.locality] if value]
         return ", ".join(address_items)
+
 
     def save(self, *args, **kwargs):
         build_url = True
@@ -1114,6 +1115,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
     def generate_invoice(self):
         pass
 
+
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
             return self.hospital.network, payout_model.Outstanding.HOSPITAL_NETWORK_LEVEL
@@ -1130,6 +1132,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                                                         action=ConsumerTransaction.SALE).
                        order_by("created_at").last())
         return consumer_tx.amount
+
 
     def is_doctor_available(self):
         if DoctorLeave.objects.filter(start_date__lte=self.time_slot_start.date(),
@@ -1177,7 +1180,9 @@ class OpdAppointment(auth_model.TimeStampedModel):
         #     logger.error("Error in auto cancel flow - " + str(e))
         print('all ops tasks completed')
 
+
     def save(self, *args, **kwargs):
+        logger.error("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
@@ -1369,7 +1374,7 @@ class PrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
 class MedicalCondition(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=100, verbose_name="Name")
     specialization = models.ManyToManyField(
-        GeneralSpecialization,
+        'PracticeSpecialization',
         through='MedicalConditionSpecialization',
         through_fields=('medical_condition', 'specialization'),
     )
@@ -1383,7 +1388,8 @@ class MedicalCondition(auth_model.TimeStampedModel, SearchKey):
 
 class MedicalConditionSpecialization(auth_model.TimeStampedModel):
     medical_condition = models.ForeignKey(MedicalCondition, on_delete=models.CASCADE)
-    specialization = models.ForeignKey(GeneralSpecialization, on_delete=models.CASCADE)
+    specialization = models.ForeignKey('PracticeSpecialization', on_delete=models.CASCADE, null=True,
+                                       blank=True)
 
     def __str__(self):
         return self.medical_condition.name + " " + self.specialization.name
@@ -1419,7 +1425,8 @@ class CommonMedicalCondition(auth_model.TimeStampedModel):
 
 
 class CommonSpecialization(auth_model.TimeStampedModel):
-    specialization = models.OneToOneField(GeneralSpecialization, related_name="common_specialization", on_delete=models.CASCADE)
+    specialization = models.OneToOneField('PracticeSpecialization', related_name="common_specialization", on_delete=models.CASCADE,
+                                          null=True, blank=True)
     icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
     priority = models.PositiveIntegerField(default=0)
 
@@ -1473,6 +1480,61 @@ class CompetitorInfo(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class SpecializationDepartment(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200, unique=True)
+
+    class Meta:
+        db_table = 'specialization_department'
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+
+class SpecializationField(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200, unique=True)
+
+    class Meta:
+        db_table = 'specialization_field'
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+
+class SpecializationDepartmentMapping(auth_model.TimeStampedModel):
+    specialization = models.ForeignKey('PracticeSpecialization', on_delete=models.DO_NOTHING)
+    department = models.ForeignKey(SpecializationDepartment, on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'specialization_department_mapping'
+
+
+class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
+    name = models.CharField(max_length=200, unique=True)
+    department = models.ManyToManyField(SpecializationDepartment, through=SpecializationDepartmentMapping,
+                                        through_fields=('specialization', 'department'),
+                                        related_name='departments')
+    specialization_field = models.ForeignKey(SpecializationField, on_delete=models.DO_NOTHING)
+    general_specialization_ids = ArrayField(models.IntegerField(blank=True, null=True), size=100,
+                                            null=True, blank=True)
+
+    class Meta:
+        db_table = 'practice_specialization'
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+
+class DoctorPracticeSpecialization(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, related_name="doctorpracticespecializations", on_delete=models.CASCADE)
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False)
+
+    def __str__(self):
+        return "{}-{}".format(self.doctor.name, self.specialization.name)
+
+    class Meta:
+        db_table = "doctor_practice_specialization"
+        unique_together = ("doctor", "specialization")
+
 class CompetitorMonthlyVisit(models.Model):
     NAME_TYPE_CHOICES = CompetitorInfo.NAME_TYPE_CHOICES
     doctor = models.ForeignKey(Doctor, related_name="competitor_doctor_hits", on_delete=models.CASCADE)
@@ -1484,17 +1546,25 @@ class CompetitorMonthlyVisit(models.Model):
         unique_together = ('doctor', 'name')
 
 
-class DoctorProcedure(auth_model.TimeStampedModel):
-    name = models.CharField(max_length=500)
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE)
-    hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True)
-    mrp = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    listing_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+class Procedure(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=500, unique=True)
     details = models.CharField(max_length=2000)
     duration = models.IntegerField()
 
-    class Meta:
-        db_table = "doctor_procedure"
-        unique_together = ('name', 'doctor', 'hospital')
+    def __str__(self):
+        return self.name
 
+    class Meta:
+        db_table = "procedure"
+
+
+class DoctorClinicProcedure(auth_model.TimeStampedModel):
+    procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE)
+    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE)
+    mrp = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    listing_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        db_table = "doctor_clinic_procedure"
+        unique_together = ('procedure', 'doctor_clinic')

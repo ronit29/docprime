@@ -189,7 +189,7 @@ class UpdateXlsViewSet():
 
         results = Doctor.objects.all()
         results = (Doctor.objects.filter(
-                doctorspecializations__specialization__in=specialty_id
+            doctorpracticespecializations__specialization__in=specialty_id
             ) if len(specialty_id)>0 else Doctor.objects.all())
 
         search_count = results.filter(
@@ -288,7 +288,7 @@ class UpdateXlsViewSet1():
 
         if report_type == 'doctor':
             results = (Doctor.objects.filter(
-                doctorspecializations__specialization__in=specialization_ids
+                doctorpracticespecializations__specialization__in=specialization_ids
             ) if specialization_ids else Doctor.objects.all())
             search_count = results.filter(
                 hospitals__location__distance_lte=(Point(longitude, latitude), max_distance),

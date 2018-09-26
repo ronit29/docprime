@@ -6,6 +6,7 @@ from django.conf.urls import url
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.db.models import Q
+from import_export.fields import Field
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin
 from import_export import fields, resources
 from django.utils.dateparse import parse_datetime
@@ -30,10 +31,12 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
                                  DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
-                                 DoctorEmail, College, DoctorSpecialization, GeneralSpecialization,
+                                 DoctorEmail, College, 
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
-                                 OpdAppointment, CompetitorInfo, CompetitorMonthlyVisit, DoctorProcedure)
+                                 OpdAppointment, CompetitorInfo, SpecializationDepartment,
+                                 SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
+                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -131,7 +134,17 @@ class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
                 if t not in temp:
                     temp.add(t)
                 else:
-                    raise forms.ValidationError("Duplicacy in the record not allowed")
+                    raise forms.ValidationError("Duplicate records not allowed.")
+
+
+class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
+    model = DoctorClinicProcedure
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    verbose_name = 'Procedure'
+    verbose_name_plural = 'Procedures'
+    autocomplete_fields = ['procedure']
 
 
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
@@ -151,7 +164,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     formset = DoctorClinicFormSet
     show_change_link = False
     autocomplete_fields = ['hospital']
-    inlines = [DoctorClinicTimingInline]
+    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline]
 
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
@@ -455,7 +468,7 @@ class DoctorForm(FormCleanMixin):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
                        'raw_about': 'req', 'license': 'req', 'mobiles': 'count', 'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
-                       'doctorspecializations': 'count'}
+                       'doctorpracticespecializations': 'count'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
         # (network is null or network billing is false)
@@ -508,8 +521,8 @@ class CreatedByFilter(SimpleListFilter):
         return queryset
 
 
-class DoctorSpecializationInline(nested_admin.NestedTabularInline):
-    model = DoctorSpecialization
+class DoctorPracticeSpecializationInline(nested_admin.NestedTabularInline):
+    model = DoctorPracticeSpecialization
     extra = 0
     can_delete = True
     show_change_link = False
@@ -623,7 +636,7 @@ class DoctorResource(resources.ModelResource):
     fees = fields.Field()
 
     def get_queryset(self):
-        return Doctor.objects.all().prefetch_related('hospitals', 'doctorspecializations', 'qualifications',
+        return Doctor.objects.all().prefetch_related('hospitals', 'doctorpracticespecializations', 'qualifications',
                                                      'doctor_clinics__hospital',
                                                      'doctor_clinics__availability',
                                                      'documents')
@@ -646,7 +659,7 @@ class DoctorResource(resources.ModelResource):
         return ','.join([str(h.city) for h in doctor.hospitals.distinct('city')])
 
     def dehydrate_specialization(self, doctor):
-        return ','.join([str(h.specialization.name) for h in doctor.doctorspecializations.all()])
+        return ','.join([str(h.specialization.name) for h in doctor.doctorpracticespecializations.all()])
 
     def dehydrate_qualification(self, doctor):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
@@ -752,16 +765,6 @@ class CompetitorMonthlyVisitsInline(nested_admin.NestedTabularInline):
     verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
-class ProcedureInline(nested_admin.NestedTabularInline):
-    model = DoctorProcedure
-    extra = 0
-    can_delete = True
-    show_change_link = False
-    verbose_name = 'Procedure'
-    verbose_name_plural = 'Procedures'
-    autocomplete_fields = ['hospital']
-
-
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -772,7 +775,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
-        'data_status', 'onboarding_status', 'is_insurance_enabled', 'doctorspecializations__specialization',
+        'data_status', 'onboarding_status', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [
@@ -780,8 +783,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         CompetitorMonthlyVisitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
-        ProcedureInline,
-        DoctorSpecializationInline,
+        #ProcedureInline,
+        DoctorPracticeSpecializationInline,
         DoctorQualificationInline,
         # DoctorHospitalInline,
         DoctorClinicInline,
@@ -1047,6 +1050,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         resp = super().change_view(request, object_id, form_url, extra_context=None)
         return resp
 
+
     def get_profile(self, obj):
         if not obj.profile_detail:
             return ''
@@ -1258,21 +1262,9 @@ class QualificationResource(resources.ModelResource):
         fields = ('id', 'name')
 
 
-class GeneralSpecializationResource(resources.ModelResource):
-    class Meta:
-        model = GeneralSpecialization
-        fields = ('id', 'name')
-
-
 class SpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
     resource_class = SpecializationResource
-    change_list_template = 'superuser_import_export.html'
-
-
-class GeneralSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
-    search_fields = ['name']
-    resource_class = GeneralSpecializationResource
     change_list_template = 'superuser_import_export.html'
 
 
@@ -1353,3 +1345,110 @@ class DoctorMappingAdmin(VersionAdmin):
 
 class CommonSpecializationAdmin(VersionAdmin):
     autocomplete_fields = ['specialization']
+
+
+class SpecializationDepartmentResource(resources.ModelResource):
+
+    def skip_row(self, instance, original):
+        if SpecializationDepartment.objects.filter(name=instance.name).exists():
+            return True
+        super().skip_row(instance, original)
+
+    class Meta:
+        model = SpecializationDepartment
+        fields = ('id', 'name')
+
+
+class SpecializationFieldResource(resources.ModelResource):
+
+    def skip_row(self, instance, original):
+        if SpecializationField.objects.filter(name=instance.name).exists():
+            return True
+        super().skip_row(instance, original)
+
+    class Meta:
+        model = SpecializationField
+        fields = ('id', 'name')
+
+
+class PracticeSpecializationResource(resources.ModelResource):
+    name = Field(attribute='name', column_name='modified_name')
+    field_medicine = Field(column_name='field_medicine')
+    department = Field(column_name='department')
+    general_specialization_id = Field(column_name='general_specialization_id')
+
+    class Meta:
+        model = PracticeSpecialization
+        fields = ('id', 'name')
+
+    def skip_row(self, instance, original):
+        database_instance = PracticeSpecialization.objects.filter(name=instance.name).first()
+        if database_instance:
+            if not PracticeSpecialization.objects.filter(
+                    general_specialization_ids__contains=[instance._general_specialization_id]).exists():
+                if database_instance.general_specialization_ids:
+                    database_instance.general_specialization_ids.append(instance._general_specialization_id)
+                else:
+                    database_instance.general_specialization_ids = [instance._general_specialization_id]
+            if not database_instance.specialization_field:
+                database_instance.specialization_field = instance.specialization_field
+            database_instance.save()
+            if not instance._department:
+                return True
+            SpecializationDepartmentMapping.objects.get_or_create(specialization=database_instance,
+                                                                  department=instance._department)
+            return True
+        return False
+
+    def get_or_init_instance(self, instance_loader, row):
+        instance, created = super().get_or_init_instance(instance_loader, row)
+        specialization_field, is_field_created = SpecializationField.objects.get_or_create(
+            name=row.get('field_medicine')) if row.get('field_medicine') else (None, False)
+        _department, is_dept_created = SpecializationDepartment.objects.get_or_create(
+            name=row.get('department')) if row.get('department') else (None, False)
+        _general_specialization_id = int(row.get('general_specialization_id'))
+        instance._department = _department
+        instance._general_specialization_id = _general_specialization_id
+        instance.specialization_field = specialization_field
+        return instance, created
+
+    def after_save_instance(self, instance, using_transactions, dry_run):
+        if instance.general_specialization_ids:
+            instance.general_specialization_ids.append(instance._general_specialization_id)
+        else:
+            instance.general_specialization_ids = [instance._general_specialization_id]
+        instance.save()
+        if instance._department:
+            SpecializationDepartmentMapping.objects.get_or_create(specialization=instance,
+                                                                  department=instance._department)
+        super().after_save_instance(instance, using_transactions, dry_run)
+
+
+class SpecializationDepartmentAdmin(ImportExportMixin, VersionAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name', )
+    date_hierarchy = 'created_at'
+    resource_class = SpecializationDepartmentResource
+
+
+class SpecializationFieldAdmin(ImportExportMixin, VersionAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name', )
+    date_hierarchy = 'created_at'
+    resource_class = SpecializationFieldResource
+
+
+class PracticeSpecializationDepartmentMappingInline(admin.TabularInline):
+    model = SpecializationDepartmentMapping
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
+class PracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name', )
+    date_hierarchy = 'created_at'
+    inlines = [PracticeSpecializationDepartmentMappingInline, ]
+    resource_class = PracticeSpecializationResource
+    search_fields = ['name', ]

@@ -7,12 +7,13 @@ from django.contrib.gis.db.models.functions import Distance
 
 
 def map_hospital_locations():
-    all_hospitals = Hospital.objects.filter(is_live=True).all().annotate(distance=Distance('location', Point(float(77.0694707),float(28.4502948), srid=4326))).order_by('distance')[:50]
+    all_hospitals = Hospital.objects.filter(is_live=True).all().annotate(distance=Distance('location', Point(float(77.0694707),float(28.4502948), srid=4326))).order_by('distance')[:5000]
     print("Attempting for hospital. ", len(all_hospitals))
     for hospital in all_hospitals:
-        success = EntityLocationRelationship.create(latitude=hospital.location.y, longitude=hospital.location.x, content_object=hospital)
-        if not success:
-            print("Failed for id", hospital.id)
+        if hospital.location:
+            success = EntityLocationRelationship.create(latitude=hospital.location.y, longitude=hospital.location.x, content_object=hospital)
+            if not success:
+                print("Failed for id", hospital.id)
 
 
 class Command(BaseCommand):

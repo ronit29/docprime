@@ -1,7 +1,6 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
-from ondoc.doctor.models import GeneralSpecialization
 from ondoc.notification.models import EmailNotification
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
@@ -463,7 +462,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'doctor_clinics__hospital',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
-                                    'doctorspecializations__specialization'
+                                    'doctorpracticespecializations__specialization'
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
@@ -689,7 +688,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions,
                                                                        many=True, context={'request': request})
 
-        specializations = models.GeneralSpecialization.objects.filter(
+        specializations = models.PracticeSpecialization.objects.filter(
             Q(search_key__icontains=name) |
             Q(search_key__icontains=' ' + name) |
             Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
@@ -757,7 +756,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         doctor_data = models.Doctor.objects.filter(
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
                                                 "doctor_clinics__hospital",
-                                                "doctorspecializations", "doctorspecializations__specialization",
+                                                "doctorpracticespecializations", "doctorpracticespecializations__specialization",
                                                 "experiences", "images", "qualifications",
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college").order_by(preserved)
@@ -789,7 +788,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         locality = sublocality + ' ' + locality
 
             if validated_data.get('specialization_ids'):
-                specialization_name_obj = GeneralSpecialization.objects.filter(
+                specialization_name_obj = models.PracticeSpecialization.objects.filter(
                     id__in=validated_data.get('specialization_ids', [])).values(
                     'name')
                 specialization_list = []
@@ -836,7 +835,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             else:
                 resp['url'] = None
 
-        specializations = list(models.GeneralSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+        specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
+
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
                          "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo})
