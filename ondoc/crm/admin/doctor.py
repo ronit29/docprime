@@ -775,7 +775,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
-        'data_status', 'onboarding_status', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
+        'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorspecializations__specialization',
         CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [
@@ -1049,7 +1049,6 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def change_view(self, request, object_id, form_url='', extra_context=None):        
         resp = super().change_view(request, object_id, form_url, extra_context=None)
         return resp
-
 
     def get_profile(self, obj):
         if not obj.profile_detail:
