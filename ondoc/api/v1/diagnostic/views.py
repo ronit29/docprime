@@ -126,7 +126,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 kwargs['parameters'] = get_lab_search_details(extras, request.query_params)
                 response = self.list(request, **kwargs)
                 return response
-        return Response({})
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
     def retrieve_by_url(self, request):
 
@@ -152,8 +153,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             entity_id = entity.entity_id
             response = self.retrieve(request, entity_id)
             return response
-
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
     def list(self, request, **kwargs):
         parameters = request.query_params

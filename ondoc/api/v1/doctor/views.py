@@ -726,8 +726,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 kwargs['parameters'] = doctor_query_parameters(extras, request.query_params)
                 response = self.list(request, **kwargs)
                 return response
-
-        return Response({})
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
     def list(self, request, *args, **kwargs):
         parameters = request.query_params
