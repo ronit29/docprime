@@ -635,8 +635,19 @@ class DoctorResource(resources.ModelResource):
     aadhar = fields.Field()
     fees = fields.Field()
 
+    # def export(self, queryset=None, *args, **kwargs):
+    #     queryset = self.get_queryset()
+    #     return super().export(queryset, *args, **kwargs)
+
+    def export(self, queryset=None):
+        queryset = self.get_queryset()
+        fetched_queryset = list(queryset)
+        return super().export(fetched_queryset)
+
     def get_queryset(self):
         return Doctor.objects.all().prefetch_related('hospitals', 'doctorpracticespecializations', 'qualifications',
+                                                     'doctorpracticespecializations__specialization',
+                                                     'qualifications__qualification',
                                                      'doctor_clinics__hospital',
                                                      'doctor_clinics__availability',
                                                      'documents')
@@ -656,7 +667,7 @@ class DoctorResource(resources.ModelResource):
         return dict(Doctor.ONBOARDING_STATUS)[doctor.onboarding_status]
 
     def dehydrate_city(self, doctor):
-        return ','.join([str(h.city) for h in doctor.hospitals.distinct('city')])
+        return ','.join({str(h.city) for h in doctor.hospitals.all()})
 
     def dehydrate_specialization(self, doctor):
         return ','.join([str(h.specialization.name) for h in doctor.doctorpracticespecializations.all()])
@@ -665,7 +676,9 @@ class DoctorResource(resources.ModelResource):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
     def dehydrate_fees(self, doctor):
-        return ', '.join([str(h.hospital.name + '-Rs.' + (str(h.availability.first().fees) if h.availability.first() else '')) for h in doctor.doctor_clinics.all()])
+        return ', '.join(
+            [str(h.hospital.name + '-Rs.' + (str(h.availability.all()[0].fees) if h.availability.all() else '')) for h
+             in doctor.doctor_clinics.all()])
 
     def dehydrate_gst(self, doctor):
 
@@ -801,6 +814,16 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
                'onboarded_at', 'qc_approved_at']
     search_fields = ['name']
+
+    # def get_export_queryset(self, request):
+    #     return super(DoctorAdmin, self).get_export_queryset(request).prefetch_related('hospitals',
+    #                                                                                   'doctorpracticespecializations',
+    #                                                                                   'qualifications',
+    #                                                                                   'doctorpracticespecializations__specialization',
+    #                                                                                   'qualifications__qualification',
+    #                                                                                   'doctor_clinics__hospital',
+    #                                                                                   'doctor_clinics__availability',
+    #                                                                                   'documents')
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live']
