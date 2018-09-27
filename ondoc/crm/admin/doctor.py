@@ -910,13 +910,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
     def save_formset(self, request, form, formset, change):
         for form in formset.forms:
-            try:
-                form.instance._meta.get_field('created_by')
-                if not form.instance.created_by:
-                    form.instance.created_by = request.user
-            except FieldDoesNotExist as e:
-                logger.error(str(e))
-
+            if hasattr(form.instance, 'created_by'):
+                form.instance.created_by = request.user
         formset.save()
 
     def save_related(self, request, form, formsets, change):
