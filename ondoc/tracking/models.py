@@ -59,4 +59,4 @@ class TrackingEvent(auth_models.TimeStampedModel):
 class ServerHitMonitor(auth_models.TimeStampedModel):
 
     url = models.TextField(null=True)
-    refferar = models.CharField(max_length=255, default=None)
+    refferar = models.CharField(max_length=255, default=None, null=True)
