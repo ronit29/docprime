@@ -286,11 +286,11 @@ class LabDocumentFormSet(forms.BaseInlineFormSet):
             if not key==LabDocument.ADDRESS and value>1:
                 raise forms.ValidationError("Only one "+choices[key]+" is allowed")
 
-        if not self.instance.network or not self.instance.network.is_billing_enabled:
-            if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
-                for key, value in count.items():
-                    if not key==LabDocument.GST and value<1:
-                        raise forms.ValidationError(choices[key]+" is required")
+        # if not self.instance.network or not self.instance.network.is_billing_enabled:
+        #     if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
+        #         for key, value in count.items():
+        #             if not key==LabDocument.GST and value<1:
+        #                 raise forms.ValidationError(choices[key]+" is required")
 
 
 class LabDocumentInline(admin.TabularInline):
@@ -367,11 +367,11 @@ class LabForm(FormCleanMixin):
         if self.instance.network and self.instance.network.data_status != QCModel.QC_APPROVED:
             raise forms.ValidationError("Lab Network is not QC approved.")
 
-        if not self.instance.network or not self.instance.network.is_billing_enabled:
-            qc_required.update({
-                'lab_documents': 'count'
-            })
-        for key,value in qc_required.items():
+        # if not self.instance.network or not self.instance.network.is_billing_enabled:
+        #     qc_required.update({
+        #         'lab_documents': 'count'
+        #     })
+        for key, value in qc_required.items():
             if value=='req' and not self.cleaned_data[key]:
                 raise forms.ValidationError(key+" is required for Quality Check")
             if value=='count' and int(self.data[key+'-TOTAL_FORMS'])<=0:
