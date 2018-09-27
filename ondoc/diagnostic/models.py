@@ -831,8 +831,10 @@ class LabAppointment(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
+
         try:
-            if self.status == self.COMPLETED and (not database_instance or database_instance.status != self.status):
+            if (self.payment_type != OpdAppointment.INSURANCE and self.status == self.COMPLETED and
+                    (not database_instance or database_instance.status != self.status) and not self.outstanding):
                 out_obj = self.outstanding_create()
                 self.outstanding = out_obj
         except:
@@ -922,9 +924,9 @@ class LabAppointment(TimeStampedModel):
         self.status = self.COMPLETED
         out_obj = None
         if self.payment_type != OpdAppointment.INSURANCE:
-            out_obj = self.outstanding_create()
-        if out_obj:
-            self.outstanding = out_obj
+            if not self.outstanding:
+                out_obj = self.outstanding_create()
+                self.outstanding = out_obj
         self.save()
 
     def outstanding_create(self):

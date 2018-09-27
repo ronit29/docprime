@@ -933,11 +933,15 @@ class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, IsDoctor)
 
+    @transaction.atomic
     def complete(self, request):
         serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         lab_appointment = validated_data.get('lab_appointment')
+
+        lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
+
         if lab_appointment.lab.manageable_lab_admins.filter(user=request.user,
                                                             is_disabled=False,
                                                             write_permission=True).exists() or \
@@ -958,12 +962,16 @@ class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
 
 class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
 
+    @transaction.atomic
     def complete(self, request):
         resp = {}
         serializer = diagnostic_serializer.AppointmentCompleteBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         lab_appointment = validated_data.get('lab_appointment')
+
+        lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
+
         if lab_appointment:
             lab_appointment.action_completed()
             # lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,

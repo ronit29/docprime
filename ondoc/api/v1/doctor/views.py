@@ -153,7 +153,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('id'))
+
+        # opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('id'))
+        opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('id')).first()
+        if not opd_appointment:
+            return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
+
         permission_queryset = (auth_models.GenericAdmin.objects.filter(doctor=opd_appointment.doctor.id).
                                filter(hospital=opd_appointment.hospital_id))
         if permission_queryset:
@@ -893,12 +898,17 @@ class ConfigView(viewsets.GenericViewSet):
 
 class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
 
+    @transaction.atomic
     def complete(self, request):
         resp = {}
         serializer = serializers.OpdAppointmentCompleteTempSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('opd_appointment'))
+        # opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('opd_appointment'))
+        opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('id')).first()
+        if not opd_appointment:
+            return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
+
         if opd_appointment:
             opd_appointment.action_completed()
 
