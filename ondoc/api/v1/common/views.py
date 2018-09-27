@@ -22,6 +22,7 @@ import random
 import string
 import base64
 import logging
+import datetime
 from django.db.models import Count
 
 logger = logging.getLogger(__name__)
@@ -75,7 +76,12 @@ class ServicesViewSet(viewsets.GenericViewSet):
         content = render_to_string("email/chat_prescription/body.html", context=context)
         pdf_file = HTML(string=content).write_pdf()
         random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
-        name = random_string + '.pdf'
+        patient_profile = context.get('profile')
+        patient_name = ''
+        if patient_profile:
+            patient_name = patient_profile.get('name', '')
+        name = 'dp_{}_{}_{}.pdf'.format('_'.join(patient_name.lower().split()), datetime.datetime.now().date(), random_string)
+        # name = random_string + '.pdf'
         file = SimpleUploadedFile(name, pdf_file, content_type='application/pdf')
         chat = ChatPrescription.objects.create(name=name, file=file)
         prescription_url = "{}{}{}".format(settings.BASE_URL,
