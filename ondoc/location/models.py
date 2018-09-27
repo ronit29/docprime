@@ -3,8 +3,6 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import logging
 
-from django.contrib.gis.measure import D
-
 from .service import get_meta_by_latlong
 import logging
 logger = logging.getLogger(__name__)
@@ -14,7 +12,7 @@ from ondoc.doctor import models as doc_models
 from ondoc.authentication.models import TimeStampedModel
 from django.contrib.gis.geos import Point, GEOSGeometry
 from django.template.defaultfilters import slugify
-# from ondoc.diagnostic.models import Lab
+import datetime
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -141,13 +139,13 @@ class EntityUrls(TimeStampedModel):
         PAGEURL = 'PAGEURL'
         SEARCHURL = 'SEARCHURL'
 
-    url = models.CharField(blank=False, null=True, max_length=500, unique=True)
+    url = models.CharField(blank=False, null=True, max_length=500, unique=True, db_index=True)
     url_type = models.CharField(max_length=24, choices=UrlType.as_choices(), null=True)
     entity_type = models.CharField(max_length=24, null=True)
     extras = models.TextField(default=json.dumps({}))
     entity_id = models.PositiveIntegerField(null=True, default=None)
     is_valid = models.BooleanField(default=True)
-    count = models.IntegerField(max_length=30, null=True)
+    count = models.IntegerField(max_length=30, null=True, default=0)
 
     @property
     def additional_info(self):
@@ -155,25 +153,30 @@ class EntityUrls(TimeStampedModel):
 
     @classmethod
     def create_doctor_search_urls(cls):
+        from ondoc.doctor.models import DoctorPracticeSpecialization, DoctorClinic
         try:
+            current_timestamp = datetime.datetime.now()
             specializations = doc_models.PracticeSpecialization.objects.all()
             locations_set = EntityAddress.objects.filter\
                 (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
             for location in locations_set:
                 for specialization in specializations:
                     location_json = {}
+                    count = 0
                     if location.type == 'LOCALITY':
                         url = "{prefix}-in-{locality}-sptcit".format(prefix=specialization.name, locality=location.value)
-
                         # Storing the locality data for fallback cases.
                         location_json['locality_id'] = location.id
                         location_json['locality_value'] = location.value
                         location_json['locality_latitude'] = location.centroid.y if location.centroid is not None and hasattr(location.centroid, 'y') else 0.0
                         location_json['locality_longitude'] = location.centroid.x if location.centroid is not None and hasattr(location.centroid, 'x') else 0.0
+                        ref_location = Point(float(location_json['locality_longitude']),
+                                             float(location_json['locality_latitude']))
+                        distance = 15000
+
                     elif location.type == 'SUBLOCALITY':
                         ea_locality = EntityAddress.objects.get(id=location.parent)
                         url = "{prefix}-in-{sublocality}-{locality}-sptlitcit".format(prefix=specialization.name, sublocality=location.value, locality=ea_locality.value)
-
                         # storing the sublocality and locality data for fallback cases.
                         location_json['sublocality_id'] = location.id
                         location_json['sublocality_value'] = location.value
@@ -183,28 +186,69 @@ class EntityUrls(TimeStampedModel):
                         location_json['locality_value'] = ea_locality.value
                         location_json['locality_latitude'] = ea_locality.centroid.y if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'y') else 0.0
                         location_json['locality_longitude'] = ea_locality.centroid.x if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'x') else 0.0
-                    url = slugify(url)
+                        ref_location = Point(float(location_json['sublocality_longitude']),
+                                             float(location_json['sublocality_latitude']))
+                        distance = 5000
 
+                    url = slugify(url)
                     url = url.lower()
                     extra = {'specialization': specialization.name, 'specialization_id': specialization.id,
                              'location_json': location_json}
 
-                    if not cls.objects.filter(url=url).exists():
+                    pnt = GEOSGeometry(ref_location, srid=4326)
+
+                    doctors_in_range = DoctorClinic.objects.filter(
+                        hospital__location__distance_lte=(pnt, distance)).values('doctor')
+
+                    for doctor in doctors_in_range:
+                        doc_spec = DoctorPracticeSpecialization.objects.filter(specialization=specialization, doctor=doctor.get('doctor'))
+                        if doc_spec.exists():
+                            count += 1
+
+                    url_qs = cls.objects.filter(url=url)
+                    if url_qs.exists():
+                        url_obj = url_qs.first()
+                        url_obj.extras = json.dumps(extra)
+                        url_obj.count = count
+                        url_obj.save()
+                    else:
                         entity_url_obj = cls(url=url, entity_type='Doctor',
-                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count)
                         entity_url_obj.save()
                         print(url)
 
-                doctor_in_city_url = "doctors-in-{location}-sptcit".format(location=location.value)
+                if location.type == 'LOCALITY':
+                    doctor_in_city_url = "doctors-in-{location}-sptcit".format(location=location.value)
+                else:
+                    ea_locality = EntityAddress.objects.get(id=location.parent)
+                    doctor_in_city_url = "doctors-in-{sublocality}-{locality}-sptlitcit".\
+                        format(sublocality=location.value, locality=ea_locality.value)
+
+                count = 0
                 if doctor_in_city_url:
+                    if doctors_in_range.exists():
+                        count = doctors_in_range.count()
+
                     doctor_in_city_url = slugify(doctor_in_city_url)
                     extra = {'location_id': location.id, 'location_json': location_json}
-                    if not cls.objects.filter(url=doctor_in_city_url).exists():
+
+                    url_qs = cls.objects.filter(url=doctor_in_city_url)
+                    if url_qs.exists():
+                        url_obj = url_qs.first()
+                        url_obj.extras = json.dumps(extra)
+                        url_obj.count = count
+                        url_obj.save()
+                    else:
                         entity_url_obj = cls(url=doctor_in_city_url,
                                              entity_type='Doctor',
-                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count)
                         entity_url_obj.save()
                         print(doctor_in_city_url)
+
+            undesirable_urls_qs = cls.objects.filter(updated_at__lte=current_timestamp, url_type=cls.UrlType.SEARCHURL,
+                                                     entity_type='Doctor')
+            if undesirable_urls_qs.exists():
+                undesirable_urls_qs.delete()
 
             return True
         except Exception as e:
@@ -214,7 +258,7 @@ class EntityUrls(TimeStampedModel):
     @classmethod
     def create_lab_search_urls(cls):
         try:
-
+            current_timestamp = datetime.datetime.now()
             locations_set = EntityAddress.objects.filter \
                 (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
             for location in locations_set:
@@ -227,9 +271,11 @@ class EntityUrls(TimeStampedModel):
                     location_json['locality_value'] = location.value
                     location_json['locality_latitude'] = location.centroid.y if location.centroid is not None and hasattr(location.centroid, 'y') else 0.0
                     location_json['locality_longitude'] = location.centroid.x if location.centroid is not None and hasattr(location.centroid, 'x') else 0.0
+                    ref_location = Point(float(location_json['locality_longitude']),
+                                         float(location_json['locality_latitude']))
+                    distance = 15000
 
-
-                elif location.type == 'SUBLOCALITY':
+                else:
                     ea_locality = EntityAddress.objects.get(id=location.parent)
                     url = "labs-in-{sublocality}-{locality}-lblitcit".format(sublocality=location.value, locality=ea_locality.value)
                     # storing the sublocality and locality data for fallback cases.
@@ -244,26 +290,33 @@ class EntityUrls(TimeStampedModel):
 
                     ref_location = Point(float(location_json['sublocality_longitude']),
                                          float(location_json['sublocality_latitude']))
-
-                    pnt = GEOSGeometry(ref_location, srid=4326)
-                    from ondoc.diagnostic.models import Lab
-                    qs = Lab.objects.filter(location__distance_lte=(pnt, 5000))
-                    if qs.exists():
-                        entity = EntityUrls.objects.filter(url=url)
-                        count = qs.count()
-                        if entity.exists():
-                            entity = entity.first()
-                            entity.count = count
-                            entity.save()
+                    distance = 5000
 
                 url = slugify(url)
                 url = url.lower()
                 extra = {'location_json': location_json}
-                if not cls.objects.filter(url=url).exists():
+
+                pnt = GEOSGeometry(ref_location, srid=4326)
+                from ondoc.diagnostic.models import Lab
+                qs = Lab.objects.filter(location__distance_lte=(pnt, distance))
+                count = qs.count()
+
+                url_qs = cls.objects.filter(url=url)
+                if url_qs.exists():
+                    url_obj = url_qs.first()
+                    url_obj.extras = json.dumps(extra)
+                    url_obj.count = count
+                    url_obj.save()
+                else:
                     entity_url_obj = cls(url=url, entity_type='Lab',
-                                         url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra))
+                                         url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count)
                     entity_url_obj.save()
                     print(url)
+
+            undesirable_urls_qs = cls.objects.filter(updated_at__lte=current_timestamp, url_type=cls.UrlType.SEARCHURL,
+                                                     entity_type='Lab')
+            if undesirable_urls_qs.exists():
+                undesirable_urls_qs.delete()
             return True
         except Exception as e:
             print(str(e))

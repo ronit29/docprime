@@ -31,12 +31,12 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
                                  DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
-                                 DoctorEmail, College, 
+                                 DoctorEmail, College,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
-                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure)
+                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -775,7 +775,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
-        'data_status', 'onboarding_status', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
+        'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorspecializations__specialization',
         CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [
@@ -1049,7 +1049,6 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def change_view(self, request, object_id, form_url='', extra_context=None):        
         resp = super().change_view(request, object_id, form_url, extra_context=None)
         return resp
-
 
     def get_profile(self, obj):
         if not obj.profile_detail:
@@ -1445,10 +1444,15 @@ class PracticeSpecializationDepartmentMappingInline(admin.TabularInline):
     show_change_link = False
 
 
-class PracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
+class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', )
     date_hierarchy = 'created_at'
     inlines = [PracticeSpecializationDepartmentMappingInline, ]
     resource_class = PracticeSpecializationResource
     search_fields = ['name', ]
+
+
+class ProcedureAdmin(AutoComplete, VersionAdmin):
+    model = Procedure
+    search_fields = ['name']
