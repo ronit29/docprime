@@ -22,7 +22,7 @@ class EventCreateViewSet(GenericViewSet):
         visitor_id, visit_id = self.get_visit(request)
         resp = {}
         data = request.data
-        del data['visitor_info']
+        data.pop('visitor_info', None)
         if data and isinstance(data, dict):
             event_name = data.get('event')
             if event_name:
