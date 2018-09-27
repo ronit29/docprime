@@ -8,6 +8,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from ondoc.api.v1.utils import IsConsumer
 from .serializers import RatingBodySerializer
+from .serializers import RatingDataSerializer
 
 
 class SubmitRatingViewSet(viewsets.GenericViewSet):
@@ -32,7 +33,18 @@ class SubmitRatingViewSet(viewsets.GenericViewSet):
                                               review=valid_data.get('review'),
                                               content_object=content_data)
                 rating_review.save()
-                resp['ratings'] = "Rating have been processed successfully!!"
+                resp['success'] = "Rating have been processed successfully!!"
         except Exception as e:
             resp['error'] = e
         return Response(resp)
+
+
+class GetRatingViewSet(viewsets.GenericViewSet):
+
+    def get_ratings(self, request):
+        serializer = RatingDataSerializer.get_ratings_data(request)
+        resp={}
+        resp['ratings'] = serializer
+        return Response(resp)
+
+

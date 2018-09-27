@@ -328,6 +328,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
     rating = GenericRelation(ratings_models.RatingsReview)
+    rating_query= GenericRelation(ratings_models.RatingsReview, related_query_name='doctors')
 
     def __str__(self):
         return self.name

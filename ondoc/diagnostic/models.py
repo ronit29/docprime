@@ -195,6 +195,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     entity = GenericRelation(location_models.EntityLocationRelationship)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
     rating = GenericRelation(ratings_models.RatingsReview)
+    rating_query = GenericRelation(ratings_models.RatingsReview, related_query_name='labs')
 
     def __str__(self):
         return self.name
