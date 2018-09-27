@@ -60,3 +60,4 @@ class ServerHitMonitor(auth_models.TimeStampedModel):
 
     url = models.TextField(null=True)
     refferar = models.CharField(max_length=255, default=None, null=True)
+    ip_address = models.CharField(max_length=24, null=True, default=None)
