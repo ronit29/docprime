@@ -11,8 +11,8 @@ from .serializers import RatingBodySerializer
 
 
 class SubmitRatingViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated, IsConsumer)
+    # authentication_classes = (JWTAuthentication, )
+    # permission_classes = (IsAuthenticated, IsConsumer)
 
     def create(self, request):
         serializer = RatingBodySerializer(data= request.data)
@@ -22,9 +22,9 @@ class SubmitRatingViewSet(viewsets.GenericViewSet):
         resp={}
         try:
             if valid_data.get('appointment_type') == RatingsReview.OPD:
-                content_data = doc_models.OpdAppointment.objects.filter(id=valid_data.get('apoointment_id')).first()
+                content_data = doc_models.OpdAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
             else:
-                content_data = lab_models.LabAppointment.objects.filter(id=valid_data.get('apoointment_id')).first()
+                content_data = lab_models.LabAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
             if content_data:
                 rating_review = RatingsReview(user=request.user, ratings=valid_data.get('rating'),
                                               appointment_type=valid_data.get('appointment_type'),

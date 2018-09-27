@@ -37,6 +37,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
 from ondoc.location import models as location_models
+from ondoc.ratings_review import models as ratings_models
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +194,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     home_collection_charges = GenericRelation(HomePickupCharges)
     entity = GenericRelation(location_models.EntityLocationRelationship)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
+    rating = GenericRelation(ratings_models.RatingsReview)
 
     def __str__(self):
         return self.name
@@ -631,6 +633,8 @@ class AvailableLabTest(TimeStampedModel):
     enabled = models.BooleanField(default=False)
     lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
                                           related_name='available_lab_tests')
+    rating = GenericRelation(ratings_models.RatingsReview)
+
 
     def get_testid(self):
         return self.test.id

@@ -358,6 +358,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         #     return self.images.all()[0].name.url
         return None
 
+    def get_ratings(self):
+        self.rating.all()
+
     def update_live_status(self):
 
         if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):

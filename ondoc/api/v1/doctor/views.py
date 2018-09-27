@@ -38,6 +38,7 @@ import copy
 import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
+from ondoc.ratings_review import models as rating_models
 User = get_user_model()
 
 
@@ -836,7 +837,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 resp['url'] = None
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
-
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
                          "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo})

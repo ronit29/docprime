@@ -9,6 +9,9 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
 from ondoc.authentication.models import UserProfile
+from ondoc.ratings_review.models import RatingsReview
+from django.db.models import Avg
+from django.db.models import Q
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot
@@ -617,6 +620,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
     availability = None
     seo = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
 
     def get_seo(self, obj):
         if self.parent:
@@ -671,13 +675,17 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             "doctor_clinic__doctor", "doctor_clinic__hospital")
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
+    def get_rating(self, obj):
+        result = DoctorRatingSerializer.get_doctor_rating_summary(obj)
+        return result
+
     class Meta:
         model = Doctor
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'thumbnail', 'license', 'is_live','seo')
+                  'general_specialization', 'thumbnail', 'license', 'is_live','seo', 'rating')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
@@ -801,6 +809,22 @@ class OpdAppointmentCompleteTempSerializer(serializers.Serializer):
             if not appointment.otp == attrs['otp']:
                 raise serializers.ValidationError("Invalid OTP.")
         return attrs
+
+
+class DoctorRatingSerializer(serializers.Serializer):
+    rating = serializers.SerializerMethodField()
+
+    def get_doctor_rating_summary(self):
+        rating_row = self.rating.all()
+        review_row = self.rating.filter(review__isnull=False).all()
+        rating_count = rating_row.count()
+        review_count = review_row.count()
+        average_rating = rating_row.aggregate(Avg('ratings'))
+        average_rating = average_rating['ratings__avg']
+
+        return {'rating_count': rating_count, 'average_rating': average_rating, 'review_count': review_count}
+
+
 
 
 

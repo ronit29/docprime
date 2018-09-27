@@ -18,6 +18,9 @@ import pytz
 import random
 import logging
 import json
+from ondoc.ratings_review.models import RatingsReview
+from django.db.models import Avg
+from django.db.models import Q
 
 from ondoc.location.models import EntityUrls, EntityAddress
 
@@ -61,9 +64,19 @@ class LabModelSerializer(serializers.ModelSerializer):
     lab_thumbnail = serializers.SerializerMethodField()
     home_pickup_charges = serializers.ReadOnlyField()
     seo = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
+
+    def get_rating(self, obj):
+        rating_row = obj.rating.all()
+        review_row = obj.rating.filter(review__isnull=False).all()
+        rating_count = rating_row.count()
+        review_count = review_row.count()
+        average_rating = rating_row.aggregate(Avg('ratings'))
+        average_rating = average_rating['ratings__avg']
+
+        return {'rating_count': rating_count, 'average_rating': average_rating, 'review_count': review_count}
 
     def get_seo(self, obj):
-
         if self.parent:
             return None
         entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
@@ -111,7 +124,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo')
+                  'is_home_collection_enabled', 'seo', 'rating')
 
 
 class LabProfileSerializer(LabModelSerializer):
@@ -146,7 +159,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled', )
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled')
 
 
 class LabCustomSerializer(serializers.Serializer):
