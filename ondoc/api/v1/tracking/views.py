@@ -146,8 +146,9 @@ class ServerHitMonitor(GenericViewSet):
         if data and isinstance(data, dict):
             url = data.get('url', None)
             refferar = data.get('refferar', None)
+            ip_address = data.get('ip', None)
             if url:
-                server_hit = track_models.ServerHitMonitor(url=url, refferar=refferar)
+                server_hit = track_models.ServerHitMonitor(url=url, refferar=refferar, ip_address=ip_address)
                 server_hit.save()
                 resp['success'] = 'Server hit persisted successfully'
         else:
