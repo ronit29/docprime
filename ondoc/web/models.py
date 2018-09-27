@@ -92,7 +92,7 @@ class ContactUs(TimeStampedModel):
 class TinyUrl(TimeStampedModel):
     SHORT_URL_PREFIX = 'short'
     original_url = models.URLField(max_length=5000)
-    short_code = models.CharField(max_length=50, unique=True)
+    short_code = models.CharField(max_length=50, unique=True,db_index=True)
 
     def __str__(self):
         return "{}".format(self.id)
@@ -107,6 +107,9 @@ class TinyUrl(TimeStampedModel):
 class TinyUrlHits(TimeStampedModel):
     tiny_url = models.ForeignKey(TinyUrl, blank=True, null=True, on_delete=models.SET_NULL)
     ip_address = models.CharField(max_length=500, blank=True, null=True)
+
+    class Meta:
+        db_table = 'tiny_url_hits'
 
 
 class UploadImage(TimeStampedModel):
