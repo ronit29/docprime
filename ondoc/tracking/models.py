@@ -60,7 +60,9 @@ class ServerHitMonitor(auth_models.TimeStampedModel):
 
     url = models.TextField(null=True)
     refferar = models.CharField(max_length=5000, default=None, null=True)
-    ip_address = models.CharField(max_length=255, null=True, default=None)
+    ip_address = models.CharField(max_length=5000, null=True, default=None)
+    type = models.CharField(max_length=50, null=True, default=None)
+
 
     class Meta:
         db_table = 'server_hit_monitor'
