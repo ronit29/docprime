@@ -1,4 +1,6 @@
 from ondoc.tracking import models as track_models
+import logging
+logger = logging.getLogger(__name__)
 from rest_framework.response import Response
 from rest_framework import status
 from . import serializers
@@ -134,3 +136,22 @@ class UUIDEncoder(json.JSONEncoder):
             # if the obj is uuid, we simply return the value of uuid
             return obj.hex
         return json.JSONEncoder.default(self, obj)
+
+
+class ServerHitMonitor(GenericViewSet):
+
+    def create(self, request):
+        resp = {}
+        data = request.data
+        if data and isinstance(data, dict):
+            url = data.get('url', None)
+            refferar = data.get('refferar', None)
+            ip_address = data.get('ip', None)
+            if url:
+                server_hit = track_models.ServerHitMonitor(url=url, refferar=refferar, ip_address=ip_address)
+                server_hit.save()
+                resp['success'] = 'Server hit persisted successfully'
+        else:
+            resp['error'] = 'Invalid Data format.'
+            logger.error("Not able to persist the server hit.")
+        return Response(status=status.HTTP_201_CREATED, data=resp)

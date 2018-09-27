@@ -1,5 +1,5 @@
 from django.contrib import admin
-from ondoc.web.models import Career, OnlineLead, UploadImage
+from ondoc.web.models import Career, OnlineLead, UploadImage, TinyUrl
 from django.utils.safestring import mark_safe
 
 # Register your models here.
@@ -34,3 +34,4 @@ class UploadImageAdmin(admin.ModelAdmin):
 admin.site.register(OnlineLead, OnlineLeadAdmin)
 admin.site.register(Career, CareerAdmin)
 admin.site.register(UploadImage, UploadImageAdmin)
+admin.site.register(TinyUrl)
