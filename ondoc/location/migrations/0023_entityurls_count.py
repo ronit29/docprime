@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='entityurls',
             name='count',
-            field=models.IntegerField(max_length=30, null=True),
+            field=models.IntegerField(max_length=30, null=True, default=0),
         ),
     ]

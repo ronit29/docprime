@@ -257,6 +257,7 @@ class EntityUrls(TimeStampedModel):
 
     @classmethod
     def create_lab_search_urls(cls):
+        from ondoc.diagnostic.models import Lab
         try:
             current_timestamp = datetime.datetime.now()
             locations_set = EntityAddress.objects.filter \
@@ -297,7 +298,7 @@ class EntityUrls(TimeStampedModel):
                 extra = {'location_json': location_json}
 
                 pnt = GEOSGeometry(ref_location, srid=4326)
-                from ondoc.diagnostic.models import Lab
+
                 qs = Lab.objects.filter(location__distance_lte=(pnt, distance))
                 count = qs.count()
 
