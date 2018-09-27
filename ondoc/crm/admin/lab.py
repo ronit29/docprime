@@ -888,9 +888,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
-                    logger.error("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
+                    logger.warning("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
-                    logger.error("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
+                    logger.warning("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
             else:
                 super().save_model(request, obj, form, change)
 
