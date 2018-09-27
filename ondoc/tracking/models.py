@@ -54,3 +54,9 @@ class TrackingEvent(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = 'tracking_event'
+
+
+class ServerHitMonitor(auth_models.TimeStampedModel):
+
+    url = models.TextField(null=True)
+    refferar = models.CharField(max_length=255, default=None)
