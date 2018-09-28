@@ -790,6 +790,7 @@ class LabAppointment(TimeStampedModel):
                                                                          product=account_model.Order.LAB_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
 
+        # Do not delete below commented code
         # try:
         #     prev_app_dict = {'id': self.id,
         #                      'status': self.status,
