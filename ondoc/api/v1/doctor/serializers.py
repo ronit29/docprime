@@ -617,6 +617,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
     availability = None
     seo = serializers.SerializerMethodField()
+    breadcrumb = serializers.SerializerMethodField()
 
     def get_seo(self, obj):
         if self.parent:
@@ -665,6 +666,17 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         description += '. Book appointments online, check fees, address and more.'
         return {'title': title, "description": description}
 
+    def get_breadcrumb(self, obj):
+
+        if self.parent:
+            return None
+        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Doctor')
+        breadcrums = None
+        if entity.exists():
+            breadcrums = entity.first().additional_info.get('breadcrums')
+        return breadcrums
+
     def get_hospitals(self, obj):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__hospital__is_live=True).select_related(
@@ -677,7 +689,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'thumbnail', 'license', 'is_live','seo')
+                  'general_specialization', 'thumbnail', 'license', 'is_live','seo', 'breadcrumb')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):

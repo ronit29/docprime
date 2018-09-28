@@ -723,6 +723,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             extras = entity.first().additional_info
             if extras:
                 kwargs['extras'] = extras
+                kwargs['url'] = url
                 kwargs['parameters'] = doctor_query_parameters(extras, request.query_params)
                 response = self.list(request, **kwargs)
                 return response
@@ -738,6 +739,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         if kwargs.get('extras'):
             validated_data['extras'] = kwargs['extras']
+        if kwargs.get('url'):
+            validated_data['url'] = kwargs['url']
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
@@ -774,18 +777,26 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         title = ''
         description = ''
         seo = None
+        breadcrumb = None
+
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
         if validated_data.get('extras') or validated_data.get('specialization_ids'):
+            breadcrumb_sublocality = None
+            breadcrumb = None
             locality = ''
             sublocality = ''
             specializations = ''
             if validated_data.get('extras') and validated_data.get('extras').get('location_json'):
                 if validated_data.get('extras').get('location_json').get('locality_value'):
                     locality = validated_data.get('extras').get('location_json').get('locality_value')
+                    breadcrumb_locality = locality
                 if validated_data.get('extras').get('location_json').get('sublocality_value'):
                     sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
                     if sublocality:
+                        breadcrumb_sublocality = sublocality
                         locality = sublocality + ' ' + locality
+                if validated_data.get('extras').get('location_json').get('breadcrum_url'):
+                    breadcrumb_locality_url = validated_data.get('extras').get('location_json').get('breadcrum_url')
 
             if validated_data.get('specialization_ids'):
                 specialization_name_obj = models.PracticeSpecialization.objects.filter(
@@ -821,13 +832,22 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 description += 'in '+ locality
             description += '.'
 
+            if breadcrumb_sublocality:
+                breadcrumb =[ {
+                'name': breadcrumb_locality,
+                'url': breadcrumb_locality_url
+                },
+                 {
+                        'name': breadcrumb_sublocality,
+                        'url': validated_data.get('url')
+                    }
+                ]
+
             if title or description:
                 seo = {
                     "title": title,
                     "description": description
                 }
-
-                # response[0]['seo'] = seo
 
         for resp in response:
             if id_url_dict.get(resp['id']):
@@ -839,7 +859,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
-                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo})
+                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):

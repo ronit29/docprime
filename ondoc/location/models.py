@@ -186,6 +186,7 @@ class EntityUrls(TimeStampedModel):
                         location_json['locality_value'] = ea_locality.value
                         location_json['locality_latitude'] = ea_locality.centroid.y if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'y') else 0.0
                         location_json['locality_longitude'] = ea_locality.centroid.x if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'x') else 0.0
+                        location_json['breadcrum_url'] = slugify("{prefix}-in-{locality}-sptcit".format(prefix=specialization.name, locality=ea_locality.value))
                         ref_location = Point(float(location_json['sublocality_longitude']),
                                              float(location_json['sublocality_latitude']))
                         distance = 5000
@@ -288,7 +289,7 @@ class EntityUrls(TimeStampedModel):
                     location_json['locality_value'] = ea_locality.value
                     location_json['locality_latitude'] = ea_locality.centroid.y if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'y') else 0.0
                     location_json['locality_longitude'] = ea_locality.centroid.x if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'x') else 0.0
-
+                    location_json['breadcrum_url'] = slugify("labs-in-{locality}-lbcit".format(locality=ea_locality.value))
                     ref_location = Point(float(location_json['sublocality_longitude']),
                                          float(location_json['sublocality_latitude']))
                     distance = 5000
@@ -326,6 +327,12 @@ class EntityUrls(TimeStampedModel):
     @classmethod
     def create_page_url(cls, entity_object):
         try:
+            if entity_object.__class__.__name__.upper() == 'DOCTOR':
+                forname = 'doctors'
+                identifier = 'spt'
+            else:
+                forname = 'labs'
+                identifier = 'lb'
             entity_helper = entity_as_mapping[entity_object.__class__.__name__.upper()]
             entity_helper_obj = entity_helper()
             url_dict = entity_helper_obj.create_return_personal_urls(entity_object)
@@ -337,7 +344,26 @@ class EntityUrls(TimeStampedModel):
                     if not url:
                         return
 
-                    extra = {'related_entity_id': entity_object.id, 'location_id': page_url_dict.get('location_id')}
+                    # build urls for bread crums
+                    breadcrums = list()
+                    location_id = page_url_dict.get('location_id')
+                    address_obj = EntityAddress.objects.get(id=location_id)
+                    if address_obj.type_blueprint == EntityAddress.AllowedKeys.SUBLOCALITY:
+                        address_obj_parent = EntityAddress.objects.get(id=address_obj.parent)
+                        if address_obj_parent:
+                            bread_url = slugify('{prefix}-in-{locality}-{identifier}cit'
+                                                .format(identifier=identifier, prefix=forname,
+                                                        locality=address_obj_parent.value))
+                            breadcrums.append({'name': address_obj_parent.value, 'url': bread_url})
+
+                            bread_url = slugify('{prefix}-in-{sublocality}-{locality}-{identifier}litcit'.
+                                                format(prefix=forname, sublocality=address_obj.value,
+                                                       locality=address_obj_parent.value, identifier=identifier))
+                            breadcrums.append({'name': address_obj.value, 'url': bread_url})
+
+                    extra = {'related_entity_id': entity_object.id, 'location_id': page_url_dict.get('location_id'),
+                             'breadcrums': breadcrums}
+
                     entity_url_objs = cls.objects.filter(entity_id=entity_object.id, entity_type=entity_object.__class__.__name__, url_type='PAGEURL', is_valid=True)
                     if not entity_url_objs.exists():
                         entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,

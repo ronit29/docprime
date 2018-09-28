@@ -9,7 +9,7 @@ from django.contrib.gis.db.models.functions import Distance
 
 def calculate_centroid():
     try:
-        entity_addr_queryset = EntityAddress.objects.filter(type__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
+        entity_addr_queryset = EntityAddress.objectEntityLos.filter(type__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
         for address in entity_addr_queryset:
             point_list = list()
             entity_location_relationships_qs = address.associated_relations.filter(valid=True).values('object_id', 'content_type')

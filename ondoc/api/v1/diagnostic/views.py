@@ -123,6 +123,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             extras = entity.first().additional_info
             if extras.get('location_json'):
                 kwargs['location_json'] = extras.get('location_json')
+                kwargs['url'] = url
                 kwargs['parameters'] = get_lab_search_details(extras, request.query_params)
                 response = self.list(request, **kwargs)
                 return response
@@ -166,6 +167,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         if kwargs.get('location_json'):
             serializer.validated_data['location_json'] = kwargs['location_json']
+        if kwargs.get('url'):
+            serializer.validated_data['url'] = kwargs['url']
 
         parameters = serializer.validated_data
 
@@ -195,9 +198,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
         seo = None
+        breadcrumb = None
         if parameters.get('location_json'):
             locality = ''
             sublocality = ''
+            breadcrumb_url = None
 
             if parameters.get('location_json') and parameters.get('location_json').get('locality_value'):
                 locality = parameters.get('location_json').get('locality_value')
@@ -206,6 +211,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 sublocality = parameters.get('location_json').get('sublocality_value')
                 if sublocality:
                     sublocality += ' '
+
+            if parameters.get('location_json') and parameters.get('location_json').get('breadcrum_url'):
+                breadcrumb_locality_url = parameters.get('location_json').get('breadcrum_url')
 
             title = "Diagnostic Centres & Labs "
             if locality:
@@ -216,10 +224,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 description += " in " + sublocality + locality
             description += " and book test online, check fees, packages prices and more at DocPrime."
             seo = {'title': title, "description": description}
+            if sublocality:
+                breadcrumb = [{
+                    'name': locality,
+                     'url': breadcrumb_locality_url
+                },
+                    {
+                        'name': sublocality,
+                        'url': parameters.get('url')
+                }]
 
         return Response({"result": serializer.data,
                          "count": count,'tests':tests,
-                         "seo": seo})
+                         "seo": seo, "breadcrumb": breadcrumb})
 
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
