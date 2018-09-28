@@ -872,7 +872,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     @transaction.atomic
     def save_model(self, request, obj, form, change):
         if obj:
-            lab_app_obj = LabAppointment.objects.select_for_update().get(pk=obj.id)
+            if obj.id:
+                lab_app_obj = LabAppointment.objects.select_for_update().get(pk=obj.id)
             # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
             #
