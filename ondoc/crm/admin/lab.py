@@ -872,7 +872,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     @transaction.atomic
     def save_model(self, request, obj, form, change):
         if obj:
-            lab_app_obj = LabAppointment.objects.select_for_update().get(pk=obj.id)
+            if obj.id:
+                lab_app_obj = LabAppointment.objects.select_for_update().get(pk=obj.id)
             # date = datetime.datetime.strptime(request.POST['start_date'], '%Y-%m-%d')
             # time = datetime.datetime.strptime(request.POST['start_time'], '%H:%M').time()
             #
@@ -888,9 +889,9 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
-                    logger.error("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
+                    logger.warning("Lab Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
-                    logger.error("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
+                    logger.warning("Lab Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
             else:
                 super().save_model(request, obj, form, change)
 
