@@ -50,6 +50,7 @@ User = get_user_model()
 
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         count = request.query_params.get('count', 10)
         count = int(count)
@@ -77,6 +78,7 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
     # filter_fields = ('name',)
     search_fields = ('name',)
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         name = request.query_params.get('name')
         temp_data = dict()
@@ -112,6 +114,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
+    @transaction.non_atomic_requests
     def list_by_url(self, request, *args, **kwargs):
         url = request.GET.get('url', None)
         if not url:
@@ -129,6 +132,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+    @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
 
         url = request.GET.get('url')
@@ -156,6 +160,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+    @transaction.non_atomic_requests
     def list(self, request, **kwargs):
         parameters = request.query_params
         if kwargs.get('parameters'):
@@ -221,6 +226,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          "count": count,'tests':tests,
                          "seo": seo})
 
+    @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
         queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs__id=lab_id,
@@ -350,7 +356,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(lab_pricing_group__available_lab_tests__test_id__in=ids,
                 lab_pricing_group__available_lab_tests__enabled=True)
 
-
         if ids:
             deal_price_calculation = Case(When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
                                                then=F('lab_pricing_group__available_lab_tests__computed_deal_price')),
@@ -457,6 +462,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 Q(lab__network__manageable_lab_network_admins__user=request.user,
                   lab__network__manageable_lab_network_admins__is_disabled=False)).distinct()
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         if not queryset:
@@ -494,6 +500,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = serializers.LabAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
+    @transaction.non_atomic_requests
     def retrieve(self, request, pk=None):
         user = request.user
         queryset = self.get_queryset().filter(pk=pk).distinct()
@@ -707,6 +714,7 @@ class LabTimingListView(mixins.ListModelMixin,
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         params = request.query_params
 
@@ -741,6 +749,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
     queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs__is_live=True).all()
     serializer_class = diagnostic_serializer.AvailableLabTestSerializer
 
+    @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
         params = request.query_params
         queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True, enabled=True)
@@ -914,6 +923,7 @@ class LabReportFileViewset(mixins.CreateModelMixin,
                                                           permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
                                                           write_permission=True).exists()
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         lab_appointment = request.query_params.get("labappointment")
         if not lab_appointment:
