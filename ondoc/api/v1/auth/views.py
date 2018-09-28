@@ -62,6 +62,7 @@ User = get_user_model()
 def expire_otp(phone_number):
     OtpVerifications.objects.filter(phone_number=phone_number).update(is_expired=True)
 
+
 class LoginOTP(GenericViewSet):
 
     serializer_class = serializers.OTPSerializer
@@ -378,6 +379,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         user = self.request.user
         return OpdAppointment.objects.filter(user=user)
 
+    @transaction.non_atomic_requests
     def list(self, request):
         params = request.query_params
         doctor_serializer = self.doctor_appointment_list(request, params)
@@ -405,6 +407,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         combined_data = combined_data[:80]
         return Response(combined_data)
 
+    @transaction.non_atomic_requests
     def retrieve(self, request, pk=None):
         user = request.user
         input_serializer = serializers.AppointmentqueryRetrieveSerializer(data=request.query_params)
@@ -878,6 +881,7 @@ class UserIDViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
     pagination_class = None
 
+    @transaction.non_atomic_requests
     def retrieve(self, request):
         data = {
             "user_id": request.user.id
@@ -1062,6 +1066,7 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
+    @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
         tx_queryset = ConsumerTransaction.objects.filter(user=user)
@@ -1092,6 +1097,7 @@ class OrderHistoryViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer,)
 
+    @transaction.non_atomic_requests
     def list(self, request):
         # opd_action_data = list()
         # lab_action_data = list()
@@ -1188,6 +1194,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
+    @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
         doc_hosp_queryset = (DoctorClinic.objects.filter(doctor__is_live=True, hospital__is_live=True).annotate(
@@ -1211,6 +1218,7 @@ class UserLabViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
+    @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
         user_lab_queryset = Lab.objects.filter(Q(manageable_lab_admins__user=user,
@@ -1230,6 +1238,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
+    @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
         doc_hosp_queryset = (
@@ -1332,6 +1341,7 @@ class OrderViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated,)
 
+    @transaction.non_atomic_requests
     def retrieve(self, request, pk):
         user = request.user
         order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING, action_data__user=user.id).first()
@@ -1420,6 +1430,7 @@ class OrderDetailViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated, )
     serializer_class = serializers.OrderDetailDoctorSerializer
 
+    @transaction.non_atomic_requests
     def details(self, request, order_id):
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -1437,6 +1448,8 @@ class OrderDetailViewSet(GenericViewSet):
 
 
 class UserTokenViewSet(GenericViewSet):
+
+    @transaction.non_atomic_requests
     def details(self, request):
         token = request.query_params.get("token")
         if not token:

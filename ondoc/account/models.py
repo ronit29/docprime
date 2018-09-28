@@ -7,7 +7,7 @@ from django.db import transaction
 from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
 from django.utils import timezone
-from ondoc.api.v1.utils import refund_curl_request
+from ondoc.api.v1.utils import refund_curl_request, form_pg_refund_data
 from django.conf import settings
 from rest_framework import status
 import hashlib
@@ -278,23 +278,6 @@ class PgTransaction(TimeStampedModel):
 
         return pgtx_details
 
-    @staticmethod
-    def form_pg_refund_data(refund_objs):
-        pg_data = list()
-        for data in refund_objs:
-            if data.pg_transaction:
-                params = {
-                    "user": str(data.user.id),
-                    "orderNo": str(data.pg_transaction.order_no),
-                    "orderId": str(data.pg_transaction.order_id),
-                    "refundAmount": str(data.refund_amount),
-                    "refNo": str(data.id),
-                }
-                secret_key = settings.PG_SECRET_KEY_REFUND
-                client_key = settings.PG_CLIENT_KEY_REFUND
-                params["checkSum"] = PgTransaction.create_pg_hash(params, secret_key, client_key)
-                pg_data.append(params)
-        return pg_data
 
     @classmethod
     def is_valid_hash(cls, data, product_id):
@@ -493,7 +476,7 @@ class ConsumerRefund(TimeStampedModel):
             consumer_refund_objs.extend(obj)
 
         try:
-            pg_data = PgTransaction.form_pg_refund_data(consumer_refund_objs)
+            pg_data = form_pg_refund_data(consumer_refund_objs)
             # transaction.on_commit(lambda: refund_curl_request(pg_data))
         except Exception as e:
             logger.error("Error in refund celery - " + str(e))
@@ -503,11 +486,11 @@ class ConsumerRefund(TimeStampedModel):
 
     @classmethod
     def schedule_refund_task(cls, consumer_refund_objs):
-        pg_data = PgTransaction.form_pg_refund_data(consumer_refund_objs)
+        pg_data = form_pg_refund_data(consumer_refund_objs)
         refund_curl_request(pg_data)
 
     def schedule_refund(self):
-        pg_data = PgTransaction.form_pg_refund_data([self, ])
+        pg_data = form_pg_refund_data([self, ])
         for req_data in pg_data:
             if settings.AUTO_REFUND:
                 try:

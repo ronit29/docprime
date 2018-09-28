@@ -1,4 +1,5 @@
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from ondoc.location import models as location_models
 from ondoc.doctor import models as doctor_models
 from rest_framework import mixins, viewsets, status
@@ -15,6 +16,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return location_models.EntityUrls.objects.filter(is_valid=True)
 
+    @transaction.non_atomic_requests
     def list(self, request):
         response = {}
         searchUrl = request.GET.get('searchUrl', None)
@@ -67,6 +69,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
 
         return Response(response)
 
+    @transaction.non_atomic_requests
     def retrieve(self, request):
         response = {}
         serializer = serializers.EntityDetailSerializer(data=request.query_params)

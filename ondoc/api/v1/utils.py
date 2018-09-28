@@ -442,3 +442,22 @@ def doctor_query_parameters(entity_params, req_params):
     if entity_params.get("specialization_id"):
         params_dict["specialization_ids"] = str(entity_params["specialization_id"])
     return params_dict
+
+
+def form_pg_refund_data(refund_objs):
+    from ondoc.account.models import PgTransaction
+    pg_data = list()
+    for data in refund_objs:
+        if data.pg_transaction:
+            params = {
+                "user": str(data.user.id),
+                "orderNo": str(data.pg_transaction.order_no),
+                "orderId": str(data.pg_transaction.order_id),
+                "refundAmount": str(data.refund_amount),
+                "refNo": str(data.id),
+            }
+            secret_key = settings.PG_SECRET_KEY_REFUND
+            client_key = settings.PG_CLIENT_KEY_REFUND
+            params["checkSum"] = PgTransaction.create_pg_hash(params, secret_key, client_key)
+            pg_data.append(params)
+    return pg_data

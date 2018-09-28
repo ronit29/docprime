@@ -6,6 +6,7 @@ from ipware import get_client_ip
 import requests
 import logging
 from django.contrib.gis.geos import Point
+from django.db import transaction
 from random import randint
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
     ALT_TEXT_LIST = [ALT_TEXT_CHAT, ALT_TEXT_LAB, ALT_TEXT_DOCTOR]
     SEARCH_URL_LIST = [REDIRECT_PRODUCTION_URL_CHAT, REDIRECT_PRODUCTION_URL_LAB, REDIRECT_PRODUCTION_URL_DOCTOR]
 
+    @transaction.non_atomic_requests
     def ip_details(self, request):
         resp = dict()
         resp["status"] = 1
