@@ -1,5 +1,5 @@
 from ondoc.diagnostic import models as lab_models
-from ondoc.ratings_review.models import (RatingsReview)
+from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments)
 from ondoc.authentication.models import UserProfile, Address, User
 from ondoc.doctor import models as doc_models
 from rest_framework.response import Response
@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from ondoc.api.v1.utils import IsConsumer
 from .serializers import RatingBodySerializer
 from .serializers import RatingDataSerializer
+from .serializers import ReviewComplimentSerializer
 
 
 class SubmitRatingViewSet(viewsets.GenericViewSet):
@@ -45,6 +46,15 @@ class GetRatingViewSet(viewsets.GenericViewSet):
         serializer = RatingDataSerializer.get_ratings_data(request)
         resp={}
         resp['ratings'] = serializer
+        return Response(resp)
+
+
+class GetComplimentViewSet(viewsets.GenericViewSet):
+
+    def get_compliments(self, request):
+        serializer = ReviewComplimentSerializer.get_compliments(request)
+        resp={}
+        resp['compliment'] = serializer
         return Response(resp)
 
 

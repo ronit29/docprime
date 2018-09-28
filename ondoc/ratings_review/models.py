@@ -1,5 +1,6 @@
 from django.contrib.gis.db import models
 from ondoc.authentication import models as auth_model
+# from ondoc.ratings_review.models import ReviewCompliments
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -40,4 +41,14 @@ class ReviewActions(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'review_action'
+
+
+class ReviewCompliments(auth_model.TimeStampedModel):
+    doc_high_rating = models.CharField(max_length=100)
+    doc_low_rating = models.CharField(max_length=100)
+    lab_high_rating = models.CharField(max_length=100)
+    lab_low_rating = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'review_compliments'
 
