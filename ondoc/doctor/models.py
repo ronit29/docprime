@@ -1184,7 +1184,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
 
     def save(self, *args, **kwargs):
-        logger.error("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
+        logger.warning("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
