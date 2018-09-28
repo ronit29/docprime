@@ -202,7 +202,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if parameters.get('location_json'):
             locality = ''
             sublocality = ''
-            breadcrumb_url = None
 
             if parameters.get('location_json') and parameters.get('location_json').get('locality_value'):
                 locality = parameters.get('location_json').get('locality_value')
