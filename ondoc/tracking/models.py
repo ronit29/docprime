@@ -61,7 +61,7 @@ class ServerHitMonitor(auth_models.TimeStampedModel):
 
     url = models.TextField(null=True)
     agent = models.TextField(null=True)
-    navigator = JSONField()
+    data = JSONField()
     refferar = models.CharField(max_length=5000, default=None, null=True)
     ip_address = models.CharField(max_length=5000, null=True, default=None)
     type = models.CharField(max_length=50, null=True, default=None)

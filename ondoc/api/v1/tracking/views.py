@@ -148,11 +148,11 @@ class ServerHitMonitor(GenericViewSet):
             refferar = data.get('refferar', None)
             ip_address = data.get('ip', None)
             type = data.get('type', None)
-            agent = request.META['HTTP_USER_AGENT']
-            navigator = data.get('navigator', {})
+            agent = request.META.get('HTTP_USER_AGENT')
+            data = data.get('data', {})
             if url:
                 server_hit = track_models.ServerHitMonitor(url=url, refferar=refferar, ip_address=ip_address, type=type,
-                                                           agent=agent, navigator=navigator)
+                                                           agent=agent, data=data)
                 server_hit.save()
                 resp['success'] = 'Server hit persisted successfully'
         else:
