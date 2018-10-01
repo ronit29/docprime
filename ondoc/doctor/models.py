@@ -443,6 +443,7 @@ class DoctorQualification(auth_model.TimeStampedModel):
     class Meta:
         db_table = "doctor_qualification"
         unique_together = (("doctor", "qualification", "specialization", "college"),)
+        ordering = ('created_at', )
 
 
 class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
@@ -1112,10 +1113,11 @@ class OpdAppointment(auth_model.TimeStampedModel):
     def action_completed(self):
         self.status = self.COMPLETED
         if self.payment_type != self.INSURANCE:
-            admin_obj, out_level = self.get_billable_admin_level()
-            app_outstanding_fees = self.doc_payout_amount()
-            out_obj = payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
-            self.outstanding = out_obj
+            if not self.outstanding:
+                admin_obj, out_level = self.get_billable_admin_level()
+                app_outstanding_fees = self.doc_payout_amount()
+                out_obj = payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
+                self.outstanding = out_obj
         self.save()
 
     def generate_invoice(self):
@@ -1188,7 +1190,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
 
 
     def save(self, *args, **kwargs):
-        logger.error("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
+        logger.warning("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")

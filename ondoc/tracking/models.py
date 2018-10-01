@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.postgres.fields import JSONField
 import uuid
 from ondoc.authentication import models as auth_models
 from django.contrib.postgres.fields import JSONField
@@ -54,3 +55,17 @@ class TrackingEvent(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = 'tracking_event'
+
+
+class ServerHitMonitor(auth_models.TimeStampedModel):
+
+    url = models.TextField(null=True)
+    agent = models.TextField(null=True)
+    data = JSONField(null=True)
+    refferar = models.CharField(max_length=5000, default=None, null=True)
+    ip_address = models.CharField(max_length=5000, null=True, default=None)
+    type = models.CharField(max_length=50, null=True, default=None)
+
+
+    class Meta:
+        db_table = 'server_hit_monitor'

@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import viewsets
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Q
 from . import serializers
 
@@ -20,6 +21,7 @@ class BillingViewSet(viewsets.GenericViewSet):
     queryset = Outstanding.objects.all()
     permission_classes = (IsAuthenticated, )
 
+    @transaction.non_atomic_requests
     def list(self, request):
         params = request.query_params
         serializer = BillingSerializer(data=params)
@@ -49,6 +51,7 @@ class BillingViewSet(viewsets.GenericViewSet):
             resp_data.append(temp_data)
             prev = obj
 
+    @transaction.non_atomic_requests
     def current_billing(self, request):
         params = request.query_params
         user = request.user
@@ -88,6 +91,7 @@ class BillingViewSet(viewsets.GenericViewSet):
                 present_obj = out_obj[0]
             resp_data.append(Outstanding.get_month_billing(prev_obj, present_obj))
 
+    @transaction.non_atomic_requests
     def billing_summary(self, request):
         query_param = request.query_params
         serializer = BillingSummarySerializer(data=query_param)
@@ -101,6 +105,7 @@ class BillingViewSet(viewsets.GenericViewSet):
             resp_data = LabAppointment.get_billing_summary(request.user, valid_data)
         return Response(resp_data)
 
+    @transaction.non_atomic_requests
     def billing_appointments(self, request):
         query_param = request.query_params
         serializer = BillingSummarySerializer(data=query_param)

@@ -31,12 +31,12 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
                                  DoctorDocument, DoctorMobile, DoctorOnboardingToken, Hospital,
-                                 DoctorEmail, College, 
+                                 DoctorEmail, College,
                                  Specialization, Qualification, Language, DoctorClinic, DoctorClinicTiming,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
-                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure)
+                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -635,8 +635,19 @@ class DoctorResource(resources.ModelResource):
     aadhar = fields.Field()
     fees = fields.Field()
 
+    # def export(self, queryset=None, *args, **kwargs):
+    #     queryset = self.get_queryset()
+    #     return super().export(queryset, *args, **kwargs)
+
+    def export(self, queryset=None):
+        queryset = self.get_queryset()
+        fetched_queryset = list(queryset)
+        return super().export(fetched_queryset)
+
     def get_queryset(self):
         return Doctor.objects.all().prefetch_related('hospitals', 'doctorpracticespecializations', 'qualifications',
+                                                     'doctorpracticespecializations__specialization',
+                                                     'qualifications__qualification',
                                                      'doctor_clinics__hospital',
                                                      'doctor_clinics__availability',
                                                      'documents')
@@ -656,7 +667,7 @@ class DoctorResource(resources.ModelResource):
         return dict(Doctor.ONBOARDING_STATUS)[doctor.onboarding_status]
 
     def dehydrate_city(self, doctor):
-        return ','.join([str(h.city) for h in doctor.hospitals.distinct('city')])
+        return ','.join({str(h.city) for h in doctor.hospitals.all()})
 
     def dehydrate_specialization(self, doctor):
         return ','.join([str(h.specialization.name) for h in doctor.doctorpracticespecializations.all()])
@@ -665,7 +676,9 @@ class DoctorResource(resources.ModelResource):
         return ','.join([str(h.qualification) for h in doctor.qualifications.all()])
 
     def dehydrate_fees(self, doctor):
-        return ', '.join([str(h.hospital.name + '-Rs.' + (str(h.availability.first().fees) if h.availability.first() else '')) for h in doctor.doctor_clinics.all()])
+        return ', '.join(
+            [str(h.hospital.name + '-Rs.' + (str(h.availability.all()[0].fees) if h.availability.all() else '')) for h
+             in doctor.doctor_clinics.all()])
 
     def dehydrate_gst(self, doctor):
 
@@ -775,7 +788,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         'get_onboard_link')
     date_hierarchy = 'created_at'
     list_filter = (
-        'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorspecializations__specialization',
+        'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
     form = DoctorForm
     inlines = [
@@ -801,6 +814,16 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
                'onboarded_at', 'qc_approved_at']
     search_fields = ['name']
+
+    # def get_export_queryset(self, request):
+    #     return super(DoctorAdmin, self).get_export_queryset(request).prefetch_related('hospitals',
+    #                                                                                   'doctorpracticespecializations',
+    #                                                                                   'qualifications',
+    #                                                                                   'doctorpracticespecializations__specialization',
+    #                                                                                   'qualifications__qualification',
+    #                                                                                   'doctor_clinics__hospital',
+    #                                                                                   'doctor_clinics__availability',
+    #                                                                                   'documents')
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live']
@@ -887,13 +910,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
     def save_formset(self, request, form, formset, change):
         for form in formset.forms:
-            try:
-                form.instance._meta.get_field('created_by')
-                if not form.instance.created_by:
-                    form.instance.created_by = request.user
-            except FieldDoesNotExist:
-                pass
-
+            if hasattr(form.instance, 'created_by'):
+                form.instance.created_by = request.user
         formset.save()
 
     def save_related(self, request, form, formsets, change):
@@ -1211,7 +1229,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     @transaction.atomic
     def save_model(self, request, obj, form, change):
         if obj:
-            opd_obj = OpdAppointment.objects.select_for_update().get(pk=obj.id)
+            if obj.id:
+                opd_obj = OpdAppointment.objects.select_for_update().get(pk=obj.id)
             if request.POST.get('start_date') and request.POST.get('start_time'):
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)
@@ -1223,9 +1242,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 obj.cancellation_type = OpdAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
-                    logger.error("Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
+                    logger.warning("Admin Cancel started - " + str(obj.id) + " timezone - " + str(timezone.now()))
                     obj.action_cancelled(cancel_type)
-                    logger.error("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
+                    logger.warning("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
 
             else:        
                 super().save_model(request, obj, form, change)
@@ -1444,10 +1463,15 @@ class PracticeSpecializationDepartmentMappingInline(admin.TabularInline):
     show_change_link = False
 
 
-class PracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
+class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', )
     date_hierarchy = 'created_at'
     inlines = [PracticeSpecializationDepartmentMappingInline, ]
     resource_class = PracticeSpecializationResource
     search_fields = ['name', ]
+
+
+class ProcedureAdmin(AutoComplete, VersionAdmin):
+    model = Procedure
+    search_fields = ['name']

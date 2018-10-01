@@ -17,7 +17,8 @@ from .lead import HospitalLeadAdmin, DoctorLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
                      DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
-                     SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,CompetitorInfoImportAdmin)
+                     SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,
+                     CompetitorInfoImportAdmin, ProcedureAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -36,6 +37,8 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
+from ondoc.geoip.models import AdwordLocationCriteria
+from .geoip import AdwordLocationCriteriaAdmin
 
 
 # Admin Site config
@@ -97,4 +100,6 @@ admin.site.register(PracticeSpecialization, PracticeSpecializationAdmin)
 admin.site.register(ConsumerAccount)
 admin.site.register(TestParameter, TestParameterAdmin)
 admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
-#admin.site.register(Procedure, ProcedureAdmin)
+admin.site.register(Procedure, ProcedureAdmin)
+
+admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)

@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from ondoc.articles.models import ArticleCategory
 from . import serializers
 from ondoc.api.pagination import paginate_queryset
+from django.db import transaction
 
 
 class ArticleCategoryViewSet(viewsets.GenericViewSet):
@@ -14,6 +15,7 @@ class ArticleCategoryViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return article_models.ArticleCategory.objects.all()
 
+    @transaction.non_atomic_requests
     def list(self, request):
         queryset = paginate_queryset(self.get_queryset(), request, 10)
         article_category_list = [serializers.ArticleCategoryListSerializer(category, context={'request': request}).data
@@ -26,6 +28,7 @@ class TopArticleCategoryViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return article_models.ArticleCategory.objects.all()
 
+    @transaction.non_atomic_requests
     def list(self, request):
         response = list()
         for category in self.get_queryset():
@@ -43,6 +46,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return article_models.Article.objects.prefetch_related('category').filter(is_published=True)
 
+    @transaction.non_atomic_requests
     def list(self, request):
         category_url = request.GET.get('categoryUrl', None)
         if not category_url:
@@ -62,16 +66,17 @@ class ArticleViewSet(viewsets.GenericViewSet):
         description = ''
         title_description = ArticleCategory.objects.filter(url=category_url).values('title', 'description')
         if title_description.exists():
-            title = title_description.first().get('title')
-            description = title_description.first().get('description')
+            title = title_description.first().get('title', '')
+            description = title_description.first().get('description', '')
 
         category_seo = {
             "title": title,
             "description": description
         }
 
-        return Response({'result': resp, 'category_seo': category_seo})
+        return Response({'result': resp, 'seo': category_seo})
 
+    @transaction.non_atomic_requests
     def retrieve(self, request):
         serializer = serializers.ArticlePreviewSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
