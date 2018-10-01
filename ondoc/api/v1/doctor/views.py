@@ -80,6 +80,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         elif user.user_type == User.CONSUMER:
             return models.OpdAppointment.objects.filter(user=user, doctor__is_live=True, hospital__is_live=True)
 
+    @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
         queryset = models.OpdAppointment.objects.filter(hospital__is_live=True, doctor__is_live=True).filter(
@@ -132,6 +133,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
+    @transaction.non_atomic_requests
     def retrieve(self, request, pk=None):
         user = request.user
         queryset = models.OpdAppointment.objects.filter(hospital__is_live=True, doctor__is_live=True).filter(
@@ -153,7 +155,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('id'))
+
+        # opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('id'))
+        opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('id')).first()
+        if not opd_appointment:
+            return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
+
         permission_queryset = (auth_models.GenericAdmin.objects.filter(doctor=opd_appointment.doctor.id).
                                filter(hospital=opd_appointment.hospital_id))
         if permission_queryset:
@@ -351,6 +358,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
     def get_queryset(self):
         return models.OpdAppointment.objects.all()
 
+    @transaction.non_atomic_requests
     def retrieve(self, request):
         from django.contrib.staticfiles.templatetags.staticfiles import static
         resp_data = dict()
@@ -430,6 +438,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         response_data['hospitals'] = availability
         return response_data
 
+    @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
         if not url:
@@ -455,6 +464,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         return Response(status=status.HTTP_404_NOT_FOUND)
 
+    @transaction.non_atomic_requests
     def retrieve(self, request, pk):
         response_data = []
         doctor = (models.Doctor.objects
@@ -495,6 +505,7 @@ class DoctorHospitalView(mixins.ListModelMixin,
             return models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=user.doctor, doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True).select_related(
                 "doctor_clinic__doctor", "doctor_clinic__hospital")
 
+    @transaction.non_atomic_requests
     def list(self, request):
         resp_data = list()
         if hasattr(request.user, 'doctor') and request.user.doctor:
@@ -516,6 +527,7 @@ class DoctorHospitalView(mixins.ListModelMixin,
 
         return Response(resp_data)
 
+    @transaction.non_atomic_requests
     def retrieve(self, request, pk):
         temp_data = list()
         if hasattr(request.user, 'doctor') and request.user.doctor:
@@ -548,6 +560,7 @@ class DoctorBlockCalendarViewSet(OndocViewSet):
         user = self.request.user
         return models.DoctorLeave.objects.filter(doctor=user.doctor.id, deleted_at__isnull=True, doctor__is_live=True)
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         if not request.user.doctor:
             return Response([])
@@ -613,6 +626,7 @@ class PrescriptionFileViewset(OndocViewSet):
         else:
             return models.PrescriptionFile.objects.none()
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         appointment = int(request.query_params.get("appointment"))
         if not appointment:
@@ -675,6 +689,7 @@ class PrescriptionFileViewset(OndocViewSet):
 class SearchedItemsViewSet(viewsets.GenericViewSet):
     # permission_classes = (IsAuthenticated, DoctorPermission,)
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         name = request.query_params.get("name")
         if not name:
@@ -696,6 +711,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations})
 
+    @transaction.non_atomic_requests
     def common_conditions(self, request):
         count = request.query_params.get('count', 10)
         count = int(count)
@@ -712,6 +728,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 class DoctorListViewSet(viewsets.GenericViewSet):
     queryset = models.Doctor.objects.all()
 
+    @transaction.non_atomic_requests
     def list_by_url(self, request, *args, **kwargs):
         url = request.GET.get('url', None)
         if not url:
@@ -730,6 +747,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         parameters = request.query_params
         if kwargs.get("parameters"):
@@ -864,6 +882,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -896,6 +915,7 @@ class HealthTipView(viewsets.GenericViewSet):
     def get_queryset(self):
         return models.HealthTip.objects.all()
 
+    @transaction.non_atomic_requests
     def list(self, request):
         data = self.get_queryset()
         serializer = serializers.HealthTipSerializer(data, many=True)
@@ -913,12 +933,17 @@ class ConfigView(viewsets.GenericViewSet):
 
 class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
 
+    @transaction.atomic
     def complete(self, request):
         resp = {}
         serializer = serializers.OpdAppointmentCompleteTempSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('opd_appointment'))
+        # opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('opd_appointment'))
+        opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('id')).first()
+        if not opd_appointment:
+            return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
+
         if opd_appointment:
             opd_appointment.action_completed()
 
