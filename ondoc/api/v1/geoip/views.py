@@ -134,8 +134,11 @@ class AdwordLocationCriteriaViewset(viewsets.GenericViewSet):
 
         queryset = self.get_queryset().filter(criteria_id=criteria_id)
         if queryset.exists():
+            data = {}
             obj = queryset.first()
-            data = {'latitude': obj.latlong.y, 'longitude': obj.latlong.x}
+            if obj.latlong:
+                data['latitude'] = obj.latlong.y
+                data['longitude'] = obj.latlong.x
             return Response(status=status.HTTP_200_OK, data=data)
         else:
             return Response({"error": "Not Found"}, status=status.HTTP_404_NOT_FOUND)
