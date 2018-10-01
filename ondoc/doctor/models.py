@@ -360,7 +360,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         return None
 
     def get_ratings(self):
-        self.rating.all()
+         return self.rating.all()
 
     def update_live_status(self):
 

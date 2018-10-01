@@ -203,6 +203,9 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     class Meta:
         db_table = "lab"
 
+    def get_ratings(self):
+        return self.rating.all()
+
     def get_thumbnail(self):
         all_documents = self.lab_documents.all()
         for document in all_documents:

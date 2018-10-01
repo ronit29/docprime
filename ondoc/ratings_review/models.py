@@ -11,6 +11,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class ReviewCompliments(auth_model.TimeStampedModel):
+    LAB = 1
+    DOCTOR = 2
+    TYPE_CHOICES = [(LAB, 'Lab'), (DOCTOR, 'Opd')]
+    message = models.CharField(max_length=128, default=None)
+    type = models.PositiveSmallIntegerField(choices=TYPE_CHOICES, blank=True, null=True)
+    rating_level = models.PositiveSmallIntegerField(max_length=5, default=None)
+
+    class Meta:
+        db_table = 'review_compliments'
+
+
 class RatingsReview(auth_model.TimeStampedModel):
     LAB = 1
     OPD = 2
@@ -18,9 +30,10 @@ class RatingsReview(auth_model.TimeStampedModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     ratings = models.PositiveIntegerField(null=True)
     review = models.CharField(max_length=500, null=True, blank=True)
-    appoitnment_id = models.PositiveIntegerField(blank=True, null=True)
-    appoitnment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, blank=True, null=True)
+    appointment_id = models.PositiveIntegerField(blank=True, null=True)
+    appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, blank=True, null=True)
     is_live = models.BooleanField(default=True)
+    compliment = models.ManyToManyField(ReviewCompliments, related_name='compliment_review')
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
@@ -37,18 +50,9 @@ class ReviewActions(auth_model.TimeStampedModel):
     ACTION_CHOICES = [(NOACTION, "NoAction"), (LIKE, "Like"), (DISLIKE, "Dislike"), (REPORT, "Report")]
 
     action = models.PositiveIntegerField(default=NOACTION, choices=ACTION_CHOICES)
-    rating = models.OneToOneField(RatingsReview, blank=True, null=True, on_delete=models.CASCADE)
+    rating = models.ForeignKey(RatingsReview, blank=True, null=True, on_delete=models.CASCADE)
 
     class Meta:
         db_table = 'review_action'
 
-
-class ReviewCompliments(auth_model.TimeStampedModel):
-    doc_high_rating = models.CharField(max_length=100)
-    doc_low_rating = models.CharField(max_length=100)
-    lab_high_rating = models.CharField(max_length=100)
-    lab_low_rating = models.CharField(max_length=100)
-
-    class Meta:
-        db_table = 'review_compliments'
 

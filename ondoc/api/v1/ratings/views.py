@@ -1,58 +1,73 @@
 from ondoc.diagnostic import models as lab_models
 from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments)
-from ondoc.authentication.models import UserProfile, Address, User
+from django.shortcuts import get_object_or_404
 from ondoc.doctor import models as doc_models
 from rest_framework.response import Response
-from rest_framework import viewsets, mixins
+from rest_framework import viewsets, mixins, status
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from ondoc.api.v1.utils import IsConsumer
-from .serializers import RatingBodySerializer
-from .serializers import RatingDataSerializer
-from .serializers import ReviewComplimentSerializer
+from . import serializers
 
 
-class SubmitRatingViewSet(viewsets.GenericViewSet):
-    # authentication_classes = (JWTAuthentication, )
-    # permission_classes = (IsAuthenticated, IsConsumer)
+class RatingsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsConsumer)
 
     def create(self, request):
-        serializer = RatingBodySerializer(data= request.data)
+        serializer = serializers.RatingCreateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
 
         resp={}
-        try:
-            if valid_data.get('appointment_type') == RatingsReview.OPD:
-                content_data = doc_models.OpdAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
-            else:
-                content_data = lab_models.LabAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
-            if content_data:
+        if valid_data.get('appointment_type') == RatingsReview.OPD:
+            content_data = doc_models.OpdAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
+            if content_data and content_data.status == doc_models.OpdAppointment.COMPLETED:
+                content_obj = content_data.doctor
+        else:
+            content_data = lab_models.LabAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
+            if content_data and content_data.status == lab_models.LabAppointment.COMPLETED:
+                content_obj = content_data.lab
+        if content_obj:
+            try:
                 rating_review = RatingsReview(user=request.user, ratings=valid_data.get('rating'),
                                               appointment_type=valid_data.get('appointment_type'),
                                               appointment_id=valid_data.get('appointment_id'),
                                               review=valid_data.get('review'),
-                                              content_object=content_data)
+                                              content_object=content_obj)
                 rating_review.save()
-                resp['success'] = "Rating have been processed successfully!!"
-        except Exception as e:
-            resp['error'] = e
+            except Exception as e:
+                resp['error'] = e
+            resp['success'] = "Rating have been processed successfully!!"
+        else:
+            return Response({'error':'Object Not Found'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(resp)
 
+    def list(self, request):
+        serializer = serializers.RatingListBodySerializerdata(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        if valid_data.get('content_type') == RatingsReview.OPD:
+            content_data = doc_models.Doctor.objects.filter(id=valid_data.get('object_id')).first()
+        else:
+            content_data = lab_models.Lab.objects.filter(id=valid_data.get('object_id')).first()
+        if content_data:
+                ratings = content_data.get_ratings()
+                body_serializer = serializers.RatingsModelSerializer(ratings, many=True, context={'request':request})
+        else:
+            return Response({'error': 'Invalid Object'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(body_serializer.data)
 
-class GetRatingViewSet(viewsets.GenericViewSet):
-
-    def get_ratings(self, request):
-        serializer = RatingDataSerializer.get_ratings_data(request)
-        resp={}
-        resp['ratings'] = serializer
-        return Response(resp)
+    def retrieve(self,request, pk):
+        rating = get_object_or_404(RatingsReview, pk=pk)
+        body_serializer = serializers.RatingsModelSerializer(rating, context={'request': request})
+        return Response(body_serializer.data)
 
 
 class GetComplimentViewSet(viewsets.GenericViewSet):
 
     def get_compliments(self, request):
-        serializer = ReviewComplimentSerializer.get_compliments(request)
+        serializer = serializers.ReviewComplimentSerializer.get_compliments(request)
         resp={}
         resp['compliment'] = serializer
         return Response(resp)
