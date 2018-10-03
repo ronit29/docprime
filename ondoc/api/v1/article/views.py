@@ -54,6 +54,13 @@ class ArticleViewSet(viewsets.GenericViewSet):
 
         article_start = request.GET.get('startsWith', None)
         article_contains = request.GET.get('contains', None)
+
+        category_qs = article_models.ArticleCategory.objects.filter(url=category_url)
+        if category_qs.exists():
+            category = category_qs.first()
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND, data={'error': 'Category url not found'})
+
         article_data = self.get_queryset().filter(category__url=category_url)
         if article_start:
             article_data = article_data.filter(title__istartswith=article_start)
@@ -74,7 +81,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
             "description": description
         }
 
-        return Response({'result': resp, 'seo': category_seo})
+        return Response({'result': resp, 'seo': category_seo, 'category': category.name})
 
     @transaction.non_atomic_requests
     def retrieve(self, request):
