@@ -338,3 +338,4 @@ SEND_THROUGH_NODEJS_ENABLED = env.bool('SEND_THROUGH_NODEJS_ENABLED', default=Fa
 #DEFAULT_FILE_STORAGE = 'config.settings.storage_backends.MediaStorage'
 #DJANGO_TABLES2_TEMPLATE = 'django_tables2/bootstrap.html'
 DATA_UPLOAD_MAX_NUMBER_FIELDS=10000
+CONN_MAX_AGE=600
