@@ -11,8 +11,8 @@ from . import serializers
 
 
 class RatingsViewSet(viewsets.GenericViewSet):
-    # authentication_classes = (JWTAuthentication, )
-    # permission_classes = (IsAuthenticated, IsConsumer)
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsConsumer)
 
     def create(self, request):
         serializer = serializers.RatingCreateBodySerializer(data=request.data)
@@ -65,6 +65,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
 
 
 class GetComplementViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsConsumer)
 
     def get_complements(self, request):
         serializer = serializers.ReviewComplimentSerializer(data=request.query_params)

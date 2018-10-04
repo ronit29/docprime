@@ -25,9 +25,9 @@ class RatingsModelSerializer(serializers.ModelSerializer):
         model = RatingsReview
         fields = ('id', 'user', 'ratings', 'review', 'is_live', 'updated_at')
 
+
 class ReviewComplimentSerializer(serializers.Serializer):
     type = serializers.ChoiceField(choices=ReviewCompliments.TYPE_CHOICES)
-    rating_level = serializers.IntegerField(max_value=5)
 
 
 class GetComplementSerializer(serializers.ModelSerializer):
