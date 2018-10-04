@@ -151,7 +151,7 @@ def push_signup_lead_to_matrix(self, data):
             'LeadID': online_lead_obj.matrix_lead_id if online_lead_obj.matrix_lead_id else 0,
             'EmailId': online_lead_obj.email,
             'Gender': 0,
-            'CityId': online_lead_obj.city_name.id if online_lead_obj.city_name.id else 0,
+            'CityId': online_lead_obj.city_name.id if online_lead_obj.city_name and online_lead_obj.city_name.id else 0,
             'ProductId': data.get('product_id'),
             'SubProductId': data.get('sub_product_id'),
             'CreatedOn': int(time.mktime(online_lead_obj.created_at.utctimetuple())),
