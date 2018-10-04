@@ -463,17 +463,57 @@ def form_pg_refund_data(refund_objs):
     return pg_data
 
 
-def validate_coupon(user, coupon_code):
-    from ondoc.coupon.models import Coupon
-    from ondoc.doctor.models import OpdAppointment
-    from ondoc.diagnostic.models import LabAppointment
-    if coupon_code == Coupon.objects.filter(user=user, status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED, OpdAppointment.RESCHEDULED_DOCTOR, OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.ACCEPTED, OpdAppointment.COMPLETED]):
-        count = Coupon.count
-    if coupon_code == Coupon.objects.filter(user=user, status__in=[LabAppointment.CREATED, LabAppointment.BOOKED, LabAppointment.RESCHEDULED_DOCTOR, LabAppointment.RESCHEDULED_PATIENT, LabAppointment.ACCEPTED, LabAppointment.COMPLETED]):
-        count += Coupon.count
+class CouponsMixin(object):
 
-    if count != 0:
-        return True
-    else:
-        return False
+    def validate_coupon(self, user, coupon_code):
+        from ondoc.coupon.models import Coupon
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
 
+        coupon_data = Coupon.objects.filter(code__exact=coupon_code).first()
+
+        if coupon_data:
+            if isinstance(self, OpdAppointment) == True and coupon_data.type not in [Coupon.DOCTOR, Coupon.ALL]:
+                return False
+            elif isinstance(self, LabAppointment) == True and coupon_data.type not in [Coupon.LAB, Coupon.ALL]:
+                return False
+
+            count = OpdAppointment.objects.filter(user=user,
+                                                  status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
+                                                              OpdAppointment.RESCHEDULED_DOCTOR,
+                                                              OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.ACCEPTED,
+                                                              OpdAppointment.COMPLETED],
+                                                  coupon__code__exact=coupon_code).count()
+            count += LabAppointment.objects.filter(user=user,
+                                                   status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
+                                                               LabAppointment.RESCHEDULED_DOCTOR,
+                                                               LabAppointment.RESCHEDULED_PATIENT, LabAppointment.ACCEPTED,
+                                                               LabAppointment.COMPLETED],
+                                                   coupon__code__exact=coupon_code).count()
+            allowed_coupon_count = coupon_data.count
+            if count < allowed_coupon_count:
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def get_discount(self, code, price):
+        from ondoc.coupon.models import Coupon
+
+        data = Coupon.objects.filter(code__exact=code).first()
+
+        if data:
+            if data.min_order_amount is not None and price < data.min_order_amount:
+                return 0
+
+            if data.flat_discount is not None:
+                return data.flat_discount
+            elif data.percentage_discount is not None:
+                discount = price * data.percentage_discount / 100
+                if data.max_discount_amount is not None:
+                    return min(data.max_discount_amount, discount)
+                else:
+                    return discount
+        else:
+            return 0

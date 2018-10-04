@@ -9,7 +9,7 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
-from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
+from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, CouponsMixin
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
@@ -690,7 +690,7 @@ class AvailableLabTest(TimeStampedModel):
         db_table = "available_lab_test"
 
 
-class LabAppointment(TimeStampedModel):
+class LabAppointment(TimeStampedModel, CouponsMixin):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -734,7 +734,7 @@ class LabAppointment(TimeStampedModel):
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     matrix_lead_id = models.IntegerField(null=True)
-    coupon = models.ForeignKey(Coupon, blank=True, null=True, on_delete=models.SET_NULL)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, on_delete=models.SET_NULL)
 
     def allowed_action(self, user_type, request):
         allowed = []

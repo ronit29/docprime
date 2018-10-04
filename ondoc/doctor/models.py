@@ -25,7 +25,7 @@ from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
-from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin
 from functools import reduce
 from operator import or_
 import logging
@@ -970,7 +970,7 @@ class DoctorOnboardingToken(auth_model.TimeStampedModel):
 #         db_table = "hospital_network_mapping"
 
 
-class OpdAppointment(auth_model.TimeStampedModel):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_DOCTOR = 3
@@ -1025,7 +1025,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
-    coupon = models.ForeignKey(Coupon, blank=True, null=True, on_delete=models.SET_NULL)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
