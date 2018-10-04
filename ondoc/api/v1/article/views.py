@@ -66,6 +66,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
             article_data = article_data.filter(title__istartswith=article_start)
         if article_contains and len(article_contains) > 2:
             article_data = article_data.filter(title__icontains=article_contains)
+        articles_count = article_data.count()
         article_data = paginate_queryset(article_data, request, 10)
         resp = serializers.ArticleListSerializer(article_data, many=True,
                                                  context={'request': request}).data
@@ -81,7 +82,8 @@ class ArticleViewSet(viewsets.GenericViewSet):
             "description": description
         }
 
-        return Response({'result': resp, 'seo': category_seo, 'category': category.name})
+        return Response(
+            {'result': resp, 'seo': category_seo, 'category': category.name, 'total_articles': articles_count})
 
     @transaction.non_atomic_requests
     def retrieve(self, request):
