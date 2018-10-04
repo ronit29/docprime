@@ -1389,7 +1389,19 @@ class OnlineLeadViewSet(GenericViewSet):
 
     def create(self, request):
         resp = {}
-        serializer = serializers.OnlineLeadSerializer(data=request.data)
+        data = request.data
+
+        if request.user_agent.is_mobile or request.user_agent.is_tablet:
+            source = request.user_agent.os.family
+        elif request.user_agent.is_pc:
+            source = "WEB %s" % (data.get('source', ''))
+        else:
+            source = "Unknown"
+
+        data['source'] = source
+        if not data['city_name']:
+            data['city_name'] = 0
+        serializer = serializers.OnlineLeadSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         data = serializer.save()
         if data.id:

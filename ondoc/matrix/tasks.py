@@ -30,6 +30,8 @@ def prepare_and_hit(self, data):
         service_name = ','.join([test_obj.test.name for test_obj in appointment.lab_test.all()])
 
     appointment_details = {
+        'AppointmentStatus': appointment.status,
+        'PaymentStatus': 300,
         'DocPrimeBookingID': appointment.id,
         'BookingDateTime': int(time.mktime(appointment.created_at.utctimetuple())),
         'AppointmentDateTime': int(time.mktime(appointment.time_slot_start.utctimetuple())),
@@ -145,7 +147,7 @@ def push_signup_lead_to_matrix(self, data):
         request_data = {
             'Name': online_lead_obj.name,
             'PrimaryNo': online_lead_obj.mobile,
-            'LeadSource': 'DocPrime',
+            'LeadSource': online_lead_obj.source if online_lead_obj.source else 'Unknown',
             'LeadID': online_lead_obj.matrix_lead_id if online_lead_obj.matrix_lead_id else 0,
             'EmailId': online_lead_obj.email,
             'Gender': 0,
