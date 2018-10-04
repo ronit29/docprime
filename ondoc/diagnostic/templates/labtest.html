@@ -92,6 +92,7 @@
             </div>
         </div>
      </div>
+    <span class="test_error" style="color:red;"></span>
      <div class="panel panel-primary panel_formsets">
          <div class="panel-heading">
             <input type="text"  class="typeahead form-control" autocomplete="off" data-provide="typeahead" placeholder="Search For Tests">
@@ -223,7 +224,6 @@
                 var selected_test_id = test.id;
                 var selected_test_name = test.text;
                 var exists = 0;
-
                 var existing = $('.table-container tbody tr[data-test-id='+selected_test_id+']')
                 if (existing.length>0)
                 {
@@ -259,6 +259,7 @@
             <!--AJAX REQUEST-->
 
             $(".table-container").on("click", ".save-row",function(){
+                $('.test_error').html('');
                 var tr = $(this).closest('tr');
                 var ajax_submit_button = this;
 
@@ -279,9 +280,7 @@
 
                 if ((typeof testid !== 'undefined' && testid !== null && testid !== '') && (typeof mrp !== 'undefined' && mrp>0 && $.isNumeric(mrp)))
                  {
-                     $(ajax_submit_button).addClass('hidden');
-                     $(ajax_submit_button).siblings('.edit-row').removeClass('hidden');
-                     $(ajax_submit_button).closest('tr').find('input').attr("disabled", true);
+
 
                      var dataString = 'id='+id +'&enabled='+enabled + '&lab_pricing_group='+lab_pricing_group + '&test='+testid + '&mrp='+mrp + '&custom_agreed_price='+custom_agreed_price + '&custom_deal_price='+custom_deal_price;
                       jQuery.ajax({
@@ -290,9 +289,15 @@
                             url:  '/admin/ajax/labtest/save/',
                             success: function(response) {
                                 if(response['success']){
+                                   $(ajax_submit_button).addClass('hidden');
+                                   $(ajax_submit_button).siblings('.edit-row').removeClass('hidden');
+                                   $(ajax_submit_button).closest('tr').find('input').attr("disabled", true);
                                    $(tr).find('td.computed_agreed_price').html(response['computed_agreed_price']);
                                    $(tr).find('td.computed_deal_price').html(response['computed_deal_price']);
                                    $(tr).attr('data-id',response['id']);
+                                }
+                                else{
+                                    $('.test_error').html(response['error']);
                                 }
                             },
                             error: function (request, status, error) {
