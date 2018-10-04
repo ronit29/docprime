@@ -287,6 +287,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     home_pickup_charges = serializers.DecimalField(max_digits=10, decimal_places=2)
     is_home_pickup = serializers.BooleanField(default=False)
     address = serializers.JSONField(required=False)
+    coupon = serializers.ListField(child=serializers.IntegerField())
+    discount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -352,6 +354,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     address = serializers.PrimaryKeyRelatedField(queryset=Address.objects.all(), required=False, allow_null=True)
     # address = serializers.IntegerField(required=False, allow_null=True)
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
+    coupon_code = serializers.ListField(child=serializers.CharField(), required=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 3
@@ -377,6 +380,12 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
         if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"]).count() >= MAX_APPOINTMENTS_ALLOWED:
             raise serializers.ValidationError('Max '+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
+
+        if data.get("coupon_code"):
+            for coupon in data.get("coupon_code"):
+                obj = LabAppointment()
+                if not obj.validate_coupon(request.user, coupon):
+                    raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request)

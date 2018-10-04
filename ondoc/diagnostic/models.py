@@ -735,6 +735,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     matrix_lead_id = models.IntegerField(null=True)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -877,8 +878,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
         lab_ids = appointment_data.pop("lab_test")
+        coupon_list = appointment_data.pop("coupon")
         app_obj = cls.objects.create(**appointment_data)
         app_obj.lab_test.add(*lab_ids)
+        if coupon_list:
+            app_obj.coupon.add(*coupon_list)
         return app_obj
 
     def action_rescheduled_lab(self):

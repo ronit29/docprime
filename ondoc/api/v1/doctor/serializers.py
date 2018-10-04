@@ -9,6 +9,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
 from ondoc.authentication.models import UserProfile
+from ondoc.coupon.models import Coupon
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot
@@ -133,6 +134,8 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     time_slot_start = serializers.DateTimeField()
     payment_type = serializers.IntegerField()
+    coupon = serializers.ListField(child=serializers.IntegerField())
+    discount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
@@ -150,6 +153,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     end_time = serializers.FloatField(required=False)
     time_slot_start = serializers.DateTimeField(required=False)    
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
+    coupon_code = serializers.ListField(child=serializers.CharField(), required=False)
 
     # time_slot_end = serializers.DateTimeField()
 
@@ -218,6 +222,12 @@ class CreateAppointmentSerializer(serializers.Serializer):
                 "Error 'Max active appointments reached' for opd appointment with data - " + json.dumps(
                     request.data))
             raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
+
+        if data.get("coupon_code"):
+            for coupon in data.get("coupon_code"):
+                obj = OpdAppointment()
+                if not obj.validate_coupon(request.user, coupon):
+                    raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         return data
 

@@ -240,12 +240,15 @@ def opdappointment_transform(app_data):
     app_data["fees"] = str(app_data["fees"])
     app_data["effective_price"] = str(app_data["effective_price"])
     app_data["mrp"] = str(app_data["mrp"])
+    app_data["discount"] = str(app_data["discount"])
     app_data["time_slot_start"] = str(app_data["time_slot_start"])
     app_data["doctor"] = app_data["doctor"].id
     app_data["hospital"] = app_data["hospital"].id
     app_data["profile"] = app_data["profile"].id
     app_data["user"] = app_data["user"].id
     app_data["booked_by"] = app_data["booked_by"].id
+    if app_data["coupon"]:
+        app_data["coupon"] = list(app_data["coupon"])
     return app_data
 
 
@@ -254,11 +257,14 @@ def labappointment_transform(app_data):
     app_data["agreed_price"] = str(app_data["agreed_price"])
     app_data["deal_price"] = str(app_data["deal_price"])
     app_data["effective_price"] = str(app_data["effective_price"])
+    app_data["discount"] = str(app_data["discount"])
     app_data["time_slot_start"] = str(app_data["time_slot_start"])
     app_data["lab"] = app_data["lab"].id
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
+    if app_data["coupon"]:
+        app_data["coupon"] = list(app_data["coupon"])
     return app_data
 
 
@@ -307,7 +313,7 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
-    profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
+    # profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
@@ -317,7 +323,7 @@ def payment_details(request, order):
         'furl': furl,
         'referenceId': "",
         'orderId': order.id,
-        'name': profile.name,
+        'name': order.action_data.get("profile_detail").get("name"),
         'txAmount': str(order.amount),
     }
     secret_key = client_key = ""
@@ -478,7 +484,7 @@ class CouponsMixin(object):
             elif isinstance(self, LabAppointment) and data.type not in [Coupon.LAB, Coupon.ALL]:
                 return False
 
-            if (max(data.created_at, user.created_at) - timezone.now()).days > data.validity:
+            if (timezone.now() - max(data.created_at, user.date_joined)).days > data.validity:
                 return False
 
             count = OpdAppointment.objects.filter(user=user,

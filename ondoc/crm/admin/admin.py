@@ -9,6 +9,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter)
+from ondoc.coupon.models import Coupon
 from ondoc.lead.models import HospitalLead, DoctorLead
 from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
@@ -103,3 +104,5 @@ admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
 admin.site.register(Procedure, ProcedureAdmin)
 
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
+
+admin.site.register(Coupon)

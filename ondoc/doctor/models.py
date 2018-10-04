@@ -1026,6 +1026,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1060,7 +1061,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
+        coupon_list = appointment_data.pop("coupon")
         app_obj = cls.objects.create(**appointment_data)
+        if coupon_list:
+            app_obj.coupon.add(*coupon_list)
         return app_obj
 
     @transaction.atomic
@@ -1119,7 +1123,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     def generate_invoice(self):
         pass
 
-
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
             return self.hospital.network, payout_model.Outstanding.HOSPITAL_NETWORK_LEVEL
@@ -1136,7 +1139,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                                                                         action=ConsumerTransaction.SALE).
                        order_by("created_at").last())
         return consumer_tx.amount
-
 
     def is_doctor_available(self):
         if DoctorLeave.objects.filter(start_date__lte=self.time_slot_start.date(),
