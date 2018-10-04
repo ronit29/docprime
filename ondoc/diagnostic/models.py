@@ -734,7 +734,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     matrix_lead_id = models.IntegerField(null=True)
-    coupon = models.ManyToManyField(Coupon, blank=True, null=True, on_delete=models.SET_NULL)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True)
 
     def allowed_action(self, user_type, request):
         allowed = []

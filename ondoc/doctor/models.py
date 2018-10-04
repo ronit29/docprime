@@ -1025,7 +1025,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
-    coupon = models.ManyToManyField(Coupon, blank=True, null=True, on_delete=models.SET_NULL)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"

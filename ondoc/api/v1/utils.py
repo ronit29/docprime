@@ -470,12 +470,12 @@ class CouponsMixin(object):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
-        coupon_data = Coupon.objects.filter(code__exact=coupon_code).first()
+        data = Coupon.objects.filter(code__exact=coupon_code).first()
 
-        if coupon_data:
-            if isinstance(self, OpdAppointment) == True and coupon_data.type not in [Coupon.DOCTOR, Coupon.ALL]:
+        if data:
+            if isinstance(self, OpdAppointment) == True and data.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return False
-            elif isinstance(self, LabAppointment) == True and coupon_data.type not in [Coupon.LAB, Coupon.ALL]:
+            elif isinstance(self, LabAppointment) == True and data.type not in [Coupon.LAB, Coupon.ALL]:
                 return False
 
             count = OpdAppointment.objects.filter(user=user,
@@ -490,7 +490,7 @@ class CouponsMixin(object):
                                                                LabAppointment.RESCHEDULED_PATIENT, LabAppointment.ACCEPTED,
                                                                LabAppointment.COMPLETED],
                                                    coupon__code__exact=coupon_code).count()
-            allowed_coupon_count = coupon_data.count
+            allowed_coupon_count = data.count
             if count < allowed_coupon_count:
                 return True
             else:
@@ -498,10 +498,10 @@ class CouponsMixin(object):
         else:
             return False
 
-    def get_discount(self, code, price):
+    def get_discount(self, coupon_code, price):
         from ondoc.coupon.models import Coupon
 
-        data = Coupon.objects.filter(code__exact=code).first()
+        data = Coupon.objects.filter(code__exact=coupon_code).first()
 
         if data:
             if data.min_order_amount is not None and price < data.min_order_amount:
