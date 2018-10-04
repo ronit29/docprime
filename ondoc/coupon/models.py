@@ -7,7 +7,7 @@ class Coupon(auth_model.TimeStampedModel):
     LAB = 2
     ALL = 3
     TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"),)
-    code = models.CharField()
+    code = models.CharField(max_length=50)
     min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     percentage_discount = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
     max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
