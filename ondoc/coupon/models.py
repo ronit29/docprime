@@ -17,7 +17,7 @@ class Coupon(auth_model.TimeStampedModel):
     count = models.PositiveIntegerField()
 
     def __str__(self):
-        return self.coupon_code.name + " (" + self.name + ")"
+        return self.code.name
 
     class Meta:
         db_table = "coupon"

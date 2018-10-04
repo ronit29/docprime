@@ -473,9 +473,12 @@ class CouponsMixin(object):
         data = Coupon.objects.filter(code__exact=coupon_code).first()
 
         if data:
-            if isinstance(self, OpdAppointment) == True and data.type not in [Coupon.DOCTOR, Coupon.ALL]:
+            if isinstance(self, OpdAppointment) and data.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return False
-            elif isinstance(self, LabAppointment) == True and data.type not in [Coupon.LAB, Coupon.ALL]:
+            elif isinstance(self, LabAppointment) and data.type not in [Coupon.LAB, Coupon.ALL]:
+                return False
+
+            if (max(data.created_at, user.created_at) - timezone.now()).days > data.validity:
                 return False
 
             count = OpdAppointment.objects.filter(user=user,
@@ -486,7 +489,7 @@ class CouponsMixin(object):
                                                   coupon__code__exact=coupon_code).count()
             count += LabAppointment.objects.filter(user=user,
                                                    status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
-                                                               LabAppointment.RESCHEDULED_DOCTOR,
+                                                               LabAppointment.RESCHEDULED_LAB,
                                                                LabAppointment.RESCHEDULED_PATIENT, LabAppointment.ACCEPTED,
                                                                LabAppointment.COMPLETED],
                                                    coupon__code__exact=coupon_code).count()
