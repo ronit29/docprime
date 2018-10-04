@@ -461,3 +461,19 @@ def form_pg_refund_data(refund_objs):
             params["checkSum"] = PgTransaction.create_pg_hash(params, secret_key, client_key)
             pg_data.append(params)
     return pg_data
+
+
+def validate_coupon(user, coupon_code):
+    from ondoc.coupon.models import Coupon
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    if coupon_code == Coupon.objects.filter(user=user, status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED, OpdAppointment.RESCHEDULED_DOCTOR, OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.ACCEPTED, OpdAppointment.COMPLETED]):
+        count = Coupon.count
+    if coupon_code == Coupon.objects.filter(user=user, status__in=[LabAppointment.CREATED, LabAppointment.BOOKED, LabAppointment.RESCHEDULED_DOCTOR, LabAppointment.RESCHEDULED_PATIENT, LabAppointment.ACCEPTED, LabAppointment.COMPLETED]):
+        count += Coupon.count
+
+    if count != 0:
+        return True
+    else:
+        return False
+

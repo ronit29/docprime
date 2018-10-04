@@ -4,6 +4,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, FileExt
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
 from ondoc.doctor.models import Hospital, SearchKey
+from ondoc.coupon.models import Coupon
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -733,6 +734,7 @@ class LabAppointment(TimeStampedModel):
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     matrix_lead_id = models.IntegerField(null=True)
+    coupon = models.ForeignKey(Coupon, blank=True, null=True, on_delete=models.SET_NULL)
 
     def allowed_action(self, user_type, request):
         allowed = []

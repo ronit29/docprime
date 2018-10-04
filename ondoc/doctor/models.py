@@ -17,6 +17,7 @@ from ondoc.authentication import models as auth_model
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund
 from ondoc.payout.models import Outstanding
+from ondoc.coupon.models import Coupon
 from ondoc.doctor.tasks import doc_app_auto_cancel
 # from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
@@ -1024,6 +1025,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
+    coupon = models.ForeignKey(Coupon, blank=True, null=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
