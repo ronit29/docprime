@@ -3,18 +3,108 @@ from django.contrib.sitemaps import Sitemap
 from django.conf import settings
 
 
-class EntityUrlSitemap(Sitemap):
+class SpecializationLocalityCitySitemap(Sitemap):
     changefreq = "weekly"
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.all()
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.SPECIALIZATION_LOCALITY_CITY)
 
     def location(self, obj):
-        return "/%s" %(obj.url)
+        return "/%s" % obj.url
+
+
+class SpecializationCitySitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.SPECIALIZATION_CITY)
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+
+class DoctorLocalityCitySitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+
+class DoctorCitySitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTORS_CITY)
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+
+class DoctorPageSitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+
+class LabLocalityCitySitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_LOCALITY_CITY)
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+
+class LabCitySitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_CITY)
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+
+class LabPageSitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE)
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+
+sitemap_identifier_mapping = {
+    'SPECIALIZATION_LOCALITY_CITY': SpecializationLocalityCitySitemap,
+    'SPECIALIZATION_CITY': SpecializationCitySitemap,
+    'DOCTORS_LOCALITY_CITY': DoctorLocalityCitySitemap,
+    'DOCTORS_CITY': DoctorCitySitemap,
+    'DOCTOR_PAGE': DoctorPageSitemap,
+    'LAB_LOCALITY_CITY': LabLocalityCitySitemap,
+    'LAB_CITY': LabCitySitemap,
+    'LAB_PAGE': LabPageSitemap
+}
 
 
 def get_sitemap_urls(sitemap_identifier):
-    aa = EntityUrlSitemap()
-    aa.protocol = 'https'
-    return aa.get_urls()
+    sitemap_class = sitemap_identifier_mapping[sitemap_identifier]
+    sitemap_obj = sitemap_class()
+    sitemap_obj.protocol = 'https'
+    return sitemap_obj.get_urls()
