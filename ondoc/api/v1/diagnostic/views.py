@@ -126,6 +126,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             extras = entity.first().additional_info
             if extras.get('location_json'):
                 kwargs['location_json'] = extras.get('location_json')
+                kwargs['url'] = url
                 kwargs['parameters'] = get_lab_search_details(extras, request.query_params)
                 response = self.list(request, **kwargs)
                 return response
@@ -171,6 +172,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         if kwargs.get('location_json'):
             serializer.validated_data['location_json'] = kwargs['location_json']
+        if kwargs.get('url'):
+            serializer.validated_data['url'] = kwargs['url']
 
         parameters = serializer.validated_data
 
@@ -200,6 +203,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
         seo = None
+        breadcrumb = None
         if parameters.get('location_json'):
             locality = ''
             sublocality = ''
@@ -212,6 +216,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 if sublocality:
                     sublocality += ' '
 
+            if parameters.get('location_json') and parameters.get('location_json').get('breadcrum_url'):
+                breadcrumb_locality_url = parameters.get('location_json').get('breadcrum_url')
+
             title = "Diagnostic Centres & Labs "
             if locality:
                 title += "in " + sublocality + locality
@@ -221,10 +228,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 description += " in " + sublocality + locality
             description += " and book test online, check fees, packages prices and more at DocPrime."
             seo = {'title': title, "description": description}
+            if sublocality:
+                breadcrumb = [{
+                    'name': locality,
+                     'url': breadcrumb_locality_url
+                },
+                    {
+                        'name': sublocality,
+                        'url': parameters.get('url')
+                }]
 
         return Response({"result": serializer.data,
                          "count": count,'tests':tests,
-                         "seo": seo})
+                         "seo": seo, "breadcrumb": breadcrumb})
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
@@ -544,6 +560,21 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 home_pickup_charges = data["lab"].home_pickup_charges
             # TODO PM - call coupon function to calculate effective price
         start_dt = form_time_slot(data["start_date"], data["start_time"])
+
+        test_ids_list = list()
+        extra_details = list()
+        for obj in lab_test_queryset:
+            test_ids_list.append(obj.id)
+            extra_details.append({
+                "id": str(obj.test.id),
+                "name": str(obj.test.name),
+                "custom_deal_price": str(obj.custom_deal_price),
+                "computed_deal_price": str(obj.computed_deal_price),
+                "mrp": str(obj.mrp),
+                "computed_agreed_price": str(obj.computed_agreed_price),
+                "custom_agreed_price": str(obj.custom_agreed_price)
+            })
+
         profile_detail = {
             "name": data["profile"].name,
             "gender": data["profile"].gender,
@@ -564,7 +595,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
             "payment_type": data["payment_type"],
-            "lab_test": [x["id"] for x in lab_test_queryset.values("id")]
+            "lab_test": test_ids_list,
+            # "lab_test": [x["id"] for x in lab_test_queryset.values("id")],
+            "extra_details": extra_details
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address").id).first()

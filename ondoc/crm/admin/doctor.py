@@ -93,6 +93,8 @@ class DoctorQualificationInline(nested_admin.NestedTabularInline):
 class DoctorClinicTimingForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
+        if any(self.errors):
+            return
         start = cleaned_data.get("start")
         end = cleaned_data.get("end")
         fees = cleaned_data.get("fees")
@@ -912,7 +914,10 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         for form in formset.forms:
             if hasattr(form.instance, 'created_by'):
                 form.instance.created_by = request.user
-        formset.save()
+        try:
+            formset.save()
+        except Exception as e:
+            logger.error(e)
 
     def save_related(self, request, form, formsets, change):
         super(type(self), self).save_related(request, form, formsets, change)
