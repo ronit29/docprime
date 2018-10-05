@@ -107,4 +107,4 @@ def get_sitemap_urls(sitemap_identifier):
     sitemap_class = sitemap_identifier_mapping[sitemap_identifier]
     sitemap_obj = sitemap_class()
     sitemap_obj.protocol = 'https'
-    return sitemap_obj.get_urls()
+    return sitemap_obj
