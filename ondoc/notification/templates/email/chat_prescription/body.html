@@ -139,7 +139,7 @@
             <tr>
                 <td align="center" valign="top" style="text-align: center;">
                     <div style="float: right; width:100px; height:50px; text-align: center; font-size: 9px; font-style: italic; margin-bottom: 10px; padding:0px 10px;">
-                        <img src="{{signatureurl}}" style="width:100px; height:50px;">
+                        {% if signatureurl %}<img src="{{signatureurl}}" style="width:100px; height:50px;">{% endif %}
                     </div>
                 </td>
             </tr>
