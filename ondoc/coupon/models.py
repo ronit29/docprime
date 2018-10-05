@@ -15,6 +15,7 @@ class Coupon(auth_model.TimeStampedModel):
     validity = models.PositiveIntegerField(blank=True, null=True)
     type = models.IntegerField(choices=TYPE_CHOICES)
     count = models.PositiveIntegerField()
+    description = models.CharField(max_length=500, default="")
 
     def __str__(self):
         return self.code
