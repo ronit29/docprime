@@ -5,9 +5,21 @@ from ondoc.account import models as account_model
 
 class Insurer(auth_model.TimeStampedModel):
     name = models.CharField(max_length=100)
+    is_disabeld = models.BooleanField(default=False)
+    is_live = models.BooleanField(default=False)
 
     class Meta:
         db_table = "insurer"
+
+
+class InsurerFloat(auth_model.TimeStampedModel):
+
+    insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
+    max_float = models.PositiveIntegerField(default=None)
+    current_float = models.PositiveIntegerField(default=None)
+
+    class Meta:
+        db_table = "insurer_float"
 
 
 class Insurance(auth_model.TimeStampedModel):
@@ -66,6 +78,52 @@ class PgInsurance(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "pg_insurance"
+
+
+class InsurancePlans(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
+    type = models.CharField(max_length=100)
+    amount = models.PositiveIntegerField(default=None)
+    is_disabled = models.BooleanField(default=False)
+    is_live = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "insurance_plans"
+
+
+class InsuranceThreshold(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
+    insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.CASCADE)
+    opd_count_limit = models.PositiveIntegerField(default=None)
+    opd_amount_limit = models.PositiveIntegerField(default=None)
+    lab_count_limit = models.PositiveIntegerField(default=None)
+    lab_amount_limit = models.PositiveIntegerField(default=None)
+    min_age = models.PositiveIntegerField(default=None)
+    max_age = models.PositiveIntegerField(default=None)
+    tenure = models.PositiveIntegerField(default=None)
+    is_disabled = models.BooleanField(default=False)
+    is_live = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "insurance_threshold"
+
+
+class InsuredMembers(auth_model.TimeStampedModel):
+
+    insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.CASCADE)
+    insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
+    first_name = models.CharField(max_length=50, null=False)
+    last_name = models.CharField(max_length=50, null=False)
+    dob = models.DateTimeField(null=False)
+    email = models.EmailField(max_length=100)
+    relation = models.CharField(max_length=50)
+    pincode = models.PositiveIntegerField(default=None)
+    address = models.TextField(default=None)
+
+    class Meta:
+        db_table = "insured_members"
+
+
 
 
 # class InsuranceTransaction(auth_model.TimeStampedModel):

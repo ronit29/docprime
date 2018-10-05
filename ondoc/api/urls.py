@@ -14,6 +14,7 @@ from .v1.common.router import urlpatterns as common_url
 from .v1.location.router import urlpatterns as location_url
 from .v1.tracking.router import urlpatterns as track_url
 from .v1.geoip.router import urlpatterns as geoip_url
+from .v1.insurance.router import urlpatterns as insurance_url
 # from .v1.account.router import urlpatterns as acct_url
 
 
@@ -32,4 +33,5 @@ urlpatterns = [
     path('v1/location/', include(location_url)),
     path('v1/tracking/', include(track_url)),
     path('v1/geoip/', include(geoip_url)),
+    path('v1/insurance/', include(insurance_url)),
 ]
