@@ -1,4 +1,4 @@
-from ondoc.geoip.models import GeoIPEntries, VisitorIpAddress
+from ondoc.geoip.models import GeoIPEntries, VisitorIpAddress, AdwordLocationCriteria
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django.conf import settings
@@ -120,3 +120,25 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
         else:
             resp = self.DOCTOR_QUERY_VALUE
         return resp
+
+
+class AdwordLocationCriteriaViewset(viewsets.GenericViewSet):
+
+    def get_queryset(self):
+        return AdwordLocationCriteria.objects.filter(status=AdwordLocationCriteria.Status.Active)
+
+    @transaction.non_atomic_requests
+    def retrieve(self, request, criteria_id):
+        if not criteria_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = self.get_queryset().filter(criteria_id=criteria_id)
+        if queryset.exists():
+            data = {}
+            obj = queryset.first()
+            if obj.latlong:
+                data['latitude'] = obj.latlong.y
+                data['longitude'] = obj.latlong.x
+            return Response(status=status.HTTP_200_OK, data=data)
+        else:
+            return Response({"error": "Not Found"}, status=status.HTTP_404_NOT_FOUND)

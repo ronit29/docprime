@@ -23,6 +23,7 @@ class OnlineLead(TimeStampedModel):
     email = models.EmailField(blank=False)
     matrix_lead_id = models.IntegerField(null=True)
     utm_params = JSONField(blank=True, null=True)
+    source = models.CharField(max_length=128, null=True)
 
     def __str__(self):
         return self.name

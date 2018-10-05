@@ -23,7 +23,7 @@ from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital,
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken)
-from ondoc.notification.models import SmsNotification
+from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -1389,7 +1389,19 @@ class OnlineLeadViewSet(GenericViewSet):
 
     def create(self, request):
         resp = {}
-        serializer = serializers.OnlineLeadSerializer(data=request.data)
+        data = request.data
+
+        if request.user_agent.is_mobile or request.user_agent.is_tablet:
+            source = request.user_agent.os.family
+        elif request.user_agent.is_pc:
+            source = "WEB %s" % (data.get('source', ''))
+        else:
+            source = "Unknown"
+
+        data['source'] = source
+        if not data['city_name']:
+            data['city_name'] = 0
+        serializer = serializers.OnlineLeadSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         data = serializer.save()
         if data.id:
@@ -1419,8 +1431,17 @@ class SendBookingUrlViewSet(GenericViewSet):
     def send_booking_url(self, request, order_id):
         type = request.data.get('type')
         agent_token = AgentToken.objects.create_token(user=request.user, order_id=order_id)
+        order = Order.objects.filter(pk=order_id).first()
+        if not order:
+            return Response({"status": 1})
+        profile_id = order.action_data.get('profile')
+        user_profile = UserProfile.objects.filter(pk=profile_id).first()
+        if not user_profile:
+            return Response({"status": 1})
         booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
-                                                       phone_number=request.user.phone_number)
+                                                       phone_number=str(user_profile.phone_number))
+        EmailNotification.send_booking_url(token=agent_token.token, order_id=order_id, email=user_profile.email)
+
         return Response({"status": 1})
 
 
