@@ -93,6 +93,8 @@ class DoctorQualificationInline(nested_admin.NestedTabularInline):
 class DoctorClinicTimingForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
+        if any(self.errors):
+            return
         start = cleaned_data.get("start")
         end = cleaned_data.get("end")
         fees = cleaned_data.get("fees")

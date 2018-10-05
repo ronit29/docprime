@@ -9,6 +9,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from . import serializers
 from django.conf import settings
 import requests, re, json
@@ -18,6 +19,7 @@ User = get_user_model()
 
 class ChatSearchedItemsViewSet(viewsets.GenericViewSet):
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         medical_conditions = models.ChatMedicalCondition.objects.all().values("id", "name")
         return Response({"conditions": medical_conditions})
@@ -29,6 +31,7 @@ class DoctorsListViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated, )
     queryset = doc_models.Doctor.objects.none()
 
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         queryset = doc_models.Doctor.objects.all().order_by('id')[:20]
         # serializer = serializers.DoctorListSerializer(queryset, many=True)
@@ -41,6 +44,7 @@ class DoctorProfileViewSet(viewsets.GenericViewSet):
 
     queryset = doc_models.DoctorMapping.objects
 
+    @transaction.non_atomic_requests
     def retrieve(self, request, pk):
         doctor = get_object_or_404(doc_models.Doctor, id=pk)
         response = []
@@ -58,6 +62,7 @@ class UserProfileViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, )
 
+    @transaction.non_atomic_requests
     def retrieve(self, request):
         user_id = request.user.id
         chat_domain = settings.CHAT_API_URL

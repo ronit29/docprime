@@ -148,7 +148,10 @@ class ServerHitMonitor(GenericViewSet):
             refferar = data.get('refferar', None)
             ip_address = data.get('ip', None)
             type = data.get('type', None)
-            agent = request.META.get('HTTP_USER_AGENT')
+            agent = data.get('agent',None)
+            if not agent:
+                agent = request.META.get('HTTP_USER_AGENT')
+
             data = data.get('data', {})
             if url:
                 server_hit = track_models.ServerHitMonitor(url=url, refferar=refferar, ip_address=ip_address, type=type,
