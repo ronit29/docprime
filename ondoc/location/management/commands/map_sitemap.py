@@ -12,6 +12,7 @@ def map_sitemaps():
         file = template.render({'urlset': aa})
         print("success for ", sitemap_identifier)
 
+
 class Command(BaseCommand):
     def handle(self, **options):
         map_sitemaps()
