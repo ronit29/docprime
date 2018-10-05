@@ -126,7 +126,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(BillingAccount,
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
-                                                           SpecializationField, PracticeSpecialization,
+                                                           SpecializationField,
                                                            SpecializationDepartmentMapping,Procedure
                                                            )
 
