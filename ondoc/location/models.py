@@ -135,6 +135,17 @@ class EntityLocationRelationship(TimeStampedModel):
 
 
 class EntityUrls(TimeStampedModel):
+    class SitemapIdentifier(Choices):
+        SPECIALIZATION_LOCALITY_CITY = 'SPECIALIZATION_LOCALITY_CITY'
+        SPECIALIZATION_CITY = 'SPECIALIZATION_CITY'
+        DOCTORS_LOCALITY_CITY = 'DOCTORS_LOCALITY_CITY'
+        DOCTORS_CITY = 'DOCTORS_CITY'
+        DOCTOR_PAGE = 'DOCTOR_PAGE'
+
+        LAB_LOCALITY_CITY = 'LAB_LOCALITY_CITY'
+        LAB_CITY = 'LAB_CITY'
+        LAB_PAGE = 'LAB_PAGE'
+
     class UrlType(Choices):
         PAGEURL = 'PAGEURL'
         SEARCHURL = 'SEARCHURL'
@@ -146,6 +157,7 @@ class EntityUrls(TimeStampedModel):
     entity_id = models.PositiveIntegerField(null=True, default=None)
     is_valid = models.BooleanField(default=True)
     count = models.IntegerField(max_length=30, null=True, default=0)
+    sitemap_identifier = models.CharField(max_length=28, null=True, choices=SitemapIdentifier.as_choices())
 
     @property
     def additional_info(self):
@@ -164,6 +176,7 @@ class EntityUrls(TimeStampedModel):
                     location_json = {}
                     count = 0
                     if location.type == 'LOCALITY':
+                        sitemap_identifier = cls.SitemapIdentifier.SPECIALIZATION_CITY
                         url = "{prefix}-in-{locality}-sptcit".format(prefix=specialization.name, locality=location.value)
                         # Storing the locality data for fallback cases.
                         location_json['locality_id'] = location.id
@@ -174,7 +187,8 @@ class EntityUrls(TimeStampedModel):
                                              float(location_json['locality_latitude']))
                         distance = 15000
 
-                    elif location.type == 'SUBLOCALITY':
+                    else:
+                        sitemap_identifier = cls.SitemapIdentifier.SPECIALIZATION_LOCALITY_CITY
                         ea_locality = EntityAddress.objects.get(id=location.parent)
                         url = "{prefix}-in-{sublocality}-{locality}-sptlitcit".format(prefix=specialization.name, sublocality=location.value, locality=ea_locality.value)
                         # storing the sublocality and locality data for fallback cases.
@@ -214,13 +228,16 @@ class EntityUrls(TimeStampedModel):
                         url_obj.save()
                     else:
                         entity_url_obj = cls(url=url, entity_type='Doctor',
-                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count)
+                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count,
+                                             sitemap_identifier=sitemap_identifier)
                         entity_url_obj.save()
                         print(url)
 
                 if location.type == 'LOCALITY':
+                    sitemap_identifier = cls.SitemapIdentifier.DOCTORS_CITY
                     doctor_in_city_url = "doctors-in-{location}-sptcit".format(location=location.value)
                 else:
+                    sitemap_identifier = cls.SitemapIdentifier.DOCTORS_LOCALITY_CITY
                     ea_locality = EntityAddress.objects.get(id=location.parent)
                     doctor_in_city_url = "doctors-in-{sublocality}-{locality}-sptlitcit".\
                         format(sublocality=location.value, locality=ea_locality.value)
@@ -242,7 +259,8 @@ class EntityUrls(TimeStampedModel):
                     else:
                         entity_url_obj = cls(url=doctor_in_city_url,
                                              entity_type='Doctor',
-                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count)
+                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count,
+                                             sitemap_identifier=sitemap_identifier)
                         entity_url_obj.save()
                         print(doctor_in_city_url)
 
@@ -264,9 +282,9 @@ class EntityUrls(TimeStampedModel):
             locations_set = EntityAddress.objects.filter \
                 (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
             for location in locations_set:
-                count = 0
                 location_json = {}
                 if location.type == 'LOCALITY':
+                    sitemap_identifier = cls.SitemapIdentifier.LAB_CITY
                     url = "labs-in-{locality}-lbcit".format(locality=location.value)
                     # Storing the locality data for fallback cases.
                     location_json['locality_id'] = location.id
@@ -278,6 +296,7 @@ class EntityUrls(TimeStampedModel):
                     distance = 15000
 
                 else:
+                    sitemap_identifier = cls.SitemapIdentifier.LAB_LOCALITY_CITY
                     ea_locality = EntityAddress.objects.get(id=location.parent)
                     url = "labs-in-{sublocality}-{locality}-lblitcit".format(sublocality=location.value, locality=ea_locality.value)
                     # storing the sublocality and locality data for fallback cases.
@@ -311,7 +330,8 @@ class EntityUrls(TimeStampedModel):
                     url_obj.save()
                 else:
                     entity_url_obj = cls(url=url, entity_type='Lab',
-                                         url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count)
+                                         url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count,
+                                         sitemap_identifier=sitemap_identifier)
                     entity_url_obj.save()
                     print(url)
 
@@ -328,9 +348,11 @@ class EntityUrls(TimeStampedModel):
     def create_page_url(cls, entity_object):
         try:
             if entity_object.__class__.__name__.upper() == 'DOCTOR':
+                sitemap_identifier = cls.SitemapIdentifier.DOCTOR_PAGE
                 forname = 'doctors'
                 identifier = 'spt'
             else:
+                sitemap_identifier = cls.SitemapIdentifier.LAB_PAGE
                 forname = 'labs'
                 identifier = 'lb'
             entity_helper = entity_as_mapping[entity_object.__class__.__name__.upper()]
@@ -367,7 +389,8 @@ class EntityUrls(TimeStampedModel):
                     entity_url_objs = cls.objects.filter(entity_id=entity_object.id, entity_type=entity_object.__class__.__name__, url_type='PAGEURL', is_valid=True)
                     if not entity_url_objs.exists():
                         entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
-                                             url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id, extras=json.dumps(extra))
+                                             url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id,
+                                             extras=json.dumps(extra), sitemap_identifier=sitemap_identifier)
                         entity_url_obj.save()
                     else:
                         entity_url_obj = entity_url_objs.first()
@@ -377,7 +400,7 @@ class EntityUrls(TimeStampedModel):
 
                             entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
                                                  url_type=cls.UrlType.PAGEURL, extras=json.dumps(extra),
-                                                 entity_id=entity_object.id)
+                                                 entity_id=entity_object.id,sitemap_identifier=sitemap_identifier)
                             entity_url_obj.save()
             return True
 
