@@ -544,6 +544,21 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 home_pickup_charges = data["lab"].home_pickup_charges
             # TODO PM - call coupon function to calculate effective price
         start_dt = form_time_slot(data["start_date"], data["start_time"])
+
+        test_ids_list = list()
+        extra_details = list()
+        for obj in lab_test_queryset:
+            test_ids_list.append(obj.id)
+            extra_details.append({
+                "id": str(obj.test.id),
+                "name": str(obj.test.name),
+                "custom_deal_price": str(obj.custom_deal_price),
+                "computed_deal_price": str(obj.computed_deal_price),
+                "mrp": str(obj.mrp),
+                "computed_agreed_price": str(obj.computed_agreed_price),
+                "custom_agreed_price": str(obj.custom_agreed_price)
+            })
+
         profile_detail = {
             "name": data["profile"].name,
             "gender": data["profile"].gender,
@@ -564,7 +579,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
             "payment_type": data["payment_type"],
-            "lab_test": [x["id"] for x in lab_test_queryset.values("id")]
+            "lab_test": test_ids_list,
+            # "lab_test": [x["id"] for x in lab_test_queryset.values("id")],
+            "extra_details": extra_details
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address").id).first()
