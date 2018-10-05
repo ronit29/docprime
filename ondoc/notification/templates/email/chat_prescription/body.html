@@ -87,7 +87,7 @@
                             <ul style="font-size: 13px;">
                                 {% for value in medicines %}
                                     <li style="padding: 2px 0px; font-weight: 600;">{{value.MedicineName}}
-                                        <p style="    margin-top: 0px;color: #7f7979; font-weight: 500;">{{value.qunatity}}, {{value.selectedNoOfTimes}}{% if value.times %}, {{value.times|join:"| "}}{% endif %} {% if value.mealtimes %}({{value.mealtimes}}){% endif %} {{value.selectedmedDays}}{% if value.medicineInstructions %} ({{ value.medicineInstructions }}){% endif %}</p>
+                                        <p style="    margin-top: 0px;color: #7f7979; font-weight: 500;">{{value.qunatity}}, {{value.selectedNoOfTimes}}{% if value.times %}, {{value.times|join:"| "}}{% endif %} {% if value.mealtimes %}({{value.mealtimes}}){% endif %} {{value.selectedmedDays}}{% if value.medicineInstructions %} {{ value.medicineInstructions }}{% endif %}</p>
                                     </li>
                                 {% endfor %}
                             </ul>
