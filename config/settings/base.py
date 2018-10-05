@@ -89,7 +89,8 @@ DJANGO_APPS = (
     'django.contrib.gis',
     'reversion',
     'storages',
-
+    'django.contrib.sites',
+    'django.contrib.sitemaps',
 )
 
 THIRD_PARTY_APPS = (
@@ -198,6 +199,8 @@ STATICFILES_FINDERS = (
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = str(APPS_DIR('media'))
+
+SITE_ID = 1
 
 # TEMPLATES
 # ------------------------------------------------------------------------------
