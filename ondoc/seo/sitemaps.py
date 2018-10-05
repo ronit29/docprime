@@ -8,7 +8,8 @@ class SpecializationLocalityCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.SPECIALIZATION_LOCALITY_CITY)
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.SPECIALIZATION_LOCALITY_CITY)\
+            .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
@@ -19,7 +20,8 @@ class SpecializationCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.SPECIALIZATION_CITY)
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.SPECIALIZATION_CITY)\
+            .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
@@ -30,7 +32,8 @@ class DoctorLocalityCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)\
+            .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
@@ -41,7 +44,8 @@ class DoctorCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTORS_CITY)
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTORS_CITY)\
+            .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
@@ -52,7 +56,8 @@ class DoctorPageSitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE)\
+            .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
@@ -63,7 +68,8 @@ class LabLocalityCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_LOCALITY_CITY)
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_LOCALITY_CITY)\
+            .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
@@ -74,7 +80,7 @@ class LabCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_CITY)
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_CITY).order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
@@ -85,7 +91,7 @@ class LabPageSitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE)
+        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
