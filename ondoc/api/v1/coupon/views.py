@@ -20,12 +20,12 @@ User = get_user_model()
 class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
     def list(self, request, *args, **kwargs):
-        if request.user.is_authenticated:
+        if request.user.last_login:
             user = request.user
         else:
             return Response({
                 'status': 'Failed',
-                'message': 'No Authenticated User Found'})
+                'message': 'User not Logged In'})
         applicable_coupons = []
         all_coupons_data = coupon_models.Coupon.objects.all()
         for coupon in all_coupons_data:
