@@ -137,6 +137,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     entity = GenericRelation(location_models.EntityLocationRelationship)
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
 
     def __str__(self):
         return self.name
@@ -181,8 +182,19 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                          [self.sublocality, self.locality] if value]
         return ", ".join(address_items)
 
+    def update_live_status(self):
+
+        if not self.is_live and ( self.data_status == self.QC_APPROVED and self.enabled == True):
+
+            self.is_live = True
+            if not self.live_at:
+                self.live_at = datetime.datetime.now()
+        if self.is_live and (self.data_status != self.QC_APPROVED or self.enabled == False):
+            self.is_live = False
+
 
     def save(self, *args, **kwargs):
+        self.update_live_status()
         build_url = True
         if self.is_live and self.id and self.location:
             if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
