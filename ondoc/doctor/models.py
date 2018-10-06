@@ -137,7 +137,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     entity = GenericRelation(location_models.EntityLocationRelationship)
-    enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -337,7 +337,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
     billing_merchant = GenericRelation(auth_model.BillingAccount)
-    enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=True,  blank=True)
 
     def __str__(self):
         return self.name
