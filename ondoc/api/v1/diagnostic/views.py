@@ -9,7 +9,7 @@ from ondoc.authentication.models import UserProfile, Address
 from ondoc.notification.models import EmailNotification
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone, get_lab_search_details
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone, get_lab_search_details, TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -31,7 +31,6 @@ from django.http import Http404
 from django.conf import settings
 import hashlib
 from rest_framework import status
-from collections import OrderedDict
 from django.utils import timezone
 from ondoc.diagnostic import models
 from ondoc.authentication import models as auth_models
@@ -44,7 +43,6 @@ import copy
 import re
 import datetime
 from django.contrib.auth import get_user_model
-from decimal import Decimal
 User = get_user_model()
 
 
@@ -804,104 +802,6 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
         serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
                                                                       context={"lab": lab_obj})
         return Response(serializer.data)
-
-
-class TimeSlotExtraction(object):
-    MORNING = "Morning"
-    AFTERNOON = "Afternoon"
-    EVENING = "Evening"
-    TIME_SPAN = 15  # In minutes
-    timing = dict()
-    price_available = dict()
-
-    def __init__(self):
-        for i in range(7):
-            self.timing[i] = dict()
-            self.price_available[i] = dict()
-
-    def form_time_slots(self, day, start, end, price=None, is_available=True,
-                        deal_price=None, mrp=None, is_doctor=False):
-        start = Decimal(str(start))
-        end = Decimal(str(end))
-        time_span = self.TIME_SPAN
-
-        float_span = (Decimal(time_span) / Decimal(60))
-        if not self.timing[day].get('timing'):
-            self.timing[day]['timing'] = dict()
-            self.timing[day]['timing'][self.MORNING] = OrderedDict()
-            self.timing[day]['timing'][self.AFTERNOON] = OrderedDict()
-            self.timing[day]['timing'][self.EVENING] = OrderedDict()
-        temp_start = start
-        while temp_start <= end:
-            day_slot, am_pm = self.get_day_slot(temp_start)
-            time_str = self.form_time_string(temp_start, am_pm)
-            self.timing[day]['timing'][day_slot][temp_start] = time_str
-            price_available = {"price": price, "is_available": is_available}
-            if is_doctor:
-                price_available.update({
-                    "mrp": mrp,
-                    "deal_price": deal_price
-                })
-            self.price_available[day][temp_start] = price_available
-            temp_start += float_span
-
-    def get_day_slot(self, time):
-        am = 'AM'
-        pm = 'PM'
-        if time < 12:
-            return self.MORNING, am
-        elif time < 16:
-            return self.AFTERNOON, pm
-        else:
-            return self.EVENING, pm
-
-    def form_time_string(self, time, am_pm):
-
-        day_time_hour = int(time)
-        day_time_min = (time - day_time_hour) * 60
-
-        if day_time_hour > 12:
-            day_time_hour -= 12
-
-        day_time_hour_str = str(int(day_time_hour))
-        if int(day_time_hour) < 10:
-            day_time_hour_str = '0' + str(int(day_time_hour))
-
-        day_time_min_str = str(int(day_time_min))
-        if int(day_time_min) < 10:
-            day_time_min_str = '0' + str(int(day_time_min))
-
-        time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
-
-        return time_str
-
-    def get_timing_list(self):
-        whole_timing_data = dict()
-        for i in range(7):
-            whole_timing_data[i] = list()
-            pa = self.price_available[i]
-            if self.timing[i].get('timing'):
-                # data = self.format_data(self.timing[i]['timing'][self.MORNING], pa)
-                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
-                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
-                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
-
-        return whole_timing_data
-
-    def format_data(self, data, day_time, pa):
-        data_list = list()
-        for k, v in data.items():
-            if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
-                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                  "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
-                                  "is_available": pa[k]["is_available"]})
-            else:
-                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                  "is_available": pa[k]["is_available"]})
-        format_data = dict()
-        format_data['title'] = day_time
-        format_data['timing'] = data_list
-        return format_data
 
 
 class LabReportFileViewset(mixins.CreateModelMixin,
