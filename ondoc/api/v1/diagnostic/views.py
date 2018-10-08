@@ -430,7 +430,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row["lab"] = temp_var[row["id"]]
 
             if row["lab"].always_open:
-                lab_timing = "00:00 AM - 23:45 PM"
+                lab_timing = "12:00 AM - 11:45 PM"
                 lab_timing_data = [{
                     "start": 0.0,
                     "end": 23.75
