@@ -192,7 +192,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
     entity = GenericRelation(location_models.EntityLocationRelationship)
-    enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -875,6 +875,7 @@ class LabAppointment(TimeStampedModel):
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
         lab_ids = appointment_data.pop("lab_test")
+        appointment_data.pop("extra_details", None)
         app_obj = cls.objects.create(**appointment_data)
         app_obj.lab_test.add(*lab_ids)
         return app_obj

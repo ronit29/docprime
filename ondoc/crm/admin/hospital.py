@@ -191,8 +191,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             obj.data_status = 2
         if '_qc_approve' in request.POST:
             obj.data_status = 3
-            obj.is_live = True
-            obj.live_at = datetime.datetime.now()
+            #obj.is_live = True
+            #obj.live_at = datetime.datetime.now()
             obj.qc_approved_at = datetime.datetime.now()
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
