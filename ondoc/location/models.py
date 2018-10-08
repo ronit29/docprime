@@ -224,12 +224,12 @@ class EntityUrls(TimeStampedModel):
                     url_qs = cls.objects.filter(url=url)
                     if url_qs.exists():
                         url_obj = url_qs.first()
-                        url_obj.extras = json.dumps(extra)
+                        url_obj.extras = extra
                         url_obj.count = count
                         url_obj.save()
                     else:
                         entity_url_obj = cls(url=url, entity_type='Doctor',
-                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count,
+                                             url_type=cls.UrlType.SEARCHURL, extras=extra, count=count,
                                              sitemap_identifier=sitemap_identifier)
                         entity_url_obj.save()
                         print(url)
@@ -254,13 +254,13 @@ class EntityUrls(TimeStampedModel):
                     url_qs = cls.objects.filter(url=doctor_in_city_url)
                     if url_qs.exists():
                         url_obj = url_qs.first()
-                        url_obj.extras = json.dumps(extra)
+                        url_obj.extras = extra
                         url_obj.count = count
                         url_obj.save()
                     else:
                         entity_url_obj = cls(url=doctor_in_city_url,
                                              entity_type='Doctor',
-                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count,
+                                             url_type=cls.UrlType.SEARCHURL, extras=extra, count=count,
                                              sitemap_identifier=sitemap_identifier)
                         entity_url_obj.save()
                         print(doctor_in_city_url)
@@ -326,12 +326,12 @@ class EntityUrls(TimeStampedModel):
                 url_qs = cls.objects.filter(url=url)
                 if url_qs.exists():
                     url_obj = url_qs.first()
-                    url_obj.extras = json.dumps(extra)
+                    url_obj.extras = extra
                     url_obj.count = count
                     url_obj.save()
                 else:
                     entity_url_obj = cls(url=url, entity_type='Lab',
-                                         url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count,
+                                         url_type=cls.UrlType.SEARCHURL, extras=extra, count=count,
                                          sitemap_identifier=sitemap_identifier)
                     entity_url_obj.save()
                     print(url)
@@ -393,7 +393,7 @@ class EntityUrls(TimeStampedModel):
                     if not entity_url_objs.exists():
                         entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
                                              url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id,
-                                             extras=json.dumps(extra), sitemap_identifier=sitemap_identifier)
+                                             extras=extra, sitemap_identifier=sitemap_identifier)
                         entity_url_obj.save()
                     else:
                         entity_url_obj = entity_url_objs.first()
@@ -402,8 +402,11 @@ class EntityUrls(TimeStampedModel):
                             entity_url_obj.save()
 
                             entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
-                                                 url_type=cls.UrlType.PAGEURL, extras=json.dumps(extra),
+                                                 url_type=cls.UrlType.PAGEURL, extras=extra,
                                                  entity_id=entity_object.id,sitemap_identifier=sitemap_identifier)
+                            entity_url_obj.save()
+                        else:
+                            entity_url_obj.extras = extra
                             entity_url_obj.save()
             return True
 
