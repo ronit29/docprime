@@ -53,3 +53,16 @@ class InsuranceThresholdSerializer(serializers.Serializer):
         model = InsuranceThreshold
         field = {'id', 'lab_amount_limit', 'lab_count_limit', 'opd_count_limit', 'opd_amount_limit',
                  'max_age', 'min_age', 'tenure'}
+
+
+class InsuredMemberSerializer(serializers.Serializer):
+
+    first_name = serializers.CharField(max_length=50)
+    last_name = serializers.CharField(max_length=50)
+    dob = serializers.DateField()
+    email = serializers.EmailField()
+    relation = serializers.CharField(max_length=50)
+    address = serializers.CharField(max_length=250)
+    pincode = serializers.IntegerField()
+
+

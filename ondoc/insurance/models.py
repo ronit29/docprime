@@ -119,6 +119,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
     relation = models.CharField(max_length=50)
     pincode = models.PositiveIntegerField(default=None)
     address = models.TextField(default=None)
+    profile = models.ForeignKey(auth_model.UserProfile, on_delete=models.SET_NULL, null=True)
 
     class Meta:
         db_table = "insured_members"
