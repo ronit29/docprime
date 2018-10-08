@@ -91,12 +91,21 @@ class RatingsViewSet(viewsets.GenericViewSet):
 
 
 
-class GetComplimentViewSet(viewsets.GenericViewSet):
+class GetComplementViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsConsumer)
 
-    def get_compliments(self, request):
-        serializer = serializers.ReviewComplimentSerializer.get_compliments(request)
-        resp={}
-        resp['compliment'] = serializer
-        return Response(resp)
+    def get_complements(self, request):
+        serializer = serializers.ReviewComplimentSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        type = valid_data.get('type')
+        complement_data = ReviewCompliments.objects.filter(type=type).all()
+        if type == ReviewCompliments.DOCTOR:
+            body_serializer = serializers.GetComplementSerializer(complement_data, many=True, context={'request': request})
+        elif type == ReviewCompliments.LAB:
+            body_serializer = serializers.GetComplementSerializer(complement_data, many=True, context={'request': request})
+
+        return Response(body_serializer.data)
 
 

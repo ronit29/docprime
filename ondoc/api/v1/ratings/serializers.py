@@ -25,30 +25,13 @@ class RatingsModelSerializer(serializers.ModelSerializer):
         model = RatingsReview
         fields = ('id', 'user', 'ratings', 'review', 'is_live', 'updated_at')
 
+
 class ReviewComplimentSerializer(serializers.Serializer):
+    type = serializers.ChoiceField(choices=ReviewCompliments.TYPE_CHOICES)
+    class Meta:
+        model = ReviewCompliments
+        fields = ('id', 'message', 'rating_level', 'type')
 
-    def get_compliments(request):
-        parameters = request.query_params
-        profile = parameters['profile']
-        rating = int(parameters['rating'])
-        compliment_data={}
-        review_complement_data = ReviewCompliments.objects.all()
-        if profile=='doctor':
-            if rating <= 3:
-                compliment_data = core_serializer.serialize('json', review_complement_data,
-                                                        fields=('doc_low_rating',))
-            else:
-                compliment_data = core_serializer.serialize('json', review_complement_data,
-                                                        fields=('doc_high_rating',))
-        elif profile=='lab':
-            if rating <= 3:
-                compliment_data = core_serializer.serialize('json', review_complement_data,
-                                                        fields=('lab_low_rating',))
-            else:
-                compliment_data = core_serializer.serialize('json', review_complement_data,
-                                                        fields=('lab_high_rating',))
-
-        return compliment_data
 
 class RatingUpdateBodySerializer(serializers.Serializer):
     rating = serializers.IntegerField(max_value=5)
