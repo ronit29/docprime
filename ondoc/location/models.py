@@ -376,12 +376,14 @@ class EntityUrls(TimeStampedModel):
                             bread_url = slugify('{prefix}-in-{locality}-{identifier}cit'
                                                 .format(identifier=identifier, prefix=forname,
                                                         locality=address_obj_parent.value))
-                            breadcrums.append({'name': address_obj_parent.value, 'url': bread_url})
+                            if EntityUrls.objects.filter(url=bread_url).exists():
+                                breadcrums.append({'name': address_obj_parent.value, 'url': bread_url})
 
                             bread_url = slugify('{prefix}-in-{sublocality}-{locality}-{identifier}litcit'.
                                                 format(prefix=forname, sublocality=address_obj.value,
                                                        locality=address_obj_parent.value, identifier=identifier))
-                            breadcrums.append({'name': address_obj.value, 'url': bread_url})
+                            if EntityUrls.objects.filter(url=bread_url).exists():
+                                breadcrums.append({'name': address_obj.value, 'url': bread_url})
 
                     extra = {'related_entity_id': entity_object.id, 'location_id': page_url_dict.get('location_id'),
                              'breadcrums': breadcrums}
