@@ -36,7 +36,8 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
-
+from ondoc.ratings_review.models import RatingsReview
+from ondoc.crm.admin.ratings import RatingsReviewAdmin
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -98,3 +99,4 @@ admin.site.register(ConsumerAccount)
 admin.site.register(TestParameter, TestParameterAdmin)
 admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
 #admin.site.register(Procedure, ProcedureAdmin)
+admin.site.register(RatingsReview, RatingsReviewAdmin)

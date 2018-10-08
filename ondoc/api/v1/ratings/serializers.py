@@ -49,3 +49,8 @@ class ReviewComplimentSerializer(serializers.Serializer):
                                                         fields=('lab_high_rating',))
 
         return compliment_data
+
+class RatingUpdateBodySerializer(serializers.Serializer):
+    rating = serializers.IntegerField(max_value=5)
+    review = serializers.CharField(max_length=500)
+    id = serializers.IntegerField()

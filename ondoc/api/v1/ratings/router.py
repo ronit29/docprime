@@ -10,5 +10,7 @@ urlpatterns = [
     path('list', RatingsViewSet.as_view({'get': 'list'}), name='get-ratings'),
     path('retrieve/<int:pk>', RatingsViewSet.as_view({'get': 'retrieve'}), name='get-ratings'),
     path('getcompliments', GetComplimentViewSet.as_view({'get': 'get_compliments'}), name='get-compliments'),
+    path('update', RatingsViewSet.as_view({'post' : 'update'}), name='update-rating'),
 ]
 
+# RatingsRevie.objects.filter(pk=idwala).update(rating=newRating)
