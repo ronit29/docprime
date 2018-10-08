@@ -909,14 +909,14 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             form.base_fields['assigned_to'].disabled = True
         return form
 
-    def save_formset(self, request, form, formset, change):
-        for form in formset.forms:
-            if hasattr(form.instance, 'created_by'):
-                form.instance.created_by = request.user
-        try:
-            formset.save()
-        except Exception as e:
-            logger.error(e)
+    # def save_formset(self, request, form, formset, change):
+    #     for form in formset.forms:
+    #         if hasattr(form.instance, 'created_by'):
+    #             form.instance.created_by = request.user
+    #     try:
+    #         formset.save()
+    #     except Exception as e:
+    #         logger.error(e)
 
     def save_related(self, request, form, formsets, change):
         super(type(self), self).save_related(request, form, formsets, change)
