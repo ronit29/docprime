@@ -675,6 +675,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         breadcrums = None
         if entity.exists():
             breadcrums = entity.first().additional_info.get('breadcrums')
+            if breadcrums:
+                return breadcrums
         return breadcrums
 
     def get_hospitals(self, obj):

@@ -13,6 +13,7 @@ from ondoc.authentication.models import TimeStampedModel
 from django.contrib.gis.geos import Point, GEOSGeometry
 from django.template.defaultfilters import slugify
 import datetime
+from django.contrib.postgres.fields import JSONField
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -153,7 +154,7 @@ class EntityUrls(TimeStampedModel):
     url = models.CharField(blank=False, null=True, max_length=500, unique=True, db_index=True)
     url_type = models.CharField(max_length=24, choices=UrlType.as_choices(), null=True)
     entity_type = models.CharField(max_length=24, null=True)
-    extras = models.TextField(default=json.dumps({}))
+    extras = JSONField()
     entity_id = models.PositiveIntegerField(null=True, default=None)
     is_valid = models.BooleanField(default=True)
     count = models.IntegerField(max_length=30, null=True, default=0)
@@ -161,7 +162,7 @@ class EntityUrls(TimeStampedModel):
 
     @property
     def additional_info(self):
-        return json.loads(self.extras)
+        return self.extras
 
     @classmethod
     def create_doctor_search_urls(cls):
@@ -223,12 +224,12 @@ class EntityUrls(TimeStampedModel):
                     url_qs = cls.objects.filter(url=url)
                     if url_qs.exists():
                         url_obj = url_qs.first()
-                        url_obj.extras = json.dumps(extra)
+                        url_obj.extras = extra
                         url_obj.count = count
                         url_obj.save()
                     else:
                         entity_url_obj = cls(url=url, entity_type='Doctor',
-                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count,
+                                             url_type=cls.UrlType.SEARCHURL, extras=extra, count=count,
                                              sitemap_identifier=sitemap_identifier)
                         entity_url_obj.save()
                         print(url)
@@ -253,13 +254,13 @@ class EntityUrls(TimeStampedModel):
                     url_qs = cls.objects.filter(url=doctor_in_city_url)
                     if url_qs.exists():
                         url_obj = url_qs.first()
-                        url_obj.extras = json.dumps(extra)
+                        url_obj.extras = extra
                         url_obj.count = count
                         url_obj.save()
                     else:
                         entity_url_obj = cls(url=doctor_in_city_url,
                                              entity_type='Doctor',
-                                             url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count,
+                                             url_type=cls.UrlType.SEARCHURL, extras=extra, count=count,
                                              sitemap_identifier=sitemap_identifier)
                         entity_url_obj.save()
                         print(doctor_in_city_url)
@@ -325,12 +326,12 @@ class EntityUrls(TimeStampedModel):
                 url_qs = cls.objects.filter(url=url)
                 if url_qs.exists():
                     url_obj = url_qs.first()
-                    url_obj.extras = json.dumps(extra)
+                    url_obj.extras = extra
                     url_obj.count = count
                     url_obj.save()
                 else:
                     entity_url_obj = cls(url=url, entity_type='Lab',
-                                         url_type=cls.UrlType.SEARCHURL, extras=json.dumps(extra), count=count,
+                                         url_type=cls.UrlType.SEARCHURL, extras=extra, count=count,
                                          sitemap_identifier=sitemap_identifier)
                     entity_url_obj.save()
                     print(url)
@@ -376,12 +377,14 @@ class EntityUrls(TimeStampedModel):
                             bread_url = slugify('{prefix}-in-{locality}-{identifier}cit'
                                                 .format(identifier=identifier, prefix=forname,
                                                         locality=address_obj_parent.value))
-                            breadcrums.append({'name': address_obj_parent.value, 'url': bread_url})
+                            if EntityUrls.objects.filter(url=bread_url).exists():
+                                breadcrums.append({'name': address_obj_parent.value, 'url': bread_url})
 
                             bread_url = slugify('{prefix}-in-{sublocality}-{locality}-{identifier}litcit'.
                                                 format(prefix=forname, sublocality=address_obj.value,
                                                        locality=address_obj_parent.value, identifier=identifier))
-                            breadcrums.append({'name': address_obj.value, 'url': bread_url})
+                            if EntityUrls.objects.filter(url=bread_url).exists():
+                                breadcrums.append({'name': address_obj.value, 'url': bread_url})
 
                     extra = {'related_entity_id': entity_object.id, 'location_id': page_url_dict.get('location_id'),
                              'breadcrums': breadcrums}
@@ -390,7 +393,7 @@ class EntityUrls(TimeStampedModel):
                     if not entity_url_objs.exists():
                         entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
                                              url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id,
-                                             extras=json.dumps(extra), sitemap_identifier=sitemap_identifier)
+                                             extras=extra, sitemap_identifier=sitemap_identifier)
                         entity_url_obj.save()
                     else:
                         entity_url_obj = entity_url_objs.first()
@@ -399,8 +402,11 @@ class EntityUrls(TimeStampedModel):
                             entity_url_obj.save()
 
                             entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
-                                                 url_type=cls.UrlType.PAGEURL, extras=json.dumps(extra),
+                                                 url_type=cls.UrlType.PAGEURL, extras=extra,
                                                  entity_id=entity_object.id,sitemap_identifier=sitemap_identifier)
+                            entity_url_obj.save()
+                        else:
+                            entity_url_obj.extras = extra
                             entity_url_obj.save()
             return True
 
