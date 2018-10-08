@@ -21,7 +21,6 @@ from django.utils.html import format_html_join
 import pytz
 
 from ondoc.account.models import Order
-from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,

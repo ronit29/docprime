@@ -99,6 +99,8 @@ class LabModelSerializer(serializers.ModelSerializer):
         breadcrums = None
         if entity.exists():
             breadcrums = entity.first().additional_info.get('breadcrums')
+            if breadcrums:
+                return breadcrums
         return breadcrums
 
     def get_lab_thumbnail(self, obj):
