@@ -13,6 +13,7 @@ from ondoc.authentication.models import TimeStampedModel
 from django.contrib.gis.geos import Point, GEOSGeometry
 from django.template.defaultfilters import slugify
 import datetime
+from django.contrib.postgres.fields import JSONField
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -153,7 +154,7 @@ class EntityUrls(TimeStampedModel):
     url = models.CharField(blank=False, null=True, max_length=500, unique=True, db_index=True)
     url_type = models.CharField(max_length=24, choices=UrlType.as_choices(), null=True)
     entity_type = models.CharField(max_length=24, null=True)
-    extras = models.TextField(default=json.dumps({}))
+    extras = JSONField()
     entity_id = models.PositiveIntegerField(null=True, default=None)
     is_valid = models.BooleanField(default=True)
     count = models.IntegerField(max_length=30, null=True, default=0)
@@ -161,7 +162,7 @@ class EntityUrls(TimeStampedModel):
 
     @property
     def additional_info(self):
-        return json.loads(self.extras)
+        return self.extras
 
     @classmethod
     def create_doctor_search_urls(cls):
