@@ -320,7 +320,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
-        if UserProfile.objects.filter(name=data['name'], user=request.user).exists():
+        if UserProfile.objects.filter(name__iexact=data['name'], user=request.user).exists():
             # return Response({
             #     "request_errors": {"code": "invalid",
             #                        "message": "Profile with the given name already exists."
