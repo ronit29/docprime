@@ -62,6 +62,7 @@ class EntityAddress(TimeStampedModel):
 
     type = models.CharField(max_length=128, blank=False, null=False, choices=AllowedKeys.as_choices())
     value = models.TextField()
+    alternative_value = models.TextField(default='', null=True)
     type_blueprint = models.CharField(max_length=128, blank=False, null=True)
     postal_code = models.PositiveIntegerField(null=True)
     parent = models.IntegerField(null=True)
