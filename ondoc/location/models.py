@@ -162,6 +162,7 @@ class EntityUrls(TimeStampedModel):
     is_valid = models.BooleanField(default=True)
     count = models.IntegerField(max_length=30, null=True, default=0)
     sitemap_identifier = models.CharField(max_length=28, null=True, choices=SitemapIdentifier.as_choices())
+    sequence = models.PositiveIntegerField(default=0)
 
     @property
     def additional_info(self):
