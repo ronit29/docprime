@@ -170,6 +170,14 @@ class EntityUrls(TimeStampedModel):
 
     @classmethod
     def create_doctor_search_urls(cls):
+        from ondoc.api.v1.utils import RawSql
+        query = '''select nextval('entity_url_version_seq') as inc;'''
+        seq = RawSql(query).fetch_all()
+        if seq:
+            sequence = seq[0]['inc'] if seq[0]['inc'] else 0
+        else:
+            sequence = 0
+
         from ondoc.doctor.models import DoctorPracticeSpecialization, DoctorClinic
         try:
             current_timestamp = datetime.datetime.now()
