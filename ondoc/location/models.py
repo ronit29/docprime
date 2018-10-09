@@ -91,7 +91,9 @@ class EntityAddress(TimeStampedModel):
                     entity_address = saved_data[0]
                     parent_id = entity_address.id
                 elif len(saved_data) == 0:
-                    entity_address = cls(type=meta['key'], centroid=point, postal_code=postal_code, type_blueprint=meta['type'], value=meta['value'], parent=parent_id)
+                    entity_address = cls(type=meta['key'], centroid=point, postal_code=postal_code,
+                                         type_blueprint=meta['type'], value=meta['value'], parent=parent_id,
+                                         alternative_value=meta['value'])
                     entity_address.save()
                     parent_id = entity_address.id
 
@@ -377,15 +379,15 @@ class EntityUrls(TimeStampedModel):
                         if address_obj_parent:
                             bread_url = slugify('{prefix}-in-{locality}-{identifier}cit'
                                                 .format(identifier=identifier, prefix=forname,
-                                                        locality=address_obj_parent.value))
+                                                        locality=address_obj_parent.alternative_value))
                             if EntityUrls.objects.filter(url=bread_url).exists():
-                                breadcrums.append({'name': address_obj_parent.value, 'url': bread_url})
+                                breadcrums.append({'name': address_obj_parent.alternative_value, 'url': bread_url})
 
                             bread_url = slugify('{prefix}-in-{sublocality}-{locality}-{identifier}litcit'.
-                                                format(prefix=forname, sublocality=address_obj.value,
-                                                       locality=address_obj_parent.value, identifier=identifier))
+                                                format(prefix=forname, sublocality=address_obj.alternative_value,
+                                                       locality=address_obj_parent.alternative_value, identifier=identifier))
                             if EntityUrls.objects.filter(url=bread_url).exists():
-                                breadcrums.append({'name': address_obj.value, 'url': bread_url})
+                                breadcrums.append({'name': address_obj.alternative_value, 'url': bread_url})
 
                     extra = {'related_entity_id': entity_object.id, 'location_id': page_url_dict.get('location_id'),
                              'breadcrums': breadcrums}
@@ -431,20 +433,20 @@ class EntityUrlsHelper(object):
     def _create_return_search_urls(self, entity_object):
         raise NotImplemented()
 
-    def create_return_search_urls(self, entity_object):
-        urls = self._create_return_search_urls(entity_object)
-        return urls
+    # def create_return_search_urls(self, entity_object):
+    #     urls = self._create_return_search_urls(entity_object)
+    #     return urls
 
     def build_url(self, prefix, location):
         url = ''
         if location.type == 'LOCALITY':
             ea = EntityAddress.objects.get(id=location.location_id, type=location.type)
-            url = "{prefix}-in-{locality}".format(prefix=prefix, locality=ea.value)
+            url = "{prefix}-in-{locality}".format(prefix=prefix, locality=ea.alternative_value)
         elif location.type == 'SUBLOCALITY':
             ea_sublocality = EntityAddress.objects.get(id=location.location_id, type=location.type)
             ea_locality = EntityAddress.objects.get(id=ea_sublocality.parent, type='LOCALITY')
             url = "{prefix}-in-{sublocality}-{locality}"\
-                .format(prefix=prefix, sublocality=ea_sublocality.value, locality=ea_locality.value)
+                .format(prefix=prefix, sublocality=ea_sublocality.alternative_value, locality=ea_locality.alternative_value)
 
         url = slugify(url)
         # url = split_and_append(url, ' ', '-')
