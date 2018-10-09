@@ -734,7 +734,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
-                                           entity_type__iexact='Doctor')
+                                           entity_type__iexact='Doctor').order_by('-updated_at')
         if entity.exists():
             extras = entity.first().additional_info
             if extras:

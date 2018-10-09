@@ -119,7 +119,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
-                                           entity_type__iexact='Lab')
+                                           entity_type__iexact='Lab').order_by('-updated_at')
         if entity.exists():
             extras = entity.first().additional_info
             if extras.get('location_json'):
