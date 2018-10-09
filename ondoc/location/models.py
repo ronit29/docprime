@@ -154,7 +154,7 @@ class EntityUrls(TimeStampedModel):
         PAGEURL = 'PAGEURL'
         SEARCHURL = 'SEARCHURL'
 
-    url = models.CharField(blank=False, null=True, max_length=500, unique=True, db_index=True)
+    url = models.CharField(blank=False, null=True, max_length=500, db_index=True)
     url_type = models.CharField(max_length=24, choices=UrlType.as_choices(), null=True)
     entity_type = models.CharField(max_length=24, null=True)
     extras = JSONField()
