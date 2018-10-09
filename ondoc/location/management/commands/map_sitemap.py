@@ -4,6 +4,7 @@ from ondoc.seo.models import SitemapManger
 from ondoc.seo.sitemaps import get_sitemap_urls
 from django.template import loader
 from django.core.files import File
+from io import StringIO
 
 
 def map_sitemaps():
@@ -19,24 +20,15 @@ def map_sitemaps():
 
             name = 'filename_%s.xml' % sitemap_identifier
             with open(name, 'w') as name:
+                string_io_obj = StringIO()
+                string_io_obj.write(file)
+                string_io_obj.seek(0)
                 print("Generating sitemap_index.xml %s" % name)
-                name.write(file)
-                sitemap = SitemapManger.objects.create(count=count, file=File(name))
+                # name.write(file)
+                sitemap = SitemapManger.objects.create(count=count, file=File(string_io_obj, name='akash.xml'))
+                sitemap.save()
 
 
-
-            #     name.close()
-            #     file1 = File(name)
-            #     file1.readable()
-            #     file1.close()
-            #     # sitemap_file = SitemapManger.objects.create(count=count, file=file)
-            #
-            #     sitemap_file = SitemapManger.objects.create()
-            #     sitemap_file.count = count
-            #     sitemap_file.file = file1
-            #     # sitemap_file.save()
-            #     # sitemap_file = SitemapManger(file=name, count=count)
-            #     sitemap_file.save()
         return 'Sitemap successful'
 
 
