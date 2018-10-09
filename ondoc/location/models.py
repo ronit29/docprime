@@ -14,7 +14,7 @@ from django.contrib.gis.geos import Point, GEOSGeometry
 from django.template.defaultfilters import slugify
 import datetime
 from django.contrib.postgres.fields import JSONField
-
+from ondoc.api.v1.utils import RawSql
 
 def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
@@ -170,114 +170,13 @@ class EntityUrls(TimeStampedModel):
 
     @classmethod
     def create_doctor_search_urls(cls):
-        from ondoc.doctor.models import DoctorPracticeSpecialization, DoctorClinic
-        try:
-            current_timestamp = datetime.datetime.now()
-            specializations = doc_models.PracticeSpecialization.objects.all()
-            locations_set = EntityAddress.objects.filter\
-                (type_blueprint__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
-            for location in locations_set:
-                for specialization in specializations:
-                    location_json = {}
-                    count = 0
-                    if location.type == 'LOCALITY':
-                        sitemap_identifier = cls.SitemapIdentifier.SPECIALIZATION_CITY
-                        url = "{prefix}-in-{locality}-sptcit".format(prefix=specialization.name, locality=location.value)
-                        # Storing the locality data for fallback cases.
-                        location_json['locality_id'] = location.id
-                        location_json['locality_value'] = location.value
-                        location_json['locality_latitude'] = location.centroid.y if location.centroid is not None and hasattr(location.centroid, 'y') else 0.0
-                        location_json['locality_longitude'] = location.centroid.x if location.centroid is not None and hasattr(location.centroid, 'x') else 0.0
-                        ref_location = Point(float(location_json['locality_longitude']),
-                                             float(location_json['locality_latitude']))
-                        distance = 15000
+        query = '''select nextval('entity_url_version_seq') as inc'''
+        seq = RawSql(query).fetch_all()
+        if seq:
+            sequence = seq[0]['inc'] if seq[0]['inc'] else 0
+        else:
+            sequence = 0
 
-                    else:
-                        sitemap_identifier = cls.SitemapIdentifier.SPECIALIZATION_LOCALITY_CITY
-                        ea_locality = EntityAddress.objects.get(id=location.parent)
-                        url = "{prefix}-in-{sublocality}-{locality}-sptlitcit".format(prefix=specialization.name, sublocality=location.value, locality=ea_locality.value)
-                        # storing the sublocality and locality data for fallback cases.
-                        location_json['sublocality_id'] = location.id
-                        location_json['sublocality_value'] = location.value
-                        location_json['sublocality_latitude'] = location.centroid.y if location.centroid is not None and hasattr(location.centroid, 'y') else 0.0
-                        location_json['sublocality_longitude'] = location.centroid.x if location.centroid is not None and hasattr(location.centroid, 'x') else 0.0
-                        location_json['locality_id'] = ea_locality.id
-                        location_json['locality_value'] = ea_locality.value
-                        location_json['locality_latitude'] = ea_locality.centroid.y if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'y') else 0.0
-                        location_json['locality_longitude'] = ea_locality.centroid.x if ea_locality.centroid is not None and hasattr(ea_locality.centroid, 'x') else 0.0
-                        location_json['breadcrum_url'] = slugify("{prefix}-in-{locality}-sptcit".format(prefix=specialization.name, locality=ea_locality.value))
-                        ref_location = Point(float(location_json['sublocality_longitude']),
-                                             float(location_json['sublocality_latitude']))
-                        distance = 5000
-
-                    url = slugify(url)
-                    url = url.lower()
-                    extra = {'specialization': specialization.name, 'specialization_id': specialization.id,
-                             'location_json': location_json}
-
-                    pnt = GEOSGeometry(ref_location, srid=4326)
-
-                    doctors_in_range = DoctorClinic.objects.filter(
-                        hospital__location__distance_lte=(pnt, distance)).values('doctor')
-
-                    for doctor in doctors_in_range:
-                        doc_spec = DoctorPracticeSpecialization.objects.filter(specialization=specialization, doctor=doctor.get('doctor'))
-                        if doc_spec.exists():
-                            count += 1
-
-                    url_qs = cls.objects.filter(url=url)
-                    if url_qs.exists():
-                        url_obj = url_qs.first()
-                        url_obj.extras = extra
-                        url_obj.count = count
-                        url_obj.save()
-                    else:
-                        entity_url_obj = cls(url=url, entity_type='Doctor',
-                                             url_type=cls.UrlType.SEARCHURL, extras=extra, count=count,
-                                             sitemap_identifier=sitemap_identifier)
-                        entity_url_obj.save()
-                        print(url)
-
-                if location.type == 'LOCALITY':
-                    sitemap_identifier = cls.SitemapIdentifier.DOCTORS_CITY
-                    doctor_in_city_url = "doctors-in-{location}-sptcit".format(location=location.value)
-                else:
-                    sitemap_identifier = cls.SitemapIdentifier.DOCTORS_LOCALITY_CITY
-                    ea_locality = EntityAddress.objects.get(id=location.parent)
-                    doctor_in_city_url = "doctors-in-{sublocality}-{locality}-sptlitcit".\
-                        format(sublocality=location.value, locality=ea_locality.value)
-
-                count = 0
-                if doctor_in_city_url:
-                    if doctors_in_range.exists():
-                        count = doctors_in_range.count()
-
-                    doctor_in_city_url = slugify(doctor_in_city_url)
-                    extra = {'location_id': location.id, 'location_json': location_json}
-
-                    url_qs = cls.objects.filter(url=doctor_in_city_url)
-                    if url_qs.exists():
-                        url_obj = url_qs.first()
-                        url_obj.extras = extra
-                        url_obj.count = count
-                        url_obj.save()
-                    else:
-                        entity_url_obj = cls(url=doctor_in_city_url,
-                                             entity_type='Doctor',
-                                             url_type=cls.UrlType.SEARCHURL, extras=extra, count=count,
-                                             sitemap_identifier=sitemap_identifier)
-                        entity_url_obj.save()
-                        print(doctor_in_city_url)
-
-            undesirable_urls_qs = cls.objects.filter(updated_at__lte=current_timestamp, url_type=cls.UrlType.SEARCHURL,
-                                                     entity_type='Doctor')
-            if undesirable_urls_qs.exists():
-                undesirable_urls_qs.delete()
-
-            return True
-        except Exception as e:
-            print(str(e))
-            return False
 
     @classmethod
     def create_lab_search_urls(cls):
@@ -351,6 +250,13 @@ class EntityUrls(TimeStampedModel):
 
     @classmethod
     def create_page_url(cls, entity_object):
+        query = '''select nextval('entity_url_version_seq') as inc'''
+        seq = RawSql(query).fetch_all()
+        if seq:
+            sequence = seq[0]['inc'] if seq[0]['inc'] else 0
+        else:
+            sequence = 0
+
         try:
             if entity_object.__class__.__name__.upper() == 'DOCTOR':
                 sitemap_identifier = cls.SitemapIdentifier.DOCTOR_PAGE
@@ -397,7 +303,7 @@ class EntityUrls(TimeStampedModel):
                     if not entity_url_objs.exists():
                         entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
                                              url_type=cls.UrlType.PAGEURL, entity_id=entity_object.id,
-                                             extras=extra, sitemap_identifier=sitemap_identifier)
+                                             extras=extra, sitemap_identifier=sitemap_identifier, sequence=sequence)
                         entity_url_obj.save()
                     else:
                         entity_url_obj = entity_url_objs.first()
@@ -407,7 +313,8 @@ class EntityUrls(TimeStampedModel):
 
                             entity_url_obj = cls(url=url.lower(), entity_type=entity_object.__class__.__name__,
                                                  url_type=cls.UrlType.PAGEURL, extras=extra,
-                                                 entity_id=entity_object.id,sitemap_identifier=sitemap_identifier)
+                                                 entity_id=entity_object.id,sitemap_identifier=sitemap_identifier,
+                                                 sequence=sequence)
                             entity_url_obj.save()
                         else:
                             entity_url_obj.extras = extra
