@@ -308,9 +308,6 @@ class EntityUrls(TimeStampedModel):
 
         return True
 
-
-
-
     @classmethod
     def create_lab_search_urls(cls):
         from ondoc.diagnostic.models import Lab
