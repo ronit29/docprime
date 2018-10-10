@@ -635,13 +635,15 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if entity.exists():
             location_id = entity.first().additional_info.get('location_id')
             type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
-            if type.first().get('type') == 'LOCALITY':
-                locality = type.first().get('value')
+            if type.exists():
+                   if type.first().get('type') == 'LOCALITY':
+                       locality = type.first().get('value')
 
-            if type.first().get('type') == 'SUBLOCALITY':
-                sublocality = type.first().get('value')
-                parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-                locality = ' ' + parent.first().get('value')
+            if type.exists():
+                if type.first().get('type') == 'SUBLOCALITY':
+                    sublocality = type.first().get('value')
+                    parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
+                    locality = ' ' + parent.first().get('value')
 
         title = obj.name
         description = obj.name + ': ' + obj.name
