@@ -21,6 +21,7 @@ class Robot(TimeStampedModel):
 class SitemapManger(TimeStampedModel):
     file = models.FileField(upload_to='seo', validators=[FileExtensionValidator(allowed_extensions=['xml'])])
     count = models.PositiveIntegerField()
+    valid = models.BooleanField(default=True)
 
     class Meta:
         db_table = "sitemap_manager"

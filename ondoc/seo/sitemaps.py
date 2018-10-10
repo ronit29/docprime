@@ -1,6 +1,19 @@
+from ondoc.articles.models import ArticleCategory
 from ondoc.location.models import EntityUrls
 from django.contrib.sitemaps import Sitemap
+from ondoc.seo.models import SitemapManger
 from django.conf import settings
+
+
+class IndexSitemap(Sitemap):
+    def __init__(self):
+        self.protocol = 'https'
+
+    def items(self):
+        return SitemapManger.objects.filter(valid=True)
+
+    def location(self, obj):
+        return '%s' % obj.file.url
 
 
 class SpecializationLocalityCitySitemap(Sitemap):
@@ -97,6 +110,21 @@ class LabPageSitemap(Sitemap):
         return "/%s" % obj.url
 
 
+class ArticleSitemap(Sitemap):
+    changefreq = "weekly"
+    priority = 1
+
+    def items(self):
+        qs = ArticleCategory.objects.filter(url=self.customized_query)
+        if not qs.exists():
+            return []
+
+        return qs.first().articles.filter(is_published=True)
+
+    def location(self, obj):
+        return "/%s" % obj.url
+
+
 sitemap_identifier_mapping = {
     'SPECIALIZATION_LOCALITY_CITY': SpecializationLocalityCitySitemap,
     'SPECIALIZATION_CITY': SpecializationCitySitemap,
@@ -105,12 +133,17 @@ sitemap_identifier_mapping = {
     'DOCTOR_PAGE': DoctorPageSitemap,
     'LAB_LOCALITY_CITY': LabLocalityCitySitemap,
     'LAB_CITY': LabCitySitemap,
-    'LAB_PAGE': LabPageSitemap
+    'LAB_PAGE': LabPageSitemap,
+    'ARTICLES': ArticleSitemap,
+
 }
 
 
-def get_sitemap_urls(sitemap_identifier):
+def get_sitemap_urls(sitemap_identifier, customized_dict=None):
     sitemap_class = sitemap_identifier_mapping[sitemap_identifier]
     sitemap_obj = sitemap_class()
     sitemap_obj.protocol = 'https'
+    if sitemap_identifier == 'ARTICLES':
+        sitemap_obj.customized_query = customized_dict['query']
+        sitemap_obj.customized_name = customized_dict['name']
     return sitemap_obj
