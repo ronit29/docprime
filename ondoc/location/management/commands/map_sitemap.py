@@ -4,40 +4,68 @@ from ondoc.seo.models import SitemapManger
 from ondoc.seo.sitemaps import get_sitemap_urls
 from django.template import loader
 from django.core.files import File
+from io import StringIO
+import datetime
+from ondoc.articles.models import ArticleCategory
+from django.template.defaultfilters import slugify
 
 
 def map_sitemaps():
-    for sitemap_identifier in EntityUrls.SitemapIdentifier.availabilities():
+    available_sitemaps = EntityUrls.SitemapIdentifier.availabilities()
+
+    for sitemap_identifier in available_sitemaps:
         sitemap_obj = get_sitemap_urls(sitemap_identifier)
-        template = loader.get_template('sitemap.xml')
+        processor(sitemap_identifier, sitemap_obj)
 
-        paginator = sitemap_obj.paginator
-        for page_num in range(1, paginator.num_pages + 1):
-            filename = 'sitemap_%s.xml' % page_num
-            count = len(sitemap_obj.get_urls())
-            file = template.render({'urlset': sitemap_obj.get_urls(page_num)})
+    for category in ArticleCategory.objects.all():
+        sitemap_obj = get_sitemap_urls('ARTICLES', customized_dict={'query': category.url, 'name': category.name})
+        processor('ARTICLES', sitemap_obj)
 
-            name = 'filename_%s.xml' % sitemap_identifier
-            with open(name, 'w') as name:
-                print("Generating sitemap_index.xml %s" % name)
-                name.write(file)
-                sitemap = SitemapManger.objects.create(count=count, file=File(name))
+    return 'Sitemap Successful'
 
 
+def processor(sitemap_identifier, sitemap_obj):
+    template = loader.get_template('sitemap.xml')
+    filename = ''
+    paginator = sitemap_obj.paginator
+    for page_num in range(1, paginator.num_pages + 1):
+        if sitemap_identifier == 'DOCTORS_CITY':
+            filename = 'doctor-city-search'
+        elif sitemap_identifier == 'DOCTORS_LOCALITY_CITY':
+            filename = 'doctor-locality-search'
+        elif sitemap_identifier == 'LAB_LOCALITY_CITY':
+            filename = 'lab-locality-search'
+        elif sitemap_identifier == 'LAB_CITY':
+            filename = 'lab-city-search'
+        elif sitemap_identifier == 'SPECIALIZATION_CITY':
+            filename = 'specialization-city-search'
+        elif sitemap_identifier == 'SPECIALIZATION_LOCALITY_CITY':
+            filename = 'specialization-locality-city-search'
+        elif sitemap_identifier == 'LAB_PAGE':
+            filename = 'lab-profile'
+        elif sitemap_identifier == 'DOCTOR_PAGE':
+            filename = 'doctor-profile'
+        elif sitemap_identifier == 'ARTICLES':
+            filename = sitemap_obj.customized_name
 
-            #     name.close()
-            #     file1 = File(name)
-            #     file1.readable()
-            #     file1.close()
-            #     # sitemap_file = SitemapManger.objects.create(count=count, file=file)
-            #
-            #     sitemap_file = SitemapManger.objects.create()
-            #     sitemap_file.count = count
-            #     sitemap_file.file = file1
-            #     # sitemap_file.save()
-            #     # sitemap_file = SitemapManger(file=name, count=count)
-            #     sitemap_file.save()
-        return 'Sitemap successful'
+        filename = slugify(filename)
+
+        count = len(sitemap_obj.get_urls())
+        file = template.render({'urlset': sitemap_obj.get_urls(page_num)})
+        relative_name = '%s-%s.' % (filename, page_num)
+        name = '%ssitemap.xml' % (relative_name)
+        string_io_obj = StringIO()
+        string_io_obj.write(file)
+        string_io_obj.seek(0)
+        print("Generating sitemap_index.xml %s" % filename)
+        existing_sitemap = SitemapManger.objects.filter(file__contains=relative_name, valid=True)
+        sitemap = SitemapManger(count=count, file=File(string_io_obj, name=name))
+        if existing_sitemap.exists():
+            existing_sitemap = existing_sitemap.first()
+            existing_sitemap.valid = False
+            existing_sitemap.file.name = str(datetime.datetime.now()) + existing_sitemap.file.name
+            existing_sitemap.save()
+        sitemap.save()
 
 
 class Command(BaseCommand):

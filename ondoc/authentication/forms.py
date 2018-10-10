@@ -51,3 +51,20 @@ class BillingAccountForm(forms.ModelForm):
             self.fields['account_number'].widget.attrs['readonly'] = True
             self.fields['pan_number'].widget.attrs['readonly'] = True
             self.fields['ifsc_code'].widget.attrs['readonly'] = True
+
+
+class SPOCDetailsForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+
+        if not self.cleaned_data.get('number') and not self.cleaned_data.get('email'):
+            raise forms.ValidationError("Email or  Phone Number is required!")
+
+        if (self.cleaned_data.get('std_code')) and (not self.cleaned_data.get('number')):
+            raise forms.ValidationError("Phone Number is required!")
+
+        if (not self.cleaned_data.get('std_code')) and (self.cleaned_data.get('number')):
+            if self.cleaned_data.get('number') < 6000000000 or self.cleaned_data.get('number') > 9999999999:
+                raise forms.ValidationError("Invalid Phone Number!")
+
+

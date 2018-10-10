@@ -60,6 +60,8 @@ def prepare_and_hit(self, data):
         'AppointmentDetails': appointment_details
     }
 
+    logger.error(json.dumps(request_data))
+
     url = settings.MATRIX_API_URL
     matrix_api_token = settings.MATRIX_API_TOKEN
     response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
@@ -160,6 +162,8 @@ def push_signup_lead_to_matrix(self, data):
             'UtmSource': utm.get('utm_source', ''),
             'UtmTerm': utm.get('utm_term', ''),
         }
+
+        logger.error(json.dumps(request_data))
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN

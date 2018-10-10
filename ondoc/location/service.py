@@ -9,7 +9,7 @@ import json
 
 def get_meta_by_latlong(lat, long):
     from .models import GeoIpResults
-    saved_json = GeoIpResults.objects.filter(latitude=lat, longitude=long)
+    saved_json = GeoIpResults.objects.filter(latitude=lat, longitude=long, language='en')
 
     if not saved_json.exists():
         response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?sensor=false',

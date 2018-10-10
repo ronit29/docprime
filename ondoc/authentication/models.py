@@ -948,7 +948,29 @@ class AgentToken(TimeStampedModel):
         db_table = 'agent_token'
 
 
+class SPOCDetails(TimeStampedModel):
+    OTHER =1
+    SPOC = 2
+    MANAGER = 3
+    OWNER = 4
+    name = models.CharField(max_length=200)
+    std_code = models.IntegerField(blank=True, null=True)
+    number = models.BigIntegerField(blank=True, null=True)
+    email = models.EmailField(max_length=100, blank=True, null=True)
+    details = models.CharField(max_length=200, blank=True)
+    CONTACT_TYPE_CHOICES = [(OTHER, "Other"), (SPOC, "Single Point of Contact"), (MANAGER, "Manager"), (OWNER, "Owner")]
+    contact_type = models.PositiveSmallIntegerField(
+        choices=CONTACT_TYPE_CHOICES)
 
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "spoc_details"
 
 
 
