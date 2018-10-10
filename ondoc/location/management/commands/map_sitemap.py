@@ -34,17 +34,15 @@ def map_sitemaps():
             count = len(sitemap_obj.get_urls())
             file = template.render({'urlset': sitemap_obj.get_urls(page_num)})
 
-            name = 'filename_%s.xml' % sitemap_identifier
-            with open(name, 'w') as name:
-                string_io_obj = StringIO()
-                string_io_obj.write(file)
-                string_io_obj.seek(0)
-                print("Generating sitemap_index.xml %s" % name)
-                # name.write(file)
-                sitemap = SitemapManger.objects.create(count=count, file=File(string_io_obj,
-                                                                              name='%s-search%s-sitemap.xml'
-                                                                                   % (filename, page_num)))
-                sitemap.save()
+            string_io_obj = StringIO()
+            string_io_obj.write(file)
+            string_io_obj.seek(0)
+            print("Generating sitemap_index.xml %s" % name)
+            # name.write(file)
+            sitemap = SitemapManger.objects.create(count=count, file=File(string_io_obj,
+                                                                          name='%s-search%s-sitemap.xml'
+                                                                               % (filename, page_num)))
+            sitemap.save()
 
     return 'Sitemap Successful'
 
