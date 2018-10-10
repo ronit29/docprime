@@ -1,4 +1,5 @@
 from ondoc.diagnostic import models as lab_models
+from ondoc.ratings_review import models
 from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments)
 from django.shortcuts import get_object_or_404
 from ondoc.doctor import models as doc_models
@@ -11,8 +12,9 @@ from . import serializers
 
 
 class RatingsViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated, IsConsumer)
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated, IsConsumer)
+
 
     def get_queryset(self):
         pass
@@ -39,6 +41,10 @@ class RatingsViewSet(viewsets.GenericViewSet):
                                               review=valid_data.get('review'),
                                               content_object=content_obj)
                 rating_review.save()
+                if valid_data.get('compliment'):
+                    rating_review.compliment.add(*valid_data.get('compliment'))
+
+
             except Exception as e:
                 resp['error'] = e
             resp['success'] = "Rating have been processed successfully!!"
@@ -66,25 +72,33 @@ class RatingsViewSet(viewsets.GenericViewSet):
         body_serializer = serializers.RatingsModelSerializer(rating, context={'request': request})
         return Response(body_serializer.data)
 
-    def update(self, request):
+    def update(self, request, pk):
+
+        rating = get_object_or_404(models.RatingsReview, pk=pk)
+
         serializer = serializers.RatingUpdateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
 
-        if not RatingsReview.objects.filter(id=valid_data.get('id'),user=request.user).exists():
-            return Response({'msg' : 'You are an Unauthorised user'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
 
 
         resp={}
 
-        rating = RatingsReview.objects.filter(id = valid_data.get('id')).first()
         rating.ratings = valid_data.get('rating')
+        if valid_data.get('compliment'):
+            rating.compliment.set(valid_data.get('compliment'))
+        else:
+            rating.compliment.set("")
 
-        if rating.review == valid_data.get('review'):
+        if valid_data.get('review'):
             rating.review = valid_data.get('review')
-
+        # else:
+        #     rating.review = ""
         rating.save()
         return Response({'msg': 'Sucessfully Updated'})
+
 
 
 
