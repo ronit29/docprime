@@ -6,7 +6,7 @@ from ondoc.sendemail import api as email_api
 # import models here
 from ondoc.diagnostic.models import LabOnboardingToken, Lab, LabAward
 from ondoc.doctor.models import DoctorOnboardingToken, Doctor
-from django.conf import settings
+from ondoc.notification import models as notif_models
 from django.utils.safestring import mark_safe
 
 # import forms here.
@@ -145,7 +145,8 @@ def generate_doctor(request):
                  \n\nFor any queries you can connect with our representative over the phone which is already associated with you.''' % (url, url)
 
     message = mark_safe(message)
-    email_api.send_email(p_email.email, 'Onboarding link for '+doctor.name, message)
+    # email_api.send_email(p_email.email, 'Onboarding link for '+doctor.name, message)
+    notif_models.EmailNotification.publish_ops_email(p_email.email, message, 'Onboarding link for '+doctor.name)
     doctor.onboarding_status = doctor.REQUEST_SENT
     doctor.save()
 

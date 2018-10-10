@@ -596,6 +596,7 @@ class DoctorListSerializer(serializers.Serializer):
     doctor_name = serializers.CharField(required=False)
     hospital_name = serializers.CharField(required=False)
     max_distance = serializers.IntegerField(required=False, allow_null=True)
+    min_distance = serializers.IntegerField(required=False, allow_null=True)
 
     def validate_specialization_id(self, value):
         request = self.context.get("request")
@@ -621,6 +622,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     availability = None
     seo = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
+    breadcrumb = serializers.SerializerMethodField()
 
     def get_seo(self, obj):
         if self.parent:
@@ -637,13 +639,15 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if entity.exists():
             location_id = entity.first().additional_info.get('location_id')
             type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
-            if type.first().get('type') == 'LOCALITY':
-                locality = type.first().get('value')
+            if type.exists():
+                   if type.first().get('type') == 'LOCALITY':
+                       locality = type.first().get('value')
 
-            if type.first().get('type') == 'SUBLOCALITY':
-                sublocality = type.first().get('value')
-                parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-                locality = ' ' + parent.first().get('value')
+            if type.exists():
+                if type.first().get('type') == 'SUBLOCALITY':
+                    sublocality = type.first().get('value')
+                    parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
+                    locality = ' ' + parent.first().get('value')
 
         title = obj.name
         description = obj.name + ': ' + obj.name
@@ -669,6 +673,19 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         description += '. Book appointments online, check fees, address and more.'
         return {'title': title, "description": description}
 
+    def get_breadcrumb(self, obj):
+
+        if self.parent:
+            return None
+        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Doctor')
+        breadcrums = None
+        if entity.exists():
+            breadcrums = entity.first().additional_info.get('breadcrums')
+            if breadcrums:
+                return breadcrums
+        return breadcrums
+
     def get_hospitals(self, obj):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__hospital__is_live=True).select_related(
@@ -685,7 +702,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'thumbnail', 'license', 'is_live','seo', 'rating')
+
+                  'general_specialization', 'thumbnail', 'license', 'is_live','seo', 'breadcrumb', 'rating')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):

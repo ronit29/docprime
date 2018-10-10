@@ -138,6 +138,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     entity = GenericRelation(location_models.EntityLocationRelationship)
+    spoc_details = GenericRelation(auth_model.SPOCDetails)
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -182,8 +184,19 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                          [self.sublocality, self.locality] if value]
         return ", ".join(address_items)
 
+    def update_live_status(self):
+
+        if not self.is_live and ( self.data_status == self.QC_APPROVED and self.enabled == True):
+
+            self.is_live = True
+            if not self.live_at:
+                self.live_at = datetime.datetime.now()
+        if self.is_live and (self.data_status != self.QC_APPROVED or self.enabled == False):
+            self.is_live = False
+
 
     def save(self, *args, **kwargs):
+        self.update_live_status()
         build_url = True
         if self.is_live and self.id and self.location:
             if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
@@ -326,9 +339,10 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
     billing_merchant = GenericRelation(auth_model.BillingAccount)
-    enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
     rating = GenericRelation(ratings_models.RatingsReview)
     rating_query= GenericRelation(ratings_models.RatingsReview, related_query_name='doctors')
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=True,  blank=True)
+
 
     def __str__(self):
         return self.name
@@ -843,6 +857,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     # generic_hospital_network_admins = GenericRelation(auth_model.GenericAdmin, related_query_name='manageable_hospital_networks')
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital_networks')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
+    spoc_details = GenericRelation(auth_model.SPOCDetails)
 
     def __str__(self):
         return self.name + " (" + self.city + ")"

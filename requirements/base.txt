@@ -28,3 +28,4 @@ celery==4.2.1
 PyJWT
 django-ipware
 openpyxl==2.5.6
+django-user-agents==0.3.2

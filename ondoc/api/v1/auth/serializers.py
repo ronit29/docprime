@@ -361,21 +361,24 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
     name = serializers.CharField(max_length=255)
     speciality = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
     mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
-    city_name = serializers.IntegerField()
+    city_name = serializers.IntegerField(required=False)
     email = serializers.EmailField()
     utm_params = serializers.JSONField(required=False)
+    source = serializers.CharField(max_length=128, required=False, allow_null=True, allow_blank=True)
 
     def validate(self, attrs):
-        if not common_models.Cities.objects.filter(id=attrs['city_name']).exists():
-            raise serializers.ValidationError('city_name should be integer.')
+        if attrs['city_name'] > 0:
+            if not common_models.Cities.objects.filter(id=attrs['city_name']).exists():
+                raise serializers.ValidationError('City not found for given city.')
 
-        attrs['city_name'] = common_models.Cities.objects.filter(id=attrs['city_name']).first()
-
+            attrs['city_name'] = common_models.Cities.objects.filter(id=attrs['city_name']).first()
+        else:
+            attrs['city_name'] = None
         return attrs
 
     class Meta:
         model = OnlineLead
-        fields = ('member_type', 'name', 'speciality', 'mobile', 'city_name', 'email', 'utm_params')
+        fields = ('member_type', 'name', 'speciality', 'mobile', 'city_name', 'email', 'utm_params', 'source')
 
 
 class CareerSerializer(serializers.ModelSerializer):

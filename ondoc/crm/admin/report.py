@@ -53,7 +53,7 @@ class ReportAdmin(admin.ModelAdmin):
         if result:
             table_class = get_table_class(result[0].keys())
             table = table_class(result)
-            table.export_formats = ['csv', 'xls', 'xlsx', ]
+            table.export_formats = ['csv']
             RequestConfig(request).configure(table)
             export_format = request.GET.get('_export', None)
             if TableExport.is_valid_format(export_format):
