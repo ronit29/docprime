@@ -3,12 +3,14 @@ from django.urls import path
 #                    AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet, DoctorLabAppointmentsNoAuthViewSet)
 from .views import RatingsViewSet
 
-from .views import GetComplimentViewSet
+from .views import GetComplementViewSet
 
 urlpatterns = [
     path('create', RatingsViewSet.as_view({'post': 'create'}), name='submit-rating'),
     path('list', RatingsViewSet.as_view({'get': 'list'}), name='get-ratings'),
     path('retrieve/<int:pk>', RatingsViewSet.as_view({'get': 'retrieve'}), name='get-ratings'),
-    path('getcompliments', GetComplimentViewSet.as_view({'get': 'get_compliments'}), name='get-compliments'),
+    path('update', RatingsViewSet.as_view({'post' : 'update'}), name='update-rating'),
+    path('complements', GetComplementViewSet.as_view({'get': 'get_complements'}), name='get-complements'),
 ]
 
+# RatingsRevie.objects.filter(pk=idwala).update(rating=newRating)

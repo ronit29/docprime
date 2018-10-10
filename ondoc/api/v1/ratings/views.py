@@ -14,6 +14,9 @@ class RatingsViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsConsumer)
 
+    def get_queryset(self):
+        pass
+
     def create(self, request):
         serializer = serializers.RatingCreateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -63,13 +66,46 @@ class RatingsViewSet(viewsets.GenericViewSet):
         body_serializer = serializers.RatingsModelSerializer(rating, context={'request': request})
         return Response(body_serializer.data)
 
+    def update(self, request):
+        serializer = serializers.RatingUpdateBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
 
-class GetComplimentViewSet(viewsets.GenericViewSet):
+        if not RatingsReview.objects.filter(id=valid_data.get('id'),user=request.user).exists():
+            return Response({'msg' : 'You are an Unauthorised user'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    def get_compliments(self, request):
-        serializer = serializers.ReviewComplimentSerializer.get_compliments(request)
+
         resp={}
-        resp['compliment'] = serializer
-        return Response(resp)
+
+        rating = RatingsReview.objects.filter(id = valid_data.get('id')).first()
+        rating.ratings = valid_data.get('rating')
+
+        if rating.review == valid_data.get('review'):
+            rating.review = valid_data.get('review')
+
+        rating.save()
+        return Response({'msg': 'Sucessfully Updated'})
+
+
+
+
+
+
+class GetComplementViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsConsumer)
+
+    def get_complements(self, request):
+        serializer = serializers.ReviewComplimentSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        type = valid_data.get('type')
+        complement_data = ReviewCompliments.objects.filter(type=type).all()
+        if type == ReviewCompliments.DOCTOR:
+            body_serializer = serializers.GetComplementSerializer(complement_data, many=True, context={'request': request})
+        elif type == ReviewCompliments.LAB:
+            body_serializer = serializers.GetComplementSerializer(complement_data, many=True, context={'request': request})
+
+        return Response(body_serializer.data)
 
 

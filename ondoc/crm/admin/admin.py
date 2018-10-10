@@ -37,8 +37,11 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
+
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
+from ondoc.ratings_review.models import RatingsReview
+from ondoc.crm.admin.ratings import RatingsReviewAdmin
 
 
 # Admin Site config
@@ -103,3 +106,5 @@ admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
 admin.site.register(Procedure, ProcedureAdmin)
 
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
+admin.site.register(RatingsReview, RatingsReviewAdmin)
+
