@@ -10,7 +10,7 @@ from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
 from ondoc.authentication.models import GenericAdmin, User, QCModel
-from ondoc.authentication.admin import BillingAccountInline
+from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
 
 
 class HospitalImageInline(admin.TabularInline):
@@ -238,7 +238,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalDocumentInline,
         HospitalCertificationInline,
         GenericAdminInline,
-        BillingAccountInline
+        BillingAccountInline,
+        SPOCDetailsInline
     ]
 
     map_width = 200

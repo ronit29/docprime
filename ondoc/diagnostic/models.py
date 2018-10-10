@@ -412,6 +412,8 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab_networks')
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
+    spoc_details = GenericRelation(auth_model.SPOCDetails)
+
 
     def all_associated_labs(self):
         if self.id:
