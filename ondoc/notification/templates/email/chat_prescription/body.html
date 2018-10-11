@@ -102,6 +102,15 @@
                                 </ul>
                             {% endif %}
                         </span>
+                        <span style="font-size: 13px;">
+                            {% if findings %}
+                                <ul style="font-size: 13px;">
+                                    {% for value in findings %}
+                                    <li style="padding: 2px 0px">{{value}}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </span>
                     </div>
                 </td>
             </tr>
