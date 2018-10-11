@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='sitemapmanger',
             name='file',
-            field=models.FileField(storage=ondoc.seo.models.OverwriteStorage(), upload_to='seo', validators=[django.core.validators.FileExtensionValidator(allowed_extensions=['xml'])]),
+            field=models.FileField(upload_to='seo', validators=[django.core.validators.FileExtensionValidator(allowed_extensions=['xml'])]),
         ),
     ]

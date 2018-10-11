@@ -51,12 +51,16 @@ def processor(sitemap_identifier, sitemap_obj):
         filename = slugify(filename)
 
         count = len(sitemap_obj.get_urls())
-        file = template.render({'urlset': sitemap_obj.get_urls(page_num)})
+        file = template.render({'urlset': sitemap_obj.get_urls(page_num)}).encode()
         relative_name = '%s-%s' % (filename, page_num)
         name = '%s-sitemap.xml' % (relative_name)
-        string_io_obj = StringIO()
+        string_io_obj = BytesIO()
         string_io_obj.write(file)
         string_io_obj.seek(0)
+
+        file_obj = InMemoryUploadedFile(string_io_obj, None, name, 'text/xml',
+                                  string_io_obj.tell(), None)
+
         print("Generating sitemap_index.xml %s" % filename)
         existing_sitemap = SitemapManger.objects.filter(file__contains=relative_name, valid=True)
         if existing_sitemap.exists():
@@ -64,7 +68,7 @@ def processor(sitemap_identifier, sitemap_obj):
             existing_sitemap.delete()
             # existing_sitemap.save()
 
-        sitemap = SitemapManger(count=count, file=File(string_io_obj, name=name))
+        sitemap = SitemapManger(count=count, file=file_obj)
         sitemap.save()
 
 
