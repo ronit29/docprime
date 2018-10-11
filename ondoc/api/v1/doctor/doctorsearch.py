@@ -92,7 +92,7 @@ class DoctorSearchHelper:
             self.query_params.get('max_distance') * 1000 if self.query_params.get(
                 'max_distance') and self.query_params.get(
                 'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
-        min_distance = self.query_params.get('min_distance')*1000 + 500 if self.query_params.get('min_distance') else 0
+        min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
         # max_distance = 10000000000000000000000
 
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \

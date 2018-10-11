@@ -257,10 +257,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing_data = list()
         if lab_obj:
             if lab_obj.always_open:
-                lab_timing = "00:00 AM - 23:45 PM"
+                lab_timing = "12:00 AM - 23:45 PM"
                 lab_timing_data = [{
-                    "start": 7.0,
-                    "end": 19.0
+                    "start": 0.0,
+                    "end": 23.75
                 }]
             else:
                 timing_queryset = lab_obj.lab_timings.filter(day=day_now)
