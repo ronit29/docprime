@@ -22,7 +22,6 @@ from django.contrib import messages
 class LabTestAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         query = self.request.GET.get('query')
-        print(query)
         if not self.request.user:
             return LabTest.objects.none()
         qs = LabTest.objects.all()
@@ -86,11 +85,13 @@ def availablelabtestajaxsave(request):
 
         if serialized_data.is_valid(raise_exception=True):
             data = serialized_data.validated_data
+            if data.get('lab_pricing_group') and data.get('lab_pricing_group').radiology_agreed_price_percentage is None:
+                if data.get('test').test_type and data.get('test').test_type == LabTest.RADIOLOGY:
+                    return JsonResponse({'error': "Radiology Price Percentage Not Found!"})
+            if data.get('lab_pricing_group') and data.get('lab_pricing_group').pathology_agreed_price_percentage is None:
+                if data.get('test').test_type and data.get('test').test_type == LabTest.PATHOLOGY:
+                    return JsonResponse({'error': "Pathology Price Percentage Not Found!"})
             id = data.get('id')
-            # data['computed_agreed_price'] = get_computed_agreed_price(data)
-            # data['computed_deal_price'] = get_computed_deal_price(data)
-            # data['custom_agreed_price'] = None
-            # data['custom_deal_price'] = None
 
             if id:
                 record = AvailableLabTest.objects.filter(id=id).first()
@@ -110,43 +111,6 @@ def availablelabtestajaxsave(request):
                 return JsonResponse({'success': 1, 'id' : new_record.id, 'computed_agreed_price': new_record.computed_agreed_price, 'computed_deal_price': new_record.computed_deal_price})
     else:
         return JsonResponse({'error': "Invalid Request"})
-
-#
-# def get_computed_agreed_price(obj):
-#     if obj.get('test').test_type == LabTest.RADIOLOGY:
-#         agreed_percent = obj.get('lab_pricing_group').radiology_agreed_price_percentage if obj.get('lab_pricing_group').radiology_agreed_price_percentage else None
-#     else:
-#         agreed_percent = obj.get('lab_pricing_group').pathology_agreed_price_percentage if obj.get('lab_pricing_group').pathology_agreed_price_percentage else None
-#     mrp = decimal.Decimal(obj.get('mrp'))
-#
-#     if agreed_percent is not None:
-#         price = math.ceil(mrp * (agreed_percent / 100))
-#         if price>mrp:
-#             price=mrp
-#         return price
-#     else:
-#         return None
-#
-#
-# def get_computed_deal_price(obj):
-#     if obj.get('test').test_type == LabTest.RADIOLOGY:
-#         deal_percent = obj.get('lab_pricing_group').radiology_deal_price_percentage if obj.get('lab_pricing_group').radiology_deal_price_percentage else None
-#     else:
-#         deal_percent = obj.get('lab_pricing_group').pathology_deal_price_percentage if obj.get('lab_pricing_group').pathology_deal_price_percentage else None
-#     mrp = decimal.Decimal(obj.get('mrp'))
-#     computed_agreed_price = obj.get('computed_agreed_price')
-#     if deal_percent is not None:
-#         price = math.ceil(mrp * (deal_percent / 100))
-#         # ceil to next 10 and subtract 1 so it end with a 9
-#         price = math.ceil(price/10.0)*10-1
-#         if price>mrp:
-#             price=mrp
-#         if computed_agreed_price is not None:
-#             if price<computed_agreed_price:
-#                 price=computed_agreed_price
-#         return price
-#     else:
-#         return None
 
 
 def testcsvupload(request):

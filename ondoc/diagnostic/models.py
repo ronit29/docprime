@@ -193,7 +193,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
     entity = GenericRelation(location_models.EntityLocationRelationship)
-    enabled = models.BooleanField(verbose_name='Is Enabled', default=True)
+    enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -413,6 +413,8 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     assigned_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_lab_networks')
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
+    spoc_details = GenericRelation(auth_model.SPOCDetails)
+
 
     def all_associated_labs(self):
         if self.id:
@@ -879,6 +881,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         appointment_data["otp"] = otp
         lab_ids = appointment_data.pop("lab_test")
         coupon_list = appointment_data.pop("coupon", None)
+        appointment_data.pop("extra_details", None)
         app_obj = cls.objects.create(**appointment_data)
         app_obj.lab_test.add(*lab_ids)
         if coupon_list:
