@@ -1,7 +1,5 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
-from ondoc.doctor.models import OpdAppointment
-from ondoc.diagnostic.models import LabAppointment
 
 
 class Coupon(auth_model.TimeStampedModel):
@@ -20,6 +18,9 @@ class Coupon(auth_model.TimeStampedModel):
     description = models.CharField(max_length=500, default="")
 
     def used_coupon_count(self, user):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
         count = 0
         if str(self.type) == str(self.DOCTOR) or str(self.type) == str(self.ALL):
             count += OpdAppointment.objects.filter(user=user,
@@ -37,6 +38,7 @@ class Coupon(auth_model.TimeStampedModel):
                                                                LabAppointment.ACCEPTED,
                                                                LabAppointment.COMPLETED],
                                                    coupon__code=self).count()
+        return count
 
     def __str__(self):
         return self.code
