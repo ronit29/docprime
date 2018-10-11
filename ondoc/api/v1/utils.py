@@ -471,6 +471,33 @@ def form_pg_refund_data(refund_objs):
 
 class CouponsMixin(object):
 
+    # def used_coupon_count(self, user, coupon_code):
+    #     from ondoc.coupon.models import Coupon
+    #     from ondoc.doctor.models import OpdAppointment
+    #     from ondoc.diagnostic.models import LabAppointment
+    #
+    #     data = Coupon.objects.filter(code__exact=coupon_code).first()
+    #
+    #     count = 0
+    #     if data:
+    #         if str(data.type) == str(Coupon.DOCTOR) or str(data.type) == str(Coupon.ALL):
+    #             count += OpdAppointment.objects.filter(user=user,
+    #                                                    status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
+    #                                                                OpdAppointment.RESCHEDULED_DOCTOR,
+    #                                                                OpdAppointment.RESCHEDULED_PATIENT,
+    #                                                                OpdAppointment.ACCEPTED,
+    #                                                                OpdAppointment.COMPLETED],
+    #                                                    coupon__code__exact=coupon_code).count()
+    #         if str(data.type) == str(Coupon.LAB) or str(data.type) == str(Coupon.ALL):
+    #             count += LabAppointment.objects.filter(user=user,
+    #                                                    status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
+    #                                                                LabAppointment.RESCHEDULED_LAB,
+    #                                                                LabAppointment.RESCHEDULED_PATIENT,
+    #                                                                LabAppointment.ACCEPTED,
+    #                                                                LabAppointment.COMPLETED],
+    #                                                    coupon__code__exact=coupon_code).count()
+    #     return count
+
     def validate_coupon(self, user, coupon_code):
         from ondoc.coupon.models import Coupon
         from ondoc.doctor.models import OpdAppointment
@@ -487,19 +514,9 @@ class CouponsMixin(object):
             if (timezone.now() - max(data.created_at, user.date_joined)).days > data.validity:
                 return False
 
-            count = OpdAppointment.objects.filter(user=user,
-                                                  status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
-                                                              OpdAppointment.RESCHEDULED_DOCTOR,
-                                                              OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.ACCEPTED,
-                                                              OpdAppointment.COMPLETED],
-                                                  coupon__code__exact=coupon_code).count()
-            count += LabAppointment.objects.filter(user=user,
-                                                   status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
-                                                               LabAppointment.RESCHEDULED_LAB,
-                                                               LabAppointment.RESCHEDULED_PATIENT, LabAppointment.ACCEPTED,
-                                                               LabAppointment.COMPLETED],
-                                                   coupon__code__exact=coupon_code).count()
             allowed_coupon_count = data.count
+            count = data.used_coupon_count(user)
+
             if count < allowed_coupon_count:
                 return True
             else:
