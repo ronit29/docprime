@@ -52,8 +52,8 @@ def processor(sitemap_identifier, sitemap_obj):
 
         count = len(sitemap_obj.get_urls())
         file = template.render({'urlset': sitemap_obj.get_urls(page_num)})
-        relative_name = '%s-%s.' % (filename, page_num)
-        name = '%ssitemap.xml' % (relative_name)
+        relative_name = '%s-%s' % (filename, page_num)
+        name = '%s-%s-sitemap.xml' % (relative_name, str(datetime.datetime.utcnow()))
         string_io_obj = StringIO()
         string_io_obj.write(file)
         string_io_obj.seek(0)
@@ -63,7 +63,6 @@ def processor(sitemap_identifier, sitemap_obj):
         if existing_sitemap.exists():
             existing_sitemap = existing_sitemap.first()
             existing_sitemap.valid = False
-            existing_sitemap.file.name = str(datetime.datetime.now()) + existing_sitemap.file.name
             existing_sitemap.save()
         sitemap.save()
 
