@@ -722,7 +722,7 @@ class LabAppointment(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
     lab_test = models.ManyToManyField(AvailableLabTest)
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.SET_NULL, null=True)
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='lab_appointments')
     profile_detail = JSONField(blank=True, null=True)
     status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
     cancellation_type = models.PositiveSmallIntegerField(choices=CANCELLATION_TYPE_CHOICES, blank=True, null=True)
@@ -743,6 +743,8 @@ class LabAppointment(TimeStampedModel):
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     matrix_lead_id = models.IntegerField(null=True)
+    is_rated = models.BooleanField(default=False)
+    rating_declined = models.BooleanField(default=False)
 
     def allowed_action(self, user_type, request):
         allowed = []

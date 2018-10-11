@@ -14,6 +14,7 @@ from django.db.models import Avg
 from django.db.models import Q
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
+from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -621,7 +622,9 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
     availability = None
     seo = serializers.SerializerMethodField()
-    rating = serializers.SerializerMethodField()
+    # rating = serializers.SerializerMethodField()
+    rating = rating_serializer.RatingsModelSerializer(read_only=True, many=True, source='get_ratings')
+    rating_graph = rating_serializer.RatingsGraphSerializer(read_only=True, source='rating')
     breadcrumb = serializers.SerializerMethodField()
 
     def get_seo(self, obj):
@@ -692,18 +695,13 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             "doctor_clinic__doctor", "doctor_clinic__hospital")
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
 
-    def get_rating(self, obj):
-        result = DoctorRatingSerializer.get_doctor_rating_summary(obj)
-        return result
-
     class Meta:
         model = Doctor
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-
-                  'general_specialization', 'thumbnail', 'license', 'is_live','seo', 'breadcrumb', 'rating')
+                  'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
