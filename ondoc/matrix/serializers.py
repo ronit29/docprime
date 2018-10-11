@@ -15,7 +15,7 @@ class MatrixLeadDataSerializer(serializers.Serializer):
     agent_employee_id = serializers.CharField()
     matrix_lead_id = serializers.IntegerField()
     matrix_reference_id = serializers.IntegerField(required=False)
-    phone_number = serializers.IntegerField(required=False, min_value=7000000000, max_value=9999999999)
+    phone_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999)
 
     def validate(self, attrs):
 
@@ -26,7 +26,7 @@ class MatrixLeadDataSerializer(serializers.Serializer):
         #     if Lab.objects.filter(matrix_lead_id=attrs.get('matrix_lead_id')).exists():
         #         raise serializers.ValidationError("Lab with Same Lead Id Already Exists.")
         # if attrs.get('phone_number'):
-        #     if attrs['phone_number'] < 7000000000 or attrs['phone_number'] > 9999999999:
+        #     if attrs['phone_number'] < 5000000000 or attrs['phone_number'] > 9999999999:
         #         attrs['phone_number'] = None
 
         return attrs
