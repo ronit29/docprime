@@ -53,7 +53,7 @@ def processor(sitemap_identifier, sitemap_obj):
         count = len(sitemap_obj.get_urls())
         file = template.render({'urlset': sitemap_obj.get_urls(page_num)})
         relative_name = '%s-%s' % (filename, page_num)
-        name = '%s-%s-sitemap.xml' % (relative_name, str(datetime.datetime.utcnow()))
+        name = '%s-sitemap.xml' % (relative_name)
         string_io_obj = StringIO()
         string_io_obj.write(file)
         string_io_obj.seek(0)
