@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXlsViewSet, UploadDoctorViewSet,
-                    UploadQualificationViewSet)
+                    UploadQualificationViewSet, UploadExperienceViewSet, UploadAwardViewSet)
 
 urlpatterns = [
     path('cities/list', CitiesViewSet.as_view({'get': 'list'}), name='cities-list'),
@@ -11,5 +11,7 @@ urlpatterns = [
     # path('update_xl', UpdateXlsViewSet.as_view({'post': 'update'}, ), name='update-xl'),
     path('upload_doctor', UploadDoctorViewSet.as_view({'post': 'upload'}, ), name='update-doctor'),
     path('upload_qualification', UploadQualificationViewSet.as_view({'post': 'upload'}, ), name='update-doctor'),
+    path('upload_experience', UploadExperienceViewSet.as_view({'post': 'upload'}, ), name='update-experience'),
+    path('upload_award', UploadAwardViewSet.as_view({'post': 'upload'}, ), name='update-award'),
     path('chat_prescription/<str:name>', ServicesViewSet.as_view({'get': 'download_pdf'}, ), name='download-pdf'),
 ]

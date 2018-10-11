@@ -428,7 +428,7 @@ class UploadQualificationViewSet(viewsets.GenericViewSet):
 
     def get_college(self, row, sheet, headers):
         dp_college_id = self.clean_data(
-            sheet.cell(row=row, column=headers.get('dp_college_id')).value)l
+            sheet.cell(row=row, column=headers.get('dp_college_id')).value)
         college_name = self.clean_data(sheet.cell(row=row, column=headers.get('college')).value)
         if dp_college_id and College.objects.filter(pk=dp_college_id).exists():
             return College.objects.filter(pk=dp_college_id).first()
@@ -455,7 +455,11 @@ class UploadExperienceViewSet(viewsets.GenericViewSet):
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         for i in range(2, len(rows) + 1):
             doctor = self.get_doctor(i, sheet, headers)
-            hospital = self.clean_data()
+            hospital = self.clean_data(sheet.cell(row=i, column=headers.get('hospital')).value)
+            start_year = self.clean_data(sheet.cell(row=i, column=headers.get('start_year')).value)
+            end_year = self.clean_data(sheet.cell(row=i, column=headers.get('end_year')).value)
+            DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
+                                                   hospital=hospital)
         return Response(data={'message': 'success'})
 
     def get_doctor(self, row, sheet, headers):
@@ -466,3 +470,32 @@ class UploadExperienceViewSet(viewsets.GenericViewSet):
         if value and isinstance(value, str):
             return value.strip()
         return value
+
+
+class UploadAwardViewSet(viewsets.GenericViewSet):
+
+    def upload(self, request):
+        serializer = serializers.XlsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        file = validated_data.get('file')
+        wb = load_workbook(file)
+        sheet = wb.active
+        rows = [row for row in sheet.rows]
+        headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
+        for i in range(2, len(rows) + 1):
+            doctor = self.get_doctor(i, sheet, headers)
+            award = self.clean_data(sheet.cell(row=i, column=headers.get('award')).value)
+            year = self.clean_data(sheet.cell(row=i, column=headers.get('year')).value)
+            if award and year:
+                DoctorAward.objects.get_or_create(doctor=doctor, year=year)
+        return Response(data={'message': 'success'})
+
+    def clean_data(self, value):
+        if value and isinstance(value, str):
+            return value.strip()
+        return value
+
+    def get_doctor(self, row, sheet, headers):
+        doctor_id = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_id')).value)
+        return Doctor.objects.filter(pk=doctor_id).first()
