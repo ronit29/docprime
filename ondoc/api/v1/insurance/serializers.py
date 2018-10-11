@@ -64,5 +64,6 @@ class InsuredMemberSerializer(serializers.Serializer):
     relation = serializers.CharField(max_length=50)
     address = serializers.CharField(max_length=250)
     pincode = serializers.IntegerField()
+    title = serializers.CharField(max_length=50)
 
 
