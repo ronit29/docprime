@@ -55,7 +55,7 @@ class InsuranceThresholdSerializer(serializers.Serializer):
                  'max_age', 'min_age', 'tenure'}
 
 
-class InsuredMemberSerializer(serializers.Serializer):
+class MemberListSerializer(serializers.Serializer):
 
     first_name = serializers.CharField(max_length=50)
     last_name = serializers.CharField(max_length=50)
@@ -64,5 +64,25 @@ class InsuredMemberSerializer(serializers.Serializer):
     relation = serializers.CharField(max_length=50)
     address = serializers.CharField(max_length=250)
     pincode = serializers.IntegerField()
+    # gender = serializers.SerializerMethodField()
+
+    # def get_gender(self, obj):
+    #     if obj.relation == InsuredMembers.HUSBAND or InsuredMembers.SON:
+    #         gender = InsuredMembers.MALE
+    #     else:
+    #         gender = InsuredMembers.FEMALE
+    #
+    #     return gender
+
+
+class InsuredMemberSerializer(serializers.Serializer):
+    # member_list = MemberListSerializer(many=True)
+    members = serializers.ListSerializer(child=MemberListSerializer())
+    insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
+    insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+
+    # class Meta:
+    #     model = InsuredMembers
+    #     fields={'insurer', 'insurance_plan', 'insured_member'}
 
 

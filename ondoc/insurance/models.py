@@ -109,8 +109,16 @@ class InsuranceThreshold(auth_model.TimeStampedModel):
 
 
 class InsuredMembers(auth_model.TimeStampedModel):
-
-    insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.CASCADE)
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
+    SELF = 'self'
+    HUSBAND = 'husband'
+    WIFE = 'wife'
+    SON = 'son'
+    DAUGHTER = 'daughter'
+    RELATION_CHOICES = [(HUSBAND, 'Husband'), (WIFE, 'Wife'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
     insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
     first_name = models.CharField(max_length=50, null=False)
     last_name = models.CharField(max_length=50, null=False)
