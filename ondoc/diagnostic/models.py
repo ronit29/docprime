@@ -193,6 +193,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     home_collection_charges = GenericRelation(HomePickupCharges)
     entity = GenericRelation(location_models.EntityLocationRelationship)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
+    priority = models.IntegerField(blank=True, null=True)
 
     def __str__(self):
         return self.name
