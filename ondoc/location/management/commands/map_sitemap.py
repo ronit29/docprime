@@ -59,11 +59,12 @@ def processor(sitemap_identifier, sitemap_obj):
         string_io_obj.seek(0)
         print("Generating sitemap_index.xml %s" % filename)
         existing_sitemap = SitemapManger.objects.filter(file__contains=relative_name, valid=True)
-        sitemap = SitemapManger(count=count, file=File(string_io_obj, name=name))
         if existing_sitemap.exists():
             existing_sitemap = existing_sitemap.first()
-            existing_sitemap.valid = False
-            existing_sitemap.save()
+            existing_sitemap.delete()
+            # existing_sitemap.save()
+
+        sitemap = SitemapManger(count=count, file=File(string_io_obj, name=name))
         sitemap.save()
 
 

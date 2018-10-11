@@ -116,11 +116,11 @@ class ArticleSitemap(Sitemap):
     priority = 1
 
     def items(self):
-        qs = ArticleCategory.objects.filter(url=self.customized_query)
+        qs = ArticleCategory.objects.filter(url=self.customized_query).order_by('id')
         if not qs.exists():
             return []
 
-        return qs.first().articles.filter(is_published=True)
+        return qs.first().articles.filter(is_published=True).order_by('id')
 
     def location(self, obj):
         return "/%s" % obj.url
