@@ -134,7 +134,7 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     time_slot_start = serializers.DateTimeField()
     payment_type = serializers.IntegerField()
-    coupon = serializers.ListField(child=serializers.IntegerField())
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False)
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 
