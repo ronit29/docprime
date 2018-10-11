@@ -562,11 +562,13 @@ class UserAppointmentsViewSet(OndocViewSet):
                     if doctor_hospital:
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
-                        # COUPON PROCESS to be Discussed
-                        coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
-                        new_appointment = dict()
+                        coupon_discount = opd_appointment.discount
 
-                        new_effective_price = doctor_hospital.deal_price - coupon_price
+                        if coupon_discount > doctor_hospital.deal_price:
+                            new_effective_price = 0
+                        else:
+                            new_effective_price = doctor_hospital.deal_price - coupon_discount
+
                         new_appointment = {
                             "id": opd_appointment.id,
                             "doctor": opd_appointment.doctor,
@@ -581,7 +583,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "effective_price": new_effective_price,
                             "mrp": doctor_hospital.mrp,
                             "time_slot_start": time_slot_start,
-                            "payment_type": opd_appointment.payment_type
+                            "payment_type": opd_appointment.payment_type,
+                            "discount": coupon_discount
                         }
                         resp = self.extract_payment_details(request, opd_appointment, new_appointment,
                                                             account_models.Order.DOCTOR_PRODUCT_ID)

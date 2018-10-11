@@ -247,7 +247,7 @@ def opdappointment_transform(app_data):
     app_data["profile"] = app_data["profile"].id
     app_data["user"] = app_data["user"].id
     app_data["booked_by"] = app_data["booked_by"].id
-    if app_data["coupon"]:
+    if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
     return app_data
 
@@ -263,7 +263,7 @@ def labappointment_transform(app_data):
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
-    if app_data["coupon"]:
+    if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
     return app_data
 
