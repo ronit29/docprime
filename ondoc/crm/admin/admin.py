@@ -39,7 +39,8 @@ User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
-
+from ondoc.insurance.models import Insurer, InsurerFloat, InsurancePlans, InsuranceThreshold
+from ondoc.crm.admin import insurance
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -101,5 +102,5 @@ admin.site.register(ConsumerAccount)
 admin.site.register(TestParameter, TestParameterAdmin)
 admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
 admin.site.register(Procedure, ProcedureAdmin)
-
+admin.site.register(insurance, insuranceAdmin)
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
