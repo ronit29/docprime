@@ -52,14 +52,16 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         coupon_code = input_data.get("coupon_code")
         deal_price = input_data.get("deal_price")
         product_id = input_data.get("product_id")
-        if product_id == str(Order.DOCTOR_PRODUCT_ID):
+        if str(product_id) == str(Order.DOCTOR_PRODUCT_ID):
             obj = OpdAppointment()
-        elif product_id == str(Order.LAB_PRODUCT_ID):
+        elif str(product_id) == str(Order.LAB_PRODUCT_ID):
             obj = LabAppointment()
+        discount = 0
         if coupon_code:
-            if not obj.validate_coupon(request.user, coupon_code):
-                return Response({"status":0, "message": "Invalid coupon code for the user"}, status.HTTP_404_NOT_FOUND)
-            else:
-                discount = obj.get_discount(coupon_code, deal_price)
+            for coupon in coupon_code:
+                if not obj.validate_coupon(request.user, coupon):
+                    return Response({"status":0, "message": "Invalid coupon code for the user"}, status.HTTP_404_NOT_FOUND)
+                else:
+                    discount += obj.get_discount(coupon, deal_price)
 
         return Response({"discount": discount, "status": 1})
