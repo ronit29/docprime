@@ -514,7 +514,7 @@ class EntityUrlsHelper(object):
 
         url = slugify(url)
 
-        if not url and not re.match("^[A-Za-z0-9_-]*$", ul):
+        if not url and not re.match("^[A-Za-z0-9_-]*$", url):
             return None
 
         return url
