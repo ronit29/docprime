@@ -21,11 +21,11 @@ User = get_user_model()
 
 
 class OTPSerializer(serializers.Serializer):
-    phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
 
 
 class OTPVerificationSerializer(serializers.Serializer):
-    phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000, max_value=999999)
 
     def validate(self, attrs):
@@ -43,7 +43,7 @@ class OTPVerificationSerializer(serializers.Serializer):
 
 
 class DoctorLoginSerializer(serializers.Serializer):
-    phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
 
     def validate(self, attrs):
@@ -79,7 +79,7 @@ class DoctorLoginSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
 
     def validate(self, attrs):

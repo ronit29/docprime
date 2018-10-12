@@ -652,7 +652,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                     action=action,
                     action_data=temp_app_details,
                     amount=new_appointment_details.get('effective_price') - balance,
-                    reference_id=appointment_details.id,
+                    # reference_id=appointment_details.id,
                     payment_status=account_models.Order.PAYMENT_PENDING
                 )
                 new_appointment_details["payable_amount"] = new_appointment_details.get('effective_price') - balance
@@ -897,6 +897,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.TransactionSerializer
     queryset = PgTransaction.objects.none()
 
+    @transaction.atomic
     def save(self, request):
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
@@ -929,7 +930,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 logger.error("ValueError : statusCode is not type integer")
                 pg_resp_code = None
 
-            order_obj = Order.objects.filter(pk=response.get("orderId")).first()
+            order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId"), reference_id__isnull=True).first()
             if pg_resp_code == 1:
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER

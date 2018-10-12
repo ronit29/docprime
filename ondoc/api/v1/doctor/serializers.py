@@ -122,6 +122,7 @@ class OpdAppModelSerializer(serializers.ModelSerializer):
 
 
 class OpdAppTransactionModelSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
