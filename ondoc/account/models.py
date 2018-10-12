@@ -103,22 +103,22 @@ class Order(TimeStampedModel):
             new_appointment_data = appointment_data
             appointment_obj = OpdAppointment.objects.get(pk=appointment_data.get("id"))
             if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
+                amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
                 appointment_obj.action_rescheduled_patient(new_appointment_data)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
-                amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
         elif self.action == Order.LAB_APPOINTMENT_RESCHEDULE:
             new_appointment_data = appointment_data
             appointment_obj = LabAppointment.objects.get(pk=appointment_data.get("id"))
             if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
+                amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
                 appointment_obj.action_rescheduled_patient(new_appointment_data)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
-                amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
         if order_dict:
             self.update_order(order_dict)
         if appointment_obj:
