@@ -300,7 +300,7 @@ class EntityUrls(TimeStampedModel):
             group by ea.id)x where count>=3)y
             left join entity_address ea on y.parent=ea.id 
             ) as data
-            )x where rnum=1and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' ''' % (sequence)
+            )x where rnum=1 and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' ''' % (sequence)
 
 
         # seq = RawSql(query).fetch_all()
