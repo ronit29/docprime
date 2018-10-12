@@ -70,6 +70,11 @@ class EntityAddress(TimeStampedModel):
 
     @classmethod
     def get_or_create(cls, *args, **kwargs):
+        mapping_dictionary = {
+            'bengaluru': 'Banglore',
+            'gurugram': 'Gurgaon'
+        }
+
         meta_data = get_meta_by_latlong(kwargs.get('latitude'), kwargs.get('longitude'))
         if not kwargs.get('content_object', None):
             raise ValueError('Missing parameter: content_object')
@@ -91,9 +96,10 @@ class EntityAddress(TimeStampedModel):
                     entity_address = saved_data[0]
                     parent_id = entity_address.id
                 elif len(saved_data) == 0:
+                    alternative_name = mapping_dictionary.get(meta['value'].lower()) if mapping_dictionary.get(meta['value'].lower(), None) else meta['value']
                     entity_address = cls(type=meta['key'], centroid=point, postal_code=postal_code,
                                          type_blueprint=meta['type'], value=meta['value'], parent=parent_id,
-                                         alternative_value=meta['value'])
+                                         alternative_value=alternative_name)
                     entity_address.save()
                     parent_id = entity_address.id
 
@@ -239,7 +245,7 @@ class EntityUrls(TimeStampedModel):
             group by ea.id,ps.id)x where count>=3)y
             left join entity_address ea on y.parent=ea.id 
             ) as data												 
-            )x where rnum=1 ''' % (sequence)
+            )x where rnum=1 and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' ''' % (sequence)
 
         # Query for doctors in location and insertion .
 
@@ -251,7 +257,7 @@ class EntityUrls(TimeStampedModel):
             (
             select 
             case when y.type='LOCALITY' then json_build_object('location_json',
-            json_build_object('locality_id',location_id,'locality_',location_name, 'locality_latitude',latitude, 
+            json_build_object('locality_id',location_id,'locality_value',location_name, 'locality_latitude',latitude, 
             'locality_longitude',longitude),'location_id',location_id)
             
             when y.type='SUBLOCALITY' then json_build_object('location_json',
@@ -294,7 +300,8 @@ class EntityUrls(TimeStampedModel):
             group by ea.id)x where count>=3)y
             left join entity_address ea on y.parent=ea.id 
             ) as data
-            )x where rnum=1;''' % (sequence)
+            )x where rnum=1 and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' ''' % (sequence)
+
 
         # seq = RawSql(query).fetch_all()
         from django.db import connection
@@ -322,6 +329,7 @@ class EntityUrls(TimeStampedModel):
             sequence = 0
 
          # Query for lab in location and insertion .
+
 
         query ='''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, updated_at, sequence)
             select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url, 
@@ -373,7 +381,7 @@ class EntityUrls(TimeStampedModel):
             group by ea.id)x where count>=3)y
             left join entity_address ea on y.parent=ea.id 
             ) as data 
-            ) x where rnum=1''' % (sequence)
+            ) x where rnum=1 and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' ''' % (sequence)
 
         from django.db import connection
         with connection.cursor() as cursor:
@@ -385,8 +393,6 @@ class EntityUrls(TimeStampedModel):
                 return False
 
         return True
-
-
 
     @classmethod
     def create_page_url(cls, entity_object):
@@ -421,23 +427,32 @@ class EntityUrls(TimeStampedModel):
                     breadcrums = list()
                     location_id = page_url_dict.get('location_id')
                     address_obj = EntityAddress.objects.get(id=location_id)
+
+                    locality_value = address_obj.value
+                    sublocality_value = ''
+
                     if address_obj.type_blueprint == EntityAddress.AllowedKeys.SUBLOCALITY:
                         address_obj_parent = EntityAddress.objects.get(id=address_obj.parent)
+                        locality_value = address_obj_parent.alternative_value
+                        sublocality_value = address_obj.alternative_value
                         if address_obj_parent:
                             bread_url = slugify('{prefix}-in-{locality}-{identifier}cit'
                                                 .format(identifier=identifier, prefix=forname,
                                                         locality=address_obj_parent.alternative_value))
+
                             if EntityUrls.objects.filter(url=bread_url).exists():
                                 breadcrums.append({'name': address_obj_parent.alternative_value, 'url': bread_url})
 
                             bread_url = slugify('{prefix}-in-{sublocality}-{locality}-{identifier}litcit'.
                                                 format(prefix=forname, sublocality=address_obj.alternative_value,
                                                        locality=address_obj_parent.alternative_value, identifier=identifier))
+
+
                             if EntityUrls.objects.filter(url=bread_url).exists():
                                 breadcrums.append({'name': address_obj.alternative_value, 'url': bread_url})
 
                     extra = {'related_entity_id': entity_object.id, 'location_id': page_url_dict.get('location_id'),
-                             'breadcrums': breadcrums}
+                             'breadcrums': breadcrums, 'locality_value': locality_value, 'sublocality_value': sublocality_value}
 
                     entity_url_objs = cls.objects.filter(entity_id=entity_object.id, entity_type=entity_object.__class__.__name__, url_type='PAGEURL', is_valid=True)
                     if not entity_url_objs.exists():
@@ -486,6 +501,7 @@ class EntityUrlsHelper(object):
     #     return urls
 
     def build_url(self, prefix, location):
+        import re
         url = ''
         if location.type == 'LOCALITY':
             ea = EntityAddress.objects.get(id=location.location_id, type=location.type)
@@ -497,11 +513,9 @@ class EntityUrlsHelper(object):
                 .format(prefix=prefix, sublocality=ea_sublocality.alternative_value, locality=ea_locality.alternative_value)
 
         url = slugify(url)
-        # url = split_and_append(url, ' ', '-')
-        # url = split_and_append(url, '/', '-')
 
-        if not url:
-            url = None
+        if not url and not re.match("^[A-Za-z0-9_-]*$", url):
+            return None
 
         return url
 
