@@ -799,6 +799,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
         if validated_data.get('extras') or validated_data.get('specialization_ids'):
             breadcrumb_sublocality = None
+            breadcrumb_locality = None
             breadcrumb = None
             locality = ''
             sublocality = ''
@@ -834,19 +835,42 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if specializations:
                 title = specializations
                 description = specializations
+            else:
+                title = 'Doctors'
+                description = 'Doctors'
             if locality:
                 title += ' in '  + locality
                 description += ' in ' +locality
             if specializations:
-                title += '- Book Best ' + specializations
                 description += ': Book best ' + specializations + '\'s appointment online '
-            if locality:
-                description += 'in ' + locality
-            title += ' Instantly | DocPrime'
+                if locality:
+                    if sublocality == '':
 
-            description += '. View Address, fees and more for doctors '
+                        description +=  'in ' + breadcrumb_locality
+                    else:
+
+                        description += ': Book best ' + specializations + '\'s appointment online ' + 'in '+ locality
+
+            else:
+                if locality:
+                    if sublocality == '':
+
+                        description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in ' + breadcrumb_locality
+                    else:
+
+                        description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
+            if specializations:
+                if breadcrumb_locality:
+                    title += ' -Book Best ' + specializations +' Online'
+                else:
+                    title += '| Book & Get Best Deal'
+
+            else:
+                title += '| Book & Get Best Deal'
+
+            description += ' and get upto 50% off. View Address, fees and more for doctors '
             if locality:
-                description += 'in '+ locality
+                description += 'in '+ breadcrumb_locality
             description += '.'
 
             if breadcrumb_sublocality:
