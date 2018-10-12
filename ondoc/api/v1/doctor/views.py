@@ -834,7 +834,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #     else:
             #         specializations = ''
             specializations = None
-            if validated_data.get('extras').get('specialization'):
+            if validated_data.get('extras') and validated_data.get('extras').get('specialization'):
                 specializations = validated_data.get('extras').get('specialization')
 
             if specializations:
