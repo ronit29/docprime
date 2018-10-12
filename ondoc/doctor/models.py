@@ -326,6 +326,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     live_at = models.DateTimeField(null=True, blank=True)
     is_internal = models.BooleanField(verbose_name='Is Staff Doctor', default=False)
     is_test_doctor = models.BooleanField(verbose_name='Is Test Doctor', default=False)
+    is_license_verified = models.BooleanField(default=False, blank=True)
+
     # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
@@ -1038,7 +1040,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
-    is_license_verified = models.BooleanField(default=False)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
