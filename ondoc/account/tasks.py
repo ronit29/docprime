@@ -73,7 +73,7 @@ def refund_curl_task(self, req_data):
                     ConsumerRefund.update_refund_status_on_resp(req_data["refNo"])
                 elif (resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_FAILURE_OK_STATUS and
                       resp_data.get("status") is not None and str(resp_data["status"]) == PgTransaction.PG_REFUND_ALREADY_REQUESTED_STATUS):
-                    # ConsumerRefund.update_refund_status_on_resp(req_data["refNo"])
+                    ConsumerRefund.update_refund_status_on_resp(req_data["refNo"])
                     print("Already Requested")
                 elif (resp_data.get("ok") is None or
                       (str(resp_data["ok"]) == PgTransaction.PG_REFUND_FAILURE_OK_STATUS and

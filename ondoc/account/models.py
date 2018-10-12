@@ -514,7 +514,7 @@ class ConsumerRefund(TimeStampedModel):
                         elif (resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_FAILURE_OK_STATUS and
                               resp_data.get("status") is not None and str(
                                     resp_data["status"]) == PgTransaction.PG_REFUND_ALREADY_REQUESTED_STATUS):
-                            # self.update_refund_status_on_resp(req_data["refNo"])
+                            self.update_refund_status_on_resp(req_data["refNo"])
                             print("Already Requested")
                         elif (resp_data.get("ok") is None or
                               (str(resp_data["ok"]) == PgTransaction.PG_REFUND_FAILURE_OK_STATUS and
@@ -541,7 +541,8 @@ class ConsumerRefund(TimeStampedModel):
             refund_queryset = cls.objects.select_for_update().filter(pk=pk).first()
             if refund_queryset:
                 refund_queryset.refund_state = ConsumerRefund.REQUESTED
-                refund_queryset.refund_initiated_at = timezone.now()
+                if not refund_queryset.refund_initiated_at:
+                    refund_queryset.refund_initiated_at = timezone.now()
                 refund_queryset.save()
                 print("Status Updated")
 
