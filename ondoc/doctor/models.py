@@ -813,7 +813,7 @@ class DoctorMobile(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="mobiles", on_delete=models.CASCADE)
     country_code = models.PositiveSmallIntegerField(default=91, blank=True, null=True)
     number = models.BigIntegerField(blank=True, null=True,
-                                    validators=[MaxValueValidator(9999999999), MinValueValidator(7000000000)])
+                                    validators=[MaxValueValidator(9999999999), MinValueValidator(5000000000)])
     is_primary = models.BooleanField(verbose_name='Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name='Phone Number Verified?', default=False)
 
@@ -1038,6 +1038,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
+    is_license_verified = models.BooleanField(default=False)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"

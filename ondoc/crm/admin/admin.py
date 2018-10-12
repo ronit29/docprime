@@ -39,7 +39,8 @@ User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
-
+from .seo import SitemapManagerAdmin
+from ondoc.seo.models import SitemapManger
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -103,3 +104,4 @@ admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
 admin.site.register(Procedure, ProcedureAdmin)
 
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
+admin.site.register(SitemapManger, SitemapManagerAdmin)
