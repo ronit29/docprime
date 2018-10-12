@@ -89,7 +89,8 @@ DJANGO_APPS = (
     'django.contrib.gis',
     'reversion',
     'storages',
-
+    'django.contrib.sites',
+    'django.contrib.sitemaps',
 )
 
 THIRD_PARTY_APPS = (
@@ -104,7 +105,8 @@ THIRD_PARTY_APPS = (
     'django_tables2',
     'anymail',
     'nested_admin',
-    'ipware'
+    'ipware',
+    'django_user_agents'
 )
 
 LOCAL_APPS = (
@@ -144,6 +146,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_user_agents.middleware.UserAgentMiddleware'
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -196,6 +199,8 @@ STATICFILES_FINDERS = (
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = str(APPS_DIR('media'))
+
+SITE_ID = 1
 
 # TEMPLATES
 # ------------------------------------------------------------------------------
@@ -287,6 +292,7 @@ MATRIX_API_URL= env('MATRIX_API_URL')
 MATRIX_API_TOKEN = env('MATRIX_API_TOKEN')
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
 CHAT_API_URL = env('CHAT_API_URL')
+CHAT_PRESCRIPTION_URL = env('CHAT_PRESCRIPTION_URL')
 PG_SECRET_KEY_P1 = env('PG_SECRET_KEY_P1')
 PG_CLIENT_KEY_P1 = env('PG_CLIENT_KEY_P1')
 PG_SECRET_KEY_P2 = env('PG_SECRET_KEY_P2')

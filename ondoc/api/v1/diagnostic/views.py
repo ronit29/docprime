@@ -10,7 +10,7 @@ from ondoc.notification.models import EmailNotification
 from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone, get_lab_search_details
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone, get_lab_search_details, TimeSlotExtraction
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -32,7 +32,6 @@ from django.http import Http404
 from django.conf import settings
 import hashlib
 from rest_framework import status
-from collections import OrderedDict
 from django.utils import timezone
 from ondoc.diagnostic import models
 from ondoc.authentication import models as auth_models
@@ -45,7 +44,6 @@ import copy
 import re
 import datetime
 from django.contrib.auth import get_user_model
-from decimal import Decimal
 User = get_user_model()
 
 
@@ -122,11 +120,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
-                                           entity_type__iexact='Lab')
+                                           entity_type__iexact='Lab').order_by('-updated_at')
         if entity.exists():
             extras = entity.first().additional_info
             if extras.get('location_json'):
                 kwargs['location_json'] = extras.get('location_json')
+                kwargs['url'] = url
                 kwargs['parameters'] = get_lab_search_details(extras, request.query_params)
                 response = self.list(request, **kwargs)
                 return response
@@ -172,6 +171,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         if kwargs.get('location_json'):
             serializer.validated_data['location_json'] = kwargs['location_json']
+        if kwargs.get('url'):
+            serializer.validated_data['url'] = kwargs['url']
 
         parameters = serializer.validated_data
 
@@ -201,6 +202,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
         seo = None
+        breadcrumb = None
         if parameters.get('location_json'):
             locality = ''
             sublocality = ''
@@ -213,6 +215,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 if sublocality:
                     sublocality += ' '
 
+            if parameters.get('location_json') and parameters.get('location_json').get('breadcrum_url'):
+                breadcrumb_locality_url = parameters.get('location_json').get('breadcrum_url')
+
             title = "Diagnostic Centres & Labs "
             if locality:
                 title += "in " + sublocality + locality
@@ -222,10 +227,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 description += " in " + sublocality + locality
             description += " and book test online, check fees, packages prices and more at DocPrime."
             seo = {'title': title, "description": description}
+            if sublocality:
+                breadcrumb = [{
+                    'name': locality,
+                     'url': breadcrumb_locality_url
+                },
+                    {
+                        'name': sublocality,
+                        'url': parameters.get('url')
+                }]
 
         return Response({"result": serializer.data,
                          "count": count,'tests':tests,
-                         "seo": seo})
+                         "seo": seo, "breadcrumb": breadcrumb})
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
@@ -244,10 +258,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing_data = list()
         if lab_obj:
             if lab_obj.always_open:
-                lab_timing = "00:00 AM - 23:45 PM"
+                lab_timing = "12:00 AM - 23:45 PM"
                 lab_timing_data = [{
-                    "start": 7.0,
-                    "end": 19.0
+                    "start": 0.0,
+                    "end": 23.75
                 }]
             else:
                 timing_queryset = lab_obj.lab_timings.filter(day=day_now)
@@ -415,7 +429,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row["lab"] = temp_var[row["id"]]
 
             if row["lab"].always_open:
-                lab_timing = "00:00 AM - 23:45 PM"
+                lab_timing = "12:00 AM - 11:45 PM"
                 lab_timing_data = [{
                     "start": 0.0,
                     "end": 23.75
@@ -560,6 +574,21 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 effective_price = effective_price - coupon_discount
 
         start_dt = form_time_slot(data["start_date"], data["start_time"])
+
+        test_ids_list = list()
+        extra_details = list()
+        for obj in lab_test_queryset:
+            test_ids_list.append(obj.id)
+            extra_details.append({
+                "id": str(obj.test.id),
+                "name": str(obj.test.name),
+                "custom_deal_price": str(obj.custom_deal_price),
+                "computed_deal_price": str(obj.computed_deal_price),
+                "mrp": str(obj.mrp),
+                "computed_agreed_price": str(obj.computed_agreed_price),
+                "custom_agreed_price": str(obj.custom_agreed_price)
+            })
+
         profile_detail = {
             "name": data["profile"].name,
             "gender": data["profile"].gender,
@@ -580,7 +609,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
             "payment_type": data["payment_type"],
-            "lab_test": [x["id"] for x in lab_test_queryset.values("id")],
+            "lab_test": test_ids_list,
+            # "lab_test": [x["id"] for x in lab_test_queryset.values("id")],
+            "extra_details": extra_details,
             "coupon": coupon_list,
             "discount": coupon_discount
         }
@@ -789,104 +820,6 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
         serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
                                                                       context={"lab": lab_obj})
         return Response(serializer.data)
-
-
-class TimeSlotExtraction(object):
-    MORNING = "Morning"
-    AFTERNOON = "Afternoon"
-    EVENING = "Evening"
-    TIME_SPAN = 15  # In minutes
-    timing = dict()
-    price_available = dict()
-
-    def __init__(self):
-        for i in range(7):
-            self.timing[i] = dict()
-            self.price_available[i] = dict()
-
-    def form_time_slots(self, day, start, end, price=None, is_available=True,
-                        deal_price=None, mrp=None, is_doctor=False):
-        start = Decimal(str(start))
-        end = Decimal(str(end))
-        time_span = self.TIME_SPAN
-
-        float_span = (Decimal(time_span) / Decimal(60))
-        if not self.timing[day].get('timing'):
-            self.timing[day]['timing'] = dict()
-            self.timing[day]['timing'][self.MORNING] = OrderedDict()
-            self.timing[day]['timing'][self.AFTERNOON] = OrderedDict()
-            self.timing[day]['timing'][self.EVENING] = OrderedDict()
-        temp_start = start
-        while temp_start <= end:
-            day_slot, am_pm = self.get_day_slot(temp_start)
-            time_str = self.form_time_string(temp_start, am_pm)
-            self.timing[day]['timing'][day_slot][temp_start] = time_str
-            price_available = {"price": price, "is_available": is_available}
-            if is_doctor:
-                price_available.update({
-                    "mrp": mrp,
-                    "deal_price": deal_price
-                })
-            self.price_available[day][temp_start] = price_available
-            temp_start += float_span
-
-    def get_day_slot(self, time):
-        am = 'AM'
-        pm = 'PM'
-        if time < 12:
-            return self.MORNING, am
-        elif time < 16:
-            return self.AFTERNOON, pm
-        else:
-            return self.EVENING, pm
-
-    def form_time_string(self, time, am_pm):
-
-        day_time_hour = int(time)
-        day_time_min = (time - day_time_hour) * 60
-
-        if day_time_hour > 12:
-            day_time_hour -= 12
-
-        day_time_hour_str = str(int(day_time_hour))
-        if int(day_time_hour) < 10:
-            day_time_hour_str = '0' + str(int(day_time_hour))
-
-        day_time_min_str = str(int(day_time_min))
-        if int(day_time_min) < 10:
-            day_time_min_str = '0' + str(int(day_time_min))
-
-        time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
-
-        return time_str
-
-    def get_timing_list(self):
-        whole_timing_data = dict()
-        for i in range(7):
-            whole_timing_data[i] = list()
-            pa = self.price_available[i]
-            if self.timing[i].get('timing'):
-                # data = self.format_data(self.timing[i]['timing'][self.MORNING], pa)
-                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
-                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
-                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
-
-        return whole_timing_data
-
-    def format_data(self, data, day_time, pa):
-        data_list = list()
-        for k, v in data.items():
-            if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
-                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                  "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
-                                  "is_available": pa[k]["is_available"]})
-            else:
-                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
-                                  "is_available": pa[k]["is_available"]})
-        format_data = dict()
-        format_data['title'] = day_time
-        format_data['timing'] = data_list
-        return format_data
 
 
 class LabReportFileViewset(mixins.CreateModelMixin,

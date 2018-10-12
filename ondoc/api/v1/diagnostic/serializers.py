@@ -61,6 +61,7 @@ class LabModelSerializer(serializers.ModelSerializer):
     lab_thumbnail = serializers.SerializerMethodField()
     home_pickup_charges = serializers.ReadOnlyField()
     seo = serializers.SerializerMethodField()
+    breadcrumb = serializers.SerializerMethodField()
 
     def get_seo(self, obj):
 
@@ -73,14 +74,16 @@ class LabModelSerializer(serializers.ModelSerializer):
         if entity.exists():
             location_id = entity.first().additional_info.get('location_id')
             type = EntityAddress.objects.filter(id=location_id).values('type', 'value', 'parent')
-            if type.first().get('type') == 'LOCALITY':
-                locality = type.first().get('value')
+            if type.exists():
+                if type.first().get('type') == 'LOCALITY':
+                    locality = type.first().get('value')
 
-            if type.first().get('type') == 'SUBLOCALITY':
-                sublocality = type.first().get('value')
-                parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-                if sublocality:
-                    locality = ' ' + parent.first().get('value')
+            if type.exists():
+                if type.first().get('type') == 'SUBLOCALITY':
+                    sublocality = type.first().get('value')
+                    parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
+                    if sublocality:
+                        locality = ' ' + parent.first().get('value')
         if not(sublocality == '') or not(locality == ''):
             title = obj.name + ' - Diagnostic Centre in '+ sublocality + locality + ' |DocPrime'
         else:
@@ -88,6 +91,19 @@ class LabModelSerializer(serializers.ModelSerializer):
 
         description = obj.name + ': Book test at ' + obj.name + ' online, check fees, packages prices and more at DocPrime. '
         return {'title': title, "description": description}
+
+    def get_breadcrumb(self, obj):
+
+        if self.parent:
+            return None
+        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Lab')
+        breadcrums = None
+        if entity.exists():
+            breadcrums = entity.first().additional_info.get('breadcrums')
+            if breadcrums:
+                return breadcrums
+        return breadcrums
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
@@ -111,7 +127,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo')
+                  'is_home_collection_enabled', 'seo', 'breadcrumb')
 
 
 class LabProfileSerializer(LabModelSerializer):
@@ -287,7 +303,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     home_pickup_charges = serializers.DecimalField(max_digits=10, decimal_places=2)
     is_home_pickup = serializers.BooleanField(default=False)
     address = serializers.JSONField(required=False)
-    coupon = serializers.ListField(child=serializers.IntegerField())
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False)
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 

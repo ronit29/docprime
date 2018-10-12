@@ -12,7 +12,6 @@ def map_doctor_urls():
             print("Failed for id", doctor.id)
 
 
-
 class Command(BaseCommand):
     def handle(self, **options):
         map_doctor_urls()

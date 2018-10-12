@@ -5,6 +5,7 @@ import datetime
 
 
 class ArticleCategory(TimeStampedModel):
+
     name = models.CharField(blank=False, null=False, max_length=500)
     identifier = models.CharField(max_length=48, blank=False, null=True)
     url = models.CharField(blank=False, null=True, max_length=500, unique=True)

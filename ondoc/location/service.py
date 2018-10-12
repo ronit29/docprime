@@ -13,7 +13,7 @@ def get_meta_by_latlong(lat, long):
 
     if not saved_json.exists():
         response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?sensor=false',
-                                params={'latlng': '%s,%s' % (lat, long), 'key': settings.REVERSE_GEOCODING_API_KEY})
+                                params={'latlng': '%s,%s' % (lat, long), 'key': settings.REVERSE_GEOCODING_API_KEY, 'language': 'en'})
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
             logger.info("[ERROR] %s", response.reason)
