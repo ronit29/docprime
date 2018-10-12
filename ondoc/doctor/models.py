@@ -297,10 +297,10 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     ONBOARDED = 3
     ONBOARDING_STATUS = [(NOT_ONBOARDED, "Not Onboarded"), (REQUEST_SENT, "Onboarding Request Sent"),
                          (ONBOARDED, "Onboarded")]
-
+    GENDER_CHOICES = [("", "Select"), ("m", "Male"), ("f", "Female"), ("o", "Other")]
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
-                              choices=[("", "Select"), ("m", "Male"), ("f", "Female"), ("o", "Other")])
+                              choices=GENDER_CHOICES)
     practicing_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     raw_about = models.CharField(max_length=2000, blank=True)
     about = models.CharField(max_length=2000, blank=True)
