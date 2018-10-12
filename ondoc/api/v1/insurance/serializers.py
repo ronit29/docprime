@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.renderers import JSONRenderer
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerFloat, InsuredMembers)
+from ondoc.authentication.models import UserProfile
 
 
 class InsurerSerializer(serializers.Serializer):
@@ -64,7 +65,9 @@ class MemberListSerializer(serializers.Serializer):
     relation = serializers.CharField(max_length=50)
     address = serializers.CharField(max_length=250)
     pincode = serializers.IntegerField()
-    # gender = serializers.SerializerMethodField()
+    member_type = serializers.ChoiceField(choices=InsuredMembers.MEMBER_TYPE_CHOICES)
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
+    gender = serializers.ChoiceField(choices=InsuredMembers.GENDER_CHOICES)
 
     # def get_gender(self, obj):
     #     if obj.relation == InsuredMembers.HUSBAND or InsuredMembers.SON:

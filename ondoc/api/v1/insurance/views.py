@@ -5,6 +5,9 @@ from django.http import JsonResponse
 from ondoc.account import models as account_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans)
 from ondoc.authentication.models import UserProfile
+from ondoc.authentication.backends import JWTAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status, permissions
 import json
 import datetime
 
@@ -24,6 +27,8 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
 
 
 class InsuredMemberViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter()
@@ -36,32 +41,59 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         resp = {}
 
         if valid_data:
-            if request.data.get('profile'):
-                profile = UserProfile.objects.get(id=request.data.get('profile'))
-                pre_insured_members = {}
-                insured_members_list = []
-                for member in members:
+            user = request.user
+            # profile = UserProfile.objects.filter(user_id=user.id)
+            pre_insured_members = {}
+            insured_members_list = []
+            for member in members:
 
-                    pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
-                    pre_insured_members['first_name'] = member['first_name']
-                    pre_insured_members['last_name'] = member['last_name']
-                    pre_insured_members['dob'] = member['dob']
-                    pre_insured_members['address'] = member['address']
-                    pre_insured_members['pincode'] = member['pincode']
-                    pre_insured_members['email'] = member['email']
-                    pre_insured_members['relation'] = member['relation']
+                name = member['first_name'] + " " + member['last_name']
+                dob = member['dob']
+                current_date = datetime.datetime.now().date()
+                days_diff = current_date - dob
+                days_diff = days_diff.days
+                years_diff = days_diff / 365
+                years_diff = int(years_diff)
+                insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
+                                                                        valid_data.get('insurance_plan').id,
+                                                                        insurer_id=valid_data.get('insurer')).first()
+                adult_max_age = insurance_threshold.max_age
+                adult_min_age = insurance_threshold.min_age
+                child_min_age = insurance_threshold.child_min_age
+                if member['member_type'] == "adult":
 
-                    insured_members_list.append(pre_insured_members)
+                    if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
+                        pre_insured_members['dob'] = member['dob']
+                    elif adult_max_age <= years_diff:
+                        return Response({"message": "Adult Age would be less than " + adult_max_age},
+                                        status.HTTP_404_NOT_FOUND)
+                    elif adult_min_age <= years_diff:
+                        return Response({"message": "Adult Age would be more than " + adult_min_age},
+                                        status.HTTP_404_NOT_FOUND)
+                if member['member_type'] == "child":
+                    if child_min_age <= days_diff:
+                        pre_insured_members['dob'] = member['dob']
+                    else:
+                        return Response({"message": "Child Age would be more than " + child_min_age},
+                                        status.HTTP_404_NOT_FOUND)
+                # pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
+                pre_insured_members['first_name'] = member['first_name']
+                pre_insured_members['last_name'] = member['last_name']
 
-            insured_members = {"insurer": valid_data.get('insurer'), "insurance_plan": valid_data.get('insurance_plan'),
-                               "insured_members": insured_members_list}
+                pre_insured_members['address'] = member['address']
+                pre_insured_members['pincode'] = member['pincode']
+                pre_insured_members['email'] = member['email']
+                pre_insured_members['relation'] = member['relation']
 
-            insurance_transaction = {"insurer": valid_data.get('insurer'),
-                                     "insurance_plan": valid_data.get('insurance_plan'),
-                                     "user": request.user, "reference_id": " ", "order_id": "",
-                                     "type": account_models.PgTransaction.DEBIT, "payment_mode": "",
-                                     "response_code": "", "transaction_date": "", "transaction_id": "",
-                                     "status": "TODO"}
+                insured_members_list.append(pre_insured_members)
+
+
+            # insurance_transaction = {"insurer": valid_data.get('insurer'),
+            #                          "insurance_plan": valid_data.get('insurance_plan'),
+            #                          "user": request.user, "reference_id": " ", "order_id": "",
+            #                          "type": account_models.PgTransaction.DEBIT, "payment_mode": "",
+            #                          "response_code": "", "transaction_date": "", "transaction_id": "",
+            #                          "status": "TODO"}
 
             insurer = Insurer.objects.filter(id=valid_data.get('insurer').id).values()
             insurance_plan = InsurancePlans.objects.filter(id=valid_data.get('insurance_plan').id).values()
@@ -69,14 +101,16 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             return Response(resp)
 
     def create(self, request):
-
         insurance_data = request.data.get('insurance')
-
+        insurance_plan = insurance_data.get('insurance_plan')
+        insurer = insurance_data.get('insurer')
+        insured_member = insurance_data.get('members')
+        amount = insurance_plan[0]['amount']
         order = account_models.Order.objects.create(
             product_id=account_models.Order.INSURANCE_PRODUCT_ID,
             action=account_models.Order.INSURANCE_CREATE,
             action_data=insurance_data,
-            amount=3000,
+            amount=amount,
             reference_id=1,
             payment_status=account_models.Order.PAYMENT_PENDING
         )

@@ -5,7 +5,7 @@ from ondoc.account import models as account_model
 
 class Insurer(auth_model.TimeStampedModel):
     name = models.CharField(max_length=100)
-    is_disabeld = models.BooleanField(default=False)
+    is_disabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
     class Meta:
@@ -20,65 +20,6 @@ class InsurerFloat(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "insurer_float"
-
-
-class Insurance(auth_model.TimeStampedModel):
-    insurer = models.ForeignKey(Insurer, on_delete=models.SET_NULL, null=True)
-    product_id = models.PositiveSmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
-    name = models.CharField(max_length=100)
-    insurance_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    insured_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    max_profile = models.PositiveSmallIntegerField(blank=True, null=True)
-
-    class Meta:
-        db_table = "insurance"
-
-
-class UserInsurance(auth_model.TimeStampedModel):
-    insurance = models.ForeignKey(Insurance, on_delete=models.DO_NOTHING)
-    user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
-    product_id = models.PositiveSmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
-
-    class Meta:
-        db_table = "user_insurance"
-
-
-class ProfileInsurance(auth_model.TimeStampedModel):
-    insurance = models.ForeignKey(Insurance, on_delete=models.DO_NOTHING)
-    user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
-    profile = models.ManyToManyField(auth_model.UserProfile)
-    product_id = models.PositiveSmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
-    insured_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    insurance_amount = models.DecimalField(max_digits=10, decimal_places=2)
-
-    class Meta:
-        db_table = "profile_insurance"
-
-
-class PgInsurance(auth_model.TimeStampedModel):
-    insurance = models.ForeignKey(Insurance, on_delete=models.DO_NOTHING)
-    user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
-
-    product_id = models.SmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
-    reference_id = models.PositiveIntegerField(blank=True, null=True)
-    order_id = models.PositiveIntegerField()
-    type = models.SmallIntegerField(choices=account_model.PgTransaction.TYPE_CHOICES)
-
-    payment_mode = models.CharField(max_length=50)
-    response_code = models.IntegerField()
-    bank_id = models.CharField(max_length=50)
-    transaction_date = models.CharField(max_length=80)
-    bank_name = models.CharField(max_length=100)
-    currency = models.CharField(max_length=15)
-    status_code = models.IntegerField()
-    pg_name = models.CharField(max_length=100)
-    status_type = models.CharField(max_length=50)
-    transaction_id = models.CharField(max_length=100, unique=True)
-    pb_gateway_name = models.CharField(max_length=100)
-
-    class Meta:
-        db_table = "pg_insurance"
-
 
 class InsurancePlans(auth_model.TimeStampedModel):
     insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
@@ -100,6 +41,7 @@ class InsuranceThreshold(auth_model.TimeStampedModel):
     lab_amount_limit = models.PositiveIntegerField(default=None)
     min_age = models.PositiveIntegerField(default=None)
     max_age = models.PositiveIntegerField(default=None)
+    child_min_age = models.PositiveIntegerField(default=None)
     tenure = models.PositiveIntegerField(default=None)
     is_disabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
@@ -119,6 +61,9 @@ class InsuredMembers(auth_model.TimeStampedModel):
     SON = 'son'
     DAUGHTER = 'daughter'
     RELATION_CHOICES = [(HUSBAND, 'Husband'), (WIFE, 'Wife'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    ADULT = "adult"
+    CHILD = "child"
+    MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
     insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
     first_name = models.CharField(max_length=50, null=False)
     last_name = models.CharField(max_length=50, null=False)
@@ -133,8 +78,61 @@ class InsuredMembers(auth_model.TimeStampedModel):
         db_table = "insured_members"
 
 
+class Insurance(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, on_delete=models.SET_NULL, null=True)
+    product_id = models.PositiveSmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
+    name = models.CharField(max_length=100)
+    insurance_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    insured_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    max_profile = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = "insurance"
 
 
-# class InsuranceTransaction(auth_model.TimeStampedModel):
+class UserInsurance(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING, null=True)
+    insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING, null=True)
+    user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
+    product_id = models.PositiveSmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
+
+    class Meta:
+        db_table = "user_insurance"
+
+
+# class ProfileInsurance(auth_model.TimeStampedModel):
+#     insurance = models.ForeignKey(Insurance, on_delete=models.DO_NOTHING)
+#     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
+#     profile = models.ManyToManyField(auth_model.UserProfile)
+#     product_id = models.PositiveSmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
+#     insured_amount = models.DecimalField(max_digits=10, decimal_places=2)
+#     insurance_amount = models.DecimalField(max_digits=10, decimal_places=2)
 #
-#     pass
+#     class Meta:
+#         db_table = "profile_insurance"
+
+
+class InsuranceTransaction(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
+    insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
+    user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
+
+    product_id = models.SmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
+    reference_id = models.PositiveIntegerField(blank=True, null=True)
+    order_id = models.PositiveIntegerField()
+    type = models.SmallIntegerField(choices=account_model.PgTransaction.TYPE_CHOICES)
+
+    payment_mode = models.CharField(max_length=50)
+    response_code = models.IntegerField()
+    bank_id = models.CharField(max_length=50)
+    transaction_date = models.CharField(max_length=80)
+    bank_name = models.CharField(max_length=100)
+    currency = models.CharField(max_length=15)
+    status_code = models.IntegerField()
+    pg_name = models.CharField(max_length=100)
+    status_type = models.CharField(max_length=50)
+    transaction_id = models.CharField(max_length=100, unique=True)
+    pb_gateway_name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = "insurance_transaction"
