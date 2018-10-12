@@ -82,9 +82,10 @@ class InsuredMembers(auth_model.TimeStampedModel):
     last_name = models.CharField(max_length=50, null=False)
     dob = models.DateTimeField(null=False)
     email = models.EmailField(max_length=100)
-    relation = models.CharField(max_length=50)
+    relation = models.CharField(max_length=50, choices=RELATION_CHOICES)
     pincode = models.PositiveIntegerField(default=None)
     address = models.TextField(default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES)
     profile = models.ForeignKey(auth_model.UserProfile, on_delete=models.SET_NULL, null=True)
 
     class Meta:

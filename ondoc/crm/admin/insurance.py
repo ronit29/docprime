@@ -4,7 +4,7 @@ from ondoc.insurance.models import Insurer, InsurerFloat, InsurancePlans, Insura
 
 class InsurerAdmin(admin.ModelAdmin):
 
-    list_display = ['name', 'is_disabeld', 'is_live']
+    list_display = ['name', 'is_disabled', 'is_live']
     list_filter = ['name']
 
 
@@ -19,8 +19,5 @@ class InsurancePlansAdmin(admin.ModelAdmin):
 
 
 class InsuranceThresholdAdmin(admin.ModelAdmin):
-    # query_set = Insurer.objects.all().first()
-    # if query_set:
-    #     name = query_set.name
-    model = InsuranceThreshold
+
     list_display = ('insurer', 'insurance_plan')
