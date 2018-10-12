@@ -800,6 +800,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         if validated_data.get('extras') or validated_data.get('specialization_ids'):
             breadcrumb_sublocality = None
             breadcrumb_locality = None
+            city = None
             breadcrumb = None
             locality = ''
             sublocality = ''
@@ -808,6 +809,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if validated_data.get('extras').get('location_json').get('locality_value'):
                     locality = validated_data.get('extras').get('location_json').get('locality_value')
                     breadcrumb_locality = locality
+                    city = locality
                 if validated_data.get('extras').get('location_json').get('sublocality_value'):
                     sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
                     if sublocality:
@@ -842,11 +844,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 title += ' in '  + locality
                 description += ' in ' +locality
             if specializations:
-                description += ': Book best ' + specializations + '\'s appointment online '
+
                 if locality:
                     if sublocality == '':
 
-                        description +=  'in ' + breadcrumb_locality
+                        description += ': Book best ' + specializations + '\'s appointment online ' +  'in ' + city
                     else:
 
                         description += ': Book best ' + specializations + '\'s appointment online ' + 'in '+ locality
@@ -855,12 +857,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if locality:
                     if sublocality == '':
 
-                        description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in ' + breadcrumb_locality
+                        description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in ' + city
                     else:
 
                         description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
             if specializations:
-                if breadcrumb_locality:
+                if city:
                     title += ' -Book Best ' + specializations +' Online'
                 else:
                     title += '| Book & Get Best Deal'
@@ -870,7 +872,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
             description += ' and get upto 50% off. View Address, fees and more for doctors '
             if locality:
-                description += 'in '+ breadcrumb_locality
+                description += 'in '+ city
             description += '.'
 
             if breadcrumb_sublocality:
