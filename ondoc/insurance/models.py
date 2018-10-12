@@ -8,6 +8,9 @@ class Insurer(auth_model.TimeStampedModel):
     is_disabeld = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
+    def __str__(self):
+        return self.name
+
     class Meta:
         db_table = "insurer"
 
@@ -17,6 +20,10 @@ class InsurerFloat(auth_model.TimeStampedModel):
     insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
     max_float = models.PositiveIntegerField(default=None)
     current_float = models.PositiveIntegerField(default=None)
+
+    def __str__(self):
+        return self.insurer
+
 
     class Meta:
         db_table = "insurer_float"
@@ -87,6 +94,9 @@ class InsurancePlans(auth_model.TimeStampedModel):
     is_disabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
+    def __str__(self):
+        return self.type
+
     class Meta:
         db_table = "insurance_plans"
 
@@ -103,6 +113,9 @@ class InsuranceThreshold(auth_model.TimeStampedModel):
     tenure = models.PositiveIntegerField(default=None)
     is_disabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
+
+    def __str__(self):
+        return str(self.insurer)
 
     class Meta:
         db_table = "insurance_threshold"
