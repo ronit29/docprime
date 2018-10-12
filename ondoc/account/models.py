@@ -24,6 +24,7 @@ class Order(TimeStampedModel):
     OPD_APPOINTMENT_CREATE = 2
     LAB_APPOINTMENT_RESCHEDULE = 3
     LAB_APPOINTMENT_CREATE = 4
+    INSURANCE_CREATE = 5
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_STATUS_CHOICES = (
@@ -34,10 +35,13 @@ class Order(TimeStampedModel):
                       (OPD_APPOINTMENT_CREATE, "Opd Create"),
                       (LAB_APPOINTMENT_CREATE, "Lab Create"),
                       (LAB_APPOINTMENT_RESCHEDULE, "Lab Reschedule"),
+                      (INSURANCE_CREATE, "Insurance Create"),
                       )
     DOCTOR_PRODUCT_ID = 1
     LAB_PRODUCT_ID = 2
-    PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID")]
+    INSURANCE_PRODUCT_ID = 3
+    PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
+                   (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID")]
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
     reference_id = models.PositiveSmallIntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
