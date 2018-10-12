@@ -8,7 +8,7 @@ sitemaps = {
 }
 
 urlpatterns = [
-    path('sitemap.xml', sitemap, {'sitemaps': sitemaps}),
+    path('index-sitemap.xml', sitemap, {'sitemaps': sitemaps}),
     path('robots.txt', views.robots, name='robots'),
     re_path(r'-sitemap.xml$', views.getsitemap, name='sitemap'),
  ]
