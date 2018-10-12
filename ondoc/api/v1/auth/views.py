@@ -71,8 +71,8 @@ class LoginOTP(GenericViewSet):
     def generate(self, request, format=None):
 
         response = {'exists': 0}
-        if request.data.get("phone_number"):
-            expire_otp(phone_number=request.data.get("phone_number"))
+        # if request.data.get("phone_number"):
+        #     expire_otp(phone_number=request.data.get("phone_number"))
         serializer = serializers.OTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -1021,17 +1021,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
             appointment_data = order_obj.action_data
             if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                 serializer = OpdAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid()
+                serializer.is_valid(raise_exception=True)
                 appointment_data = serializer.validated_data
             elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
                 serializer = LabAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid()
+                serializer.is_valid(raise_exception=True)
                 appointment_data = serializer.validated_data
 
             appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
             # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
-        except:
-            pass
+        except Exception as e:
+            logger.error("Internal error in creating/rescheduling appointment in pg flow with exception - " + str(e))
 
         return appointment_obj
 

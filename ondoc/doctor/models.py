@@ -1038,6 +1038,7 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
+    is_license_verified = models.BooleanField(default=False)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"

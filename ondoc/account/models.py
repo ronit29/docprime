@@ -39,7 +39,7 @@ class Order(TimeStampedModel):
     LAB_PRODUCT_ID = 2
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID")]
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
-    reference_id = models.PositiveSmallIntegerField(blank=True, null=True)
+    reference_id = models.IntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
     action_data = JSONField(blank=True, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
