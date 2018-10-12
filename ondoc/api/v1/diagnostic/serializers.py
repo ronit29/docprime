@@ -384,7 +384,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         if data.get("coupon_code"):
             for coupon in data.get("coupon_code"):
                 obj = LabAppointment()
-                if not obj.validate_coupon(request.user, coupon):
+                if not obj.validate_coupon(request.user, coupon).get("is_valid"):
                     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         self.test_lab_id_validator(data, request)

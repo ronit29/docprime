@@ -507,22 +507,22 @@ class CouponsMixin(object):
 
         if data:
             if isinstance(self, OpdAppointment) and data.type not in [Coupon.DOCTOR, Coupon.ALL]:
-                return False
+                return {"is_valid": False, "used_count": None}
             elif isinstance(self, LabAppointment) and data.type not in [Coupon.LAB, Coupon.ALL]:
-                return False
+                return {"is_valid": False, "used_count": None}
 
             if (timezone.now() - max(data.created_at, user.date_joined)).days > data.validity:
-                return False
+                return {"is_valid": False, "used_count": None}
 
             allowed_coupon_count = data.count
             count = data.used_coupon_count(user)
 
             if count < allowed_coupon_count:
-                return True
+                return {"is_valid": True, "used_count": count}
             else:
-                return False
+                return {"is_valid": False, "used_count": count}
         else:
-            return False
+            return {"is_valid": False, "used_count": None}
 
     def get_discount(self, coupon_code, price):
         from ondoc.coupon.models import Coupon
@@ -536,7 +536,7 @@ class CouponsMixin(object):
             if data.flat_discount is not None:
                 return data.flat_discount
             elif data.percentage_discount is not None:
-                discount = price * data.percentage_discount / 100
+                discount = math.floor(price * data.percentage_discount / 100)
                 if data.max_discount_amount is not None:
                     return min(data.max_discount_amount, discount)
                 else:
