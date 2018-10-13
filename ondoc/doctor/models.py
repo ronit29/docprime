@@ -341,6 +341,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True,  blank=True)
+    source = models.CharField(max_length=20, blank=True)
 
     def __str__(self):
         return self.name

@@ -27,6 +27,11 @@ import logging
 import datetime
 import re
 from django.db.models import Count
+from io import BytesIO
+import requests
+from PIL import Image as Img
+import os
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -343,8 +348,37 @@ class UploadDoctorViewSet(viewsets.GenericViewSet):
         practicing_since = self.clean_data(sheet.cell(row=row, column=headers.get('practicing_since')).value)
         city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
         doctor, created = Doctor.objects.get_or_create(name=doctor_name, gender=gender,
-                                                       practicing_since=practicing_since)
+                                                       practicing_since=practicing_since, source='pr')
+        self.save_image(row, sheet, headers, doctor.id)
         return doctor
+
+    def save_image(self, row, sheet, headers, doctor_id):
+        url = self.clean_data(sheet.cell(row=row, column=headers.get('image_url')).value)
+        if url:
+            r = requests.get(url)
+            content = BytesIO(r.content)
+            path = settings.MEDIA_ROOT+'/temp/image/'+str(doctor_id)+'.jpg'
+            final_path = settings.MEDIA_ROOT+'/temp/final/'+str(doctor_id)+'.jpg'
+            if os.path.exists(path):
+                os.remove(path)
+            if os.path.exists(final_path):
+                os.remove(final_path)
+
+            of = open(path, 'xb')
+            of.write(content.read())
+            of.close()
+            img = Img.open(path)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            size = img.size
+            bottom = math.floor(size[1]*.8)
+            img = img.crop((0,0,size[0],bottom))
+
+            img.save(final_path, format='JPEG')
+            # new_image_io.tell()
+            # ff = open(final_path, 'xb')
+            # ff.write(new_image_io.read())
+            # ff.close()
 
     def map_doctor_specialization(self, row, sheet, headers, doctor):
         practice_specialization_id = self.clean_data(
