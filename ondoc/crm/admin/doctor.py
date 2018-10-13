@@ -392,6 +392,30 @@ class DoctorMobileForm(forms.ModelForm):
     number = forms.CharField(required=True)
     is_primary = forms.BooleanField(required=False)
 
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        std_code = data.get('std_code')
+        number = data.get('number')
+        if std_code:
+            try:
+                std_code=int(std_code)
+            except:
+                raise forms.ValidationError("Invalid STD code")
+
+        try:
+            number=int(number)
+        except:
+            raise forms.ValidationError("Invalid Number")
+
+        if std_code:
+            if data.get('is_primary'):
+                raise forms.ValidationError("Primary number should be a mobile number")
+        else:
+            if number and (number<5000000000 or number>9999999999):
+                raise forms.ValidationError("Invalid mobile number")
 
 class DoctorMobileFormSet(forms.BaseInlineFormSet):
     def clean(self):
@@ -420,7 +444,7 @@ class DoctorMobileInline(nested_admin.NestedTabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-    fields = ['number', 'is_primary']
+    fields = ['std_code','number', 'is_primary']
 
 
 class DoctorEmailForm(forms.ModelForm):

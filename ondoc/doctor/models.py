@@ -815,9 +815,8 @@ class DoctorMedicalService(auth_model.TimeStampedModel):
 
 class DoctorMobile(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="mobiles", on_delete=models.CASCADE)
-    country_code = models.PositiveSmallIntegerField(default=91, blank=True, null=True)
-    number = models.BigIntegerField(blank=True, null=True,
-                                    validators=[MaxValueValidator(9999999999), MinValueValidator(5000000000)])
+    std_code = models.PositiveSmallIntegerField(blank=True, null=True)
+    number = models.BigIntegerField(blank=True, null=True)
     is_primary = models.BooleanField(verbose_name='Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name='Phone Number Verified?', default=False)
 
