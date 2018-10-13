@@ -118,7 +118,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     parking = models.PositiveSmallIntegerField(blank=True, null=True,
                                                choices=[("", "Select"), (1, "Easy"), (2, "Difficult")])
     registration_number = models.CharField(max_length=500, blank=True)
-    building = models.CharField(max_length=100, blank=True)
+    building = models.CharField(max_length=1000, blank=True)
     sublocality = models.CharField(max_length=100, blank=True)
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100)
@@ -495,6 +495,7 @@ class DoctorClinic(auth_model.TimeStampedModel):
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
+    SHORT_DAY_CHOICES = [(0, "Mon"), (1, "Tue"), (2, "Wed"), (3, "Thu"), (4, "Fri"), (5, "Sat"), (6, "Sun")]
     doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name='availability')
     day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
 
@@ -1587,3 +1588,16 @@ class DoctorClinicProcedure(auth_model.TimeStampedModel):
     class Meta:
         db_table = "doctor_clinic_procedure"
         unique_together = ('procedure', 'doctor_clinic')
+
+
+class SourceIdentifier(auth_model.TimeStampedModel):
+    DOCTOR = 1
+    HOSPITAL = 5
+    type_choice = ((DOCTOR, "Doctor"), (HOSPITAL, "Hospital"))
+    reference_id = models.IntegerField()
+    unique_identifier = models.CharField(max_length=1000)
+    type = models.PositiveSmallIntegerField(choices=type_choice, blank=True, null=True)
+
+    class Meta:
+        db_table = "source_identifier"
+        unique_together = ('unique_identifier', )

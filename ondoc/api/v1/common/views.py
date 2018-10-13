@@ -1,6 +1,6 @@
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import Point, GEOSGeometry
 from django.conf import settings
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -8,7 +8,8 @@ from weasyprint import HTML
 from django.http import HttpResponse
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
-                                 Specialization, College, DoctorQualification, DoctorExperience, DoctorAward)
+                                 Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
+                                 DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier)
 
 from ondoc.chat.models import ChatPrescription
 from ondoc.notification.rabbitmq_client import publish_message
@@ -533,3 +534,148 @@ class UploadAwardViewSet(viewsets.GenericViewSet):
     def get_doctor(self, row, sheet, headers):
         doctor_id = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_id')).value)
         return Doctor.objects.filter(pk=doctor_id).first()
+
+
+class UploadHospitalViewSet(viewsets.GenericViewSet):
+
+    def upload(self, request):
+        serializer = serializers.XlsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        reverse_day_map = {value[1]: value[0] for value in DoctorClinicTiming.SHORT_DAY_CHOICES}
+
+        file = validated_data.get('file')
+        wb = load_workbook(file)
+        sheet = wb.active
+        rows = [row for row in sheet.rows]
+        headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
+
+        doctor_obj_dict = dict()
+        hospital_obj_dict = dict()
+        doc_clinic_obj_dict = dict()
+        for i in range(2, len(rows) + 1):
+            doctor_obj = self.get_doctor(i, sheet, headers, doctor_obj_dict)
+            if not doctor_obj:
+                continue
+            hospital_obj = self.get_hospital(i, sheet, headers, hospital_obj_dict)
+            doc_clinic_obj = self.get_doc_clinic(doctor_obj, hospital_obj, doc_clinic_obj_dict)
+            day_list = self.parse_day_range(sheet.cell(row=i, column=headers.get('day_range')).value, reverse_day_map)
+            start, end = self.parse_timing(sheet.cell(row=i, column=headers.get('timing')).value)
+            clinic_time_data = list()
+            for day in day_list:
+                temp_data = {
+                    "doctor_clinic": doc_clinic_obj,
+                    "day": day,
+                    "start": start,
+                    "end": end,
+                    "fees": sheet.cell(row=i, column=headers.get('fee')).value
+                }
+                clinic_time_data.append(DoctorClinicTiming(**temp_data))
+            if clinic_time_data:
+                DoctorClinicTiming.objects.bulk_create(clinic_time_data)
+
+        return Response(data={'message': 'success'})
+
+    def get_hospital(self, row, sheet, headers, hospital_obj_dict):
+        hospital_identifier = sheet.cell(row=row, column=headers.get('hospital_url')).value
+        if hospital_obj_dict.get(hospital_identifier):
+            hospital_obj = hospital_obj_dict.get(hospital_identifier)
+        else:
+            si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.HOSPITAL,
+                                                     unique_identifier=hospital_identifier).first()
+            if si_obj:
+                hospital_obj = Hospital.objects.filter(pk=si_obj.reference_id).first()
+            else:
+                hospital_name = sheet.cell(row=row, column=headers.get('hospital_name')).value
+                address = sheet.cell(row=row, column=headers.get('address')).value
+                location = self.parse_gaddress(sheet.cell(row=row, column=headers.get('gaddress')).value)
+                hospital_obj = Hospital.objects.create(name=hospital_name, building=address, location=location)
+                SourceIdentifier.objects.create(reference_id=hospital_obj.id, unique_identifier=hospital_identifier,
+                                                type=SourceIdentifier.HOSPITAL)
+            hospital_obj_dict[hospital_identifier] = hospital_obj
+        return hospital_obj
+
+    def get_doc_clinic(self, doctor_obj, hospital_obj, doc_clinic_obj_dict):
+        print(doctor_obj, hospital_obj, "hello")
+        if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
+            doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
+        else:
+            doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj)
+            doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
+
+        return doc_clinic_obj
+
+    def parse_gaddress(self, address):
+        print("\n",address, "HELLO")
+        address = address.strip().split("/")
+        lat_long = address[-1]
+        lat_long_list = lat_long.strip().split(",")
+        pnt = None
+        if len(lat_long_list) == 2 and "null" not in lat_long_list:
+            point_string = 'POINT(' + str(lat_long_list[1].strip()) + ' ' + str(lat_long_list[0].strip()) + ')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+        return pnt
+
+    def parse_day_range(self, day_range, reverse_day_map):
+        temp_list = day_range.split(',')
+        days_list = list()
+        for dr in temp_list:
+            dr = dr.strip()
+            rng_str = dr.split("-")
+            if len(rng_str) == 1:
+                days_list.append(reverse_day_map[rng_str[0].strip()])
+            elif len(rng_str) == 2:
+                s = reverse_day_map[rng_str[0].strip()]
+                e = reverse_day_map[rng_str[1].strip()]
+                for i in range(s, e + 1):
+                    days_list.append(i)
+        return days_list
+
+    def parse_timing(self, timing):
+        tlist = timing.strip().split("-")
+        start = None
+        end = None
+        if len(tlist) == 2:
+            start = self.time_to_float(tlist[0])
+            end = self.time_to_float(tlist[1])
+        return start, end
+
+    def time_to_float(self, time):
+        hour_min, am_pm = time.strip().split(" ")
+        hour, minute = hour_min.strip().split(":")
+        hour = self.hour_to_int(int(hour.strip()), am_pm)
+        minute = self.min_to_float(int(minute.strip()))
+        return hour + minute
+
+    def hour_to_int(self, hour, am_pm):
+        if am_pm == "PM":
+            if hour < 12:
+                hour += 12
+        elif am_pm == "AM":
+            if hour >= 12:
+                hour = 0
+        return hour
+
+    def min_to_float(self, minute):
+        NUM_SLOTS_MIN = 2
+        # print(float(minute)/60, "HI", minute, "HELLO", round(minute/60,2))
+        minute = round(round(float(minute) / 60, 2) * NUM_SLOTS_MIN) / NUM_SLOTS_MIN
+        return minute
+
+    def get_doctor(self, row, sheet, headers, doctor_obj_dict):
+        doctor_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_identifier')).value)
+        if doctor_obj_dict.get(doctor_identifier):
+            doctor_obj = doctor_obj_dict.get(doctor_identifier)
+        else:
+            # doctor_id = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_id')).value)
+            si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
+            doctor_obj = None
+            if si_obj:
+                doctor_obj = Doctor.objects.get(pk=si_obj.reference_id)
+            doctor_obj_dict[doctor_identifier] = doctor_obj
+        return doctor_obj
+
+    def clean_data(self, value):
+        if value and isinstance(value, str):
+            return value.strip()
+        return value
