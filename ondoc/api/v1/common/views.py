@@ -320,50 +320,167 @@ class UpdateXlsViewSet1():
         return search_count
 
 
-class UploadDoctorViewSet(viewsets.GenericViewSet):
+class DocViewset(viewsets.GenericViewSet):
+
+    def get_doctor(self, doctor_identifier):
+        si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
+        doctor_obj = None
+        if si_obj:
+            doctor_obj = Doctor.objects.get(pk=si_obj.reference_id)
+        return doctor_obj
+
+    def clean_data(self, value):
+        if value and isinstance(value, str):
+            return value.strip()
+        return value
+
+
+class UploadDoctorViewSet(DocViewset):
 
     def upload(self, request):
-        serializer = serializers.XlsSerializer(data=request.data)
+        serializer = serializers.DoctorXLSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         file = validated_data.get('file')
+        source = validated_data.get('source')
+        batch = validated_data.get('batch')
         wb = load_workbook(file)
         sheet = wb.active
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
-        for i in range(2, len(rows) + 1):
-            doctor = self.create_doctor(row=i, sheet=sheet, headers=headers)
-            self.map_doctor_specialization(row=i, sheet=sheet, headers=headers, doctor=doctor)
-            self.add_doctor_phone_numbers(row=i, sheet=sheet, headers=headers, doctor=doctor)
-            sheet.cell(row=i, column=headers.get('doctor_id')).value = doctor.id
-        response = HttpResponse(content=save_virtual_workbook(wb),
-                                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename=myexport.xlsx'
-        return response
 
-    def create_doctor(self, row, sheet, headers):
+        for i in range(2, len(rows) + 1):
+            data = self.get_data(row=i, sheet=sheet, headers=headers)
+            doctor = self.create_doctor(data, source, batch)
+            self.map_doctor_specialization(doctor, data.get('practice_specialization'))
+            self.add_doctor_phone_numbers(doctor, data.get('numbers'))
+
+        # response = HttpResponse(content=save_virtual_workbook(wb),
+        #                         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        # response['Content-Disposition'] = 'attachment; filename=myexport.xlsx'
+        return Response(data={'message': 'success'})
+
+    def get_data(self, row, sheet, headers):
         gender_mapping = {value[1]: value[0] for value in Doctor.GENDER_CHOICES}
-        doctor_name = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_name')).value)
-        gender = gender_mapping.get(
-            self.clean_data(sheet.cell(row=row, column=headers.get('gender')).value))
-        practicing_since = self.clean_data(sheet.cell(row=row, column=headers.get('practicing_since')).value)
+
+        gender = gender_mapping.get(self.clean_data(sheet.cell(row=row, column=headers.get('gender')).value))
+        identifier = self.clean_data(sheet.cell(row=row, column=headers.get('identifier')).value)
+        name = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_name')).value)
+        license = self.clean_data(sheet.cell(row=row, column=headers.get('license')).value)
         city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
-        doctor, created = Doctor.objects.get_or_create(name=doctor_name, gender=gender,
-                                                       practicing_since=practicing_since, source='pr')
-        self.save_image(row, sheet, headers, doctor.id)
+        practicing_since = self.clean_data(sheet.cell(row=row, column=headers.get('practicing_since')).value)
+
+        if practicing_since:
+            try:
+                practicing_since = int(practicing_since)
+            except:
+                print('Invalid Practicing since='+str(practicing_since))
+                practicing_since = None
+
+
+
+        practice_specialization_id = self.clean_data(sheet.cell(row=row, column=headers.get('practice_specialization_id')).value)
+        practice_specialization = None
+        if practice_specialization_id:
+            practice_specialization = PracticeSpecialization.objects.filter(pk=practice_specialization_id).first()
+
+        number_entry = []
+        primary_number = self.clean_data(sheet.cell(row=row, column=headers.get('primary_number')).value)
+        alternate_number_1 = self.clean_data(sheet.cell(row=row, column=headers.get('alternate_number_1')).value)
+        alternate_number_2 = self.clean_data(sheet.cell(row=row, column=headers.get('alternate_number_2')).value)
+
+        num = self.get_number(primary_number, True, city)
+        if num:
+            number_entry.append(num)
+
+        num = self.get_number(alternate_number_1, False, city)
+        if num:
+            number_entry.append(num)
+
+        num = self.get_number(alternate_number_2, False, city)
+        if num:
+            number_entry.append(num)
+
+        image_url = self.clean_data(sheet.cell(row=row, column=headers.get('image_url')).value)
+
+        data = {}
+        if not license:
+            license=''
+
+        data['gender'] = gender
+        data['identifier'] = identifier
+        data['name'] = name
+        data['practicing_since'] = practicing_since
+        data['practice_specialization'] = practice_specialization
+        data['numbers'] = number_entry
+        data['image_url'] = image_url
+        data['license'] = license
+        return data
+
+
+    def get_number(self, number, is_primary, city):
+        code=[11,44,22,129,40,120,33,215,124]
+        data = {}
+        std_code = None
+        phone = None
+        number = str(number).lstrip('0').strip()
+        number = re.sub('[^0-9]+', ' ', number).strip()
+        comps = number.split(' ')
+        #print(number)
+        if not number:
+            return None
+
+        if len(comps)==3 and comps[0] and comps[1] and comps[2]:
+            return {'std_code':comps[0],'number':comps[1]+comps[2],'is_primary':False}
+        elif len(comps)==2 and comps[0] and comps[1]:
+            return {'std_code':comps[0],'number':comps[1],'is_primary':False}
+        elif len(comps)>3:
+            print('invalid number' + str(number))
+
+        for cd in code:
+            if number.startswith(str(cd)):
+                data['std_code'] = cd
+                data['number'] = number.replace(str(cd), '', 1)
+                data['is_primary'] = False
+                return data
+        #print(number)
+        try:
+            number = int(number)
+            if number < 5000000000 or number > 9999999999:
+                print('invalid number' + str(number))
+                return None
+        except Exception as e:
+            print(e)
+            print('invalid number while parsing '+str(number))
+            return None
+
+        return {'number': number, 'is_primary': is_primary}
+
+    def create_doctor(self, data, source, batch):
+
+        doctor = self.get_doctor(data.get('identifier'))
+        if doctor:
+            return doctor
+
+        doctor = Doctor.objects.create(name=data['name'], license=data.get('license',''), gender=data['gender'],
+                                                       practicing_since=data['practicing_since'], source=source, batch=batch)
+        SourceIdentifier.objects.create(type=SourceIdentifier.DOCTOR, unique_identifier=data.get('identifier'), reference_id=doctor.id)
+        self.save_image(data.get('image_url'),data.get('identifier'))
         return doctor
 
-    def save_image(self, row, sheet, headers, doctor_id):
-        url = self.clean_data(sheet.cell(row=row, column=headers.get('image_url')).value)
-        if url:
+    def save_image(self, url, identifier):
+        if url and identifier:
+            path = settings.MEDIA_ROOT+'/temp/image/'+identifier + '.jpg'
+            final_path = settings.MEDIA_ROOT+'/temp/final/'+identifier + '.jpg'
+            if os.path.exists(path):
+                return None
+
             r = requests.get(url)
             content = BytesIO(r.content)
-            path = settings.MEDIA_ROOT+'/temp/image/'+str(doctor_id)+'.jpg'
-            final_path = settings.MEDIA_ROOT+'/temp/final/'+str(doctor_id)+'.jpg'
-            if os.path.exists(path):
-                os.remove(path)
-            if os.path.exists(final_path):
-                os.remove(final_path)
+            # if os.path.exists(path):
+            #     os.remove(path)
+            # if os.path.exists(final_path):
+            #     os.remove(final_path)
 
             of = open(path, 'xb')
             of.write(content.read())
@@ -381,31 +498,14 @@ class UploadDoctorViewSet(viewsets.GenericViewSet):
             # ff.write(new_image_io.read())
             # ff.close()
 
-    def map_doctor_specialization(self, row, sheet, headers, doctor):
-        practice_specialization_id = self.clean_data(
-            sheet.cell(row=row, column=headers.get('practice_specialization_id')).value)
-        practice_specialization = PracticeSpecialization.objects.filter(pk=practice_specialization_id).first()
+    def map_doctor_specialization(self, doctor, practice_specialization):
         if practice_specialization and doctor:
             DoctorPracticeSpecialization.objects.get_or_create(doctor=doctor, specialization=practice_specialization)
 
-    def add_doctor_phone_numbers(self, row, sheet, headers, doctor):
-        primary_number = self.clean_data(sheet.cell(row=row, column=headers.get('primary_number')).value)
-        alternate_number_1 = self.clean_data(sheet.cell(row=row, column=headers.get('alternate_number_1')).value)
-        alternate_number_2 = self.clean_data(sheet.cell(row=row, column=headers.get('alternate_number_2')).value)
-        primary_number = re.sub(r'[\s-]+', '', primary_number) if primary_number and isinstance(primary_number,
-                                                                                                str) else primary_number
-        alternate_number_1 = re.sub(r'[\s-]+', '', alternate_number_1) if alternate_number_1 and isinstance(
-            alternate_number_1,
-            str) else alternate_number_1
-        alternate_number_2 = re.sub(r'[\s-]+', '', alternate_number_2) if alternate_number_1 and isinstance(
-            alternate_number_2,
-            str) else alternate_number_2
-        if primary_number:
-            DoctorMobile.objects.get_or_create(doctor=doctor, number=int(primary_number), is_primary=True)
-        if alternate_number_1:
-            DoctorMobile.objects.get_or_create(doctor=doctor, number=int(alternate_number_1))
-        if alternate_number_2:
-            DoctorMobile.objects.get_or_create(doctor=doctor, number=int(alternate_number_2))
+    def add_doctor_phone_numbers(self, doctor, numbers):
+        for num in numbers:
+            #print(num)
+            DoctorMobile.objects.get_or_create(doctor=doctor, std_code=num.get('std_code'),number=num.get('number'), is_primary=num.get('is_primary'))
 
     def clean_data(self, value):
         if value and isinstance(value, str):
@@ -413,7 +513,7 @@ class UploadDoctorViewSet(viewsets.GenericViewSet):
         return value
 
 
-class UploadQualificationViewSet(viewsets.GenericViewSet):
+class UploadQualificationViewSet(DocViewset):
 
     def upload(self, request):
         serializer = serializers.XlsSerializer(data=request.data)
@@ -425,59 +525,88 @@ class UploadQualificationViewSet(viewsets.GenericViewSet):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         for i in range(2, len(rows) + 1):
-            doctor = self.get_doctor(i, sheet, headers)
-            qualification = self.get_qualification(i, sheet, headers)
-            specialization = self.get_specialization(i, sheet, headers)
-            college = self.get_college(i, sheet, headers)
-            passing_year = self.clean_data(sheet.cell(row=i, column=headers.get('passing_year')).value)
-            DoctorQualification.objects.get_or_create(doctor=doctor,
-                                                      qualification=qualification,
-                                                      college=college,
-                                                      specialization=specialization,
-                                                      passing_year=passing_year)
+            data = self.get_data(i, sheet, headers)
+            #doctor = self.get_doctor(i, sheet, headers)
+            # qualification = self.get_qualification(i, sheet, headers)
+            # specialization = self.get_specialization(i, sheet, headers)
+            # college = self.get_college(i, sheet, headers)
+            # passing_year = self.clean_data(sheet.cell(row=i, column=headers.get('passing_year')).value)
+            DoctorQualification.objects.get_or_create(doctor=data.get('doctor'),
+                                                      qualification=data.get('qualification'),
+                                                      college=data.get('college'),
+                                                      specialization=data.get('specialization'),
+                                                      passing_year=data.get('passing_year'))
+
         return Response(data={'message': 'success'})
 
-    def get_doctor(self, row, sheet, headers):
-        doctor_id = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_id')).value)
-        return Doctor.objects.filter(pk=doctor_id).first()
+    def get_data(self, row, sheet, headers):
+        identifier = self.clean_data(sheet.cell(row=row, column=headers.get('identifier')).value)
+        doctor = self.get_doctor(identifier)
 
-    def get_qualification(self, row, sheet, headers):
-        dp_qualification_id = self.clean_data(
-            sheet.cell(row=row, column=headers.get('dp_qualification_id')).value)
+        qualification_id = self.clean_data(
+            sheet.cell(row=row, column=headers.get('qualification_id')).value)
         qualification_name = self.clean_data(sheet.cell(row=row, column=headers.get('qualification')).value)
-        if dp_qualification_id and Qualification.objects.filter(pk=dp_qualification_id).exists():
-            return Qualification.objects.filter(pk=dp_qualification_id).first()
-        else:
-            obj, create = Qualification.objects.get_or_create(name=qualification_name)
-            return obj
+        qualification = self.get_qualification(qualification_id, qualification_name)
 
-    def get_specialization(self, row, sheet, headers):
-        dp_specialization_id = self.clean_data(
-            sheet.cell(row=row, column=headers.get('dp_specialization_id')).value)
+        specialization_id = self.clean_data(
+            sheet.cell(row=row, column=headers.get('specialization_id')).value)
         specialization_name = self.clean_data(sheet.cell(row=row, column=headers.get('specialization')).value)
-        if dp_specialization_id and Specialization.objects.filter(pk=dp_specialization_id).exists():
-            return Specialization.objects.filter(pk=dp_specialization_id).first()
-        else:
-            obj, create = Specialization.objects.get_or_create(name=specialization_name)
-            return obj
+        specialization = self.get_specialization(specialization_id, specialization_name)
 
-    def get_college(self, row, sheet, headers):
-        dp_college_id = self.clean_data(
-            sheet.cell(row=row, column=headers.get('dp_college_id')).value)
+        college_id = self.clean_data(
+            sheet.cell(row=row, column=headers.get('college_id')).value)
         college_name = self.clean_data(sheet.cell(row=row, column=headers.get('college')).value)
-        if dp_college_id and College.objects.filter(pk=dp_college_id).exists():
-            return College.objects.filter(pk=dp_college_id).first()
-        else:
-            obj, create = College.objects.get_or_create(name=college_name)
-            return obj
+        college = self.get_college(college_id, college_name)
 
-    def clean_data(self, value):
-        if value and isinstance(value, str):
-            return value.strip()
-        return value
+        passing_year = self.clean_data(sheet.cell(row=row, column=headers.get('passing_year')).value)
+
+        data = {}
+        data['doctor'] = doctor
+        data['qualification'] = qualification
+        data['specialization'] = specialization
+        data['college'] = college
+        data['passing_year'] = passing_year
+
+        return data;
 
 
-class UploadExperienceViewSet(viewsets.GenericViewSet):
+    def get_qualification(self, qualification_id, qualification_name):
+
+        qualification = None
+        if qualification_id:
+            qualification = Qualification.objects.filter(pk=qualification_id).first()
+        if not qualification:
+            qualification = Qualification.objects.filter(name__iexact=qualification_name).first()
+        if not qualification:
+            qualification, create = Qualification.objects.get_or_create(name=qualification_name)
+
+        return qualification
+
+
+    def get_specialization(self, specialization_id, specialization_name):
+
+        specialization = None
+        if specialization_id:
+            specialization = Specialization.objects.filter(pk=specialization_id).first()
+        if not specialization:
+            specialization = Specialization.objects.filter(name__iexact=specialization_name).first()
+        if not specialization:
+            specialization, create = Specialization.objects.get_or_create(name=specialization_name)
+
+        return specialization
+
+    def get_college(self, college_id, college_name):
+
+        college = None
+        if college_id:
+            college = College.objects.filter(pk=college_id).first()
+        if not college:
+            college = College.objects.filter(name__iexact=college_name).first()
+        if not college:
+            college, create = College.objects.get_or_create(name=college_name)
+        return college
+
+class UploadExperienceViewSet(DocViewset):
 
     def upload(self, request):
         serializer = serializers.XlsSerializer(data=request.data)
@@ -489,23 +618,14 @@ class UploadExperienceViewSet(viewsets.GenericViewSet):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         for i in range(2, len(rows) + 1):
-            doctor = self.get_doctor(i, sheet, headers)
+            identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
+            doctor = self.get_doctor(identifier)
             hospital = self.clean_data(sheet.cell(row=i, column=headers.get('hospital')).value)
             start_year = self.clean_data(sheet.cell(row=i, column=headers.get('start_year')).value)
             end_year = self.clean_data(sheet.cell(row=i, column=headers.get('end_year')).value)
             DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
                                                    hospital=hospital)
         return Response(data={'message': 'success'})
-
-    def get_doctor(self, row, sheet, headers):
-        doctor_id = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_id')).value)
-        return Doctor.objects.filter(pk=doctor_id).first()
-
-    def clean_data(self, value):
-        if value and isinstance(value, str):
-            return value.strip()
-        return value
-
 
 class UploadAwardViewSet(viewsets.GenericViewSet):
 
@@ -519,21 +639,13 @@ class UploadAwardViewSet(viewsets.GenericViewSet):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         for i in range(2, len(rows) + 1):
-            doctor = self.get_doctor(i, sheet, headers)
+            identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
+            doctor = self.get_doctor(identifier)
             award = self.clean_data(sheet.cell(row=i, column=headers.get('award')).value)
             year = self.clean_data(sheet.cell(row=i, column=headers.get('year')).value)
             if award and year:
                 DoctorAward.objects.get_or_create(doctor=doctor, year=year)
         return Response(data={'message': 'success'})
-
-    def clean_data(self, value):
-        if value and isinstance(value, str):
-            return value.strip()
-        return value
-
-    def get_doctor(self, row, sheet, headers):
-        doctor_id = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_id')).value)
-        return Doctor.objects.filter(pk=doctor_id).first()
 
 
 class UploadHospitalViewSet(viewsets.GenericViewSet):
@@ -661,6 +773,13 @@ class UploadHospitalViewSet(viewsets.GenericViewSet):
         # print(float(minute)/60, "HI", minute, "HELLO", round(minute/60,2))
         minute = round(round(float(minute) / 60, 2) * NUM_SLOTS_MIN) / NUM_SLOTS_MIN
         return minute
+
+    def get_doctor(self, doctor_identifier):
+        si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
+        doctor_obj = None
+        if si_obj:
+            doctor_obj = Doctor.objects.get(pk=si_obj.reference_id)
+        return doctor_obj
 
     def get_doctor(self, row, sheet, headers, doctor_obj_dict):
         doctor_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_identifier')).value)

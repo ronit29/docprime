@@ -139,6 +139,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     entity = GenericRelation(location_models.EntityLocationRelationship)
     spoc_details = GenericRelation(auth_model.SPOCDetails)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
+    source = models.CharField(max_length=20, blank=True)
+    batch = models.CharField(max_length=20, blank=True)
 
     def __str__(self):
         return self.name
@@ -342,6 +344,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True,  blank=True)
     source = models.CharField(max_length=20, blank=True)
+    batch = models.CharField(max_length=20, blank=True)
 
     def __str__(self):
         return self.name
@@ -815,7 +818,7 @@ class DoctorMedicalService(auth_model.TimeStampedModel):
 
 class DoctorMobile(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="mobiles", on_delete=models.CASCADE)
-    std_code = models.PositiveSmallIntegerField(blank=True, null=True)
+    std_code = models.IntegerField(blank=True, null=True)
     number = models.BigIntegerField(blank=True, null=True)
     is_primary = models.BooleanField(verbose_name='Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name='Phone Number Verified?', default=False)
