@@ -1063,7 +1063,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'created_at', 'updated_at')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 

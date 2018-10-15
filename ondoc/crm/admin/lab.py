@@ -705,7 +705,7 @@ class LabAppointmentForm(forms.ModelForm):
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
-    list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at', 'updated_at')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
