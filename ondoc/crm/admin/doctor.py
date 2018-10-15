@@ -330,7 +330,8 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
             if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
                 for key, value in count.items():
                     if key == DoctorDocument.REGISTRATION and value < 1:
-                        raise forms.ValidationError(choices[key] + " is required")
+                        pass
+                        #raise forms.ValidationError(choices[key] + " is required")
 
 
 class HospitalDocumentFormSet(forms.BaseInlineFormSet):
