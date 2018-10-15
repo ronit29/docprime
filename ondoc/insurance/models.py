@@ -91,6 +91,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     profile = models.ForeignKey(auth_model.UserProfile, on_delete=models.SET_NULL, null=True)
 
+
     class Meta:
         db_table = "insured_members"
 
