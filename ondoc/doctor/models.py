@@ -294,6 +294,8 @@ class College(auth_model.TimeStampedModel):
 
 
 class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
+    SOURCE_PRACTO = "pr"
+
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
@@ -345,6 +347,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True,  blank=True)
     source = models.CharField(max_length=20, blank=True)
     batch = models.CharField(max_length=20, blank=True)
+    enable_for_online_booking = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -377,19 +380,27 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def update_live_status(self):
 
-        if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
-            # dochospitals = []
-            # for hosp in self.hospitals.all():
-            #     dochospitals.append(hosp.id)
-            # queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
-            #                                (Q(doctor__isnull=False, doctor=self) |
-            #                                 Q(doctor__isnull=True, hospital__id__in=dochospitals)))
+        if self.source == self.SOURCE_PRACTO:
+            if not self.is_live and (self.data_status == self.QC_APPROVED and self.enabled == True):
+                self.is_live = True
+                if not self.live_at:
+                    self.live_at = datetime.datetime.now()
+            if self.is_live and (self.data_status != self.QC_APPROVED or self.enabled == False):
+                self.is_live = False
+        else:
+            if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
+                # dochospitals = []
+                # for hosp in self.hospitals.all():
+                #     dochospitals.append(hosp.id)
+                # queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
+                #                                (Q(doctor__isnull=False, doctor=self) |
+                #                                 Q(doctor__isnull=True, hospital__id__in=dochospitals)))
 
-            self.is_live = True
-            if not self.live_at:
-                self.live_at = datetime.datetime.now()
-        if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
-            self.is_live = False
+                self.is_live = True
+                if not self.live_at:
+                    self.live_at = datetime.datetime.now()
+            if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
+                self.is_live = False
 
     def save(self, *args, **kwargs):
         self.update_live_status()
