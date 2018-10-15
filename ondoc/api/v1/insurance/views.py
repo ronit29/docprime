@@ -35,16 +35,27 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
     def summary(self, request):
         serializer = serializers.InsuredMemberSerializer(data=request.data)
+        flag = 0
+        logged_in_user_id = None
+        user_profile_id = UserProfile.objects.filter(user_id=request.user.pk, is_default_user=True).order_by('-id').first()
+        if user_profile_id:
+            for member_record in serializer.initial_data.get('members'):
+                if user_profile_id.id == member_record.get('profile'):
+                    logged_in_user_id = member_record.get('profile')
+                    flag = 1
+                else:
+                    pass
+
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
 
         members = valid_data.get("members")
         resp = {}
 
-        if valid_data:
+        if valid_data and flag == 1:
             user = request.user
-            user_profile = UserProfile.objects.filter(user_id=request.user.pk, is_otp_verified=True) \
-                .values('name', 'email', 'gender', 'user_id', 'dob', 'phone_number')
+
+            user_profile = UserProfile.objects.filter(id= logged_in_user_id, is_default_user=True).values('name', 'email', 'gender', 'user_id', 'dob', 'phone_number')
             pre_insured_members = {}
             insured_members_list = []
 
@@ -82,11 +93,10 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                                         status.HTTP_404_NOT_FOUND)
                 # pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
                 # User Profile creation or updation
+                if member['profile']:
+                    profile = UserProfile.objects.filter(name=name, user=request.user, id=member['profile'].id)
 
-                profile = UserProfile.objects.filter(name=name, user=request.user, id=member['profile'].id)
-
-
-                if not profile.exists():
+                if not member['profile']  or not profile.exists():
                     member_profile = UserProfile.objects.create(name=name,
                                                                 email=member['email'], gender=member['gender'],
                                                                 user_id=request.user.pk, dob=member['dob'],
@@ -121,7 +131,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
             insurer = Insurer.objects.filter(id=valid_data.get('insurer').id).values()
             insurance_plan = InsurancePlans.objects.filter(id=valid_data.get('insurance_plan').id).values()
-            resp['insurance'] = {"profile": user_profile[0], "members": insured_members_list, "insurer": insurer, "insurance_plan": insurance_plan}
+            resp['insurance'] = {"profile": user_profile, "members": insured_members_list, "insurer": insurer, "insurance_plan": insurance_plan}
             return Response(resp)
 
     def create(self, request):
