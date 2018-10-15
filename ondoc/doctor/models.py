@@ -402,6 +402,11 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
                 self.is_live = False
 
+        if self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED:
+            self.enable_for_online_booking = True
+        else:
+            self.enable_for_online_booking = False
+
     def save(self, *args, **kwargs):
         self.update_live_status()
         super(Doctor, self).save(*args, **kwargs)

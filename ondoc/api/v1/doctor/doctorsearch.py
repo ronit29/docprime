@@ -187,6 +187,7 @@ class DoctorSearchHelper:
 
             temp = {
                 "doctor_id": doctor.id,
+                "enable_for_online_booking": doctor.enable_for_online_booking,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,
