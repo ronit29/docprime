@@ -136,6 +136,9 @@ def push_appointment_to_matrix(self, data):
                 raise Exception("Appointment could not found against id - " + str(appointment_id))
 
             mobile_list = list()
+            # Lab mobile number
+            mobile_list.append({'MobileNo': appointment.lab.primary_mobile, 'Name': appointment.lab.name, 'Type': 3})
+
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
 
