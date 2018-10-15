@@ -9,7 +9,7 @@ from django.http import HttpResponse
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
-                                 DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier)
+                                 DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
 
 from ondoc.chat.models import ChatPrescription
 from ondoc.notification.rabbitmq_client import publish_message
@@ -621,13 +621,36 @@ class UploadExperienceViewSet(DocViewset):
             identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
             doctor = self.get_doctor(identifier)
             hospital = self.clean_data(sheet.cell(row=i, column=headers.get('hospital')).value)
-            start_year = self.clean_data(sheet.cell(row=i, column=headers.get('start_year')).value)
-            end_year = self.clean_data(sheet.cell(row=i, column=headers.get('end_year')).value)
-            DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
+            if hospital:
+                start_year = self.clean_data(sheet.cell(row=i, column=headers.get('start_year')).value)
+                end_year = self.clean_data(sheet.cell(row=i, column=headers.get('end_year')).value)
+                DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
                                                    hospital=hospital)
         return Response(data={'message': 'success'})
 
-class UploadAwardViewSet(viewsets.GenericViewSet):
+
+class UploadMembershipViewSet(DocViewset):
+
+    def upload(self, request):
+        serializer = serializers.XlsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        file = validated_data.get('file')
+        wb = load_workbook(file)
+        sheet = wb.active
+        rows = [row for row in sheet.rows]
+        headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
+        for i in range(2, len(rows) + 1):
+            identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
+            doctor = self.get_doctor(identifier)
+            member = self.clean_data(sheet.cell(row=i, column=headers.get('memberships')).value)
+
+            if doctor and member:
+                DoctorAssociation.objects.get_or_create(doctor=doctor, name=member)
+        return Response(data={'message': 'success'})
+
+
+class UploadAwardViewSet(DocViewset):
 
     def upload(self, request):
         serializer = serializers.XlsSerializer(data=request.data)
@@ -648,7 +671,7 @@ class UploadAwardViewSet(viewsets.GenericViewSet):
         return Response(data={'message': 'success'})
 
 
-class UploadHospitalViewSet(viewsets.GenericViewSet):
+class UploadHospitalViewSet(DocViewset):
 
     def upload(self, request):
         serializer = serializers.XlsSerializer(data=request.data)
@@ -666,66 +689,82 @@ class UploadHospitalViewSet(viewsets.GenericViewSet):
         hospital_obj_dict = dict()
         doc_clinic_obj_dict = dict()
         for i in range(2, len(rows) + 1):
-            doctor_obj = self.get_doctor(i, sheet, headers, doctor_obj_dict)
+            identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
+            doctor_obj = self.get_doctor(identifier)
             if not doctor_obj:
+                print('Doctor not found for identifier: '+identifier)
                 continue
+
             hospital_obj = self.get_hospital(i, sheet, headers, hospital_obj_dict)
             doc_clinic_obj = self.get_doc_clinic(doctor_obj, hospital_obj, doc_clinic_obj_dict)
             day_list = self.parse_day_range(sheet.cell(row=i, column=headers.get('day_range')).value, reverse_day_map)
             start, end = self.parse_timing(sheet.cell(row=i, column=headers.get('timing')).value)
             clinic_time_data = list()
+            fees = self.clean_data(sheet.cell(row=i, column=headers.get('fee')).value)
+            try:
+                fees = int(fees)
+            except Exception as e:
+                print('invalid fees' + str(fees))
+                fees = None
+
             for day in day_list:
-                temp_data = {
-                    "doctor_clinic": doc_clinic_obj,
-                    "day": day,
-                    "start": start,
-                    "end": end,
-                    "fees": sheet.cell(row=i, column=headers.get('fee')).value
-                }
-                clinic_time_data.append(DoctorClinicTiming(**temp_data))
+                if fees:
+                    temp_data = {
+                        "doctor_clinic": doc_clinic_obj,
+                        "day": day,
+                        "start": start,
+                        "end": end,
+                        "fees": fees
+                    }
+                    clinic_time_data.append(DoctorClinicTiming(**temp_data))
             if clinic_time_data:
                 DoctorClinicTiming.objects.bulk_create(clinic_time_data)
 
         return Response(data={'message': 'success'})
 
     def get_hospital(self, row, sheet, headers, hospital_obj_dict):
-        hospital_identifier = sheet.cell(row=row, column=headers.get('hospital_url')).value
-        if hospital_obj_dict.get(hospital_identifier):
-            hospital_obj = hospital_obj_dict.get(hospital_identifier)
-        else:
+        hospital_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_url')).value)
+        hospital_id = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_id')).value)
+
+        hospital = None
+        if hospital_id:
+            hospital = Hospital.objects.filter(pk=hospital_id).first()
+        if not hospital:
             si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.HOSPITAL,
                                                      unique_identifier=hospital_identifier).first()
             if si_obj:
-                hospital_obj = Hospital.objects.filter(pk=si_obj.reference_id).first()
-            else:
-                hospital_name = sheet.cell(row=row, column=headers.get('hospital_name')).value
-                address = sheet.cell(row=row, column=headers.get('address')).value
-                location = self.parse_gaddress(sheet.cell(row=row, column=headers.get('gaddress')).value)
-                hospital_obj = Hospital.objects.create(name=hospital_name, building=address, location=location)
-                SourceIdentifier.objects.create(reference_id=hospital_obj.id, unique_identifier=hospital_identifier,
+                hospital = Hospital.objects.filter(pk=si_obj.reference_id).first()
+
+        if not hospital:
+            hospital_name = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_name')).value)
+            address = self.clean_data(sheet.cell(row=row, column=headers.get('address')).value)
+            location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('gaddress')).value))
+            hospital = Hospital.objects.create(name=hospital_name, building=address, location=location)
+            SourceIdentifier.objects.create(reference_id=hospital.id, unique_identifier=hospital_identifier,
                                                 type=SourceIdentifier.HOSPITAL)
-            hospital_obj_dict[hospital_identifier] = hospital_obj
-        return hospital_obj
+
+        return hospital
 
     def get_doc_clinic(self, doctor_obj, hospital_obj, doc_clinic_obj_dict):
-        print(doctor_obj, hospital_obj, "hello")
-        if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
-            doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
-        else:
-            doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj)
-            doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
+        # print(doctor_obj, hospital_obj, "hello")
+        # if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
+        #     doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
+        # else:
+        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj)
+        # doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
 
         return doc_clinic_obj
 
     def parse_gaddress(self, address):
-        print("\n",address, "HELLO")
-        address = address.strip().split("/")
-        lat_long = address[-1]
-        lat_long_list = lat_long.strip().split(",")
         pnt = None
-        if len(lat_long_list) == 2 and "null" not in lat_long_list:
-            point_string = 'POINT(' + str(lat_long_list[1].strip()) + ' ' + str(lat_long_list[0].strip()) + ')'
-            pnt = GEOSGeometry(point_string, srid=4326)
+
+        if address:
+            address = address.strip().split("/")
+            lat_long = address[-1]
+            lat_long_list = lat_long.strip().split(",")
+            if len(lat_long_list) == 2 and "null" not in lat_long_list:
+                point_string = 'POINT(' + str(lat_long_list[1].strip()) + ' ' + str(lat_long_list[0].strip()) + ')'
+                pnt = GEOSGeometry(point_string, srid=4326)
         return pnt
 
     def parse_day_range(self, day_range, reverse_day_map):
@@ -735,12 +774,30 @@ class UploadHospitalViewSet(viewsets.GenericViewSet):
             dr = dr.strip()
             rng_str = dr.split("-")
             if len(rng_str) == 1:
-                days_list.append(reverse_day_map[rng_str[0].strip()])
+                day = rng_str[0].strip()
+                if reverse_day_map.get(day) is None:
+                    print('invalid day ' + str(day))
+                else:
+                    days_list.append(reverse_day_map[day])
             elif len(rng_str) == 2:
-                s = reverse_day_map[rng_str[0].strip()]
-                e = reverse_day_map[rng_str[1].strip()]
-                for i in range(s, e + 1):
-                    days_list.append(i)
+                s = rng_str[0].strip()
+                e = rng_str[1].strip()
+                if reverse_day_map.get(s) is None or reverse_day_map.get(e) is None:
+                    print('invalid day range ' + str(day_range))
+                else:
+                    start = reverse_day_map[s]
+                    end = reverse_day_map[e]
+                    counter = start
+
+                    while True:
+                        val = counter % 7
+                        days_list.append(val)
+                        if val == end:
+                            break
+                        counter += 1
+
+            else:
+                print('invalid day string ' + day_range)
         return days_list
 
     def parse_timing(self, timing):
@@ -750,6 +807,9 @@ class UploadHospitalViewSet(viewsets.GenericViewSet):
         if len(tlist) == 2:
             start = self.time_to_float(tlist[0])
             end = self.time_to_float(tlist[1])
+        if start >= end:
+            print('Invalid time string ' + timing)
+
         return start, end
 
     def time_to_float(self, time):
@@ -774,27 +834,27 @@ class UploadHospitalViewSet(viewsets.GenericViewSet):
         minute = round(round(float(minute) / 60, 2) * NUM_SLOTS_MIN) / NUM_SLOTS_MIN
         return minute
 
-    def get_doctor(self, doctor_identifier):
-        si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
-        doctor_obj = None
-        if si_obj:
-            doctor_obj = Doctor.objects.get(pk=si_obj.reference_id)
-        return doctor_obj
+    # def get_doctor(self, doctor_identifier):
+    #     si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
+    #     doctor_obj = None
+    #     if si_obj:
+    #         doctor_obj = Doctor.objects.get(pk=si_obj.reference_id)
+    #     return doctor_obj
 
-    def get_doctor(self, row, sheet, headers, doctor_obj_dict):
-        doctor_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_identifier')).value)
-        if doctor_obj_dict.get(doctor_identifier):
-            doctor_obj = doctor_obj_dict.get(doctor_identifier)
-        else:
-            # doctor_id = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_id')).value)
-            si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
-            doctor_obj = None
-            if si_obj:
-                doctor_obj = Doctor.objects.get(pk=si_obj.reference_id)
-            doctor_obj_dict[doctor_identifier] = doctor_obj
-        return doctor_obj
+    # def get_doctor(self, row, sheet, headers, doctor_obj_dict):
+    #     doctor_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_identifier')).value)
+    #     if doctor_obj_dict.get(doctor_identifier):
+    #         doctor_obj = doctor_obj_dict.get(doctor_identifier)
+    #     else:
+    #         # doctor_id = self.clean_data(sheet.cell(row=row, column=headers.get('doctor_id')).value)
+    #         si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
+    #         doctor_obj = None
+    #         if si_obj:
+    #             doctor_obj = Doctor.objects.get(pk=si_obj.reference_id)
+    #         doctor_obj_dict[doctor_identifier] = doctor_obj
+    #     return doctor_obj
 
-    def clean_data(self, value):
-        if value and isinstance(value, str):
-            return value.strip()
-        return value
+    # def clean_data(self, value):
+    #     if value and isinstance(value, str):
+    #         return value.strip()
+    #     return value
