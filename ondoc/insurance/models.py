@@ -85,8 +85,9 @@ class InsuredMembers(auth_model.TimeStampedModel):
     relation = models.CharField(max_length=50, choices=RELATION_CHOICES)
     pincode = models.PositiveIntegerField(default=None)
     address = models.TextField(default=None)
-    gender = models.CharField(max_length=50, choices=GENDER_CHOICES)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, null=True)
     profile = models.ForeignKey(auth_model.UserProfile, on_delete=models.SET_NULL, null=True)
+    phone_number = models.PositiveIntegerField(max_length=10, null=True)
 
     class Meta:
         db_table = "insured_members"
