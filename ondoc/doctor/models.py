@@ -43,6 +43,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -384,7 +385,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             if not self.is_live and self.enabled == True:
                 self.is_live = True
                 if not self.live_at:
-                    self.live_at = datetime.datetime.now()
+                    self.live_at = timezone.now()
             if self.is_live and self.enabled == False:
                 self.is_live = False
         else:
@@ -398,7 +399,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
                 self.is_live = True
                 if not self.live_at:
-                    self.live_at = datetime.datetime.now()
+                    self.live_at = timezone.now()
             if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
                 self.is_live = False
 

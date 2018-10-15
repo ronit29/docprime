@@ -177,7 +177,7 @@ class UploadDoctor(Doc):
             return doctor
 
         doctor = Doctor.objects.create(name=data['name'], license=data.get('license',''), gender=data['gender'],
-                                                       practicing_since=data['practicing_since'], source=source, batch=batch)
+                                                       practicing_since=data['practicing_since'], source=source, batch=batch, enabled=False)
         SourceIdentifier.objects.create(type=SourceIdentifier.DOCTOR, unique_identifier=data.get('identifier'), reference_id=doctor.id)
         self.save_image(batch,data.get('image_url'),data.get('identifier'))
         return doctor
