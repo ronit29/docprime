@@ -381,11 +381,11 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def update_live_status(self):
 
         if self.source == self.SOURCE_PRACTO:
-            if not self.is_live and (self.data_status == self.QC_APPROVED and self.enabled == True):
+            if not self.is_live and self.enabled == True:
                 self.is_live = True
                 if not self.live_at:
                     self.live_at = datetime.datetime.now()
-            if self.is_live and (self.data_status != self.QC_APPROVED or self.enabled == False):
+            if self.is_live and self.enabled == False:
                 self.is_live = False
         else:
             if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
@@ -402,7 +402,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
                 self.is_live = False
 
-        if self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED:
+        if self.onboarding_status == self.ONBOARDED:
             self.enable_for_online_booking = True
         else:
             self.enable_for_online_booking = False
