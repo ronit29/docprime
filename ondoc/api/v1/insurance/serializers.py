@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.renderers import JSONRenderer
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerFloat, InsuredMembers)
+from ondoc.authentication.models import UserProfile
 
 
 class InsurerSerializer(serializers.Serializer):
@@ -55,7 +56,7 @@ class InsuranceThresholdSerializer(serializers.Serializer):
                  'max_age', 'min_age', 'tenure'}
 
 
-class InsuredMemberSerializer(serializers.Serializer):
+class MemberListSerializer(serializers.Serializer):
 
     first_name = serializers.CharField(max_length=50)
     last_name = serializers.CharField(max_length=50)
@@ -64,6 +65,13 @@ class InsuredMemberSerializer(serializers.Serializer):
     relation = serializers.CharField(max_length=50)
     address = serializers.CharField(max_length=250)
     pincode = serializers.IntegerField()
-    title = serializers.CharField(max_length=50)
+    member_type = serializers.ChoiceField(choices=InsuredMembers.MEMBER_TYPE_CHOICES)
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
+    gender = serializers.ChoiceField(choices=InsuredMembers.GENDER_CHOICES)
 
 
+class InsuredMemberSerializer(serializers.Serializer):
+
+    members = serializers.ListSerializer(child=MemberListSerializer())
+    insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
+    insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
