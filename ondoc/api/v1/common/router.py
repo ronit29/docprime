@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXlsViewSet, UploadDoctorViewSet,
                     UploadQualificationViewSet, UploadExperienceViewSet, UploadAwardViewSet, UploadHospitalViewSet,
-                    UploadMembershipViewSet)
+                    UploadMembershipViewSet, SearchLeadViewSet)
 
 urlpatterns = [
     path('cities/list', CitiesViewSet.as_view({'get': 'list'}), name='cities-list'),
@@ -17,4 +17,5 @@ urlpatterns = [
     path('upload_hospital', UploadHospitalViewSet.as_view({'post': 'upload'}, ), name='update-hospital'),
     path('upload_award', UploadAwardViewSet.as_view({'post': 'upload'}, ), name='update-award'),
     path('chat_prescription/<str:name>', ServicesViewSet.as_view({'get': 'download_pdf'}, ), name='download-pdf'),
+    path('search-lead/create', SearchLeadViewSet.as_view({'post': 'create'}, ), name='create-search-lead'),
 ]
