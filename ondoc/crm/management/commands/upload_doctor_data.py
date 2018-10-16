@@ -72,7 +72,10 @@ class UploadDoctor(Doc):
             data = self.get_data(row=i, sheet=sheet, headers=headers)
             doctor = self.create_doctor(data, source, batch)
             self.map_doctor_specialization(doctor, data.get('practice_specialization'))
-            self.add_doctor_phone_numbers(doctor, data.get('numbers'))
+            try:
+                self.add_doctor_phone_numbers(doctor, data.get('numbers'))
+            except:
+                print('error in saving phone number')
 
     def get_data(self, row, sheet, headers):
         gender_mapping = {value[1]: value[0] for value in Doctor.GENDER_CHOICES}
