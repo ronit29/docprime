@@ -852,7 +852,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     #                                                                                   'documents')
 
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'enable_for_online_booking']
+        read_only_fields = ['lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'enable_for_online_booking', 'onboarding_url']
         if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         return read_only_fields
@@ -865,6 +865,13 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                 return mark_safe(html)
         else:
             return mark_safe('''<span></span>''')
+
+    def onboarding_url(self, instance):
+        if instance.id:
+            token = DoctorOnboardingToken.objects.filter(doctor=instance.id, status=DoctorOnboardingToken.GENERATED).first()
+            if token:
+                return mark_safe('<a href="{0}">{0}</a>'.format(settings.BASE_URL + '/onboard/doctor?token=' + str(token.token)))
+        return None
 
     def registered(self, instance):
         registered = None
