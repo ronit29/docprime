@@ -43,6 +43,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -381,11 +382,11 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def update_live_status(self):
 
         if self.source == self.SOURCE_PRACTO:
-            if not self.is_live and (self.data_status == self.QC_APPROVED and self.enabled == True):
+            if not self.is_live and self.enabled == True:
                 self.is_live = True
                 if not self.live_at:
-                    self.live_at = datetime.datetime.now()
-            if self.is_live and (self.data_status != self.QC_APPROVED or self.enabled == False):
+                    self.live_at = timezone.now()
+            if self.is_live and self.enabled == False:
                 self.is_live = False
         else:
             if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
@@ -398,11 +399,11 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
                 self.is_live = True
                 if not self.live_at:
-                    self.live_at = datetime.datetime.now()
+                    self.live_at = timezone.now()
             if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
                 self.is_live = False
 
-        if self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED:
+        if self.onboarding_status == self.ONBOARDED:
             self.enable_for_online_booking = True
         else:
             self.enable_for_online_booking = False
@@ -841,7 +842,7 @@ class DoctorMobile(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "doctor_mobile"
-        unique_together = (("doctor", "number"),)
+        unique_together = (("doctor", "number","std_code"),)
 
 
 class DoctorEmail(auth_model.TimeStampedModel):
