@@ -39,6 +39,7 @@ class Command(BaseCommand):
         membership = UploadMembership()
         award = UploadAward()
         hospital = UploadHospital()
+        specialization = UploadSpecialization()
 
         doctor.upload(sheets[0], source, batch)
         qualification.upload(sheets[1])
@@ -46,6 +47,8 @@ class Command(BaseCommand):
         membership.upload(sheets[3])
         award.upload(sheets[4])
         hospital.upload(sheets[5], source, batch)
+        specialization.upload(sheets[6])
+
 
 
 class Doc():
@@ -272,11 +275,12 @@ class UploadQualification(Doc):
             # specialization = self.get_specialization(i, sheet, headers)
             # college = self.get_college(i, sheet, headers)
             # passing_year = self.clean_data(sheet.cell(row=i, column=headers.get('passing_year')).value)
-            DoctorQualification.objects.get_or_create(doctor=data.get('doctor'),
-                                                      qualification=data.get('qualification'),
-                                                      college=data.get('college'),
-                                                      specialization=data.get('specialization'),
-                                                      passing_year=data.get('passing_year'))
+            if data.get('doctor'):
+                DoctorQualification.objects.get_or_create(doctor=data.get('doctor'),
+                                                          qualification=data.get('qualification'),
+                                                          college=data.get('college'),
+                                                          specialization=data.get('specialization'),
+                                                          passing_year=data.get('passing_year'))
 
 
     def get_data(self, row, sheet, headers):
@@ -317,7 +321,7 @@ class UploadQualification(Doc):
             qualification = Qualification.objects.filter(pk=qualification_id).first()
         if not qualification:
             qualification = Qualification.objects.filter(name__iexact=qualification_name).first()
-        if not qualification:
+        if not qualification and qualification_name:
             qualification, create = Qualification.objects.get_or_create(name=qualification_name)
 
         return qualification
@@ -330,7 +334,7 @@ class UploadQualification(Doc):
             specialization = Specialization.objects.filter(pk=specialization_id).first()
         if not specialization:
             specialization = Specialization.objects.filter(name__iexact=specialization_name).first()
-        if not specialization:
+        if not specialization and specialization_name:
             specialization, create = Specialization.objects.get_or_create(name=specialization_name)
 
         return specialization
@@ -342,7 +346,7 @@ class UploadQualification(Doc):
             college = College.objects.filter(pk=college_id).first()
         if not college:
             college = College.objects.filter(name__iexact=college_name).first()
-        if not college:
+        if not college and college_name:
             college, create = College.objects.get_or_create(name=college_name)
         return college
 
@@ -360,6 +364,21 @@ class UploadExperience(Doc):
                 end_year = self.clean_data(sheet.cell(row=i, column=headers.get('end_year')).value)
                 DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
                                                    hospital=hospital)
+
+class UploadSpecialization(Doc):
+
+    def upload(self, sheet):
+        rows = [row for row in sheet.rows]
+        headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
+        for i in range(2, len(rows) + 1):
+            identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
+            sp_id = self.clean_data(sheet.cell(row=i, column=headers.get('specialization_id')).value)
+            doctor = self.get_doctor(identifier)
+            practice_specialization = None
+            if sp_id:
+                practice_specialization = PracticeSpecialization.objects.filter(pk=sp_id).first()
+                if practice_specialization and doctor:
+                    DoctorPracticeSpecialization.objects.get_or_create(doctor=doctor, specialization=practice_specialization)
 
 
 class UploadMembership(Doc):
@@ -434,7 +453,7 @@ class UploadHospital(Doc):
                 DoctorClinicTiming.objects.bulk_create(clinic_time_data)
 
 
-    def get_hospital(self, row, sheet, headers, hospital_obj_dict):
+    def get_hospital(self, row, sheet, headers, hospital_obj_dict, source, batch):
         hospital_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_url')).value)
         hospital_id = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_id')).value)
 
