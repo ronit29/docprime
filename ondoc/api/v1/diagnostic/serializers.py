@@ -137,6 +137,63 @@ class LabProfileSerializer(LabModelSerializer):
         fields = ('id', 'lat', 'long', 'address', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality',
                   'sublocality', 'city', 'state', 'country', 'about', 'always_open', 'building', )
 
+
+class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
+    test = LabTestSerializer()
+    test_id = serializers.ReadOnlyField(source='test.id')
+    agreed_price = serializers.SerializerMethodField()
+    deal_price = serializers.SerializerMethodField()
+    is_home_collection_enabled = serializers.SerializerMethodField()
+    package = serializers.SerializerMethodField()
+    parameters = serializers.SerializerMethodField()
+
+    def get_is_home_collection_enabled(self, obj):
+        if self.context.get("lab") is not None:
+            if self.context["lab"].is_home_collection_enabled and obj.test.home_collection_possible:
+                return True
+            return False
+        return obj.test.home_collection_possible
+        # return None
+
+    def get_agreed_price(self, obj):
+        agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
+        return agreed_price
+
+    def get_deal_price(self, obj):
+        deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
+        return deal_price
+
+    def get_package(self, obj):
+        ret_data = list()
+        if obj.test.is_package:
+            packages_test = obj.test.packages.all()
+            for t_obj in packages_test:
+                # param_list = t_obj.lab_test.labtests.all().values_list("parameter__name", flat=True)
+                param_objs = t_obj.lab_test.labtests.all()
+                param_list = list()
+                for obj in param_objs:
+                    param_list.append(obj.parameter.name)
+                ret_data.append({
+                    "name": t_obj.lab_test.name,
+                    "parameters": param_list
+                })
+        return ret_data
+
+    def get_parameters(self, obj):
+        # parameters = obj.test.labtests.all().values_list("parameter__name", flat=True)
+
+        parameters = list()
+        param_objs = obj.test.labtests.all()
+        for obj in param_objs:
+            parameters.append(obj.parameter.name)
+
+        return parameters
+
+    class Meta:
+        model = AvailableLabTest
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled', 'package', 'parameters')
+
+
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
     test_id = serializers.ReadOnlyField(source='test.id')
