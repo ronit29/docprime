@@ -842,7 +842,7 @@ class DoctorMobile(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "doctor_mobile"
-        unique_together = (("doctor", "number"),)
+        unique_together = (("doctor", "number","std_code"),)
 
 
 class DoctorEmail(auth_model.TimeStampedModel):
