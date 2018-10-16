@@ -791,7 +791,7 @@ class DoctorLanguage(auth_model.TimeStampedModel):
 
 class DoctorAward(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="awards", on_delete=models.CASCADE)
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=2000)
     year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
 
     def __str__(self):
@@ -803,7 +803,7 @@ class DoctorAward(auth_model.TimeStampedModel):
 
 class DoctorAssociation(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="associations", on_delete=models.CASCADE)
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=2000)
 
     def __str__(self):
         return self.doctor.name + " (" + self.name + ")"
@@ -814,7 +814,7 @@ class DoctorAssociation(auth_model.TimeStampedModel):
 
 class DoctorExperience(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="experiences", on_delete=models.CASCADE)
-    hospital = models.CharField(max_length=200)
+    hospital = models.CharField(max_length=2000)
     start_year = models.PositiveSmallIntegerField(default=None, blank=True, null=True,
                                                   validators=[MinValueValidator(1950)])
     end_year = models.PositiveSmallIntegerField(default=None, blank=True, null=True,
