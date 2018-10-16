@@ -14,6 +14,7 @@ from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeS
 
 from ondoc.chat.models import ChatPrescription
 from ondoc.lead.models import SearchLead
+from ondoc.notification.models import EmailNotification
 from ondoc.notification.rabbitmq_client import publish_message
 from django.template.loader import render_to_string
 from . import serializers
@@ -868,4 +869,9 @@ class SearchLeadViewSet(viewsets.GenericViewSet):
         serializer = SearchLeadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        html_body = ''
+        for k, v in serializer.validated_data.items():
+            html_body += '{} : {}\n'.format(k, v)
+        for email in settings.OPS_EMAIL_ID:
+            EmailNotification.publish_ops_email(email, html_body, 'New Search Lead')
         return Response({'msg': 'success'}, status=status.HTTP_200_OK)
