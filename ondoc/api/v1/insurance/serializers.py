@@ -49,11 +49,12 @@ class InsuranceThresholdSerializer(serializers.Serializer):
     max_age = serializers.IntegerField()
     min_age = serializers.IntegerField()
     tenure = serializers.IntegerField()
+    child_min_age = serializers.IntegerField()
 
     class Meta:
         model = InsuranceThreshold
         field = {'id', 'lab_amount_limit', 'lab_count_limit', 'opd_count_limit', 'opd_amount_limit',
-                 'max_age', 'min_age', 'tenure'}
+                 'max_age', 'min_age', 'tenure', 'child_min_age'}
 
 
 class MemberListSerializer(serializers.Serializer):
