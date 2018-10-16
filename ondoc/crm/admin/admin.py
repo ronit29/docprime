@@ -8,7 +8,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization, Procedure)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
-                                     TestParameter)
+                                     TestParameter, CommonPackage)
 from ondoc.lead.models import HospitalLead, DoctorLead
 from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
@@ -24,7 +24,7 @@ from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
-    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin
+    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -76,6 +76,7 @@ admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
 admin.site.register(Lab, LabAdmin)
 admin.site.register(CommonTest, CommonTestAdmin)
+admin.site.register(CommonPackage, CommonPackageAdmin)
 admin.site.register(CommonDiagnosticCondition, CommonDiagnosticConditionAdmin)
 admin.site.register(LabNetwork, LabNetworkAdmin)
 

@@ -1058,6 +1058,17 @@ class CommonTest(TimeStampedModel):
         return "{}-{}".format(self.test.name, self.id)
 
 
+class CommonPackage(TimeStampedModel):
+    package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
+    icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
+
+    def __str__(self):
+        return "{}-{}".format(self.package.name, self.id)
+
+    class Meta:
+        db_table = 'common_package'
+
+
 class CommonDiagnosticCondition(TimeStampedModel):
     name = models.CharField(max_length=200)
     lab_test = models.ManyToManyField(
