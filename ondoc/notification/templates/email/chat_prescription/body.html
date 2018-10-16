@@ -58,6 +58,12 @@
                             {% endfor %}
                         </ul>
                         {% endif %}
+
+                        {% if findings %}
+                            {% for value in findings %}
+                                <li style="font-size: 13px; font-weight: bold; padding-bottom: 10px; list-style:none;">{{value}}</li>
+                            {% endfor %}
+                        {% endif %}
                         <br>
                             {% if prodiagnosis and prodiagnosisType %}
                                 <span style="font-size: 13px; font-weight: bold; padding-bottom: 10px; display: inline-block">Provisional
@@ -97,15 +103,6 @@
                                 <span style="font-weight: bold">Investigation</span>
                                 <ul style="font-size: 13px;">
                                     {% for value in investigations %}
-                                    <li style="padding: 2px 0px">{{value}}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% endif %}
-                        </span>
-                        <span style="font-size: 13px;">
-                            {% if findings %}
-                                <ul style="font-size: 13px;">
-                                    {% for value in findings %}
                                     <li style="padding: 2px 0px">{{value}}</li>
                                     {% endfor %}
                                 </ul>

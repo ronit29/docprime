@@ -17,3 +17,8 @@ class SMSServiceSerializer(serializers.Serializer):
 
 class XlsSerializer(serializers.Serializer):
     file = serializers.FileField()
+
+class DoctorXLSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    source = serializers.CharField(max_length=20)
+    batch = serializers.CharField(max_length=20)

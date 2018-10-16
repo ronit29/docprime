@@ -1,326 +1,53 @@
-from rest_framework import mixins, viewsets, status
-from rest_framework.response import Response
-from django.contrib.gis.geos import Point, GEOSGeometry
+from django.core.management.base import BaseCommand
 from django.conf import settings
-from django.utils import timezone
-from django.utils.dateparse import parse_datetime
-from weasyprint import HTML
-from django.http import HttpResponse
-from ondoc.diagnostic.models import Lab
+from io import BytesIO
+from openpyxl import load_workbook
+import requests
+import re
+from PIL import Image as Img
+import os
+import math
+from django.core.files.storage import default_storage
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
 
-from ondoc.chat.models import ChatPrescription
-from ondoc.notification.rabbitmq_client import publish_message
-from django.template.loader import render_to_string
-from . import serializers
-from ondoc.common.models import Cities
-from ondoc.common.utils import send_email, send_sms
-from ondoc.authentication.backends import JWTAuthentication
-from django.core.files.uploadedfile import SimpleUploadedFile
-from openpyxl import load_workbook
-from openpyxl.writer.excel import save_virtual_workbook
-import random
-import string
-import base64
-import logging
-import datetime
-import re
-from django.db.models import Count
-from io import BytesIO
-import requests
-from PIL import Image as Img
-import os
-import math
 
-logger = logging.getLogger(__name__)
+class Command(BaseCommand):
+    help = 'Upload doctors via Excel'
 
-class CitiesViewSet(viewsets.GenericViewSet):
+    def add_arguments(self, parser):
+        parser.add_argument('source', type=str, help='data source')
+        parser.add_argument('batch', type=int, help='data batch')
+        parser.add_argument('url', type=str, help='data url')
 
-    def get_queryset(self):
-        return Cities.objects.all().order_by('name')
+    def handle(self, *args, **options):
 
-    def list(self, request):
-        filter_text = request.GET.get('filter', None)
-        if not filter_text:
-            response = [{'value': city.id, 'name': city.name} for city in self.get_queryset()]
-        else:
-            response = [{'value': city.id, 'name': city.name} for city in self.get_queryset().filter(name__istartswith=filter_text)]
-        return Response(response)
+        print(options)
+        source = options['source']
+        batch = options['batch']
+        url = options['url']
+
+        r = requests.get(url)
+        content = BytesIO(r.content)
+        wb = load_workbook(content)
+        sheets = wb.worksheets
+        doctor = UploadDoctor()
+        qualification = UploadQualification()
+        experience = UploadExperience()
+        membership = UploadMembership()
+        award = UploadAward()
+        hospital = UploadHospital()
+
+        doctor.upload(sheets[0], source, batch)
+        qualification.upload(sheets[1])
+        experience.upload(sheets[2])
+        membership.upload(sheets[3])
+        award.upload(sheets[4])
+        hospital.upload(sheets[5])
 
 
-class ServicesViewSet(viewsets.GenericViewSet):
-
-    def generatepdf(self, request):
-        from ondoc.api.v1.utils import generate_short_url
-        content = None
-        try:
-            coded_data = request.data.get('content')
-            if isinstance(coded_data, list):
-                coded_data = coded_data[0]
-            coded_data += "=="
-            content = base64.b64decode(coded_data).decode()
-        except Exception as e:
-            logger.error("Error in decoding base64 content with exception - " + str(e))
-
-        if not content:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Content is required.'})
-        pdf_file = HTML(string=content).write_pdf()
-        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
-        name = random_string + '.pdf'
-        file = SimpleUploadedFile(name, pdf_file, content_type='application/pdf')
-        chat = ChatPrescription.objects.create(name=name, file=file)
-        prescription_url = "{}{}{}".format(settings.BASE_URL,
-                                           "/api/v1/common/chat_prescription/",
-                                           chat.name)
-        short_url = generate_short_url(prescription_url)
-        return Response({"url": short_url})
-
-    def generate_pdf_template(self, request):
-        from ondoc.api.v1.utils import generate_short_url
-        context = {key: value for key, value in request.data.items()}
-        if context.get('_updatedAt'):
-            context['updated_at'] = parse_datetime(context.get('_updatedAt'))
-        content = render_to_string("email/chat_prescription/body.html", context=context)
-        pdf_file = HTML(string=content).write_pdf()
-        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
-        patient_profile = context.get('profile')
-        patient_name = ''
-        if patient_profile:
-            patient_name = patient_profile.get('name', '')
-        name = 'dp_{}_{}_{}.pdf'.format('_'.join(patient_name.lower().split()), datetime.datetime.now().date(), random_string)
-        # name = random_string + '.pdf'
-        file = SimpleUploadedFile(name, pdf_file, content_type='application/pdf')
-        chat = ChatPrescription.objects.create(name=name, file=file)
-        prescription_url = "{}{}{}".format(settings.BASE_URL,
-                                           "/api/v1/common/chat_prescription/",
-                                           chat.name)
-        short_url = generate_short_url(prescription_url)
-        return Response({"url": short_url})
-
-    def send_email(self, request):
-        context = {key: value for key, value in request.data.items()}
-        if context.get('_updatedAt'):
-            context['updated_at'] = parse_datetime(context.get('_updatedAt'))
-        serializer = serializers.EmailServiceSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        to = serializer.validated_data.get('to')
-        cc = serializer.validated_data.get('cc')
-        to = list(set(to)) if isinstance(to, list) else []
-        cc = list(set(cc)) if isinstance(cc, list) else []
-        content = render_to_string("email/chat_prescription/body.html", context=context)
-        subject = serializer.validated_data.get('subject')
-        send_email(to, cc, subject, content)
-        return Response({"status": "success"})
-
-    def send_sms(self, request):
-        serializer = serializers.SMSServiceSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        text = serializer.validated_data.get('text')
-        phone_number = serializer.validated_data.get('phone_number')
-        phone_number = list(set(phone_number))
-        send_sms(text, phone_number)
-        return Response({"status": "success"})
-
-    def download_pdf(self, request, name=None):
-        chat_prescription = ChatPrescription.objects.filter(name=name).first()
-        response = HttpResponse(chat_prescription.file, content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename=%s' % chat_prescription.name
-        return response
-
-
-class SmsServiceViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication, )
-
-    def send_sms(self, request):
-        serializer = serializers.SMSServiceSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        text = serializer.validated_data.get('text')
-        phone_number = [request.user.phone_number] if request.user else []
-        phone_number = list(set(phone_number))
-        send_sms(text, phone_number)
-        return Response({"status": "success"})
-
-
-class UpdateXlsViewSet():
-    fields = ['longitude', 'latitude', 'radius', 'specialty_id', 'lab_id', 'type', 'test_id']
-    required_headers = fields+['result_count', 'url']
-
-    def update(self, request):
-
-        search_count_column = None
-        serializer = serializers.XlsSerializer(data=request.FILES)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        file = validated_data.get('file')
-        wb = load_workbook(file)
-        sheet = wb.active
-
-        rows = [row for row in sheet.rows]
-        #columns = {i+1: column.value.strip().lower() for i, column in enumerate(rows[0]) if column.value}
-        self.header = {column.value.strip().lower(): i + 1  for i, column in enumerate(rows[0]) if column.value}
-        search_count_column = self.header.get('result_count')
-        url_column = self.header.get('url')
-        validation_url_column = self.header.get('validation_url')
-
-        for i in range(2, len(rows)+1):
-            data = self.get_data(i,sheet)
-            output = self.get_result_count(data)
-            sheet.cell(row=i, column=search_count_column).value = output[0]
-            sheet.cell(row=i, column=url_column).value = output[1]
-            sheet.cell(row=i, column=validation_url_column).value = output[2]
-
-        response = HttpResponse(content=save_virtual_workbook(wb),
-                                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename=myexport.xlsx'
-        return response
-
-    def get_data(self,row,sheet):
-        data={}
-        for key in self.fields:
-            value = sheet.cell(row=row, column=self.header.get(key)).value
-            if isinstance(value, str):
-                value = value.strip().lower()
-            if key in ['specialty_id','test_id']:
-                value = [int(x) for x in str(value).split(',')] if value else []
-
-            data[key] = value
-        return data
-
-    def get_result_count(self, data):
-        if data['type']=='doctor' :
-            return self.get_doctor_count(data);
-        elif data['type']=='lab' :
-            return self.get_lab_count(data);
-        else :
-            return 0
-
-    def get_doctor_count(self, data):
-        specialty_id = data['specialty_id']
-        latitude = data['latitude']
-        longitude = data['longitude']
-        max_distance = 1000*data['radius']
-
-        results = Doctor.objects.all()
-        results = (Doctor.objects.filter(
-            doctorpracticespecializations__specialization__in=specialty_id
-            ) if len(specialty_id)>0 else Doctor.objects.all())
-
-        search_count = results.filter(
-            hospitals__location__distance_lte=(Point(longitude, latitude), max_distance),
-            is_live=True,
-            is_test_doctor=False,
-            is_internal=False,
-            hospitals__is_live=True).distinct().count()
-        url = "{domain}/opd/searchresults?min_fees=0&max_fees=1500&sort_on=distance&is_available=false&is_female=false&doctor_name=&hospital_name=&conditions=&specializations={specialty_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, specialty_id=','.join([str(x) for x in specialty_id]),latitude=str(latitude), longitude=str(longitude))
-        validation_url = url+"&max_distance={max_distance}".format(max_distance=max_distance/1000)
-        url = url + "&max_distance=20"
-        return (search_count, url, validation_url)
-
-    def get_lab_count(self, data):
-        test_id = data['test_id']
-        #lab_id = data['lab_id']
-        latitude = data['latitude']
-        longitude = data['longitude']
-        max_distance = 1000*data['radius']
-
-        filter = {'location__distance_lte': (Point(longitude, latitude), max_distance)}
-        if len(test_id)>0:
-            filter.update({
-                'lab_pricing_group__available_lab_tests__test_id__in': test_id,
-                'lab_pricing_group__available_lab_tests__enabled': True
-            })
-        count = 0
-
-        search = Lab.objects.filter(is_test_lab=False, is_live=True,
-                                          lab_pricing_group__isnull=False).filter(**filter)
-
-        if len(test_id)>0:
-            count = search.annotate(count=Count('id')).filter(count__gte=len(test_id)).count()
-        else :
-            count = search.count()
-
-        url = "{domain}/lab/searchresults?min_distance=0&min_price=0&max_price=20000&sort_on=distancel&lab_name=&test_ids={test_id}&lat={latitude}&long={longitude}&force_location=true".format(domain=settings.CONSUMER_APP_DOMAIN, test_id=','.join([str(x) for x in test_id]),latitude=str(latitude), longitude=str(longitude))
-        validation_url = url+"&max_distance={max_distance}".format(max_distance=max_distance/1000)
-        url = url + "&max_distance=20"
-        return (count, url, validation_url)
-
-class UpdateXlsViewSet1():
-
-    def update(self, request):
-        search_count_column = None
-        serializer = serializers.XlsSerializer(data=request.FILES)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        file = validated_data.get('file')
-        wb = load_workbook(file)
-        sheet = wb.active
-        rows = [row for row in sheet.rows]
-        columns = {i+1: column.value.strip().lower() for i, column in enumerate(rows[0]) if column.value}
-        for key in columns.keys():
-            if columns.get(key) == 'number_of_results_on_search_page':
-                search_count_column = key
-        if search_count_column:
-            for i in range(2, len(rows)+1):
-                sheet.cell(row=i, column=search_count_column).value = self.get_result_count(i, columns, sheet)
-            response = HttpResponse(content=save_virtual_workbook(wb),
-                                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            response['Content-Disposition'] = 'attachment; filename=myexport.xlsx'
-            return response
-        return None
-
-    def prepare_query(self, column, value, query):
-        if column == 'test_id' and value is not None and value != '':
-            query.update({
-                'lab_pricing_group__available_lab_tests__test_id__in': [int(value.strip()) for value in
-                                                                        str(value).split(",")],
-                'lab_pricing_group__available_lab_tests__enabled': True
-            })
-        elif column == 'lab_id' and value is not None and value != '':
-            query.update({
-                'id': int(value)
-            })
-        return query
-
-    def get_result_count(self, row, columns, sheet):
-        longitude, latitude, max_distance, search_count_column, report_type = None, None, None, None, None
-        query = {}
-        for key in columns.keys():
-            cell_value = str(sheet.cell(row=row, column=key).value).strip() if sheet.cell(row=row,
-                                                                                          column=key).value else None
-            if columns.get(key) == 'longitude':
-                longitude = float(cell_value) if cell_value else None
-            elif columns.get(key) == 'latitude':
-                latitude = float(cell_value) if cell_value else None
-            elif columns.get(key) == 'radius_in_km':
-                max_distance = int(cell_value) * 1000 if cell_value else None
-            elif columns.get(key) == 'specialization_ids':
-                specialization_ids = [int(value.strip()) for value in cell_value.split(",")] if cell_value else []
-            elif columns.get(key) == 'type':
-                report_type = cell_value
-            self.prepare_query(columns.get(key), sheet.cell(row=row, column=key).value, query)
-
-        if report_type == 'doctor':
-            results = (Doctor.objects.filter(
-                doctorpracticespecializations__specialization__in=specialization_ids
-            ) if specialization_ids else Doctor.objects.all())
-            search_count = results.filter(
-                hospitals__location__distance_lte=(Point(longitude, latitude), max_distance),
-                is_live=True,
-                is_test_doctor=False,
-                is_internal=False,
-                hospitals__is_live=True).distinct().count()
-        else:
-            query.update({
-                'location__distance_lte': (Point(longitude, latitude), max_distance)
-            })
-            search_count = Lab.objects.filter(is_test_lab=False, is_live=True,
-                                              lab_pricing_group__isnull=False).filter(**query).distinct().count()
-        return search_count
-
-
-class DocViewset(viewsets.GenericViewSet):
+class Doc():
 
     def get_doctor(self, doctor_identifier):
         si_obj = SourceIdentifier.objects.filter(type=SourceIdentifier.DOCTOR, unique_identifier=doctor_identifier).first()
@@ -335,17 +62,9 @@ class DocViewset(viewsets.GenericViewSet):
         return value
 
 
-class UploadDoctorViewSet(DocViewset):
+class UploadDoctor(Doc):
 
-    def upload(self, request):
-        serializer = serializers.DoctorXLSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        file = validated_data.get('file')
-        source = validated_data.get('source')
-        batch = validated_data.get('batch')
-        wb = load_workbook(file)
-        sheet = wb.active
+    def upload(self, sheet, source, batch):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
 
@@ -353,12 +72,10 @@ class UploadDoctorViewSet(DocViewset):
             data = self.get_data(row=i, sheet=sheet, headers=headers)
             doctor = self.create_doctor(data, source, batch)
             self.map_doctor_specialization(doctor, data.get('practice_specialization'))
-            self.add_doctor_phone_numbers(doctor, data.get('numbers'))
-
-        # response = HttpResponse(content=save_virtual_workbook(wb),
-        #                         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        # response['Content-Disposition'] = 'attachment; filename=myexport.xlsx'
-        return Response(data={'message': 'success'})
+            try:
+                self.add_doctor_phone_numbers(doctor, data.get('numbers'))
+            except:
+                print('error in saving phone number')
 
     def get_data(self, row, sheet, headers):
         gender_mapping = {value[1]: value[0] for value in Doctor.GENDER_CHOICES}
@@ -463,36 +180,65 @@ class UploadDoctorViewSet(DocViewset):
             return doctor
 
         doctor = Doctor.objects.create(name=data['name'], license=data.get('license',''), gender=data['gender'],
-                                                       practicing_since=data['practicing_since'], source=source, batch=batch)
+                                                       practicing_since=data['practicing_since'], source=source, batch=batch, enabled=False)
         SourceIdentifier.objects.create(type=SourceIdentifier.DOCTOR, unique_identifier=data.get('identifier'), reference_id=doctor.id)
-        self.save_image(data.get('image_url'),data.get('identifier'))
+        self.save_image(batch,data.get('image_url'),data.get('identifier'))
         return doctor
 
-    def save_image(self, url, identifier):
+    def save_image(self, batch, url, identifier):
         if url and identifier:
-            path = settings.MEDIA_ROOT+'/temp/image/'+identifier + '.jpg'
-            final_path = settings.MEDIA_ROOT+'/temp/final/'+identifier + '.jpg'
-            if os.path.exists(path):
+            #path = settings.MEDIA_ROOT+'/temp/image/'+identifier + '.jpg'
+            #final_path = settings.MEDIA_ROOT+'/temp/final/'+identifier + '.jpg'
+            path = 'temp/image/'+identifier + '.jpg'
+            final_path = 'temp/final/'+identifier + '.jpg'
+
+            if default_storage.exists(path):
                 return None
+            # if os.path.exists(path):
+            #     return None
+
+            # file = default_storage.open('storage_test', 'w')
+            # file.write('storage contents')
+            # file.close()
+
 
             r = requests.get(url)
             content = BytesIO(r.content)
+
             # if os.path.exists(path):
             #     os.remove(path)
             # if os.path.exists(final_path):
             #     os.remove(final_path)
 
-            of = open(path, 'xb')
-            of.write(content.read())
-            of.close()
-            img = Img.open(path)
+            # of = open(path, 'xb')
+            # of.write(content.read())
+            # of.close()
+
+            file = default_storage.open(path, 'wb')
+            file.write(content.read())
+            file.close()
+
+            # r = requests.get(url)
+            # content = BytesIO(r.content)
+            ff = default_storage.open(path, 'rb')
+            img = Img.open(ff)
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             size = img.size
             bottom = math.floor(size[1]*.8)
             img = img.crop((0,0,size[0],bottom))
 
-            img.save(final_path, format='JPEG')
+            buffer = BytesIO()
+            img.save(buffer, format='JPEG')
+            buffer.seek(0)
+            #print(len(buffer))
+            #buffer.tell()
+
+            cropped_file = default_storage.open(final_path, 'wb')
+            cropped_file.write(buffer.read())
+            cropped_file.close()
+            #file.close()
+
             # new_image_io.tell()
             # ff = open(final_path, 'xb')
             # ff.write(new_image_io.read())
@@ -513,15 +259,9 @@ class UploadDoctorViewSet(DocViewset):
         return value
 
 
-class UploadQualificationViewSet(DocViewset):
+class UploadQualification(Doc):
 
-    def upload(self, request):
-        serializer = serializers.XlsSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        file = validated_data.get('file')
-        wb = load_workbook(file)
-        sheet = wb.active
+    def upload(self, sheet):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         for i in range(2, len(rows) + 1):
@@ -537,7 +277,6 @@ class UploadQualificationViewSet(DocViewset):
                                                       specialization=data.get('specialization'),
                                                       passing_year=data.get('passing_year'))
 
-        return Response(data={'message': 'success'})
 
     def get_data(self, row, sheet, headers):
         identifier = self.clean_data(sheet.cell(row=row, column=headers.get('identifier')).value)
@@ -606,15 +345,9 @@ class UploadQualificationViewSet(DocViewset):
             college, create = College.objects.get_or_create(name=college_name)
         return college
 
-class UploadExperienceViewSet(DocViewset):
+class UploadExperience(Doc):
 
-    def upload(self, request):
-        serializer = serializers.XlsSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        file = validated_data.get('file')
-        wb = load_workbook(file)
-        sheet = wb.active
+    def upload(self, sheet):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         for i in range(2, len(rows) + 1):
@@ -626,18 +359,11 @@ class UploadExperienceViewSet(DocViewset):
                 end_year = self.clean_data(sheet.cell(row=i, column=headers.get('end_year')).value)
                 DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
                                                    hospital=hospital)
-        return Response(data={'message': 'success'})
 
 
-class UploadMembershipViewSet(DocViewset):
+class UploadMembership(Doc):
 
-    def upload(self, request):
-        serializer = serializers.XlsSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        file = validated_data.get('file')
-        wb = load_workbook(file)
-        sheet = wb.active
+    def upload(self, sheet):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         for i in range(2, len(rows) + 1):
@@ -647,18 +373,10 @@ class UploadMembershipViewSet(DocViewset):
 
             if doctor and member:
                 DoctorAssociation.objects.get_or_create(doctor=doctor, name=member)
-        return Response(data={'message': 'success'})
 
+class UploadAward(Doc):
 
-class UploadAwardViewSet(DocViewset):
-
-    def upload(self, request):
-        serializer = serializers.XlsSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        file = validated_data.get('file')
-        wb = load_workbook(file)
-        sheet = wb.active
+    def upload(self, sheet):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         for i in range(2, len(rows) + 1):
@@ -668,22 +386,14 @@ class UploadAwardViewSet(DocViewset):
             year = self.clean_data(sheet.cell(row=i, column=headers.get('year')).value)
             if award and year:
                 DoctorAward.objects.get_or_create(doctor=doctor, year=year)
-        return Response(data={'message': 'success'})
 
 
-class UploadHospitalViewSet(DocViewset):
+class UploadHospital(Doc):
 
-    def upload(self, request):
-        serializer = serializers.XlsSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        reverse_day_map = {value[1]: value[0] for value in DoctorClinicTiming.SHORT_DAY_CHOICES}
-
-        file = validated_data.get('file')
-        wb = load_workbook(file)
-        sheet = wb.active
+    def upload(self, sheet):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
+        reverse_day_map = {value[1]: value[0] for value in DoctorClinicTiming.SHORT_DAY_CHOICES}
 
         doctor_obj_dict = dict()
         hospital_obj_dict = dict()
@@ -720,7 +430,6 @@ class UploadHospitalViewSet(DocViewset):
             if clinic_time_data:
                 DoctorClinicTiming.objects.bulk_create(clinic_time_data)
 
-        return Response(data={'message': 'success'})
 
     def get_hospital(self, row, sheet, headers, hospital_obj_dict):
         hospital_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_url')).value)

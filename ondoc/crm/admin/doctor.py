@@ -330,7 +330,8 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
             if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
                 for key, value in count.items():
                     if key == DoctorDocument.REGISTRATION and value < 1:
-                        raise forms.ValidationError(choices[key] + " is required")
+                        pass
+                        #raise forms.ValidationError(choices[key] + " is required")
 
 
 class HospitalDocumentFormSet(forms.BaseInlineFormSet):
@@ -392,6 +393,30 @@ class DoctorMobileForm(forms.ModelForm):
     number = forms.CharField(required=True)
     is_primary = forms.BooleanField(required=False)
 
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        std_code = data.get('std_code')
+        number = data.get('number')
+        if std_code:
+            try:
+                std_code=int(std_code)
+            except:
+                raise forms.ValidationError("Invalid STD code")
+
+        try:
+            number=int(number)
+        except:
+            raise forms.ValidationError("Invalid Number")
+
+        if std_code:
+            if data.get('is_primary'):
+                raise forms.ValidationError("Primary number should be a mobile number")
+        else:
+            if number and (number<5000000000 or number>9999999999):
+                raise forms.ValidationError("Invalid mobile number")
 
 class DoctorMobileFormSet(forms.BaseInlineFormSet):
     def clean(self):
@@ -420,7 +445,7 @@ class DoctorMobileInline(nested_admin.NestedTabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
-    fields = ['number', 'is_primary']
+    fields = ['std_code','number', 'is_primary']
 
 
 class DoctorEmailForm(forms.ModelForm):
@@ -827,7 +852,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     #                                                                                   'documents')
 
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live']
+        read_only_fields = ['lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'enable_for_online_booking']
         if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         return read_only_fields
