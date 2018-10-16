@@ -386,7 +386,7 @@ class UploadAward(Doc):
             award = self.clean_data(sheet.cell(row=i, column=headers.get('award')).value)
             year = self.clean_data(sheet.cell(row=i, column=headers.get('year')).value)
             if award and year:
-                DoctorAward.objects.get_or_create(doctor=doctor, year=year)
+                DoctorAward.objects.get_or_create(doctor=doctor, name=award, year=year)
 
 
 class UploadHospital(Doc):
