@@ -45,7 +45,7 @@ class Command(BaseCommand):
         experience.upload(sheets[2])
         membership.upload(sheets[3])
         award.upload(sheets[4])
-        hospital.upload(sheets[5])
+        hospital.upload(sheets[5], source, batch)
 
 
 class Doc():
@@ -419,13 +419,15 @@ class UploadHospital(Doc):
                 fees = None
 
             for day in day_list:
-                if fees:
+                if fees is not None and day is not None and start is not None and end is not None and start != end:
                     temp_data = {
                         "doctor_clinic": doc_clinic_obj,
                         "day": day,
                         "start": start,
                         "end": end,
-                        "fees": fees
+                        "fees": fees,
+                        "deal_price":fees,
+                        "mrp":fees
                     }
                     clinic_time_data.append(DoctorClinicTiming(**temp_data))
             if clinic_time_data:
@@ -460,7 +462,7 @@ class UploadHospital(Doc):
         # if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
         #     doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
         # else:
-        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj)
+        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj, followup_charges=0, followup_duration=7)
         # doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
 
         return doc_clinic_obj

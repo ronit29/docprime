@@ -418,30 +418,29 @@ class DoctorMobileForm(forms.ModelForm):
             if number and (number<5000000000 or number>9999999999):
                 raise forms.ValidationError("Invalid mobile number")
 
-class DoctorMobileFormSet(forms.BaseInlineFormSet):
-    def clean(self):
-        super().clean()
-        if any(self.errors):
-            return
 
-        primary = 0
-        count = 0
-        for value in self.cleaned_data:
-            count += 1
-            if value.get('is_primary'):
-                primary += 1
-
-        if count > 0:
-            if primary == 0:
-                raise forms.ValidationError("One primary number is required")
-            if primary >= 2:
-                raise forms.ValidationError("Only one mobile number can be primary")
+# class DoctorMobileFormSet(forms.BaseInlineFormSet):
+#     def clean(self):
+#         super().clean()
+#         if any(self.errors):
+#             return
+#
+#         primary = 0
+#         count = 0
+#         for value in self.cleaned_data:
+#             count += 1
+#             if value.get('is_primary'):
+#                 primary += 1
+#
+#         if count > 0:
+#             if not primary == 1:
+#                 raise forms.ValidationError("Doctor must have one primary mobile number.")
 
 
 class DoctorMobileInline(nested_admin.NestedTabularInline):
     model = DoctorMobile
     form = DoctorMobileForm
-    formset = DoctorMobileFormSet
+    # formset = DoctorMobileFormSet
     extra = 0
     can_delete = True
     show_change_link = False
@@ -492,7 +491,7 @@ class DoctorForm(FormCleanMixin):
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
-                       'raw_about': 'req', 'license': 'req', 'mobiles': 'count', 'emails': 'count',
+                       'license': 'req', 'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count'}
 
@@ -912,7 +911,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         # check for errors
         errors = []
-        required = ['name', 'raw_about', 'gender', 'license', 'practicing_since']
+        required = ['name', 'gender', 'license', 'practicing_since']
         for req in required:
             if not getattr(doctor, req):
                 errors.append(req + ' is required')
@@ -923,6 +922,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         for req in length_required:
             if not len(getattr(doctor, req).all()):
                 errors.append(req + ' is required')
+            if req =='mobiles' and not len(getattr(doctor, req).filter(is_primary=True)) == 1:
+                errors.append("Doctor must have atleast and atmost one primary mobile number.")
 
         return render(request, 'onboarddoctor.html', {'doctor': doctor, 'count': count, 'errors': errors})
 

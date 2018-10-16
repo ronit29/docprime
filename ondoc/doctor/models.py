@@ -416,7 +416,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             location_models.EntityUrls.create_page_url(self)
 
 
-
     class Meta:
         db_table = "doctor"
 
