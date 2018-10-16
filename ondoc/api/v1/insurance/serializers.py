@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.renderers import JSONRenderer
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerFloat, InsuredMembers)
 from ondoc.authentication.models import UserProfile
-
+from ondoc.api.v1.doctor import serializers as doc_serializers
 
 class InsurerSerializer(serializers.Serializer):
     id = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all(), required=True)
@@ -76,3 +76,13 @@ class InsuredMemberSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=MemberListSerializer())
     insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
     insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+
+
+# class InsuredMembersListSerializer(serializers.Serializer):
+#     ids = serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all(), required=True)
+
+
+class InsuredMemberIdsSerializer(serializers.Serializer):
+    #ids = doc_serializers.CommaSepratedToListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all()))
+    ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all()))
+

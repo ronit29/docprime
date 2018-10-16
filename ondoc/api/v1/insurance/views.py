@@ -1,7 +1,7 @@
 from rest_framework import viewsets
 from . import serializers
 from rest_framework.response import Response
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from ondoc.account import models as account_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans)
 from ondoc.authentication.models import UserProfile
@@ -28,11 +28,30 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
 
 
 class InsuredMemberViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter()
+
+    def memberlist(self, request):
+
+        serializer = serializers.InsuredMemberIdsSerializer(data=request.data)
+
+        serializer.is_valid(raise_exception=True)
+        parameters = serializer.validated_data
+
+        result = list()
+        if parameters.get('ids'):
+
+            for id in parameters.get('ids'):
+                resp = {}
+                resp = {"id": id.id, "first_name": id.first_name, "last_name": id.last_name, "dob": id.dob, "email":id.email,
+                        "relation": id.relation, "gender": id.gender, "phone_number": id.phone_number, "hypertension": id.hypertension,
+                        "liver_disease": id.liver_disease, "heart_disease": id.heart_disease, "diabetes": id.diabetes}
+                result.append(resp)
+
+        return Response({"insured_members": result})
 
     def summary(self, request):
         serializer = serializers.InsuredMemberSerializer(data=request.data)

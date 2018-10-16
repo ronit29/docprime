@@ -90,7 +90,10 @@ class InsuredMembers(auth_model.TimeStampedModel):
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     profile = models.ForeignKey(auth_model.UserProfile, on_delete=models.SET_NULL, null=True)
-
+    hypertension = models.NullBooleanField(blank=True, null=True)
+    diabetes = models.NullBooleanField(blank=True, null=True)
+    liver_disease = models.NullBooleanField(blank=True, null=True)
+    heart_disease = models.NullBooleanField(blank=True, null=True)
 
     class Meta:
         db_table = "insured_members"
