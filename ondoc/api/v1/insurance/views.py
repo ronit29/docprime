@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, permissions
 import json
 import datetime
+from ondoc.authentication.models import User
 
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):
@@ -35,16 +36,16 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
     def summary(self, request):
         serializer = serializers.InsuredMemberSerializer(data=request.data)
-        flag = 0
-        logged_in_user_id = None
-        user_profile_id = UserProfile.objects.filter(user_id=request.user.pk, is_default_user=True).order_by('-id').first()
-        if user_profile_id:
-            for member_record in serializer.initial_data.get('members'):
-                if user_profile_id.id == member_record.get('profile'):
-                    logged_in_user_id = member_record.get('profile')
-                    flag = 1
-                else:
-                    pass
+        # flag = 0
+        # logged_in_user_id = None
+        # user_profile_id = UserProfile.objects.filter(user_id=request.user.pk, is_default_user=True).order_by('-id').first()
+        # if user_profile_id:
+        #     for member_record in serializer.initial_data.get('members'):
+        #         if user_profile_id.id == member_record.get('profile'):
+        #             logged_in_user_id = member_record.get('profile')
+        #             flag = 1
+        #         else:
+        #             pass
 
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
@@ -52,10 +53,10 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         members = valid_data.get("members")
         resp = {}
 
-        if valid_data and flag == 1:
+        if valid_data:
             user = request.user
+            logged_in_user_id = None
 
-            user_profile = UserProfile.objects.filter(id= logged_in_user_id, is_default_user=True).values('name', 'email', 'gender', 'user_id', 'dob', 'phone_number')
             pre_insured_members = {}
             insured_members_list = []
 
@@ -94,21 +95,31 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                 # pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
                 # User Profile creation or updation
                 if member['profile']:
-                    profile = UserProfile.objects.filter(name=name, user=request.user, id=member['profile'].id)
+                    profile = UserProfile.objects.filter(id=member['profile'].id).values('id','name', 'email', 'gender', 'user_id', 'dob', 'phone_number')
+                    if profile.exists():
+                        if profile[0].get('user_id') == request.user.pk:
+                            member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
+                                                            dob=member['dob'])
 
-                if not member['profile']  or not profile.exists():
+                            if member['relation'].lower() == 'self'.lower():
+                                logged_in_user_id = member['profile'].id
+
+
+                        else:
+                            return Response({"message": "User is not valid"},
+                                            status.HTTP_404_NOT_FOUND)
+
+                else:
                     member_profile = UserProfile.objects.create(name=name,
                                                                 email=member['email'], gender=member['gender'],
                                                                 user_id=request.user.pk, dob=member['dob'],
                                                                 is_default_user=False, is_otp_verified=False,
                                                                 phone_number=request.user.phone_number)
-                    profile = {'name': member_profile.name, 'email': member_profile.email, 'gender': member_profile.gender, 'user_id': member_profile.id,
+                    profile = {'id':member_profile.id, 'name': member_profile.name, 'email': member_profile.email, 'gender': member_profile.gender, 'user_id': member_profile.user_id,
                                'dob': member_profile.dob, 'phone_number': member_profile.phone_number}
-                else:
 
-                    member_profile = profile.update(email=member['email'], gender=member['gender'], dob=member['dob'])
-                    profile = profile.values('name', 'email', 'gender', 'user_id', 'dob', 'phone_number')
-
+                    if member['relation'].lower() == 'self'.lower():
+                        logged_in_user_id = member_profile.id
 
 
                 pre_insured_members['first_name'] = member['first_name']
@@ -131,7 +142,18 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
             insurer = Insurer.objects.filter(id=valid_data.get('insurer').id).values()
             insurance_plan = InsurancePlans.objects.filter(id=valid_data.get('insurance_plan').id).values()
-            resp['insurance'] = {"profile": user_profile, "members": insured_members_list, "insurer": insurer, "insurance_plan": insurance_plan}
+            user_profile = UserProfile.objects.filter(id=logged_in_user_id, user_id=request.user.pk).values('name',
+                                                                                                         'email',
+                                                                                                         'gender',
+                                                                                                         'user_id',
+                                                                                                         'dob',
+                                                                                                         'phone_number')
+            user = User.objects.filter(id=request.user.pk).values('id','phone_number', 'email', 'user_type', 'is_superuser',
+                                                                  'is_active', 'is_staff')
+
+
+
+            resp['insurance'] = {"profile": user_profile[0], "members": insured_members_list, "insurer": insurer, "insurance_plan": insurance_plan, "user": user}
             return Response(resp)
 
     def create(self, request):
