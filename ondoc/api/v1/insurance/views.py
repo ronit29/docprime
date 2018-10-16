@@ -151,8 +151,6 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             user = User.objects.filter(id=request.user.pk).values('id','phone_number', 'email', 'user_type', 'is_superuser',
                                                                   'is_active', 'is_staff')
 
-
-
             resp['insurance'] = {"profile": user_profile[0], "members": insured_members_list, "insurer": insurer, "insurance_plan": insurance_plan, "user": user}
             return Response(resp)
 
