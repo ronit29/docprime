@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from django.contrib.gis.geos import Point, GEOSGeometry
 from django.conf import settings
 from django.utils import timezone
+from ondoc.api.v1.common.serializers import SearchLeadSerializer
 from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
@@ -12,6 +13,7 @@ from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeS
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
 
 from ondoc.chat.models import ChatPrescription
+from ondoc.lead.models import SearchLead
 from ondoc.notification.rabbitmq_client import publish_message
 from django.template.loader import render_to_string
 from . import serializers
@@ -858,3 +860,12 @@ class UploadHospitalViewSet(DocViewset):
     #     if value and isinstance(value, str):
     #         return value.strip()
     #     return value
+
+
+class SearchLeadViewSet(viewsets.GenericViewSet):
+
+    def create(self, request):
+        serializer = SearchLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'msg': 'success'}, status=status.HTTP_200_OK)

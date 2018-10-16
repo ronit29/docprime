@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from ondoc.lead.models import SearchLead
+
 
 class EmailSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -18,7 +20,14 @@ class SMSServiceSerializer(serializers.Serializer):
 class XlsSerializer(serializers.Serializer):
     file = serializers.FileField()
 
+
 class DoctorXLSerializer(serializers.Serializer):
     file = serializers.FileField()
     source = serializers.CharField(max_length=20)
     batch = serializers.CharField(max_length=20)
+
+
+class SearchLeadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SearchLead
+        fields = '__all__'
