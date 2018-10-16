@@ -980,12 +980,16 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
 
 
 class DoctorContactNumberViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def retrieve(self, request, doctor_id):
 
-        doctor_details = models.DoctorMobile.objects.filter(doctor=doctor_id).values('is_primary','number').order_by('-is_primary').first()
+        doctor_obj = get_object_or_404(models.Doctor, pk=doctor_id)
+
+        doctor_details = models.DoctorMobile.objects.filter(doctor=doctor_obj).values('is_primary','number').order_by('-is_primary').first()
 
         if not doctor_details:
-            return Response({'status': 0, 'message': 'Invalid Doctor ID'}, status.HTTP_404_NOT_FOUND)
+            return Response({'status': 0, 'message': 'No Contact Number found'}, status.HTTP_404_NOT_FOUND)
         else:
             return Response({'status': 1, 'number': doctor_details.get('number')}, status.HTTP_200_OK)
