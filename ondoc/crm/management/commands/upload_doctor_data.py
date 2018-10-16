@@ -11,6 +11,7 @@ from django.core.files.storage import default_storage
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
+from django.contrib.gis.geos import Point, GEOSGeometry
 
 
 class Command(BaseCommand):
