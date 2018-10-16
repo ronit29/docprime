@@ -391,7 +391,7 @@ class UploadAward(Doc):
 
 class UploadHospital(Doc):
 
-    def upload(self, sheet):
+    def upload(self, sheet, source, batch):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         reverse_day_map = {value[1]: value[0] for value in DoctorClinicTiming.SHORT_DAY_CHOICES}
@@ -406,7 +406,7 @@ class UploadHospital(Doc):
                 print('Doctor not found for identifier: '+identifier)
                 continue
 
-            hospital_obj = self.get_hospital(i, sheet, headers, hospital_obj_dict)
+            hospital_obj = self.get_hospital(i, sheet, headers, hospital_obj_dict, source, batch)
             doc_clinic_obj = self.get_doc_clinic(doctor_obj, hospital_obj, doc_clinic_obj_dict)
             day_list = self.parse_day_range(sheet.cell(row=i, column=headers.get('day_range')).value, reverse_day_map)
             start, end = self.parse_timing(sheet.cell(row=i, column=headers.get('timing')).value)
@@ -432,7 +432,7 @@ class UploadHospital(Doc):
                 DoctorClinicTiming.objects.bulk_create(clinic_time_data)
 
 
-    def get_hospital(self, row, sheet, headers, hospital_obj_dict):
+    def get_hospital(self, row, sheet, headers, hospital_obj_dict, source, batch):
         hospital_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_url')).value)
         hospital_id = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_id')).value)
 
@@ -449,7 +449,7 @@ class UploadHospital(Doc):
             hospital_name = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_name')).value)
             address = self.clean_data(sheet.cell(row=row, column=headers.get('address')).value)
             location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('gaddress')).value))
-            hospital = Hospital.objects.create(name=hospital_name, building=address, location=location)
+            hospital = Hospital.objects.create(name=hospital_name, building=address, location=location, source=source, batch=batch)
             SourceIdentifier.objects.create(reference_id=hospital.id, unique_identifier=hospital_identifier,
                                                 type=SourceIdentifier.HOSPITAL)
 
