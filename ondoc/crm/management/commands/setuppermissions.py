@@ -36,7 +36,7 @@ from ondoc.web.models import Career, OnlineLead
 
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 
-from ondoc.authentication.models import BillingAccount
+from ondoc.authentication.models import BillingAccount, SPOCDetails
 
 from ondoc.seo.models import Sitemap
 
@@ -70,7 +70,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
-            DoctorClinicProcedure)
+            DoctorClinicProcedure, SPOCDetails)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -157,7 +157,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, DoctorClinicProcedure)
+            CompetitorMonthlyVisit, DoctorClinicProcedure, SPOCDetails)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -216,7 +216,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, DoctorClinicProcedure)
+            CompetitorMonthlyVisit, DoctorClinicProcedure, SPOCDetails)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

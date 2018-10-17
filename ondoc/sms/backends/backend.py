@@ -4,6 +4,8 @@ from django.conf import settings
 from ondoc.authentication.models import OtpVerifications
 from random import randint
 from ondoc.notification.rabbitmq_client import publish_message
+from django.utils import timezone
+from dateutil.relativedelta import relativedelta
 
 
 class NodeJsSmsBackend(object):
@@ -83,9 +85,17 @@ class WhitelistedSmsBackend(BaseSmsBackend):
             return True
         return False
 
+
 def create_otp(phone_no, message):
-    otp = randint(100000,999999)
-    otpEntry = OtpVerifications(phone_number=phone_no, code=otp, country_code="+91")
-    otpEntry.save()
+    otpEntry = (OtpVerifications.objects.filter(phone_number=phone_no, is_expired=False,
+                                                created_at__gte=timezone.now() - relativedelta(
+                                                    minutes=OtpVerifications.OTP_EXPIRY_TIME)).first())
+    if otpEntry:
+        otp = otpEntry.code
+    else:
+        OtpVerifications.objects.filter(phone_number=phone_no).update(is_expired=True)
+        otp = randint(100000,999999)
+        otpEntry = OtpVerifications(phone_number=phone_no, code=otp, country_code="+91")
+        otpEntry.save()
     message = message.format(str(otp))
     return message

@@ -122,6 +122,7 @@ class OpdAppModelSerializer(serializers.ModelSerializer):
 
 
 class OpdAppTransactionModelSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
@@ -226,7 +227,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
         if data.get("coupon_code"):
             for coupon in data.get("coupon_code"):
                 obj = OpdAppointment()
-                if not obj.validate_coupon(request.user, coupon):
+                if not obj.validate_coupon(request.user, coupon).get("is_valid"):
                     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         return data
@@ -626,6 +627,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
     hospitals = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
+    enable_for_online_booking = serializers.BooleanField(read_only=True)
     availability = None
     seo = serializers.SerializerMethodField()
     breadcrumb = serializers.SerializerMethodField()
@@ -704,7 +706,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'thumbnail', 'license', 'is_live','seo', 'breadcrumb')
+                  'general_specialization', 'thumbnail', 'license', 'is_live','seo', 'breadcrumb', 'enable_for_online_booking')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):

@@ -39,7 +39,7 @@ class Order(TimeStampedModel):
     LAB_PRODUCT_ID = 2
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID")]
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
-    reference_id = models.PositiveSmallIntegerField(blank=True, null=True)
+    reference_id = models.IntegerField(blank=True, null=True)
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
     action_data = JSONField(blank=True, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -101,22 +101,24 @@ class Order(TimeStampedModel):
                 amount = appointment_obj.effective_price
         elif self.action == Order.OPD_APPOINTMENT_RESCHEDULE:
             new_appointment_data = appointment_data
-            appointment_obj = OpdAppointment.objects.get(pk=self.reference_id)
+            appointment_obj = OpdAppointment.objects.get(pk=appointment_data.get("id"))
             if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
+                amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
                 appointment_obj.action_rescheduled_patient(new_appointment_data)
                 order_dict = {
+                    "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
-                amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
         elif self.action == Order.LAB_APPOINTMENT_RESCHEDULE:
             new_appointment_data = appointment_data
-            appointment_obj = LabAppointment.objects.get(pk=self.reference_id)
+            appointment_obj = LabAppointment.objects.get(pk=appointment_data.get("id"))
             if consumer_account.balance + appointment_obj.effective_price >= new_appointment_data["effective_price"]:
+                amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
                 appointment_obj.action_rescheduled_patient(new_appointment_data)
                 order_dict = {
+                    "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
-                amount = new_appointment_data["effective_price"] - appointment_obj.effective_price
         if order_dict:
             self.update_order(order_dict)
         if appointment_obj:
@@ -448,6 +450,7 @@ class ConsumerRefund(TimeStampedModel):
     refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     pg_transaction = models.ForeignKey(PgTransaction, related_name='pg_refund', blank=True, null=True, on_delete=models.DO_NOTHING)
     refund_state = models.PositiveSmallIntegerField(choices=state_type, default=PENDING)
+    refund_initiated_at = models.DateTimeField(blank=True, null=True)
 
     @classmethod
     def initiate_refund(cls, user, ctx_obj):
@@ -538,6 +541,8 @@ class ConsumerRefund(TimeStampedModel):
             refund_queryset = cls.objects.select_for_update().filter(pk=pk).first()
             if refund_queryset:
                 refund_queryset.refund_state = ConsumerRefund.REQUESTED
+                if not refund_queryset.refund_initiated_at:
+                    refund_queryset.refund_initiated_at = timezone.now()
                 refund_queryset.save()
                 print("Status Updated")
 

@@ -17,6 +17,29 @@ class Coupon(auth_model.TimeStampedModel):
     count = models.PositiveIntegerField()
     description = models.CharField(max_length=500, default="")
 
+    def used_coupon_count(self, user):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        count = 0
+        if str(self.type) == str(self.DOCTOR) or str(self.type) == str(self.ALL):
+            count += OpdAppointment.objects.filter(user=user,
+                                                   status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
+                                                               OpdAppointment.RESCHEDULED_DOCTOR,
+                                                               OpdAppointment.RESCHEDULED_PATIENT,
+                                                               OpdAppointment.ACCEPTED,
+                                                               OpdAppointment.COMPLETED],
+                                                   coupon__code=self).count()
+        if str(self.type) == str(self.LAB) or str(self.type) == str(self.ALL):
+            count += LabAppointment.objects.filter(user=user,
+                                                   status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
+                                                               LabAppointment.RESCHEDULED_LAB,
+                                                               LabAppointment.RESCHEDULED_PATIENT,
+                                                               LabAppointment.ACCEPTED,
+                                                               LabAppointment.COMPLETED],
+                                                   coupon__code=self).count()
+        return count
+
     def __str__(self):
         return self.code
 

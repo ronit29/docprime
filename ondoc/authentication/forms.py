@@ -64,7 +64,7 @@ class SPOCDetailsForm(forms.ModelForm):
             raise forms.ValidationError("Phone Number is required!")
 
         if (not self.cleaned_data.get('std_code')) and (self.cleaned_data.get('number')):
-            if self.cleaned_data.get('number') < 6000000000 or self.cleaned_data.get('number') > 9999999999:
+            if self.cleaned_data.get('number') < 5000000000 or self.cleaned_data.get('number') > 9999999999:
                 raise forms.ValidationError("Invalid Phone Number!")
 
 

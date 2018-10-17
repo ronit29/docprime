@@ -44,6 +44,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     parking = models.PositiveSmallIntegerField(blank=True, null=True,
                                                choices=[("", "Select"), (1, "Easy"), (2, "Difficult")])
     registration_number = models.CharField(max_length=500, blank=True)
-    building = models.CharField(max_length=100, blank=True)
+    building = models.CharField(max_length=1000, blank=True)
     sublocality = models.CharField(max_length=100, blank=True)
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100)
@@ -140,6 +141,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     entity = GenericRelation(location_models.EntityLocationRelationship)
     spoc_details = GenericRelation(auth_model.SPOCDetails)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
+    source = models.CharField(max_length=20, blank=True)
+    batch = models.CharField(max_length=20, blank=True)
 
     def __str__(self):
         return self.name
@@ -293,15 +296,17 @@ class College(auth_model.TimeStampedModel):
 
 
 class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
+    SOURCE_PRACTO = "pr"
+
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
     ONBOARDING_STATUS = [(NOT_ONBOARDED, "Not Onboarded"), (REQUEST_SENT, "Onboarding Request Sent"),
                          (ONBOARDED, "Onboarded")]
-
+    GENDER_CHOICES = [("", "Select"), ("m", "Male"), ("f", "Female"), ("o", "Other")]
     name = models.CharField(max_length=200)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True,
-                              choices=[("", "Select"), ("m", "Male"), ("f", "Female"), ("o", "Other")])
+                              choices=GENDER_CHOICES)
     practicing_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     raw_about = models.CharField(max_length=2000, blank=True)
     about = models.CharField(max_length=2000, blank=True)
@@ -327,6 +332,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     live_at = models.DateTimeField(null=True, blank=True)
     is_internal = models.BooleanField(verbose_name='Is Staff Doctor', default=False)
     is_test_doctor = models.BooleanField(verbose_name='Is Test Doctor', default=False)
+    is_license_verified = models.BooleanField(default=False, blank=True)
+
     # doctor_admins = models.ForeignKey(auth_model.GenericAdmin, related_query_name='manageable_doctors')
     hospitals = models.ManyToManyField(
         Hospital,
@@ -340,6 +347,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True,  blank=True)
+    source = models.CharField(max_length=20, blank=True)
+    batch = models.CharField(max_length=20, blank=True)
+    enable_for_online_booking = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -372,26 +382,38 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def update_live_status(self):
 
-        if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
-            # dochospitals = []
-            # for hosp in self.hospitals.all():
-            #     dochospitals.append(hosp.id)
-            # queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
-            #                                (Q(doctor__isnull=False, doctor=self) |
-            #                                 Q(doctor__isnull=True, hospital__id__in=dochospitals)))
+        if self.source == self.SOURCE_PRACTO:
+            if not self.is_live and self.enabled == True:
+                self.is_live = True
+                if not self.live_at:
+                    self.live_at = timezone.now()
+            if self.is_live and self.enabled == False:
+                self.is_live = False
+        else:
+            if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):
+                # dochospitals = []
+                # for hosp in self.hospitals.all():
+                #     dochospitals.append(hosp.id)
+                # queryset = auth_model.GenericAdmin.objects.filter(Q(is_disabled=False, user__isnull=False, permission_type = auth_model.GenericAdmin.APPOINTMENT),
+                #                                (Q(doctor__isnull=False, doctor=self) |
+                #                                 Q(doctor__isnull=True, hospital__id__in=dochospitals)))
 
-            self.is_live = True
-            if not self.live_at:
-                self.live_at = datetime.datetime.now()
-        if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
-            self.is_live = False
+                self.is_live = True
+                if not self.live_at:
+                    self.live_at = timezone.now()
+            if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
+                self.is_live = False
+
+        if self.onboarding_status == self.ONBOARDED:
+            self.enable_for_online_booking = True
+        else:
+            self.enable_for_online_booking = False
 
     def save(self, *args, **kwargs):
         self.update_live_status()
         super(Doctor, self).save(*args, **kwargs)
         if self.is_live:
             location_models.EntityUrls.create_page_url(self)
-
 
 
     class Meta:
@@ -493,6 +515,7 @@ class DoctorClinic(auth_model.TimeStampedModel):
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
+    SHORT_DAY_CHOICES = [(0, "Mon"), (1, "Tue"), (2, "Wed"), (3, "Thu"), (4, "Fri"), (5, "Sat"), (6, "Sun")]
     doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name='availability')
     day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
 
@@ -768,7 +791,7 @@ class DoctorLanguage(auth_model.TimeStampedModel):
 
 class DoctorAward(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="awards", on_delete=models.CASCADE)
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=2000)
     year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
 
     def __str__(self):
@@ -780,7 +803,7 @@ class DoctorAward(auth_model.TimeStampedModel):
 
 class DoctorAssociation(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="associations", on_delete=models.CASCADE)
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=2000)
 
     def __str__(self):
         return self.doctor.name + " (" + self.name + ")"
@@ -791,7 +814,7 @@ class DoctorAssociation(auth_model.TimeStampedModel):
 
 class DoctorExperience(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="experiences", on_delete=models.CASCADE)
-    hospital = models.CharField(max_length=200)
+    hospital = models.CharField(max_length=2000)
     start_year = models.PositiveSmallIntegerField(default=None, blank=True, null=True,
                                                   validators=[MinValueValidator(1950)])
     end_year = models.PositiveSmallIntegerField(default=None, blank=True, null=True,
@@ -812,15 +835,14 @@ class DoctorMedicalService(auth_model.TimeStampedModel):
 
 class DoctorMobile(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="mobiles", on_delete=models.CASCADE)
-    country_code = models.PositiveSmallIntegerField(default=91, blank=True, null=True)
-    number = models.BigIntegerField(blank=True, null=True,
-                                    validators=[MaxValueValidator(9999999999), MinValueValidator(7000000000)])
+    std_code = models.IntegerField(blank=True, null=True)
+    number = models.BigIntegerField(blank=True, null=True)
     is_primary = models.BooleanField(verbose_name='Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name='Phone Number Verified?', default=False)
 
     class Meta:
         db_table = "doctor_mobile"
-        unique_together = (("doctor", "number"),)
+        unique_together = (("doctor", "number","std_code"),)
 
 
 class DoctorEmail(auth_model.TimeStampedModel):
@@ -1588,3 +1610,16 @@ class DoctorClinicProcedure(auth_model.TimeStampedModel):
     class Meta:
         db_table = "doctor_clinic_procedure"
         unique_together = ('procedure', 'doctor_clinic')
+
+
+class SourceIdentifier(auth_model.TimeStampedModel):
+    DOCTOR = 1
+    HOSPITAL = 5
+    type_choice = ((DOCTOR, "Doctor"), (HOSPITAL, "Hospital"))
+    reference_id = models.IntegerField()
+    unique_identifier = models.CharField(max_length=1000)
+    type = models.PositiveSmallIntegerField(choices=type_choice, blank=True, null=True)
+
+    class Meta:
+        db_table = "source_identifier"
+        unique_together = ('unique_identifier', )

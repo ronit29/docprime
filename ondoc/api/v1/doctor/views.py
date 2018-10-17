@@ -809,8 +809,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         breadcrumb = None
 
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
-        if validated_data.get('extras') or validated_data.get('specialization_ids'):
+        if validated_data.get('extras'):
             breadcrumb_sublocality = None
+            breadcrumb_locality = None
+            city = None
             breadcrumb = None
             locality = ''
             sublocality = ''
@@ -819,6 +821,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if validated_data.get('extras').get('location_json').get('locality_value'):
                     locality = validated_data.get('extras').get('location_json').get('locality_value')
                     breadcrumb_locality = locality
+                    city = locality
                 if validated_data.get('extras').get('location_json').get('sublocality_value'):
                     sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
                     if sublocality:
@@ -826,39 +829,65 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         locality = sublocality + ' ' + locality
                 if validated_data.get('extras').get('location_json').get('breadcrum_url'):
                     breadcrumb_locality_url = validated_data.get('extras').get('location_json').get('breadcrum_url')
-
-            if validated_data.get('specialization_ids'):
-                specialization_name_obj = models.PracticeSpecialization.objects.filter(
-                    id__in=validated_data.get('specialization_ids', [])).values(
-                    'name')
-                specialization_list = []
-
-                for names in specialization_name_obj:
-                    specialization_list.append(names.get('name'))
-
-                specializations = ', '.join(specialization_list)
-            else:
-                if validated_data.get('extras').get('specialization'):
-                    specializations = validated_data.get('extras').get('specialization')
-                else:
-                    specializations = ''
+            #
+            # if validated_data.get('specialization_ids'):
+            #     specialization_name_obj = models.PracticeSpecialization.objects.filter(
+            #         id__in=validated_data.get('specialization_ids', [])).values(
+            #         'name')
+            #     specialization_list = []
+            #
+            #     for names in specialization_name_obj:
+            #         specialization_list.append(names.get('name'))
+            #
+            #     specializations = ', '.join(specialization_list)
+            # else:
+            #     if validated_data.get('extras').get('specialization'):
+            #         specializations = validated_data.get('extras').get('specialization')
+            #     else:
+            #         specializations = ''
+            specializations = None
+            if validated_data.get('extras') and validated_data.get('extras').get('specialization'):
+                specializations = validated_data.get('extras').get('specialization')
 
             if specializations:
                 title = specializations
                 description = specializations
+            else:
+                title = 'Doctors'
+                description = 'Doctors'
             if locality:
                 title += ' in '  + locality
                 description += ' in ' +locality
             if specializations:
-                title += '- Book Best ' + specializations
-                description += ': Book best ' + specializations + '\'s appointment online '
-            if locality:
-                description += 'in ' + locality
-            title += ' Instantly | DocPrime'
 
-            description += '. View Address, fees and more for doctors '
+                if locality:
+                    if sublocality == '':
+
+                        description += ': Book best ' + specializations + '\'s appointment online ' +  'in ' + city
+                    else:
+
+                        description += ': Book best ' + specializations + '\'s appointment online ' + 'in '+ locality
+
+            else:
+                if locality:
+                    if sublocality == '':
+
+                        description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in ' + city
+                    else:
+
+                        description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
+            if specializations:
+                if not sublocality:
+                    title += ' -Book Best ' + specializations +' Online'
+                else:
+                    title += '| Book & Get Best Deal'
+
+            else:
+                 title += ' | Book Doctors Online & Get Best Deal'
+
+            description += ' and get upto 50% off. View Address, fees and more for doctors '
             if locality:
-                description += 'in '+ locality
+                description += 'in '+ city
             description += '.'
 
             if breadcrumb_sublocality:
@@ -958,5 +987,22 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         if opd_appointment:
             opd_appointment.action_completed()
 
-            resp = {'success': 'Appointment Completed Successfullly!'}
+            resp = {'success': 'Appointment Completed Successfully!'}
         return Response(resp)
+
+
+class DoctorContactNumberViewSet(viewsets.GenericViewSet):
+
+    def retrieve(self, request, doctor_id):
+
+        doctor_obj = get_object_or_404(models.Doctor, pk=doctor_id)
+
+        doctor_details = models.DoctorMobile.objects.filter(doctor=doctor_obj).values('is_primary','number','std_code').order_by('-is_primary').first()
+
+        if not doctor_details:
+            return Response({'status': 0, 'message': 'No Contact Number found'}, status.HTTP_404_NOT_FOUND)
+        else:
+            final = str(doctor_details.get('number'))
+            if doctor_details.get('std_code'):
+                final = str(doctor_details.get('std_code'))+str(doctor_details.get('number'))
+            return Response({'status': 1, 'number': final}, status.HTTP_200_OK)

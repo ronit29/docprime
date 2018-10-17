@@ -288,6 +288,7 @@ class LabAppointmentBillingSerializer(serializers.ModelSerializer):
 
 
 class LabAppTransactionModelSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
@@ -400,7 +401,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         if data.get("coupon_code"):
             for coupon in data.get("coupon_code"):
                 obj = LabAppointment()
-                if not obj.validate_coupon(request.user, coupon):
+                if not obj.validate_coupon(request.user, coupon).get("is_valid"):
                     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         self.test_lab_id_validator(data, request)

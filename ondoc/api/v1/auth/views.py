@@ -71,8 +71,8 @@ class LoginOTP(GenericViewSet):
     def generate(self, request, format=None):
 
         response = {'exists': 0}
-        if request.data.get("phone_number"):
-            expire_otp(phone_number=request.data.get("phone_number"))
+        # if request.data.get("phone_number"):
+        #     expire_otp(phone_number=request.data.get("phone_number"))
         serializer = serializers.OTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -661,7 +661,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                     action=action,
                     action_data=temp_app_details,
                     amount=new_appointment_details.get('effective_price') - balance,
-                    reference_id=appointment_details.id,
+                    # reference_id=appointment_details.id,
                     payment_status=account_models.Order.PAYMENT_PENDING
                 )
                 new_appointment_details["payable_amount"] = new_appointment_details.get('effective_price') - balance
@@ -906,6 +906,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.TransactionSerializer
     queryset = PgTransaction.objects.none()
 
+    @transaction.atomic
     def save(self, request):
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
@@ -938,7 +939,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 logger.error("ValueError : statusCode is not type integer")
                 pg_resp_code = None
 
-            order_obj = Order.objects.filter(pk=response.get("orderId")).first()
+            order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId"), reference_id__isnull=True).first()
             if pg_resp_code == 1:
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
@@ -1032,17 +1033,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
             appointment_data = order_obj.action_data
             if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                 serializer = OpdAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid()
+                serializer.is_valid(raise_exception=True)
                 appointment_data = serializer.validated_data
             elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
                 serializer = LabAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid()
+                serializer.is_valid(raise_exception=True)
                 appointment_data = serializer.validated_data
 
             appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
             # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
-        except:
-            pass
+        except Exception as e:
+            logger.error("Internal error in creating/rescheduling appointment in pg flow with exception - " + str(e))
 
         return appointment_obj
 
