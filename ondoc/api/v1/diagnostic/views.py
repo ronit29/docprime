@@ -88,13 +88,13 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             search_key = re.findall(r'[a-z0-9A-Z.]+', name)
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
-            test_queryset = LabTest.objects.filter(
+            test_queryset = LabTest.objects.filter(is_package=False).filter(
                 Q(search_key__icontains=search_key) |
                 Q(search_key__icontains=' ' + search_key) |
                 Q(search_key__istartswith=search_key)).annotate(search_index=StrIndex('search_key', Value(search_key))).order_by(
                 'search_index')
             test_queryset = paginate_queryset(test_queryset, request)
-            lab_queryset = Lab.objects.filter(is_live=True, is_test_lab=False).filter(
+            lab_queryset = Lab.objects.filter(is_live=True, is_test_lab=False, is_package=False).filter(
                 Q(search_key__icontains=search_key) |
                 Q(search_key__icontains=' ' + search_key) |
                 Q(search_key__istartswith=search_key)).annotate(search_index=StrIndex('search_key', Value(search_key))).order_by(
@@ -819,7 +819,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
             search_key = re.findall(r'[a-z0-9A-Z.]+', params.get('test_name'))
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
-            queryset = queryset.filter(
+            queryset = queryset.filter(test__is_package=False).filter(
                 Q(test__search_key__istartswith=search_key) | Q(test__search_key__icontains=" "+search_key))
 
         queryset = queryset[:20]

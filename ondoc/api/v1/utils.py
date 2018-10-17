@@ -530,19 +530,26 @@ class CouponsMixin(object):
         from ondoc.coupon.models import Coupon
 
         data = Coupon.objects.filter(code__exact=coupon_code).first()
+        discount = 0
 
         if data:
             if data.min_order_amount is not None and price < data.min_order_amount:
                 return 0
 
             if data.flat_discount is not None:
-                return data.flat_discount
+                discount = data.flat_discount
             elif data.percentage_discount is not None:
                 discount = math.floor(price * data.percentage_discount / 100)
-                if data.max_discount_amount is not None:
-                    return min(data.max_discount_amount, discount)
-                else:
-                    return discount
+
+            if data.max_discount_amount is not None:
+                discount =  min(data.max_discount_amount, discount)
+
+            if discount > price:
+                discount = price
+
+            return discount
+                # else:
+                #     return discount
         else:
             return 0
 

@@ -188,6 +188,7 @@ class DoctorSearchHelper:
             temp = {
                 "doctor_id": doctor.id,
                 "enable_for_online_booking": doctor.enable_for_online_booking,
+                "is_license_verified" : doctor.is_license_verified,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,
