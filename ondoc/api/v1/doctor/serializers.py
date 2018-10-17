@@ -154,7 +154,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     end_time = serializers.FloatField(required=False)
     time_slot_start = serializers.DateTimeField(required=False)    
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
-    coupon_code = serializers.ListField(child=serializers.CharField(), required=False)
+    coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
     # time_slot_end = serializers.DateTimeField()
 

@@ -450,7 +450,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     address = serializers.PrimaryKeyRelatedField(queryset=Address.objects.all(), required=False, allow_null=True)
     # address = serializers.IntegerField(required=False, allow_null=True)
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
-    coupon_code = serializers.ListField(child=serializers.CharField(), required=False)
+    coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 3
