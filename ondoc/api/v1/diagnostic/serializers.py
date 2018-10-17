@@ -309,6 +309,7 @@ class LabAppointmentBillingSerializer(serializers.ModelSerializer):
 
 
 class LabAppTransactionModelSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
