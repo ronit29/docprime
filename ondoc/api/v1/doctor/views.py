@@ -983,5 +983,22 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         if opd_appointment:
             opd_appointment.action_completed()
 
-            resp = {'success': 'Appointment Completed Successfullly!'}
+            resp = {'success': 'Appointment Completed Successfully!'}
         return Response(resp)
+
+
+class DoctorContactNumberViewSet(viewsets.GenericViewSet):
+
+    def retrieve(self, request, doctor_id):
+
+        doctor_obj = get_object_or_404(models.Doctor, pk=doctor_id)
+
+        doctor_details = models.DoctorMobile.objects.filter(doctor=doctor_obj).values('is_primary','number','std_code').order_by('-is_primary').first()
+
+        if not doctor_details:
+            return Response({'status': 0, 'message': 'No Contact Number found'}, status.HTTP_404_NOT_FOUND)
+        else:
+            final = str(doctor_details.get('number'))
+            if doctor_details.get('std_code'):
+                final = str(doctor_details.get('std_code'))+str(doctor_details.get('number'))
+            return Response({'status': 1, 'number': final}, status.HTTP_200_OK)

@@ -585,6 +585,10 @@ class LabTest(TimeStampedModel, SearchKey):
         'TestParameter', through=ParameterLabTest,
         through_fields=('lab_test', 'parameter')
     )
+    approximate_duration = models.CharField(max_length=50, default='15 mins', verbose_name='What is the approximate duration for the test?')
+    report_schedule = models.CharField(max_length=150, default='After 2 days of test.', verbose_name='What is the report schedule for the test?')
+    enable_for_ppc = models.BooleanField(default=False)
+    enable_for_retail = models.BooleanField(default=False)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,

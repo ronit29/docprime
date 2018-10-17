@@ -1,9 +1,10 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.contrib.gis.geos import Point
-from ondoc.doctor.models import (Hospital,  Doctor, DoctorClinic,
+from ondoc.doctor.models import (Hospital, Doctor, DoctorClinic,
                                  DoctorAward, DoctorQualification, DoctorExperience, DoctorMedicalService,
                                  MedicalService, Qualification, College)
+from ondoc.authentication.models import TimeStampedModel
 
 
 class HospitalLead(models.Model):
@@ -194,3 +195,15 @@ class DoctorHospitalLead(models.Model):
     def __str__(self):
         return "doctor-lead-{} hospital-lead-{}".format(self.doctor_lead.id,
                                                         self.hospital_lead.id)
+
+
+class SearchLead(TimeStampedModel):
+
+    phone_number = models.CharField(max_length=15)
+    location = models.CharField(max_length=200, null=True, blank=True)
+
+    def __str__(self):
+        return '{0} {1}'.format(self.phone_number, self.location)
+
+    class Meta:
+        db_table = "search_lead"
