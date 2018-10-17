@@ -810,6 +810,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
         if validated_data.get('extras'):
+            location = None
             breadcrumb_sublocality = None
             breadcrumb_locality = None
             city = None
@@ -878,7 +879,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
             if specializations:
                 if not sublocality:
-                    title += ' -Book Best ' + specializations +' Online'
+                    title += '- Book Best ' + specializations +' Online'
                 else:
                     title += '| Book & Get Best Deal'
 
@@ -902,9 +903,16 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 ]
 
             if title or description:
+                if locality:
+                    if not sublocality:
+                        location = city
+                    else:
+                        location = locality
+
                 seo = {
                     "title": title,
-                    "description": description
+                    "description": description,
+                    "location" : location
                 }
 
         for resp in response:

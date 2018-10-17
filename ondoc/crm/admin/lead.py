@@ -233,6 +233,17 @@ class HospitalLeadAdmin(ImportMixin, admin.ModelAdmin):
     about.short_description = "About"
 
 
+class SearchLeadAdmin(admin.ModelAdmin):
+    list_display = ['phone_number', 'location']
+    readonly_fields = ['phone_number', 'location']
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
+
 class DoctorLeadAdmin(ImportExportMixin, admin.ModelAdmin):
     inlines = [DoctorHospitalInline, ]
     formats = (base_formats.XLS, base_formats.XLSX,)

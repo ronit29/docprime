@@ -10,11 +10,11 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabSe
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage)
 from ondoc.coupon.models import Coupon
-from ondoc.lead.models import HospitalLead, DoctorLead
+from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
 from .common import Cities, CitiesAdmin
-from .lead import HospitalLeadAdmin, DoctorLeadAdmin
+from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
                      DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
@@ -89,6 +89,7 @@ admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
 admin.site.register(HospitalLead, HospitalLeadAdmin)
 admin.site.register(Cities, CitiesAdmin)
 admin.site.register(DoctorLead, DoctorLeadAdmin)
+admin.site.register(SearchLead, SearchLeadAdmin)
 
 admin.site.register(notifcation_model.EmailNotification, EmailNotificationAdmin)
 admin.site.register(notifcation_model.SmsNotification, SmsNotificationAdmin)

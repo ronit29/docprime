@@ -1412,7 +1412,7 @@ class OnlineLeadViewSet(GenericViewSet):
             source = "Unknown"
 
         data['source'] = source
-        if not data['city_name']:
+        if not data.get('city_name'):
             data['city_name'] = 0
         serializer = serializers.OnlineLeadSerializer(data=data)
         serializer.is_valid(raise_exception=True)
