@@ -4,7 +4,7 @@ from ondoc.location.models import EntityUrls
 
 
 def map_doctor_urls():
-    all_doctors = Doctor.objects.filter(is_live=True).all()
+    all_doctors = Doctor.objects.filter(is_live=True, is_test_doctor=False).all()
     for doctor in all_doctors:
         success = EntityUrls.create_page_url(doctor)
         print("success is", success)

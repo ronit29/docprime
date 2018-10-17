@@ -71,8 +71,8 @@ class LoginOTP(GenericViewSet):
     def generate(self, request, format=None):
 
         response = {'exists': 0}
-        if request.data.get("phone_number"):
-            expire_otp(phone_number=request.data.get("phone_number"))
+        # if request.data.get("phone_number"):
+        #     expire_otp(phone_number=request.data.get("phone_number"))
         serializer = serializers.OTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -503,11 +503,19 @@ class UserAppointmentsViewSet(OndocViewSet):
                     temp_lab_test = lab_test_queryset.values('lab_pricing_group__labs').annotate(total_mrp=Sum("mrp"),
                                                                              total_deal_price=Sum(deal_price_calculation),
                                                                              total_agreed_price=Sum(agreed_price_calculation))
-                    old_deal_price = lab_appointment.deal_price
-                    old_effective_price = lab_appointment.effective_price
-                    coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
+                    # old_deal_price = lab_appointment.deal_price
+                    # old_effective_price = lab_appointment.effective_price
+                    coupon_discount = lab_appointment.discount
+                    # coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
                     new_deal_price = temp_lab_test[0].get("total_deal_price")
-                    new_effective_price = new_deal_price - coupon_price
+
+                    if lab_appointment.home_pickup_charges:
+                        new_deal_price += lab_appointment.home_pickup_charges
+
+                    if new_deal_price <= coupon_discount:
+                        new_effective_price = 0
+                    else:
+                        new_effective_price = new_deal_price - coupon_discount
                     # new_appointment = dict()
 
                     new_appointment = {
@@ -523,7 +531,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                         "profile_detail": lab_appointment.profile_detail,
                         "status": lab_appointment.status,
                         "payment_type": lab_appointment.payment_type,
-                        "lab_test": lab_appointment.lab_test
+                        "lab_test": lab_appointment.lab_test,
+                        "discount": coupon_discount
                     }
 
                     resp = self.extract_payment_details(request, lab_appointment, new_appointment,
@@ -1024,17 +1033,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
             appointment_data = order_obj.action_data
             if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
                 serializer = OpdAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid()
+                serializer.is_valid(raise_exception=True)
                 appointment_data = serializer.validated_data
             elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
                 serializer = LabAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid()
+                serializer.is_valid(raise_exception=True)
                 appointment_data = serializer.validated_data
 
             appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
             # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
-        except:
-            pass
+        except Exception as e:
+            logger.error("Internal error in creating/rescheduling appointment in pg flow with exception - " + str(e))
 
         return appointment_obj
 

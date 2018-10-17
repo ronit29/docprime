@@ -1,10 +1,11 @@
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.management.base import BaseCommand
 from ondoc.location.models import EntityLocationRelationship, EntityUrls
 from ondoc.seo.models import SitemapManger
 from ondoc.seo.sitemaps import get_sitemap_urls
 from django.template import loader
 from django.core.files import File
-from io import StringIO
+from io import StringIO, BytesIO
 import datetime
 from ondoc.articles.models import ArticleCategory
 from django.template.defaultfilters import slugify
