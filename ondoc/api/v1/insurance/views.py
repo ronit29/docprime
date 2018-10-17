@@ -99,7 +99,9 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                 # pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
                 # User Profile creation or updation
                 if member['profile']:
-                    profile = UserProfile.objects.filter(id=member['profile'].id).values('id','name', 'email', 'gender', 'user_id', 'dob', 'phone_number')
+                    profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
+                                                                                         'gender', 'user_id', 'dob',
+                                                                                         'phone_number')
                     if profile.exists():
                         if profile[0].get('user_id') == request.user.pk:
                             member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
@@ -139,7 +141,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
             insurer = Insurer.objects.filter(id=valid_data.get('insurer').id).values()
             insurance_plan = InsurancePlans.objects.filter(id=valid_data.get('insurance_plan').id).values()
-            user_profile = UserProfile.objects.filter(id=logged_in_user_id, user_id=request.user.pk).values('name',
+            user_profile = UserProfile.objects.filter(id=logged_in_user_id, user_id=request.user.pk).values('id','name',
                                                                                                          'email',
                                                                                                          'gender',
                                                                                                          'user_id',
