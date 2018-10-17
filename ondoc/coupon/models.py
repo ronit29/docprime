@@ -16,6 +16,7 @@ class Coupon(auth_model.TimeStampedModel):
     type = models.IntegerField(choices=TYPE_CHOICES)
     count = models.PositiveIntegerField()
     description = models.CharField(max_length=500, default="")
+    tnc = models.CharField(max_length=2000, default="")
 
     def used_coupon_count(self, user):
         from ondoc.doctor.models import OpdAppointment
