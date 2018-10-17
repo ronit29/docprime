@@ -141,6 +141,7 @@ class LabProfileSerializer(LabModelSerializer):
 class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
     test_id = serializers.ReadOnlyField(source='test.id')
+    is_package = serializers.ReadOnlyField(source='test.is_package')
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
@@ -191,7 +192,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled', 'package', 'parameters')
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
+                  'package', 'parameters', 'is_package')
 
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
