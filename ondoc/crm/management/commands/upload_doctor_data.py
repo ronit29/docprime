@@ -282,7 +282,7 @@ class UploadQualification(Doc):
                                                               college=data.get('college'),
                                                               specialization=data.get('specialization'),
                                                               passing_year=data.get('passing_year'))
-                except e:
+                except:
                     print('error saving doctor qualification')
 
 
