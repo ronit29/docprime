@@ -566,7 +566,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 home_pickup_charges = data["lab"].home_pickup_charges
             # TODO PM - call coupon function to calculate effective price
 
-        coupon_list = None
+        coupon_list = []
         coupon_discount = 0
         if data.get("coupon_code"):
             coupon_list = list(Coupon.objects.filter(code__in=data.get("coupon_code")).values_list('id', flat=True))
