@@ -376,6 +376,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     def get_ratings(self):
          return self.rating.all()
 
+    def get_rating_count(self):
+        count = 0
+        if self.rating.exists():
+            count = self.rating.count()
+        return count
+
     def update_live_status(self):
 
         if not self.is_live and (self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled == True):

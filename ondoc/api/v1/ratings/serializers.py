@@ -1,17 +1,12 @@
 from rest_framework import serializers
 from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments)
-from django.core import serializers as core_serializer
-from ondoc.doctor import models as doc_models
-import json
-from django.db.models import Count, Sum, When, Case, Q, F
-from django.utils import timezone
-from ondoc.api.v1 import utils
 
 
-class ListReviewComplimentSerializer(serializers.Serializer):
+class ReviewComplimentBodySerializer(serializers.Serializer):
     type = serializers.ChoiceField(choices=ReviewCompliments.TYPE_CHOICES)
-    message = serializers.CharField(max_length=500)
-    rating_level = serializers.IntegerField(max_value=5, default=None)
+
+
+class GetComplementSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReviewCompliments
         fields = ('id', 'message', 'rating_level', 'type')
@@ -19,11 +14,11 @@ class ListReviewComplimentSerializer(serializers.Serializer):
 
 class RatingCreateBodySerializer(serializers.Serializer):
     rating = serializers.IntegerField(max_value=5)
-    review = serializers.CharField(max_length=500)
+    review = serializers.CharField(max_length=500, allow_blank=True)
     appointment_id = serializers.IntegerField()
     appointment_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
     # compliment = ListReviewComplimentSerializer(source='request.data')
-    compliment = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ReviewCompliments.objects.all()))
+    compliment = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ReviewCompliments.objects.all()), allow_empty=True)
 
     # def validate(self, attrs):
     #     if (attrs.get('appointment_id') and attrs.get('appointment_type')):
@@ -35,6 +30,7 @@ class RatingCreateBodySerializer(serializers.Serializer):
 class RatingPromptCloseBodySerializer(serializers.Serializer):
     appointment_id = serializers.IntegerField()
     appointment_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
+
 
 class RatingListBodySerializerdata(serializers.Serializer):
     content_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
@@ -50,24 +46,30 @@ class RatingsGraphSerializer(serializers.Serializer):
 
     def get_top_compliments(self, obj):
         comp = []
+        response = []
+        request = self.context.get('request')
         for rate in obj.all():
-            if rate.compliment.exists():
-                for r in rate.compliment.values('id', 'message', 'icon'):
-                    comp.append(r)
+            for cmlmnt in  rate.compliment.all():
+                r = {'id': cmlmnt.id,
+                     'message': cmlmnt.message,
+                     'icon': cmlmnt.icon.url if cmlmnt.icon else None}
+                comp.append(r)
         comp_count = {}
         for x in comp:
             if comp_count.get(x['id']):
-                comp_count[x['id']] += 1
-                x['count'] +=1
+                comp_count[x['id']]['count'] += 1
+
             else:
-                comp_count[x['id']] = 1
-                x['count'] = 1
-        return comp
+                comp_count[x['id']] = x
+                comp_count[x['id']]['count'] = 1
+                comp_count[x['id']]['icon'] = request.build_absolute_uri(x['icon']) if x.get('icon') is not None else None
+        response = [comp_count[k] for k in sorted(comp_count, key=comp_count.get('count'), reverse=True)][:3]
+        return response
 
     def get_rating_count(self, obj):
         count = 0
-        if obj.all().first():
-            count = obj.all().count()
+        if obj.exists():
+            count = obj.count()
         return count
 
     def get_review_count(self, obj):
@@ -77,12 +79,17 @@ class RatingsGraphSerializer(serializers.Serializer):
         return count
 
     def get_star_count(self, obj):
-        count = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-
+        star_data = {1: {'count': 0, 'percent': 0},
+                 2: {'count': 0, 'percent': 0},
+                 3: {'count': 0, 'percent': 0},
+                 4: {'count': 0, 'percent': 0},
+                 5: {'count': 0, 'percent': 0}}
+        total = obj.count()
         for rate in obj.all():
-            count[rate.ratings] += 1
-
-        return count
+            star_data[rate.ratings]['count'] += 1
+        for key, value in star_data.items():
+            star_data[key]['percent'] = '{0:.2f}'.format((star_data[key]['count'] / total * 100))
+        return star_data
 
 
     def get_avg_rating(self, obj):

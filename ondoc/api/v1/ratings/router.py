@@ -9,6 +9,6 @@ urlpatterns = [
     path('unrated', RatingsViewSet.as_view({'get': 'unrated'}), name='unrated'),
     path('retrieve/<int:pk>', RatingsViewSet.as_view({'get': 'retrieve'}), name='get-ratings'),
     path('update/<int:pk>', RatingsViewSet.as_view({'post' : 'update'}), name='update-rating'),
-    path('complements', GetComplementViewSet.as_view({'get': 'get_complements'}), name='get-complements'),
+    path('compliments', GetComplementViewSet.as_view({'get': 'get_complements'}), name='get-complements'),
 ]
 

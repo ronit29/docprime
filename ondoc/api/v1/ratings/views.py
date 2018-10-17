@@ -32,7 +32,8 @@ class RatingsViewSet(viewsets.GenericViewSet):
         else:
             content_data = lab_models.LabAppointment.objects.filter(id=valid_data.get('appointment_id')).first()
         try:
-            content_data.update(rating_declined=True)
+            content_data.rating_declined = True
+            content_data.save()
             resp['success'] = 'Updated!'
         except Exception as e:
             return Response({'error': 'Something went wrong'}, status=status.HTTP_404_NOT_FOUND)
@@ -64,18 +65,18 @@ class RatingsViewSet(viewsets.GenericViewSet):
                                               review=valid_data.get('review'),
                                               content_object=content_obj)
                 rating_review.save()
-                content_data.update(is_rated=True)
+                content_data.is_rated = True
+                content_data.save()
 
                 if valid_data.get('compliment'):
                     rating_review.compliment.add(*valid_data.get('compliment'))
 
-
+                serialized = serializers.RatingsModelSerializer(rating_review, context={'request':request})
             except Exception as e:
                 resp['error'] = e
-            resp['success'] = "Rating have been processed successfully!!"
         else:
-            return Response({'error':'Object Not Found'}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(resp)
+            return Response({'error': 'Object Not Found'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serialized.data)
 
     def list(self, request):
         serializer = serializers.RatingListBodySerializerdata(data=request.query_params)
@@ -126,17 +127,32 @@ class RatingsViewSet(viewsets.GenericViewSet):
         user = request.user
         appntment = None
         resp = []
-        opd = user.appointments.filter(status=doc_models.OpdAppointment.COMPLETED, is_rated=False, rating_declined=False).order_by('updated_at').last()
-        lab = user.lab_appointments.filter(status=lab_models.LabAppointment.COMPLETED, is_rated=False, rating_declined=False).order_by('updated_at').last()
-        if opd and lab:
-            if opd.updated_at > lab.updated_at:
-                appntment = doc_serializers.AppointmentRetrieveSerializer(opd, many=False, context={'request': request})
+        opd_app = None
+        opd_all = user.appointments.all().order_by('-id')
+        for opd in opd_all:
+            if opd.status == doc_models.OpdAppointment.COMPLETED:
+                if opd.is_rated==False and opd.rating_declined==False:
+                    opd_app = opd
+                break
+        lab_app = None
+        lab_all = user.lab_appointments.all().order_by('-id')
+        for lab in lab_all:
+            if lab.status == lab_models.LabAppointment.COMPLETED:
+                if lab.is_rated == False and lab.rating_declined == False:
+                    lab_app = lab
+                break
+
+        # opd = user.appointments.filter(status=doc_models.OpdAppointment.COMPLETED, is_rated=False, rating_declined=False).order_by('updated_at').last()
+        # lab = user.lab_appointments.filter(status=lab_models.LabAppointment.COMPLETED, is_rated=False, rating_declined=False).order_by('updated_at').last()
+        if opd_app and lab_app:
+            if opd_app.updated_at > lab_app.updated_at:
+                appntment = doc_serializers.AppointmentRetrieveSerializer(opd_app, many=False, context={'request': request})
             else:
-                appntment = lab_serializers.LabAppointmentRetrieveSerializer(lab, many=False, context= {'request': request})
-        elif opd and not lab:
-            appntment = doc_serializers.AppointmentRetrieveSerializer(opd, many=False, context={'request': request})
-        elif lab and not opd:
-            appntment = lab_serializers.LabAppointmentRetrieveSerializer(lab, many=False, context={'request': request})
+                appntment = lab_serializers.LabAppointmentRetrieveSerializer(lab_app, many=False, context= {'request': request})
+        elif opd_app and not lab_app:
+            appntment = doc_serializers.AppointmentRetrieveSerializer(opd_app, many=False, context={'request': request})
+        elif lab_app and not opd_app:
+            appntment = lab_serializers.LabAppointmentRetrieveSerializer(lab_app, many=False, context={'request': request})
         else:
             resp = []
         if appntment:
@@ -150,15 +166,15 @@ class GetComplementViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated, IsConsumer)
 
     def get_complements(self, request):
-        serializer = serializers.ReviewComplimentSerializer(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-        valid_data = serializer.validated_data
-        type = valid_data.get('type')
-        complement_data = ReviewCompliments.objects.filter(type=type).all()
-        if type == ReviewCompliments.DOCTOR:
-            body_serializer = serializers.GetComplementSerializer(complement_data, many=True, context={'request': request})
-        elif type == ReviewCompliments.LAB:
-            body_serializer = serializers.GetComplementSerializer(complement_data, many=True, context={'request': request})
+        # serializer = serializers.ReviewComplimentBodySerializer(data=request.query_params)
+        # serializer.is_valid(raise_exception=True)
+        # valid_data = serializer.validated_data
+        # type = valid_data.get('type')
+        complement_data = ReviewCompliments.objects.all()
+        # if type == ReviewCompliments.DOCTOR:
+        #     body_serializer = serializers.GetComplementSerializer(complement_data, many=True, context={'request': request})
+        # elif type == ReviewCompliments.LAB:
+        body_serializer = serializers.GetComplementSerializer(complement_data, many=True, context={'request': request})
 
         return Response(body_serializer.data)
 

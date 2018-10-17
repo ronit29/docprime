@@ -624,8 +624,14 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     seo = serializers.SerializerMethodField()
     # rating = serializers.SerializerMethodField()
     rating = rating_serializer.RatingsModelSerializer(read_only=True, many=True, source='get_ratings')
-    rating_graph = rating_serializer.RatingsGraphSerializer(read_only=True, source='rating')
+    rating_graph = serializers.SerializerMethodField()
     breadcrumb = serializers.SerializerMethodField()
+
+    def get_rating_graph(self, obj):
+        if obj and obj.rating:
+            data = rating_serializer.RatingsGraphSerializer(obj.rating, context={'request':self.context.get('request')}).data
+            return data
+        return None
 
     def get_seo(self, obj):
         if self.parent:
@@ -747,7 +753,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',)
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail')
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):

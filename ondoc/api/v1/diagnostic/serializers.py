@@ -21,7 +21,7 @@ import json
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
 from django.db.models import Q
-
+from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.location.models import EntityUrls, EntityAddress
 
 logger = logging.getLogger(__name__)
@@ -64,8 +64,15 @@ class LabModelSerializer(serializers.ModelSerializer):
     lab_thumbnail = serializers.SerializerMethodField()
     home_pickup_charges = serializers.ReadOnlyField()
     seo = serializers.SerializerMethodField()
-    rating = serializers.SerializerMethodField()
+    rating = rating_serializer.RatingsModelSerializer(read_only=True, many=True, source='get_ratings')
     breadcrumb = serializers.SerializerMethodField()
+    rating_graph = serializers.SerializerMethodField()
+
+    def get_rating_graph(self, obj):
+        if obj and obj.rating:
+            data = rating_serializer.RatingsGraphSerializer(obj.rating, context={'request':self.context.get('request')}).data
+            return data
+        return None
 
     def get_rating(self, obj):
         rating_row = obj.rating.all()
@@ -140,7 +147,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating')
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph')
 
 
 class LabProfileSerializer(LabModelSerializer):
