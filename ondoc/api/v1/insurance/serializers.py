@@ -1,8 +1,10 @@
 from rest_framework import serializers
 from rest_framework.renderers import JSONRenderer
-from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerFloat, InsuredMembers)
-from ondoc.authentication.models import UserProfile
-from ondoc.api.v1.doctor import serializers as doc_serializers
+from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerFloat, InsuredMembers,
+                                    InsuranceTransaction)
+from ondoc.authentication.models import (User, UserProfile)
+from ondoc.account import models as account_models
+from ondoc.account.models import (Order)
 
 class InsurerSerializer(serializers.Serializer):
     id = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all(), required=True)
@@ -78,11 +80,16 @@ class InsuredMemberSerializer(serializers.Serializer):
     insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
 
 
-# class InsuredMembersListSerializer(serializers.Serializer):
-#     ids = serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all(), required=True)
+class InsuranceTransactionModelSerializer(serializers.Serializer):
+
+    insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
+    insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    product_id = serializers.ChoiceField(choices=account_models.Order.PRODUCT_IDS)
+    order_id = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all())
+    amount = serializers.IntegerField()
+    status_type = serializers.CharField(max_length=50)
 
 
 class InsuredMemberIdsSerializer(serializers.Serializer):
-    #ids = doc_serializers.CommaSepratedToListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all()))
-    ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all()))
-
+    ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuranceTransaction.objects.all()))

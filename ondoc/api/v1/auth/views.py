@@ -38,6 +38,7 @@ from ondoc.api.v1.doctor.views import DoctorAppointmentsViewSet
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
+from ondoc.api.v1.insurance.serializers import (InsuranceTransactionModelSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
@@ -897,6 +898,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
     def save(self, request):
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
+        INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/home"
+        INSURANCE_FAILURE_REDIRECT_URL = settings.BASE_URL + "/insurance/%s/book?error_code=%s"
         LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
         OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
         ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
@@ -1016,6 +1019,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         consumer_account.credit_payment(pg_data, tx_amount)
 
         appointment_obj = None
+        insurance_obj = None
         try:
             appointment_data = order_obj.action_data
             if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
@@ -1026,9 +1030,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 serializer = LabAppTransactionModelSerializer(data=appointment_data)
                 serializer.is_valid()
                 appointment_data = serializer.validated_data
+            elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
+                serializer = InsuranceTransactionModelSerializer(data=appointment_data)
+                serializer.is_valid()
+                insurance_data = serializer.validated_data
 
-            appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
-            # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
+            if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID or account_models.Order.DOCTOR_PRODUCT_ID:
+                appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
+                # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
+            elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
+                insurance_obj = order_obj.process_insurance_order(consumer_account, pg_data, order_obj)
+
         except:
             pass
 
