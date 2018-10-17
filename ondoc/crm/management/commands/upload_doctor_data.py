@@ -276,11 +276,14 @@ class UploadQualification(Doc):
             # college = self.get_college(i, sheet, headers)
             # passing_year = self.clean_data(sheet.cell(row=i, column=headers.get('passing_year')).value)
             if data.get('doctor'):
-                DoctorQualification.objects.get_or_create(doctor=data.get('doctor'),
-                                                          qualification=data.get('qualification'),
-                                                          college=data.get('college'),
-                                                          specialization=data.get('specialization'),
-                                                          passing_year=data.get('passing_year'))
+                try:
+                    DoctorQualification.objects.get_or_create(doctor=data.get('doctor'),
+                                                              qualification=data.get('qualification'),
+                                                              college=data.get('college'),
+                                                              specialization=data.get('specialization'),
+                                                              passing_year=data.get('passing_year'))
+                except e:
+                    print('error saving doctor qualification')
 
 
     def get_data(self, row, sheet, headers):
