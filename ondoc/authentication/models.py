@@ -30,7 +30,7 @@ class Image(models.Model):
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
         return "{}/{}/{}".format(first,prefix,last)
-    
+
 
     def has_image_changed(self):
         if not self.pk:
@@ -348,7 +348,7 @@ class UserProfile(TimeStampedModel):
 
 
 class OtpVerifications(TimeStampedModel):
-    OTP_EXPIRY_TIME = 60  # In minutes
+    OTP_EXPIRY_TIME = 120  # In minutes
     phone_number = models.CharField(max_length=10)
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)

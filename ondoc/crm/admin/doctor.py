@@ -330,7 +330,8 @@ class DoctorDocumentFormSet(forms.BaseInlineFormSet):
             if '_submit_for_qc' in self.request.POST or '_qc_approve' in self.request.POST:
                 for key, value in count.items():
                     if key == DoctorDocument.REGISTRATION and value < 1:
-                        raise forms.ValidationError(choices[key] + " is required")
+                        pass
+                        #raise forms.ValidationError(choices[key] + " is required")
 
 
 class HospitalDocumentFormSet(forms.BaseInlineFormSet):
@@ -392,35 +393,58 @@ class DoctorMobileForm(forms.ModelForm):
     number = forms.CharField(required=True)
     is_primary = forms.BooleanField(required=False)
 
-
-class DoctorMobileFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
         if any(self.errors):
             return
+        data = self.cleaned_data
+        std_code = data.get('std_code')
+        number = data.get('number')
+        if std_code:
+            try:
+                std_code=int(std_code)
+            except:
+                raise forms.ValidationError("Invalid STD code")
 
-        primary = 0
-        count = 0
-        for value in self.cleaned_data:
-            count += 1
-            if value.get('is_primary'):
-                primary += 1
+        try:
+            number=int(number)
+        except:
+            raise forms.ValidationError("Invalid Number")
 
-        if count > 0:
-            if primary == 0:
-                raise forms.ValidationError("One primary number is required")
-            if primary >= 2:
-                raise forms.ValidationError("Only one mobile number can be primary")
+        if std_code:
+            if data.get('is_primary'):
+                raise forms.ValidationError("Primary number should be a mobile number")
+        else:
+            if number and (number<5000000000 or number>9999999999):
+                raise forms.ValidationError("Invalid mobile number")
+
+
+# class DoctorMobileFormSet(forms.BaseInlineFormSet):
+#     def clean(self):
+#         super().clean()
+#         if any(self.errors):
+#             return
+#
+#         primary = 0
+#         count = 0
+#         for value in self.cleaned_data:
+#             count += 1
+#             if value.get('is_primary'):
+#                 primary += 1
+#
+#         if count > 0:
+#             if not primary == 1:
+#                 raise forms.ValidationError("Doctor must have one primary mobile number.")
 
 
 class DoctorMobileInline(nested_admin.NestedTabularInline):
     model = DoctorMobile
     form = DoctorMobileForm
-    formset = DoctorMobileFormSet
+    # formset = DoctorMobileFormSet
     extra = 0
     can_delete = True
     show_change_link = False
-    fields = ['number', 'is_primary']
+    fields = ['std_code','number', 'is_primary']
 
 
 class DoctorEmailForm(forms.ModelForm):
@@ -467,7 +491,7 @@ class DoctorForm(FormCleanMixin):
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
-                       'raw_about': 'req', 'license': 'req', 'mobiles': 'count', 'emails': 'count',
+                       'license': 'req', 'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count'}
 
@@ -827,7 +851,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     #                                                                                   'documents')
 
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live']
+        read_only_fields = ['lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'enable_for_online_booking', 'onboarding_url']
         if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         return read_only_fields
@@ -840,6 +864,13 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                 return mark_safe(html)
         else:
             return mark_safe('''<span></span>''')
+
+    def onboarding_url(self, instance):
+        if instance.id:
+            token = DoctorOnboardingToken.objects.filter(doctor=instance.id, status=DoctorOnboardingToken.GENERATED).first()
+            if token:
+                return mark_safe('<a href="{0}">{0}</a>'.format(settings.BASE_URL + '/onboard/doctor?token=' + str(token.token)))
+        return None
 
     def registered(self, instance):
         registered = None
@@ -880,7 +911,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         # check for errors
         errors = []
-        required = ['name', 'raw_about', 'gender', 'license', 'practicing_since']
+        required = ['name', 'gender', 'license', 'practicing_since']
         for req in required:
             if not getattr(doctor, req):
                 errors.append(req + ' is required')
@@ -891,6 +922,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         for req in length_required:
             if not len(getattr(doctor, req).all()):
                 errors.append(req + ' is required')
+            if req =='mobiles' and not len(getattr(doctor, req).filter(is_primary=True)) == 1:
+                errors.append("Doctor must have atleast and atmost one primary mobile number.")
 
         return render(request, 'onboarddoctor.html', {'doctor': doctor, 'count': count, 'errors': errors})
 
