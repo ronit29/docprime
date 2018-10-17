@@ -127,6 +127,37 @@ class Order(TimeStampedModel):
             consumer_account.debit_schedule(appointment_obj, pg_data.get("product_id"), amount)
         return appointment_obj
 
+    @transaction.atomic
+    def process_insurance_order(self, consumer_account, pg_data, order):
+        # New code for processing order
+        insurance_data = order.action_data
+        from ondoc.insurance.models import (InsuranceTransaction, InsuredMembers, UserInsurance, InsurerFloat)
+        insurance_obj = None
+        order_dict = dict()
+        amount = None
+        if self.action == Order.INSURANCE_CREATE:
+            if consumer_account.balance >= insurance_data["amount"]:
+                insured_member_dict = InsuredMembers.create_insured_members(insurance_data)
+                if insured_member_dict:
+                    insurance_transaction_obj = InsuranceTransaction.create_insurance_transaction(order,
+                                                                                                  insured_member_dict)
+                    if insurance_transaction_obj:
+                        user_insurance_obj = UserInsurance.create_user_insurance(insurance_data, insured_member_dict,
+                                                                                 insurance_transaction_obj)
+
+                order_dict = {
+                    "reference_id": insurance_transaction_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                amount = insurance_transaction_obj.amount
+        if order_dict:
+            self.update_order(order_dict)
+        if insurance_obj:
+            consumer_account.debit_schedule(insurance_transaction_obj, pg_data.get("product_id"), amount)
+            InsurerFloat.debit_float_schedule(insurance_data.get('insurer'), amount)
+
+        return insurance_obj
+
     def update_order(self, data):
         self.reference_id = data.get("reference_id", self.reference_id)
         self.payment_status = data.get("payment_status", self.payment_status)
@@ -292,6 +323,9 @@ class PgTransaction(TimeStampedModel):
         elif product_id == Order.LAB_PRODUCT_ID:
             client_key = settings.PG_CLIENT_KEY_P2
             secret_key = settings.PG_SECRET_KEY_P2
+        elif product_id == Order.INSURANCE_PRODUCT_ID:
+            client_key = settings.PG_CLIENT_KEY_P3
+            secret_key = settings.PG_SECRET_KEY_P3
         pg_hash = None
         temp_data = copy.deepcopy(data)
         if temp_data.get("hash"):

@@ -11,6 +11,7 @@ from rest_framework import status, permissions
 import json
 import datetime
 from ondoc.authentication.models import User
+from ondoc.api.v1 import utils
 
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):
@@ -80,7 +81,9 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                 # pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
                 # User Profile creation or updation
                 if member['profile']:
-                    profile = UserProfile.objects.filter(id=member['profile'].id).values('id','name', 'email', 'gender', 'user_id', 'dob', 'phone_number')
+                    profile = UserProfile.objects.filter(id=member['profile'].id).values('id','name', 'email',
+                                                                                         'gender', 'user_id',
+                                                                                         'dob', 'phone_number')
                     if profile.exists():
                         if profile[0].get('user_id') == request.user.pk:
                             member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
@@ -88,7 +91,6 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
                             if member['relation'].lower() == 'self'.lower():
                                 logged_in_user_id = member['profile'].id
-
 
                         else:
                             return Response({"message": "User is not valid"},
@@ -100,12 +102,12 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                                                                 user_id=request.user.pk, dob=member['dob'],
                                                                 is_default_user=False, is_otp_verified=False,
                                                                 phone_number=request.user.phone_number)
-                    profile = {'id':member_profile.id, 'name': member_profile.name, 'email': member_profile.email, 'gender': member_profile.gender, 'user_id': member_profile.user_id,
+                    profile = {'id': member_profile.id, 'name': member_profile.name, 'email': member_profile.email,
+                               'gender': member_profile.gender, 'user_id': member_profile.user_id,
                                'dob': member_profile.dob, 'phone_number': member_profile.phone_number}
 
                     if member['relation'].lower() == 'self'.lower():
                         logged_in_user_id = member_profile.id
-
 
                 pre_insured_members['first_name'] = member['first_name']
                 pre_insured_members['last_name'] = member['last_name']
@@ -129,8 +131,6 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             user = User.objects.filter(id=request.user.pk).values('id','phone_number', 'email', 'user_type', 'is_superuser',
                                                                   'is_active', 'is_staff')
 
-
-
             resp['insurance'] = {"profile": user_profile[0], "members": insured_members_list, "insurer": insurer, "insurance_plan": insurance_plan, "user": user}
             return Response(resp)
 
@@ -140,6 +140,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         insurer = insurance_data.get('insurer')
         insured_member = insurance_data.get('members')
         amount = insurance_plan[0]['amount']
+        resp = {}
         order = account_models.Order.objects.create(
             product_id=account_models.Order.INSURANCE_PRODUCT_ID,
             action=account_models.Order.INSURANCE_CREATE,
@@ -148,3 +149,5 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             reference_id=1,
             payment_status=account_models.Order.PAYMENT_PENDING
         )
+        resp['data'], resp["payment_required"] = utils.payment_details(request, order)
+        return Response(resp)

@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from rest_framework.renderers import JSONRenderer
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerFloat, InsuredMembers)
-from ondoc.authentication.models import UserProfile
-
+from ondoc.authentication.models import (User, UserProfile)
+from ondoc.account import models as account_models
+from ondoc.account.models import (Order)
 
 class InsurerSerializer(serializers.Serializer):
     id = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all(), required=True)
@@ -76,3 +77,14 @@ class InsuredMemberSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=MemberListSerializer())
     insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
     insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+
+
+class InsuranceTransactionModelSerializer(serializers.Serializer):
+
+    insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
+    insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    product_id = serializers.ChoiceField(choices=account_models.Order.PRODUCT_IDS)
+    reference_id = serializers.IntegerField()
+    order_id = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all())
+    status_type = serializers.CharField(max_length=50)
