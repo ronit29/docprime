@@ -71,7 +71,7 @@ class EntityAddress(TimeStampedModel):
     @classmethod
     def get_or_create(cls, *args, **kwargs):
         mapping_dictionary = {
-            'bengaluru': 'Banglore',
+            'bengaluru': 'Bangalore',
             'gurugram': 'Gurgaon'
         }
 

@@ -202,6 +202,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
         seo = None
         breadcrumb = None
+        location = None
         if parameters.get('location_json'):
             locality = ''
             sublocality = ''
@@ -224,8 +225,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             description = "Find best Diagnostic Centres and Labs"
             if locality:
                 description += " in " + sublocality + locality
+                location = sublocality + locality
+            elif sublocality:
+                location = sublocality
             description += " and book test online, check fees, packages prices and more at DocPrime."
-            seo = {'title': title, "description": description}
+            seo = {'title': title, "description": description, "location": location}
             if sublocality:
                 breadcrumb = [{
                     'name': locality,
