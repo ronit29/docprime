@@ -143,6 +143,9 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     test_id = serializers.ReadOnlyField(source='test.id')
     is_package = serializers.ReadOnlyField(source='test.is_package')
     number_of_tests = serializers.ReadOnlyField(source='test.number_of_tests')
+    expected_tat = serializers.ReadOnlyField(source='test.expected_tat')
+    pre_test_info = serializers.ReadOnlyField(source='test.pre_test_info')
+    why = serializers.ReadOnlyField(source='test.why')
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
@@ -177,6 +180,9 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                     param_list.append(obj.parameter.name)
                 ret_data.append({
                     "name": t_obj.lab_test.name,
+                    "why": t_obj.lab_test.why,
+                    "pre_test_info": t_obj.lab_test.pre_test_info,
+                    "expected_tat": t_obj.lab_test.expected_tat,
                     "parameters": param_list
                 })
         return ret_data
@@ -194,7 +200,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'package', 'parameters', 'is_package', 'number_of_tests')
+                  'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat')
 
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
