@@ -412,15 +412,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by("price", "distance")
+                queryset = queryset.order_by("-order_priority", "price", "distance")
             elif order_by == 'distance':
-                queryset = queryset.order_by("distance")
+                queryset = queryset.order_by("-order_priority", "distance")
             elif order_by == 'name':
-                queryset = queryset.order_by("name")
+                queryset = queryset.order_by("-order_priority", "name")
             else:
-                queryset = queryset.order_by("distance")
+                queryset = queryset.order_by("-order_priority", "distance")
         else:
-            queryset = queryset.order_by("distance")
+            queryset = queryset.order_by("-order_priority", "distance")
         return queryset
 
     def form_lab_whole_data(self, queryset):
