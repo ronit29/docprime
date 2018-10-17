@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile)
+                                     CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
@@ -248,9 +248,22 @@ class CommonTestSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
 
-
     class Meta:
         model = CommonTest
+        fields = ('id', 'name', 'icon')
+
+
+class CommonPackageSerializer(serializers.ModelSerializer):
+    id = serializers.ReadOnlyField(source='package.id')
+    name = serializers.ReadOnlyField(source='package.name')
+    icon = serializers.SerializerMethodField()
+
+    def get_icon(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.icon.url) if obj.icon else None
+
+    class Meta:
+        model = CommonPackage
         fields = ('id', 'name', 'icon')
 
 
