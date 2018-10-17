@@ -139,7 +139,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
                       (FAILED, 'Failed')]
     insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
     insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
-    order_id = models.ForeignKey(Order, on_delete=models.DO_NOTHING)
+    order = models.ForeignKey(Order, on_delete=models.DO_NOTHING)
     amount = models.PositiveIntegerField(null=True)
     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
     status_type = models.CharField(max_length=50)

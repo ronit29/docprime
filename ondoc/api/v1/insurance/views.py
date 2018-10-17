@@ -55,6 +55,12 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
         return Response({"insured_members": result})
 
+    def update(self, request):
+        serializer = serializers.InsuredMemberIdsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        parameters = serializer.validated_data
+
+
     def summary(self, request):
         serializer = serializers.InsuredMemberSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
