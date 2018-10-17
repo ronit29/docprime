@@ -63,8 +63,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                            "coupon_id": coupon.id,
                                            "code": coupon.code,
                                            "desc": coupon.description,
-                                           "coupon count": coupon.count,
-                                           "used count": is_valid_coupon.get("used_count"),
+                                           "coupon_count": coupon.count,
+                                           "used_count": is_valid_coupon.get("used_count"),
                                            "tnc": coupon.tnc})
 
         return Response(applicable_coupons)
