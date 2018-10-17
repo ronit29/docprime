@@ -561,3 +561,7 @@ class TimeSlotExtraction(object):
         format_data['title'] = day_time
         format_data['timing'] = data_list
         return format_data
+
+def consumers_balance_refund():
+    consumer_accounts = ConsumerAccount.objects.select_for_update().get(user=user)
+    pass
