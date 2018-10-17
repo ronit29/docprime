@@ -75,7 +75,7 @@ class UploadDoctor(Doc):
         for i in range(2, len(rows) + 1):
             data = self.get_data(row=i, sheet=sheet, headers=headers)
             doctor = self.create_doctor(data, source, batch)
-            self.map_doctor_specialization(doctor, data.get('practice_specialization'))
+            #self.map_doctor_specialization(doctor, data.get('practice_specialization'))
             try:
                 self.add_doctor_phone_numbers(doctor, data.get('numbers'))
             except:
@@ -100,10 +100,10 @@ class UploadDoctor(Doc):
 
 
 
-        practice_specialization_id = self.clean_data(sheet.cell(row=row, column=headers.get('practice_specialization_id')).value)
-        practice_specialization = None
-        if practice_specialization_id:
-            practice_specialization = PracticeSpecialization.objects.filter(pk=practice_specialization_id).first()
+        # practice_specialization_id = self.clean_data(sheet.cell(row=row, column=headers.get('practice_specialization_id')).value)
+        # practice_specialization = None
+        # if practice_specialization_id:
+        #     practice_specialization = PracticeSpecialization.objects.filter(pk=practice_specialization_id).first()
 
         number_entry = []
         primary_number = self.clean_data(sheet.cell(row=row, column=headers.get('primary_number')).value)
@@ -132,7 +132,7 @@ class UploadDoctor(Doc):
         data['identifier'] = identifier
         data['name'] = name
         data['practicing_since'] = practicing_since
-        data['practice_specialization'] = practice_specialization
+        # data['practice_specialization'] = practice_specialization
         data['numbers'] = number_entry
         data['image_url'] = image_url
         data['license'] = license
@@ -186,7 +186,7 @@ class UploadDoctor(Doc):
         doctor = Doctor.objects.create(name=data['name'], license=data.get('license',''), gender=data['gender'],
                                                        practicing_since=data['practicing_since'], source=source, batch=batch, enabled=False)
         SourceIdentifier.objects.create(type=SourceIdentifier.DOCTOR, unique_identifier=data.get('identifier'), reference_id=doctor.id)
-        self.save_image(batch,data.get('image_url'),data.get('identifier'))
+        #self.save_image(batch,data.get('image_url'),data.get('identifier'))
         return doctor
 
     def save_image(self, batch, url, identifier):
@@ -468,9 +468,10 @@ class UploadHospital(Doc):
 
         if not hospital:
             hospital_name = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_name')).value)
-            address = self.clean_data(sheet.cell(row=row, column=headers.get('address')).value)
+            building = self.clean_data(sheet.cell(row=row, column=headers.get('building')).value)
+            city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
             location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('gaddress')).value))
-            hospital = Hospital.objects.create(name=hospital_name, building=address, location=location, source=source, batch=batch)
+            hospital = Hospital.objects.create(name=hospital_name, building=building, city=city, country='India', location=location, source=source, batch=batch)
             SourceIdentifier.objects.create(reference_id=hospital.id, unique_identifier=hospital_identifier,
                                                 type=SourceIdentifier.HOSPITAL)
 
