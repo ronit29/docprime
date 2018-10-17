@@ -123,7 +123,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     sublocality = models.CharField(max_length=100, blank=True)
     locality = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
+    state = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100)
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     hospital_type = models.PositiveSmallIntegerField(blank=True, null=True, choices=HOSPITAL_TYPE_CHOICES)
