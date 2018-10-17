@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerFloat, InsuredMembers,
                                     InsuranceTransaction)
@@ -91,5 +92,13 @@ class InsuranceTransactionModelSerializer(serializers.Serializer):
     status_type = serializers.CharField(max_length=50)
 
 
-class InsuredMemberIdsSerializer(serializers.Serializer):
+class InsuredTransactionIdsSerializer(serializers.Serializer):
     ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuranceTransaction.objects.all()))
+
+
+class InsuredMemberIdsSerializer(serializers.Serializer):
+    id = serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all())
+    hypertension = serializers.NullBooleanField(required=False)
+    liver_disease = serializers.NullBooleanField(required=False)
+    heart_disease = serializers.NullBooleanField(required=False)
+    diabetes = serializers.NullBooleanField(required=False)

@@ -37,7 +37,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
     def memberlist(self, request):
 
-        serializer = serializers.InsuredMemberIdsSerializer(data=request.data)
+        serializer = serializers.InsuredTransactionIdsSerializer(data=request.data)
 
         serializer.is_valid(raise_exception=True)
         parameters = serializer.validated_data
@@ -59,6 +59,32 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         serializer = serializers.InsuredMemberIdsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         parameters = serializer.validated_data
+
+        member_id = parameters.get('id')
+
+        if member_id:
+
+            resp = {}
+
+            if parameters.get('hypertension'):
+                member_id.hypertension = parameters.get('hypertension')
+
+            if parameters.get('liver_disease'):
+                member_id.liver_disease = parameters.get('liver_disease')
+
+            if parameters.get('heart_disease'):
+                member_id.heart_disease = parameters.get('heart_disease')
+
+            if parameters.get('diabetes'):
+                member_id.diabetes = parameters.get('diabetes')
+
+            resp = {"id": member_id.id, "first_name": member_id.first_name, "last_name": member_id.last_name, "dob": member_id.dob,
+                    "email":member_id.email, "relation": member_id.relation, "gender": member_id.gender, "phone_number": member_id.phone_number,
+                    "hypertension": member_id.hypertension, "liver_disease": member_id.liver_disease, "heart_disease": member_id.heart_disease,
+                    "diabetes": member_id.diabetes}
+
+        return Response(resp)
+
 
 
     def summary(self, request):
