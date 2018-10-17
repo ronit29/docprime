@@ -244,12 +244,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs__id=lab_id,
+        queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter').filter(lab_pricing_group__labs__id=lab_id,
                                                                     lab_pricing_group__labs__is_test_lab=False,
                                                                     lab_pricing_group__labs__is_live=True,
                                                                     test__in=test_ids)
         lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
-        test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
+        test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = list()
