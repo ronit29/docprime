@@ -94,7 +94,7 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
                 Q(search_key__istartswith=search_key)).annotate(search_index=StrIndex('search_key', Value(search_key))).order_by(
                 'search_index')
             test_queryset = paginate_queryset(test_queryset, request)
-            lab_queryset = Lab.objects.filter(is_live=True, is_test_lab=False, is_package=False).filter(
+            lab_queryset = Lab.objects.filter(is_live=True, is_test_lab=False).filter(
                 Q(search_key__icontains=search_key) |
                 Q(search_key__icontains=' ' + search_key) |
                 Q(search_key__istartswith=search_key)).annotate(search_index=StrIndex('search_key', Value(search_key))).order_by(
