@@ -383,7 +383,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     home_pickup_charges = serializers.DecimalField(max_digits=10, decimal_places=2)
     is_home_pickup = serializers.BooleanField(default=False)
     address = serializers.JSONField(required=False)
-    coupon = serializers.ListField(child=serializers.IntegerField(), required=False)
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 
