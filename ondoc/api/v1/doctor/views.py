@@ -1007,8 +1007,8 @@ class DoctorContactNumberViewSet(viewsets.GenericViewSet):
 
 class DoctorFeedbackViewSet(viewsets.GenericViewSet):
 
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, IsDoctor)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
 
     def feedback(self, request):
         resp = {}
