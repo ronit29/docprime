@@ -258,6 +258,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
+        # for Demo
+        demo_lab_test = AvailableLabTest.objects.all()[:10]
+        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = list()
         lab_serializable_data = list()
@@ -284,6 +287,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
         temp_data['tests'] = test_serializer.data
+        temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
 
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
