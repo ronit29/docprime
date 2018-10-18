@@ -1,3 +1,4 @@
+from django.forms.utils import ErrorList
 from reversion.admin import VersionAdmin
 from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned
 from django.contrib.admin import SimpleListFilter
@@ -52,6 +53,21 @@ class AutoComplete:
         return CustomAutoComplete.as_view(model_admin=self)(request)
 
 
+class ReadOnlyInline(nested_admin.NestedTabularInline):
+    def get_readonly_fields(self, request, obj=None):
+        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+            all_fields = [f for f in self.model._meta.get_fields()
+                          if f.concrete and (
+                                  not f.is_relation
+                                  or f.one_to_one
+                                  or (f.many_to_one and f.related_model)
+                          ) and not f.auto_created and not (f.auto_now if hasattr(f, 'auto_now') else False) and not (
+                    f.auto_now_add if hasattr(f, 'auto_now_add') else False)
+                          ]
+            return [x.name for x in all_fields]
+        return []
+
+
 class DoctorQualificationForm(forms.ModelForm):
     passing_year = forms.ChoiceField(choices=college_passing_year_choices, required=False)
 
@@ -79,7 +95,7 @@ class DoctorQualificationFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one Qualification is required")
 
 
-class DoctorQualificationInline(nested_admin.NestedTabularInline):
+class DoctorQualificationInline(ReadOnlyInline):
     model = DoctorQualification
     form = DoctorQualificationForm
     formset = DoctorQualificationFormSet
@@ -90,6 +106,12 @@ class DoctorQualificationInline(nested_admin.NestedTabularInline):
 
 
 class DoctorClinicTimingForm(forms.ModelForm):
+
+    def __init__(self, data=None, files=None, auto_id='id_%s', prefix=None, initial=None, error_class=ErrorList,
+                 label_suffix=None, empty_permitted=False, instance=None, use_required_attribute=None):
+        super().__init__(data, files, auto_id, prefix, initial, error_class, label_suffix, empty_permitted, instance,
+                         use_required_attribute)
+
     def clean(self):
         cleaned_data = super().clean()
         if any(self.errors):
@@ -158,11 +180,10 @@ class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     readonly_fields = ['deal_price']
 
 
-class DoctorClinicInline(nested_admin.NestedTabularInline):
+class DoctorClinicInline(ReadOnlyInline):
     model = DoctorClinic
     extra = 0
     can_delete = True
-    formset = DoctorClinicFormSet
     show_change_link = False
     autocomplete_fields = ['hospital']
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline]
@@ -188,9 +209,8 @@ class DoctorLanguageFormSet(forms.BaseInlineFormSet):
                 raise forms.ValidationError("Atleast one language is required")
 
 
-class DoctorLanguageInline(nested_admin.NestedTabularInline):
+class DoctorLanguageInline(ReadOnlyInline):
     model = DoctorLanguage
-    formset = DoctorLanguageFormSet
     extra = 0
     can_delete = True
     show_change_link = False
@@ -252,7 +272,7 @@ class DoctorExperienceFormSet(forms.BaseInlineFormSet):
 
 class DoctorExperienceInline(nested_admin.NestedTabularInline):
     model = DoctorExperience
-    formset = DoctorExperienceFormSet
+    # formset = DoctorExperienceFormSet
     extra = 0
     can_delete = True
     show_change_link = False
@@ -361,7 +381,7 @@ class HospitalDocumentFormSet(forms.BaseInlineFormSet):
         #                 raise forms.ValidationError(choices[key] + " is required")
 
 
-class DoctorDocumentInline(nested_admin.NestedTabularInline):
+class DoctorDocumentInline(ReadOnlyInline):
     formset = DoctorDocumentFormSet
 
     def get_formset(self, request, obj=None, **kwargs):
@@ -546,7 +566,7 @@ class CreatedByFilter(SimpleListFilter):
         return queryset
 
 
-class DoctorPracticeSpecializationInline(nested_admin.NestedTabularInline):
+class DoctorPracticeSpecializationInline(ReadOnlyInline):
     model = DoctorPracticeSpecialization
     extra = 0
     can_delete = True
@@ -767,7 +787,7 @@ class CompetitorInfoForm(forms.ModelForm):
     # processed_url = forms.URLField(required=True)
 
 
-class CompetitorInfoInline(nested_admin.NestedTabularInline):
+class CompetitorInfoInline(ReadOnlyInline):
     model = CompetitorInfo
     autocomplete_fields = ['hospital']
     form = CompetitorInfoForm
@@ -794,7 +814,7 @@ class CompetitorInfoImportAdmin(ImportExportModelAdmin):
     list_display = ('id', 'doctor', 'hospital_name', 'fee', 'url')
 
 
-class CompetitorMonthlyVisitsInline(nested_admin.NestedTabularInline):
+class CompetitorMonthlyVisitsInline(ReadOnlyInline):
     model = CompetitorMonthlyVisit
     extra = 0
     can_delete = True
@@ -851,9 +871,14 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     #                                                                                   'documents')
 
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['source', 'batch', 'lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'enable_for_online_booking', 'onboarding_url']
+        read_only_fields = ['source', 'batch', 'lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'enable_for_online_booking', 'onboarding_url', 'get_onboard_link']
         if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
+        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+            read_only_fields += ['name', 'gender', 'practicing_since', 'raw_about', 'license', 'additional_details',
+                                 'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
+                                 'online_consultation_fees', 'live_at', 'is_internal',
+                                 'is_test_doctor', 'is_license_verified', 'signature', 'enabled']
         return read_only_fields
 
     def lead_url(self, instance):
@@ -981,10 +1006,11 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                 GenericAdmin.create_admin_billing_permissions(doctor)
 
     def save_model(self, request, obj, form, change):
-        if not obj.created_by:
-            obj.created_by = request.user
-        if not obj.assigned_to:
-            obj.assigned_to = request.user
+        if not request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+            if not obj.created_by:
+                obj.created_by = request.user
+            if not obj.assigned_to:
+                obj.assigned_to = request.user
         if '_submit_for_qc' in request.POST:
             obj.data_status = 2
         if '_qc_approve' in request.POST:
@@ -1005,6 +1031,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             return True
         if (request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or request.user.groups.filter(
                 name=constants['SUPER_QC_GROUP']).exists() or request.user.groups.filter(
+                name=constants['DOCTOR_SALES_GROUP']).exists() or request.user.groups.filter(
                 name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists()) and obj.data_status in (1, 2, 3):
             return True
         return obj.created_by == request.user
