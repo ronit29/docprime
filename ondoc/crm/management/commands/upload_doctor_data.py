@@ -365,8 +365,12 @@ class UploadExperience(Doc):
             if hospital:
                 start_year = self.clean_data(sheet.cell(row=i, column=headers.get('start_year')).value)
                 end_year = self.clean_data(sheet.cell(row=i, column=headers.get('end_year')).value)
-                DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
+                try:
+                    DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
                                                    hospital=hospital)
+                except Exception as e:
+                    print('error' + str(e))
+
 
 class UploadSpecialization(Doc):
 
@@ -381,7 +385,10 @@ class UploadSpecialization(Doc):
             if sp_id:
                 practice_specialization = PracticeSpecialization.objects.filter(pk=sp_id).first()
                 if practice_specialization and doctor:
-                    DoctorPracticeSpecialization.objects.get_or_create(doctor=doctor, specialization=practice_specialization)
+                    try:
+                        DoctorPracticeSpecialization.objects.get_or_create(doctor=doctor, specialization=practice_specialization)
+                    except Exception as e:
+                        print('error' + str(e))
 
 
 class UploadMembership(Doc):
@@ -395,7 +402,11 @@ class UploadMembership(Doc):
             member = self.clean_data(sheet.cell(row=i, column=headers.get('memberships')).value)
 
             if doctor and member:
-                DoctorAssociation.objects.get_or_create(doctor=doctor, name=member)
+                try:
+                    DoctorAssociation.objects.get_or_create(doctor=doctor, name=member)
+                except Exception as e:
+                    print('error' + str(e))
+
 
 class UploadAward(Doc):
 
@@ -408,7 +419,10 @@ class UploadAward(Doc):
             award = self.clean_data(sheet.cell(row=i, column=headers.get('award')).value)
             year = self.clean_data(sheet.cell(row=i, column=headers.get('year')).value)
             if award and year:
-                DoctorAward.objects.get_or_create(doctor=doctor, name=award, year=year)
+                try:
+                    DoctorAward.objects.get_or_create(doctor=doctor, name=award, year=year)
+                except Exception as e:
+                    print('error' + str(e))
 
 
 class UploadHospital(Doc):
