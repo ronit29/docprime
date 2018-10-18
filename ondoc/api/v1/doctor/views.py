@@ -40,6 +40,8 @@ from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
 from ondoc.notification import models as notif_models
 User = get_user_model()
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.throttling import AnonRateThrottle
 
 
 class CreateAppointmentPermission(permissions.BasePermission):
@@ -999,8 +1001,16 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
             resp = {'success': 'Appointment Completed Successfully!'}
         return Response(resp)
 
+class LimitUser(UserRateThrottle):
+    rate = '10/day'
+
+class LimitAnon(AnonRateThrottle):
+    rate = '10/day'
+
 
 class DoctorContactNumberViewSet(viewsets.GenericViewSet):
+
+    throttle_classes = (LimitUser, LimitAnon)
 
     def retrieve(self, request, doctor_id):
 

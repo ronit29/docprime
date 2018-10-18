@@ -82,7 +82,7 @@ class DoctorSearchHelper:
             if self.query_params.get('sort_on') == 'fees':
                 order_by_field = "deal_price ASC"
                 rank_by = "rank_fees=1"
-        order_by_field = "{}, {} ".format('d.is_live DESC, d.enable_for_online_booking DESC, d.is_license_verified DESC', order_by_field)
+        order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC', order_by_field)
         # order_by_field = "{}, {} ".format('d.is_live DESC', order_by_field)
         return order_by_field, rank_by
 
@@ -187,7 +187,7 @@ class DoctorSearchHelper:
 
             temp = {
                 "doctor_id": doctor.id,
-                "enable_for_online_booking": doctor.enable_for_online_booking,
+                "enabled_for_online_booking": doctor.enabled_for_online_booking,
                 "is_license_verified" : doctor.is_license_verified,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,

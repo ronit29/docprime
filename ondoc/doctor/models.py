@@ -349,7 +349,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True,  blank=True)
     source = models.CharField(max_length=20, blank=True)
     batch = models.CharField(max_length=20, blank=True)
-    enable_for_online_booking = models.BooleanField(default=False)
+    enabled_for_online_booking = models.BooleanField(default=False)
+    enabled_for_online_booking_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -404,10 +405,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
                 self.is_live = False
 
-        if self.onboarding_status == self.ONBOARDED:
-            self.enable_for_online_booking = True
+        if self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED:
+            self.enabled_for_online_booking = True
+            if not self.enabled_for_online_booking_at:
+                self.enabled_for_online_booking_at = timezone.now()
+
         else:
-            self.enable_for_online_booking = False
+            self.enabled_for_online_booking = False
 
     def save(self, *args, **kwargs):
         self.update_live_status()
