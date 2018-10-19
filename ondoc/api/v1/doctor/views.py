@@ -1001,11 +1001,13 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
             resp = {'success': 'Appointment Completed Successfully!'}
         return Response(resp)
 
+
 class LimitUser(UserRateThrottle):
-    rate = '10/day'
+    rate = '5/day'
+
 
 class LimitAnon(AnonRateThrottle):
-    rate = '10/day'
+    rate = '5/day'
 
 
 class DoctorContactNumberViewSet(viewsets.GenericViewSet):
@@ -1023,7 +1025,7 @@ class DoctorContactNumberViewSet(viewsets.GenericViewSet):
         else:
             final = str(doctor_details.get('number'))
             if doctor_details.get('std_code'):
-                final = str(doctor_details.get('std_code'))+str(doctor_details.get('number'))
+                final = '0'+str(doctor_details.get('std_code'))+' '+str(doctor_details.get('number'))
             return Response({'status': 1, 'number': final}, status.HTTP_200_OK)
 
 
