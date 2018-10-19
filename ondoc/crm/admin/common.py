@@ -69,11 +69,12 @@ class QCPemAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        final_qs = None
+        final_qs = qs
         if request.user.is_superuser or \
                 request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or \
                 request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists() or \
-                request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
+                request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() or \
+                request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
             final_qs = qs
         if final_qs:
             final_qs = final_qs.prefetch_related('created_by', 'assigned_to', 'assigned_to__staffprofile',
@@ -93,8 +94,9 @@ class FormCleanMixin(forms.ModelForm):
             if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
                 if self.instance.data_status == 2:
                     raise forms.ValidationError("Cannot update Data submitted for QC approval")
-                elif self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
-                    raise forms.ValidationError("Cannot modify Data added by other users")
+                if not self.request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+                    if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
+                        raise forms.ValidationError("Cannot modify Data added by other users")
             if '_submit_for_qc' in self.data:
                 self.validate_qc()
                 if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:

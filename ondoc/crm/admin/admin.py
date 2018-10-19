@@ -55,7 +55,7 @@ admin.site.register(OtpVerifications)
 admin.site.register(UserProfile)
 
 admin.site.register(LabAppointment, LabAppointmentAdmin) #temp temp temp
-admin.site.register(DoctorClinic, DoctorClinicAdmin)
+#admin.site.register(DoctorClinic, DoctorClinicAdmin)
 
 admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(AboutDoctor, AboutDoctorAdmin)
