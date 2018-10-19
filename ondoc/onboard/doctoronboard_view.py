@@ -133,13 +133,13 @@ class DoctorOnboard(View):
         min_num = 0
         validate_min = False
 
-        if request.POST.get('_action',None) == '_submit':
-            min_num = 1
-            validate_min = True
-            if 'awards_not_applicable' not in request.POST:
-                validate_req.append(award_formset)
-            if 'assoc_not_applicable' not in request.POST:
-                validate_req.append(association_formset)
+        # if request.POST.get('_action',None) == '_submit':
+        #     min_num = 1
+        #     validate_min = True
+        #     if 'awards_not_applicable' not in request.POST:
+        #         validate_req.append(award_formset)
+        #     if 'assoc_not_applicable' not in request.POST:
+        #         validate_req.append(association_formset)
 
                 # validate_req.append(association_formset)
 

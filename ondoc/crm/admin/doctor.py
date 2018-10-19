@@ -835,7 +835,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
-    form = DoctorForm
+    #form = DoctorForm
     inlines = [
         CompetitorInfoInline,
         CompetitorMonthlyVisitsInline,
@@ -856,8 +856,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         GenericAdminInline,
         BillingAccountInline
     ]
-    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
-               'onboarded_at', 'qc_approved_at']
+
     search_fields = ['name']
 
     # def get_export_queryset(self, request):
@@ -869,17 +868,43 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     #                                                                                   'doctor_clinics__hospital',
     #                                                                                   'doctor_clinics__availability',
     #                                                                                   'documents')
+    #exclude = ('source','batch','lead_url','registered')
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+            qs = qs.filter(source='pr')
+            if request.path.endswith('doctor/'):
+                qs = Doctor.objects.none()
+            #pass
+        return qs
+
+    def get_exclude(self, request, obj=None):
+        exclude = ['source', 'user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
+               'onboarded_at', 'qc_approved_at','enabled_for_online_booking_at']
+
+        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+            exclude += ['source','batch','lead_url','registered','created_by','about','raw_about',
+            'additional_details','is_insurance_enabled','is_insurance_enabled','is_online_consultation_enabled',
+            'online_consultation_fees', 'is_retail_enabled', 'is_internal', 'is_test_doctor','doctor_signature',
+            'is_enabled','matrix_reference_id','doctor_signature']
+
+        return exclude
+
 
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['source', 'batch', 'lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'enable_for_online_booking', 'onboarding_url', 'get_onboard_link']
+        read_only_fields = ['source', 'lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'enabled_for_online_booking', 'onboarding_url', 'get_onboard_link']
         if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-            read_only_fields += ['name', 'gender', 'practicing_since', 'raw_about', 'license', 'additional_details',
+            read_only_fields += ['name', 'gender', 'practicing_since',  'license', 'additional_details',
                                  'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
                                  'online_consultation_fees', 'live_at', 'is_internal',
                                  'is_test_doctor', 'is_license_verified', 'signature', 'enabled']
-        return read_only_fields
+        excluded = self.get_exclude(request, obj) 
+        final = [x for x in read_only_fields if x not in excluded]
+                        
+        return final
 
     def lead_url(self, instance):
         if instance.id:
@@ -941,8 +966,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             if not getattr(doctor, req):
                 errors.append(req + ' is required')
 
-        length_required = ['mobiles', 'emails', 'qualifications', 'hospitals',
-                           'languages', 'experiences']
+        length_required = ['mobiles', 'emails', 'hospitals']
 
         for req in length_required:
             if not len(getattr(doctor, req).all()):
@@ -959,7 +983,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         return ""
 
     def get_form(self, request, obj=None, **kwargs):
-        form = super(DoctorAdmin, self).get_form(request, obj=obj, **kwargs)
+        if not request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+            kwargs['form'] = DoctorForm
+        form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
         if (not request.user.is_superuser) and (
