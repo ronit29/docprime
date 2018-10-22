@@ -808,7 +808,7 @@ class CompetitorInfoInline(ReadOnlyInline):
 class CompetitorInfoResource(resources.ModelResource):
     class Meta:
         model = CompetitorInfo
-        fields = ('id', 'doctor', 'hospital_name', 'fee', 'url')
+        fields = ('id', 'doctor', 'hospital_name', 'fee', 'hospital', 'url')
 
     def init_instance(self, row=None):
         ins = super().init_instance(row)
