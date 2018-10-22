@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RemoveField(
             model_name='insurancetransaction',
-            name='order_id',
+            name='order',
         ),
         migrations.AlterField(
             model_name='insurancetransaction',

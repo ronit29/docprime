@@ -22,8 +22,8 @@ class Insurer(auth_model.TimeStampedModel):
 class InsurerFloat(auth_model.TimeStampedModel):
 
     insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
-    max_float = models.PositiveIntegerField(default=None)
-    current_float = models.PositiveIntegerField(default=None)
+    max_float = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    current_float = models.DecimalField(max_digits=10, decimal_places=2, null=True)
 
     def __str__(self):
         return self.insurer
@@ -39,7 +39,13 @@ class InsurerFloat(auth_model.TimeStampedModel):
             current_float = insurer_float.current_float
             if amount <= current_float:
                 updated_current_float = current_float - amount
-                insurer_float.update(current_float=updated_current_float)
+                # insurer_float.update(current_float=updated_current_float)
+                #insurer_float = insurer_float.first()
+                insurer_float.current_float=updated_current_float
+                insurer_float.save()
+        else:
+            return False
+
 
 
 class InsurancePlans(auth_model.TimeStampedModel):
@@ -94,7 +100,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
     insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
     first_name = models.CharField(max_length=50, null=False)
     last_name = models.CharField(max_length=50, null=False)
-    dob = models.DateTimeField(null=False)
+    dob = models.DateField(blank=True, null=True)
     email = models.EmailField(max_length=100)
     relation = models.CharField(max_length=50, choices=RELATION_CHOICES)
     pincode = models.PositiveIntegerField(default=None)
@@ -143,7 +149,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
                       (FAILED, 'Failed')]
     insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
     insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
-    # order = models.ForeignKey("account.Order", on_delete=models.DO_NOTHING)
+    #order_id = models.ForeignKey("account.Order", on_delete=models.DO_NOTHING, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
     status_type = models.CharField(max_length=50)

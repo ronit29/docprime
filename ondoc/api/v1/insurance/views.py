@@ -109,29 +109,30 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                 days_diff = days_diff.days
                 years_diff = days_diff / 365
                 years_diff = int(years_diff)
-                insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
+                if valid_data.get('insurance_plan'):
+                    insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
                                                                         valid_data.get('insurance_plan').id,
                                                                         insurer_id=valid_data.get('insurer')).first()
-                adult_max_age = insurance_threshold.max_age
-                adult_min_age = insurance_threshold.min_age
-                child_min_age = insurance_threshold.child_min_age
-                if member['member_type'] == "adult":
-                    if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
-                        pre_insured_members['dob'] = member['dob']
-                    elif adult_max_age <= years_diff:
-                        return Response({"message": "Adult Age would be less than " + str(adult_max_age) + " years"},
-                                        status.HTTP_404_NOT_FOUND)
-                    elif adult_min_age >= years_diff:
-                        return Response({"message": "Adult Age would be more than " + str(adult_min_age) + " years"},
-                                        status.HTTP_404_NOT_FOUND)
-                if member['member_type'] == "child":
-                    if child_min_age <= days_diff:
-                        pre_insured_members['dob'] = member['dob']
-                    else:
-                        return Response({"message": "Child Age would be more than " + str(child_min_age) + " days"},
-                                        status.HTTP_404_NOT_FOUND)
-                # pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
-                # User Profile creation or updation
+                    adult_max_age = insurance_threshold.max_age
+                    adult_min_age = insurance_threshold.min_age
+                    child_min_age = insurance_threshold.child_min_age
+                    if member['member_type'] == "adult":
+                        if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
+                            pre_insured_members['dob'] = member['dob']
+                        elif adult_max_age <= years_diff:
+                            return Response({"message": "Adult Age would be less than " + str(adult_max_age) + " years"},
+                                            status.HTTP_404_NOT_FOUND)
+                        elif adult_min_age >= years_diff:
+                            return Response({"message": "Adult Age would be more than " + str(adult_min_age) + " years"},
+                                            status.HTTP_404_NOT_FOUND)
+                    if member['member_type'] == "child":
+                        if child_min_age <= days_diff:
+                            pre_insured_members['dob'] = member['dob']
+                        else:
+                            return Response({"message": "Child Age would be more than " + str(child_min_age) + " days"},
+                                            status.HTTP_404_NOT_FOUND)
+                    # pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
+                    # User Profile creation or updation
                 if member['profile']:
 
                     profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
@@ -194,7 +195,8 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         insurance_plan = insurance_data.get('insurance_plan')
         insurer = insurance_data.get('insurer')
         insured_member = insurance_data.get('members')
-        amount = insurance_plan[0]['amount']
+        if insurance_plan:
+            amount = insurance_plan.get('amount')
         resp = {}
         order = account_models.Order.objects.create(
             product_id=account_models.Order.INSURANCE_PRODUCT_ID,
@@ -205,4 +207,4 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             payment_status=account_models.Order.PAYMENT_PENDING
         )
         # resp['data'], resp["payment_required"] = utils.payment_details(request, order)
-        # return Response(resp)
+        return Response(resp)

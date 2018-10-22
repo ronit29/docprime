@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('product_id', models.SmallIntegerField(choices=[(1, 'Doctor Appointment'), (2, 'LAB_PRODUCT_ID'), (3, 'INSURANCE_PRODUCT_ID')])),
                 ('reference_id', models.PositiveIntegerField(blank=True, null=True)),
-                ('order_id', models.PositiveIntegerField()),
+                ('order', models.PositiveIntegerField()),
                 ('type', models.SmallIntegerField(choices=[(0, 'Credit'), (1, 'Debit')])),
                 ('payment_mode', models.CharField(max_length=50)),
                 ('response_code', models.IntegerField()),

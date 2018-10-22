@@ -41,7 +41,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterField(
             model_name='insurancetransaction',
-            name='order_id',
+            name='order',
             field=models.ForeignKey(on_delete=django.db.models.deletion.DO_NOTHING, to='account.Order'),
         ),
     ]
