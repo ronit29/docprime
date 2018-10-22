@@ -842,7 +842,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
-    form = DoctorForm
+    #form = DoctorForm
     inlines = [
         CompetitorInfoInline,
         CompetitorMonthlyVisitsInline,
