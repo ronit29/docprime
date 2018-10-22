@@ -53,6 +53,7 @@ from collections import defaultdict
 import copy
 import logging
 import jwt
+from ondoc.insurance.models import InsuranceTransaction
 
 from ondoc.web.models import ContactUs
 
@@ -909,18 +910,18 @@ class TransactionViewSet(viewsets.GenericViewSet):
             response = None
             data = request.data
             # Commenting below for testing
-            try:
-                coded_response = data.get("response")
-                if isinstance(coded_response, list):
-                    coded_response = coded_response[0]
-                coded_response += "=="
-                decoded_response = base64.b64decode(coded_response).decode()
-                response = json.loads(decoded_response)
-            except Exception as e:
-                logger.error("Cannot decode pg data - " + str(e))
+            # try:
+            #     coded_response = data.get("response")
+            #     if isinstance(coded_response, list):
+            #         coded_response = coded_response[0]
+            #     coded_response += "=="
+            #     decoded_response = base64.b64decode(coded_response).decode()
+            #     response = json.loads(decoded_response)
+            # except Exception as e:
+            #     logger.error("Cannot decode pg data - " + str(e))
 
             # For testing only
-            # response = request.data
+            response = request.data
             appointment_obj = None
 
             try:
@@ -938,7 +939,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     resp_serializer = serializers.TransactionSerializer(data=response)
                     if resp_serializer.is_valid():
                         response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-                        if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                        if True:
+                        # if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
                             pg_tx_queryset = None
                             try:
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)
@@ -1019,7 +1021,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         consumer_account.credit_payment(pg_data, tx_amount)
 
         appointment_obj = None
-        insurance_obj = None
+        insurance_data = order_obj.action_data
         try:
             appointment_data = order_obj.action_data
             if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
@@ -1031,15 +1033,23 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 serializer.is_valid()
                 appointment_data = serializer.validated_data
             elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
-                serializer = InsuranceTransactionModelSerializer(data=appointment_data)
+                transaction_dict = {}
+                transaction_dict["user"] = insurance_data.get('user')
+                transaction_dict["insurer"] = insurance_data.get('insurer').get('id')
+                transaction_dict["insurance_plan"] = insurance_data.get('insurance_plan').get('id')
+                # transaction_dict["order_id"] = order_obj.id
+                transaction_dict["amount"] = order_obj.amount
+                transaction_dict["status_type"] = InsuranceTransaction.CREATED
+                # transaction_dict["insured_members"] = insurance_data.get('members')
+                serializer = InsuranceTransactionModelSerializer(data=transaction_dict)
                 serializer.is_valid()
-                insurance_data = serializer.validated_data
+                valid_data = serializer.validated_data
 
-            if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID or account_models.Order.DOCTOR_PRODUCT_ID:
+            if (order_obj.product_id == account_models.Order.LAB_PRODUCT_ID) or (order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID):
                 appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
                 # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
             elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
-                insurance_obj = order_obj.process_insurance_order(consumer_account, pg_data, order_obj)
+                insurance_obj = order_obj.process_insurance_order(consumer_account, pg_data, order_obj, valid_data)
 
         except:
             pass
