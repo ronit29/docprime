@@ -4,6 +4,8 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
 from ondoc.account.models import (Order)
+from django.contrib.postgres.fields import JSONField
+
 
 class InsurerSerializer(serializers.Serializer):
     id = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all(), required=True)
@@ -76,7 +78,7 @@ class InsuredMemberSerializer(serializers.Serializer):
 
     members = serializers.ListSerializer(child=MemberListSerializer())
     insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
-    insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+    # insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
 
 
 class InsuranceTransactionModelSerializer(serializers.Serializer):
@@ -84,10 +86,10 @@ class InsuranceTransactionModelSerializer(serializers.Serializer):
     insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
     insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
-    product_id = serializers.ChoiceField(choices=account_models.Order.PRODUCT_IDS)
-    order_id = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all())
-    amount = serializers.IntegerField()
+    order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     status_type = serializers.CharField(max_length=50)
+    insured_members = JSONField(null=True, blank=True)
 
 
 class InsuredMemberIdsSerializer(serializers.Serializer):

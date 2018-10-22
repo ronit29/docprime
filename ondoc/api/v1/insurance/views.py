@@ -147,10 +147,11 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                                                                                                          'user_id',
                                                                                                          'dob',
                                                                                                          'phone_number')
-            user = User.objects.filter(id=request.user.pk).values('id','phone_number', 'email', 'user_type', 'is_superuser',
-                                                                  'is_active', 'is_staff')
+            # user = User.objects.filter(id=request.user.pk).values('id','phone_number', 'email', 'user_type',
+            #                                                       'is_superuser', 'is_active', 'is_staff')
 
-            resp['insurance'] = {"profile": user_profile[0], "members": insured_members_list, "insurer": insurer, "insurance_plan": insurance_plan, "user": user}
+            resp['insurance'] = {"profile": user_profile[0], "members": insured_members_list, "insurer": insurer[0],
+                                 "insurance_plan": insurance_plan[0], "user": request.user.pk}
             return Response(resp)
 
     def create(self, request):
@@ -168,5 +169,5 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             reference_id=1,
             payment_status=account_models.Order.PAYMENT_PENDING
         )
-        resp['data'], resp["payment_required"] = utils.payment_details(request, order)
-        return Response(resp)
+        # resp['data'], resp["payment_required"] = utils.payment_details(request, order)
+        # return Response(resp)
