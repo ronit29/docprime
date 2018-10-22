@@ -131,10 +131,10 @@ class EntityLocationRelationship(TimeStampedModel):
                     object_id=kwargs.get('content_object').id)
                 if entity_location_qs.exists():
                     entity_location_qs.update(valid=False)
-
-                for ea in ea_list:
-                    entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
-                    entity_location_relation.save()
+                else:
+                    for ea in ea_list:
+                        entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
+                        entity_location_relation.save()
             return True
         except Exception as e:
             print(str(e))

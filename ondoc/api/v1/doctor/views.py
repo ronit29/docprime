@@ -37,6 +37,7 @@ import copy
 import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
+from ondoc.notification import models as notif_models
 User = get_user_model()
 
 
@@ -1002,3 +1003,28 @@ class DoctorContactNumberViewSet(viewsets.GenericViewSet):
             if doctor_details.get('std_code'):
                 final = str(doctor_details.get('std_code'))+str(doctor_details.get('number'))
             return Response({'status': 1, 'number': final}, status.HTTP_200_OK)
+
+
+class DoctorFeedbackViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
+
+    def feedback(self, request):
+        resp = {}
+        serializer = serializers.DoctorFeedbackBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        message = ''
+        for key, value in valid_data.items():
+            if isinstance(value, list):
+                val = ' '.join(map(str, value))
+            else:
+                val = value
+            message += str(key) + "  -  " + str(val) + "\n"
+        try:
+            notif_models.EmailNotification.publish_ops_email(valid_data.get('email'), message, 'Feedback Mail')
+            resp['status'] = "success"
+        except:
+            resp['status'] = "error"
+        return Response(resp)
