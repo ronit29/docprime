@@ -172,8 +172,10 @@ class LabCustomSerializer(serializers.Serializer):
     mrp = serializers.IntegerField(default=None)
     distance = serializers.IntegerField(source='distance.m')
     pickup_available = serializers.IntegerField(default=0)
-    lab_timing = serializers.DictField()
-    lab_timing_data = serializers.DictField()
+    lab_timing = serializers.CharField(max_length=1000)
+    lab_timing_data = serializers.ListField()
+    next_lab_timing = serializers.CharField(max_length=1000)
+    next_lab_timing_data = serializers.ListField()
 
 
     # def get_lab(self, obj):
