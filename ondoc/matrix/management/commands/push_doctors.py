@@ -6,7 +6,7 @@ import json
 import requests
 from ondoc.common.models import Cities
 from ondoc.location.models import EntityUrls
-
+from ondoc.doctor.models import SourceIdentifier
 
 def push_doctors():
     doctors = Doctor.objects.filter(source='pr', matrix_lead_id__isnull=True)
@@ -25,13 +25,24 @@ def push_doctors():
         if len(doctor_mobiles) > 0:
             mobile = doctor_mobiles[0].number
         elif len(doctor_mobiles_list) > 0:
-            mobile = "%s-%s" % (doctor_mobiles_list[0].std_code, doctor_mobiles_list[0].number)
+            mobile = doctor_mobiles_list[0].number
+            if doctor_mobiles_list[0].std_code:
+                mobile = str(doctor_mobiles_list[0].std_code)+str(mobile)
+
+            #mobile = "%s-%s" % (doctor_mobiles_list[0].std_code, doctor_mobiles_list[0].number)
+
+
+        si = SourceIdentifier.objects.filter(reference_id = doctor.id, type=1).first()
+        unique_id = None
+        if si:
+            unique_id = si.unique_identifier
+
 
         if len(hospital_list) > 0 and mobile:
             request_data = {
                 "ExitPointUrl": '%s/admin/doctor/doctor/%s/change' % (settings.ADMIN_BASE_URL, doctor.id),
                 "PrimaryNo": mobile,
-                "DocPrimeUniqueId": "",
+                "DocPrimeUniqueId": unique_id,
                 "ProductId": 1,
                 "Name": doctor.name,
                 "DocPrimeUserId ": 0,
