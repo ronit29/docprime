@@ -142,10 +142,11 @@ class Order(TimeStampedModel):
                 insured_member_dict = InsuredMembers.create_insured_members(insurance_data)
 
                 if insured_member_dict:
-                    insurance_transaction_obj = InsuranceTransaction.create_insurance_transaction(insurance_transaction)
-                    if insurance_transaction_obj:
-                        user_insurance_obj = UserInsurance.create_user_insurance(insurance_data, insured_member_dict,
-                                                                                 insurance_transaction_obj)
+                    insurance_transaction_obj = InsuranceTransaction.create_insurance_transaction(insurance_transaction,
+                                                                                                  insured_member_dict)
+                    # if insurance_transaction_obj:
+                        # user_insurance_obj = UserInsurance.create_user_insurance(insurance_data, insured_member_dict,
+                        #                                                          insurance_transaction_obj)
 
             order_dict = {
                 "reference_id": insurance_transaction_obj.id,
@@ -154,9 +155,9 @@ class Order(TimeStampedModel):
             amount = insurance_transaction_obj.amount
         if order_dict:
             self.update_order(order_dict)
-        if insurance_obj:
+        if insurance_transaction_obj:
             consumer_account.debit_schedule(insurance_transaction_obj, pg_data.get("product_id"), amount)
-            InsurerFloat.debit_float_schedule(insurance_data.get('insurer'), amount)
+            InsurerFloat.debit_float_schedule(insurance_transaction_obj.insurer_id, amount)
 
         return insurance_obj
 

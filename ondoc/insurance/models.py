@@ -32,12 +32,14 @@ class InsurerFloat(auth_model.TimeStampedModel):
     class Meta:
         db_table = "insurer_float"
 
+    @classmethod
     def debit_float_schedule(self, insurer, amount):
-        insurer_float = InsurerFloat.objects.filter(insurer=insurer).first()
-        current_float = insurer_float.current_float
-        if amount >= current_float:
-            updated_current_float = current_float - amount
-        insurer_float.update(current_float=updated_current_float)
+        insurer_float = InsurerFloat.objects.get(insurer=insurer)
+        if insurer_float:
+            current_float = insurer_float.current_float
+            if amount <= current_float:
+                updated_current_float = current_float - amount
+                insurer_float.update(current_float=updated_current_float)
 
 
 class InsurancePlans(auth_model.TimeStampedModel):
@@ -151,16 +153,17 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
         db_table = "insurance_transaction"
 
     @classmethod
-    def create_insurance_transaction(self, data):
-        insurer = Insurer.objects.get(id=data.get('insurer'))
-        insurance_plan = InsurancePlans.objects.get(id=data.get('insurance_plan'))
+    def create_insurance_transaction(self, data, insured_members):
+        insurer = Insurer.objects.get(id=data.get('insurer').id)
+        insurance_plan = InsurancePlans.objects.get(id=data.get('insurance_plan').id)
         # order = account_models.Order.objects.get(id=data.get('order'))
         try:
             insurance_transaction_obj = InsuranceTransaction.objects.create(insurer=insurer,
                                                                 insurance_plan=insurance_plan,
                                                                 user=data.get('user'),
                                                                 status_type=InsuranceTransaction.CREATED,
-                                                                insured_members=data.get('insured_members'))
+                                                                insured_members=insured_members,
+                                                                            amount=data.get('amount'))
 
             # insurance_transaction_obj = InsuranceTransaction.objects.create(**data)
         except Exception as e:

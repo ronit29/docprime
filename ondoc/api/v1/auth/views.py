@@ -1040,7 +1040,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 # transaction_dict["order_id"] = order_obj.id
                 transaction_dict["amount"] = order_obj.amount
                 transaction_dict["status_type"] = InsuranceTransaction.CREATED
-                transaction_dict["insured_members"] = insurance_data.get('members')
+                # transaction_dict["insured_members"] = insurance_data.get('members')
                 serializer = InsuranceTransactionModelSerializer(data=transaction_dict)
                 serializer.is_valid()
                 valid_data = serializer.validated_data

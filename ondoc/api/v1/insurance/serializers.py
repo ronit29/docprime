@@ -91,8 +91,8 @@ class InsuranceTransactionModelSerializer(serializers.Serializer):
     # order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     status_type = serializers.CharField(max_length=50)
-    insured_members = JSONField(null=True, blank=True)
-
+    # insured_members = JSONField(null=True, blank=True)
+    # insured_members = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all))
 
 class InsuredTransactionIdsSerializer(serializers.Serializer):
     ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuranceTransaction.objects.all()))
