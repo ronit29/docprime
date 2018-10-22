@@ -530,6 +530,13 @@ class DoctorForm(FormCleanMixin):
                 raise forms.ValidationError(key + " is required for Quality Check")
             if value == 'count' and int(self.data[key + '-TOTAL_FORMS']) <= 0:
                 raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
+            if key == 'doctor_clinics':
+                    all_hospital_ids = []
+                    for indx in range(int(self.data[key + '-TOTAL_FORMS'])):
+                        all_hospital_ids.append(int(self.data[key + '-{}-hospital'.format(indx)]))
+                    if not Hospital.objects.filter(pk__in=all_hospital_ids, is_live=True).count():
+                        raise forms.ValidationError("Atleast one entry of " + key + " should be live for Quality Check")
+
 
     def clean_practicing_since(self):
         data = self.cleaned_data['practicing_since']
@@ -835,7 +842,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
-    #form = DoctorForm
+    form = DoctorForm
     inlines = [
         CompetitorInfoInline,
         CompetitorMonthlyVisitsInline,
