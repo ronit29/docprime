@@ -37,7 +37,7 @@ def push_doctors():
         if si:
             unique_id = si.unique_identifier
 
-        lead_id = None
+        lead_id = 0
         if doctor.matrix_lead_id:
             lead_id = doctor.matrix_lead_id
 
@@ -51,7 +51,7 @@ def push_doctors():
                 "Name": doctor.name,
                 "DocPrimeUserId ": 0,
                 "EmployeeId": "",
-                "LeadSource":"PR",
+                "LeadSource":"pr",
                 "CityId": Cities.objects.filter(name__iexact=hospital_list[0].city.lower()).first().id,
                 "Gender": 1 if doctor.gender == 'm' else 2 if doctor.gender == 'f' else 0,
                 "LeadID": lead_id
@@ -63,15 +63,15 @@ def push_doctors():
 
                 if response.status_code != status.HTTP_200_OK or not response.ok:
                     print('Could not push doctor with id ', doctor.id)
+                else:
+                    resp_data = response.json()
 
-                resp_data = response.json()
+                    # save the appointment with the matrix lead id.
+                    doctor.matrix_lead_id = resp_data.get('Id', None)
+                    doctor.matrix_lead_id = int(doctor.matrix_lead_id)
 
-                # save the appointment with the matrix lead id.
-                doctor.matrix_lead_id = resp_data.get('Id', None)
-                doctor.matrix_lead_id = int(doctor.matrix_lead_id)
-
-                doctor.save()
-                print('Successfully pushed for doctor', doctor.id)
+                    doctor.save()
+                    print('Successfully pushed for doctor', doctor.id)
             except Exception as e:
                 print(str(e))
 
