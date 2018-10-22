@@ -141,8 +141,8 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
                       (FAILED, 'Failed')]
     insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
     insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
-    order = models.ForeignKey("account.Order", on_delete=models.DO_NOTHING)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    # order = models.ForeignKey("account.Order", on_delete=models.DO_NOTHING)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
     status_type = models.CharField(max_length=50)
     insured_members = JSONField(blank=True, null=True)
@@ -154,12 +154,11 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     def create_insurance_transaction(self, data):
         insurer = Insurer.objects.get(id=data.get('insurer'))
         insurance_plan = InsurancePlans.objects.get(id=data.get('insurance_plan'))
-        order = account_models.Order.objects.get(id=data.get('order'))
+        # order = account_models.Order.objects.get(id=data.get('order'))
         try:
             insurance_transaction_obj = InsuranceTransaction.objects.create(insurer=insurer,
                                                                 insurance_plan=insurance_plan,
                                                                 user=data.get('user'),
-                                                                order=order, amount=data.get('amount'),
                                                                 status_type=InsuranceTransaction.CREATED,
                                                                 insured_members=data.get('insured_members'))
 

@@ -1037,7 +1037,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 transaction_dict["user"] = insurance_data.get('user')
                 transaction_dict["insurer"] = insurance_data.get('insurer').get('id')
                 transaction_dict["insurance_plan"] = insurance_data.get('insurance_plan').get('id')
-                transaction_dict["order_id"] = order_obj.id
+                # transaction_dict["order_id"] = order_obj.id
                 transaction_dict["amount"] = order_obj.amount
                 transaction_dict["status_type"] = InsuranceTransaction.CREATED
                 transaction_dict["insured_members"] = insurance_data.get('members')

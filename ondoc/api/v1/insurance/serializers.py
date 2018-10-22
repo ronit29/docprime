@@ -1,6 +1,8 @@
 from rest_framework import serializers
+from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
-from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerFloat, InsuredMembers)
+from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerFloat, InsuredMembers,
+                                    InsuranceTransaction)
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
 from ondoc.account.models import (Order)
@@ -86,11 +88,19 @@ class InsuranceTransactionModelSerializer(serializers.Serializer):
     insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
     insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
-    order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
+    # order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     status_type = serializers.CharField(max_length=50)
     insured_members = JSONField(null=True, blank=True)
 
 
+class InsuredTransactionIdsSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuranceTransaction.objects.all()))
+
+
 class InsuredMemberIdsSerializer(serializers.Serializer):
-    ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all()))
+    id = serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all())
+    hypertension = serializers.NullBooleanField(required=False)
+    liver_disease = serializers.NullBooleanField(required=False)
+    heart_disease = serializers.NullBooleanField(required=False)
+    diabetes = serializers.NullBooleanField(required=False)

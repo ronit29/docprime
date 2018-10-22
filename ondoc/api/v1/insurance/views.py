@@ -37,7 +37,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
     def memberlist(self, request):
 
-        serializer = serializers.InsuredMemberIdsSerializer(data=request.data)
+        serializer = serializers.InsuredTransactionIdsSerializer(data=request.data)
 
         serializer.is_valid(raise_exception=True)
         parameters = serializer.validated_data
@@ -46,13 +46,46 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         if parameters.get('ids'):
 
             for id in parameters.get('ids'):
-                resp = {}
-                resp = {"id": id.id, "first_name": id.first_name, "last_name": id.last_name, "dob": id.dob, "email":id.email,
-                        "relation": id.relation, "gender": id.gender, "phone_number": id.phone_number, "hypertension": id.hypertension,
-                        "liver_disease": id.liver_disease, "heart_disease": id.heart_disease, "diabetes": id.diabetes}
+                resp = id.insured_members
+                # resp = {}
+                # resp = {"id": id.id, "first_name": id.first_name, "last_name": id.last_name, "dob": id.dob, "email":id.email,
+                #         "relation": id.relation, "gender": id.gender, "phone_number": id.phone_number, "hypertension": id.hypertension,
+                #         "liver_disease": id.liver_disease, "heart_disease": id.heart_disease, "diabetes": id.diabetes}
                 result.append(resp)
 
         return Response({"insured_members": result})
+
+    def update(self, request):
+        serializer = serializers.InsuredMemberIdsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        parameters = serializer.validated_data
+
+        member_id = parameters.get('id')
+
+        if member_id:
+
+            resp = {}
+
+            if parameters.get('hypertension'):
+                member_id.hypertension = parameters.get('hypertension')
+
+            if parameters.get('liver_disease'):
+                member_id.liver_disease = parameters.get('liver_disease')
+
+            if parameters.get('heart_disease'):
+                member_id.heart_disease = parameters.get('heart_disease')
+
+            if parameters.get('diabetes'):
+                member_id.diabetes = parameters.get('diabetes')
+
+            resp = {"id": member_id.id, "first_name": member_id.first_name, "last_name": member_id.last_name, "dob": member_id.dob,
+                    "email":member_id.email, "relation": member_id.relation, "gender": member_id.gender, "phone_number": member_id.phone_number,
+                    "hypertension": member_id.hypertension, "liver_disease": member_id.liver_disease, "heart_disease": member_id.heart_disease,
+                    "diabetes": member_id.diabetes}
+
+        return Response(resp)
+
+
 
     def summary(self, request):
         serializer = serializers.InsuredMemberSerializer(data=request.data)
@@ -100,9 +133,11 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                 # pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
                 # User Profile creation or updation
                 if member['profile']:
-                    profile = UserProfile.objects.filter(id=member['profile'].id).values('id','name', 'email',
-                                                                                         'gender', 'user_id',
-                                                                                         'dob', 'phone_number')
+
+                    profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
+                                                                                         'gender', 'user_id', 'dob',
+                                                                                         'phone_number')
+
                     if profile.exists():
                         if profile[0].get('user_id') == request.user.pk:
                             member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
@@ -141,7 +176,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
             insurer = Insurer.objects.filter(id=valid_data.get('insurer').id).values()
             insurance_plan = InsurancePlans.objects.filter(id=valid_data.get('insurance_plan').id).values()
-            user_profile = UserProfile.objects.filter(id=logged_in_user_id, user_id=request.user.pk).values('name',
+            user_profile = UserProfile.objects.filter(id=logged_in_user_id, user_id=request.user.pk).values('id','name',
                                                                                                          'email',
                                                                                                          'gender',
                                                                                                          'user_id',
