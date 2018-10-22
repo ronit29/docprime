@@ -114,11 +114,11 @@ class FormCleanMixin(forms.ModelForm):
                     raise forms.ValidationError("Doctor must have atleast and atmost one primary mobile number.")
             if '_qc_approve' in self.data:
                 self.validate_qc()
-                if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
-                    for h in self.instance.doctor_clinics.all():
-                        if (h.hospital.data_status < 3):
-                            raise forms.ValidationError(
-                                "Cannot approve QC check without approving associated Hospitals: " + h.hospital.name)
+                # if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
+                #     for h in self.instance.doctor_clinics.all():
+                #         if (h.hospital.data_status < 3):
+                #             raise forms.ValidationError(
+                #                 "Cannot approve QC check without approving associated Hospitals: " + h.hospital.name)
                 if hasattr(self.instance, 'network') and self.instance.network is not None:
                     if self.instance.network.data_status < 3:
                         class_name = self.instance.network.__class__.__name__
