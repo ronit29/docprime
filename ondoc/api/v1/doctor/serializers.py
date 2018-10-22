@@ -647,13 +647,13 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                     parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
                     locality = ' ' + parent.first().get('value')
 
-        title = obj.name
-        description = obj.name + ': ' + obj.name
+        title = "Dr. " + obj.name
+        description = "Dr. " + obj.name + ': ' + "Dr. " + obj.name
         doc_spec_list = []
 
         for name in specializations:
             doc_spec_list.append(str(name))
-        if len(doc_spec_list)>=1:
+        if len(doc_spec_list) >= 1:
             title +=  ' - '+', '.join(doc_spec_list)
             description += ' is ' + ', '.join(doc_spec_list)
         if not (sublocality == '') or not (locality == ''):
