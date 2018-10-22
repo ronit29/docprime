@@ -37,6 +37,10 @@ def push_doctors():
         if si:
             unique_id = si.unique_identifier
 
+        lead_id = None
+        if doctor.matrix_lead_id:
+            lead_id = doctor.matrix_lead_id
+
 
         if len(hospital_list) > 0 and mobile:
             request_data = {
@@ -47,9 +51,10 @@ def push_doctors():
                 "Name": doctor.name,
                 "DocPrimeUserId ": 0,
                 "EmployeeId": "",
+                "LeadSource":"PR",
                 "CityId": Cities.objects.filter(name__iexact=hospital_list[0].city.lower()).first().id,
                 "Gender": 1 if doctor.gender == 'm' else 2 if doctor.gender == 'f' else 0,
-                "LeadID": 0
+                "LeadID": lead_id
             }
 
             try:
