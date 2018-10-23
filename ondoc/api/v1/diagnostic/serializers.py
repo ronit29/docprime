@@ -78,8 +78,8 @@ class LabModelSerializer(serializers.ModelSerializer):
             if entity.additional_info:
                 locality = entity.additional_info.get('locality_value')
                 sublocality = entity.additional_info.get('sublocality_value')
-                if sublocality:
-                       locality =  " " + locality
+                # if sublocality:
+                #        locality =  " " + locality
             # if type.exists():
             #     if type.first().get('type') == 'LOCALITY':
             #         locality = type.first().get('value')
@@ -90,8 +90,10 @@ class LabModelSerializer(serializers.ModelSerializer):
             #         parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
             #         if sublocality:
             #             locality = ' ' + parent.first().get('value')
-        if not(sublocality == '') or not(locality == ''):
-            title = obj.name + ' - Diagnostic Centre in '+ sublocality + locality + ' |DocPrime'
+        if sublocality:
+            title = obj.name + ' - Diagnostic Centre in '+ sublocality + " " + locality + ' |DocPrime'
+        elif locality:
+            title = obj.name + ' - Diagnostic Centre in ' + locality + ' |DocPrime'
         else:
             title = obj.name + ' - Diagnostic Centre |DocPrime'
 
