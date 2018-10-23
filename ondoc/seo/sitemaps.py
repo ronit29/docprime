@@ -12,6 +12,9 @@ class IndexSitemap(Sitemap):
     def items(self):
         return SitemapManger.objects.filter(valid=True)
 
+    def lastmod(self, obj):
+        return obj.created_at
+
     def location(self, obj):
         partial_url_path_list = obj.file.url.split('/')
         return '/%s' % partial_url_path_list[len(partial_url_path_list)-1]

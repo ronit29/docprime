@@ -866,7 +866,11 @@ class DoctorRatingSerializer(serializers.Serializer):
         return {'rating_count': rating_count, 'average_rating': average_rating, 'review_count': review_count}
 
 
-
+class DoctorFeedbackBodySerializer(serializers.Serializer):
+    rating = serializers.IntegerField(max_value=10)
+    feedback = serializers.CharField(max_length=512)
+    feedback_tags = serializers.ListField()
+    email = serializers.EmailField()
 
 
 
