@@ -28,9 +28,9 @@ class InsurerFloat(auth_model.TimeStampedModel):
     def __str__(self):
         return self.insurer
 
-
     class Meta:
         db_table = "insurer_float"
+
 
     def debit_float_schedule(self, insurer, amount):
         insurer_float = InsurerFloat.objects.filter(insurer=insurer).first()
@@ -38,6 +38,7 @@ class InsurerFloat(auth_model.TimeStampedModel):
         if amount >= current_float:
             updated_current_float = current_float - amount
         insurer_float.update(current_float=updated_current_float)
+
 
 class InsurancePlans(auth_model.TimeStampedModel):
     insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
@@ -166,6 +167,9 @@ class UserInsurance(auth_model.TimeStampedModel):
     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
     insurance_transaction = models.ForeignKey(InsuranceTransaction, on_delete=models.DO_NOTHING, null=True)
     insured_members = JSONField(blank=True, null=True)
+
+    def __str__(self):
+        return str(self.user)
 
     class Meta:
         db_table = "user_insurance"

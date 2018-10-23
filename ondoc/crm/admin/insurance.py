@@ -1,6 +1,5 @@
 from django.contrib import admin
-from django.db import models
-from ondoc.insurance.models import Insurer, InsurerFloat, InsurancePlans, InsuranceThreshold
+
 
 class InsurerAdmin(admin.ModelAdmin):
 
@@ -12,7 +11,6 @@ class InsurerFloatAdmin(admin.ModelAdmin):
     list_display = ['insurer']
 
 
-
 class InsurancePlansAdmin(admin.ModelAdmin):
 
     list_display = ['insurer', 'type', 'amount']
@@ -20,4 +18,28 @@ class InsurancePlansAdmin(admin.ModelAdmin):
 
 class InsuranceThresholdAdmin(admin.ModelAdmin):
 
-    list_display = ('insurer', 'insurance_plan')
+    list_display = ['insurer', 'insurance_plan']
+
+
+class UserInsuranceAdmin(admin.ModelAdmin):
+
+    list_display = ['insurer', 'insurance_plan', 'user']
+    readonly_fields = ['insurer', 'insurance_plan', 'user']
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class InsuredMembersAdmin(admin.ModelAdmin):
+
+    list_display = ['insurer', 'first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number']
+    readonly_fields = ['insurer', 'first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number', 'relation', 'profile']
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
