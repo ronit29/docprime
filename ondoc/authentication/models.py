@@ -241,6 +241,29 @@ class User(AbstractBaseUser, PermissionsMixin):
             return self.staffprofile.name
         return str(self.phone_number)
 
+
+    def get_unrated_opd_appointment(self):
+        from ondoc.doctor import models as doc_models
+        opd_app = None
+        opd_all = self.appointments.all().order_by('-id')
+        for opd in opd_all:
+            if opd.status == doc_models.OpdAppointment.COMPLETED:
+                if opd.is_rated == False and opd.rating_declined == False:
+                    opd_app = opd
+                break
+        return opd_app
+
+    def get_unrated_lab_appointment(self):
+        from ondoc.diagnostic import models as lab_models
+        lab_app = None
+        lab_all = self.lab_appointments.all().order_by('-id')
+        for lab in lab_all:
+            if lab.status == lab_models.LabAppointment.COMPLETED:
+                if lab.is_rated == False and lab.rating_declined == False:
+                    lab_app = lab
+                break
+        return lab_app
+
     def save(self, *args, **kwargs):
         if self.email:
             self.email = self.email.lower()

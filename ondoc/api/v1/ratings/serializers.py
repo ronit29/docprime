@@ -85,10 +85,12 @@ class RatingsGraphSerializer(serializers.Serializer):
                  4: {'count': 0, 'percent': 0},
                  5: {'count': 0, 'percent': 0}}
         total = obj.count()
-        for rate in obj.all():
-            star_data[rate.ratings]['count'] += 1
-        for key, value in star_data.items():
-            star_data[key]['percent'] = '{0:.2f}'.format((star_data[key]['count'] / total * 100))
+        if total:
+            for rate in obj.all():
+                star_data[rate.ratings]['count'] += 1
+            for key, value in star_data.items():
+                star_data[key]['percent'] = '{0:.2f}'.format((star_data[key]['count'] / total * 100))
+            return star_data
         return star_data
 
 

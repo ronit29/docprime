@@ -127,28 +127,15 @@ class RatingsViewSet(viewsets.GenericViewSet):
         user = request.user
         appntment = None
         resp = []
-        opd_app = None
-        opd_all = user.appointments.all().order_by('-id')
-        for opd in opd_all:
-            if opd.status == doc_models.OpdAppointment.COMPLETED:
-                if opd.is_rated==False and opd.rating_declined==False:
-                    opd_app = opd
-                break
-        lab_app = None
-        lab_all = user.lab_appointments.all().order_by('-id')
-        for lab in lab_all:
-            if lab.status == lab_models.LabAppointment.COMPLETED:
-                if lab.is_rated == False and lab.rating_declined == False:
-                    lab_app = lab
-                break
 
-        # opd = user.appointments.filter(status=doc_models.OpdAppointment.COMPLETED, is_rated=False, rating_declined=False).order_by('updated_at').last()
-        # lab = user.lab_appointments.filter(status=lab_models.LabAppointment.COMPLETED, is_rated=False, rating_declined=False).order_by('updated_at').last()
+        opd_app = user.get_unrated_opd_appointment()
+        lab_app = user.get_unrated_lab_appointment()
+
         if opd_app and lab_app:
             if opd_app.updated_at > lab_app.updated_at:
                 appntment = doc_serializers.AppointmentRetrieveSerializer(opd_app, many=False, context={'request': request})
             else:
-                appntment = lab_serializers.LabAppointmentRetrieveSerializer(lab_app, many=False, context= {'request': request})
+                appntment = lab_serializers.LabAppointmentRetrieveSerializer(lab_app, many=False, context={'request': request})
         elif opd_app and not lab_app:
             appntment = doc_serializers.AppointmentRetrieveSerializer(opd_app, many=False, context={'request': request})
         elif lab_app and not opd_app:

@@ -628,6 +628,22 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     rating = rating_serializer.RatingsModelSerializer(read_only=True, many=True, source='get_ratings')
     rating_graph = serializers.SerializerMethodField()
     breadcrumb = serializers.SerializerMethodField()
+    unrated_appointment = serializers.SerializerMethodField()
+
+    def get_unrated_appointment(self, obj):
+        request = self.context.get('request')
+        if request:
+            user = request.user
+            opd_app = None
+            opd_all = user.appointments.filter(doctor=obj).order_by('-id')
+            for opd in opd_all:
+                if opd.status == OpdAppointment.COMPLETED and opd.rating_declined == False and opd.is_rated == False:
+                        opd_app = opd
+                break
+            if opd_app:
+                data = AppointmentRetrieveSerializer(opd_app, many=False, context={'request': request})
+                return data.data
+            return None
 
     def get_rating_graph(self, obj):
         if obj and obj.rating:
@@ -709,7 +725,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'enable_for_online_booking')
+                  'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
+                  'enable_for_online_booking', 'unrated_appointment')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
@@ -753,7 +770,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     class Meta:
         model = OpdAppointment
-        fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
+        fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail')
 

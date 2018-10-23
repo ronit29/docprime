@@ -67,6 +67,22 @@ class LabModelSerializer(serializers.ModelSerializer):
     rating = rating_serializer.RatingsModelSerializer(read_only=True, many=True, source='get_ratings')
     breadcrumb = serializers.SerializerMethodField()
     rating_graph = serializers.SerializerMethodField()
+    unrated_appointment = serializers.SerializerMethodField()
+
+    def get_unrated_appointment(self, obj):
+        request = self.context.get('request')
+        if request:
+            user = request.user
+            lab_app = None
+            lab_all = user.lab_appointments.filter(lab=obj).order_by('-id')
+            for lab in lab_all:
+                if lab.status == LabAppointment.COMPLETED and lab.rating_declined == False and lab.is_rated == False:
+                    lab_app = lab
+                break
+            if lab_app:
+                data = LabAppointmentModelSerializer(lab_app, many=False, context={'request': request})
+                return data.data
+            return []
 
     def get_rating_graph(self, obj):
         if obj and obj.rating:
@@ -147,7 +163,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph')
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'unrated_appointment')
 
 
 class LabProfileSerializer(LabModelSerializer):
@@ -651,7 +667,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 
     class Meta:
         model = LabAppointment
-        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
+        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type')
 
 
