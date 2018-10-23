@@ -1,7 +1,7 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
 from django.core.validators import MaxValueValidator, MinValueValidator
-from ondoc.authentication.models import UserProfile
+from ondoc.authentication.models import UserProfile, User
 from ondoc.account import models as account_models
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
@@ -122,11 +122,12 @@ class InsuredMembers(auth_model.TimeStampedModel):
     def create_insured_members(self, insurance_data):
         insured_members = insurance_data.get("members")
         insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
+        insurance_plan_id = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
 
         list_members = []
         for member in insured_members:
             user_profile = UserProfile.objects.get(id=member.get('member_profile').get('id'))
-            insured_members_obj = InsuredMembers.objects.create(first_name=member.get('first_name'),
+            insured_members_obj = InsuredMembers.objects.create( first_name=member.get('first_name'),
                                                                     last_name=member.get('last_name'),
                                                                     dob=member.get('dob'), email=member.get('email'),
                                                                     relation=member.get('relation'),
@@ -135,7 +136,8 @@ class InsuredMembers(auth_model.TimeStampedModel):
                                                                     phone_number=member.get('phone_number'),
                                                                     gender=member.get('gender'),
                                                                     profile=user_profile,
-                                                                    insurer=insurer
+                                                                    insurer=insurer,
+                                                                 insurance_plan=insurance_plan_id
                                                                     )
             list_members.append(model_to_dict(insured_members_obj))
         members_data = {"members": list_members}
@@ -161,17 +163,18 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
         db_table = "insurance_transaction"
 
     @classmethod
-    def create_insurance_transaction(self, data, insured_members):
+    def create_insurance_transaction(self, data, insured_members, order):
         insurer = Insurer.objects.get(id=data.get('insurer').id)
         insurance_plan = InsurancePlans.objects.get(id=data.get('insurance_plan').id)
-        # order = account_models.Order.objects.get(id=data.get('order'))
+        # order = account_models.Order.objects.get(id=data.get('order').id)
         try:
             insurance_transaction_obj = InsuranceTransaction.objects.create(insurer=insurer,
                                                                 insurance_plan=insurance_plan,
                                                                 user=data.get('user'),
                                                                 status_type=InsuranceTransaction.CREATED,
                                                                 insured_members=insured_members,
-                                                                            amount=data.get('amount'))
+                                                                            amount=data.get('amount'),
+                                                                            order=order)
 
             # insurance_transaction_obj = InsuranceTransaction.objects.create(**data)
         except Exception as e:
@@ -191,10 +194,13 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     @classmethod
     def create_user_insurance(self, insurance_data, insured_members, insurance_transaction):
-        user_insurance = UserInsurance.objects.create(insurer=insurance_data.get('insurer'),
-                                              insurance_plan=insurance_data.get('insurance_plan'),
-                                              user=insurance_data.get('user'),
-                                              insurance_transaction=insurance_transaction,
+        insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
+        insurance_plan = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
+        user = User.objects.get(id=insurance_data.get('user'))
+        user_insurance = UserInsurance.objects.create(insurer=insurer,
+                                              insurance_plan=insurance_plan,
+                                              user=user,
+                                              insurance_transaction_id=insurance_transaction.id,
                                               insured_members=insured_members)
         user_insurance.save()
         return user_insurance

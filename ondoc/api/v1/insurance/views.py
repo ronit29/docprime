@@ -17,7 +17,7 @@ from ondoc.api.v1 import utils
 class ListInsuranceViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
-        return Insurer.objects.filter()
+        return Insurer.objects.filter(is_live=True)
 
     def list(self, request):
         insurer_data = self.get_queryset()
@@ -33,7 +33,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
-        return Insurer.objects.filter()
+        return Insurer.objects.filter(is_live=True)
 
     def memberlist(self, request):
 
