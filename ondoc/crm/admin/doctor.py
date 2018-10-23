@@ -1486,6 +1486,12 @@ class SpecializationFieldResource(resources.ModelResource):
         fields = ('id', 'name')
 
 
+class PracticeSpecializationSynonymResource(resources.ModelResource):
+    class Meta:
+        model = PracticeSpecialization
+        fields = ('id', 'synonyms')
+
+
 class PracticeSpecializationResource(resources.ModelResource):
     name = Field(attribute='name', column_name='modified_name')
     field_medicine = Field(column_name='field_medicine')
@@ -1565,7 +1571,7 @@ class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin)
     list_display = ('name', )
     date_hierarchy = 'created_at'
     inlines = [PracticeSpecializationDepartmentMappingInline, ]
-    resource_class = PracticeSpecializationResource
+    resource_class = PracticeSpecializationSynonymResource
     search_fields = ['name', ]
 
 
