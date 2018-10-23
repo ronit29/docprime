@@ -431,23 +431,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         for row in queryset:
             lab_timing = None
             lab_timing_data = None
-            next_lab_timing = None
-            next_lab_timing_data = None
+            next_lab_timing_dict = {}
+            next_lab_timing_data_dict = {}
             data_array = [list() for i in range(7)]
             row["lab"] = temp_var[row["id"]]
 
-            lab_timing_day = set()
             if row["lab"].always_open:
                 lab_timing = "12:00 AM - 11:45 PM"
-                next_lab_timing = "12:00 AM - 11:45 PM"
-                lab_timing_data = {
+                next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
+                lab_timing_data = [{
                     "start": 0.0,
                     "end": 23.75
-                }
-                next_lab_timing_data = {
+                }]
+                next_lab_timing_data_dict = {rotated_days_array[1]: {
                     "start": 0.0,
                     "end": 23.75
-                }
+                }}
             else:
                 timing_queryset = row["lab"].lab_timings.all()
 
@@ -456,41 +455,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
                 rotated_data_array = data_array[day_now:] + data_array[:day_now]
 
-                count = 1
-                for timing_data in rotated_data_array:
-                    if count > 2:
-                        break
-                    if count == 1:
+                for count, timing_data in enumerate(rotated_data_array):
+                    day = rotated_days_array[count]
+                    if count == 0:
                         if timing_data:
                             lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
                             lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
-                        count += 1
                     elif timing_data:
                         next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
                         next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
-                        count += 1
-                #
-                # for count, timing_data in enumerate(rotated_data_array):
-                #     if len(lab_timing_day) == 2:
-                #         break
-                #     day = rotated_days_array[count]
-                #     if not timing_data:
-                #         if count == 0:
-                #             lab_timing_dict[day] = None
-                #             lab_timing_data_dict[day] = None
-                #         else:
-                #             continue
-                #     lab_timing_day.add(day)
-                #     lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
-                #     lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
-                #     if lab_timing:
-                #         lab_timing_dict[day] = lab_timing
-                #     if lab_timing_data:
-                #         lab_timing_data_dict[day] = lab_timing_data
+                        next_lab_timing_dict[day] = next_lab_timing
+                        next_lab_timing_data_dict[day] = next_lab_timing_data
+                        break
+
             row["lab_timing"] = lab_timing
             row["lab_timing_data"] = lab_timing_data
-            row["next_lab_timing"] = next_lab_timing
-            row["next_lab_timing_data"] = next_lab_timing_data
+            row["next_lab_timing"] = next_lab_timing_dict
+            row["next_lab_timing_data"] = next_lab_timing_data_dict
             resp_queryset.append(row)
 
         return resp_queryset
