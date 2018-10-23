@@ -639,8 +639,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             if entity.additional_info:
                 locality = entity.additional_info.get('locality_value')
                 sublocality = entity.additional_info.get('sublocality_value')
-                if sublocality:
-                    locality = " " + locality
+                # if sublocality:
+                #     locality = " " + locality
             # location_id = entity.first().additional_info.get('location_id')
             # type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
             # if type.exists():
@@ -662,9 +662,13 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if len(doc_spec_list) >= 1:
             title +=  ' - '+', '.join(doc_spec_list)
             description += ' is ' + ', '.join(doc_spec_list)
-        if not (sublocality == '') or not (locality == ''):
+        if sublocality:
             title += ' in ' + sublocality + " " + locality + ' - Consult Online'
             description += ' in ' + sublocality + " " + locality
+        elif locality:
+            title += ' in ' + locality + ' - Consult Online'
+            description += ' in ' + locality
+
         else:
             title += ' - Consult Online'
 
