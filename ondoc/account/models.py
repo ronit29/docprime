@@ -8,7 +8,6 @@ from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request, form_pg_refund_data
-from ondoc.insurance.models import (InsuranceTransaction, InsuredMembers, UserInsurance, InsurerFloat)
 from django.conf import settings
 from rest_framework import status
 import hashlib

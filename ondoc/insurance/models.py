@@ -97,7 +97,8 @@ class InsuredMembers(auth_model.TimeStampedModel):
     ADULT = "adult"
     CHILD = "child"
     MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
-    insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
+    insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
+    insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
     first_name = models.CharField(max_length=50, null=False)
     last_name = models.CharField(max_length=50, null=False)
     dob = models.DateField(blank=True, null=True)
@@ -149,11 +150,12 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
                       (FAILED, 'Failed')]
     insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
     insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
-    #order_id = models.ForeignKey("account.Order", on_delete=models.DO_NOTHING, null=True)
+    order = models.ForeignKey(account_models.Order, on_delete=models.DO_NOTHING, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
     status_type = models.CharField(max_length=50)
     insured_members = JSONField(blank=True, null=True)
+    policy_number = models.CharField(max_length=50, blank=False, null=True, default=None)
 
     class Meta:
         db_table = "insurance_transaction"
@@ -199,13 +201,8 @@ class UserInsurance(auth_model.TimeStampedModel):
 
 
 class Insurance(auth_model.TimeStampedModel):
-    DOCTOR_PRODUCT_ID = 1
-    LAB_PRODUCT_ID = 2
-    INSURANCE_PRODUCT_ID = 3
-    PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
-                   (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID")]
     insurer = models.ForeignKey(Insurer, on_delete=models.SET_NULL, null=True)
-    product_id = models.PositiveSmallIntegerField(choices=PRODUCT_IDS)
+    product_id = models.PositiveSmallIntegerField(choices=account_models.Order.PRODUCT_IDS)
     name = models.CharField(max_length=100)
     insurance_amount = models.DecimalField(max_digits=10, decimal_places=2)
     insured_amount = models.DecimalField(max_digits=10, decimal_places=2)
