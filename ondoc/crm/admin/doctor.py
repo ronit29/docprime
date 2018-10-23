@@ -35,7 +35,8 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
-                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure)
+                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure,
+                                 DoctorPlaceSheet)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -1512,3 +1513,23 @@ class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin)
 class ProcedureAdmin(AutoComplete, VersionAdmin):
     model = Procedure
     search_fields = ['name']
+
+
+class DoctorPlaceSheetResource(resources.ModelResource):
+    identifier = fields.Field(attribute='identifier', column_name='Unique identifier')
+    name = fields.Field(attribute='name', column_name='Doc Name')
+    clinic_hospital_name = fields.Field(attribute='clinic_hospital_name', column_name='Clinic/ Hospital Name')
+    address = fields.Field(attribute='address', column_name='Address')
+    doctor_clinic_address = fields.Field(attribute='doctor_clinic_address', column_name='Doctor Name + Clinic Name +  Address ')
+    clinic_address = fields.Field(attribute='clinic_address', column_name='Clinic Name +  Address ')
+
+    class Meta:
+        model = DoctorPlaceSheet
+        import_id_fields = ('id',)
+        exclude = ('created_at', 'updated_at', 'latlong',)
+
+
+class DoctorPlaceSheetAdmin(ImportMixin, admin.ModelAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name', 'clinic_hospital_name')
+    resource_class = DoctorPlaceSheetResource

@@ -1,3 +1,4 @@
+from ondoc.common.helper import Choices
 from django.contrib.gis.db import models
 from django.db import migrations, transaction
 from django.db.models import Count, Sum, When, Case, Q, F
@@ -1619,3 +1620,34 @@ class SourceIdentifier(auth_model.TimeStampedModel):
     class Meta:
         db_table = "source_identifier"
         unique_together = ('unique_identifier', )
+
+
+class DoctorPlaceSheet(auth_model.TimeStampedModel):
+    identifier = models.CharField(max_length=255, null=False, blank=False)
+    name = models.CharField(max_length=64, null=False, blank=False)
+    clinic_hospital_name = models.CharField(max_length=128, null=False, blank=False)
+    address = models.TextField()
+    doctor_clinic_address = models.TextField()
+    clinic_address = models.TextField()
+
+    class Meta:
+        db_table = 'doctor_place_sheet'
+
+
+class GoogleDetailing(auth_model.TimeStampedModel):
+    class Kind(Choices):
+        FINDPLACE = 'FINDPLACE'
+        DETAIL = 'DETAIL'
+
+    class Parameter(Choices):
+        DOCTOR_CLINIC_ADDRESS = 'DOCTOR_CLINIC_ADDRESS'
+        CLINIC_ADDRESS = 'CLINIC_ADDRESS'
+
+    doc_place_sheet = models.ForeignKey(DoctorPlaceSheet, on_delete=models.CASCADE)
+    kind = models.CharField(max_length=48, choices=Kind.as_choices())
+    parameter = models.CharField(max_length=48, choices=Parameter.as_choices())
+    raw_value = models.TextField()
+    extracted_value = models.TextField()
+
+    class Meta:
+        db_table = 'google_api_details'

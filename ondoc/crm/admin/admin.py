@@ -39,6 +39,8 @@ User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
+from ondoc.doctor.models import DoctorPlaceSheet
+from .doctor import DoctorPlaceSheetAdmin
 from .seo import SitemapManagerAdmin
 from ondoc.seo.models import SitemapManger
 
@@ -106,3 +108,5 @@ admin.site.register(Procedure, ProcedureAdmin)
 
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
 admin.site.register(SitemapManger, SitemapManagerAdmin)
+
+admin.site.register(DoctorPlaceSheet, DoctorPlaceSheetAdmin)
