@@ -72,8 +72,8 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_unrated_appointment(self, obj):
         request = self.context.get('request')
         if request:
-            user = request.user
-            if user:
+            if request.user.is_authenticated:
+                user = request.user
                 lab_app = None
                 lab_all = user.lab_appointments.filter(lab=obj).order_by('-id')
                 for lab in lab_all:

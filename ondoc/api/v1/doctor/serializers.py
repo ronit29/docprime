@@ -647,8 +647,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     def get_unrated_appointment(self, obj):
         request = self.context.get('request')
         if request:
-            user = request.user
-            if user:
+            if request.user.is_authenticated:
+                user = request.user
                 opd_app = None
                 opd_all = user.appointments.filter(doctor=obj).order_by('-id')
                 for opd in opd_all:
