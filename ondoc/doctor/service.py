@@ -66,6 +66,8 @@ def get_doctor_detail_from_google(place_sheet_obj):
 
         resp_data = None
 
+
+
         # For clinic_address.
         if not saved_json.exists():
             # Hitting the google api for find the place for clinic_address.
@@ -117,19 +119,35 @@ def get_doctor_detail_from_google(place_sheet_obj):
         clinic_international_number = result.get('international_phone_number', '')
         clinic_name = result.get('name', '')
 
-        GoogleDetailing(doc_place_sheet=place_sheet_obj,
-                        doctor_place_search=json.dumps(doctor_place_search_data),
-                        clinic_place_search=json.dumps(clinic_place_search_data),
-                        doctor_detail=json.dumps(doctor_detail_search_data),
-                        clinic_detail=json.dumps(clinic_detail_search_data),
-                        doctor_number=doctor_number,
-                        clinic_number=clinic_number,
-                        doctor_international_number=doctor_international_number,
-                        clinic_international_number=clinic_international_number,
-                        doctor_formatted_address=doctor_formatted_address,
-                        clinic_formatted_address=clinic_formatted_address,
-                        doctor_name=doctor_name,
-                        clinic_name=clinic_name).save()
+        if not saved_json.exists():
+            GoogleDetailing(doc_place_sheet=place_sheet_obj,
+                            doctor_place_search=json.dumps(doctor_place_search_data),
+                            clinic_place_search=json.dumps(clinic_place_search_data),
+                            doctor_detail=json.dumps(doctor_detail_search_data),
+                            clinic_detail=json.dumps(clinic_detail_search_data),
+                            doctor_number=doctor_number,
+                            clinic_number=clinic_number,
+                            doctor_international_number=doctor_international_number,
+                            clinic_international_number=clinic_international_number,
+                            doctor_formatted_address=doctor_formatted_address,
+                            clinic_formatted_address=clinic_formatted_address,
+                            doctor_name=doctor_name,
+                            clinic_name=clinic_name).save()
+        else:
+            obj = saved_json.first()
+            obj.doctor_place_search = json.dumps(doctor_place_search_data)
+            obj.clinic_place_search = json.dumps(clinic_place_search_data)
+            obj.doctor_detail = json.dumps(doctor_detail_search_data)
+            obj.clinic_detail = json.dumps(clinic_detail_search_data)
+            obj.doctor_number = doctor_number
+            obj.clinic_number = clinic_number
+            obj.doctor_international_number = doctor_international_number
+            obj.clinic_international_number = clinic_international_number
+            obj.doctor_formatted_address = doctor_formatted_address
+            obj.clinic_formatted_address = clinic_formatted_address
+            obj.doctor_name = doctor_name
+            obj.clinic_name = clinic_name
+            obj.save()
 
         return True
     except Exception as e:
