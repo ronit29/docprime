@@ -1,10 +1,10 @@
 from django.core.management.base import BaseCommand
-from ondoc.doctor.models import DoctorPlaceSheet, GoogleDetailing
+from ondoc.doctor.models import  GoogleDetailing
 from ondoc.doctor.service import get_doctor_detail_from_google
 
 
 def google_doctor_parser():
-    for doctor in DoctorPlaceSheet.objects.all()[:1]:
+    for doctor in GoogleDetailing.objects.all().order_by('id')[:1]:
         success = get_doctor_detail_from_google(doctor)
         if success:
             print("Successfull")

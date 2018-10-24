@@ -1623,21 +1623,14 @@ class SourceIdentifier(auth_model.TimeStampedModel):
         unique_together = ('unique_identifier', )
 
 
-class DoctorPlaceSheet(auth_model.TimeStampedModel):
-    identifier = models.CharField(max_length=255, null=False, blank=False)
-    name = models.CharField(max_length=64, null=False, blank=False)
-    clinic_hospital_name = models.CharField(max_length=128, null=False, blank=False)
-    address = models.TextField()
-    doctor_clinic_address = models.TextField()
-    clinic_address = models.TextField()
-
-    class Meta:
-        db_table = 'doctor_place_sheet'
-
-
 class GoogleDetailing(auth_model.TimeStampedModel):
 
-    doc_place_sheet = models.ForeignKey(DoctorPlaceSheet, on_delete=models.CASCADE)
+    identifier = models.CharField(max_length=255, null=True, blank=False)
+    name = models.CharField(max_length=64, null=True, blank=False)
+    clinic_hospital_name = models.CharField(max_length=128, null=True, blank=False)
+    address = models.TextField(null=True, blank=False)
+    doctor_clinic_address = models.TextField(null=True, blank=False)
+    clinic_address = models.TextField(null=True, blank=False)
 
     doctor_place_search = models.TextField(null=True)
     clinic_place_search = models.TextField(null=True)

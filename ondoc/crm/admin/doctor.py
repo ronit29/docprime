@@ -36,7 +36,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure,
-                                 DoctorPlaceSheet)
+                                 GoogleDetailing)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -1515,7 +1515,7 @@ class ProcedureAdmin(AutoComplete, VersionAdmin):
     search_fields = ['name']
 
 
-class DoctorPlaceSheetResource(resources.ModelResource):
+class GoogleDetailingResource(resources.ModelResource):
     identifier = fields.Field(attribute='identifier', column_name='Unique identifier')
     name = fields.Field(attribute='name', column_name='Doc Name')
     clinic_hospital_name = fields.Field(attribute='clinic_hospital_name', column_name='Clinic/ Hospital Name')
@@ -1524,12 +1524,15 @@ class DoctorPlaceSheetResource(resources.ModelResource):
     clinic_address = fields.Field(attribute='clinic_address', column_name='Clinic Name +  Address ')
 
     class Meta:
-        model = DoctorPlaceSheet
+        model = GoogleDetailing
         import_id_fields = ('id',)
-        exclude = ('created_at', 'updated_at', 'latlong',)
+        exclude = ('created_at', 'updated_at', 'doctor_place_search', 'clinic_place_search', 'doctor_detail',
+                   'clinic_detail', 'doctor_number', 'clinic_number', 'doctor_international_number',
+                   'clinic_international_number', 'doctor_formatted_address', 'clinic_formatted_address', 'doctor_name',
+                   'clinic_name')
 
 
-class DoctorPlaceSheetAdmin(ImportMixin, admin.ModelAdmin):
+class GoogleDetailingAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', 'clinic_hospital_name')
-    resource_class = DoctorPlaceSheetResource
+    resource_class = GoogleDetailingResource
