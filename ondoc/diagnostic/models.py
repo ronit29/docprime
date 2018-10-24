@@ -8,7 +8,7 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
-from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
+from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
@@ -193,6 +193,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     home_collection_charges = GenericRelation(HomePickupCharges)
     entity = GenericRelation(location_models.EntityLocationRelationship)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
+    dayend_booking_threshold_hours = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
         return self.name
@@ -362,6 +363,59 @@ class LabImage(TimeStampedModel, Image):
         db_table = "lab_image"
 
 
+class LabBookingClosingManager(models.Manager):
+
+
+    # def filter_lab(self, lab_id, home_pickup):
+    #     return super(LabBookingClosingManager, self).get_queryset().filter(lab__id=lab_id, lab__is_live=True, lab__is_home_collection_enabled=home_pickup)
+
+    def lab_booking_slots(self, lab_id, is_home_pickup):
+
+        lab_timing_queryset = LabTiming.timing_manager.filter(lab__id=lab_id, lab__is_live=True, lab__is_home_collection_enabled=is_home_pickup)
+
+        if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
+            return []
+
+        else:
+
+            obj = TimeSlotExtraction()
+
+            if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
+                for day in range(0, 7):
+                    obj.form_time_slots(day, 0.0, 23.75, None, True)
+
+            elif is_home_pickup:
+                for day in range(0, 7):
+                    obj.form_time_slots(day, 7.0, 19.0, None, True)
+            else:
+                threshold = lab_timing_queryset[0].lab.dayend_booking_threshold_hours
+                # threshold = 5
+                # daywise_data_array = [[] for i in range(7)]
+                # for data in lab_timing_queryset:
+                #     daywise_data_array[data.day].append(data)
+                daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
+                day, end = daywise_data_array[0].day, daywise_data_array[0].end
+                end_time = [None for i in range(len(lab_timing_queryset))]
+                end_time[0] = end
+                for count, data in enumerate(daywise_data_array, start=1):
+                    if data.day != day:
+                        day = data.day
+                        end = data.end
+                    end_time[count-1] = end
+                threshold_end_time = list(map(lambda x: x - threshold, end_time))
+                for count, data in enumerate(daywise_data_array):
+                    if data.start <= threshold_end_time[count] <= data.end:
+                        data.end = threshold_end_time[count]
+                    elif threshold_end_time[count] <= data.start <= data.end:
+                        daywise_data_array[count] = None
+                lab_timing_queryset = [x for x in daywise_data_array if x is not None]
+                for data in lab_timing_queryset:
+                    obj.form_time_slots(data.day, data.start, data.end, None, True)
+
+            resp_list = obj.get_timing_list()
+            return resp_list
+
+
 class LabTiming(TimeStampedModel):
 
     TIME_CHOICES = [(7.0, "7 AM"), (7.5, "7:30 AM"),
@@ -389,6 +443,9 @@ class LabTiming(TimeStampedModel):
                                                     (4, "Friday"), (5, "Saturday"), (6, "Sunday")])
     start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
     end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+
+    objects = models.Manager()  #default manager
+    timing_manager = LabBookingClosingManager()
 
     class Meta:
         db_table = "lab_timing"
@@ -1331,4 +1388,3 @@ class LabTestGroup(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'lab_test_group'
-
