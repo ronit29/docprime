@@ -1,5 +1,3 @@
-import json
-from ondoc.common.helper import Choices
 from django.contrib.gis.db import models
 from django.db import migrations, transaction
 from django.db.models import Count, Sum, When, Case, Q, F
