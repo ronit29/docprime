@@ -511,7 +511,7 @@ class DoctorForm(FormCleanMixin):
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
-                       'license': 'req', 'emails': 'count',
+                       'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count'}
 
@@ -968,7 +968,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         # check for errors
         errors = []
-        required = ['name', 'gender', 'license', 'practicing_since']
+        required = ['name', 'gender', 'practicing_since']
         for req in required:
             if not getattr(doctor, req):
                 errors.append(req + ' is required')
