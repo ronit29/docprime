@@ -23,14 +23,12 @@ def get_doctor_detail_from_google(place_sheet_obj):
                 logger.info("[ERROR] %s", response.reason)
                 return False
             else:
-                resp_data = response.json()
+                doctor_place_search_data = response.json()
         else:
-            resp_data = json.loads(place_sheet_obj.doctor_place_search)
+            doctor_place_search_data = json.loads(place_sheet_obj.doctor_place_search)
 
-        doctor_place_search_data = deepcopy(resp_data)
-
-        if resp_data.get('candidates', None) and isinstance(resp_data.get('candidates'), list) and len(resp_data.get('candidates')) > 0:
-            candidate = resp_data.get('candidates')[0]
+        if doctor_place_search_data.get('candidates', None) and isinstance(doctor_place_search_data.get('candidates'), list) and len(doctor_place_search_data.get('candidates')) > 0:
+            candidate = doctor_place_search_data.get('candidates')[0]
             place_id = candidate.get('place_id')
             if not place_id:
                 return False
@@ -47,23 +45,20 @@ def get_doctor_detail_from_google(place_sheet_obj):
                 logger.info("[ERROR] %s", response.reason)
                 return False
             else:
-                resp_data = response.json()
+                doctor_detail_search_data = response.json()
         else:
-            resp_data = json.loads(place_sheet_obj.doctor_detail)
+            doctor_detail_search_data = json.loads(place_sheet_obj.doctor_detail)
 
-        doctor_detail_search_data = deepcopy(resp_data)
-        if not resp_data.get('result', None):
+        if not doctor_detail_search_data.get('result', None):
             logger.info("[ERROR] Invalid data recieved from google detail api for doctor_clinic_address.")
             return False
 
-        result = resp_data.get('result')
+        result = doctor_detail_search_data.get('result')
         # Extract the useful information from the above api.
         doctor_formatted_address = result.get('formatted_address', '')
         doctor_number = result.get('formatted_phone_number', '')
         doctor_international_number = result.get('international_phone_number', '')
         doctor_name = result.get('name', '')
-
-        resp_data = None
 
 
 
@@ -78,14 +73,12 @@ def get_doctor_detail_from_google(place_sheet_obj):
                 logger.info("[ERROR] %s", response.reason)
                 return False
             else:
-                resp_data = response.json()
+                clinic_place_search_data = response.json()
         else:
-            resp_data = json.loads(place_sheet_obj.clinic_place_search)
+            clinic_place_search_data = json.loads(place_sheet_obj.clinic_place_search)
 
-        clinic_place_search_data = deepcopy(resp_data)
-
-        if resp_data.get('candidates', None) and isinstance(resp_data.get('candidates'), list) and len(resp_data.get('candidates')) > 0:
-            candidate = resp_data.get('candidates')[0]
+        if clinic_place_search_data.get('candidates', None) and isinstance(clinic_place_search_data.get('candidates'), list) and len(clinic_place_search_data.get('candidates')) > 0:
+            candidate = clinic_place_search_data.get('candidates')[0]
             place_id = candidate.get('place_id')
             if not place_id:
                 return False
@@ -102,16 +95,15 @@ def get_doctor_detail_from_google(place_sheet_obj):
                 logger.info("[ERROR] %s", response.reason)
                 return False
             else:
-                resp_data = response.json()
+                clinic_detail_search_data = response.json()
         else:
-            resp_data = json.loads(place_sheet_obj.clinic_detail)
+            clinic_detail_search_data = json.loads(place_sheet_obj.clinic_detail)
 
-        clinic_detail_search_data = deepcopy(resp_data)
-        if not resp_data.get('result', None):
+        if not clinic_detail_search_data.get('result', None):
             logger.info("[ERROR] Invalid data recieved from google detail api for clinic_address.")
             return False
 
-        result = resp_data.get('result')
+        result = clinic_detail_search_data.get('result')
         # Extract the useful information from the above api.
         clinic_formatted_address = result.get('formatted_address', '')
         clinic_number = result.get('formatted_phone_number', '')

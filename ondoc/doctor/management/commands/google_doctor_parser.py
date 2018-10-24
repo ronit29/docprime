@@ -4,7 +4,7 @@ from ondoc.doctor.service import get_doctor_detail_from_google
 
 
 def google_doctor_parser():
-    for doctor in GoogleDetailing.objects.all().order_by('id')[:1]:
+    for doctor in GoogleDetailing.objects.all().order_by('id'):
         success = get_doctor_detail_from_google(doctor)
         if success:
             print("Successfull")
