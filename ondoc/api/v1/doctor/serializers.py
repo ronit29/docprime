@@ -624,11 +624,15 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     enable_for_online_booking = serializers.BooleanField(read_only=True)
     availability = None
     seo = serializers.SerializerMethodField()
-    # rating = serializers.SerializerMethodField()
-    rating = rating_serializer.RatingsModelSerializer(read_only=True, many=True, source='get_ratings')
+    rating = serializers.SerializerMethodField()
+    # rating = rating_serializer.RatingsModelSerializer(read_only=True, many=True, source='get_ratings')
     rating_graph = serializers.SerializerMethodField()
     breadcrumb = serializers.SerializerMethodField()
     unrated_appointment = serializers.SerializerMethodField()
+
+    def get_rating(self, obj):
+        reviews = rating_serializer.RatingsModelSerializer(obj.rating.exclude(Q(review='') | Q(review=None)), many=True)
+        return reviews.data[:5]
 
     def get_unrated_appointment(self, obj):
         request = self.context.get('request')

@@ -1,5 +1,8 @@
 from rest_framework import serializers
 from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments)
+from ondoc.doctor import models as doc_models
+from ondoc.diagnostic import models as lab_models
+from django.db.models import Q
 
 
 class ReviewComplimentBodySerializer(serializers.Serializer):
@@ -73,9 +76,7 @@ class RatingsGraphSerializer(serializers.Serializer):
         return count
 
     def get_review_count(self, obj):
-        count = 0
-        if obj.filter(review__isnull=False).exists():
-            count = obj.filter(review__isnull=False).count()
+        count = obj.exclude(Q(review='') | Q(review=None)).count()
         return count
 
     def get_star_count(self, obj):
@@ -110,9 +111,14 @@ class RatingsModelSerializer(serializers.ModelSerializer):
 
     def get_user_name(self, obj):
         name= None
-        profile = obj.user.profiles.all().first()
-        if profile:
-            name = profile.name
+        if obj.appointment_type == RatingsReview.OPD:
+            app = doc_models.OpdAppointment.objects.filter(id=obj.appointment_id).first()
+        else:
+            app = lab_models.LabAppointment.objects.filter(id=obj.appointment_id).first()
+        if app:
+            profile = app.profile
+            if profile:
+                name = profile.name
         return name
 
     def get_date(self, obj):

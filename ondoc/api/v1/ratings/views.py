@@ -153,14 +153,7 @@ class GetComplementViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated, IsConsumer)
 
     def get_complements(self, request):
-        # serializer = serializers.ReviewComplimentBodySerializer(data=request.query_params)
-        # serializer.is_valid(raise_exception=True)
-        # valid_data = serializer.validated_data
-        # type = valid_data.get('type')
         complement_data = ReviewCompliments.objects.all()
-        # if type == ReviewCompliments.DOCTOR:
-        #     body_serializer = serializers.GetComplementSerializer(complement_data, many=True, context={'request': request})
-        # elif type == ReviewCompliments.LAB:
         body_serializer = serializers.GetComplementSerializer(complement_data, many=True, context={'request': request})
 
         return Response(body_serializer.data)
