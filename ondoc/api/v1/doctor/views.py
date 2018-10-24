@@ -1036,6 +1036,7 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
 
     def feedback(self, request):
         resp = {}
+        user = request.user
         serializer = serializers.DoctorFeedbackBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
@@ -1046,6 +1047,32 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
             else:
                 val = value
             message += str(key) + "  -  " + str(val) + "\n"
+        if user.doctor:
+            managers_list = []
+            for managers in user.doctor.manageable_doctors.all():
+                info = {}
+                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "\n"
+                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "\n"
+                info['user_id'] = (str(managers.user_id) ) if managers.user else "\n"
+                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "\n"
+                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "\n"
+                managers_list.append(info)
+            managers_string = "\n".join(str(x) for x in managers_list)
+        if managers_string:
+            message = message + "\n\nUser's Managers \n"+ managers_string
+
+        manages_list = []
+        for manages in user.manages.all():
+            info = {}
+            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "\n"
+            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "\n"
+            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "\n"
+            info['user_id'] = (str(user.id)) if user else "\n"
+            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "\n"
+            manages_list.append(info)
+        manages_string = "\n".join(str(x) for x in manages_list)
+        if manages_string:
+            message = message + "\n\n User Manages \n"+ manages_string
         try:
             notif_models.EmailNotification.publish_ops_email(valid_data.get('email'), message, 'Feedback Mail')
             resp['status'] = "success"
