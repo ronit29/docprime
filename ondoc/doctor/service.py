@@ -20,7 +20,7 @@ def get_doctor_detail_from_google(place_sheet_obj):
             response = requests.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery',
                                     params={'key': api_key, 'input': request_parameter})
             if response.status_code != status.HTTP_200_OK or not response.ok:
-                logger.info("[ERROR] Google API for fetching place id.")
+                logger.info("[ERROR] Google API for fetching doctor_clinic_address place id.")
                 logger.info("[ERROR] %s", response.reason)
                 return False
             else:
@@ -36,7 +36,7 @@ def get_doctor_detail_from_google(place_sheet_obj):
             if not place_id:
                 return False
         else:
-            logger.info("[ERROR] Invalid data recieved from google api.")
+            logger.info("[ERROR] Invalid data recieved from google api for doctor_clinic_data.")
             return False
 
         if not saved_json.exists():
@@ -54,7 +54,7 @@ def get_doctor_detail_from_google(place_sheet_obj):
 
         doctor_detail_search_data = deepcopy(resp_data)
         if not resp_data.get('result', None):
-            logger.info("[ERROR] Invalid data recieved from google detail api.")
+            logger.info("[ERROR] Invalid data recieved from google detail api for doctor_clinic_address.")
             return False
 
         result = resp_data.get('result')
@@ -75,7 +75,7 @@ def get_doctor_detail_from_google(place_sheet_obj):
             response = requests.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery',
                                     params={'key': api_key, 'input': request_parameter})
             if response.status_code != status.HTTP_200_OK or not response.ok:
-                logger.info("[ERROR] Google API for fetching place id.")
+                logger.info("[ERROR] Google API for fetching clinic_address place id.")
                 logger.info("[ERROR] %s", response.reason)
                 return False
             else:
@@ -91,7 +91,7 @@ def get_doctor_detail_from_google(place_sheet_obj):
             if not place_id:
                 return False
         else:
-            logger.info("[ERROR] Invalid data recieved from google api.")
+            logger.info("[ERROR] Invalid data recieved from google api for clinic_address.")
             return False
 
         if not saved_json.exists():
@@ -99,7 +99,7 @@ def get_doctor_detail_from_google(place_sheet_obj):
             response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
                                     params={'key': api_key, 'place_id': place_id})
             if response.status_code != status.HTTP_200_OK or not response.ok:
-                logger.info("[ERROR] Google API for fetching detail on basis of place_id")
+                logger.info("[ERROR] Google API for fetching detail on basis of place_id for clinic_address")
                 logger.info("[ERROR] %s", response.reason)
                 return False
             else:
@@ -109,7 +109,7 @@ def get_doctor_detail_from_google(place_sheet_obj):
 
         clinic_detail_search_data = deepcopy(resp_data)
         if not resp_data.get('result', None):
-            logger.info("[ERROR] Invalid data recieved from google detail api.")
+            logger.info("[ERROR] Invalid data recieved from google detail api for clinic_address.")
             return False
 
         result = resp_data.get('result')
