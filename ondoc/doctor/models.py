@@ -1,3 +1,4 @@
+import json
 from ondoc.common.helper import Choices
 from django.contrib.gis.db import models
 from django.db import migrations, transaction
@@ -1635,19 +1636,26 @@ class DoctorPlaceSheet(auth_model.TimeStampedModel):
 
 
 class GoogleDetailing(auth_model.TimeStampedModel):
-    class Kind(Choices):
-        FINDPLACE = 'FINDPLACE'
-        DETAIL = 'DETAIL'
-
-    class Parameter(Choices):
-        DOCTOR_CLINIC_ADDRESS = 'DOCTOR_CLINIC_ADDRESS'
-        CLINIC_ADDRESS = 'CLINIC_ADDRESS'
 
     doc_place_sheet = models.ForeignKey(DoctorPlaceSheet, on_delete=models.CASCADE)
-    kind = models.CharField(max_length=48, choices=Kind.as_choices())
-    parameter = models.CharField(max_length=48, choices=Parameter.as_choices())
-    raw_value = models.TextField()
-    extracted_value = models.TextField()
+
+    doctor_place_search = models.TextField(null=True)
+    clinic_place_search = models.TextField(null=True)
+
+    doctor_detail = models.TextField(null=True)
+    clinic_detail = models.TextField(null=True)
+
+    doctor_number = models.CharField(max_length=255, null=True, blank=True)
+    clinic_number = models.CharField(max_length=255, null=True, blank=True)
+
+    doctor_international_number = models.CharField(max_length=255, null=True, blank=True)
+    clinic_international_number = models.CharField(max_length=255, null=True, blank=True)
+
+    doctor_formatted_address = models.TextField(null=True)
+    clinic_formatted_address = models.TextField(null=True)
+
+    doctor_name = models.CharField(max_length=1024, null=True, blank=True)
+    clinic_name = models.CharField(max_length=1024, null=True, blank=True)
 
     class Meta:
         db_table = 'google_api_details'
