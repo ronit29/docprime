@@ -1068,7 +1068,7 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
             info['hospital_name'] = (str(manages.hospital.name) + "\n") if manages.hospital else "\n"
             info['doctor_name'] = (str(manages.doctor.name) + "\n") if manages.doctor else "\n"
             info['user_id'] = (str(user.id) + "\n") if user else "\n"
-            info['doctor_number'] = (str(manages.phone_number) + "\n") if manages.doctor and manages.doctor.mobiles.filter(is_primary=True) else "\n"
+            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().phone_number) + "\n") if (manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "\n"
             manages_list.append(info)
         try:
             notif_models.EmailNotification.publish_ops_email(valid_data.get('email'), message, 'Feedback Mail')
