@@ -73,15 +73,16 @@ class LabModelSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request:
             user = request.user
-            lab_app = None
-            lab_all = user.lab_appointments.filter(lab=obj).order_by('-id')
-            for lab in lab_all:
-                if lab.status == LabAppointment.COMPLETED and lab.rating_declined == False and lab.is_rated == False:
-                    lab_app = lab
-                break
-            if lab_app:
-                data = LabAppointmentModelSerializer(lab_app, many=False, context={'request': request})
-                return data.data
+            if user:
+                lab_app = None
+                lab_all = user.lab_appointments.filter(lab=obj).order_by('-id')
+                for lab in lab_all:
+                    if lab.status == LabAppointment.COMPLETED and lab.rating_declined == False and lab.is_rated == False:
+                        lab_app = lab
+                    break
+                if lab_app:
+                    data = LabAppointmentModelSerializer(lab_app, many=False, context={'request': request})
+                    return data.data
             return []
 
     def get_rating_graph(self, obj):

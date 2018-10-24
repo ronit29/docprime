@@ -881,10 +881,10 @@ class DoctorRatingSerializer(serializers.Serializer):
 
 
 class DoctorFeedbackBodySerializer(serializers.Serializer):
-    rating = serializers.IntegerField(max_value=10)
-    feedback = serializers.CharField(max_length=512)
-    feedback_tags = serializers.ListField()
-    email = serializers.EmailField()
+    rating = serializers.IntegerField(max_value=10, required=False)
+    feedback = serializers.CharField(max_length=512, required=False)
+    feedback_tags = serializers.ListField(required=False)
+    email = serializers.EmailField(required=False)
 
 
 

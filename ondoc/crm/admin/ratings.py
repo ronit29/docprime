@@ -7,6 +7,7 @@ from ondoc.doctor.models import OpdAppointment, Doctor
 from django import forms
 
 class RatingsReviewForm(forms.ModelForm):
+
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -38,9 +39,14 @@ class ReviewActionsInLine(admin.TabularInline):
 
 class RatingsReviewAdmin(admin.ModelAdmin):
     inlines = [ReviewActionsInLine]
-    list_display = (['name', 'appointment_type', 'content_type', 'object_id', 'ratings', 'updated_at'])
+    list_display = (['name', 'appointment_type', 'ratings', 'updated_at'])
     readonly_fields = ['name']
     form = RatingsReviewForm
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(RatingsReviewAdmin, self).get_form(request, obj, **kwargs)
+        form.base_fields['compliment'].widget = forms.CheckboxSelectMultiple()
+        return form
 
     def name(self, instance):
         if instance.content_type==ContentType.objects.get_for_model(Doctor):
