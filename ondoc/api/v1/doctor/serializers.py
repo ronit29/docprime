@@ -740,7 +740,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
-                  'enable_for_online_booking', 'unrated_appointment')
+                  'enabled_for_online_booking', 'unrated_appointment')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
