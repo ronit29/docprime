@@ -658,7 +658,7 @@ class GenericAdmin(TimeStampedModel):
     APPOINTMENT = 1
     BILLINNG = 2
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
     type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
     hospital_network = models.ForeignKey("doctor.HospitalNetwork", null=True, blank=True,
