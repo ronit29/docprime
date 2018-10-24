@@ -3,10 +3,11 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonDiagnosticCondition, CommonTest)
+                                     CommonDiagnosticCondition, CommonTest, CommonPackage)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.notification.models import EmailNotification
+from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone, get_lab_search_details, TimeSlotExtraction
@@ -57,11 +58,14 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         test_queryset = CommonTest.objects.all()[:count]
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
+        package_queryset = CommonPackage.objects.prefetch_related('package').all()[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
+        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
         temp_data = dict()
         temp_data['common_tests'] = test_serializer.data
+        temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data
 
@@ -247,13 +251,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs__id=lab_id,
+        queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter').filter(lab_pricing_group__labs__id=lab_id,
                                                                     lab_pricing_group__labs__is_test_lab=False,
                                                                     lab_pricing_group__labs__is_live=True,
                                                                     test__in=test_ids)
         lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
-        test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
+        test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
+        # for Demo
+        demo_lab_test = AvailableLabTest.objects.filter(lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).prefetch_related('test')[:10]
+        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = list()
         lab_serializable_data = list()
@@ -280,6 +287,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
         temp_data['tests'] = test_serializer.data
+        temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
 
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
@@ -408,15 +416,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by("price", "distance")
+                queryset = queryset.order_by("-order_priority", "price", "distance")
             elif order_by == 'distance':
-                queryset = queryset.order_by("distance")
+                queryset = queryset.order_by("-order_priority", "distance")
             elif order_by == 'name':
-                queryset = queryset.order_by("name")
+                queryset = queryset.order_by("-order_priority", "name")
             else:
-                queryset = queryset.order_by("distance")
+                queryset = queryset.order_by("-order_priority", "distance")
         else:
-            queryset = queryset.order_by("distance")
+            queryset = queryset.order_by("-order_priority", "distance")
         return queryset
 
     def form_lab_whole_data(self, queryset):
@@ -561,6 +569,21 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 effective_price += data["lab"].home_pickup_charges
                 home_pickup_charges = data["lab"].home_pickup_charges
             # TODO PM - call coupon function to calculate effective price
+
+        coupon_list = []
+        coupon_discount = 0
+        if data.get("coupon_code"):
+            coupon_list = list(Coupon.objects.filter(code__in=data.get("coupon_code")).values_list('id', flat=True))
+            obj = models.LabAppointment()
+            for coupon in data.get("coupon_code"):
+                coupon_discount += obj.get_discount(coupon, effective_price)
+
+        if data.get("payment_type") in [doctor_model.OpdAppointment.COD, doctor_model.OpdAppointment.PREPAID]:
+            if coupon_discount >= effective_price:
+                effective_price = 0
+            else:
+                effective_price = effective_price - coupon_discount
+
         start_dt = form_time_slot(data["start_date"], data["start_time"])
 
         test_ids_list = list()
@@ -599,7 +622,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             "payment_type": data["payment_type"],
             "lab_test": test_ids_list,
             # "lab_test": [x["id"] for x in lab_test_queryset.values("id")],
-            "extra_details": extra_details
+            "extra_details": extra_details,
+            "coupon": coupon_list,
+            "discount": coupon_discount
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address").id).first()

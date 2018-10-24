@@ -9,9 +9,9 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
 from ondoc.authentication.models import UserProfile
-from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
 from django.db.models import Q
+from ondoc.coupon.models import Coupon
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.ratings import serializers as rating_serializer
@@ -138,6 +138,8 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     time_slot_start = serializers.DateTimeField()
     payment_type = serializers.IntegerField()
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
+    discount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
@@ -155,6 +157,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     end_time = serializers.FloatField(required=False)
     time_slot_start = serializers.DateTimeField(required=False)    
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
+    coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
     # time_slot_end = serializers.DateTimeField()
 
@@ -223,6 +226,12 @@ class CreateAppointmentSerializer(serializers.Serializer):
                 "Error 'Max active appointments reached' for opd appointment with data - " + json.dumps(
                     request.data))
             raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
+
+        if data.get("coupon_code"):
+            for coupon in data.get("coupon_code"):
+                obj = OpdAppointment()
+                if not obj.validate_coupon(request.user, coupon).get("is_valid"):
+                    raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         return data
 
@@ -618,10 +627,11 @@ class DoctorListSerializer(serializers.Serializer):
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     emails = None
     experience_years = serializers.IntegerField(allow_null=True)
+    is_license_verified = serializers.BooleanField(read_only=True)
     # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
     hospitals = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
-    enable_for_online_booking = serializers.BooleanField(read_only=True)
+    enabled_for_online_booking = serializers.BooleanField(read_only=True)
     availability = None
     seo = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
@@ -680,8 +690,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                     parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
                     locality = ' ' + parent.first().get('value')
 
-        title = obj.name
-        description = obj.name + ': ' + obj.name
+        title = "Dr. " + obj.name
+        description = "Dr. " +  obj.name + ': ' +"Dr. " +  obj.name
         doc_spec_list = []
 
         for name in specializations:
@@ -727,7 +737,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         model = Doctor
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
-        fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
+        fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
                   'enable_for_online_booking', 'unrated_appointment')

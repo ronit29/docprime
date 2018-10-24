@@ -337,7 +337,7 @@ LabDoctorFormSet = inlineformset_factory(Lab, LabDoctor, form=LabDoctorForm, ext
 # include all doctor onboarding forms here
 
 class DoctorForm(forms.ModelForm):
-    about = forms.CharField(widget=forms.Textarea)
+    about = forms.CharField(widget=forms.Textarea, required=False)
     practicing_since = forms.ChoiceField(choices=practicing_since_choices, required=True)
 
     def __init__(self, *args, **kwargs):

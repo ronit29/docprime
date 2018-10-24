@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile)
+                                     CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
@@ -174,6 +174,71 @@ class LabProfileSerializer(LabModelSerializer):
                   'sublocality', 'city', 'state', 'country', 'about', 'always_open', 'building', )
 
 
+class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
+    test = LabTestSerializer()
+    test_id = serializers.ReadOnlyField(source='test.id')
+    is_package = serializers.ReadOnlyField(source='test.is_package')
+    number_of_tests = serializers.ReadOnlyField(source='test.number_of_tests')
+    expected_tat = serializers.ReadOnlyField(source='test.expected_tat')
+    pre_test_info = serializers.ReadOnlyField(source='test.pre_test_info')
+    why = serializers.ReadOnlyField(source='test.why')
+    agreed_price = serializers.SerializerMethodField()
+    deal_price = serializers.SerializerMethodField()
+    is_home_collection_enabled = serializers.SerializerMethodField()
+    package = serializers.SerializerMethodField()
+    parameters = serializers.SerializerMethodField()
+
+    def get_is_home_collection_enabled(self, obj):
+        if self.context.get("lab") is not None:
+            if self.context["lab"].is_home_collection_enabled and obj.test.home_collection_possible:
+                return True
+            return False
+        return obj.test.home_collection_possible
+        # return None
+
+    def get_agreed_price(self, obj):
+        agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
+        return agreed_price
+
+    def get_deal_price(self, obj):
+        deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
+        return deal_price
+
+    def get_package(self, obj):
+        ret_data = list()
+        if obj.test.is_package:
+            packages_test = obj.test.packages.all()
+            for t_obj in packages_test:
+                # param_list = t_obj.lab_test.labtests.all().values_list("parameter__name", flat=True)
+                param_objs = t_obj.lab_test.labtests.all()
+                param_list = list()
+                for obj in param_objs:
+                    param_list.append(obj.parameter.name)
+                ret_data.append({
+                    "name": t_obj.lab_test.name,
+                    "why": t_obj.lab_test.why,
+                    "pre_test_info": t_obj.lab_test.pre_test_info,
+                    "expected_tat": t_obj.lab_test.expected_tat,
+                    "parameters": param_list
+                })
+        return ret_data
+
+    def get_parameters(self, obj):
+        # parameters = obj.test.labtests.all().values_list("parameter__name", flat=True)
+
+        parameters = list()
+        param_objs = obj.test.labtests.all()
+        for obj in param_objs:
+            parameters.append(obj.parameter.name)
+
+        return parameters
+
+    class Meta:
+        model = AvailableLabTest
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
+                  'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat')
+
+
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
     test_id = serializers.ReadOnlyField(source='test.id')
@@ -228,9 +293,22 @@ class CommonTestSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return request.build_absolute_uri(obj['icon']) if obj['icon'] else None
 
-
     class Meta:
         model = CommonTest
+        fields = ('id', 'name', 'icon')
+
+
+class CommonPackageSerializer(serializers.ModelSerializer):
+    id = serializers.ReadOnlyField(source='package.id')
+    name = serializers.ReadOnlyField(source='package.name')
+    icon = serializers.SerializerMethodField()
+
+    def get_icon(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.icon.url) if obj.icon else None
+
+    class Meta:
+        model = CommonPackage
         fields = ('id', 'name', 'icon')
 
 
@@ -341,6 +419,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     home_pickup_charges = serializers.DecimalField(max_digits=10, decimal_places=2)
     is_home_pickup = serializers.BooleanField(default=False)
     address = serializers.JSONField(required=False)
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
+    discount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -406,6 +486,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     address = serializers.PrimaryKeyRelatedField(queryset=Address.objects.all(), required=False, allow_null=True)
     # address = serializers.IntegerField(required=False, allow_null=True)
     payment_type = serializers.IntegerField(default=OpdAppointment.PREPAID)
+    coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 3
@@ -431,6 +512,12 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
         if LabAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile=data["profile"]).count() >= MAX_APPOINTMENTS_ALLOWED:
             raise serializers.ValidationError('Max '+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
+
+        if data.get("coupon_code"):
+            for coupon in data.get("coupon_code"):
+                obj = LabAppointment()
+                if not obj.validate_coupon(request.user, coupon).get("is_valid"):
+                    raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request)

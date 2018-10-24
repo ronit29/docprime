@@ -242,12 +242,15 @@ def opdappointment_transform(app_data):
     app_data["fees"] = str(app_data["fees"])
     app_data["effective_price"] = str(app_data["effective_price"])
     app_data["mrp"] = str(app_data["mrp"])
+    app_data["discount"] = str(app_data["discount"])
     app_data["time_slot_start"] = str(app_data["time_slot_start"])
     app_data["doctor"] = app_data["doctor"].id
     app_data["hospital"] = app_data["hospital"].id
     app_data["profile"] = app_data["profile"].id
     app_data["user"] = app_data["user"].id
     app_data["booked_by"] = app_data["booked_by"].id
+    if app_data.get("coupon"):
+        app_data["coupon"] = list(app_data["coupon"])
     return app_data
 
 
@@ -256,11 +259,14 @@ def labappointment_transform(app_data):
     app_data["agreed_price"] = str(app_data["agreed_price"])
     app_data["deal_price"] = str(app_data["deal_price"])
     app_data["effective_price"] = str(app_data["effective_price"])
+    app_data["discount"] = str(app_data["discount"])
     app_data["time_slot_start"] = str(app_data["time_slot_start"])
     app_data["lab"] = app_data["lab"].id
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
+    if app_data.get("coupon"):
+        app_data["coupon"] = list(app_data["coupon"])
     return app_data
 
 
@@ -309,7 +315,7 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
-    profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
+    # profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
@@ -319,7 +325,7 @@ def payment_details(request, order):
         'furl': furl,
         'referenceId': "",
         'orderId': order.id,
-        'name': profile.name,
+        'name': order.action_data.get("profile_detail").get("name"),
         'txAmount': str(order.amount),
     }
     secret_key = client_key = ""
@@ -463,6 +469,89 @@ def form_pg_refund_data(refund_objs):
             params["checkSum"] = PgTransaction.create_pg_hash(params, secret_key, client_key)
             pg_data.append(params)
     return pg_data
+
+
+class CouponsMixin(object):
+
+    # def used_coupon_count(self, user, coupon_code):
+    #     from ondoc.coupon.models import Coupon
+    #     from ondoc.doctor.models import OpdAppointment
+    #     from ondoc.diagnostic.models import LabAppointment
+    #
+    #     data = Coupon.objects.filter(code__exact=coupon_code).first()
+    #
+    #     count = 0
+    #     if data:
+    #         if str(data.type) == str(Coupon.DOCTOR) or str(data.type) == str(Coupon.ALL):
+    #             count += OpdAppointment.objects.filter(user=user,
+    #                                                    status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
+    #                                                                OpdAppointment.RESCHEDULED_DOCTOR,
+    #                                                                OpdAppointment.RESCHEDULED_PATIENT,
+    #                                                                OpdAppointment.ACCEPTED,
+    #                                                                OpdAppointment.COMPLETED],
+    #                                                    coupon__code__exact=coupon_code).count()
+    #         if str(data.type) == str(Coupon.LAB) or str(data.type) == str(Coupon.ALL):
+    #             count += LabAppointment.objects.filter(user=user,
+    #                                                    status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
+    #                                                                LabAppointment.RESCHEDULED_LAB,
+    #                                                                LabAppointment.RESCHEDULED_PATIENT,
+    #                                                                LabAppointment.ACCEPTED,
+    #                                                                LabAppointment.COMPLETED],
+    #                                                    coupon__code__exact=coupon_code).count()
+    #     return count
+
+    def validate_coupon(self, user, coupon_code):
+        from ondoc.coupon.models import Coupon
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        data = Coupon.objects.filter(code__exact=coupon_code).first()
+
+        if data:
+            if isinstance(self, OpdAppointment) and data.type not in [Coupon.DOCTOR, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+            elif isinstance(self, LabAppointment) and data.type not in [Coupon.LAB, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+
+            if (timezone.now() - max(data.created_at, user.date_joined)).days > data.validity:
+                return {"is_valid": False, "used_count": None}
+
+            allowed_coupon_count = data.count
+            count = data.used_coupon_count(user)
+
+            if count < allowed_coupon_count:
+                return {"is_valid": True, "used_count": count}
+            else:
+                return {"is_valid": False, "used_count": count}
+        else:
+            return {"is_valid": False, "used_count": None}
+
+    def get_discount(self, coupon_code, price):
+        from ondoc.coupon.models import Coupon
+
+        data = Coupon.objects.filter(code__exact=coupon_code).first()
+        discount = 0
+
+        if data:
+            if data.min_order_amount is not None and price < data.min_order_amount:
+                return 0
+
+            if data.flat_discount is not None:
+                discount = data.flat_discount
+            elif data.percentage_discount is not None:
+                discount = math.floor(price * data.percentage_discount / 100)
+
+            if data.max_discount_amount is not None:
+                discount =  min(data.max_discount_amount, discount)
+
+            if discount > price:
+                discount = price
+
+            return discount
+                # else:
+                #     return discount
+        else:
+            return 0
 
 
 class TimeSlotExtraction(object):

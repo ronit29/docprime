@@ -4,11 +4,12 @@ from django.core.validators import MaxValueValidator, MinValueValidator, FileExt
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
 from ondoc.doctor.models import Hospital, SearchKey
+from ondoc.coupon.models import Coupon
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
-from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate
+from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, CouponsMixin
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
@@ -196,7 +197,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     rating = GenericRelation(ratings_models.RatingsReview)
     rating_query = GenericRelation(ratings_models.RatingsReview, related_query_name='labs')
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
-
+    order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     def __str__(self):
         return self.name
 
@@ -703,7 +704,7 @@ class AvailableLabTest(TimeStampedModel):
         db_table = "available_lab_test"
 
 
-class LabAppointment(TimeStampedModel):
+class LabAppointment(TimeStampedModel, CouponsMixin):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_LAB = 3
@@ -749,6 +750,8 @@ class LabAppointment(TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
     is_rated = models.BooleanField(default=False)
     rating_declined = models.BooleanField(default=False)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -891,9 +894,12 @@ class LabAppointment(TimeStampedModel):
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
         lab_ids = appointment_data.pop("lab_test")
+        coupon_list = appointment_data.pop("coupon", None)
         appointment_data.pop("extra_details", None)
         app_obj = cls.objects.create(**appointment_data)
         app_obj.lab_test.add(*lab_ids)
+        if coupon_list:
+            app_obj.coupon.add(*coupon_list)
         return app_obj
 
     def action_rescheduled_lab(self):
@@ -1070,6 +1076,17 @@ class CommonTest(TimeStampedModel):
 
     def __str__(self):
         return "{}-{}".format(self.test.name, self.id)
+
+
+class CommonPackage(TimeStampedModel):
+    package = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commonpackage')
+    icon = models.ImageField(upload_to='diagnostic/common_package_icons', null=True)
+
+    def __str__(self):
+        return "{}-{}".format(self.package.name, self.id)
+
+    class Meta:
+        db_table = 'common_package'
 
 
 class CommonDiagnosticCondition(TimeStampedModel):

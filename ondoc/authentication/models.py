@@ -972,7 +972,7 @@ class AgentToken(TimeStampedModel):
 
 
 class SPOCDetails(TimeStampedModel):
-    OTHER =1
+    OTHER = 1
     SPOC = 2
     MANAGER = 3
     OWNER = 4
