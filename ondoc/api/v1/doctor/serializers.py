@@ -641,7 +641,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     unrated_appointment = serializers.SerializerMethodField()
 
     def get_rating(self, obj):
-        reviews = rating_serializer.RatingsModelSerializer(obj.rating.exclude(Q(review='') | Q(review=None)), many=True)
+        reviews = rating_serializer.RatingsModelSerializer(obj.rating.exclude(Q(review='') | Q(review=None)).filter(is_live=True), many=True)
         return reviews.data[:5]
 
     def get_unrated_appointment(self, obj):
@@ -661,7 +661,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
     def get_rating_graph(self, obj):
         if obj and obj.rating:
-            data = rating_serializer.RatingsGraphSerializer(obj.rating, context={'request':self.context.get('request')}).data
+            data = rating_serializer.RatingsGraphSerializer(obj.rating.filter(is_live=True), context={'request':self.context.get('request')}).data
             return data
         return None
 
