@@ -1075,7 +1075,9 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         if manages_string:
             message = message + "\n\n User Manages \n"+ manages_string
         try:
-            notif_models.EmailNotification.publish_ops_email(valid_data.get('email'), message, 'Feedback Mail')
+            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com"]
+            for x in emails:
+                notif_models.EmailNotification.publish_ops_email(str(x), message, 'Feedback Mail')
             resp['status'] = "success"
         except:
             resp['status'] = "error"
