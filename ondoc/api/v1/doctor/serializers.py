@@ -648,15 +648,16 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         request = self.context.get('request')
         if request:
             user = request.user
-            opd_app = None
-            opd_all = user.appointments.filter(doctor=obj).order_by('-id')
-            for opd in opd_all:
-                if opd.status == OpdAppointment.COMPLETED and opd.rating_declined == False and opd.is_rated == False:
-                        opd_app = opd
-                break
-            if opd_app:
-                data = AppointmentRetrieveSerializer(opd_app, many=False, context={'request': request})
-                return data.data
+            if user:
+                opd_app = None
+                opd_all = user.appointments.filter(doctor=obj).order_by('-id')
+                for opd in opd_all:
+                    if opd.status == OpdAppointment.COMPLETED and opd.rating_declined == False and opd.is_rated == False:
+                            opd_app = opd
+                    break
+                if opd_app:
+                    data = AppointmentRetrieveSerializer(opd_app, many=False, context={'request': request})
+                    return data.data
             return None
 
     def get_rating_graph(self, obj):
