@@ -20,6 +20,8 @@ import datetime
 from django.db import transaction
 import logging
 
+from ondoc.procedure.models import DoctorClinicProcedure
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +38,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
-                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure)
+                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -160,16 +162,6 @@ class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
                     raise forms.ValidationError("Duplicate records not allowed.")
 
 
-class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
-    model = DoctorClinicProcedure
-    extra = 0
-    can_delete = True
-    show_change_link = False
-    verbose_name = 'Procedure'
-    verbose_name_plural = 'Procedures'
-    autocomplete_fields = ['procedure']
-
-
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     model = DoctorClinicTiming
     form = DoctorClinicTimingForm
@@ -178,6 +170,16 @@ class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     can_delete = True
     show_change_link = False
     readonly_fields = ['deal_price']
+
+
+class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
+    model = DoctorClinicProcedure
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    verbose_name = 'Procedure'
+    verbose_name_plural = 'Procedures'
+    autocomplete_fields = ['procedure']
 
 
 class DoctorClinicInline(ReadOnlyInline):
@@ -1581,7 +1583,3 @@ class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin)
     resource_class = PracticeSpecializationResource
     search_fields = ['name', ]
 
-
-class ProcedureAdmin(AutoComplete, VersionAdmin):
-    model = Procedure
-    search_fields = ['name']
