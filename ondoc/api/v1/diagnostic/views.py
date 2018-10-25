@@ -759,36 +759,9 @@ class LabTimingListView(mixins.ListModelMixin,
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
 
-        # lab_queryset = LabTiming.timing_manager.filter_lab(lab_id=lab, home_pickup=for_home_pickup).lab_
+        resp_list = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live = True, lab__is_home_collection_enabled = for_home_pickup, for_home_pickup=for_home_pickup)
 
-        resp_list = LabTiming.timing_manager.lab_booking_slots(lab_id=lab, is_home_pickup=for_home_pickup)
-
-        # # LabTiming.timing_manager.lab_booking_slots(lab, lab_queryset)
-        # # lab_queryset = Lab.objects.filter(pk=lab, is_live=True).prefetch_related('lab_timings').first()
-        # if not lab_queryset or (for_home_pickup and not lab_queryset.is_home_collection_enabled):
-        #     return Response([])
-        #
-        # obj = TimeSlotExtraction()
-        #
-        # if not for_home_pickup and lab_queryset.always_open:
-        #     for day in range(0, 7):
-        #         obj.form_time_slots(day, 0.0, 23.75, None, True)
-        # # New condition for home pickup timing from 7 to 7
-        # elif for_home_pickup:
-        #     for day in range(0, 7):
-        #         obj.form_time_slots(day, 7.0, 19.0, None, True)
-        # else:
-        #     lab_timing_queryset = lab_queryset.lab_timings.all()
-        #     # modfd_lab_timing_queryset = lab_timing_queryset.timing_manager.lab_booking_slots(lab=lab_queryset)
-        #     for data in lab_timing_queryset:
-        #         if for_home_pickup == data.for_home_pickup:
-        #
-        #             obj.form_time_slots(data.day, data.start, data.end, None, True)
-        #
-        # resp_list = obj.get_timing_list()
         return Response(resp_list)
-
-
 
 
 class AvailableTestViewSet(mixins.RetrieveModelMixin,
