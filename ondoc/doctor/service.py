@@ -10,7 +10,7 @@ from copy import deepcopy
 
 
 def get_doctor_detail_from_google(place_sheet_obj):
-    api_key = settings.GOOGLE_MAP_API_KEY
+    api_key = settings.REVERSE_GEOCODING_API_KEY
     try:
         # For doctor_clinic_address.
         if not place_sheet_obj.doctor_place_search:
