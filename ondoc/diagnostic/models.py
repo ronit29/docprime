@@ -371,7 +371,9 @@ class LabImage(TimeStampedModel, Image):
 
 class LabTiming(TimeStampedModel):
 
-    TIME_CHOICES = [(7.0, "7 AM"), (7.5, "7:30 AM"),
+    TIME_CHOICES = [(5.0, "5 AM"), (5.5, "5:30 AM"),
+                    (6.0, "6 AM"), (6.5, "6:30 AM"),
+                    (7.0, "7 AM"), (7.5, "7:30 AM"),
                     (8.0, "8 AM"), (8.5, "8:30 AM"),
                     (9.0, "9 AM"), (9.5, "9:30 AM"),
                     (10.0, "10 AM"), (10.5, "10:30 AM"),
@@ -386,7 +388,8 @@ class LabTiming(TimeStampedModel):
                     (19.0, "7 PM"), (19.5, "7:30 PM"),
                     (20.0, "8 PM"), (20.5, "8:30 PM"),
                     (21.0, "9 PM"), (21.5, "9:30 PM"),
-                    (22.0, "10 PM"), (22.5, "10:30 PM")]
+                    (22.0, "10 PM"), (22.5, "10:30 PM"),
+                    (23.0, "11 PM"), (23.5, "11:30 PM")]
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='lab_timings')
 
