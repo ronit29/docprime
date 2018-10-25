@@ -15,30 +15,11 @@ from django.template.defaultfilters import slugify
 import datetime
 from django.contrib.postgres.fields import JSONField
 from ondoc.api.v1.utils import RawSql
+from ondoc.common.helper import Choices
 
 def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
     return appender.join(value_chunks)
-
-
-class Choices(object):
-    @classmethod
-    def as_choices(cls):
-        properties = list(filter(lambda x : not x.startswith ("__"), dir(cls)))
-        properties.remove ("as_choices")
-        properties.remove ("availabilities")
-        choices = []
-        for prop in properties:
-            val = getattr(cls, prop)
-            choices.append((prop, val))
-        return choices
-
-    @classmethod
-    def availabilities(cls):
-        props = list(filter(lambda x: not x.startswith("__"), dir(cls)))
-        props.remove("as_choices")
-        props.remove("availabilities")
-        return props
 
 
 class GeoIpResults(TimeStampedModel):
@@ -72,7 +53,9 @@ class EntityAddress(TimeStampedModel):
     def get_or_create(cls, *args, **kwargs):
         mapping_dictionary = {
             'bengaluru': 'Bangalore',
-            'gurugram': 'Gurgaon'
+            'bengalooru': 'Bangalore',
+            'gurugram': 'Gurgaon',
+            'gurugram rural': 'Gurgaon'
         }
 
         meta_data = get_meta_by_latlong(kwargs.get('latitude'), kwargs.get('longitude'))
@@ -577,6 +560,8 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
             hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True, hospital_type=2).first()
         elif doctor_realted_hospitals.filter(is_live=True, hospital_type=3).exists():
             hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True, hospital_type=3).first()
+        else:
+            hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True).first()
 
         if hospital_for_doctor_page:
 

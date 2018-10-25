@@ -17,6 +17,7 @@ from ondoc.authentication import models as auth_model
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund
 from ondoc.payout.models import Outstanding
+from ondoc.coupon.models import Coupon
 from ondoc.doctor.tasks import doc_app_auto_cancel
 # from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
@@ -24,7 +25,7 @@ from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
-from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin
 from functools import reduce
 from operator import or_
 import logging
@@ -348,7 +349,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True,  blank=True)
     source = models.CharField(max_length=20, blank=True)
     batch = models.CharField(max_length=20, blank=True)
-    enable_for_online_booking = models.BooleanField(default=False)
+    enabled_for_online_booking = models.BooleanField(default=False)
+    enabled_for_online_booking_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -403,10 +405,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
                 self.is_live = False
 
-        if self.onboarding_status == self.ONBOARDED:
-            self.enable_for_online_booking = True
+        if self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED:
+            self.enabled_for_online_booking = True
+            if not self.enabled_for_online_booking_at:
+                self.enabled_for_online_booking_at = timezone.now()
+
         else:
-            self.enable_for_online_booking = False
+            self.enabled_for_online_booking = False
 
     def save(self, *args, **kwargs):
         self.update_live_status()
@@ -1005,7 +1010,7 @@ class DoctorOnboardingToken(auth_model.TimeStampedModel):
 #         db_table = "hospital_network_mapping"
 
 
-class OpdAppointment(auth_model.TimeStampedModel):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_DOCTOR = 3
@@ -1060,9 +1065,12 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
+
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -1094,7 +1102,10 @@ class OpdAppointment(auth_model.TimeStampedModel):
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
+        coupon_list = appointment_data.pop("coupon", None)
         app_obj = cls.objects.create(**appointment_data)
+        if coupon_list:
+            app_obj.coupon.add(*coupon_list)
         return app_obj
 
     @transaction.atomic
@@ -1153,7 +1164,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
     def generate_invoice(self):
         pass
 
-
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
             return self.hospital.network, payout_model.Outstanding.HOSPITAL_NETWORK_LEVEL
@@ -1170,7 +1180,6 @@ class OpdAppointment(auth_model.TimeStampedModel):
                                                                         action=ConsumerTransaction.SALE).
                        order_by("created_at").last())
         return consumer_tx.amount
-
 
     def is_doctor_available(self):
         if DoctorLeave.objects.filter(start_date__lte=self.time_slot_start.date(),
@@ -1619,3 +1628,34 @@ class SourceIdentifier(auth_model.TimeStampedModel):
     class Meta:
         db_table = "source_identifier"
         unique_together = ('unique_identifier', )
+
+
+class GoogleDetailing(auth_model.TimeStampedModel):
+
+    identifier = models.CharField(max_length=255, null=True, blank=False)
+    name = models.CharField(max_length=64, null=True, blank=False)
+    clinic_hospital_name = models.CharField(max_length=128, null=True, blank=False)
+    address = models.TextField(null=True, blank=False)
+    doctor_clinic_address = models.TextField(null=True, blank=False)
+    clinic_address = models.TextField(null=True, blank=False)
+
+    doctor_place_search = models.TextField(null=True)
+    clinic_place_search = models.TextField(null=True)
+
+    doctor_detail = models.TextField(null=True)
+    clinic_detail = models.TextField(null=True)
+
+    doctor_number = models.CharField(max_length=255, null=True, blank=True)
+    clinic_number = models.CharField(max_length=255, null=True, blank=True)
+
+    doctor_international_number = models.CharField(max_length=255, null=True, blank=True)
+    clinic_international_number = models.CharField(max_length=255, null=True, blank=True)
+
+    doctor_formatted_address = models.TextField(null=True)
+    clinic_formatted_address = models.TextField(null=True)
+
+    doctor_name = models.CharField(max_length=1024, null=True, blank=True)
+    clinic_name = models.CharField(max_length=1024, null=True, blank=True)
+
+    class Meta:
+        db_table = 'google_api_details'

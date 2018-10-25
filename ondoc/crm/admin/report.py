@@ -6,17 +6,18 @@ from django.forms import ModelForm
 import django_tables2 as tables
 from django_tables2 import RequestConfig
 from django_tables2.export.export import TableExport
+import datetime
 
 
 def get_table_class(keys):
-    def get_table_column(field):
-        if field in ['created_at', 'updated_at']:
-            return tables.DateColumn("d/m/Y H:i")
+    def get_table_column(field, value):
+        if isinstance(value,datetime.datetime):
+            return tables.DateTimeColumn()
         else:
             return tables.Column()
 
     attrs = dict(
-        (f, get_table_column(f)) for
+        (f, get_table_column(f,keys[f])) for
         f in keys
     )
     attrs['Meta'] = type('Meta', (), {'attrs': {"class": "table"}, "order_by": ("-created_at",)})
@@ -51,7 +52,7 @@ class ReportAdmin(admin.ModelAdmin):
         query_string = object.sql
         result = RawSql(query_string).fetch_all()
         if result:
-            table_class = get_table_class(result[0].keys())
+            table_class = get_table_class(result[0])
             table = table_class(result)
             table.export_formats = ['csv']
             RequestConfig(request).configure(table)

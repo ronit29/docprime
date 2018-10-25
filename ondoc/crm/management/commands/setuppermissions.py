@@ -36,7 +36,7 @@ from ondoc.web.models import Career, OnlineLead
 
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 
-from ondoc.authentication.models import BillingAccount, SPOCDetails
+from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin
 
 from ondoc.seo.models import Sitemap
 
@@ -332,6 +332,28 @@ class Command(BaseCommand):
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
                 Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        group, created = Group.objects.get_or_create(name=constants['DOCTOR_SALES_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(DoctorEmail, DoctorMobile, DoctorClinicTiming)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(Doctor, DoctorClinic, DoctorPracticeSpecialization,
+                                                           DoctorQualification, DoctorLanguage)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
