@@ -385,7 +385,7 @@ class LabBookingClosingManager(models.Manager):
 
             elif is_home_pickup:
                 for day in range(0, 7):
-                    obj.form_time_slots(day, 7.0, 19.0-threshold, None, True)
+                    obj.form_time_slots(day, 7.0, 19.0, None, True)
 
             else:
                 daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
