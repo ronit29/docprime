@@ -53,7 +53,9 @@ class EntityAddress(TimeStampedModel):
     def get_or_create(cls, *args, **kwargs):
         mapping_dictionary = {
             'bengaluru': 'Bangalore',
-            'gurugram': 'Gurgaon'
+            'bengalooru': 'Bangalore',
+            'gurugram': 'Gurgaon',
+            'gurugram rural': 'Gurgaon'
         }
 
         meta_data = get_meta_by_latlong(kwargs.get('latitude'), kwargs.get('longitude'))
@@ -558,6 +560,8 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
             hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True, hospital_type=2).first()
         elif doctor_realted_hospitals.filter(is_live=True, hospital_type=3).exists():
             hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True, hospital_type=3).first()
+        else:
+            hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True).first()
 
         if hospital_for_doctor_page:
 

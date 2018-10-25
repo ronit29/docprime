@@ -8,7 +8,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization, Procedure)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
-                                     TestParameter)
+                                     TestParameter, CommonPackage)
+from ondoc.coupon.models import Coupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
@@ -24,7 +25,7 @@ from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
-    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin
+    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -56,7 +57,7 @@ admin.site.register(OtpVerifications)
 admin.site.register(UserProfile)
 
 admin.site.register(LabAppointment, LabAppointmentAdmin) #temp temp temp
-admin.site.register(DoctorClinic, DoctorClinicAdmin)
+#admin.site.register(DoctorClinic, DoctorClinicAdmin)
 
 admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(AboutDoctor, AboutDoctorAdmin)
@@ -78,6 +79,7 @@ admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
 admin.site.register(Lab, LabAdmin)
 admin.site.register(CommonTest, CommonTestAdmin)
+admin.site.register(CommonPackage, CommonPackageAdmin)
 admin.site.register(CommonDiagnosticCondition, CommonDiagnosticConditionAdmin)
 admin.site.register(LabNetwork, LabNetworkAdmin)
 
@@ -110,3 +112,4 @@ admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
 admin.site.register(SitemapManger, SitemapManagerAdmin)
 
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
+admin.site.register(Coupon)

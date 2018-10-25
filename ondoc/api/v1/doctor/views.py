@@ -2,6 +2,7 @@ from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification.models import EmailNotification
+from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
@@ -39,6 +40,8 @@ from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
 from ondoc.notification import models as notif_models
 User = get_user_model()
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.throttling import AnonRateThrottle
 
 
 class CreateAppointmentPermission(permissions.BasePermission):
@@ -191,13 +194,22 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "dob": str(profile_model.dob)
         }
         req_data = request.data
+
+        coupon_list = []
+        coupon_discount = 0
+        if data.get("coupon_code"):
+            coupon_list = list(Coupon.objects.filter(code__in=data.get("coupon_code")).values_list('id', flat=True))
+            obj = models.OpdAppointment()
+            for coupon in data.get("coupon_code"):
+                coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
+
         if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-            effective_price = doctor_clinic_timing.fees
-        elif data.get("payment_type") == models.OpdAppointment.COD:
             effective_price = doctor_clinic_timing.deal_price
-        else:
-            # TODO PM - Logic for coupon
-            effective_price = doctor_clinic_timing.deal_price
+        elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
+            if coupon_discount >= doctor_clinic_timing.deal_price:
+                effective_price = 0
+            else:
+                effective_price = doctor_clinic_timing.deal_price - coupon_discount
 
         opd_data = {
             "doctor": data.get("doctor"),
@@ -211,7 +223,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "effective_price": effective_price,
             "mrp": doctor_clinic_timing.mrp,
             "time_slot_start": time_slot_start,
-            "payment_type": data.get("payment_type")
+            "payment_type": data.get("payment_type"),
+            "coupon": coupon_list,
+            "discount": coupon_discount
         }
         resp = self.extract_payment_details(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID)
         return Response(data=resp)
@@ -988,7 +1002,17 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
+class LimitUser(UserRateThrottle):
+    rate = '5/day'
+
+
+class LimitAnon(AnonRateThrottle):
+    rate = '5/day'
+
+
 class DoctorContactNumberViewSet(viewsets.GenericViewSet):
+
+    throttle_classes = (LimitUser, LimitAnon)
 
     def retrieve(self, request, doctor_id):
 
@@ -1001,7 +1025,7 @@ class DoctorContactNumberViewSet(viewsets.GenericViewSet):
         else:
             final = str(doctor_details.get('number'))
             if doctor_details.get('std_code'):
-                final = str(doctor_details.get('std_code'))+str(doctor_details.get('number'))
+                final = '0'+str(doctor_details.get('std_code'))+' '+str(doctor_details.get('number'))
             return Response({'status': 1, 'number': final}, status.HTTP_200_OK)
 
 
