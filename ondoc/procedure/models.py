@@ -4,7 +4,7 @@ from ondoc.doctor.models import DoctorClinic, SearchKey
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
-    parents = models.ManyToManyField('self', through='ProcedureCategoryMapping',
+    parents = models.ManyToManyField('self', symmetrical=False, through='ProcedureCategoryMapping',
                                      through_fields=('child_category', 'parent_category'))
     name = models.CharField(max_length=500, unique=True)
     details = models.CharField(max_length=2000)
@@ -30,8 +30,8 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
 
 
 class ProcedureCategoryMapping(models.Model):
-    parent_category = models.ForeignKey(ProcedureCategory)
-    child_category = models.ForeignKey(ProcedureCategory)
+    parent_category = models.ForeignKey(ProcedureCategory, on_delete=models.CASCADE, related_name='related_parent_category')
+    child_category = models.ForeignKey(ProcedureCategory, on_delete=models.CASCADE, related_name='related_child_category')
     is_manual = models.BooleanField(default=False)
 
     def __str__(self):
