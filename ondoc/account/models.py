@@ -142,10 +142,19 @@ class Order(TimeStampedModel):
 
                 if insured_member_dict:
                     insurance_transaction_obj = InsuranceTransaction.create_insurance_transaction(insurance_transaction,
-                                                                                                  insured_member_dict)
-                    # if insurance_transaction_obj:
-                        # user_insurance_obj = UserInsurance.create_user_insurance(insurance_data, insured_member_dict,
-                        #                                                          insurance_transaction_obj)
+                                                                                                  insured_member_dict, order_obj)
+                    if insurance_transaction_obj:
+                        user_insurance_obj = UserInsurance.create_user_insurance(insurance_data, insured_member_dict,
+                                                                                 insurance_transaction_obj)
+
+                        id_list = []
+
+                        for members in insured_member_dict.get('members'):
+                            member_id = members.get('profile')
+                            id_list.append(member_id)
+
+                        user_profile_insured = UserProfile.objects.filter(id__in=id_list).update(is_insured=True)
+
 
             order_dict = {
                 "reference_id": insurance_transaction_obj.id,
