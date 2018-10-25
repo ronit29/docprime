@@ -41,9 +41,10 @@ from ondoc.authentication.models import OtpVerifications, UserProfile
 
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
-
 from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
 from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
+from ondoc.doctor.models import GoogleDetailing
+from .doctor import GoogleDetailingAdmin
 from .seo import SitemapManagerAdmin
 from ondoc.seo.models import SitemapManger
 
@@ -112,7 +113,7 @@ admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
 admin.site.register(Procedure, ProcedureAdmin)
 
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
-
 admin.site.register(RatingsReview, RatingsReviewAdmin)
 admin.site.register(SitemapManger, SitemapManagerAdmin)
+admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
 admin.site.register(Coupon)
