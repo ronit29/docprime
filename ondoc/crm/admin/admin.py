@@ -43,7 +43,7 @@ from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
 
 from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
-from ondoc.crm.admin.ratings import RatingsReviewAdmin
+from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
 from .seo import SitemapManagerAdmin
 from ondoc.seo.models import SitemapManger
 
@@ -57,7 +57,7 @@ admin.site.index_title = 'CRM Administration'
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
 admin.site.register(UserProfile)
-admin.site.register(ReviewCompliments)
+admin.site.register(ReviewCompliments, ReviewComplimentsAdmin)
 
 admin.site.register(LabAppointment, LabAppointmentAdmin) #temp temp temp
 #admin.site.register(DoctorClinic, DoctorClinicAdmin)

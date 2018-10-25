@@ -28,13 +28,26 @@ class RatingsReviewForm(forms.ModelForm):
 
 
 
-
-
-
 class ReviewActionsInLine(admin.TabularInline):
     model = ReviewActions
     extra = 0
     can_delete = True
+
+
+class ReviewComplimentsForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        if cleaned_data.get('rating_level') and (
+                cleaned_data.get('rating_level') > 5 or cleaned_data.get('rating_level') < 1 or type(
+                cleaned_data.get('rating_level')) == float):
+            raise forms.ValidationError("invalid rating level")
+
+
+class ReviewComplimentsAdmin(admin.ModelAdmin):
+    form = ReviewComplimentsForm
 
 
 class RatingsReviewAdmin(admin.ModelAdmin):

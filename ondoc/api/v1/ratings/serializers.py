@@ -17,7 +17,7 @@ class GetComplementSerializer(serializers.ModelSerializer):
 
 class RatingCreateBodySerializer(serializers.Serializer):
     rating = serializers.IntegerField(max_value=5)
-    review = serializers.CharField(max_length=500, allow_blank=True)
+    review = serializers.CharField(max_length=5000, allow_blank=True)
     appointment_id = serializers.IntegerField()
     appointment_type = serializers.ChoiceField(choices=RatingsReview.APPOINTMENT_TYPE_CHOICES)
     # compliment = ListReviewComplimentSerializer(source='request.data')
@@ -52,7 +52,7 @@ class RatingsGraphSerializer(serializers.Serializer):
         response = []
         request = self.context.get('request')
         for rate in obj.all():
-            for cmlmnt in  rate.compliment.all():
+            for cmlmnt in rate.compliment.filter(rating_level__in=[4, 5]):
                 r = {'id': cmlmnt.id,
                      'message': cmlmnt.message,
                      'icon': cmlmnt.icon.url if cmlmnt.icon else None}
@@ -66,7 +66,7 @@ class RatingsGraphSerializer(serializers.Serializer):
                 comp_count[x['id']] = x
                 comp_count[x['id']]['count'] = 1
                 comp_count[x['id']]['icon'] = request.build_absolute_uri(x['icon']) if x.get('icon') is not None else None
-        response = [comp_count[k] for k in sorted(comp_count, key=comp_count.get('count'), reverse=True)][:3]
+        response = [comp_count[k] for k in sorted(comp_count, key=comp_count.get('count'), reverse=False)][:3]
         return response
 
     def get_rating_count(self, obj):
@@ -141,7 +141,7 @@ class RatingsModelSerializer(serializers.ModelSerializer):
 
 class RatingUpdateBodySerializer(serializers.Serializer):
     rating = serializers.IntegerField(max_value=5)
-    review = serializers.CharField(max_length=500, allow_blank=True)
+    review = serializers.CharField(max_length=5000, allow_blank=True)
     id = serializers.IntegerField()
     compliment = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ReviewCompliments.objects.all()))
 

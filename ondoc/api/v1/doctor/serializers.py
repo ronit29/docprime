@@ -641,7 +641,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     unrated_appointment = serializers.SerializerMethodField()
 
     def get_rating(self, obj):
-        reviews = rating_serializer.RatingsModelSerializer(obj.rating.exclude(Q(review='') | Q(review=None)).filter(is_live=True), many=True)
+        queryset = obj.rating.exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True)
         return reviews.data[:5]
 
     def get_unrated_appointment(self, obj):
@@ -652,7 +653,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 opd_app = None
                 opd_all = user.appointments.filter(doctor=obj).order_by('-id')
                 for opd in opd_all:
-                    if opd.status == OpdAppointment.COMPLETED and opd.rating_declined == False and opd.is_rated == False:
+                    if opd.status == OpdAppointment.COMPLETED and opd.is_rated == False:
                             opd_app = opd
                     break
                 if opd_app:

@@ -33,7 +33,7 @@ class RatingsReview(auth_model.TimeStampedModel):
     APPOINTMENT_TYPE_CHOICES = [(LAB, 'Lab'), (OPD, 'Opd')]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     ratings = models.PositiveIntegerField(null=True)
-    review = models.CharField(max_length=500, null=True, blank=True)
+    review = models.CharField(max_length=5000, null=True, blank=True)
     appointment_id = models.PositiveIntegerField(blank=True, null=True)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, blank=True, null=True)
     is_live = models.BooleanField(default=True)

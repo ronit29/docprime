@@ -64,10 +64,17 @@ class LabModelSerializer(serializers.ModelSerializer):
     lab_thumbnail = serializers.SerializerMethodField()
     home_pickup_charges = serializers.ReadOnlyField()
     seo = serializers.SerializerMethodField()
-    rating = rating_serializer.RatingsModelSerializer(read_only=True, many=True, source='get_ratings')
-    breadcrumb = serializers.SerializerMethodField()
+    # rating = rating_serializer.RatingsModelSerializer(read_only=True, many=True, source='get_ratings')
     rating_graph = serializers.SerializerMethodField()
+    breadcrumb = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
     unrated_appointment = serializers.SerializerMethodField()
+
+
+    def get_rating(self, obj):
+        queryset = obj.rating.exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True)
+        return reviews.data[:5]
 
     def get_unrated_appointment(self, obj):
         request = self.context.get('request')
@@ -77,7 +84,7 @@ class LabModelSerializer(serializers.ModelSerializer):
                 lab_app = None
                 lab_all = user.lab_appointments.filter(lab=obj).order_by('-id')
                 for lab in lab_all:
-                    if lab.status == LabAppointment.COMPLETED and lab.rating_declined == False and lab.is_rated == False:
+                    if lab.status == LabAppointment.COMPLETED and lab.is_rated == False:
                         lab_app = lab
                     break
                 if lab_app:
@@ -91,15 +98,6 @@ class LabModelSerializer(serializers.ModelSerializer):
             return data
         return None
 
-    def get_rating(self, obj):
-        rating_row = obj.rating.all()
-        review_row = obj.rating.filter(review__isnull=False).all()
-        rating_count = rating_row.count()
-        review_count = review_row.count()
-        average_rating = rating_row.aggregate(Avg('ratings'))
-        average_rating = average_rating['ratings__avg']
-
-        return {'rating_count': rating_count, 'average_rating': average_rating, 'review_count': review_count}
 
     def get_seo(self, obj):
         if self.parent:
