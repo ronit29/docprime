@@ -12,16 +12,16 @@ from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin
 
 def practicing_since_choices():
-    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
+    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
 
 def hospital_operational_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-100,-1)]
 
 def college_passing_year_choices():
-    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
+    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
 
 def award_year_choices():
-    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
+    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
 
 
 def award_year_choices_no_blank():
@@ -99,11 +99,11 @@ class FormCleanMixin(forms.ModelForm):
                         raise forms.ValidationError("Cannot modify Data added by other users")
             if '_submit_for_qc' in self.data:
                 self.validate_qc()
-                if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
-                    for h in self.instance.doctor_clinics.all():
-                        if (h.hospital.data_status < 2):
-                            raise forms.ValidationError(
-                                "Cannot submit for QC without submitting associated Hospitals: " + h.hospital.name)
+                # if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
+                #     for h in self.instance.doctor_clinics.all():
+                #         if (h.hospital.data_status < 2):
+                #             raise forms.ValidationError(
+                #                 "Cannot submit for QC without submitting associated Hospitals: " + h.hospital.name)
                 if hasattr(self.instance, 'network') and self.instance.network is not None:
                     if self.instance.network.data_status < 2:
                         class_name = self.instance.network.__class__.__name__
@@ -114,11 +114,11 @@ class FormCleanMixin(forms.ModelForm):
                     raise forms.ValidationError("Doctor must have atleast and atmost one primary mobile number.")
             if '_qc_approve' in self.data:
                 self.validate_qc()
-                if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
-                    for h in self.instance.doctor_clinics.all():
-                        if (h.hospital.data_status < 3):
-                            raise forms.ValidationError(
-                                "Cannot approve QC check without approving associated Hospitals: " + h.hospital.name)
+                # if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
+                #     for h in self.instance.doctor_clinics.all():
+                #         if (h.hospital.data_status < 3):
+                #             raise forms.ValidationError(
+                #                 "Cannot approve QC check without approving associated Hospitals: " + h.hospital.name)
                 if hasattr(self.instance, 'network') and self.instance.network is not None:
                     if self.instance.network.data_status < 3:
                         class_name = self.instance.network.__class__.__name__

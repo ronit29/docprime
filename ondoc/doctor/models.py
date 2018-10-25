@@ -1071,6 +1071,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
+
     def allowed_action(self, user_type, request):
         allowed = []
         current_datetime = timezone.now()

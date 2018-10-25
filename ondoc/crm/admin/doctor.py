@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 from ondoc.account.models import Order
 from django.contrib.contenttypes.admin import GenericTabularInline
-from ondoc.authentication.models import GenericAdmin, BillingAccount
+from ondoc.authentication.models import GenericAdmin, BillingAccount, SPOCDetails
 from ondoc.authentication.admin import BillingAccountInline
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
@@ -512,7 +512,7 @@ class DoctorForm(FormCleanMixin):
 
     def validate_qc(self):
         qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
-                       'license': 'req', 'emails': 'count',
+                       'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count'}
 
@@ -531,6 +531,13 @@ class DoctorForm(FormCleanMixin):
                 raise forms.ValidationError(key + " is required for Quality Check")
             if value == 'count' and int(self.data[key + '-TOTAL_FORMS']) <= 0:
                 raise forms.ValidationError("Atleast one entry of " + key + " is required for Quality Check")
+            if key == 'doctor_clinics':
+                    all_hospital_ids = []
+                    for indx in range(int(self.data[key + '-TOTAL_FORMS'])):
+                        all_hospital_ids.append(int(self.data[key + '-{}-hospital'.format(indx)]))
+                    if not Hospital.objects.filter(pk__in=all_hospital_ids, is_live=True).count():
+                        raise forms.ValidationError("Atleast one entry of " + key + " should be live for Quality Check")
+
 
     def clean_practicing_since(self):
         data = self.cleaned_data['practicing_since']
@@ -802,7 +809,7 @@ class CompetitorInfoInline(ReadOnlyInline):
 class CompetitorInfoResource(resources.ModelResource):
     class Meta:
         model = CompetitorInfo
-        fields = ('id', 'doctor', 'hospital_name', 'fee', 'url')
+        fields = ('id', 'doctor', 'hospital_name', 'fee', 'hospital', 'url')
 
     def init_instance(self, row=None):
         ins = super().init_instance(row)
@@ -962,7 +969,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         # check for errors
         errors = []
-        required = ['name', 'gender', 'license', 'practicing_since']
+        required = ['name', 'gender', 'practicing_since']
         for req in required:
             if not getattr(doctor, req):
                 errors.append(req + ' is required')
@@ -1168,7 +1175,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     get_profile.short_description = 'Profile Name'
 
     def get_doctor(self, obj):
-        return obj.doctor.name
+        if obj.doctor:
+            return obj.doctor.name
+        return ''
+
 
     get_doctor.admin_order_field = 'doctor'
     get_doctor.short_description = 'Doctor Name'
@@ -1195,12 +1205,12 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'profile',
-                    'profile_detail', 'user', 'booked_by',
-                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type','start_date',
-                    'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
+            return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details',
+                    'contact_details', 'profile', 'profile_detail', 'user', 'booked_by',
+                    'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
+                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'contact_details', 'used_profile_name',
                     'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
@@ -1212,9 +1222,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return ('booking_id', 'doctor_id', 'doctor_details')
+            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details'
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'contact_details',
+            return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+                    'hospital_details', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
@@ -1281,6 +1292,15 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                                                                                          location_link=location_link))
         else:
             return obj.hospital.name
+
+    def hospital_details(self, obj):
+        if obj.hospital:
+            result = ''
+            c_t_d = dict(SPOCDetails.CONTACT_TYPE_CHOICES)
+            for spoc in obj.hospital.spoc_details.all():
+                result += 'Name : {name}\nSTD Code : {std_code}\nNumber : {number}\nEmail : {email}\nDetails : {details}\nContact Type : {c_t}\n\n'.format(**(spoc.__dict__), c_t=c_t_d.get(spoc.contact_type, ''))
+            return result
+        return ''
 
     def used_profile_name(self, obj):
         return obj.profile.name
