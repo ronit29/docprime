@@ -5,7 +5,7 @@ from ondoc.doctor.models import DoctorClinic, SearchKey
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
     parents = models.ManyToManyField('self', symmetrical=False, through='ProcedureCategoryMapping',
-                                     through_fields=('child_category', 'parent_category'))
+                                     through_fields=('child_category', 'parent_category'), related_name='children')
     name = models.CharField(max_length=500, unique=True)
     details = models.CharField(max_length=2000)
 
@@ -32,13 +32,25 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
 class ProcedureCategoryMapping(models.Model):
     parent_category = models.ForeignKey(ProcedureCategory, on_delete=models.CASCADE, related_name='related_parent_category')
     child_category = models.ForeignKey(ProcedureCategory, on_delete=models.CASCADE, related_name='related_child_category')
-    is_manual = models.BooleanField(default=False)
+    is_manual = models.BooleanField(default=False)  # added by code
 
     def __str__(self):
         return '({}){}-{}'.format(self.parent_category, self.child_category.name, self.is_manual)
 
     class Meta:
         db_table = "procedure_category_mapping"
+        unique_together = ('parent_category', 'child_category')
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        super().save(force_insert, force_update, using, update_fields)
+        parents = ProcedureCategoryMapping.objects.filter(child_category=self.parent_category).distinct()
+        all_objects = []
+        for i in parents:
+            all_objects.append(ProcedureCategoryMapping(parent_category=i.parent_category, child_category=self.child_category, is_manual=True))
+        ProcedureCategoryMapping.objects.bulk_create(all_objects)
+
+    def delete(self, using=None, keep_parents=False):
+        return super().delete(using, keep_parents)
 
 
 class DoctorClinicProcedure(auth_model.TimeStampedModel):

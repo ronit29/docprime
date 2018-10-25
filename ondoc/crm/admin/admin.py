@@ -9,8 +9,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage)
-from ondoc.procedure.models import Procedure
-from ondoc.crm.admin.procedure import ProcedureAdmin
+from ondoc.procedure.models import Procedure, ProcedureCategory
+from ondoc.crm.admin.procedure import ProcedureAdmin, ProcedureCategoryAdmin
 from ondoc.coupon.models import Coupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount
@@ -107,6 +107,8 @@ admin.site.register(ConsumerAccount)
 admin.site.register(TestParameter, TestParameterAdmin)
 admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
 admin.site.register(Procedure, ProcedureAdmin)
+admin.site.register(ProcedureCategory, ProcedureCategoryAdmin)
+
 
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
 admin.site.register(SitemapManger, SitemapManagerAdmin)

@@ -1,11 +1,11 @@
 from rest_framework.viewsets import GenericViewSet
 import re
 from django.db.models.functions import StrIndex
-from django.db.models import Value,Q
+from django.db.models import Value, Q
 from ondoc.api.pagination import paginate_queryset
 from ondoc.procedure.models import Procedure
 from rest_framework.response import Response
-from ondoc.api.v1.procedure.serializers import serializers as procedure_serializer
+from ondoc.api.v1.procedure import serializers as procedure_serializer
 
 
 class ProcedureListViewSet(GenericViewSet):
