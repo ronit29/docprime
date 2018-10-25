@@ -112,6 +112,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     PRIVATE = 1
     CLINIC = 2
     HOSPITAL = 3
+    NON_NETWORK_HOSPITAL = 1
+    NETWORK_HOSPITAL = 2
+    NETWORK_CHOICES = [("", "Select"), (NON_NETWORK_HOSPITAL, "Non Network Hospital"), (NETWORK_HOSPITAL, "Network Hospital")]
     HOSPITAL_TYPE_CHOICES = (("", "Select"), (PRIVATE, 'Private'), (CLINIC, "Clinic"), (HOSPITAL, "Hospital"),)
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
@@ -129,8 +132,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     hospital_type = models.PositiveSmallIntegerField(blank=True, null=True, choices=HOSPITAL_TYPE_CHOICES)
     network_type = models.PositiveSmallIntegerField(blank=True, null=True,
-                                                    choices=[("", "Select"), (1, "Non Network Hospital"),
-                                                             (2, "Network Hospital")])
+                                                    choices=NETWORK_CHOICES)
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='assoc_hospitals')
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
     is_appointment_manager = models.BooleanField(verbose_name='Enabled for Managing Appointments', default=False)
