@@ -10,7 +10,7 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabSe
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter)
 from ondoc.lead.models import HospitalLead, DoctorLead
-from ondoc.account.models import ConsumerAccount
+from ondoc.account.models import ConsumerAccount, Order
 from ondoc.notification import models as notifcation_model
 from .common import Cities, CitiesAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin
@@ -39,7 +39,8 @@ User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
-from ondoc.insurance.models import Insurer, InsurerFloat, InsurancePlans, InsuranceThreshold, UserInsurance, InsuredMembers
+from ondoc.insurance.models import Insurer, InsurerFloat, InsurancePlans, InsuranceThreshold, UserInsurance, \
+    InsuredMembers, InsuranceTransaction
 from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, UserInsuranceAdmin, InsuredMembersAdmin
 from ondoc.insurance import models as insurance_model
 
@@ -109,4 +110,6 @@ admin.site.register(InsurancePlans, InsurancePlansAdmin)
 admin.site.register(InsurerFloat, InsurerFloatAdmin)
 admin.site.register(UserInsurance, UserInsuranceAdmin)
 admin.site.register(InsuredMembers, InsuredMembersAdmin)
+admin.site.register(InsuranceTransaction)
+admin.site.register(Order)
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)

@@ -10,10 +10,11 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+
         migrations.AddField(
             model_name='insuredmembers',
             name='gender',
-            field=models.CharField(blank=True, choices=[('m', 'Male'), ('f', 'Female'), ('o', 'Other')], max_length=50, null=True),
+            field=models.CharField(choices=[('m', 'Male'), ('f', 'Female'), ('o', 'Other')], max_length=50, null=True),
         ),
         migrations.AlterField(
             model_name='insuredmembers',
