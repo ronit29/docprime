@@ -7,9 +7,9 @@ def google_doctor_parser():
     for doctor in GoogleDetailing.objects.all().order_by('id'):
         success = get_doctor_detail_from_google(doctor)
         if success:
-            print("Successfull")
+            print("Successfull for id ", doctor.id)
         else:
-            print("Failed")
+            print("Failed for id ", doctor.id)
 
 
 class Command(BaseCommand):

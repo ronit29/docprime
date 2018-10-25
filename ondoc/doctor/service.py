@@ -27,6 +27,9 @@ def get_doctor_detail_from_google(place_sheet_obj):
         else:
             doctor_place_search_data = json.loads(place_sheet_obj.doctor_place_search)
 
+        place_sheet_obj.doctor_place_search = json.dumps(doctor_place_search_data)
+        place_sheet_obj.save()
+
         if doctor_place_search_data.get('candidates', None) and isinstance(doctor_place_search_data.get('candidates'), list) and len(doctor_place_search_data.get('candidates')) > 0:
             candidate = doctor_place_search_data.get('candidates')[0]
             place_id = candidate.get('place_id')
@@ -48,6 +51,9 @@ def get_doctor_detail_from_google(place_sheet_obj):
                 doctor_detail_search_data = response.json()
         else:
             doctor_detail_search_data = json.loads(place_sheet_obj.doctor_detail)
+
+        place_sheet_obj.doctor_detail = json.dumps(doctor_detail_search_data)
+        place_sheet_obj.save()
 
         if not doctor_detail_search_data.get('result', None):
             print("[ERROR] Invalid data recieved from google detail api for doctor_clinic_address.")
@@ -77,6 +83,9 @@ def get_doctor_detail_from_google(place_sheet_obj):
         else:
             clinic_place_search_data = json.loads(place_sheet_obj.clinic_place_search)
 
+        place_sheet_obj.clinic_place_search = json.dumps(clinic_place_search_data)
+        place_sheet_obj.save()
+
         if clinic_place_search_data.get('candidates', None) and isinstance(clinic_place_search_data.get('candidates'), list) and len(clinic_place_search_data.get('candidates')) > 0:
             candidate = clinic_place_search_data.get('candidates')[0]
             place_id = candidate.get('place_id')
@@ -98,6 +107,9 @@ def get_doctor_detail_from_google(place_sheet_obj):
                 clinic_detail_search_data = response.json()
         else:
             clinic_detail_search_data = json.loads(place_sheet_obj.clinic_detail)
+
+        place_sheet_obj.clinic_detail = json.dumps(clinic_detail_search_data)
+        place_sheet_obj.save()
 
         if not clinic_detail_search_data.get('result', None):
             print("[ERROR] Invalid data recieved from google detail api for clinic_address.")
