@@ -53,13 +53,29 @@ class ReviewComplimentsAdmin(admin.ModelAdmin):
 
 
 class RatingsReviewResource(resources.ModelResource):
+
+    type = fields.Field()
+    compliments = fields.Field()
+
+    def dehydrate_type(self, obj):
+        if obj.appointment_type:
+            return dict(obj.APPOINTMENT_TYPE_CHOICES)[obj.appointment_type]
+        return ''
+
+    def dehydrate_compliments(self, obj):
+        compliments_string = ''
+        if obj.compliment:
+            c_list = obj.compliment.values_list('message', flat=True)
+            compliments_string = (', ').join(c_list)
+        return compliments_string
+
     class Meta:
         model = RatingsReview
-        fields = ('id', 'name', 'appointment_type', 'ratings', 'review', 'updated_at')
-        export_order = ('id', 'name', 'appointment_type', 'ratings', 'review', 'updated_at')
+        fields = ('id', 'type', 'appointment_id', 'ratings', 'review', 'compliments', 'updated_at')
+        export_order = ('id', 'type', 'appointment_id', 'ratings', 'review', 'compliments', 'updated_at')
 
 
-class RatingsReviewAdmin(admin.ModelAdmin, ImportExportMixin):
+class RatingsReviewAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = RatingsReviewResource
     inlines = [ReviewActionsInLine]
     list_display = (['name', 'appointment_type', 'ratings', 'updated_at'])
