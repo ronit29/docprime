@@ -375,6 +375,8 @@ class LabBookingClosingManager(models.Manager):
     def lab_booking_slots(self, *args, **kwargs):
 
         is_home_pickup = kwargs.get("for_home_pickup", False)
+        if is_home_pickup:
+            kwargs["lab__is_home_collection_enabled"] = is_home_pickup
         lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
 
         if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
