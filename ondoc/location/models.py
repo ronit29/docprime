@@ -245,6 +245,7 @@ class EntityUrls(TimeStampedModel):
             case when y.type='LOCALITY' then location_name
             when y.type='SUBLOCALITY' then ea.alternative_value
             end as locality_value,
+            
                     
             case when y.type='SUBLOCALITY' then location_name
             end as sublocality_value,
@@ -253,8 +254,7 @@ class EntityUrls(TimeStampedModel):
             when y.type='SUBLOCALITY' then ea.id
             end as locality_id,
                     
-            case when y.type='LOCALITY' then 0
-            when y.type='SUBLOCALITY' then location_id
+            case when y.type='SUBLOCALITY' then location_id
             end as sublocality_id,
             
             'Doctor' as entity_type,
@@ -294,14 +294,14 @@ class EntityUrls(TimeStampedModel):
 
         query1 = '''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, 
             updated_at, sequence, sublocality_latitude, sublocality_longitude, locality_latitude, locality_longitude, locality_id, sublocality_id,
-            locality_value, sublocality_value, specialization, specialization_id)
+            locality_value, sublocality_value, specialization)
             select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url, 
             x.count as count, x.entity_type as entity_type, x.url_type as url_type , x.is_valid, 
             x.created_at as created_at, x.updated_at as updated_at, x.sequence as sequence,
             x.sublocality_latitude as sublocality_latitude, x.sublocality_longitude as sublocality_longitude, x.locality_latitude as locality_latitude,
             x.locality_longitude as locality_longitude, x.locality_id as locality_id, x.sublocality_id as sublocality_id,
-            x.locality_value as locality_value, x.sublocality_value as sublocality_value, x.specialization as specialization,
-            x.specialization_id as specialization_id
+            x.locality_value as locality_value, x.sublocality_value as sublocality_value, x.specialization as specialization
+            
             from 
             (
             select data.*, row_number() over(partition by data.url order by count desc) as rnum from
@@ -348,8 +348,7 @@ class EntityUrls(TimeStampedModel):
             when y.type='SUBLOCALITY' then ea.id
             end as locality_id,
                     
-            case when y.type='LOCALITY' then 0
-            when y.type='SUBLOCALITY' then location_id
+            case when y.type='SUBLOCALITY' then location_id
             end as sublocality_id,
 
             'Doctor' as entity_type,
@@ -359,7 +358,7 @@ class EntityUrls(TimeStampedModel):
             NOW() as updated_at,
             %d as sequence,
             '' as specialization,
-            0 as specialization_id,
+            
 
             y.*, ea.id as parent_id, ea.alternative_value as parent_name,
             st_x(ea.centroid::geometry) as parent_longitude, st_y(ea.centroid::geometry) as parent_latitude,
@@ -470,14 +469,14 @@ class EntityUrls(TimeStampedModel):
 
         query =  '''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, 
                        updated_at, sequence, sublocality_latitude, sublocality_longitude, locality_latitude, locality_longitude, locality_id, sublocality_id,
-                       locality_value, sublocality_value, specialization, specialization_id)
+                       locality_value, sublocality_value, specialization)
                        select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url, 
                        x.count as count, x.entity_type as entity_type, x.url_type as url_type , x.is_valid, 
                        x.created_at as created_at, x.updated_at as updated_at, x.sequence as sequence,
                        x.sublocality_latitude as sublocality_latitude, x.sublocality_longitude as sublocality_longitude, x.locality_latitude as locality_latitude,
                        x.locality_longitude as locality_longitude, x.locality_id as locality_id, x.sublocality_id as sublocality_id,
-                       x.locality_value as locality_value, x.sublocality_value as sublocality_value, x.specialization as specialization,
-                       x.specialization_id as specialization_id
+                       x.locality_value as locality_value, x.sublocality_value as sublocality_value, x.specialization as specialization
+                      
                        from 
                        (select data.*, row_number() over(partition by data.url order by count desc) as rnum
                        from 
@@ -524,8 +523,7 @@ class EntityUrls(TimeStampedModel):
                        when y.type='SUBLOCALITY' then ea.id
                        end as locality_id,
 
-                       case when y.type='LOCALITY' then 0
-                       when y.type='SUBLOCALITY' then location_id
+                       case when y.type='SUBLOCALITY' then location_id
                        end as sublocality_id,
 
                        'Lab' as entity_type,
@@ -535,7 +533,7 @@ class EntityUrls(TimeStampedModel):
                        NOW() as updated_at,
                        %d as sequence,
                        '' as specialization,
-                       0 as specialization_id,
+                       
 
                        y.*, ea.id as parent_id, ea.alternative_value as parent_name,
                        st_x(ea.centroid::geometry) as parent_longitude, st_y(ea.centroid::geometry) as parent_latitude,
