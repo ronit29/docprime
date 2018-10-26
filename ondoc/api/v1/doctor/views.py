@@ -38,6 +38,8 @@ import copy
 import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
+from ondoc.ratings_review import models as rating_models
+
 from ondoc.notification import models as notif_models
 User = get_user_model()
 from rest_framework.throttling import UserRateThrottle
@@ -486,7 +488,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'doctor_clinics__hospital',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
-                                    'doctorpracticespecializations__specialization'
+                                    'doctorpracticespecializations__specialization',
+                                    'rating'
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
@@ -925,7 +928,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 resp['url'] = None
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
-
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
                          "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb})
@@ -1074,8 +1076,11 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         if manages_string:
             message = message + "\n\n User Manages \n"+ manages_string
         try:
-            notif_models.EmailNotification.publish_ops_email(valid_data.get('email'), message, 'Feedback Mail')
+            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com"]
+            for x in emails:
+                notif_models.EmailNotification.publish_ops_email(str(x), message, 'Feedback Mail')
             resp['status'] = "success"
         except:
             resp['status'] = "error"
         return Response(resp)
+

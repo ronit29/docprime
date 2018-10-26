@@ -17,7 +17,7 @@ class BillingAccountInline(GenericTabularInline, nested_admin.NestedTabularInlin
 
 
 class SPOCDetailsInline(GenericTabularInline):
-    can_delete = False
+    can_delete = True
     extra = 0
     form = SPOCDetailsForm
     model = SPOCDetails

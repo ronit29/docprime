@@ -38,6 +38,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
 from ondoc.location import models as location_models
+from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
 
 logger = logging.getLogger(__name__)
@@ -194,6 +195,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
     entity = GenericRelation(location_models.EntityLocationRelationship)
+    rating = GenericRelation(ratings_models.RatingsReview)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     booking_closing_hours_from_dayend = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))])
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
@@ -202,6 +204,9 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     class Meta:
         db_table = "lab"
+
+    def get_ratings(self):
+        return self.rating.all()
 
     def get_thumbnail(self):
         all_documents = self.lab_documents.all()
@@ -406,7 +411,9 @@ class LabBookingClosingManager(models.Manager):
 
 class LabTiming(TimeStampedModel):
 
-    TIME_CHOICES = [(7.0, "7 AM"), (7.5, "7:30 AM"),
+    TIME_CHOICES = [(5.0, "5 AM"), (5.5, "5:30 AM"),
+                    (6.0, "6 AM"), (6.5, "6:30 AM"),
+                    (7.0, "7 AM"), (7.5, "7:30 AM"),
                     (8.0, "8 AM"), (8.5, "8:30 AM"),
                     (9.0, "9 AM"), (9.5, "9:30 AM"),
                     (10.0, "10 AM"), (10.5, "10:30 AM"),
@@ -421,7 +428,8 @@ class LabTiming(TimeStampedModel):
                     (19.0, "7 PM"), (19.5, "7:30 PM"),
                     (20.0, "8 PM"), (20.5, "8:30 PM"),
                     (21.0, "9 PM"), (21.5, "9:30 PM"),
-                    (22.0, "10 PM"), (22.5, "10:30 PM")]
+                    (22.0, "10 PM"), (22.5, "10:30 PM"),
+                    (23.0, "11 PM"), (23.5, "11:30 PM")]
 
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='lab_timings')
 
@@ -682,6 +690,8 @@ class AvailableLabTest(TimeStampedModel):
     enabled = models.BooleanField(default=False)
     lab_pricing_group = models.ForeignKey(LabPricingGroup, blank=True, null=True, on_delete=models.SET_NULL,
                                           related_name='available_lab_tests')
+    rating = GenericRelation(ratings_models.RatingsReview)
+
 
     def get_testid(self):
         return self.test.id
@@ -763,7 +773,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
     lab_test = models.ManyToManyField(AvailableLabTest)
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.SET_NULL, null=True)
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='lab_appointments')
     profile_detail = JSONField(blank=True, null=True)
     status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
     cancellation_type = models.PositiveSmallIntegerField(choices=CANCELLATION_TYPE_CHOICES, blank=True, null=True)
@@ -784,6 +794,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     home_pickup_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     matrix_lead_id = models.IntegerField(null=True)
+    is_rated = models.BooleanField(default=False)
+    rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True)
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 

@@ -44,6 +44,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -112,6 +113,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     PRIVATE = 1
     CLINIC = 2
     HOSPITAL = 3
+    NON_NETWORK_HOSPITAL = 1
+    NETWORK_HOSPITAL = 2
+    NETWORK_CHOICES = [("", "Select"), (NON_NETWORK_HOSPITAL, "Non Network Hospital"), (NETWORK_HOSPITAL, "Network Hospital")]
     HOSPITAL_TYPE_CHOICES = (("", "Select"), (PRIVATE, 'Private'), (CLINIC, "Clinic"), (HOSPITAL, "Hospital"),)
     name = models.CharField(max_length=200)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
@@ -129,8 +133,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     pin_code = models.PositiveIntegerField(blank=True, null=True)
     hospital_type = models.PositiveSmallIntegerField(blank=True, null=True, choices=HOSPITAL_TYPE_CHOICES)
     network_type = models.PositiveSmallIntegerField(blank=True, null=True,
-                                                    choices=[("", "Select"), (1, "Non Network Hospital"),
-                                                             (2, "Network Hospital")])
+                                                    choices=NETWORK_CHOICES)
     network = models.ForeignKey('HospitalNetwork', null=True, blank=True, on_delete=models.SET_NULL, related_name='assoc_hospitals')
     is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
     is_appointment_manager = models.BooleanField(verbose_name='Enabled for Managing Appointments', default=False)
@@ -346,11 +349,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     matrix_reference_id = models.BigIntegerField(blank=True, null=True)
     signature = models.ImageField('Doctor Signature', upload_to='doctor/images', null=True, blank=True)
     billing_merchant = GenericRelation(auth_model.BillingAccount)
+    rating = GenericRelation(ratings_models.RatingsReview)
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True,  blank=True)
     source = models.CharField(max_length=20, blank=True)
     batch = models.CharField(max_length=20, blank=True)
     enabled_for_online_booking = models.BooleanField(default=False)
     enabled_for_online_booking_at = models.DateTimeField(null=True, blank=True)
+
 
     def __str__(self):
         return self.name
@@ -380,6 +385,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
         # if self.images.all():
         #     return self.images.all()[0].name.url
         return None
+
+    def get_ratings(self):
+         return self.rating.all()
+
+    def get_rating_count(self):
+        count = 0
+        if self.rating.exists():
+            count = self.rating.count()
+        return count
 
     def update_live_status(self):
 
@@ -523,7 +537,9 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name='availability')
     day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
 
-    TIME_CHOICES = [(7.0, "7:00 AM"), (7.5, "7:30 AM"),
+    TIME_CHOICES = [(5.0, "5 AM"), (5.5, "5:30 AM"),
+                    (6.0, "6 AM"), (6.5, "6:30 AM"),
+                    (7.0, "7:00 AM"), (7.5, "7:30 AM"),
                     (8.0, "8:00 AM"), (8.5, "8:30 AM"),
                     (9.0, "9:00 AM"), (9.5, "9:30 AM"),
                     (10.0, "10:00 AM"), (10.5, "10:30 AM"),
@@ -538,7 +554,8 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
                     (19.0, "7:00 PM"), (19.5, "7:30 PM"),
                     (20.0, "8:00 PM"), (20.5, "8:30 PM"),
                     (21.0, "9:00 PM"), (21.5, "9:30 PM"),
-                    (22.0, "10:00 PM"), (22.5, "10:30 PM")]
+                    (22.0, "10:00 PM"), (22.5, "10:30 PM"),
+                    (23.0, "11 PM"), (23.5, "11:30 PM")]
 
     TYPE_CHOICES = [(1, "Fixed"),
                     (2, "On Call")]
@@ -979,6 +996,7 @@ class HospitalNetworkEmail(auth_model.TimeStampedModel):
         db_table = "hospital_network_email"
 
 
+
 class DoctorOnboardingToken(auth_model.TimeStampedModel):
     GENERATED = 1
     REJECTED = 2
@@ -1065,6 +1083,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
+    is_rated = models.BooleanField(default=False)
+    rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True)
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
