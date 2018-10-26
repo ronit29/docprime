@@ -1,10 +1,12 @@
 from django.contrib import admin
 from django.contrib.contenttypes.models import ContentType
-
+from import_export import fields, resources
 from ondoc.ratings_review.models import ReviewActions, RatingsReview
 from ondoc.diagnostic.models import LabAppointment, Lab
 from ondoc.doctor.models import OpdAppointment, Doctor
 from django import forms
+from import_export.admin import ImportExportMixin, ImportExportActionModelAdmin
+
 
 class RatingsReviewForm(forms.ModelForm):
 
@@ -50,7 +52,15 @@ class ReviewComplimentsAdmin(admin.ModelAdmin):
     form = ReviewComplimentsForm
 
 
-class RatingsReviewAdmin(admin.ModelAdmin):
+class RatingsReviewResource(resources.ModelResource):
+    class Meta:
+        model = RatingsReview
+        fields = ('id', 'name', 'appointment_type', 'ratings', 'review', 'updated_at')
+        export_order = ('id', 'name', 'appointment_type', 'ratings', 'review', 'updated_at')
+
+
+class RatingsReviewAdmin(admin.ModelAdmin, ImportExportMixin):
+    resource_class = RatingsReviewResource
     inlines = [ReviewActionsInLine]
     list_display = (['name', 'appointment_type', 'ratings', 'updated_at'])
     readonly_fields = ['name']

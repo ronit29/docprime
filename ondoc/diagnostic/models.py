@@ -810,7 +810,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=account_model.Order.LAB_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
-
+        if self.status == self.COMPLETED and not self.is_rated:
+            notification_tasks.send_opd_rating_message.apply_async(kwargs={'appointment_id': self.id, 'type': 'lab'}, countdown=int(settings.RATING_SMS_NOTIF))
         # Do not delete below commented code
         # try:
         #     prev_app_dict = {'id': self.id,

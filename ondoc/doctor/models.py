@@ -356,7 +356,6 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     enabled_for_online_booking = models.BooleanField(default=False)
     enabled_for_online_booking_at = models.DateTimeField(null=True, blank=True)
 
-
     def __str__(self):
         return self.name
 
@@ -1235,6 +1234,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=Order.DOCTOR_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+        if self.status == self.COMPLETED and not self.is_rated:
+            notification_tasks.send_opd_rating_message.apply_async(kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
