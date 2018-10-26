@@ -249,7 +249,7 @@ def push_order_to_matrix(self, data):
             'ProductId': 5,
             'SubProductId': 4,
             'AppointmentDetails': {
-                'ProviderName': appointment_details.get('doctor_name', ''),
+                'ProviderName': appointment_details.get('doctor_name', '') if appointment_details.get('doctor_name') else appointment_details.get('lab_name'),
                 'BookingDateTime': int(data.get('created_at')),
                 'AppointmentDateTime': int(data.get('timeslot')),
             }
