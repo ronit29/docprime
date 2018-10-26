@@ -129,28 +129,21 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
             name = specialization.name
             specialization_list.append({"id": id, "specialization": name})
 
-        return Response({"specialization-inventory": specialization_list})
+        return Response({"specialization_inventory": specialization_list})
 
-    def specialities_in_localities_list(self, request, speciality):
-        if not speciality:
+    def specialities_in_localities_list(self, request, specialization_id):
+        if not specialization_id:
             return Response(status=status.HTTP_404_NOT_FOUND)
-
-        # entity = EntityUrls.objects.filter(id=579820)
-        # # json_string =json.loads(entity.additional_info)
-        # # entity.additional_info = entity.additional_info.replace("\'", "\"")
-        # for data in entity:
-        #     data.locality_value = data.locality_value.replace("\'", "\"")
-        #     data.save()
 
         pages = None
         query = '''select * from 
                 (select x.*, row_number() over(partition by locality order by count desc) row_num,
                  dense_rank() over(order by locality asc) city_num
                  from 
-                (select specialization,url,count,extras,(extras->'location_json'->'locality_value')::TEXT as locality 
+                (select locality_value, sublocality_value, specialization, specialization_id,url,count,extras,(extras->'location_json'->'locality_value')::TEXT as locality 
                  from entity_urls where url_type='SEARCHURL' and entity_type='Doctor'
-                and sitemap_identifier = 'SPECIALIZATION_CITY' 
-                )x)y where row_num<=20 and specialization  ~* '.*%s.*' order by city_num, row_num''' %(speciality)
+                and sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY' and specialization_id = %d
+                )x)y where row_num<=20  order by city_num, row_num''' %(specialization_id)
 
         from ondoc.api.v1.utils import RawSql
 
@@ -161,38 +154,49 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         # for data in sql_urls:
         #     speciality_url.append(data.get('url'))
 
-        pages = int(len(sql_urls)/500)
-        if len(sql_urls) % 500 != 0:
+        pages = int(len(sql_urls)/30)
+        if len(sql_urls) % 30 != 0:
             pages += 1
 
-        paginated_specialists = self.paginate_sqlquery(query, pages)
-        return Response({'paginated_specialists': paginated_specialists})
+        page_no = request.GET.get('page_no', None)
+        if not page_no:
+            page_no =1
 
-    def paginate_sqlquery(self, query, pages):
+        paginated_specialists = self.paginate_sqlquery(query, pages, page_no)
+        return Response({'pages': pages, 'paginated_specialists': paginated_specialists})
+
+    def paginate_sqlquery(self, query, pages,page_no):
         from ondoc.api.v1.utils import RawSql
-        query1 = '''%s  limit 500  offset 0''' % query
-        page_size = 500
+
+        page_size = 30
         speciality_urls_pages = []
         if pages==0:
             pages=pages+1
-        while pages > 0:
+        # while pages > 0:
+        else:
             speciality_url = []
 
-            if pages>1:
-                offset = (pages - 1) * page_size
-                query2 = '''%s limit 500  offset %d''' % (query, offset)
+            if int(page_no) > 1:
+                offset = (int(page_no) -1) * page_size
+                query2 = '''%s limit 30  offset %d''' % (query, offset)
                 sql_data_rest_pages = RawSql(query2).fetch_all()
                 for data in sql_data_rest_pages:
-                    speciality_url.append({"url": data.get('url')})
+                    title = None
+                    title = data.get('specialization') + " in " + data.get('sublocality_value') + " "+ \
+                            data.get('locality_value')
+                    speciality_url.append({"title":title, "url": data.get('url')})
 
             else:
+                query1 = '''%s  limit 30  offset 0''' % query
                 sql_data_first_page = RawSql(query1).fetch_all()
 
                 for data in sql_data_first_page:
-                    speciality_url.append({"url": data.get('url')})
+                    title = None
+                    title = data.get('specialization') + " in " + data.get('sublocality_value') + " " + data.get('locality_value')
+                    speciality_url.append({"title": title, "url": data.get('url')})
 
-            speciality_urls_pages.append({"page":pages, "speciality_urls":speciality_url})
+            speciality_urls_pages.append({"page_no":page_no, "speciality_urls":speciality_url})
 
-            pages = pages-1
+            # pages = pages-1
 
         return speciality_urls_pages

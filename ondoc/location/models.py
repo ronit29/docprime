@@ -171,10 +171,10 @@ class EntityUrls(TimeStampedModel):
     locality_value = models.TextField(default='', null=True)
     sublocality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
     sublocality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
-    locality_id = models.PositiveIntegerField(default=None)
-    sublocality_id = models.PositiveIntegerField(default=None)
+    locality_id = models.PositiveIntegerField(default=None,null=True)
+    sublocality_id = models.PositiveIntegerField(default=None, null=True)
     specialization = models.TextField(default='', null=True)
-    specialization_id = models.PositiveIntegerField(default=None)
+    specialization_id = models.PositiveIntegerField(default=None, null=True)
 
 
     @property
@@ -626,6 +626,7 @@ class EntityUrls(TimeStampedModel):
     def create_page_url(cls, entity_object, sequence):
 
         try:
+
             if entity_object.__class__.__name__.upper() == 'DOCTOR':
                 sitemap_identifier = cls.SitemapIdentifier.DOCTOR_PAGE
                 forname = 'doctors'
@@ -646,9 +647,11 @@ class EntityUrls(TimeStampedModel):
                     seo_parameters = page_url_dict.get('seo_parameters')
                     if seo_parameters:
                         locality_id = seo_parameters.get('locality_id')
+                        if not locality_id:
+                            locality_id = None
                         sublocality_id = seo_parameters.get('sublocality_id')
                         if not sublocality_id:
-                            sublocality_id = 0
+                            sublocality_id = None
                         locality_value = seo_parameters.get('locality_value')
                         sublocality_value = seo_parameters.get('sublocality_value')
                         locality_latitude = seo_parameters.get('locality_latitude')
