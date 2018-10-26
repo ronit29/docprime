@@ -745,14 +745,14 @@ class EntityUrlsHelper(object):
     def build_url(self, prefix, location):
         import re
         url = ''
-        locality_value = ''
-        sublocality_value = ''
-        locality_id = ''
-        sublocality_id = ''
-        locality_latitude = ''
-        locality_longitude = ''
-        sublocality_latitude = ''
-        sublocality_longitude = ''
+        locality_value = None
+        sublocality_value = None
+        locality_id = None
+        sublocality_id = None
+        locality_latitude = None
+        locality_longitude = None
+        sublocality_latitude = None
+        sublocality_longitude = None
         seo = dict()
 
         if location.type == 'LOCALITY':
