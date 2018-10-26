@@ -381,13 +381,7 @@ class EntityUrls(TimeStampedModel):
         return True
 
     @classmethod
-    def create_page_url(cls, entity_object):
-        query = '''select nextval('entity_url_version_seq') as inc'''
-        seq = RawSql(query).fetch_all()
-        if seq:
-            sequence = seq[0]['inc'] if seq[0]['inc'] else 0
-        else:
-            sequence = 0
+    def create_page_url(cls, entity_object, sequence):
 
         try:
             if entity_object.__class__.__name__.upper() == 'DOCTOR':
