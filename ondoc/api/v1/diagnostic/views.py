@@ -427,11 +427,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by(F("price")+F("pickup_charges"), "distance")
+                queryset = queryset.order_by("-priority", F("price")+F("pickup_charges"), "distance_related_charges", "distance")
             elif order_by == 'distance':
-                queryset = queryset.order_by("distance")
+                queryset = queryset.order_by("-priority", "distance")
             elif order_by == 'name':
-                queryset = queryset.order_by("name")
+                queryset = queryset.order_by("-priority", "name")
             else:
                 queryset = queryset.order_by("-priority", "distance")
         else:
