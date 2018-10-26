@@ -59,6 +59,15 @@ class ProcedureCategoryMapping(models.Model):
         super().save(force_insert, force_update, using, update_fields)
 
     def delete(self, using=None, keep_parents=False):
+        super_parents = ProcedureCategoryMapping.objects.filter(child_category_id=self.child_category.id)
+        children = ProcedureCategoryMapping.objects.filter(parent_category_id=self.child_category.id)
+        for super_parent in super_parents:
+            # category_child = ProcedureCategory.objects.get(id=self.child_category.id)
+            ProcedureCategoryMapping.objects.filter(child_category_id=self.child_category.id,
+                                                 parent_category_id=super_parent.parent_category_id, is_manual=True).delete()
+            for child in children:
+                ProcedureCategoryMapping.objects.filter(parent_category_id=super_parent.parent_category_id,
+                                                     child_category_id=child.child_category_id, is_manual=True).delete()
         result = super().delete(using, keep_parents)
         return result
 
