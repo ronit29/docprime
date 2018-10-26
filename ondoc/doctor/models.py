@@ -537,7 +537,9 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, related_name='availability')
     day = models.PositiveSmallIntegerField(blank=False, null=False, choices=DAY_CHOICES)
 
-    TIME_CHOICES = [(7.0, "7:00 AM"), (7.5, "7:30 AM"),
+    TIME_CHOICES = [(5.0, "5 AM"), (5.5, "5:30 AM"),
+                    (6.0, "6 AM"), (6.5, "6:30 AM"),
+                    (7.0, "7:00 AM"), (7.5, "7:30 AM"),
                     (8.0, "8:00 AM"), (8.5, "8:30 AM"),
                     (9.0, "9:00 AM"), (9.5, "9:30 AM"),
                     (10.0, "10:00 AM"), (10.5, "10:30 AM"),
@@ -552,7 +554,8 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
                     (19.0, "7:00 PM"), (19.5, "7:30 PM"),
                     (20.0, "8:00 PM"), (20.5, "8:30 PM"),
                     (21.0, "9:00 PM"), (21.5, "9:30 PM"),
-                    (22.0, "10:00 PM"), (22.5, "10:30 PM")]
+                    (22.0, "10:00 PM"), (22.5, "10:30 PM"),
+                    (23.0, "11 PM"), (23.5, "11:30 PM")]
 
     TYPE_CHOICES = [(1, "Fixed"),
                     (2, "On Call")]
