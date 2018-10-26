@@ -240,16 +240,19 @@ def push_order_to_matrix(self, data):
         appointment_details = order_obj.appointment_details()
         request_data = {
             'OrderId': appointment_details.get('order_id', 0),
+            'LeadSource': 'DocPrime',
             'HospitalName': appointment_details.get('hospital_name'),
             'Name': appointment_details.get('profile_name', ''),
             'BookedBy': appointment_details.get('user_number', None),
             'LeadID': order_obj.matrix_lead_id if order_obj.matrix_lead_id else 0,
+            'PrimaryNo': appointment_details.get('user_number',None),
+            'ProductId': 5,
+            'SubProductId': 4,
             'AppointmentDetails': {
                 'ProviderName': appointment_details.get('doctor_name', ''),
                 'BookingDateTime': int(data.get('created_at')),
                 'AppointmentDateTime': int(data.get('timeslot')),
             }
-
         }
 
         logger.error(json.dumps(request_data))
@@ -267,21 +270,21 @@ def push_order_to_matrix(self, data):
             logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
             print(countdown_time)
             self.retry([data], countdown=countdown_time)
-
-        resp_data = response.json()
-        logger.error(response.text)
-
-        # save the appointment with the matrix lead id.
-        order_obj.matrix_lead_id = resp_data.get('Id', None)
-        order_obj.matrix_lead_id = int(order_obj.matrix_lead_id)
-
-        order_obj.save(**data)
-
-        print(str(resp_data))
-        if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
-            logger.info("[SUCCESS] Order successfully published to the matrix system")
         else:
-            logger.info("[ERROR] Order could not be published to the matrix system")
+            resp_data = response.json()
+            logger.error(response.text)
+
+            # save the appointment with the matrix lead id.
+            order_obj.matrix_lead_id = resp_data.get('Id', None)
+            order_obj.matrix_lead_id = int(order_obj.matrix_lead_id)
+
+            order_obj.save()
+
+            print(str(resp_data))
+            if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
+                logger.info("[SUCCESS] Order successfully published to the matrix system")
+            else:
+                logger.info("[ERROR] Order could not be published to the matrix system")
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
