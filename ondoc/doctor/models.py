@@ -211,10 +211,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         super(Hospital, self).save(*args, **kwargs)
 
         if self.is_appointment_manager:
-            auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+            auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=True)
         else:
-            auth_model.GenericAdmin.objects.filter(hospital=self, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+            auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
 
         if build_url and self.location and self.is_live:
