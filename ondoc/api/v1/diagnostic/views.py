@@ -3,10 +3,11 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonDiagnosticCondition, CommonTest)
+                                     CommonDiagnosticCondition, CommonTest, CommonPackage)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.notification.models import EmailNotification
+from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone, get_lab_search_details, TimeSlotExtraction
@@ -43,6 +44,7 @@ import copy
 import re
 import datetime
 from django.contrib.auth import get_user_model
+from ondoc.matrix.tasks import push_order_to_matrix
 User = get_user_model()
 
 
@@ -57,11 +59,14 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         test_queryset = CommonTest.objects.all()[:count]
         conditions_queryset = CommonDiagnosticCondition.objects.prefetch_related('lab_test').all()
         lab_queryset = PromotedLab.objects.select_related('lab').filter(lab__is_live=True, lab__is_test_lab=False)
+        package_queryset = CommonPackage.objects.prefetch_related('package').all()[:count]
         test_serializer = diagnostic_serializer.CommonTestSerializer(test_queryset, many=True, context={'request': request})
+        package_serializer = diagnostic_serializer.CommonPackageSerializer(package_queryset, many=True, context={'request': request})
         lab_serializer = diagnostic_serializer.PromotedLabsSerializer(lab_queryset, many=True)
         condition_serializer = diagnostic_serializer.CommonConditionsSerializer(conditions_queryset, many=True)
         temp_data = dict()
         temp_data['common_tests'] = test_serializer.data
+        temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data
 
@@ -119,7 +124,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
-                                           entity_type__iexact='Lab')
+                                           entity_type__iexact='Lab').order_by('-updated_at')
         if entity.exists():
             extras = entity.first().additional_info
             if extras.get('location_json'):
@@ -202,6 +207,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
         seo = None
         breadcrumb = None
+        location = None
         if parameters.get('location_json'):
             locality = ''
             sublocality = ''
@@ -224,8 +230,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             description = "Find best Diagnostic Centres and Labs"
             if locality:
                 description += " in " + sublocality + locality
+                location = sublocality + locality
+            elif sublocality:
+                location = sublocality
             description += " and book test online, check fees, packages prices and more at DocPrime."
-            seo = {'title': title, "description": description}
+            seo = {'title': title, "description": description, "location": location}
             if sublocality:
                 breadcrumb = [{
                     'name': locality,
@@ -243,13 +252,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs__id=lab_id,
+        queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter').filter(lab_pricing_group__labs__id=lab_id,
                                                                     lab_pricing_group__labs__is_test_lab=False,
                                                                     lab_pricing_group__labs__is_live=True,
                                                                     test__in=test_ids)
-        lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
-        test_serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
+        lab_obj = Lab.objects.prefetch_related('rating').filter(id=lab_id, is_live=True).first()
+        test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
+        # for Demo
+        demo_lab_test = AvailableLabTest.objects.filter(lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).prefetch_related('test')[:10]
+        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = list()
         lab_serializable_data = list()
@@ -257,10 +269,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing_data = list()
         if lab_obj:
             if lab_obj.always_open:
-                lab_timing = "00:00 AM - 23:45 PM"
+                lab_timing = "12:00 AM - 23:45 PM"
                 lab_timing_data = [{
-                    "start": 7.0,
-                    "end": 19.0
+                    "start": 0.0,
+                    "end": 23.75
                 }]
             else:
                 timing_queryset = lab_obj.lab_timings.filter(day=day_now)
@@ -276,6 +288,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
         temp_data['tests'] = test_serializer.data
+        temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
 
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
@@ -286,6 +299,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing = ''
         lab_timing_data = list()
         temp_list = list()
+
         for qdata in queryset:
             temp_list.append({"start": qdata.start, "end": qdata.end})
 
@@ -427,15 +441,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by("-priority", F("price")+F("pickup_charges"), "distance_related_charges", "distance")
+                queryset = queryset.order_by("-order_priority", F("price")+F("pickup_charges"), "distance_related_charges", "distance")
             elif order_by == 'distance':
-                queryset = queryset.order_by("-priority", "distance")
+                queryset = queryset.order_by("-order_priority", "distance")
             elif order_by == 'name':
-                queryset = queryset.order_by("-priority", "name")
+                queryset = queryset.order_by("-order_priority", "name")
             else:
-                queryset = queryset.order_by("-priority", "distance")
+                queryset = queryset.order_by("-order_priority", "distance")
         else:
-            queryset = queryset.order_by("-priority", "distance")
+            queryset = queryset.order_by("-order_priority", "distance")
         return queryset
 
     def form_lab_whole_data(self, queryset):
@@ -444,28 +458,56 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         labs = Lab.objects.prefetch_related('lab_documents', 'lab_image', 'lab_timings').filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
+
         for obj in labs:
             temp_var[obj.id] = obj
         day_now = timezone.now().weekday()
+        days_array = [i for i in range(7)]
+        rotated_days_array = days_array[day_now:] + days_array[:day_now]
         for row in queryset:
+            lab_timing = list()
+            lab_timing_data = list()
+            next_lab_timing_dict = {}
+            next_lab_timing_data_dict = {}
+            data_array = [list() for i in range(7)]
             row["lab"] = temp_var[row["id"]]
 
             if row["lab"].always_open:
                 lab_timing = "12:00 AM - 11:45 PM"
+                next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
                 lab_timing_data = [{
                     "start": 0.0,
                     "end": 23.75
                 }]
+                next_lab_timing_data_dict = {rotated_days_array[1]: {
+                    "start": 0.0,
+                    "end": 23.75
+                }}
             else:
                 timing_queryset = row["lab"].lab_timings.all()
-                timing_data = list()
+
                 for data in timing_queryset:
-                    if data.day == day_now:
-                        timing_data.append(data)
-                lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
-            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+                    data_array[data.day].append(data)
+
+                rotated_data_array = data_array[day_now:] + data_array[:day_now]
+
+                for count, timing_data in enumerate(rotated_data_array):
+                    day = rotated_days_array[count]
+                    if count == 0:
+                        if timing_data:
+                            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+                            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+                    elif timing_data:
+                        next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+                        next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+                        next_lab_timing_dict[day] = next_lab_timing
+                        next_lab_timing_data_dict[day] = next_lab_timing_data
+                        break
+
             row["lab_timing"] = lab_timing
             row["lab_timing_data"] = lab_timing_data
+            row["next_lab_timing"] = next_lab_timing_dict
+            row["next_lab_timing_data"] = next_lab_timing_data_dict
             resp_queryset.append(row)
 
         return resp_queryset
@@ -580,6 +622,21 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 effective_price += data["lab"].home_pickup_charges
                 home_pickup_charges = data["lab"].home_pickup_charges
             # TODO PM - call coupon function to calculate effective price
+
+        coupon_list = []
+        coupon_discount = 0
+        if data.get("coupon_code"):
+            coupon_list = list(Coupon.objects.filter(code__in=data.get("coupon_code")).values_list('id', flat=True))
+            obj = models.LabAppointment()
+            for coupon in data.get("coupon_code"):
+                coupon_discount += obj.get_discount(coupon, effective_price)
+
+        if data.get("payment_type") in [doctor_model.OpdAppointment.COD, doctor_model.OpdAppointment.PREPAID]:
+            if coupon_discount >= effective_price:
+                effective_price = 0
+            else:
+                effective_price = effective_price - coupon_discount
+
         start_dt = form_time_slot(data["start_date"], data["start_time"])
 
         test_ids_list = list()
@@ -618,7 +675,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
             "payment_type": data["payment_type"],
             "lab_test": test_ids_list,
             # "lab_test": [x["id"] for x in lab_test_queryset.values("id")],
-            "extra_details": extra_details
+            "extra_details": extra_details,
+            "coupon": coupon_list,
+            "discount": coupon_discount
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address").id).first()
@@ -711,6 +770,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
                                                          order.product_id,
                                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
+
+                push_order_to_matrix.apply_async(({'order_id': order.id, 'created_at':int(order.created_at.timestamp()),
+                                                   'timeslot':int(appointment_details['time_slot_start'].timestamp())}, ), countdown=5)
             except:
                 pass
         else:
@@ -777,26 +839,9 @@ class LabTimingListView(mixins.ListModelMixin,
 
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
-        lab_queryset = Lab.objects.filter(pk=lab, is_live=True).prefetch_related('lab_timings').first()
-        if not lab_queryset or (for_home_pickup and not lab_queryset.is_home_collection_enabled):
-            return Response([])
 
-        obj = TimeSlotExtraction()
+        resp_list = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
 
-        if not for_home_pickup and lab_queryset.always_open:
-            for day in range(0, 7):
-                obj.form_time_slots(day, 0.0, 23.75, None, True)
-        # New condition for home pickup timing from 7 to 7
-        elif for_home_pickup:
-            for day in range(0, 7):
-                obj.form_time_slots(day, 7.0, 19.0, None, True)
-        else:
-            lab_timing_queryset = lab_queryset.lab_timings.all()
-            for data in lab_timing_queryset:
-                if for_home_pickup == data.for_home_pickup:
-                    obj.form_time_slots(data.day, data.start, data.end, None, True)
-
-        resp_list = obj.get_timing_list()
         return Response(resp_list)
 
 

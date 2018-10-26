@@ -15,4 +15,31 @@ class Migration(migrations.Migration):
             name='url_type',
             field=models.CharField(choices=[('PAGEURL', 'PAGEURL'), ('SEARCHURL', 'SERCHURL')], max_length=24, null=True),
         ),
+
+        migrations.RunSQL(
+            '''CREATE OR REPLACE FUNCTION getslug(texte varchar) RETURNS VARCHAR AS
+            $$
+            DECLARE
+                result varchar;
+            BEGIN
+                result := replace(texte , 'æ', 'ae');
+                result := replace(result , 'œ', 'oe');
+                result := replace(result , '€', 'euros');
+                result := replace(result , '$', 'dollars');
+                result := replace(result , '£', 'pound');
+                result := replace(result , '¥', 'yen');
+                 result := replace(result , '&', ' ');
+                result := LTRIM(RTRIM(
+                        REPLACE(REPLACE(REPLACE(result,'  ',' þ'),'þ ',''),'þ','')
+                    ));
+                
+                result := regexp_replace(translate(replace(lower(result), ' ', '-'), 
+                    'áàâãäåāăąÁÂÃÄÅĀĂĄèééêëēĕėęěĒĔĖĘĚìíîïìĩīĭÌÍÎÏÌĨĪĬóôõöōŏőÒÓÔÕÖŌŎŐùúûüũūŭůÙÚÛÜŨŪŬŮçÇÿ&,.ñÑ',
+                    'aaaaaaaaaaaaaaaaaeeeeeeeeeeeeeeeiiiiiiiiiiiiiiiiooooooooooooooouuuuuuuuuuuuuuuuccy_--nn'), E'[^\\w -]', '', 'g');
+               
+                RETURN result;
+            END;
+            $$
+            LANGUAGE PLPGSQL;'''
+        ),
     ]

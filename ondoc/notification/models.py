@@ -729,6 +729,20 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             message = json.dumps(message)
             publish_message(message)
 
+    @classmethod
+    def send_rating_link(cls, data):
+        if data:
+            sms_noti = {
+                "phone_number": data['phone_number'],
+                "content": data['text'],
+            }
+            message = {
+                "data": sms_noti,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
 
 class AppNotification(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

@@ -82,7 +82,8 @@ class DoctorSearchHelper:
             if self.query_params.get('sort_on') == 'fees':
                 order_by_field = "deal_price ASC"
                 rank_by = "rank_fees=1"
-        order_by_field = "{}, {} ".format('d.is_live DESC', order_by_field)
+        order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC', order_by_field)
+        # order_by_field = "{}, {} ".format('d.is_live DESC', order_by_field)
         return order_by_field, rank_by
 
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
@@ -92,6 +93,7 @@ class DoctorSearchHelper:
             self.query_params.get('max_distance') * 1000 if self.query_params.get(
                 'max_distance') and self.query_params.get(
                 'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+        min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
         # max_distance = 10000000000000000000000
 
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
@@ -109,12 +111,14 @@ class DoctorSearchHelper:
                        "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
                        "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
                        "WHERE d.is_live=true and %s " \
-                       "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) < %s " \
+                       "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) < %s" \
+                       "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) >= %s " \
                        "ORDER  BY %s ) x " \
                        "where %s" % (longitude, latitude,
                                      longitude, latitude,
                                      filtering_params,
-                                     longitude, latitude,max_distance,
+                                     longitude, latitude, max_distance,
+                                     longitude, latitude, min_distance,
                                      order_by_field, rank_by)
         return query_string
 
@@ -183,6 +187,8 @@ class DoctorSearchHelper:
 
             temp = {
                 "doctor_id": doctor.id,
+                "enabled_for_online_booking": doctor.enabled_for_online_booking,
+                "is_license_verified" : doctor.is_license_verified,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,

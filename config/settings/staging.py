@@ -13,3 +13,4 @@ NUMBER_WHITELIST = env.list('NUMBER_WHITELIST')
 CLOUDFRONT_DOMAIN = "qacdn.docprime.com"
 #CLOUDFRONT_ID = "your cloud front id"
 AWS_S3_CUSTOM_DOMAIN = "qacdn.docprime.com" # to make sure the url that the files are served from this domain
+RATING_SMS_NOTIF=env('RATING_SMS_NOTIF_PRD', default=86400)

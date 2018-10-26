@@ -20,7 +20,12 @@ class Robot(TimeStampedModel):
 
 class SitemapManger(TimeStampedModel):
     file = models.FileField(upload_to='seo', validators=[FileExtensionValidator(allowed_extensions=['xml'])])
-    count = models.PositiveIntegerField()
+    count = models.PositiveIntegerField(default=0, null=True)
+    valid = models.BooleanField(default=True)
+
+    def delete(self, *args, **kwargs):
+        self.file.delete()
+        super(SitemapManger, self).delete(*args, **kwargs)
 
     class Meta:
         db_table = "sitemap_manager"

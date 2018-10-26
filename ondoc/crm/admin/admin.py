@@ -8,12 +8,13 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization, Procedure)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
-                                     TestParameter)
-from ondoc.lead.models import HospitalLead, DoctorLead
+                                     TestParameter, CommonPackage)
+from ondoc.coupon.models import Coupon
+from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
 from .common import Cities, CitiesAdmin
-from .lead import HospitalLeadAdmin, DoctorLeadAdmin
+from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
                      DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
@@ -24,7 +25,7 @@ from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
-    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin
+    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -37,9 +38,15 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
+
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
-
+from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
+from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
+from ondoc.doctor.models import GoogleDetailing
+from .doctor import GoogleDetailingAdmin
+from .seo import SitemapManagerAdmin
+from ondoc.seo.models import SitemapManger
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -51,9 +58,10 @@ admin.site.index_title = 'CRM Administration'
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
 admin.site.register(UserProfile)
+admin.site.register(ReviewCompliments, ReviewComplimentsAdmin)
 
 admin.site.register(LabAppointment, LabAppointmentAdmin) #temp temp temp
-admin.site.register(DoctorClinic, DoctorClinicAdmin)
+#admin.site.register(DoctorClinic, DoctorClinicAdmin)
 
 admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(AboutDoctor, AboutDoctorAdmin)
@@ -75,6 +83,7 @@ admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
 admin.site.register(Lab, LabAdmin)
 admin.site.register(CommonTest, CommonTestAdmin)
+admin.site.register(CommonPackage, CommonPackageAdmin)
 admin.site.register(CommonDiagnosticCondition, CommonDiagnosticConditionAdmin)
 admin.site.register(LabNetwork, LabNetworkAdmin)
 
@@ -86,6 +95,7 @@ admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
 admin.site.register(HospitalLead, HospitalLeadAdmin)
 admin.site.register(Cities, CitiesAdmin)
 admin.site.register(DoctorLead, DoctorLeadAdmin)
+admin.site.register(SearchLead, SearchLeadAdmin)
 
 admin.site.register(notifcation_model.EmailNotification, EmailNotificationAdmin)
 admin.site.register(notifcation_model.SmsNotification, SmsNotificationAdmin)
@@ -103,3 +113,7 @@ admin.site.register(CompetitorInfo, CompetitorInfoImportAdmin)
 admin.site.register(Procedure, ProcedureAdmin)
 
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
+admin.site.register(RatingsReview, RatingsReviewAdmin)
+admin.site.register(SitemapManger, SitemapManagerAdmin)
+admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
+admin.site.register(Coupon)

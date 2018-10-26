@@ -9,8 +9,12 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
 from ondoc.authentication.models import UserProfile
+from django.db.models import Avg
+from django.db.models import Q
+from ondoc.coupon.models import Coupon
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
+from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -121,6 +125,7 @@ class OpdAppModelSerializer(serializers.ModelSerializer):
 
 
 class OpdAppTransactionModelSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
@@ -133,6 +138,8 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     time_slot_start = serializers.DateTimeField()
     payment_type = serializers.IntegerField()
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
+    discount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
@@ -150,6 +157,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     end_time = serializers.FloatField(required=False)
     time_slot_start = serializers.DateTimeField(required=False)    
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
+    coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
     # time_slot_end = serializers.DateTimeField()
 
@@ -218,6 +226,12 @@ class CreateAppointmentSerializer(serializers.Serializer):
                 "Error 'Max active appointments reached' for opd appointment with data - " + json.dumps(
                     request.data))
             raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
+
+        if data.get("coupon_code"):
+            for coupon in data.get("coupon_code"):
+                obj = OpdAppointment()
+                if not obj.validate_coupon(request.user, coupon).get("is_valid"):
+                    raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         return data
 
@@ -593,6 +607,7 @@ class DoctorListSerializer(serializers.Serializer):
     doctor_name = serializers.CharField(required=False)
     hospital_name = serializers.CharField(required=False)
     max_distance = serializers.IntegerField(required=False, allow_null=True)
+    min_distance = serializers.IntegerField(required=False, allow_null=True)
 
     def validate_specialization_id(self, value):
         request = self.context.get("request")
@@ -612,12 +627,45 @@ class DoctorListSerializer(serializers.Serializer):
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     emails = None
     experience_years = serializers.IntegerField(allow_null=True)
+    is_license_verified = serializers.BooleanField(read_only=True)
     # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
     hospitals = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
+    enabled_for_online_booking = serializers.BooleanField(read_only=True)
     availability = None
     seo = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
+    # rating = rating_serializer.RatingsModelSerializer(read_only=True, many=True, source='get_ratings')
+    rating_graph = serializers.SerializerMethodField()
     breadcrumb = serializers.SerializerMethodField()
+    unrated_appointment = serializers.SerializerMethodField()
+
+    def get_rating(self, obj):
+        queryset = obj.rating.exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True)
+        return reviews.data[:5]
+
+    def get_unrated_appointment(self, obj):
+        request = self.context.get('request')
+        if request:
+            if request.user.is_authenticated:
+                user = request.user
+                opd_app = None
+                opd_all = user.appointments.filter(doctor=obj).order_by('-id')
+                for opd in opd_all:
+                    if opd.status == OpdAppointment.COMPLETED and opd.is_rated == False:
+                            opd_app = opd
+                    break
+                if opd_app:
+                    data = AppointmentRetrieveSerializer(opd_app, many=False, context={'request': request})
+                    return data.data
+            return None
+
+    def get_rating_graph(self, obj):
+        if obj and obj.rating:
+            data = rating_serializer.RatingsGraphSerializer(obj.rating.filter(is_live=True), context={'request':self.context.get('request')}).data
+            return data
+        return None
 
     def get_seo(self, obj):
         if self.parent:
@@ -632,28 +680,42 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         sublocality = ''
         locality = ''
         if entity.exists():
-            location_id = entity.first().additional_info.get('location_id')
-            type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
-            if type.first().get('type') == 'LOCALITY':
-                locality = type.first().get('value')
 
-            if type.first().get('type') == 'SUBLOCALITY':
-                sublocality = type.first().get('value')
-                parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-                locality = ' ' + parent.first().get('value')
+            entity = entity.first()
+            if entity.additional_info:
+                locality = entity.additional_info.get('locality_value')
+                sublocality = entity.additional_info.get('sublocality_value')
+                # if sublocality:
+                #     locality = " " + locality
+            # location_id = entity.first().additional_info.get('location_id')
+            # type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
+            # if type.exists():
+            #        if type.first().get('type') == 'LOCALITY':
+            #            locality = type.first().get('value')
+            #
+            # if type.exists():
+            #     if type.first().get('type') == 'SUBLOCALITY':
+            #         sublocality = type.first().get('value')
+            #         parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
+            #         locality = ' ' + parent.first().get('value')
 
-        title = obj.name
-        description = obj.name + ': ' + obj.name
+        title = "Dr. " + obj.name
+        description = "Dr. " + obj.name + ': ' + "Dr. " + obj.name
+
         doc_spec_list = []
 
         for name in specializations:
             doc_spec_list.append(str(name))
-        if len(doc_spec_list)>=1:
+        if len(doc_spec_list) >= 1:
             title +=  ' - '+', '.join(doc_spec_list)
             description += ' is ' + ', '.join(doc_spec_list)
-        if not (sublocality == '') or not (locality == ''):
+        if sublocality:
             title += ' in ' + sublocality + " " + locality + ' - Consult Online'
             description += ' in ' + sublocality + " " + locality
+        elif locality:
+            title += ' in ' + locality + ' - Consult Online'
+            description += ' in ' + locality
+
         else:
             title += ' - Consult Online'
 
@@ -689,9 +751,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         model = Doctor
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
-        fields = ('about', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
+        fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'thumbnail', 'license', 'is_live','seo', 'breadcrumb')
+                  'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
+                  'enabled_for_online_booking', 'unrated_appointment')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
@@ -735,9 +798,9 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     class Meta:
         model = OpdAppointment
-        fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
+        fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail',)
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail')
 
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
@@ -816,6 +879,26 @@ class OpdAppointmentCompleteTempSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Invalid OTP.")
         return attrs
 
+
+class DoctorRatingSerializer(serializers.Serializer):
+    rating = serializers.SerializerMethodField()
+
+    def get_doctor_rating_summary(self):
+        rating_row = self.rating.all()
+        review_row = self.rating.filter(review__isnull=False).all()
+        rating_count = rating_row.count()
+        review_count = review_row.count()
+        average_rating = rating_row.aggregate(Avg('ratings'))
+        average_rating = average_rating['ratings__avg']
+
+        return {'rating_count': rating_count, 'average_rating': average_rating, 'review_count': review_count}
+
+
+class DoctorFeedbackBodySerializer(serializers.Serializer):
+    rating = serializers.IntegerField(max_value=10, required=False)
+    feedback = serializers.CharField(max_length=512, required=False)
+    feedback_tags = serializers.ListField(required=False)
+    email = serializers.EmailField(required=False)
 
 
 

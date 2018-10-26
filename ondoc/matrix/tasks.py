@@ -5,11 +5,10 @@ from django.conf import settings
 from celery import task
 import requests
 import json
-import time
 import logging
+import datetime
 from ondoc.authentication.models import Address
 from ondoc.api.v1.utils import resolve_address
-
 logger = logging.getLogger(__name__)
 
 
@@ -17,10 +16,18 @@ def prepare_and_hit(self, data):
 
     appointment = data.get('appointment')
     task_data = data.get('task_data')
+    is_home_pickup = 0
+    home_pickup_address = None
+    appointment_type = ''
     if task_data.get('type') == 'OPD_APPOINTMENT':
         booking_url = '%s/admin/doctor/opdappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
     elif task_data.get('type') == 'LAB_APPOINTMENT':
         booking_url = '%s/admin/diagnostic/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
+        appointment_type = 'Lab Visit'
+        if appointment.is_home_pickup:
+            is_home_pickup = 1
+            appointment_type = 'Home Visit'
+            home_pickup_address = appointment.get_pickup_address()
 
     patient_address = ""
     if hasattr(appointment, 'address') and appointment.address:
@@ -33,17 +40,26 @@ def prepare_and_hit(self, data):
         'AppointmentStatus': appointment.status,
         'PaymentStatus': 300,
         'DocPrimeBookingID': appointment.id,
-        'BookingDateTime': int(time.mktime(appointment.created_at.utctimetuple())),
-        'AppointmentDateTime': int(time.mktime(appointment.time_slot_start.utctimetuple())),
+        'BookingDateTime': int(appointment.created_at.timestamp()),
+        'AppointmentDateTime': int(appointment.time_slot_start.timestamp()),
         'BookingType': 'DC' if task_data.get('type') == 'LAB_APPOINTMENT' else 'D',
-        'AppointmentType': '',
+        'AppointmentType': appointment_type,
+        'IsHomePickUp' : is_home_pickup,
+        'HomePickupAddress': home_pickup_address,
         'PatientName': appointment.profile_detail.get("name", ''),
         'PatientAddress': patient_address,
         'ProviderName': getattr(appointment, 'doctor').name if task_data.get('type') == 'OPD_APPOINTMENT' else getattr(appointment, 'lab').name,
         'ServiceName': service_name,
         'InsuranceCover': 0,
         'MobileList': data.get('mobile_list'),
-        'BookingUrl': booking_url
+        'BookingUrl': booking_url,
+        'Fees': float(appointment.fees) if task_data.get('type') == 'OPD_APPOINTMENT' else float(appointment.agreed_price),
+        'EffectivePrice': float(appointment.effective_price),
+        'MRP': float(appointment.mrp) if task_data.get('type') == 'OPD_APPOINTMENT' else float(appointment.price),
+        'DealPrice': float(appointment.deal_price),
+        'DOB': datetime.datetime.strptime(appointment.profile_detail.get('dob'), "%Y-%m-%d").
+            strftime("%d-%m-%Y") if appointment.profile_detail.get('dob', None) else None,
+        'ProviderAddress': appointment.hospital.get_hos_address() if task_data.get('type') == 'OPD_APPOINTMENT' else appointment.lab.get_lab_address()
     }
 
     request_data = {
@@ -120,6 +136,9 @@ def push_appointment_to_matrix(self, data):
                 raise Exception("Appointment could not found against id - " + str(appointment_id))
 
             mobile_list = list()
+            # Lab mobile number
+            mobile_list.append({'MobileNo': appointment.lab.primary_mobile, 'Name': appointment.lab.name, 'Type': 3})
+
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
 
@@ -156,7 +175,7 @@ def push_signup_lead_to_matrix(self, data):
             'CityId': online_lead_obj.city_name.id if online_lead_obj.city_name and online_lead_obj.city_name.id else 0,
             'ProductId': data.get('product_id'),
             'SubProductId': data.get('sub_product_id'),
-            'CreatedOn': int(time.mktime(online_lead_obj.created_at.utctimetuple())),
+            'CreatedOn': int(online_lead_obj.created_at.timestamp()),
             'UtmCampaign': utm.get('utm_campaign', ''),
             'UTMMedium': utm.get('utm_medium', ''),
             'UtmSource': utm.get('utm_source', ''),
@@ -203,3 +222,69 @@ def push_signup_lead_to_matrix(self, data):
     except Exception as e:
         logger.error("Error in Celery. Failed pushing online lead to the matrix- " + str(e))
 
+
+@task(bind=True, max_retries=2)
+def push_order_to_matrix(self, data):
+    try:
+        from ondoc.account.models import Order
+        order_id = data.get('order_id', None)
+        if not order_id:
+            logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise ValueError()
+
+        order_obj = Order.objects.get(id=order_id)
+
+        if not order_obj:
+            raise Exception("Order could not found against id - " + str(order_id))
+
+        appointment_details = order_obj.appointment_details()
+        request_data = {
+            'OrderId': appointment_details.get('order_id', 0),
+            'LeadSource': 'DocPrime',
+            'HospitalName': appointment_details.get('hospital_name'),
+            'Name': appointment_details.get('profile_name', ''),
+            'BookedBy': appointment_details.get('user_number', None),
+            'LeadID': order_obj.matrix_lead_id if order_obj.matrix_lead_id else 0,
+            'PrimaryNo': appointment_details.get('user_number',None),
+            'ProductId': 5,
+            'SubProductId': 4,
+            'AppointmentDetails': {
+                'ProviderName': appointment_details.get('doctor_name', '') if appointment_details.get('doctor_name') else appointment_details.get('lab_name'),
+                'BookingDateTime': int(data.get('created_at')),
+                'AppointmentDateTime': int(data.get('timeslot')),
+            }
+        }
+
+        logger.error(json.dumps(request_data))
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] Order could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            logger.error(response.text)
+
+            # save the order with the matrix lead id.
+            order_obj.matrix_lead_id = resp_data.get('Id', None)
+            order_obj.matrix_lead_id = int(order_obj.matrix_lead_id)
+
+            order_obj.save()
+
+            print(str(resp_data))
+            if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
+                logger.info("[SUCCESS] Order successfully published to the matrix system")
+            else:
+                logger.info("[ERROR] Order could not be published to the matrix system")
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))

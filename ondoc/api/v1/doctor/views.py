@@ -2,6 +2,7 @@ from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification.models import EmailNotification
+from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
@@ -37,7 +38,13 @@ import copy
 import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
+from ondoc.ratings_review import models as rating_models
+
+from ondoc.notification import models as notif_models
 User = get_user_model()
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.throttling import AnonRateThrottle
+from ondoc.matrix.tasks import push_order_to_matrix
 
 
 class CreateAppointmentPermission(permissions.BasePermission):
@@ -190,13 +197,22 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "dob": str(profile_model.dob)
         }
         req_data = request.data
+
+        coupon_list = []
+        coupon_discount = 0
+        if data.get("coupon_code"):
+            coupon_list = list(Coupon.objects.filter(code__in=data.get("coupon_code")).values_list('id', flat=True))
+            obj = models.OpdAppointment()
+            for coupon in data.get("coupon_code"):
+                coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
+
         if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-            effective_price = doctor_clinic_timing.fees
-        elif data.get("payment_type") == models.OpdAppointment.COD:
             effective_price = doctor_clinic_timing.deal_price
-        else:
-            # TODO PM - Logic for coupon
-            effective_price = doctor_clinic_timing.deal_price
+        elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
+            if coupon_discount >= doctor_clinic_timing.deal_price:
+                effective_price = 0
+            else:
+                effective_price = doctor_clinic_timing.deal_price - coupon_discount
 
         opd_data = {
             "doctor": data.get("doctor"),
@@ -210,7 +226,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "effective_price": effective_price,
             "mrp": doctor_clinic_timing.mrp,
             "time_slot_start": time_slot_start,
-            "payment_type": data.get("payment_type")
+            "payment_type": data.get("payment_type"),
+            "coupon": coupon_list,
+            "discount": coupon_discount
         }
         resp = self.extract_payment_details(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID)
         return Response(data=resp)
@@ -292,6 +310,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
                                                          order.product_id,
                                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
+                push_order_to_matrix.apply_async(({'order_id': order.id, 'created_at':int(order.created_at.timestamp()),
+                                                   'timeslot':int(appointment_details['time_slot_start'].timestamp())}, ), countdown=5)
+
             except:
                 pass
         else:
@@ -471,7 +492,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'doctor_clinics__hospital',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
-                                    'doctorpracticespecializations__specialization'
+                                    'doctorpracticespecializations__specialization',
+                                    'rating'
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
@@ -734,7 +756,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
-                                           entity_type__iexact='Doctor')
+                                           entity_type__iexact='Doctor').order_by('-updated_at')
         if entity.exists():
             extras = entity.first().additional_info
             if extras:
@@ -797,8 +819,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         breadcrumb = None
 
         # if False and (validated_data.get('extras') or validated_data.get('specialization_ids')):
-        if validated_data.get('extras') or validated_data.get('specialization_ids'):
+        if validated_data.get('extras'):
+            location = None
             breadcrumb_sublocality = None
+            breadcrumb_locality = None
+            city = None
             breadcrumb = None
             locality = ''
             sublocality = ''
@@ -807,6 +832,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if validated_data.get('extras').get('location_json').get('locality_value'):
                     locality = validated_data.get('extras').get('location_json').get('locality_value')
                     breadcrumb_locality = locality
+                    city = locality
                 if validated_data.get('extras').get('location_json').get('sublocality_value'):
                     sublocality = validated_data.get('extras').get('location_json').get('sublocality_value')
                     if sublocality:
@@ -814,39 +840,65 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         locality = sublocality + ' ' + locality
                 if validated_data.get('extras').get('location_json').get('breadcrum_url'):
                     breadcrumb_locality_url = validated_data.get('extras').get('location_json').get('breadcrum_url')
-
-            if validated_data.get('specialization_ids'):
-                specialization_name_obj = models.PracticeSpecialization.objects.filter(
-                    id__in=validated_data.get('specialization_ids', [])).values(
-                    'name')
-                specialization_list = []
-
-                for names in specialization_name_obj:
-                    specialization_list.append(names.get('name'))
-
-                specializations = ', '.join(specialization_list)
-            else:
-                if validated_data.get('extras').get('specialization'):
-                    specializations = validated_data.get('extras').get('specialization')
-                else:
-                    specializations = ''
+            #
+            # if validated_data.get('specialization_ids'):
+            #     specialization_name_obj = models.PracticeSpecialization.objects.filter(
+            #         id__in=validated_data.get('specialization_ids', [])).values(
+            #         'name')
+            #     specialization_list = []
+            #
+            #     for names in specialization_name_obj:
+            #         specialization_list.append(names.get('name'))
+            #
+            #     specializations = ', '.join(specialization_list)
+            # else:
+            #     if validated_data.get('extras').get('specialization'):
+            #         specializations = validated_data.get('extras').get('specialization')
+            #     else:
+            #         specializations = ''
+            specializations = None
+            if validated_data.get('extras') and validated_data.get('extras').get('specialization'):
+                specializations = validated_data.get('extras').get('specialization')
 
             if specializations:
                 title = specializations
                 description = specializations
+            else:
+                title = 'Doctors'
+                description = 'Doctors'
             if locality:
                 title += ' in '  + locality
                 description += ' in ' +locality
             if specializations:
-                title += '- Book Best ' + specializations
-                description += ': Book best ' + specializations + '\'s appointment online '
-            if locality:
-                description += 'in ' + locality
-            title += ' Instantly | DocPrime'
 
-            description += '. View Address, fees and more for doctors '
+                if locality:
+                    if sublocality == '':
+
+                        description += ': Book best ' + specializations + '\'s appointment online ' +  'in ' + city
+                    else:
+
+                        description += ': Book best ' + specializations + '\'s appointment online ' + 'in '+ locality
+
+            else:
+                if locality:
+                    if sublocality == '':
+
+                        description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in ' + city
+                    else:
+
+                        description += ': Book best ' + 'Doctor' + ' appointment online ' + 'in '+ locality
+            if specializations:
+                if not sublocality:
+                    title += '- Book Best ' + specializations +' Online'
+                else:
+                    title += '| Book & Get Best Deal'
+
+            else:
+                 title += ' | Book Doctors Online & Get Best Deal'
+
+            description += ' and get upto 50% off. View Address, fees and more for doctors '
             if locality:
-                description += 'in '+ locality
+                description += 'in '+ city
             description += '.'
 
             if breadcrumb_sublocality:
@@ -861,9 +913,16 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 ]
 
             if title or description:
+                if locality:
+                    if not sublocality:
+                        location = city
+                    else:
+                        location = locality
+
                 seo = {
                     "title": title,
-                    "description": description
+                    "description": description,
+                    "location" : location
                 }
 
         for resp in response:
@@ -873,7 +932,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 resp['url'] = None
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
-
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
                          "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb})
@@ -946,5 +1004,87 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         if opd_appointment:
             opd_appointment.action_completed()
 
-            resp = {'success': 'Appointment Completed Successfullly!'}
+            resp = {'success': 'Appointment Completed Successfully!'}
         return Response(resp)
+
+
+class LimitUser(UserRateThrottle):
+    rate = '5/day'
+
+
+class LimitAnon(AnonRateThrottle):
+    rate = '5/day'
+
+
+class DoctorContactNumberViewSet(viewsets.GenericViewSet):
+
+    throttle_classes = (LimitUser, LimitAnon)
+
+    def retrieve(self, request, doctor_id):
+
+        doctor_obj = get_object_or_404(models.Doctor, pk=doctor_id)
+
+        doctor_details = models.DoctorMobile.objects.filter(doctor=doctor_obj).values('is_primary','number','std_code').order_by('-is_primary').first()
+
+        if not doctor_details:
+            return Response({'status': 0, 'message': 'No Contact Number found'}, status.HTTP_404_NOT_FOUND)
+        else:
+            final = str(doctor_details.get('number'))
+            if doctor_details.get('std_code'):
+                final = '0'+str(doctor_details.get('std_code'))+' '+str(doctor_details.get('number'))
+            return Response({'status': 1, 'number': final}, status.HTTP_200_OK)
+
+
+class DoctorFeedbackViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
+
+    def feedback(self, request):
+        resp = {}
+        user = request.user
+        serializer = serializers.DoctorFeedbackBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        message = ''
+        for key, value in valid_data.items():
+            if isinstance(value, list):
+                val = ' '.join(map(str, value))
+            else:
+                val = value
+            message += str(key) + "  -  " + str(val) + "\n"
+        if user.doctor:
+            managers_list = []
+            for managers in user.doctor.manageable_doctors.all():
+                info = {}
+                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "\n"
+                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "\n"
+                info['user_id'] = (str(managers.user_id) ) if managers.user else "\n"
+                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "\n"
+                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "\n"
+                managers_list.append(info)
+            managers_string = "\n".join(str(x) for x in managers_list)
+        if managers_string:
+            message = message + "\n\nUser's Managers \n"+ managers_string
+
+        manages_list = []
+        for manages in user.manages.all():
+            info = {}
+            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "\n"
+            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "\n"
+            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "\n"
+            info['user_id'] = (str(user.id)) if user else "\n"
+            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "\n"
+            manages_list.append(info)
+        manages_string = "\n".join(str(x) for x in manages_list)
+        if manages_string:
+            message = message + "\n\n User Manages \n"+ manages_string
+        try:
+            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com"]
+            for x in emails:
+                notif_models.EmailNotification.publish_ops_email(str(x), message, 'Feedback Mail')
+            resp['status'] = "success"
+        except:
+            resp['status'] = "error"
+        return Response(resp)
+
