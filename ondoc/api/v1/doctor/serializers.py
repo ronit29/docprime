@@ -680,30 +680,42 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         sublocality = ''
         locality = ''
         if entity.exists():
-            location_id = entity.first().additional_info.get('location_id')
-            type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
-            if type.exists():
-                   if type.first().get('type') == 'LOCALITY':
-                       locality = type.first().get('value')
 
-            if type.exists():
-                if type.first().get('type') == 'SUBLOCALITY':
-                    sublocality = type.first().get('value')
-                    parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-                    locality = ' ' + parent.first().get('value')
+            entity = entity.first()
+            if entity.additional_info:
+                locality = entity.additional_info.get('locality_value')
+                sublocality = entity.additional_info.get('sublocality_value')
+                # if sublocality:
+                #     locality = " " + locality
+            # location_id = entity.first().additional_info.get('location_id')
+            # type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
+            # if type.exists():
+            #        if type.first().get('type') == 'LOCALITY':
+            #            locality = type.first().get('value')
+            #
+            # if type.exists():
+            #     if type.first().get('type') == 'SUBLOCALITY':
+            #         sublocality = type.first().get('value')
+            #         parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
+            #         locality = ' ' + parent.first().get('value')
 
         title = "Dr. " + obj.name
-        description = "Dr. " +  obj.name + ': ' +"Dr. " +  obj.name
+        description = "Dr. " + obj.name + ': ' + "Dr. " + obj.name
+
         doc_spec_list = []
 
         for name in specializations:
             doc_spec_list.append(str(name))
-        if len(doc_spec_list)>=1:
+        if len(doc_spec_list) >= 1:
             title +=  ' - '+', '.join(doc_spec_list)
             description += ' is ' + ', '.join(doc_spec_list)
-        if not (sublocality == '') or not (locality == ''):
+        if sublocality:
             title += ' in ' + sublocality + " " + locality + ' - Consult Online'
             description += ' in ' + sublocality + " " + locality
+        elif locality:
+            title += ' in ' + locality + ' - Consult Online'
+            description += ' in ' + locality
+
         else:
             title += ' - Consult Online'
 
