@@ -1,6 +1,7 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
 from ondoc.doctor.models import DoctorClinic, SearchKey
+from django.db.models import Q
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
@@ -14,6 +15,7 @@ class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
 
     class Meta:
         db_table = "procedure_category"
+        ordering = ['name']
 
 
 class Procedure(auth_model.TimeStampedModel, SearchKey):
@@ -27,6 +29,7 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
 
     class Meta:
         db_table = "procedure"
+        ordering = ['name']
 
 
 class ProcedureCategoryMapping(models.Model):
@@ -39,18 +42,25 @@ class ProcedureCategoryMapping(models.Model):
 
     class Meta:
         db_table = "procedure_category_mapping"
-        unique_together = ('parent_category', 'child_category')
+        unique_together = (('parent_category', 'child_category'),)
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if not self.is_manual:
+            current_parents = ProcedureCategoryMapping.objects.filter(child_category=self.child_category).values_list(
+                'parent_category', flat=True)
+            new_parents = ProcedureCategoryMapping.objects.filter(child_category=self.parent_category).values_list(
+                'parent_category', flat=True)
+            parents = set(new_parents)-(set(current_parents))
+            all_objects = []
+            for i in parents:
+                all_objects.append(
+                    ProcedureCategoryMapping(parent_category_id=i, child_category=self.child_category, is_manual=True))
+            ProcedureCategoryMapping.objects.bulk_create(all_objects)
         super().save(force_insert, force_update, using, update_fields)
-        parents = ProcedureCategoryMapping.objects.filter(child_category=self.parent_category).distinct()
-        all_objects = []
-        for i in parents:
-            all_objects.append(ProcedureCategoryMapping(parent_category=i.parent_category, child_category=self.child_category, is_manual=True))
-        ProcedureCategoryMapping.objects.bulk_create(all_objects)
 
     def delete(self, using=None, keep_parents=False):
-        return super().delete(using, keep_parents)
+        result = super().delete(using, keep_parents)
+        return result
 
 
 class DoctorClinicProcedure(auth_model.TimeStampedModel):
