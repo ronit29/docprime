@@ -2,7 +2,6 @@ from django.contrib.gis.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import logging
-
 from .service import get_meta_by_latlong
 import logging
 logger = logging.getLogger(__name__)
@@ -186,10 +185,10 @@ class EntityUrls(TimeStampedModel):
     locality_value = models.TextField(default='', null=True)
     sublocality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
     sublocality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
-    locality_id = models.PositiveIntegerField(default=0)
-    sublocality_id = models.PositiveIntegerField(default=0)
+    locality_id = models.PositiveIntegerField(default=None)
+    sublocality_id = models.PositiveIntegerField(default=None)
     specialization = models.TextField(default='', null=True)
-    specialization_id = models.PositiveIntegerField(default=0)
+    specialization_id = models.PositiveIntegerField(default=None)
 
 
     @property
@@ -896,3 +895,5 @@ entity_as_mapping = {
     'DOCTOR': EntityHelperAsDoctor,
     'LAB': EntityHelperAsLab
 }
+
+

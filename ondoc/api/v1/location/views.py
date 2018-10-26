@@ -1,5 +1,6 @@
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django_extensions.db.fields import json
 
 from ondoc.doctor.models import DoctorPracticeSpecialization, PracticeSpecialization
 from ondoc.location import models as location_models
@@ -99,21 +100,23 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
 
         entity = location_models.EntityUrls.objects.filter(locality_value__iexact=city, url_type='SEARCHURL',
                                                            entity_type__iexact='Doctor',
-                                                           sitemap_identifier='SPECIALIZATION_CITY')
+                                                           sitemap_identifier='SPECIALIZATION_CITY').order_by('-count')
         spec_city_urls = []
         for data in entity:
             title = None
             title = data.specialization + " in " + data.locality_value
             url = data.url
+            count = data.count
 
             spec_city_urls.append(
                 {
-                    'title': title, 'url': url
+                    'title': title, 'url': url, 'count': count
                 }
             )
 
         if spec_city_urls:
-            return Response({"specialization-city-urls": spec_city_urls})
+            urls_count = len(spec_city_urls)
+            return Response({"specialization_city_urls": spec_city_urls, "list_size": urls_count})
 
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -128,57 +131,68 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
 
         return Response({"specialization-inventory": specialization_list})
 
-    def popular_specialists_list(self, request, speciality):
+    def specialities_in_localities_list(self, request, speciality):
         if not speciality:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        no_of_localities = 20
+        # entity = EntityUrls.objects.filter(id=579820)
+        # # json_string =json.loads(entity.additional_info)
+        # # entity.additional_info = entity.additional_info.replace("\'", "\"")
+        # for data in entity:
+        #     data.locality_value = data.locality_value.replace("\'", "\"")
+        #     data.save()
+
+        pages = None
         query = '''select * from 
                 (select x.*, row_number() over(partition by locality order by count desc) row_num,
                  dense_rank() over(order by locality asc) city_num
                  from 
-                (select specialization, url,count,extras,(extras->'location_json'->'locality_value')::TEXT as locality 
+                (select specialization,url,count,extras,(extras->'location_json'->'locality_value')::TEXT as locality 
                  from entity_urls where url_type='SEARCHURL' and entity_type='Doctor'
-                and sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY'
-                )x)y where specialization ~* '.*%s.*' ''' \
-                % speciality
+                and sitemap_identifier = 'SPECIALIZATION_CITY' 
+                )x)y where row_num<=20 and specialization  ~* '.*%s.*' order by city_num, row_num''' %(speciality)
 
         from ondoc.api.v1.utils import RawSql
 
-        query1 = '''%s and row_num<=20 order by city_num, row_num''' % query
-        no_of_urls = RawSql(query).fetch_all()
-        sql_data = RawSql(query1).fetch_all()
+        sql_urls = RawSql(query).fetch_all()
 
-        speciality_url = []
+        # speciality_url = []
+        #
+        # for data in sql_urls:
+        #     speciality_url.append(data.get('url'))
 
-        for data in sql_data:
-            speciality_url.append(data.get('url'))
-        pages = len(no_of_urls)/500
-        paginated_specialists = self.paginate_sqlquery(query, request, pages)
-        return Response({'speciality_top_localities': speciality_url, 'paginated_specialists': paginated_specialists})
+        pages = int(len(sql_urls)/500)
+        if len(sql_urls) % 500 != 0:
+            pages += 1
 
+        paginated_specialists = self.paginate_sqlquery(query, pages)
+        return Response({'paginated_specialists': paginated_specialists})
 
-     def paginate_sqlquery(query, request, pages):
-        query2 = '''%s order by city_num, row_num limit 500  offset 0''' % query
-        page_size=500
-        offset = (pages - 1) * page_size
-        query3 = '''%s order by city_num, row_num limit 500  offset %d''' % (query, offset)
+    def paginate_sqlquery(self, query, pages):
         from ondoc.api.v1.utils import RawSql
-        sql_data_first_page = RawSql(query2).fetch_all()
-        sql_data_rest_pages = RawSql(query3).fetch_all()
-        speciality_urls_list = []
-        if pages==1:
+        query1 = '''%s  limit 500  offset 0''' % query
+        page_size = 500
+        speciality_urls_pages = []
+        if pages==0:
+            pages=pages+1
+        while pages > 0:
+            speciality_url = []
 
-            for data in sql_data_first_page:
-                speciality_urls_list.append(data.get('url'))
+            if pages>1:
+                offset = (pages - 1) * page_size
+                query2 = '''%s limit 500  offset %d''' % (query, offset)
+                sql_data_rest_pages = RawSql(query2).fetch_all()
+                for data in sql_data_rest_pages:
+                    speciality_url.append({"url": data.get('url')})
 
-        else:
-            for data in sql_data_first_page:
-                speciality_urls_list.append(data.get('url'))
+            else:
+                sql_data_first_page = RawSql(query1).fetch_all()
 
+                for data in sql_data_first_page:
+                    speciality_url.append({"url": data.get('url')})
 
-        return Response({'offset':pages * page_size, 'speciality_urls_list': speciality_urls_list})
+            speciality_urls_pages.append({"page":pages, "speciality_urls":speciality_url})
 
+            pages = pages-1
 
-
-
+        return speciality_urls_pages
