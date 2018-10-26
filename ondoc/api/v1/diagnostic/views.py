@@ -26,7 +26,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
 from django.db import transaction
-from django.db.models import Count, Sum, Max, When, Case, F, Q, Value, DecimalField
+from django.db.models import Count, Sum, Max, When, Case, F, Q, Value, DecimalField, IntegerField
 from django.http import Http404
 from django.conf import settings
 import hashlib
@@ -378,13 +378,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     When(is_home_collection_enabled=False,
                          then=Value(0)),
                     output_field=DecimalField())
+                distance_related_charges = Case(
+                    When(is_home_collection_enabled=False, then=Value(0)),
+                    When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=True),
+                         then=Value(0)),
+                    When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=False),
+                         then=Value(1)),
+                    output_field=IntegerField())
             else:
-                home_pickup_calculation = Case(
-                    When(is_home_collection_enabled=True,
-                         then=Value(0)),
-                    When(is_home_collection_enabled=False,
-                         then=Value(0)),
-                    output_field=DecimalField())
+                home_pickup_calculation = Value(0, DecimalField())
+                distance_related_charges = Value(0, IntegerField())
 
             deal_price_calculation = Case(
                 When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
@@ -399,6 +402,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                distance=Max(Distance('location', pnt)),
                                                name=Max('name'),
                                                pickup_charges=Max(home_pickup_calculation),
+                                               distance_related_charges=Max(distance_related_charges),
                                                priority=Max('priority')).filter(count__gte=len(ids)))
 
             if min_price is not None:
@@ -423,7 +427,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by("price", "distance")
+                queryset = queryset.order_by(F("price")+F("pickup_charges"), "distance")
             elif order_by == 'distance':
                 queryset = queryset.order_by("distance")
             elif order_by == 'name':

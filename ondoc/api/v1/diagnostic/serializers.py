@@ -173,6 +173,7 @@ class LabCustomSerializer(serializers.Serializer):
     lab_timing = serializers.CharField(max_length=200)
     lab_timing_data = serializers.ListField()
     pickup_charges = serializers.IntegerField(default=None)
+    distance_related_charges = serializers.IntegerField()
 
 
     # def get_lab(self, obj):
