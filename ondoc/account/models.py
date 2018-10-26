@@ -43,6 +43,7 @@ class Order(TimeStampedModel):
     action = models.PositiveSmallIntegerField(blank=True, null=True, choices=ACTION_CHOICES)
     action_data = JSONField(blank=True, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    wallet_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     error_status = models.CharField(max_length=250, verbose_name="Error", blank=True, null=True)
     is_viewable = models.BooleanField(verbose_name='Is Viewable', default=True)
@@ -76,15 +77,41 @@ class Order(TimeStampedModel):
             ).update(is_viewable=False)
 
     @transaction.atomic
-    def process_order(self, consumer_account, pg_data, appointment_data):
-        # New code for processing order
+    def process_order(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
+        from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
+
+        # Initial validations for appointment data
+        appointment_data = self.action_data
+        # Check if payment is required at all, only when payment is required we debit consumer's account
+        payment_not_required = False
+        if self.product_id == self.DOCTOR_PRODUCT_ID:
+            serializer = OpdAppTransactionModelSerializer(data=appointment_data)
+            serializer.is_valid(raise_exception=True)
+            appointment_data = serializer.validated_data
+            if appointment_data['payment_type'] == OpdAppointment.COD:
+                payment_not_required = True
+            elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
+                payment_not_required = True
+        elif self.product_id == self.LAB_PRODUCT_ID:
+            serializer = LabAppTransactionModelSerialsizer(data=appointment_data)
+            serializer.is_valid(raise_exception=True)
+            appointment_data = serializer.validated_data
+            if appointment_data['payment_type'] == OpdAppointment.COD:
+                payment_not_required = True
+            elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
+                payment_not_required = True
+
+        consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
+
         appointment_obj = None
         order_dict = dict()
         amount = None
         if self.action == Order.OPD_APPOINTMENT_CREATE:
-            if consumer_account.balance >= appointment_data["effective_price"]:
+            if consumer_account.balance >= appointment_data["effective_price"] or payment_not_required:
                 appointment_obj = OpdAppointment.create_appointment(appointment_data)
                 order_dict = {
                     "reference_id": appointment_obj.id,
@@ -92,7 +119,7 @@ class Order(TimeStampedModel):
                 }
                 amount = appointment_obj.effective_price
         elif self.action == Order.LAB_APPOINTMENT_CREATE:
-            if consumer_account.balance >= appointment_data["effective_price"]:
+            if consumer_account.balance >= appointment_data["effective_price"] or payment_not_required:
                 appointment_obj = LabAppointment.create_appointment(appointment_data)
                 order_dict = {
                     "reference_id": appointment_obj.id,
@@ -121,23 +148,15 @@ class Order(TimeStampedModel):
                 }
         if order_dict:
             self.update_order(order_dict)
-        if appointment_obj:
-            consumer_account.debit_schedule(appointment_obj, pg_data.get("product_id"), amount)
+        # If payment is required and appointment is created successfully, debit consumer's account
+        if appointment_obj and not payment_not_required:
+            consumer_account.debit_schedule(appointment_obj, self.product_id, amount)
         return appointment_obj
 
     def update_order(self, data):
         self.reference_id = data.get("reference_id", self.reference_id)
         self.payment_status = data.get("payment_status", self.payment_status)
         self.save()
-
-    def debit_payment(self, consumer_account, pg_data, app_obj, amount):
-        debit_data = {
-            "user": pg_data.get("user"),
-            "product_id": pg_data.get("product_id"),
-            "transaction_id": pg_data.get("transaction_id"),
-            "reference_id": app_obj.id
-        }
-        consumer_account.debit_schedule(debit_data, amount)
 
     def appointment_details(self):
         from ondoc.doctor.models import Doctor
@@ -234,6 +253,18 @@ class PgTransaction(TimeStampedModel):
     status_type = models.CharField(max_length=50)
     transaction_id = models.CharField(max_length=100, unique=True)
     pb_gateway_name = models.CharField(max_length=100)
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        """
+            Save PG transaction and credit consumer account, with amount paid at PaymentGateway.
+        """
+        super(PgTransaction, self).save(*args, **kwargs)
+        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+        pg_data = vars(self)
+        pg_data['user'] = self.user
+        consumer_account.credit_payment(pg_data, pg_data['amount'])
 
     @classmethod
     def get_transactions(cls, user, amount):
