@@ -441,8 +441,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         days_array = [i for i in range(7)]
         rotated_days_array = days_array[day_now:] + days_array[:day_now]
         for row in queryset:
-            lab_timing = None
-            lab_timing_data = None
+            lab_timing = list()
+            lab_timing_data = list()
             next_lab_timing_dict = {}
             next_lab_timing_data_dict = {}
             data_array = [list() for i in range(7)]
