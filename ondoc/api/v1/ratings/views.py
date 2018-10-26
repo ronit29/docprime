@@ -112,8 +112,9 @@ class RatingsViewSet(viewsets.GenericViewSet):
         resp={}
 
         rating.ratings = valid_data.get('rating')
+
         if valid_data.get('compliment'):
-            rating.compliment.set(valid_data.get('compliment'))
+            rating.compliment.set(valid_data.get('compliment'), clear=True)
         else:
             rating.compliment.set("")
 

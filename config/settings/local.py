@@ -126,5 +126,6 @@ REST_FRAMEWORK = {
     ),
     'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler',
 
-
 }
+
+RATING_SMS_NOTIF=env('RATING_SMS_NOTIF_QA', default=60)
