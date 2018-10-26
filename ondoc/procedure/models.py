@@ -1,8 +1,10 @@
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 from ondoc.authentication import models as auth_model
 from ondoc.doctor.models import DoctorClinic, SearchKey
-from django.db.models import Q
-
+from collections import deque
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
     parents = models.ManyToManyField('self', symmetrical=False, through='ProcedureCategoryMapping',
@@ -44,7 +46,7 @@ class ProcedureCategoryMapping(models.Model):
         db_table = "procedure_category_mapping"
         unique_together = (('parent_category', 'child_category'),)
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def mapping(self):
         if not self.is_manual:
             current_parents = ProcedureCategoryMapping.objects.filter(child_category=self.child_category).values_list(
                 'parent_category', flat=True)
@@ -55,20 +57,51 @@ class ProcedureCategoryMapping(models.Model):
             for i in parents:
                 all_objects.append(
                     ProcedureCategoryMapping(parent_category_id=i, child_category=self.child_category, is_manual=True))
+
+            children = ProcedureCategoryMapping.objects.filter(parent_category=self.child_category).values_list(
+                'child_category', flat=True)
+            children = list(set(children))
+            if children:
+                parents = parents.union({self.parent_category.id})
+                for child in children:
+                    for parent in parents:
+                        all_objects.append(
+                            ProcedureCategoryMapping(parent_category_id=parent, child_category_id=child,
+                                                     is_manual=True))
             ProcedureCategoryMapping.objects.bulk_create(all_objects)
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         super().save(force_insert, force_update, using, update_fields)
+        self.mapping()
 
     def delete(self, using=None, keep_parents=False):
-        super_parents = ProcedureCategoryMapping.objects.filter(child_category_id=self.child_category.id)
-        children = ProcedureCategoryMapping.objects.filter(parent_category_id=self.child_category.id)
-        for super_parent in super_parents:
-            # category_child = ProcedureCategory.objects.get(id=self.child_category.id)
-            ProcedureCategoryMapping.objects.filter(child_category_id=self.child_category.id,
-                                                 parent_category_id=super_parent.parent_category_id, is_manual=True).delete()
-            for child in children:
-                ProcedureCategoryMapping.objects.filter(parent_category_id=super_parent.parent_category_id,
-                                                     child_category_id=child.child_category_id, is_manual=True).delete()
         result = super().delete(using, keep_parents)
+        if not self.is_manual:
+            curr_node = self.child_category
+            q1 = deque()
+            q1.append(curr_node)
+            while len(q1):
+                all_objects = []
+                node = q1.popleft()
+                organic_children = node.related_parent_category.filter(is_manual=False).values_list('child_category', flat=True)
+                if organic_children:
+                    for child in ProcedureCategory.objects.filter(pk__in=organic_children):
+                        q1.append(child)
+                manual_mappings = node.related_child_category.filter(is_manual=True)
+                manual_mappings.delete()
+                organic_parents = node.related_child_category.filter()  # only is_manual=False left
+                ancestors = set()
+                for parent in organic_parents:
+                    for ancestor in parent.parent_category.related_child_category.filter().values_list('parent_category', flat=True):
+                        ancestors.add(ancestor)
+                curr_parents = organic_parents.values_list('parent_category', flat=True)
+                curr_parents = set(curr_parents)
+                # to_be_added = ancestors - curr_parents
+                to_be_added = ancestors
+                for manual_parent in to_be_added:
+                    all_objects.append(ProcedureCategoryMapping(parent_category_id=manual_parent, child_category_id=node.id,
+                                                     is_manual=True))
+                ProcedureCategoryMapping.objects.bulk_create(all_objects)
         return result
 
 

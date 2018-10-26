@@ -13,7 +13,7 @@ from django.contrib.gis import forms
 
 class ParentProcedureCategoryInline(AutoComplete, TabularInline):
     model = ProcedureCategoryMapping
-    exclude = ['is_manual']
+    # exclude = ['is_manual']
     fk_name = 'child_category'
     extra = 0
     can_delete = True
