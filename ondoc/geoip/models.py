@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.gis.db import models as postgismodels
 from ondoc.authentication import models as auth_model
 from django.contrib.postgres.fields import JSONField
+from ondoc.common.helper import Choices
 from django.contrib.gis.geos import Point
 from django.conf import settings
 from rest_framework.response import Response
@@ -28,18 +29,6 @@ class GeoIPEntries(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "geoip_entries"
-
-
-class Choices(object):
-    @classmethod
-    def as_choices(cls):
-        properties = list(filter(lambda x : not x.startswith ("__"), dir(cls)))
-        properties.remove ("as_choices")
-        choices = []
-        for prop in properties:
-            val = getattr(cls, prop)
-            choices.append((prop, val))
-        return choices
 
 
 class AdwordLocationCriteria(auth_model.TimeStampedModel):

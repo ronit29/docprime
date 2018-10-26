@@ -997,3 +997,11 @@ class CommonDiagnosticConditionAdmin(VersionAdmin):
 class CommonTestAdmin(VersionAdmin):
     autocomplete_fields = ['test']
 
+
+class CommonPackageAdmin(VersionAdmin):
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(CommonPackageAdmin, self).get_form(request, obj=obj, **kwargs)
+        form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True)
+        return form
+

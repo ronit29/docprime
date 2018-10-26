@@ -75,7 +75,7 @@ class UploadDoctor(Doc):
         for i in range(2, len(rows) + 1):
             data = self.get_data(row=i, sheet=sheet, headers=headers)
             doctor = self.create_doctor(data, source, batch)
-            self.map_doctor_specialization(doctor, data.get('practice_specialization'))
+            #self.map_doctor_specialization(doctor, data.get('practice_specialization'))
             try:
                 self.add_doctor_phone_numbers(doctor, data.get('numbers'))
             except:
@@ -100,10 +100,10 @@ class UploadDoctor(Doc):
 
 
 
-        practice_specialization_id = self.clean_data(sheet.cell(row=row, column=headers.get('practice_specialization_id')).value)
-        practice_specialization = None
-        if practice_specialization_id:
-            practice_specialization = PracticeSpecialization.objects.filter(pk=practice_specialization_id).first()
+        # practice_specialization_id = self.clean_data(sheet.cell(row=row, column=headers.get('practice_specialization_id')).value)
+        # practice_specialization = None
+        # if practice_specialization_id:
+        #     practice_specialization = PracticeSpecialization.objects.filter(pk=practice_specialization_id).first()
 
         number_entry = []
         primary_number = self.clean_data(sheet.cell(row=row, column=headers.get('primary_number')).value)
@@ -132,7 +132,7 @@ class UploadDoctor(Doc):
         data['identifier'] = identifier
         data['name'] = name
         data['practicing_since'] = practicing_since
-        data['practice_specialization'] = practice_specialization
+        # data['practice_specialization'] = practice_specialization
         data['numbers'] = number_entry
         data['image_url'] = image_url
         data['license'] = license
@@ -186,7 +186,7 @@ class UploadDoctor(Doc):
         doctor = Doctor.objects.create(name=data['name'], license=data.get('license',''), gender=data['gender'],
                                                        practicing_since=data['practicing_since'], source=source, batch=batch, enabled=False)
         SourceIdentifier.objects.create(type=SourceIdentifier.DOCTOR, unique_identifier=data.get('identifier'), reference_id=doctor.id)
-        self.save_image(batch,data.get('image_url'),data.get('identifier'))
+        #self.save_image(batch,data.get('image_url'),data.get('identifier'))
         return doctor
 
     def save_image(self, batch, url, identifier):
@@ -276,11 +276,14 @@ class UploadQualification(Doc):
             # college = self.get_college(i, sheet, headers)
             # passing_year = self.clean_data(sheet.cell(row=i, column=headers.get('passing_year')).value)
             if data.get('doctor'):
-                DoctorQualification.objects.get_or_create(doctor=data.get('doctor'),
-                                                          qualification=data.get('qualification'),
-                                                          college=data.get('college'),
-                                                          specialization=data.get('specialization'),
-                                                          passing_year=data.get('passing_year'))
+                try:
+                    DoctorQualification.objects.get_or_create(doctor=data.get('doctor'),
+                                                              qualification=data.get('qualification'),
+                                                              college=data.get('college'),
+                                                              specialization=data.get('specialization'),
+                                                              passing_year=data.get('passing_year'))
+                except:
+                    print('error saving doctor qualification')
 
 
     def get_data(self, row, sheet, headers):
@@ -362,8 +365,12 @@ class UploadExperience(Doc):
             if hospital:
                 start_year = self.clean_data(sheet.cell(row=i, column=headers.get('start_year')).value)
                 end_year = self.clean_data(sheet.cell(row=i, column=headers.get('end_year')).value)
-                DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
+                try:
+                    DoctorExperience.objects.get_or_create(doctor=doctor, start_year=start_year, end_year=end_year,
                                                    hospital=hospital)
+                except Exception as e:
+                    print('error' + str(e))
+
 
 class UploadSpecialization(Doc):
 
@@ -378,7 +385,10 @@ class UploadSpecialization(Doc):
             if sp_id:
                 practice_specialization = PracticeSpecialization.objects.filter(pk=sp_id).first()
                 if practice_specialization and doctor:
-                    DoctorPracticeSpecialization.objects.get_or_create(doctor=doctor, specialization=practice_specialization)
+                    try:
+                        DoctorPracticeSpecialization.objects.get_or_create(doctor=doctor, specialization=practice_specialization)
+                    except Exception as e:
+                        print('error' + str(e))
 
 
 class UploadMembership(Doc):
@@ -392,7 +402,11 @@ class UploadMembership(Doc):
             member = self.clean_data(sheet.cell(row=i, column=headers.get('memberships')).value)
 
             if doctor and member:
-                DoctorAssociation.objects.get_or_create(doctor=doctor, name=member)
+                try:
+                    DoctorAssociation.objects.get_or_create(doctor=doctor, name=member)
+                except Exception as e:
+                    print('error' + str(e))
+
 
 class UploadAward(Doc):
 
@@ -405,7 +419,10 @@ class UploadAward(Doc):
             award = self.clean_data(sheet.cell(row=i, column=headers.get('award')).value)
             year = self.clean_data(sheet.cell(row=i, column=headers.get('year')).value)
             if award and year:
-                DoctorAward.objects.get_or_create(doctor=doctor, name=award, year=year)
+                try:
+                    DoctorAward.objects.get_or_create(doctor=doctor, name=award, year=year)
+                except Exception as e:
+                    print('error' + str(e))
 
 
 class UploadHospital(Doc):
@@ -468,9 +485,10 @@ class UploadHospital(Doc):
 
         if not hospital:
             hospital_name = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_name')).value)
-            address = self.clean_data(sheet.cell(row=row, column=headers.get('address')).value)
+            building = self.clean_data(sheet.cell(row=row, column=headers.get('building')).value)
+            city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
             location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('gaddress')).value))
-            hospital = Hospital.objects.create(name=hospital_name, building=address, location=location, source=source, batch=batch)
+            hospital = Hospital.objects.create(name=hospital_name, building=building, city=city, country='India', location=location, source=source, batch=batch)
             SourceIdentifier.objects.create(reference_id=hospital.id, unique_identifier=hospital_identifier,
                                                 type=SourceIdentifier.HOSPITAL)
 

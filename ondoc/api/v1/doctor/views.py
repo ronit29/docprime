@@ -2,6 +2,7 @@ from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.notification.models import EmailNotification
+from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
@@ -39,6 +40,9 @@ from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
 from ondoc.notification import models as notif_models
 User = get_user_model()
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.throttling import AnonRateThrottle
+from ondoc.matrix.tasks import push_order_to_matrix
 
 
 class CreateAppointmentPermission(permissions.BasePermission):
@@ -191,13 +195,22 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "dob": str(profile_model.dob)
         }
         req_data = request.data
+
+        coupon_list = []
+        coupon_discount = 0
+        if data.get("coupon_code"):
+            coupon_list = list(Coupon.objects.filter(code__in=data.get("coupon_code")).values_list('id', flat=True))
+            obj = models.OpdAppointment()
+            for coupon in data.get("coupon_code"):
+                coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
+
         if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-            effective_price = doctor_clinic_timing.fees
-        elif data.get("payment_type") == models.OpdAppointment.COD:
             effective_price = doctor_clinic_timing.deal_price
-        else:
-            # TODO PM - Logic for coupon
-            effective_price = doctor_clinic_timing.deal_price
+        elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
+            if coupon_discount >= doctor_clinic_timing.deal_price:
+                effective_price = 0
+            else:
+                effective_price = doctor_clinic_timing.deal_price - coupon_discount
 
         opd_data = {
             "doctor": data.get("doctor"),
@@ -211,7 +224,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "effective_price": effective_price,
             "mrp": doctor_clinic_timing.mrp,
             "time_slot_start": time_slot_start,
-            "payment_type": data.get("payment_type")
+            "payment_type": data.get("payment_type"),
+            "coupon": coupon_list,
+            "discount": coupon_discount
         }
         resp = self.extract_payment_details(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID)
         return Response(data=resp)
@@ -293,6 +308,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
                                                          order.product_id,
                                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
+                push_order_to_matrix.apply_async(({'order_id': order.id, 'created_at':int(order.created_at.timestamp()),
+                                                   'timeslot':int(appointment_details['time_slot_start'].timestamp())}, ), countdown=5)
+
             except:
                 pass
         else:
@@ -988,7 +1006,17 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
+class LimitUser(UserRateThrottle):
+    rate = '5/day'
+
+
+class LimitAnon(AnonRateThrottle):
+    rate = '5/day'
+
+
 class DoctorContactNumberViewSet(viewsets.GenericViewSet):
+
+    throttle_classes = (LimitUser, LimitAnon)
 
     def retrieve(self, request, doctor_id):
 
@@ -1001,7 +1029,7 @@ class DoctorContactNumberViewSet(viewsets.GenericViewSet):
         else:
             final = str(doctor_details.get('number'))
             if doctor_details.get('std_code'):
-                final = str(doctor_details.get('std_code'))+str(doctor_details.get('number'))
+                final = '0'+str(doctor_details.get('std_code'))+' '+str(doctor_details.get('number'))
             return Response({'status': 1, 'number': final}, status.HTTP_200_OK)
 
 
@@ -1012,6 +1040,7 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
 
     def feedback(self, request):
         resp = {}
+        user = request.user
         serializer = serializers.DoctorFeedbackBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
@@ -1022,6 +1051,32 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
             else:
                 val = value
             message += str(key) + "  -  " + str(val) + "\n"
+        if user.doctor:
+            managers_list = []
+            for managers in user.doctor.manageable_doctors.all():
+                info = {}
+                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "\n"
+                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "\n"
+                info['user_id'] = (str(managers.user_id) ) if managers.user else "\n"
+                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "\n"
+                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "\n"
+                managers_list.append(info)
+            managers_string = "\n".join(str(x) for x in managers_list)
+        if managers_string:
+            message = message + "\n\nUser's Managers \n"+ managers_string
+
+        manages_list = []
+        for manages in user.manages.all():
+            info = {}
+            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "\n"
+            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "\n"
+            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "\n"
+            info['user_id'] = (str(user.id)) if user else "\n"
+            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "\n"
+            manages_list.append(info)
+        manages_string = "\n".join(str(x) for x in manages_list)
+        if manages_string:
+            message = message + "\n\n User Manages \n"+ manages_string
         try:
             notif_models.EmailNotification.publish_ops_email(valid_data.get('email'), message, 'Feedback Mail')
             resp['status'] = "success"

@@ -14,40 +14,21 @@ from django.template.defaultfilters import slugify
 import datetime
 from django.contrib.postgres.fields import JSONField
 from ondoc.api.v1.utils import RawSql
+from ondoc.common.helper import Choices
 
 def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
     return appender.join(value_chunks)
 
 
-class Choices(object):
-    @classmethod
-    def as_choices(cls):
-        properties = list(filter(lambda x : not x.startswith ("__"), dir(cls)))
-        properties.remove ("as_choices")
-        properties.remove ("availabilities")
-        choices = []
-        for prop in properties:
-            val = getattr(cls, prop)
-            choices.append((prop, val))
-        return choices
-
-    @classmethod
-    def availabilities(cls):
-        props = list(filter(lambda x: not x.startswith("__"), dir(cls)))
-        props.remove("as_choices")
-        props.remove("availabilities")
-        return props
-
-
-class GeoIpResults(TimeStampedModel):
+class GeocodingResults(TimeStampedModel):
 
     value = models.TextField()
     latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
     longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
 
     class Meta:
-        db_table = 'geo_ip_results'
+        db_table = 'geocoding_results'
 
 
 class CityInventory(TimeStampedModel):
@@ -74,15 +55,19 @@ class EntityAddress(TimeStampedModel):
     postal_code = models.PositiveIntegerField(null=True)
     parent = models.IntegerField(null=True)
     centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    geocoding = models.ForeignKey(GeocodingResults, null=True, on_delete=models.DO_NOTHING)
 
     @classmethod
     def get_or_create(cls, *args, **kwargs):
         mapping_dictionary = {
             'bengaluru': 'Bangalore',
-            'gurugram': 'Gurgaon'
+            'bengalooru': 'Bangalore',
+            'gurugram': 'Gurgaon',
+            'gurugram rural': 'Gurgaon'
         }
 
         meta_data = get_meta_by_latlong(kwargs.get('latitude'), kwargs.get('longitude'))
+        geocoding_qs = GeocodingResults.objects.filter(latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'))
         if not kwargs.get('content_object', None):
             raise ValueError('Missing parameter: content_object')
 
@@ -104,9 +89,10 @@ class EntityAddress(TimeStampedModel):
                     parent_id = entity_address.id
                 elif len(saved_data) == 0:
                     alternative_name = mapping_dictionary.get(meta['value'].lower()) if mapping_dictionary.get(meta['value'].lower(), None) else meta['value']
+                    geocoding_obj = geocoding_qs.first() if geocoding_qs.exists() else None
                     entity_address = cls(type=meta['key'], centroid=point, postal_code=postal_code,
                                          type_blueprint=meta['type'], value=meta['value'], parent=parent_id,
-                                         alternative_value=alternative_name)
+                                         alternative_value=alternative_name, geocoding=geocoding_obj)
                     entity_address.save()
                     parent_id = entity_address.id
 
@@ -637,13 +623,7 @@ class EntityUrls(TimeStampedModel):
         return True
 
     @classmethod
-    def create_page_url(cls, entity_object):
-        query = '''select nextval('entity_url_version_seq') as inc'''
-        seq = RawSql(query).fetch_all()
-        if seq:
-            sequence = seq[0]['inc'] if seq[0]['inc'] else 0
-        else:
-            sequence = 0
+    def create_page_url(cls, entity_object, sequence):
 
         try:
             if entity_object.__class__.__name__.upper() == 'DOCTOR':
@@ -836,6 +816,8 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
             hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True, hospital_type=2).first()
         elif doctor_realted_hospitals.filter(is_live=True, hospital_type=3).exists():
             hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True, hospital_type=3).first()
+        else:
+            hospital_for_doctor_page = doctor_realted_hospitals.filter(is_live=True).first()
 
         if hospital_for_doctor_page:
 

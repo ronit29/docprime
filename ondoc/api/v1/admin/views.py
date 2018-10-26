@@ -60,10 +60,10 @@ def userlogin_via_agent(request):
     data = serializer.validated_data
     user_type = data["user_type"]
 
-    if user_type==User.DOCTOR and not request.user.is_superuser:
+    if user_type == User.DOCTOR and not (request.user.is_superuser or request.user.groups.filter(name='provider_group').exists()):
         return Response(status=403)
 
-    if not request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists()  and \
+    if user_type == User.CONSUMER and not request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists()  and \
            not request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
         return Response(status=403)
 
