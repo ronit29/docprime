@@ -41,7 +41,7 @@ def prepare_and_hit(self, data):
         'PaymentStatus': 300,
         'DocPrimeBookingID': appointment.id,
         'BookingDateTime': int(appointment.created_at.timestamp()),
-        'AppointmentDateTime': int(appointment.created_at.timestamp()),
+        'AppointmentDateTime': int(appointment.time_slot_start.timestamp()),
         'BookingType': 'DC' if task_data.get('type') == 'LAB_APPOINTMENT' else 'D',
         'AppointmentType': appointment_type,
         'IsHomePickUp' : is_home_pickup,
@@ -222,3 +222,66 @@ def push_signup_lead_to_matrix(self, data):
     except Exception as e:
         logger.error("Error in Celery. Failed pushing online lead to the matrix- " + str(e))
 
+
+@task(bind=True, max_retries=2)
+def push_order_to_matrix(self, data):
+    try:
+        from ondoc.account.models import Order
+        order_id = data.get('order_id', None)
+        if not order_id:
+            logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise ValueError()
+
+        order_obj = Order.objects.get(id=order_id)
+
+        if not order_obj:
+            raise Exception("Order could not found against id - " + str(order_id))
+
+        appointment_details = order_obj.appointment_details()
+        request_data = {
+            'OrderId': appointment_details.get('order_id', 0),
+            'HospitalName': appointment_details.get('hospital_name'),
+            'Name': appointment_details.get('profile_name', ''),
+            'BookedBy': appointment_details.get('user_number', None),
+            'LeadID': order_obj.matrix_lead_id if order_obj.matrix_lead_id else 0,
+            'AppointmentDetails': {
+                'ProviderName': appointment_details.get('doctor_name', ''),
+                'BookingDateTime': int(data.get('created_at')),
+                'AppointmentDateTime': int(data.get('timeslot')),
+            }
+
+        }
+
+        logger.error(json.dumps(request_data))
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] Order could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+        resp_data = response.json()
+        logger.error(response.text)
+
+        # save the appointment with the matrix lead id.
+        order_obj.matrix_lead_id = resp_data.get('Id', None)
+        order_obj.matrix_lead_id = int(order_obj.matrix_lead_id)
+
+        order_obj.save(**data)
+
+        print(str(resp_data))
+        if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
+            logger.info("[SUCCESS] Order successfully published to the matrix system")
+        else:
+            logger.info("[ERROR] Order could not be published to the matrix system")
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
