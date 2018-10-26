@@ -255,7 +255,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                     lab_pricing_group__labs__is_test_lab=False,
                                                                     lab_pricing_group__labs__is_live=True,
                                                                     test__in=test_ids)
-        lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
+        lab_obj = Lab.objects.prefetch_related('rating').filter(id=lab_id, is_live=True).first()
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo

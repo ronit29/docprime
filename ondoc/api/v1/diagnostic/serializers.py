@@ -90,7 +90,7 @@ class LabModelSerializer(serializers.ModelSerializer):
                 if lab_app:
                     data = LabAppointmentModelSerializer(lab_app, many=False, context={'request': request})
                     return data.data
-            return []
+            return None
 
     def get_rating_graph(self, obj):
         if obj and obj.rating:

@@ -195,7 +195,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     home_collection_charges = GenericRelation(HomePickupCharges)
     entity = GenericRelation(location_models.EntityLocationRelationship)
     rating = GenericRelation(ratings_models.RatingsReview)
-    rating_query = GenericRelation(ratings_models.RatingsReview, related_query_name='labs')
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     def __str__(self):
