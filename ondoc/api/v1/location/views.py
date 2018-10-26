@@ -91,8 +91,9 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         return Response(response)
 
     def list_cities(self, request):
-        cities = CityInventory.objects.all().values('city')
-        return Response(cities)
+        cities = location_models.EntityUrls.objects.filter(sitemap_identifier='DOCTORS_CITY').order_by('-count').\
+            values_list('locality_value', flat=True).distinct()
+        return Response({"cities": cities})
 
     def list_urls_by_city(self, request, city):
         if not city:
