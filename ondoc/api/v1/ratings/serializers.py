@@ -23,11 +23,15 @@ class RatingCreateBodySerializer(serializers.Serializer):
     # compliment = ListReviewComplimentSerializer(source='request.data')
     compliment = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ReviewCompliments.objects.all()), allow_empty=True)
 
-    # def validate(self, attrs):
-    #     if (attrs.get('appointment_id') and attrs.get('appointment_type')):
-    #         if attrs.get('appointment_type') == RatingsReview.OPD:
-    #             pass
-    #             raise serializers.ValidationError("Appointment Not Completed.")
+    def validate(self, attrs):
+        if (attrs.get('appointment_id') and attrs.get('appointment_type')):
+            if attrs.get('appointment_type') == RatingsReview.OPD:
+                app = doc_models.OpdAppointment.objects.filter(id=attrs.get('appointment_id')).first()
+            else:
+                app = lab_models.LabAppointment.objects.filter(id=attrs.get('appointment_id')).first()
+            if app and app.is_rated:
+                raise serializers.ValidationError("Appointment Already Rated.")
+        return attrs
 
 
 class RatingPromptCloseBodySerializer(serializers.Serializer):
