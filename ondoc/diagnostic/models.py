@@ -380,20 +380,22 @@ class LabBookingClosingManager(models.Manager):
 
             if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
                 for day in range(0, 7):
-                    obj.form_time_slots(day, 0.0, 23.75-threshold, None, True)
+                    obj.form_time_slots(day, 0.0, 23.75, None, True)
 
             else:
-                daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
-                day, end = daywise_data_array[0].day, daywise_data_array[0].end
-                end = end - threshold
-                for data in daywise_data_array:
-                    if data.day != day:
-                        day = data.day
-                        end = data.end - threshold
-                    if not end <= data.start <= data.end:
-                        if data.start <= end <= data.end:
-                            data.end = end
-                        obj.form_time_slots(data.day, data.start, data.end, None, True)
+                for data in lab_timing_queryset:
+                    obj.form_time_slots(data.day, data.start, data.end, None, True)
+                # daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
+                # day, end = daywise_data_array[0].day, daywise_data_array[0].end
+                # end = end - threshold
+                # for data in daywise_data_array:
+                #     if data.day != day:
+                #         day = data.day
+                #         end = data.end - threshold
+                #     if not end <= data.start <= data.end:
+                #         if data.start <= end <= data.end:
+                #             data.end = end
+                #         obj.form_time_slots(data.day, data.start, data.end, None, True)
 
             resp_list = obj.get_timing_list()
             return resp_list
