@@ -92,7 +92,8 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
 
     def list_cities(self, request):
         cities = location_models.EntityUrls.objects.filter(sitemap_identifier='DOCTORS_CITY').order_by('-count').\
-            values_list('locality_value', flat=True).distinct()
+            extra(select={'rank':'SELECT rank FROM "seo_cities" WHERE "entity_urls".locality_value ilike "seo_cities".city'}).\
+            extra(order_by=['rank']).values_list('locality_value', flat=True).distinct()
         return Response({"cities": cities})
 
     def list_urls_by_city(self, request, city):
