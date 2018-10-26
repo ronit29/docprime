@@ -22,14 +22,14 @@ def split_and_append(initial_str, spliter, appender):
     return appender.join(value_chunks)
 
 
-class GeoIpResults(TimeStampedModel):
+class GeocodingResults(TimeStampedModel):
 
     value = models.TextField()
     latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
     longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
 
     class Meta:
-        db_table = 'geo_ip_results'
+        db_table = 'geocoding_results'
 
 
 class EntityAddress(TimeStampedModel):
@@ -48,6 +48,7 @@ class EntityAddress(TimeStampedModel):
     postal_code = models.PositiveIntegerField(null=True)
     parent = models.IntegerField(null=True)
     centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    geocoding = models.ForeignKey(GeocodingResults, null=True, on_delete=models.DO_NOTHING)
 
     @classmethod
     def get_or_create(cls, *args, **kwargs):
@@ -59,6 +60,7 @@ class EntityAddress(TimeStampedModel):
         }
 
         meta_data = get_meta_by_latlong(kwargs.get('latitude'), kwargs.get('longitude'))
+        geocoding_qs = GeocodingResults.objects.filter(latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'))
         if not kwargs.get('content_object', None):
             raise ValueError('Missing parameter: content_object')
 
@@ -80,9 +82,10 @@ class EntityAddress(TimeStampedModel):
                     parent_id = entity_address.id
                 elif len(saved_data) == 0:
                     alternative_name = mapping_dictionary.get(meta['value'].lower()) if mapping_dictionary.get(meta['value'].lower(), None) else meta['value']
+                    geocoding_obj = geocoding_qs.first() if geocoding_qs.exists() else None
                     entity_address = cls(type=meta['key'], centroid=point, postal_code=postal_code,
                                          type_blueprint=meta['type'], value=meta['value'], parent=parent_id,
-                                         alternative_value=alternative_name)
+                                         alternative_value=alternative_name, geocoding=geocoding_obj)
                     entity_address.save()
                     parent_id = entity_address.id
 
