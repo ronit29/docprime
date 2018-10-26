@@ -375,6 +375,7 @@ class LabBookingClosingManager(models.Manager):
     def lab_booking_slots(self, *args, **kwargs):
 
         is_home_pickup = kwargs.get("for_home_pickup", False)
+
         if is_home_pickup:
             kwargs["lab__is_home_collection_enabled"] = is_home_pickup
         lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
@@ -389,10 +390,6 @@ class LabBookingClosingManager(models.Manager):
             if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
                 for day in range(0, 7):
                     obj.form_time_slots(day, 0.0, 23.75-threshold, None, True)
-
-            elif is_home_pickup:
-                for day in range(0, 7):
-                    obj.form_time_slots(day, 7.0, 19.0, None, True)
 
             else:
                 daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
