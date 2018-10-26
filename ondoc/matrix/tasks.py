@@ -274,7 +274,7 @@ def push_order_to_matrix(self, data):
             resp_data = response.json()
             logger.error(response.text)
 
-            # save the appointment with the matrix lead id.
+            # save the order with the matrix lead id.
             order_obj.matrix_lead_id = resp_data.get('Id', None)
             order_obj.matrix_lead_id = int(order_obj.matrix_lead_id)
 
