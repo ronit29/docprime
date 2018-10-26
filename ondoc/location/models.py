@@ -34,6 +34,7 @@ class GeocodingResults(TimeStampedModel):
 class CityInventory(TimeStampedModel):
 
     city = models.TextField()
+    rank = models.PositiveIntegerField(null=True, default=0)
 
     class Meta:
         db_table = 'seo_cities'
