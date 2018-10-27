@@ -50,6 +50,7 @@ from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
 from django import forms
 
+
 class AutoComplete:
     def autocomplete_view(self, request):
         return CustomAutoComplete.as_view(model_admin=self)(request)
