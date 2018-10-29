@@ -282,7 +282,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_serializable_data = list()
         lab_timing = None
         lab_timing_data = list()
+        distance_related_charges = None
+
         if lab_obj:
+            distance_related_charges = 1 if lab_obj.home_collection_charges.all().exists() else 0
             if lab_obj.always_open:
                 lab_timing = "12:00 AM - 23:45 PM"
                 lab_timing_data = [{
@@ -302,6 +305,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
+        temp_data['distance_related_charges'] = distance_related_charges
         temp_data['tests'] = test_serializer.data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
