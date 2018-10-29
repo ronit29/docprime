@@ -139,11 +139,13 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
     def specialists_list(self, request):
-        query = '''select eu.specialization_id, max(eu.specialization) specialization from entity_urls eu 
-                inner join entity_urls eur on eu.specialization_id = eur.specialization_id
-                where eu.sitemap_identifier = 'SPECIALIZATION_CITY'
-                and eur.sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY'
-                group by eu.specialization_id order by count(*) desc'''
+        query = '''select specialization_id,max(specialization) specialization  from entity_urls where 
+                 sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' group by specialization_id order by count(*) desc'''
+        # query = '''select eu.specialization_id, max(eu.specialization) specialization from entity_urls eu 
+        #         inner join entity_urls eur on eu.specialization_id = eur.specialization_id
+        #         where eu.sitemap_identifier = 'SPECIALIZATION_CITY'
+        #         and eur.sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY'
+        #         group by eu.specialization_id order by count(*) desc'''
 
         result = RawSql(query).fetch_all()
 
