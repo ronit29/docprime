@@ -170,9 +170,10 @@ class UpdateXlsViewSet():
         for i in range(2, len(rows)+1):
             data = self.get_data(i,sheet)
             output = self.get_result_count(data)
-            sheet.cell(row=i, column=search_count_column).value = output[0]
-            sheet.cell(row=i, column=url_column).value = output[1]
-            sheet.cell(row=i, column=validation_url_column).value = output[2]
+            if output!=0:
+                sheet.cell(row=i, column=search_count_column).value = output[0]
+                sheet.cell(row=i, column=url_column).value = output[1]
+                sheet.cell(row=i, column=validation_url_column).value = output[2]
 
         response = HttpResponse(content=save_virtual_workbook(wb),
                                     content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
