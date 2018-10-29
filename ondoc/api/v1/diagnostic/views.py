@@ -27,7 +27,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
 from django.db import transaction
-from django.db.models import Count, Sum, Max, When, Case, F, Q
+from django.db.models import Count, Sum, Max, When, Case, F, Q, Value, DecimalField, IntegerField
 from django.http import Http404
 from django.conf import settings
 import hashlib
@@ -382,20 +382,43 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if ids:
             queryset = queryset.filter(lab_pricing_group__available_lab_tests__test_id__in=ids,
-                lab_pricing_group__available_lab_tests__enabled=True)
+                                       lab_pricing_group__available_lab_tests__enabled=True)
 
         if ids:
-            deal_price_calculation = Case(When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
-                                               then=F('lab_pricing_group__available_lab_tests__computed_deal_price')),
-                                          When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=False,
-                                               then=F('lab_pricing_group__available_lab_tests__custom_deal_price')))
+            if LabTest.objects.filter(id__in=ids, home_collection_possible=True).count() == len(ids):
+                home_pickup_calculation = Case(
+                    When(is_home_collection_enabled=True,
+                         then=F('home_pickup_charges')),
+                    When(is_home_collection_enabled=False,
+                         then=Value(0)),
+                    output_field=DecimalField())
+                distance_related_charges = Case(
+                    When(is_home_collection_enabled=False, then=Value(0)),
+                    When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=True),
+                         then=Value(0)),
+                    When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=False),
+                         then=Value(1)),
+                    output_field=IntegerField())
+            else:
+                home_pickup_calculation = Value(0, DecimalField())
+                distance_related_charges = Value(0, IntegerField())
+
+            deal_price_calculation = Case(
+                When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
+                     then=F('lab_pricing_group__available_lab_tests__computed_deal_price')),
+                When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=False,
+                     then=F('lab_pricing_group__available_lab_tests__custom_deal_price')))
 
             queryset = (
                 queryset.values('id').annotate(price=Sum(deal_price_calculation),
                                                mrp=Sum(F('lab_pricing_group__available_lab_tests__mrp')),
                                                count=Count('id'),
                                                distance=Max(Distance('location', pnt)),
-                                               name=Max('name')).filter(count__gte=len(ids)))
+                                               name=Max('name'),
+                                               pickup_charges=Max(home_pickup_calculation),
+                                               distance_related_charges=Max(distance_related_charges),
+                                               priority=Max('priority')).filter(count__gte=len(ids)))
+
             if min_price is not None:
                 queryset = queryset.filter(price__gte=min_price)
 
@@ -418,7 +441,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by("-order_priority", "price", "distance")
+                queryset = queryset.order_by("-order_priority", F("price")+F("pickup_charges"), "distance_related_charges", "distance")
             elif order_by == 'distance':
                 queryset = queryset.order_by("-order_priority", "distance")
             elif order_by == 'name':
