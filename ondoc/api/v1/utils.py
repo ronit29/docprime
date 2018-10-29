@@ -666,12 +666,16 @@ class TimeSlotExtraction(object):
         if is_home_pickup:
             if is_thyrocare:
                 today_min = 24
+                if curr_time >= 17:
+                    tomorrow_min = 12
             else:
                 if is_sunday:
                     today_min = 24
                 else:
                     if curr_time < 13:
                         today_min = curr_time + 4
+                    elif curr_time >= 13:
+                        today_min = 24
                 if curr_time >= 17:
                     tomorrow_min = 12
         else:
