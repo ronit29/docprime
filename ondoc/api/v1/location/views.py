@@ -139,27 +139,39 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
     def specialists_list(self, request):
-        specializations = location_models.EntityUrls.objects.filter(url_type='SEARCHURL', entity_type__iexact='Doctor',
-                                                                    sitemap_identifier='SPECIALIZATION_CITY',
-                                                                    specialization_id__gt=0,
-                                                                    specialization__isnull=False).values(
-                                                                     'specialization', 'specialization_id').distinct()
+        query = '''select eu.specialization_id, max(eu.specialization) specialization from entity_urls eu 
+                inner join entity_urls eur on eu.specialization_id = eur.specialization_id
+                where eu.sitemap_identifier = 'SPECIALIZATION_CITY'
+                and eur.sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY'
+                group by eu.specialization_id order by count(*) desc'''
 
-        return Response({"specialization_inventory": specializations})
+        result = RawSql(query).fetch_all()
+
+
+        # specializations = location_models.EntityUrls.objects.filter(url_type='SEARCHURL', entity_type__iexact='Doctor',
+        #                                                             sitemap_identifier='SPECIALIZATION_CITY',
+        #                                                             specialization_id__gt=0,
+        #                                                             specialization__isnull=False).values(
+        #                                                              'specialization', 'specialization_id').distinct()
+
+        return Response({"specialization_inventory": result})
 
     def specialities_in_localities_list(self, request, specialization_id):
         if not specialization_id:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         pages = None
-        query = '''select * from
-                (select x.*, row_number() over(partition by locality order by count desc) row_num,
-                 dense_rank() over(order by locality asc) city_num
-                 from
-                (select locality_value, sublocality_value, specialization, specialization_id,url,count,extras,(extras->'location_json'->'locality_value')::TEXT as locality
-                 from entity_urls where url_type='SEARCHURL' and entity_type='Doctor' and is_valid=True
-                and sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY' and specialization_id = %d
-                )x)y where row_num<=20 ''' %(specialization_id)
+        query = '''select * from (select z.*, dense_rank() over( order by z.sub_count desc,z.locality) city_num from 
+                (
+                    select * from (select x.*, row_number() over(partition by locality order by count desc) row_num,
+                                 count(*) over (partition by locality) sub_count
+                                 from
+                                (select locality_value, sublocality_value, specialization, specialization_id,url,count,extras,
+                                 locality_value as locality
+                                 from entity_urls where is_valid=True
+                                and sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY' and specialization_id = %d
+                                )x)y where row_num<=20 order by sub_count desc)z
+                )t ''' %(specialization_id)
 
         query1 = "%s order by city_num, row_num" % query
 
@@ -176,7 +188,8 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
             start = (page_no-1) * 25 + 1
             end = page_no * 25
 
-            seo_query_result = "%s  and city_num between %d and %d  order by city_num, row_num" %(query, start, end)
+            seo_query_result = "%s  where city_num between %d and %d  order by city_num, row_num" %(query, start, end)
+
 
             seo_result = RawSql(seo_query_result).fetch_all()
             paginated_specialists = []
