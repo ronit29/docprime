@@ -76,29 +76,32 @@ class HospitalSpecialityInline(admin.TabularInline):
 #     show_change_link = False
 class GenericAdminFormSet(forms.BaseInlineFormSet):
     def clean(self):
-        appnt_manager_flag = self.instance.is_appointment_manager
-        if self.cleaned_data:
-            phone_number = False
-            for data in self.cleaned_data:
-                if data.get('phone_number') and data.get('permission_type') == GenericAdmin.APPOINTMENT:
-                    phone_number = True
-                    break
-            if phone_number:
-                if not appnt_manager_flag:
-                    if not(len(self.deleted_forms) == len(self.cleaned_data)):
-                        raise forms.ValidationError(
-                            "'Enabled for Managing Appointment' should be set if a Admin is Entered.")
-            else:
-                if appnt_manager_flag:
-                    raise forms.ValidationError(
-                        "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
-        else:
-            if appnt_manager_flag:
-                raise forms.ValidationError("An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
-        if len(self.deleted_forms) == len(self.cleaned_data):
-            if appnt_manager_flag:
-                raise forms.ValidationError(
-                    "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
+        # appnt_manager_flag = self.instance.is_appointment_manager
+        # if self.cleaned_data:
+        #     phone_number = False
+        #     for data in self.cleaned_data:
+        #         if data.get('phone_number') and data.get('permission_type') == GenericAdmin.APPOINTMENT:
+        #             phone_number = True
+        #             break
+        #     if phone_number:
+        #         if not appnt_manager_flag:
+        #             if not(len(self.deleted_forms) == len(self.cleaned_data)):
+        #                 raise forms.ValidationError(
+        #                     "'Enabled for Managing Appointment' should be set if a Admin is Entered.")
+        #     else:
+        #         if appnt_manager_flag:
+        #             raise forms.ValidationError(
+        #                 "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
+        #     pass
+        # else:
+        #     if appnt_manager_flag:
+        #         raise forms.ValidationError("An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
+        #     pass
+        # if len(self.deleted_forms) == len(self.cleaned_data):
+        #     if appnt_manager_flag:
+        #         raise forms.ValidationError(
+        #             "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
+        pass
 
 
 class GenericAdminInline(admin.TabularInline):
@@ -181,6 +184,13 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             return mark_safe(html)
         else:
             return ''
+
+    def save_related(self, request, form, formsets, change):
+        super(type(self), self).save_related(request, form, formsets, change)
+        hospital_changed_list = form.changed_data
+        hospital = form.instance
+        if 'is_billing_enabled' in hospital_changed_list or 'is_appointment_manager' in hospital_changed_list:
+            GenericAdmin.create_hospital_spoc_admin(hospital)
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:

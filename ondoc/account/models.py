@@ -46,6 +46,7 @@ class Order(TimeStampedModel):
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     error_status = models.CharField(max_length=250, verbose_name="Error", blank=True, null=True)
     is_viewable = models.BooleanField(verbose_name='Is Viewable', default=True)
+    matrix_lead_id = models.PositiveIntegerField(null=True)
 
     def __str__(self):
         return "{}".format(self.id)

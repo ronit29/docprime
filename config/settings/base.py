@@ -130,6 +130,7 @@ LOCAL_APPS = (
     'ondoc.common',
     'ondoc.tracking',
     'ondoc.seo',
+    'ondoc.ratings_review',
     'ondoc.geoip',
     'ondoc.procedure'
 )
@@ -314,6 +315,7 @@ MAXMIND_ACCOUNT_ID = env('MAXMIND_ACCOUNT_ID')
 MAXMIND_LICENSE_KEY = env('MAXMIND_LICENSE_KEY')
 MAXMIND_CITY_API_URL = env('MAXMIND_CITY_API_URL')
 OTP_BYPASS_NUMBERS = env.list('OTP_BYPASS_NUMBERS')
+#GOOGLE_MAP_API_KEY = env('GOOGLE_MAP_API_KEY')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),

@@ -44,6 +44,7 @@ import copy
 import re
 import datetime
 from django.contrib.auth import get_user_model
+from ondoc.matrix.tasks import push_order_to_matrix
 User = get_user_model()
 
 
@@ -255,7 +256,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                     lab_pricing_group__labs__is_test_lab=False,
                                                                     lab_pricing_group__labs__is_live=True,
                                                                     test__in=test_ids)
-        lab_obj = Lab.objects.filter(id=lab_id, is_live=True).first()
+        lab_obj = Lab.objects.prefetch_related('rating').filter(id=lab_id, is_live=True).first()
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
@@ -298,6 +299,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing = ''
         lab_timing_data = list()
         temp_list = list()
+
         for qdata in queryset:
             temp_list.append({"start": qdata.start, "end": qdata.end})
 
@@ -433,28 +435,56 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         labs = Lab.objects.prefetch_related('lab_documents', 'lab_image', 'lab_timings').filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
+
         for obj in labs:
             temp_var[obj.id] = obj
         day_now = timezone.now().weekday()
+        days_array = [i for i in range(7)]
+        rotated_days_array = days_array[day_now:] + days_array[:day_now]
         for row in queryset:
+            lab_timing = list()
+            lab_timing_data = list()
+            next_lab_timing_dict = {}
+            next_lab_timing_data_dict = {}
+            data_array = [list() for i in range(7)]
             row["lab"] = temp_var[row["id"]]
 
             if row["lab"].always_open:
                 lab_timing = "12:00 AM - 11:45 PM"
+                next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
                 lab_timing_data = [{
                     "start": 0.0,
                     "end": 23.75
                 }]
+                next_lab_timing_data_dict = {rotated_days_array[1]: {
+                    "start": 0.0,
+                    "end": 23.75
+                }}
             else:
                 timing_queryset = row["lab"].lab_timings.all()
-                timing_data = list()
+
                 for data in timing_queryset:
-                    if data.day == day_now:
-                        timing_data.append(data)
-                lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
-            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+                    data_array[data.day].append(data)
+
+                rotated_data_array = data_array[day_now:] + data_array[:day_now]
+
+                for count, timing_data in enumerate(rotated_data_array):
+                    day = rotated_days_array[count]
+                    if count == 0:
+                        if timing_data:
+                            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+                            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+                    elif timing_data:
+                        next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+                        next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+                        next_lab_timing_dict[day] = next_lab_timing
+                        next_lab_timing_data_dict[day] = next_lab_timing_data
+                        break
+
             row["lab_timing"] = lab_timing
             row["lab_timing_data"] = lab_timing_data
+            row["next_lab_timing"] = next_lab_timing_dict
+            row["next_lab_timing_data"] = next_lab_timing_data_dict
             resp_queryset.append(row)
 
         return resp_queryset
@@ -717,6 +747,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
                                                          order.product_id,
                                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
+
+                push_order_to_matrix.apply_async(({'order_id': order.id, 'created_at':int(order.created_at.timestamp()),
+                                                   'timeslot':int(appointment_details['time_slot_start'].timestamp())}, ), countdown=5)
             except:
                 pass
         else:
@@ -783,26 +816,9 @@ class LabTimingListView(mixins.ListModelMixin,
 
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
-        lab_queryset = Lab.objects.filter(pk=lab, is_live=True).prefetch_related('lab_timings').first()
-        if not lab_queryset or (for_home_pickup and not lab_queryset.is_home_collection_enabled):
-            return Response([])
 
-        obj = TimeSlotExtraction()
+        resp_list = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
 
-        if not for_home_pickup and lab_queryset.always_open:
-            for day in range(0, 7):
-                obj.form_time_slots(day, 0.0, 23.75, None, True)
-        # New condition for home pickup timing from 7 to 7
-        elif for_home_pickup:
-            for day in range(0, 7):
-                obj.form_time_slots(day, 7.0, 19.0, None, True)
-        else:
-            lab_timing_queryset = lab_queryset.lab_timings.all()
-            for data in lab_timing_queryset:
-                if for_home_pickup == data.for_home_pickup:
-                    obj.form_time_slots(data.day, data.start, data.end, None, True)
-
-        resp_list = obj.get_timing_list()
         return Response(resp_list)
 
 
