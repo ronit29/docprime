@@ -817,9 +817,9 @@ class LabTimingListView(mixins.ListModelMixin,
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
 
-        resp_list = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
+        resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
 
-        return Response(resp_list)
+        return Response(resp_data)
 
 
 class AvailableTestViewSet(mixins.RetrieveModelMixin,

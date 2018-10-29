@@ -372,7 +372,11 @@ class LabBookingClosingManager(models.Manager):
         lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
 
         if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
-            return []
+            return {
+                "time_slots": [],
+                "today_min": None,
+                "tomorrow_min": None
+            }
 
         else:
             obj = TimeSlotExtraction()
@@ -398,7 +402,20 @@ class LabBookingClosingManager(models.Manager):
                 #         obj.form_time_slots(data.day, data.start, data.end, None, True)
 
             resp_list = obj.get_timing_list()
-            return resp_list
+            is_thyrocare = False
+            lab_id = kwargs.get("lab__id", None)
+            if lab_id and settings.THYROCARE_NETWORK_ID:
+                if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
+                    is_thyrocare = True
+
+            today_min, tomorrow_min = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup)
+            res_data = {
+                "time_slots": resp_list,
+                "today_min": today_min,
+                "tomorrow_min": tomorrow_min
+            }
+
+            return res_data
 
 
 class LabTiming(TimeStampedModel):
