@@ -20,7 +20,7 @@ import datetime
 from django.db import transaction
 import logging
 
-from ondoc.procedure.models import DoctorClinicProcedure
+from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
 
