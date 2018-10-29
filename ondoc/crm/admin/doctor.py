@@ -133,16 +133,16 @@ class DoctorClinicFormSet(forms.BaseInlineFormSet):
         super().clean()
         if any(self.errors):
             return
-        hospital = 0
-        count = 0
-        for value in self.cleaned_data:
-            count += 1
-            if value.get('hospital'):
-                hospital += 1
-
-        if count > 0:
-            if not hospital:
-                raise forms.ValidationError("Atleast one Hospital is required")
+        # hospital = 0
+        # count = 0
+        # for value in self.cleaned_data:
+        #     count += 1
+        #     if value.get('hospital'):
+        #         hospital += 1
+        #
+        # if count > 0:
+        #     if not hospital:
+        #         raise forms.ValidationError("Atleast one Hospital is required")
 
 
 class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
@@ -185,6 +185,7 @@ class DoctorClinicInline(ReadOnlyInline):
     model = DoctorClinic
     extra = 0
     can_delete = True
+    formset = DoctorClinicFormSet
     show_change_link = False
     autocomplete_fields = ['hospital']
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline]
@@ -783,9 +784,6 @@ class CompetitorInfoFormSet(forms.BaseInlineFormSet):
         #         raise forms.ValidationError('Cannot have duplicate competitor info.')
         #     else:
         #         prev_compe_infos[req_set] = True
-
-
-
 
 
 class CompetitorInfoForm(forms.ModelForm):
@@ -1522,6 +1520,12 @@ class SpecializationFieldResource(resources.ModelResource):
         fields = ('id', 'name')
 
 
+class PracticeSpecializationSynonymResource(resources.ModelResource):
+    class Meta:
+        model = PracticeSpecialization
+        fields = ('id', 'synonyms')
+
+
 class PracticeSpecializationResource(resources.ModelResource):
     name = Field(attribute='name', column_name='modified_name')
     field_medicine = Field(column_name='field_medicine')
@@ -1601,7 +1605,7 @@ class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin)
     list_display = ('name', )
     date_hierarchy = 'created_at'
     inlines = [PracticeSpecializationDepartmentMappingInline, ]
-    resource_class = PracticeSpecializationResource
+    resource_class = PracticeSpecializationSynonymResource
     search_fields = ['name', ]
 
 

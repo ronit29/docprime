@@ -7,20 +7,18 @@ from rest_framework.response import Response
 from rest_framework import viewsets, mixins, status
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
-from ondoc.api.v1.utils import IsConsumer
+from ondoc.api.v1.utils import IsConsumer, IsNotAgent
 from . import serializers
 from ondoc.api.v1.doctor import serializers as doc_serializers
 from ondoc.api.v1.diagnostic import serializers as lab_serializers
 
 
 class RatingsViewSet(viewsets.GenericViewSet):
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated, IsConsumer)
-
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsConsumer, IsNotAgent)
 
     def get_queryset(self):
         pass
-
 
     def prompt_close(self, request):
         serializer = serializers.RatingPromptCloseBodySerializer(data=request.data)
