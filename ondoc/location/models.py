@@ -744,7 +744,10 @@ class EntityUrls(TimeStampedModel):
         db_table = 'entity_urls'
         indexes = [
             models.Index(fields=['locality_value']),
-            models.Index(fields=['locality_value', 'sitemap_identifier',])
+            models.Index(fields=['url']),
+            models.Index(fields=['locality_value', 'sitemap_identifier',]),
+            models.Index(fields=['specialization_id', 'locality_id','sublocality_id']),
+            models.Index(fields=['locality_id','sublocality_id']),
         ]
 
 
