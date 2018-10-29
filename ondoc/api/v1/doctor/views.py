@@ -752,10 +752,25 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
-                                           entity_type__iexact='Doctor').order_by('-updated_at')
-        if entity.exists():
-            extras = entity.first().additional_info
+        url = url.lower()
+
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                           entity_type__iexact='Doctor').order_by('-sequence')
+        if entity_url_qs.exists():
+            entity = entity_url_qs.first()
+            if not entity.is_valid:
+                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
+                                          entity_type__iexact='Doctor', specialization_id=entity.specialization_id,
+                                          locality_id=entity.locality_id, sublocality_id=entity.subdoctors-in-new-delhi-sptcitlocality_id,
+                                          sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+
+                if valid_qs.exists():
+                    corrected_url = valid_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            extras = entity.additional_info
             if extras:
                 kwargs['extras'] = extras
                 kwargs['url'] = url
