@@ -186,7 +186,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                 city_title = None
                 if data.get('row_num') ==1:
                     result = {'speciality_url_title': []}
-                    city_title = data.get('specialization') + " in " + data.get('locality_value')
+                    city_title = data.get('locality_value')
                     if city_title:
                         # paginated_specialists.append({"city_title": city_title})
                         result['city_title'] = city_title
