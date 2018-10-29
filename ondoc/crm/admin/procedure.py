@@ -71,3 +71,5 @@ class ProcedureCategoryAdmin(VersionAdmin):
     search_fields = ['search_key']
     inlines = [ParentProcedureCategoryInline]
     exclude = ['search_key']
+
+
