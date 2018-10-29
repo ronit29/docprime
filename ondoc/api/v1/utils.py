@@ -675,7 +675,7 @@ class TimeSlotExtraction(object):
                 if curr_time >= 17:
                     tomorrow_min = 12
         else:
-            if is_thyrocare:
+            if not is_thyrocare:
                 # add 2 hours gap,
                 today_min = curr_time + 2
 
