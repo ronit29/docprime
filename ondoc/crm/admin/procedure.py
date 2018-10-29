@@ -5,28 +5,31 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCatego
 from django import forms
 
 
-class ParentProcedureCategoryInlineFormset(forms.BaseInlineFormSet):
+class ParentProcedureCategoryInlineForm(forms.ModelForm):
     def clean(self):
         super().clean()
         if any(self.errors):
             return
-        for value in self.cleaned_data:
-            if value.get('child_category') == value.get('parent_category'):
-                raise forms.ValidationError("Category can't be related to itself.")
-            if value.get('DELETE') and value.get('is_manual', False):
-                raise forms.ValidationError("Cannot delete a link not created on CRM.")
+        value = self.cleaned_data
+        if value.get('child_category') == value.get('parent_category'):
+            raise forms.ValidationError("Category can't be related to itself.")
+        if value.get('DELETE') and value.get('is_manual', False):
+            raise forms.ValidationError("Cannot delete a link not created on CRM.")
+        parent_category = value.get('parent_category')
+        if parent_category.procedures.count():  # PROCEDURE_category_SAME_level
+            raise forms.ValidationError("Category already has few procedures under it. Procedure and Category can't be on same level.")
 
 
 class ParentProcedureCategoryInline(AutoComplete, TabularInline):
     model = ProcedureCategoryMapping
-    exclude = ['is_manual']
+    # exclude = ['is_manual']
     fk_name = 'child_category'
     extra = 0
     can_delete = True
     autocomplete_fields = ['parent_category']
     verbose_name = "Parent Category"
     verbose_name_plural = "Parent Categories"
-    formset = ParentProcedureCategoryInlineFormset
+    form = ParentProcedureCategoryInlineForm
 
     # def get_queryset(self, request):
     #     return super().get_queryset(request).filter(is_manual=False)
@@ -69,7 +72,6 @@ class ProcedureAdmin(VersionAdmin):
 
 
 class ProcedureCategoryForm(forms.ModelForm):
-
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -83,10 +85,10 @@ class ProcedureCategoryForm(forms.ModelForm):
             if self.instance.pk:
                 all_organic_parents = procedure.categories.all().values_list('pk', flat=True)
                 all_parents = ProcedureCategoryMapping.objects.filter(
-                    child_category__in=all_organic_parents).values_list('pk', flat=True)
+                    child_category__in=all_organic_parents).values_list('parent_category', flat=True)
                 all_parents = set(all_organic_parents).union(set(all_parents))
-                if self.instance.pk in all_parents:
-                    raise forms.ValidationError('Category and preferred procedure should be related.')
+                if self.instance.pk not in all_parents:
+                        raise forms.ValidationError('Category and preferred procedure should be related.')
                 if not procedure.categories.filter(pk=self.instance.pk).exists():  # PROCEDURE_category_SAME_level
                     raise forms.ValidationError(
                         'Category should be direct parent of the preferred procedure.')

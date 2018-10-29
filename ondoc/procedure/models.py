@@ -23,7 +23,7 @@ class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
 
 class Procedure(auth_model.TimeStampedModel, SearchKey):
     categories = models.ManyToManyField(ProcedureCategory, through='ProcedureToCategoryMapping',
-                                        through_fields=('procedure', 'parent_category'), related_name='procedure')
+                                        through_fields=('procedure', 'parent_category'), related_name='procedures')
     name = models.CharField(max_length=500, unique=True)
     details = models.CharField(max_length=2000)
     duration = models.IntegerField()
