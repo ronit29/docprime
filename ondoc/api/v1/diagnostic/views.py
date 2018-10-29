@@ -27,7 +27,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
 from django.db import transaction
-from django.db.models import Count, Sum, Max, When, Case, F, Q
+from django.db.models import Count, Sum, Max, When, Case, F, Q, Value, DecimalField, IntegerField
 from django.http import Http404
 from django.conf import settings
 import hashlib
@@ -123,10 +123,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
-                                           entity_type__iexact='Lab').order_by('-updated_at')
-        if entity.exists():
-            extras = entity.first().additional_info
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                  entity_type__iexact='Lab').order_by('-sequence')
+        if entity_url_qs.exists():
+            entity = entity_url_qs.first()
+            if not entity.is_valid:
+                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
+                                                     entity_type__iexact='Lab', locality_id=entity.locality_id,
+                                                     sublocality_id=entity.sublocality_id,
+                                                     sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+
+                if valid_qs.exists():
+                    corrected_url = valid_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            extras = entity.additional_info
             if extras.get('location_json'):
                 kwargs['location_json'] = extras.get('location_json')
                 kwargs['url'] = url
@@ -257,6 +270,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                     lab_pricing_group__labs__is_live=True,
                                                                     test__in=test_ids)
         lab_obj = Lab.objects.prefetch_related('rating').filter(id=lab_id, is_live=True).first()
+        if not lab_obj:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
@@ -382,20 +397,43 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if ids:
             queryset = queryset.filter(lab_pricing_group__available_lab_tests__test_id__in=ids,
-                lab_pricing_group__available_lab_tests__enabled=True)
+                                       lab_pricing_group__available_lab_tests__enabled=True)
 
         if ids:
-            deal_price_calculation = Case(When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
-                                               then=F('lab_pricing_group__available_lab_tests__computed_deal_price')),
-                                          When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=False,
-                                               then=F('lab_pricing_group__available_lab_tests__custom_deal_price')))
+            if LabTest.objects.filter(id__in=ids, home_collection_possible=True).count() == len(ids):
+                home_pickup_calculation = Case(
+                    When(is_home_collection_enabled=True,
+                         then=F('home_pickup_charges')),
+                    When(is_home_collection_enabled=False,
+                         then=Value(0)),
+                    output_field=DecimalField())
+                distance_related_charges = Case(
+                    When(is_home_collection_enabled=False, then=Value(0)),
+                    When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=True),
+                         then=Value(0)),
+                    When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=False),
+                         then=Value(1)),
+                    output_field=IntegerField())
+            else:
+                home_pickup_calculation = Value(0, DecimalField())
+                distance_related_charges = Value(0, IntegerField())
+
+            deal_price_calculation = Case(
+                When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
+                     then=F('lab_pricing_group__available_lab_tests__computed_deal_price')),
+                When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=False,
+                     then=F('lab_pricing_group__available_lab_tests__custom_deal_price')))
 
             queryset = (
                 queryset.values('id').annotate(price=Sum(deal_price_calculation),
                                                mrp=Sum(F('lab_pricing_group__available_lab_tests__mrp')),
                                                count=Count('id'),
                                                distance=Max(Distance('location', pnt)),
-                                               name=Max('name')).filter(count__gte=len(ids)))
+                                               name=Max('name'),
+                                               pickup_charges=Max(home_pickup_calculation),
+                                               distance_related_charges=Max(distance_related_charges),
+                                               order_priority=Max('order_priority')).filter(count__gte=len(ids)))
+
             if min_price is not None:
                 queryset = queryset.filter(price__gte=min_price)
 
@@ -418,7 +456,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by("-order_priority", "price", "distance")
+                queryset = queryset.order_by("-order_priority", F("price")+F("pickup_charges"), "distance_related_charges", "distance")
             elif order_by == 'distance':
                 queryset = queryset.order_by("-order_priority", "distance")
             elif order_by == 'name':
@@ -817,9 +855,9 @@ class LabTimingListView(mixins.ListModelMixin,
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
 
-        resp_list = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
+        resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
 
-        return Response(resp_list)
+        return Response(resp_data)
 
 
 class AvailableTestViewSet(mixins.RetrieveModelMixin,
