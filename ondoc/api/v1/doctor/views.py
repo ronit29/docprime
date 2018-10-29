@@ -761,7 +761,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if not entity.is_valid:
                 valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
                                           entity_type__iexact='Doctor', specialization_id=entity.specialization_id,
-                                          locality_id=entity.locality_id, sublocality_id=entity.subdoctors-in-new-delhi-sptcitlocality_id,
+                                          locality_id=entity.locality_id, sublocality_id=entity.sublocality_id,
                                           sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
 
                 if valid_qs.exists():
