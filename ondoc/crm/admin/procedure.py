@@ -6,14 +6,15 @@ from django import forms
 
 
 class ParentProcedureCategoryInlineFormset(forms.BaseInlineFormSet):
-
     def clean(self):
         super().clean()
         if any(self.errors):
             return
         for value in self.cleaned_data:
-                if value.get('child_category') == value.get('parent_category'):
-                    raise forms.ValidationError("Category can't be related to itself.")
+            if value.get('child_category') == value.get('parent_category'):
+                raise forms.ValidationError("Category can't be related to itself.")
+            if value.get('DELETE') and value.get('is_manual', False):
+                raise forms.ValidationError("Cannot delete a link not created on CRM.")
 
 
 class ParentProcedureCategoryInline(AutoComplete, TabularInline):
@@ -27,8 +28,8 @@ class ParentProcedureCategoryInline(AutoComplete, TabularInline):
     verbose_name_plural = "Parent Categories"
     formset = ParentProcedureCategoryInlineFormset
 
-    def get_queryset(self, request):
-        return super().get_queryset(request).filter(is_manual=False)
+    # def get_queryset(self, request):
+    #     return super().get_queryset(request).filter(is_manual=False)
 
 
 class ProcedureToParentCategoryInlineFormset(forms.BaseInlineFormSet):
@@ -44,7 +45,8 @@ class ProcedureToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         if all_parent_categories and ProcedureCategoryMapping.objects.filter(parent_category__in=all_parent_categories,
                                                                              child_category__in=all_parent_categories).count():
             raise forms.ValidationError("Some Categories are already related, so can't be added together.")
-        if any([category.related_parent_category.count() for category in all_parent_categories]):
+        if any([category.related_parent_category.count() for category in
+                all_parent_categories]):  # PROCEDURE_category_SAME_level
             raise forms.ValidationError("Procedure and Category can't be on same level.")
 
 
@@ -66,10 +68,38 @@ class ProcedureAdmin(VersionAdmin):
     inlines = [ParentCategoryInline]
 
 
+class ProcedureCategoryForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        procedure = cleaned_data.get('preferred_procedure', None)
+        is_live = cleaned_data.get('is_live', False)
+        if is_live and not procedure:
+            raise forms.ValidationError('Category can\'t go live without a preferred procedure.')
+        if procedure:
+            if self.instance.pk:
+                all_organic_parents = procedure.categories.all().values_list('pk', flat=True)
+                all_parents = ProcedureCategoryMapping.objects.filter(
+                    child_category__in=all_organic_parents).values_list('pk', flat=True)
+                all_parents = set(all_organic_parents).union(set(all_parents))
+                if self.instance.pk in all_parents:
+                    raise forms.ValidationError('Category and preferred procedure should be related.')
+                if not procedure.categories.filter(pk=self.instance.pk).exists():  # PROCEDURE_category_SAME_level
+                    raise forms.ValidationError(
+                        'Category should be direct parent of the preferred procedure.')
+            else:
+                raise forms.ValidationError('Category and preferred procedure should be related.')
+
+
 class ProcedureCategoryAdmin(VersionAdmin):
     model = ProcedureCategory
     search_fields = ['search_key']
     inlines = [ParentProcedureCategoryInline]
     exclude = ['search_key']
+    form = ProcedureCategoryForm
 
-
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)

@@ -11,6 +11,7 @@ class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
     details = models.CharField(max_length=2000)
     preferred_procedure = models.ForeignKey('Procedure', on_delete=models.SET_NULL,
                                             related_name='preferred_in_category', null=True, blank=True)
+    is_live = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
