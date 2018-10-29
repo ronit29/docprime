@@ -906,7 +906,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if not sublocality:
                     title += '- Book Best ' + specializations +' Online'
                 else:
-                    title += '| Book & Get Best Deal'
+                    title += ' | Book & Get Best Deal'
 
             else:
                  title += ' | Book Doctors Online & Get Best Deal'
@@ -944,33 +944,39 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             else:
                 longitude = validated_data.get('extras').get('location_json').get('locality_longitude')
 
-                seo = {
-                    "title": title,
-                    "description": description,
-                    "location" : location,
-                    'schema': {
-                        "@context": "http://schema.org",
-                        "@type": "MedicalBusiness",
-                        "name": "%s in %s" % (specializations if specializations else 'Doctors', location),
-                        "address": {
-                            "@type": "PostalAddress",
-                            "addressLocality": location,
-                            "addressRegion": locality,
-                        },
-                        "location": {
-                            "@type": "Place",
-                            "geo": {
-                                "@type": "GeoCircle",
-                                "geoMidpoint": {
-                                    "@type": "GeoCoordinates",
-                                    "latitude": latitude,
-                                    "longitude": longitude
-                                }
-                            }
-                        },
-                        "priceRange": "0"
-                    }
+            seo = {
+                "title": title,
+                "description": description,
+                "location" : location
                 }
+
+                # seo = {
+                #     "title": title,
+                #     "description": description,
+                #     "location" : location,
+                #     'schema': {
+                #         "@context": "http://schema.org",
+                #         "@type": "MedicalBusiness",
+                #         "name": "%s in %s" % (specializations if specializations else 'Doctors', location),
+                #         "address": {
+                #             "@type": "PostalAddress",
+                #             "addressLocality": location,
+                #             "addressRegion": locality,
+                #         },
+                #         "location": {
+                #             "@type": "Place",
+                #             "geo": {
+                #                 "@type": "GeoCircle",
+                #                 "geoMidpoint": {
+                #                     "@type": "GeoCoordinates",
+                #                     "latitude": latitude,
+                #                     "longitude": longitude
+                #                 }
+                #             }
+                #         },
+                #         "priceRange": "0"
+                #     }
+                # }
 
         for resp in response:
             if id_url_dict.get(resp['id']):
