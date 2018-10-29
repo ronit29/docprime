@@ -161,7 +161,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         page_no = request.GET.get('page_no', None)
         if not page_no:
             page_no = 1
-
+        page_no = int(page_no)
         start = (page_no-1) * 5 + 1
         end = page_no * 5
 
