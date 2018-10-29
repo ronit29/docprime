@@ -417,7 +417,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                name=Max('name'),
                                                pickup_charges=Max(home_pickup_calculation),
                                                distance_related_charges=Max(distance_related_charges),
-                                               priority=Max('priority')).filter(count__gte=len(ids)))
+                                               order_priority=Max('order_priority')).filter(count__gte=len(ids)))
 
             if min_price is not None:
                 queryset = queryset.filter(price__gte=min_price)
