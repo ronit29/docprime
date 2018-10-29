@@ -730,6 +730,11 @@ class EntityUrls(TimeStampedModel):
 
     class Meta:
         db_table = 'entity_urls'
+        indexes = [
+            models.Index(fields=['locality_value']),
+            models.Index(fields=['locality_value', 'sitemap_identifier',])
+        ]
+
 
 
 class EntityUrlsHelper(object):
