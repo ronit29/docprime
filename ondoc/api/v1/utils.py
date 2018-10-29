@@ -24,6 +24,7 @@ from dateutil.parser import parse
 from dateutil import tz
 from decimal import Decimal
 from collections import OrderedDict
+import datetime
 from django.utils.dateparse import parse_datetime
 User = get_user_model()
 
@@ -650,3 +651,32 @@ class TimeSlotExtraction(object):
         format_data['title'] = day_time
         format_data['timing'] = data_list
         return format_data
+
+    def initial_start_times(self, is_thyrocare, is_home_pickup):
+        today_min = None
+        tomorrow_min = None
+
+        now = datetime.datetime.now()
+        curr_time = now.hour
+        curr_minute = round(round(float(now.minute) / 60, 2) * 2) / 2
+        curr_time += curr_minute
+        is_sunday = now.weekday() == 6
+
+        # TODO: put time gaps in config
+        if is_home_pickup:
+            if is_thyrocare:
+                today_min = 24
+            else:
+                if is_sunday:
+                    today_min = 24
+                else:
+                    if curr_time < 13:
+                        today_min = curr_time + 4
+                if curr_time >= 17:
+                    tomorrow_min = 12
+        else:
+            if is_thyrocare:
+                # add 2 hours gap,
+                today_min = curr_time + 2
+
+        return today_min, tomorrow_min
