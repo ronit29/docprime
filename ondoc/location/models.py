@@ -194,6 +194,12 @@ class EntityUrls(TimeStampedModel):
         else:
             sequence = 0
 
+
+        # Mark all existing urls as is_valid=False.
+
+        update_query = '''update entity_urls set is_valid=false where sitemap_identifier in ('SPECIALIZATION_CITY', 'SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY', 'DOCTORS_CITY')'''
+
+
         # Query for specialization in location and insertion .
 
 
@@ -445,6 +451,7 @@ class EntityUrls(TimeStampedModel):
         from django.db import connection
         with connection.cursor() as cursor:
             try:
+                cursor.execute(update_query)
                 cursor.execute(query)
                 cursor.execute(query1)
             except Exception as e:
@@ -465,6 +472,10 @@ class EntityUrls(TimeStampedModel):
             sequence = seq[0]['inc'] if seq[0]['inc'] else 0
         else:
             sequence = 0
+
+        # Mark all existing urls as is_valid=False.
+
+        update_query = '''update entity_urls set is_valid=false where sitemap_identifier in ('LAB_LOCALITY_CITY', 'LAB_CITY');'''
 
          # Query for lab in location and insertion .
 
@@ -613,6 +624,7 @@ class EntityUrls(TimeStampedModel):
         from django.db import connection
         with connection.cursor() as cursor:
             try:
+                cursor.execute(update_query)
                 cursor.execute(query)
 
             except Exception as e:
