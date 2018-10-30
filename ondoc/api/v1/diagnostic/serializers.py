@@ -8,6 +8,7 @@ from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSe
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
 from ondoc.api.v1.utils import form_time_slot
 from ondoc.doctor.models import OpdAppointment
+from ondoc.account.models import Order
 from django.db.models import Count, Sum, When, Case, Q, F
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
@@ -517,8 +518,18 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         if data.get("coupon_code"):
             for coupon in data.get("coupon_code"):
                 obj = LabAppointment()
-                if not obj.validate_coupon(request.user, coupon).get("is_valid"):
+                if obj.validate_user_coupon(user=request.user, coupon_code=coupon).get("is_valid"):
+                    if coupon.is_user_specific:
+                        if not obj.validate_user_specific_coupon(user=request.user, coupon_code=coupon,
+                                                                 lab=data.get("lab").id, test=data.get("test_ids"),
+                                                                 product_id=Order.LAB_PRODUCT_ID):
+                            raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                else:
                     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                # if not (obj.validate_user_coupon(user=request.user, coupon_code=coupon).get("is_valid") \
+                #         and obj.validate_user_specific_coupon(user=request.user, coupon_code=coupon,
+                #                                               lab=(data.get("lab")).id, test=data.get("test_ids"), product_id=Order.LAB_PRODUCT_ID)):
+                #     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request)

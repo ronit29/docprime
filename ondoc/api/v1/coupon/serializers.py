@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from ondoc.coupon.models import Coupon
 from ondoc.account.models import Order
+from ondoc.diagnostic.models import Lab, LabTest
 from django.contrib.auth import get_user_model
 
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -25,3 +26,8 @@ class CouponListSerializer(serializers.Serializer):
     # class Meta:
     #     model = Coupon
     #     fields = 'code'
+
+class UserSpecificCouponSerializer(CouponListSerializer):
+
+    lab = serializers.PrimaryKeyRelatedField(required=False,queryset=Lab.objects.filter(is_live=True))
+    test = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=LabTest.objects.all()),  required=False)

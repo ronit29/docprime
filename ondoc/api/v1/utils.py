@@ -473,41 +473,18 @@ def form_pg_refund_data(refund_objs):
 
 class CouponsMixin(object):
 
-    # def used_coupon_count(self, user, coupon_code):
-    #     from ondoc.coupon.models import Coupon
-    #     from ondoc.doctor.models import OpdAppointment
-    #     from ondoc.diagnostic.models import LabAppointment
-    #
-    #     data = Coupon.objects.filter(code__exact=coupon_code).first()
-    #
-    #     count = 0
-    #     if data:
-    #         if str(data.type) == str(Coupon.DOCTOR) or str(data.type) == str(Coupon.ALL):
-    #             count += OpdAppointment.objects.filter(user=user,
-    #                                                    status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
-    #                                                                OpdAppointment.RESCHEDULED_DOCTOR,
-    #                                                                OpdAppointment.RESCHEDULED_PATIENT,
-    #                                                                OpdAppointment.ACCEPTED,
-    #                                                                OpdAppointment.COMPLETED],
-    #                                                    coupon__code__exact=coupon_code).count()
-    #         if str(data.type) == str(Coupon.LAB) or str(data.type) == str(Coupon.ALL):
-    #             count += LabAppointment.objects.filter(user=user,
-    #                                                    status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
-    #                                                                LabAppointment.RESCHEDULED_LAB,
-    #                                                                LabAppointment.RESCHEDULED_PATIENT,
-    #                                                                LabAppointment.ACCEPTED,
-    #                                                                LabAppointment.COMPLETED],
-    #                                                    coupon__code__exact=coupon_code).count()
-    #     return count
-
-    def validate_coupon(self, user, coupon_code):
+    def validate_user_coupon(self, **kwargs):
         from ondoc.coupon.models import Coupon
         from ondoc.doctor.models import OpdAppointment
-        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.diagnostic.models import LabAppointment, Lab
+
+        user = kwargs.get("user")
+        coupon_code = kwargs.get("coupon_code")
 
         data = Coupon.objects.filter(code__exact=coupon_code).first()
 
         if data:
+
             if isinstance(self, OpdAppointment) and data.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
             elif isinstance(self, LabAppointment) and data.type not in [Coupon.LAB, Coupon.ALL]:
@@ -517,6 +494,14 @@ class CouponsMixin(object):
                 return {"is_valid": False, "used_count": None}
 
             allowed_coupon_count = data.count
+
+            if data.is_user_specific:
+                user_specific_coupon = data.user_specific_coupon.filter(user=user)
+                if not user_specific_coupon:
+                    return {"is_valid": False, "used_count": None}
+                else:
+                    allowed_coupon_count = data.count
+
             count = data.used_coupon_count(user)
 
             if count < allowed_coupon_count:
@@ -525,6 +510,80 @@ class CouponsMixin(object):
                 return {"is_valid": False, "used_count": count}
         else:
             return {"is_valid": False, "used_count": None}
+
+    def validate_user_specific_coupon(self, **kwargs):
+        from django.db.models import Q
+        from ondoc.coupon.models import Coupon, UserSpecificCoupon
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment, Lab
+        from ondoc.account.models import Order
+
+        user = kwargs.get("user")
+        coupon_code = kwargs.get("coupon_code")
+
+        is_valid = False
+        # user_coupon = UserSpecificCoupon.objects.filter(coupon__code__exact=coupon_code, user=user).first()
+        coupon_obj = Coupon.objects.filter(code__exact=coupon_code)
+        if coupon_obj:
+        # if user_coupon:
+            # coupon_obj = user_coupon.coupon
+            if kwargs.get("product_id") == Order.LAB_PRODUCT_ID:
+                if kwargs.get("lab"):
+                    lab = Lab.objects.filter(pk=kwargs.get("lab"))
+                    if lab:
+                        if kwargs.get("test"):
+                            test = kwargs.get("test", [])
+                            lab = lab.filter(lab_pricing_group__available_lab_tests__test__in=test).first()
+                        if lab:
+                            is_valid = coupon_obj.filter(
+                                Q(lab_network__isnull=False, lab_network=lab.network) | Q(lab__isnull=False,
+                                                                                          test__isnull=True,
+                                                                                          lab=lab) | Q(
+                                    lab__isnull=False, test__isnull=False, test__in=test, lab=lab)).exists()
+            elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
+                pass
+        return is_valid
+
+        # data = Coupon.objects.filter(code__exact=coupon_code).first()
+
+        # if data.is_user_specific:
+        #
+        #
+        #
+        #
+        #     # product = "lab" or "doctor"
+        #
+        #     lab = kwargs.get("lab")
+        #     # return False if data.lab and not lab else None
+        #     if data.lab and not lab:
+        #         return False
+        #     test = kwargs.get("test")
+        #     if data.test.exists() and not test:
+        #         return False
+        #     lab_network = None
+        #     are_valid_tests = True
+        #     if lab:
+        #         # lab_data = Lab.objects.filter(pk=lab.id).first()
+        #         # if lab_data.network:
+        #         #     lab_network = lab_data.network
+        #         lab_network = data.lab.network
+        #         # request_tests, db_tests = set(test), set(data.test.all().values_list('id',flat=True))
+        #         request_tests, db_tests = set(test), set(data.test.all())
+        #         # request_tests, db_tests = set(test), set(data.test.filter(test))
+        #         if not (request_tests < db_tests or request_tests == db_tests):
+        #             are_valid_tests = False
+        #
+        #
+        #     if data.lab_network != lab_network or data.lab != lab or not(are_valid_tests):
+        #     # if not user_specific_coupon:
+        #         return False
+        #     elif data.lab_network == lab_network and data.lab == lab and are_valid_tests:
+        #     # else:
+        #         return True
+        # else:
+        #     return False
+        #     # return True
+
 
     def get_discount(self, coupon_code, price):
         from ondoc.coupon.models import Coupon

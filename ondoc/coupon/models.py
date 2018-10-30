@@ -1,6 +1,6 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
-
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 class Coupon(auth_model.TimeStampedModel):
     DOCTOR = 1
@@ -9,7 +9,7 @@ class Coupon(auth_model.TimeStampedModel):
     TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"),)
     code = models.CharField(max_length=50)
     min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    percentage_discount = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
+    percentage_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, validators=[MaxValueValidator(100), MinValueValidator(0)])  # range - 1 to 100
     max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     flat_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     validity = models.PositiveIntegerField(blank=True, null=True)
@@ -17,6 +17,17 @@ class Coupon(auth_model.TimeStampedModel):
     count = models.PositiveIntegerField()
     description = models.CharField(max_length=500, default="")
     tnc = models.CharField(max_length=2000, default="")
+    lab_network = models.ForeignKey("diagnostic.LabNetwork", on_delete=models.CASCADE, blank=True, null=True)
+    lab = models.ForeignKey("diagnostic.Lab", on_delete=models.CASCADE, blank=True, null=True)
+    # test = models.ManyToManyField("diagnostic.LabTest", blank=True, null=True, )
+    test = models.ManyToManyField("diagnostic.LabTest", blank=True, null=True)
+    show_price = models.BooleanField(default=True)
+    is_user_specific = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if self.percentage_discount == 100:
+            self.show_price = False
+        return super().save(*args, **kwargs)
 
     def used_coupon_count(self, user):
         from ondoc.doctor.models import OpdAppointment
@@ -46,3 +57,16 @@ class Coupon(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "coupon"
+
+
+class UserSpecificCoupon(auth_model.TimeStampedModel):
+
+    coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, null=False, related_name="user_specific_coupon")
+    phone_number = models.CharField(max_length=10, blank=False, null=False)
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True)
+
+    def __str__(self):
+        return self.coupon.code
+
+    class Meta:
+        db_table = "user_specific_coupon"

@@ -54,17 +54,20 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         for coupon in coupons_data:
 
             if is_user:
-                is_valid_coupon = obj.validate_coupon(user, coupon.code)
+                is_valid_user_coupon = obj.validate_user_coupon(user=user, coupon_code=coupon.code)
+            elif not is_user and coupon.is_user_specific:
+                # is_valid_user_coupon = {"is_valid": None, "used_count": 0}
+                continue
             else:
-                is_valid_coupon = {"is_valid": None, "used_count": 0}
+                is_valid_user_coupon = {"is_valid": None, "used_count": 0}
 
-            if (is_user and is_valid_coupon.get("is_valid")) or not is_user:
+            if (is_user and is_valid_user_coupon.get("is_valid")) or not is_user:
                 applicable_coupons.append({"coupon_type": coupon.type,
                                            "coupon_id": coupon.id,
                                            "code": coupon.code,
                                            "desc": coupon.description,
                                            "coupon_count": coupon.count,
-                                           "used_count": is_valid_coupon.get("used_count"),
+                                           "used_count": is_valid_user_coupon.get("used_count"),
                                            "tnc": coupon.tnc})
 
         return Response(applicable_coupons)
@@ -74,17 +77,19 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    serializer_class = serializers.CouponListSerializer
+    # serializer_class = serializers.CouponListSerializer
 
     def coupon_discount(self, request, *args, **kwargs):
 
-        serializer = serializers.CouponListSerializer(data=request.data)
+        serializer = serializers.UserSpecificCouponSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         input_data = serializer.validated_data
 
         coupon_code = input_data.get("coupon_code")
         deal_price = input_data.get("deal_price")
         product_id = input_data.get("product_id")
+        lab = input_data.get("lab")
+        test = input_data.get("test")
 
         if str(product_id) == str(Order.DOCTOR_PRODUCT_ID):
             obj = OpdAppointment()
@@ -94,9 +99,13 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         discount = 0
         if coupon_code:
             for coupon in coupon_code:
-                if not obj.validate_coupon(request.user, coupon).get("is_valid"):
+                if obj.validate_user_coupon(user=request.user, coupon_code=coupon).get("is_valid"):
+                    if coupon.is_user_specific:
+                        if not obj.validate_user_specific_coupon(user=request.user, coupon_code=coupon, lab=lab, test=test):
+                            return Response({"status": 0, "message": "Invalid coupon code for the user"},
+                                            status.HTTP_404_NOT_FOUND)
+                    discount += obj.get_discount(coupon, deal_price)
+                else:
                     return Response({"status": 0, "message": "Invalid coupon code for the user"},
                                     status.HTTP_404_NOT_FOUND)
-                else:
-                    discount += obj.get_discount(coupon, deal_price)
         return Response({"discount": discount, "status": 1}, status.HTTP_200_OK)

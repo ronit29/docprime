@@ -9,7 +9,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage)
-from ondoc.coupon.models import Coupon
+from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
@@ -117,3 +117,4 @@ admin.site.register(RatingsReview, RatingsReviewAdmin)
 admin.site.register(SitemapManger, SitemapManagerAdmin)
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
 admin.site.register(Coupon)
+admin.site.register(UserSpecificCoupon)

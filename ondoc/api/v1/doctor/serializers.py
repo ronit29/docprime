@@ -230,7 +230,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
         if data.get("coupon_code"):
             for coupon in data.get("coupon_code"):
                 obj = OpdAppointment()
-                if not obj.validate_coupon(request.user, coupon).get("is_valid"):
+                if not obj.validate_user_coupon(user=request.user, coupon_code=coupon).get("is_valid"):
                     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         return data
