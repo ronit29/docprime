@@ -13,6 +13,7 @@ from django.contrib.auth import get_user_model
 from collections import OrderedDict
 from django.utils import timezone
 from ondoc.api.v1 import utils
+from django.conf import settings
 import datetime
 import pytz
 import random
@@ -69,7 +70,14 @@ class LabModelSerializer(serializers.ModelSerializer):
     breadcrumb = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
     unrated_appointment = serializers.SerializerMethodField()
+    center_visit_enabled = serializers.SerializerMethodField()
 
+
+    def get_center_visit_enabled(self, obj):
+        if obj and obj.network and settings.THYROCARE_NETWORK_ID:
+            if obj.network.id == settings.THYROCARE_NETWORK_ID:
+                return False
+        return  True
 
     def get_rating(self, obj):
         queryset = obj.rating.exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
@@ -170,7 +178,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'unrated_appointment')
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'unrated_appointment', 'center_visit_enabled', )
 
 
 class LabProfileSerializer(LabModelSerializer):
@@ -285,6 +293,8 @@ class LabCustomSerializer(serializers.Serializer):
     lab_timing_data = serializers.ListField()
     next_lab_timing = serializers.DictField()
     next_lab_timing_data = serializers.DictField()
+    pickup_charges = serializers.IntegerField(default=None)
+    distance_related_charges = serializers.IntegerField(default=None)
 
 
     # def get_lab(self, obj):

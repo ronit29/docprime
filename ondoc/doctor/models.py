@@ -992,7 +992,6 @@ class HospitalNetworkEmail(auth_model.TimeStampedModel):
         db_table = "hospital_network_email"
 
 
-
 class DoctorOnboardingToken(auth_model.TimeStampedModel):
     GENERATED = 1
     REJECTED = 2
@@ -1086,7 +1085,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
-
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -1581,6 +1579,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     specialization_field = models.ForeignKey(SpecializationField, on_delete=models.DO_NOTHING)
     general_specialization_ids = ArrayField(models.IntegerField(blank=True, null=True), size=100,
                                             null=True, blank=True)
+    synonyms = models.CharField(max_length=4000, null=True, blank=True)
 
     class Meta:
         db_table = 'practice_specialization'
@@ -1677,3 +1676,48 @@ class GoogleDetailing(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'google_api_details'
+
+class DoctorPopularity(models.Model):
+    KEY = 1
+    NON_KEY = 2
+    POPULARITY_CHOICES = ((KEY, 'Key'), (NON_KEY, 'Non-Key'))
+    unique_identifier = models.CharField(max_length=500)
+    popularity = models.PositiveSmallIntegerField(choices=POPULARITY_CHOICES)
+    popularity_score = models.DecimalField(max_digits=3, decimal_places=1, validators=[MaxValueValidator(10.0)])
+    rating_percent = models.PositiveSmallIntegerField(validators=[MaxValueValidator(100)])
+    votes_count = models.PositiveIntegerField()
+    reviews_count = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = "doctor_popularity"
+        unique_together = ('unique_identifier',)
+
+    def __str__(self):
+        return self.unique_identifier
+
+
+class VisitReason(auth_model.TimeStampedModel, SearchKey):
+    name = models.TextField()
+    practice_specializations = models.ManyToManyField(PracticeSpecialization, through='VisitReasonMapping',
+                                                      through_fields=('visit_reason', 'practice_specialization'),
+                                                      related_name='visiting_reasons')
+
+    class Meta:
+        db_table = "visit_reason"
+        unique_together = (('name',),)
+
+    def __str__(self):
+        return '{}'.format(self.name)
+
+
+class VisitReasonMapping(models.Model):
+    visit_reason = models.ForeignKey(VisitReason, on_delete=models.CASCADE, related_name='related_practice_specializations')
+    practice_specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, related_name='related_visit_reasons')
+    is_primary = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "visit_reason_mapping"
+        unique_together = (('visit_reason', 'practice_specialization'),)
+
+    def __str__(self):
+        return '{}({})'.format(self.visit_reason.name, self.practice_specialization.name)
