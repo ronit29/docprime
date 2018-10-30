@@ -68,6 +68,16 @@ class Doc():
 
 class UploadDoctor(Doc):
 
+    def p_image(self, sheet, source, batch):
+        rows = [row for row in sheet.rows]
+        headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
+
+        for i in range(2, len(rows) + 1):
+            identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
+            url = self.clean_data(sheet.cell(row=i, column=headers.get('url')).value)
+            if url:
+                self.save_image(batch, url, identifier)
+
     def upload(self, sheet, source, batch):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}

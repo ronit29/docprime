@@ -54,23 +54,30 @@ class RatingsGraphSerializer(serializers.Serializer):
     def get_top_compliments(self, obj):
         comp = []
         response = []
+        comp_count = {}
         request = self.context.get('request')
         for rate in obj.all():
             for cmlmnt in rate.compliment.filter(rating_level__in=[4, 5]):
                 r = {'id': cmlmnt.id,
                      'message': cmlmnt.message,
+                     'level': cmlmnt.rating_level,
                      'icon': cmlmnt.icon.url if cmlmnt.icon else None}
-                comp.append(r)
-        comp_count = {}
-        for x in comp:
-            if comp_count.get(x['id']):
-                comp_count[x['id']]['count'] += 1
+                if comp_count.get(r['id']):
+                    comp_count[r['id']]['count'] += 1
 
+                else:
+                    comp_count[r['id']] = r
+                    comp_count[r['id']]['count'] = 1
+                    comp_count[r['id']]['icon'] = request.build_absolute_uri(r['icon']) if r.get(
+                        'icon') is not None else None
+                    comp.append(comp_count[r['id']])
+        temp = {}
+        for x in comp:
+            if temp.get(x['message']):
+                temp[x['message']]['count'] += x['count']
             else:
-                comp_count[x['id']] = x
-                comp_count[x['id']]['count'] = 1
-                comp_count[x['id']]['icon'] = request.build_absolute_uri(x['icon']) if x.get('icon') is not None else None
-        response = [comp_count[k] for k in sorted(comp_count, key=comp_count.get('count'), reverse=False)][:3]
+                temp[x['message']] = x
+        response = [temp[k] for k in sorted(temp, key=lambda k: temp[k]['count'], reverse=True)][:3]
         return response
 
     def get_rating_count(self, obj):
