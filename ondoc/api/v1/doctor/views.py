@@ -801,7 +801,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctorpracticespecializations", "doctorpracticespecializations__specialization",
                                                 "experiences", "images", "qualifications",
                                                 "qualifications__qualification", "qualifications__specialization",
-                                                "qualifications__college").order_by(preserved)
+                                                "qualifications__college", "doctor_clinics__doctorclinicprocedure_set").order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
 

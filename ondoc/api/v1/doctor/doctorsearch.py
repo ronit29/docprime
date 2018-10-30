@@ -4,9 +4,10 @@ from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor
+from ondoc.procedure.models import DoctorClinicProcedure
 from datetime import datetime
 import re
-
+import json
 from ondoc.location.models import EntityAddress
 
 
@@ -26,15 +27,26 @@ class DoctorSearchHelper:
 
         specialization_ids = self.query_params.get("specialization_ids",[])
         condition_ids = self.query_params.get("condition_ids", [])
+        procedure_ids = self.query_params.get("procedure_ids", [])
         if len(condition_ids)>0:
             cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
             cs = [str(i) for i in cs]
             specialization_ids.extend(cs)
 
+
         if len(specialization_ids)>0:
             filtering_params.append(
                 " gs.id IN({})".format(",".join(specialization_ids))
             )
+
+        if len(procedure_ids)>0:
+            ps = list(DoctorClinicProcedure.objects.filter(procedure_id__in=procedure_ids).values_list('doctor_clinic__doctor_id', flat=True))
+            ps = [str(i) for i in ps]
+            procedure_ids.extend(ps)
+            filtering_params.append(
+                " d.id IN({})".format(",".join(procedure_ids))
+            )
+
         if self.query_params.get("sits_at"):
             filtering_params.append(
                 "hospital_type IN({})".format(", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in
@@ -96,7 +108,8 @@ class DoctorSearchHelper:
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
         # max_distance = 10000000000000000000000
 
-        query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
+        query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id, " \
+                       "doctor_clinic_procedure_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
                        "Row_number() OVER( partition BY dc.doctor_id  ORDER BY " \
@@ -104,10 +117,12 @@ class DoctorSearchHelper:
                        "St_distance(St_setsrid(St_point(%s, %s), 4326), h.location) distance, d.id as doctor_id, " \
                        "dc.id as doctor_clinic_id,  " \
                        "dct.id as doctor_clinic_timing_id, " \
+                       "dcp.id as doctor_clinic_procedure_id, " \
                        "dc.hospital_id as hospital_id FROM   doctor d " \
                        "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
                        "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
                        "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
+                       "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
                        "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
                        "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
                        "WHERE d.is_live=true and %s " \
@@ -152,6 +167,10 @@ class DoctorSearchHelper:
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
+            doctor_clinic_procedure = DoctorClinicProcedure.objects.filter(doctor_clinic=doctor_clinic).values(
+                'id', 'doctor_clinic_id', 'procedure_id', 'procedure__name',
+                'procedure__details', 'procedure__duration'
+            )
             # serializer = serializers.DoctorHospitalSerializer(doctor_clinics, many=True, context={"request": request})
             filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
@@ -180,7 +199,8 @@ class DoctorSearchHelper:
                     "hospital_id": doctor_clinic.hospital.id,
                     "mrp": min_price["mrp"],
                     "discounted_fees": min_price["deal_price"],
-                    "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False)
+                    "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
+                    "procedures": json.dumps(list(doctor_clinic_procedure))
                 }]
 
             thumbnail = doctor.get_thumbnail()
