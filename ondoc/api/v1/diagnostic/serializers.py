@@ -90,11 +90,9 @@ class LabModelSerializer(serializers.ModelSerializer):
             if request.user.is_authenticated:
                 user = request.user
                 lab_app = None
-                lab_all = user.lab_appointments.filter(lab=obj).order_by('-id')
-                for lab in lab_all:
-                    if lab.status == LabAppointment.COMPLETED and lab.is_rated == False:
-                        lab_app = lab
-                    break
+                lab = user.lab_appointments.filter(lab=obj, status=LabAppointment.COMPLETED).order_by('-updated_at').first()
+                if lab and lab.is_rated == False:
+                    lab_app = lab
                 if lab_app:
                     data = LabAppointmentModelSerializer(lab_app, many=False, context={'request': request})
                     return data.data

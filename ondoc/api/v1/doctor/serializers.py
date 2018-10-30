@@ -651,11 +651,9 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             if request.user.is_authenticated:
                 user = request.user
                 opd_app = None
-                opd_all = user.appointments.filter(doctor=obj).order_by('-id')
-                for opd in opd_all:
-                    if opd.status == OpdAppointment.COMPLETED and opd.is_rated == False:
-                        opd_app = opd
-                        break
+                opd = user.appointments.filter(doctor=obj, status=OpdAppointment.COMPLETED).order_by('-updated_at').first()
+                if opd and opd.is_rated == False:
+                    opd_app = opd
                 if opd_app:
                     data = AppointmentRetrieveSerializer(opd_app, many=False, context={'request': request})
                     return data.data
