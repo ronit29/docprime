@@ -1082,6 +1082,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True)
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
+    cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1721,3 +1723,14 @@ class VisitReasonMapping(models.Model):
 
     def __str__(self):
         return '{}({})'.format(self.visit_reason.name, self.practice_specialization.name)
+
+
+class CancellationReason(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200)
+
+    class Meta:
+        db_table = 'cancellation_reason'
+        unique_together = (('name',),)
+
+    def __str__(self):
+        return self.name

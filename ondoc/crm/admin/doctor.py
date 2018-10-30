@@ -1134,6 +1134,21 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and len(cleaned_data):
             raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
 
+        if not cleaned_data.get('status') is OpdAppointment.CANCELLED and (cleaned_data.get(
+                'cancellation_reason') or cleaned_data.get('cancellation_comments')):
+            raise forms.ValidationError(
+                "Reason/Comment for cancellation can only be entered on cancelled appointment")
+
+        if cleaned_data.get('status') is OpdAppointment.CANCELLED and not cleaned_data.get('cancellation_reason'):
+            raise forms.ValidationError("Reason for Cancelled appointment should be set.")
+
+        if cleaned_data.get('status') is OpdAppointment.CANCELLED and cleaned_data.get(
+                'cancellation_reason') and 'others' in cleaned_data.get(
+                'cancellation_reason').name.lower() and not cleaned_data.get('cancellation_comments'):
+            raise forms.ValidationError(
+                "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
+
+
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                  doctor_clinic__hospital=hospital,
                                                  day=time_slot_start.weekday(),
@@ -1206,6 +1221,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
                     'contact_details', 'profile', 'profile_detail', 'user', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
+                    'cancellation_reason', 'cancellation_comments',
                     'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
@@ -1214,7 +1230,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'cancel_type', 'start_date', 'start_time')
+                    'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time')
         else:
             return ()
 
