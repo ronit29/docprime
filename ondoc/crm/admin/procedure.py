@@ -102,6 +102,3 @@ class ProcedureCategoryAdmin(VersionAdmin):
     inlines = [ParentProcedureCategoryInline]
     exclude = ['search_key']
     form = ProcedureCategoryForm
-
-    def save_related(self, request, form, formsets, change):
-        super().save_related(request, form, formsets, change)

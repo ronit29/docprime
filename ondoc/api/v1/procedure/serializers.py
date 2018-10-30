@@ -3,9 +3,18 @@ from ondoc.procedure.models import Procedure, DoctorClinicProcedure
 
 
 class ProcedureSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
     class Meta:
         model = Procedure
         fields = ('id', 'name', 'details')
+
+    def get_name(self, obj):
+        name = '{}'.format(obj.name)
+        if obj.categories.count():
+            parent = obj.categories.all().first()
+            name += ' in {}'.format(parent.name)
+        return name
 
 
 class DoctorClinicProcedureSerializer(serializers.ModelSerializer):
