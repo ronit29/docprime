@@ -1643,9 +1643,13 @@ class VisitReasonPracticeSpecializationInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+    verbose_name = 'Related practice specialization'
+    verbose_name_plural = 'Related practice specializations'
 
 
 class VisitReasonAdmin(admin.ModelAdmin):
+    fields = ['name']
     inlines = [VisitReasonPracticeSpecializationInline]
+
     class Meta:
         model = VisitReason
