@@ -936,12 +936,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
             if validated_data.get('extras', {}).get('location_json', {}).get('sublocality_latitude', None):
                 latitude = validated_data.get('extras').get('location_json').get('sublocality_latitude')
-            else:
-                latitude = validated_data.get('extras', {}).get('location_json', {}).get('locality_latitude', None)
-
-            if validated_data.get('extras', {}).get('location_json', {}).get('sublocality_longitude', None):
                 longitude = validated_data.get('extras').get('location_json').get('sublocality_longitude')
             else:
+                latitude = validated_data.get('extras', {}).get('location_json', {}).get('locality_latitude', None)
                 longitude = validated_data.get('extras', {}).get('location_json', {}).get('locality_longitude', None)
 
             # seo = {
