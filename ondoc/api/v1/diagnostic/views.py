@@ -123,10 +123,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
-                                           entity_type__iexact='Lab').order_by('-updated_at')
-        if entity.exists():
-            extras = entity.first().additional_info
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                  entity_type__iexact='Lab').order_by('-sequence')
+        if entity_url_qs.exists():
+            entity = entity_url_qs.first()
+            if not entity.is_valid:
+                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
+                                                     entity_type__iexact='Lab', locality_id=entity.locality_id,
+                                                     sublocality_id=entity.sublocality_id,
+                                                     sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+
+                if valid_qs.exists():
+                    corrected_url = valid_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            extras = entity.additional_info
             if extras.get('location_json'):
                 kwargs['location_json'] = extras.get('location_json')
                 kwargs['url'] = url
@@ -257,6 +270,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                     lab_pricing_group__labs__is_live=True,
                                                                     test__in=test_ids)
         lab_obj = Lab.objects.prefetch_related('rating').filter(id=lab_id, is_live=True).first()
+        if not lab_obj:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
@@ -267,7 +282,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_serializable_data = list()
         lab_timing = None
         lab_timing_data = list()
+        distance_related_charges = None
+
         if lab_obj:
+            distance_related_charges = 1 if lab_obj.home_collection_charges.all().exists() else 0
             if lab_obj.always_open:
                 lab_timing = "12:00 AM - 23:45 PM"
                 lab_timing_data = [{
@@ -287,6 +305,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
+        temp_data['distance_related_charges'] = distance_related_charges
         temp_data['tests'] = test_serializer.data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data

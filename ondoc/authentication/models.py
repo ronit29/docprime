@@ -1105,7 +1105,7 @@ class SPOCDetails(TimeStampedModel):
     def get_hospital_admin_objs(self):
         perm_dict = self.get_spoc_permissions()
         hospital = self.content_object
-        user_obj = User.objects.filter(phone_number=self.number).first()
+        user_obj = User.objects.filter(phone_number=self.number, user_type=User.DOCTOR).first()
         if not user_obj:
             user_obj = None
         admin_objs = list()
