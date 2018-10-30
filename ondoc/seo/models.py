@@ -1,7 +1,7 @@
 from django.db import models
 from ondoc.authentication.models import TimeStampedModel
 from django.core.validators import FileExtensionValidator
-
+from ondoc.doctor.models import PracticeSpecialization
 
 # Create your models here.
 class Sitemap(TimeStampedModel):
@@ -29,3 +29,12 @@ class SitemapManger(TimeStampedModel):
 
     class Meta:
         db_table = "sitemap_manager"
+
+
+class SeoSpecialization(TimeStampedModel):
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, null=True,
+                                       blank=True)
+    rank = models.PositiveIntegerField(default=0, null=True)
+
+    class Meta:
+        db_table = "seo_specialization"
