@@ -41,6 +41,7 @@ class ProcedureToCategoryMapping(models.Model):
                                   related_name='parent_categories_mapping')
     parent_category = models.ForeignKey(ProcedureCategory, on_delete=models.CASCADE,
                                         related_name='procedures_mapping')
+    is_primary = models.BooleanField(default=False)
 
     def __str__(self):
         return '({}){}'.format(self.procedure, self.parent_category)

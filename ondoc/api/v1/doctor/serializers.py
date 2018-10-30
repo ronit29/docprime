@@ -727,7 +727,71 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             description += ' consulting patients at '+', '.join(hospital)
 
         description += '. Book appointments online, check fees, address and more.'
-        return {'title': title, "description": description}
+
+        doctor_realted_hospitals = self.instance.hospitals.all().filter(is_live=True)
+
+        if doctor_realted_hospitals.filter(is_live=True, hospital_type=1).exists():
+            doctor_hospital = doctor_realted_hospitals.filter(is_live=True, hospital_type=1).first()
+        elif doctor_realted_hospitals.filter(is_live=True, hospital_type=2).exists():
+            doctor_hospital = doctor_realted_hospitals.filter(is_live=True, hospital_type=2).first()
+        elif doctor_realted_hospitals.filter(is_live=True, hospital_type=3).exists():
+            doctor_hospital = doctor_realted_hospitals.filter(is_live=True, hospital_type=3).first()
+        else:
+            doctor_hospital = doctor_realted_hospitals.filter(is_live=True).first()
+
+        price = None
+        opening_hours = ''
+        address_locality = ''
+        address_city = ''
+        address_pincode = ''
+        street_address = ''
+        latitude = None
+        longitude = None
+
+        if doctor_hospital:
+            doc_hospital = self.instance.doctor_clinics.filter(hospital=doctor_hospital)
+            address_locality = doctor_hospital.locality
+            address_city = doctor_hospital.city
+            address_pincode = doctor_hospital.pin_code
+            street_address = doctor_hospital.get_hos_address()
+            latitude = doctor_hospital.location.y
+            longitude = doctor_hospital.location.x
+            if doc_hospital.exists():
+                price = doc_hospital.first().availability.first().mrp
+                if doc_hospital.first().availability.exists():
+                    opening_hours = '%.2f-%.2f' % (doc_hospital.first().availability.first().start,
+                                                   doc_hospital.first().availability.first().end)
+
+        schema = {
+            'name': self.instance.get_display_name(),
+            'image': self.instance.get_thumbnail() if self.instance.get_thumbnail() else '',
+            '@context': 'http://schema.org',
+            '@type': 'MedicalBusiness',
+            'address': {
+                '@type': 'PostalAddress',
+                'addressLocality': address_locality,
+                'addressRegion': address_city,
+                'postalCode': address_pincode,
+                'streetAddress': street_address
+            },
+            'description': self.instance.about,
+            'priceRange': price,
+            'openingHours': opening_hours,
+            'location': {
+                '@type': 'Place',
+                'geo': {
+                    '@type': 'GeoCircle',
+                    'geoMidpoint': {
+                        '@type': 'GeoCoordinates',
+                        'latitude': latitude,
+                        'longitude': longitude
+                    }
+                }
+            }
+
+        }
+
+        return {'title': title, "description": description, 'schema': schema}
 
     def get_breadcrumb(self, obj):
 

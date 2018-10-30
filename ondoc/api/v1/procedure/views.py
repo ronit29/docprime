@@ -16,7 +16,6 @@ class ProcedureListViewSet(GenericViewSet):
 
     def list(self, request):
         name = request.query_params.get('name', None)
-        category = request.query_params.get('category', None)
 
         procedure_data = dict()
         if name:
@@ -28,16 +27,6 @@ class ProcedureListViewSet(GenericViewSet):
                 Q(search_key__icontains=' ' + search_key) |
                 Q(search_key__istartswith=search_key)).annotate(search_index=StrIndex('search_key', Value(search_key))
                                                                 ).order_by('search_index')
-            procedure_queryset = paginate_queryset(procedure_queryset, request)
-        elif category:
-            search_key = re.findall(r'[a-z0-9A-Z.]+', category)
-            search_key = " ".join(search_key).lower()
-            search_key = "".join(search_key.split("."))
-            procedure_queryset = Procedure.objects.filter(
-                Q(categories__search_key__icontains=search_key) |
-                Q(categories__search_key__icontains=' ' + search_key) |
-                Q(categories__search_key__istartswith=search_key)).annotate(search_index=StrIndex('search_key', Value(search_key))
-                                                                ).order_by('search_index').distinct()
             procedure_queryset = paginate_queryset(procedure_queryset, request)
         else:
             procedure_queryset = self.get_queryset()[:20]
