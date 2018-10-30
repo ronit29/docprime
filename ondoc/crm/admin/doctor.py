@@ -37,7 +37,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure,
-                                 GoogleDetailing)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -1635,3 +1635,21 @@ class GoogleDetailingAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', 'clinic_hospital_name')
     resource_class = GoogleDetailingResource
+
+
+class VisitReasonPracticeSpecializationInline(admin.TabularInline):
+    model = VisitReasonMapping
+    fk_name = 'visit_reason'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    verbose_name = 'Related practice specialization'
+    verbose_name_plural = 'Related practice specializations'
+
+
+class VisitReasonAdmin(admin.ModelAdmin):
+    fields = ['name']
+    inlines = [VisitReasonPracticeSpecializationInline]
+
+    class Meta:
+        model = VisitReason

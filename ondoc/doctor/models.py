@@ -1694,3 +1694,30 @@ class DoctorPopularity(models.Model):
 
     def __str__(self):
         return self.unique_identifier
+
+
+class VisitReason(auth_model.TimeStampedModel, SearchKey):
+    name = models.TextField()
+    practice_specializations = models.ManyToManyField(PracticeSpecialization, through='VisitReasonMapping',
+                                                      through_fields=('visit_reason', 'practice_specialization'),
+                                                      related_name='visiting_reasons')
+
+    class Meta:
+        db_table = "visit_reason"
+        unique_together = (('name',),)
+
+    def __str__(self):
+        return '{}'.format(self.name)
+
+
+class VisitReasonMapping(models.Model):
+    visit_reason = models.ForeignKey(VisitReason, on_delete=models.CASCADE, related_name='related_practice_specializations')
+    practice_specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, related_name='related_visit_reasons')
+    is_primary = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "visit_reason_mapping"
+        unique_together = (('visit_reason', 'practice_specialization'),)
+
+    def __str__(self):
+        return '{}({})'.format(self.visit_reason.name, self.practice_specialization.name)

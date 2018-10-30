@@ -192,7 +192,6 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
 
             seo_query_result = "%s  where city_num between %d and %d  order by city_num, row_num" %(query, start, end)
 
-
             seo_result = RawSql(seo_query_result).fetch_all()
             paginated_specialists = []
             result = []
