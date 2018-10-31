@@ -3,7 +3,7 @@ from rest_framework import permissions
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import F, Func
 from django.utils import timezone
 import math
@@ -684,3 +684,14 @@ class TimeSlotExtraction(object):
                 today_min = curr_time + 2
 
         return today_min, tomorrow_min
+
+@transaction.atomic
+def consumers_balance_refund():
+    from ondoc.account.models import ConsumerAccount, ConsumerRefund
+    refund_time = timezone.now() - timezone.timedelta(hours=settings.REFUND_INACTIVE_TIME)
+    consumer_accounts = ConsumerAccount.objects.select_for_update().filter(updated_at__lt=refund_time)
+    for consumer_account in consumer_accounts:
+        if consumer_account.balance > 0:
+            print("consumer account balance")
+            ctx_obj = consumer_account.debit_refund()
+            ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
