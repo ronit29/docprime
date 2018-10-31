@@ -21,6 +21,8 @@ class Footer(object):
         sql_urls = RawSql(query).fetch_all()
         return sql_urls
 
+
+
 class SpecialityCityFooter(Footer):
     def __init__(self, entity):
         self.specialization_id = int(entity.specialization_id)
@@ -36,13 +38,13 @@ class SpecialityCityFooter(Footer):
         if top_specialities_in_city:
             response['menu'].append({'sub_heading': 'Top specialities in %s' % self.locality, 'url_list': top_specialities_in_city})
 
-        speciality_in_top_cities = self.specialist_in_top_cities()
-        if speciality_in_top_cities:
-                response['menu'].append({'sub_heading': '%s in Top Cities' % self.specialization, 'url_list': speciality_in_top_cities})
-
         speciality_in_popular_localities = self.specialist_in_popular_cities()
         if speciality_in_popular_localities:
             response['menu'].append({'sub_heading': '%s in Popular Localities in %s' % (self.specialization, self.locality), 'url_list': speciality_in_popular_localities})
+
+        speciality_in_top_cities = self.specialist_in_top_cities()
+        if speciality_in_top_cities:
+                response['menu'].append({'sub_heading': '%s in Top Cities' % self.specialization, 'url_list': speciality_in_top_cities})
 
         if response['menu']:
             response['heading'] = '%s in %s Search Page' % (self.specialization, self.locality)
@@ -52,8 +54,9 @@ class SpecialityCityFooter(Footer):
 
     def specialist_in_city(self):
 
-        query = ''' select url, concat(eu.specialization,' in ',eu.locality_value) title from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
-                    and eu.locality_id=%d and eu.sitemap_identifier='SPECIALIZATION_CITY' 
+        query = ''' select url, concat(eu.specialization,' in ',eu.locality_value) title 
+                    from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
+                    and eu.locality_id!=%d and eu.sitemap_identifier='SPECIALIZATION_CITY' 
                     and eu.is_valid=True order by rank limit 10''' \
                 % (self.locality_id)
 
@@ -112,7 +115,7 @@ class SpecialityLocalityFooter(Footer):
         query = ''' select url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
                     inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                     and eu.sublocality_id=%d and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
-                    and eu.is_valid=True and eu.specialization_id=%d order by rank limit 10''' \
+                    and eu.is_valid=True and eu.specialization_id!=%d order by rank limit 10''' \
                 % (self.sublocality_id, self.specialization_id)
 
         return self.get_urls(query)
@@ -122,11 +125,11 @@ class SpecialityLocalityFooter(Footer):
 
         query = ''' select url,max(title), min(rank) from 
                     (select url, -1 as rank, concat(eu.specialization,' in ', eu.locality_value) title  from entity_urls eu 
-                    where sitemap_identifier='SPECIALIZATION_CITY' and specialization_id = %d and locality_id = %d
+                    where sitemap_identifier='SPECIALIZATION_CITY' and is_valid=True and specialization_id = %d and locality_id = %d
                     union
                     select url, rank, concat(eu.specialization,' in ', eu.locality_value) title  from entity_urls eu 
                     inner join seo_cities sc on eu.locality_value = sc.city
-                    where sitemap_identifier='SPECIALIZATION_CITY' and specialization_id = %d
+                    where sitemap_identifier='SPECIALIZATION_CITY' and is_valid=True and specialization_id = %d
                     )x group by url order by min(rank) limit 10''' \
                      % (self.specialization_id, self.locality_id, self.specialization_id)
 
