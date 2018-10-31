@@ -214,3 +214,135 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+    def static_footer(self, request):
+        static_footer_urls = []
+        cities = self.top_cities()
+        # doctor_footer_urls = []
+        doctor_urls_list = []
+        for city in cities:
+            if EntityUrls.objects.filter(sitemap_identifier='DOCTORS_CITY', url_type='SEARCHURL',
+                                                                      is_valid=True).exists():
+
+                doctor_urls_list.append({'url': EntityUrls.objects.filter(sitemap_identifier='DOCTORS_CITY',
+                                                                      url_type='SEARCHURL',
+                                                                      is_valid=True).values('url'),
+                                     'title': 'Doctors in %s' % city})
+            else:
+                doctor_urls_list.append({})
+
+        static_footer_urls.append({'title': 'Doctors in Top Cities', 'result': doctor_urls_list})
+
+        lab_urls_list = []
+        for city in cities:
+            if EntityUrls.objects.filter(sitemap_identifier='LAB_CITY', url_type='SEARCHURL',
+                                                                   is_valid=True).exists():
+                lab_urls_list.append({'url': EntityUrls.objects.filter(sitemap_identifier='LAB_CITY', url_type='SEARCHURL',
+                                                                   is_valid=True).values('url'),
+                                  'title': 'Labs in %s' % city})
+            else:
+                lab_urls_list.append({})
+        static_footer_urls.append({'title': 'Labs in Top Cities', 'result': lab_urls_list})
+
+        return Response({"static_footer": static_footer_urls})
+
+    def top_cities(self):
+        query = '''select max(eu.url), eu.locality_value, count(*) from entity_urls eu 
+                    left join seo_cities sc on eu.locality_value = sc.city
+                    inner join entity_urls eurl on eu.locality_value = eurl.locality_value and eurl.url_type='SEARCHURL'
+                     and eurl.sitemap_identifier = 'SPECIALIZATION_CITY' 
+                     where eu.sitemap_identifier='DOCTORS_CITY' and eu.is_valid =True
+                     group by eu.locality_value order by max(sc.rank) asc nulls last,count(*) desc limit 10'''
+
+        sql_urls = RawSql(query).fetch_all()
+
+        result = []
+
+        for data in sql_urls:
+            result.append(data.get('locality_value'))
+
+        return result
+
+    def specialist_in_city(self,request):
+
+        specialization_id = request.GET.get('specialization_id', None)
+        locality_id = request.GET.get('locality_id', None)
+        city = None
+
+        query = ''' select * from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
+                     and eu.locality_id=%d and eu.sitemap_identifier='SPECIALIZATION_CITY' 
+                     and eu.url_type='SEARCHURL' and eu.is_valid=True and eu.specialization_id = %d order by rank limit 10''' \
+                     %(int(locality_id), int(specialization_id))
+
+        sql_urls = RawSql(query).fetch_all()
+        if not sql_urls:
+            return Response({})
+
+        result = []
+        for data in sql_urls:
+            city = data.get('locality_value')
+            result.append({"title": data.get('specialization') + " in " + data.get('locality_value'), "url":data.get('url')})
+
+        return Response({"title":"Top specialities in %s" %city,"top_specialists_in_gurgaon":result})
+
+    def specialist_in_top_cities(self,request):
+        specialization_id = request.GET.get('specialization_id', None)
+        locality_id = request.GET.get('locality_id', None)
+        city = None
+
+        # query = ''' select max(eu.url) as url, max(eu.specialization) as specialization, eu.locality_value, count(*) from entity_urls eu
+        #             left join seo_cities sc on eu.locality_value = sc.city
+        #             inner join entity_urls eurl on eu.locality_value = eurl.locality_value and eurl.url_type='SEARCHURL'
+        #             and eu.specialization = eurl.specialization
+        #             where eu.sitemap_identifier='SPECIALIZATION_CITY' and eu.is_valid =True and eu.locality_id !=%d
+        #             and eu.specialization_id=%d
+        #             group by eu.locality_value order by max(sc.rank) asc nulls last,count(*) desc limit 10'''\
+        #             % (int(locality_id), int(specialization_id))
+
+        query = '''select * from entity_urls where locality_value IN(
+                    select  eu.locality_value from entity_urls eu 
+                    left join seo_cities sc on eu.locality_value = sc.city
+                     where eu.sitemap_identifier='DOCTORS_CITY' and eu.is_valid =True
+                     group by eu.locality_value order by max(sc.rank) asc nulls last,count(*) desc limit 10) 
+                     and sitemap_identifier='SPECIALIZATION_CITY' and is_valid =True and url_type='SEARCHURL' 
+                     and locality_id!=%d and specialization_id =%d''' \
+                     % (int(locality_id), int(specialization_id))
+
+        sql_urls = RawSql(query).fetch_all()
+        if not sql_urls:
+            return Response({})
+
+        result = []
+        for data in sql_urls:
+            city = data.get('locality_value')
+            result.append(
+                {"title": data.get('specialization') + " in " + data.get('locality_value'), "url": data.get('url')})
+
+        return Response({"title": "Top specialities in %s" % city, "top_specialists_in_gurgaon": result})
+
+    #
+        # select *
+        # from seo_specialization ss
+        # inner
+        # join
+        # entity_urls
+        # eu
+        # on
+        # ss.specialization_id = eu.specialization_id
+        # and eu.locality_id = 12394 and eu.sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY'
+        # and eu.url_type = 'SEARCHURL' and eu.is_valid = True
+        # order
+        # by
+        # rank
+        # limit
+        # 10;
+
+        # select max(eu.url), eu.locality_value, count(*) from entity_urls eu
+                            # left join seo_cities sc on eu.locality_value = sc.city
+                            # inner join entity_urls eurl on eu.locality_value = eurl.locality_value and eurl.url_type='SEARCHURL'
+                            #  where eu.sitemap_identifier='SPECIALIZATION_CITY' and eu.is_valid =True and eu.locality_id !=12394 and eu.specialization_id=258
+                            #  group by eu.locality_value order by max(sc.rank) asc nulls last,count(*) desc limit 10
+
+
+
+
+
