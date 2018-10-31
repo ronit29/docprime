@@ -727,7 +727,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         doctor_realted_hospitals = obj.doctor_clinics.all()
 
-        doctor_realted_hospitals =sorted(doctor_realted_hospitals, key=lambda x: x.hospital.hospital_type)
+        #if hospital type is null then use a default large value 
+        doctor_realted_hospitals =sorted(doctor_realted_hospitals, key=lambda x: x.hospital.hospital_type or 100)
         doctor_associated_hospital = None
 
         if len(doctor_realted_hospitals):
