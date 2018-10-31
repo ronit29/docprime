@@ -469,9 +469,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if entity.exists():
             entity = entity.first()
             if not entity.is_valid:
-                valid_entity_url_qs = location_models.EntityUrls.objects.filter(url_type='PAGEURL',
-                                                                           entity_id=entity.entity_id,
-                                                                           entity_type__iexact='Doctor', is_valid='t')
+                valid_entity_url_qs = location_models.EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
+                                                                           entity_id=entity.entity_id, is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs.first().url
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})

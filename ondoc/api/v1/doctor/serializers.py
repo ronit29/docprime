@@ -673,8 +673,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         specializations = [doctor_specialization.specialization for doctor_specialization in obj.doctorpracticespecializations.all()]
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
-        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
-                                                entity_type__iexact='Doctor')
+        entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
+                                           is_valid='t')
         sublocality = ''
         locality = ''
         if entity.exists():
@@ -746,8 +746,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             address_city = doctor_associated_hospital.city
             address_pincode = doctor_associated_hospital.pin_code
             street_address = doctor_associated_hospital.get_hos_address()
-            latitude = doctor_associated_hospital.location.y
-            longitude = doctor_associated_hospital.location.x
+            latitude = doctor_associated_hospital.location.y if getattr(doctor_associated_hospital, 'location', None) else None
+            longitude = doctor_associated_hospital.location.x if getattr(doctor_associated_hospital, 'location', None) else None
             if doctor_hospital:
                 availability_qs = doctor_hospital.availability
                 if availability_qs.exists():
