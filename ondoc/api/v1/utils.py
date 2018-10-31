@@ -696,13 +696,16 @@ class TimeSlotExtraction(object):
 
         return today_min, tomorrow_min, today_max
 
-@transaction.atomic
+
 def consumers_balance_refund():
     from ondoc.account.models import ConsumerAccount, ConsumerRefund
     refund_time = timezone.now() - timezone.timedelta(hours=settings.REFUND_INACTIVE_TIME)
-    consumer_accounts = ConsumerAccount.objects.select_for_update().filter(updated_at__lt=refund_time)
-    for consumer_account in consumer_accounts:
-        if consumer_account.balance > 0:
-            print("consumer account balance")
-            ctx_obj = consumer_account.debit_refund()
-            ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time)
+    for account in consumer_accounts:
+        with transaction.atomic():
+            consumer_account = ConsumerAccount.objects.select_for_update().filter(pk=account.id).first()
+            if consumer_account:
+                if consumer_account.balance > 0:
+                    print("consumer account balance " + str(consumer_account.balance))
+                    ctx_obj = consumer_account.debit_refund()
+                    ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
