@@ -200,10 +200,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         coupon_list = []
         coupon_discount = 0
         if data.get("coupon_code"):
-            coupon_list = list(Coupon.objects.filter(code__in=data.get("coupon_code")).values_list('id', flat=True))
+            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
             obj = models.OpdAppointment()
-            for coupon in data.get("coupon_code"):
+            for coupon in coupon_obj:
                 coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
+                coupon_list.append(coupon.id)
 
         if data.get("payment_type") == models.OpdAppointment.INSURANCE:
             effective_price = doctor_clinic_timing.deal_price

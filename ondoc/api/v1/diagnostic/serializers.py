@@ -9,6 +9,7 @@ from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializ
 from ondoc.api.v1.utils import form_time_slot
 from ondoc.doctor.models import OpdAppointment
 from ondoc.account.models import Order
+from ondoc.coupon.models import Coupon
 from django.db.models import Count, Sum, When, Case, Q, F
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
@@ -516,20 +517,19 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError('Max '+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
 
         if data.get("coupon_code"):
-            for coupon in data.get("coupon_code"):
-                obj = LabAppointment()
-                if obj.validate_user_coupon(user=request.user, coupon_code=coupon).get("is_valid"):
-                    if coupon.is_user_specific:
-                        if not obj.validate_user_specific_coupon(user=request.user, coupon_code=coupon,
-                                                                 lab=data.get("lab").id, test=data.get("test_ids"),
-                                                                 product_id=Order.LAB_PRODUCT_ID):
-                            raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
-                else:
-                    raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
-                # if not (obj.validate_user_coupon(user=request.user, coupon_code=coupon).get("is_valid") \
-                #         and obj.validate_user_specific_coupon(user=request.user, coupon_code=coupon,
-                #                                               lab=(data.get("lab")).id, test=data.get("test_ids"), product_id=Order.LAB_PRODUCT_ID)):
-                #     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+            coupon_code = data.get("coupon_code")
+            coupon_obj = Coupon.objects.filter(code__in=coupon_code)
+            if len(coupon_code) == len(coupon_obj):
+                for coupon in coupon_obj:
+                    obj = LabAppointment()
+                    if obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
+                        if coupon.is_user_specific:
+                            if not obj.validate_product_coupon(coupon_obj=coupon,
+                                                                     lab=data.get("lab"), test=data.get("test_ids"),
+                                                                     product_id=Order.LAB_PRODUCT_ID):
+                                raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                    else:
+                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         self.test_lab_id_validator(data, request)
         self.time_slot_validator(data, request)

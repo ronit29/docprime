@@ -54,9 +54,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         for coupon in coupons_data:
 
             if is_user:
-                is_valid_user_coupon = obj.validate_user_coupon(user=user, coupon_code=coupon.code)
+                is_valid_user_coupon = obj.validate_user_coupon(user=user, coupon_obj=coupon)
             elif not is_user and coupon.is_user_specific:
-                # is_valid_user_coupon = {"is_valid": None, "used_count": 0}
                 continue
             else:
                 is_valid_user_coupon = {"is_valid": None, "used_count": 0}
@@ -77,15 +76,13 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    # serializer_class = serializers.CouponListSerializer
-
     def coupon_discount(self, request, *args, **kwargs):
 
         serializer = serializers.UserSpecificCouponSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         input_data = serializer.validated_data
 
-        coupon_code = input_data.get("coupon_code")
+        coupon_code = set(input_data.get("coupon_code"))
         deal_price = input_data.get("deal_price")
         product_id = input_data.get("product_id")
         lab = input_data.get("lab")
@@ -96,16 +93,21 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         elif str(product_id) == str(Order.LAB_PRODUCT_ID):
             obj = LabAppointment()
 
+        coupon_obj = Coupon.objects.filter(code__in=coupon_code)
+
         discount = 0
-        if coupon_code:
-            for coupon in coupon_code:
-                if obj.validate_user_coupon(user=request.user, coupon_code=coupon).get("is_valid"):
+        if coupon_obj.count() == len(coupon_code):
+            for coupon in coupon_obj:
+                if obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
                     if coupon.is_user_specific:
-                        if not obj.validate_user_specific_coupon(user=request.user, coupon_code=coupon, lab=lab, test=test):
+                        if not obj.validate_product_coupon(coupon_obj=coupon, lab=lab, test=test, product_id=product_id):
                             return Response({"status": 0, "message": "Invalid coupon code for the user"},
                                             status.HTTP_404_NOT_FOUND)
                     discount += obj.get_discount(coupon, deal_price)
                 else:
                     return Response({"status": 0, "message": "Invalid coupon code for the user"},
                                     status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({"status": 0, "message": "Invalid coupon code for the user"},
+                            status.HTTP_404_NOT_FOUND)
         return Response({"discount": discount, "status": 1}, status.HTTP_200_OK)

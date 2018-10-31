@@ -601,10 +601,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
         coupon_list = []
         coupon_discount = 0
         if data.get("coupon_code"):
-            coupon_list = list(Coupon.objects.filter(code__in=data.get("coupon_code")).values_list('id', flat=True))
+            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
             obj = models.LabAppointment()
-            for coupon in data.get("coupon_code"):
+            for coupon in coupon_obj:
                 coupon_discount += obj.get_discount(coupon, effective_price)
+                coupon_list.append(coupon.id)
 
         if data.get("payment_type") in [doctor_model.OpdAppointment.COD, doctor_model.OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
