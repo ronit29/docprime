@@ -245,7 +245,7 @@ class DoctorProfileFooter(Footer):
         return self.get_urls(query)
 
     def specialist_in_popular_localities(self):
-        query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value) title from entity_urls eu where
+        query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value,' ',eu.locality_value) title from entity_urls eu where
                 specialization_id = %d and sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY'  
                 and st_distance(sublocality_location, '%s')<10000 and is_valid=True                 
                 order by count desc limit 10''' % (self.specialization_id, self.centroid)
@@ -277,7 +277,7 @@ class DoctorCityFooter(Footer):
         return response
 
     def doctor_in_top_localities(self):
-        query = '''select eu.url, concat('Doctor',' in ',eu.sublocality_value) title from entity_urls eu where
+        query = '''select eu.url, concat('Doctors',' in ',eu.sublocality_value,' ',eu.locality_value) title from entity_urls eu where
                 sitemap_identifier ='DOCTORS_LOCALITY_CITY'  
                 and st_distance(sublocality_location, '%s')<10000 and is_valid=True
                 and locality_value ilike '%s' 
