@@ -75,9 +75,9 @@ class SpecialityCityFooter(Footer):
 
         query = ''' select url, concat(eu.specialization,' in ',eu.locality_value) title 
                     from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
-                    and eu.locality_id=%d and eu.sitemap_identifier='SPECIALIZATION_CITY' 
+                    and eu.locality_value ilike '%s' and eu.sitemap_identifier='SPECIALIZATION_CITY' 
                     and eu.is_valid=True order by count desc limit 10''' \
-                % (self.locality_id)
+                % (self.locality)
 
         return  self.get_urls(query)
 
@@ -262,13 +262,14 @@ class DoctorCityFooter(Footer):
         response = {}
         response['menu'] = []
 
+        doctors_in_top_localities = self.doctor_in_top_localities()
+        if doctors_in_top_localities:
+            response['menu'].append({'sub_heading': 'Doctors in Top Localities', 'url_list': doctors_in_top_localities})
+
         top_specialities_in_city = self.specialist_in_city()
         if top_specialities_in_city:
             response['menu'].append({'sub_heading': 'Top specialities in %s' % self.locality, 'url_list': top_specialities_in_city})
 
-        doctors_in_top_localities = self.doctor_in_top_localities()
-        if doctors_in_top_localities:
-            response['menu'].append({'sub_heading': 'Doctors in Top Localities', 'url_list': doctors_in_top_localities})
 
         if response['menu']:
             response['heading'] = 'Dynamic footer on doctors in %s' % self.locality
