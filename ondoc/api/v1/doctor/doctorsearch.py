@@ -54,11 +54,19 @@ class DoctorSearchHelper:
                                                          self.query_params.get("sits_at")]))
             )
         if self.query_params.get("min_fees") is not None:
-            filtering_params.append(
-                "deal_price>={}".format(str(self.query_params.get("min_fees"))))
+            if not len(procedure_ids)>0:
+                filtering_params.append(
+                    "deal_price>={}".format(str(self.query_params.get("min_fees"))))
+            elif len(procedure_ids)>0:
+                filtering_params.append(
+                    "dcp.deal_price>={}".format(str(self.query_params.get("min_fees"))))
         if self.query_params.get("max_fees") is not None:
-            filtering_params.append(
-                "deal_price<={}".format(str(self.query_params.get("max_fees"))))
+            if not len(procedure_ids)>0:
+                filtering_params.append(
+                    "deal_price<={}".format(str(self.query_params.get("max_fees"))))
+            elif len(procedure_ids)>0:
+                filtering_params.append(
+                    "dcp.deal_price<={}".format(str(self.query_params.get("max_fees"))))
         if self.query_params.get("is_female"):
             filtering_params.append(
                 "gender='f'"
@@ -95,8 +103,7 @@ class DoctorSearchHelper:
             if self.query_params.get('sort_on') == 'fees':
                 order_by_field = "deal_price ASC"
                 rank_by = "rank_fees=1"
-        order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC,'
-                                          ' doctor__doctor_clinics__doctor_clinic_procedures__procedure__procedure_category.preffered_procedure_id DESC'
+        order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC'
                                           , order_by_field)
         # order_by_field = "{}, {} ".format('d.is_live DESC', order_by_field)
         return order_by_field, rank_by
