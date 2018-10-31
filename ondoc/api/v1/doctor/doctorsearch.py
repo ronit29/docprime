@@ -214,6 +214,37 @@ class DoctorSearchHelper:
                 "hospitals": hospitals,
                 "thumbnail": (
                     request.build_absolute_uri(thumbnail) if thumbnail else None),
+
+                "schema": {
+                    "name": doctor.get_display_name(),
+                    "image": doctor.get_thumbnail() if doctor.get_thumbnail() else '',
+                    "@context": 'http://schema.org',
+                    "@type": 'MedicalBusiness',
+                    "address": {
+                        "@type": 'PostalAddress',
+                        "addressLocality": doctor_clinic.hospital.locality if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                        "addressRegion": doctor_clinic.hospital.city if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                        "postalCode": doctor_clinic.hospital.pin_code if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                        "streetAddress": doctor_clinic.hospital.get_hos_address() if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
+                    },
+                    "description": doctor.about,
+                    "priceRange": min_price["mrp"],
+                    # 'openingHours': opening_hours,
+                    'location': {
+                        '@type': 'Place',
+                        'geo': {
+                            '@type': 'GeoCircle',
+                            'geoMidpoint': {
+                                '@type': 'GeoCoordinates',
+                                'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
+                                                                                 getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location') else None,
+                                'longitude': doctor_clinic.hospital.location.x if doctor_clinic and
+                                                                                  getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location') else None,
+                            }
+                        }
+                    }
+
+                }
             }
             response.append(temp)
         return response
