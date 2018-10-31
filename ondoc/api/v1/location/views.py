@@ -157,12 +157,12 @@ class DoctorProfileFooter(Footer):
         top_specialities_in_locality = self.specialist_in_locality()
         if top_specialities_in_locality:
             response['menu'].append(
-                {'sub_heading': 'Popular Doctors in same %s' %self.locality,
+                {'sub_heading': 'Popular Doctors in same %s' %(self.locality),
                  'url_list': top_specialities_in_locality})
 
         top_specialities_in_city = self.specialist_in_city()
         if top_specialities_in_city:
-            response['menu'].append({'sub_heading': 'Popular Doctors in %s' % self.locality, 'url_list': top_specialities_in_city})
+            response['menu'].append({'sub_heading': 'Popular Doctors in %s' % (self.locality), 'url_list': top_specialities_in_city})
 
         specialist_in_nearby_localities = self.specialist_in_nearby_localities()
         if specialist_in_nearby_localities:
@@ -263,6 +263,8 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             footer = SpecialityLocalityFooter(entity)
         elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.DOCTOR_PAGE:
             footer = DoctorProfileFooter(entity)
+        elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.DOCTORS_CITY:
+            footer = DoctorCityFooter(entity)
 
         if footer:
             response = footer.get_footer()
