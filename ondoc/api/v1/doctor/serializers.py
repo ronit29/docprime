@@ -6,7 +6,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
-                                 CommonMedicalCondition,CommonSpecialization,
+                                 CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
 from ondoc.authentication.models import UserProfile
 from django.db.models import Avg
@@ -674,7 +674,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         specializations = [doctor_specialization.specialization for doctor_specialization in obj.doctorpracticespecializations.all()]
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
         entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
-                                           is_valid='t')
+                                           is_valid=True)
         sublocality = ''
         locality = ''
         if entity.exists():

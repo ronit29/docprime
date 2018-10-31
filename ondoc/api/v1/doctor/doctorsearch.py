@@ -233,7 +233,7 @@ class DoctorSearchHelper:
                         "streetAddress": doctor_clinic.hospital.get_hos_address() if doctor_clinic and getattr(doctor_clinic, 'hospital', None) else '',
                     },
                     "description": doctor.about,
-                    "priceRange": min_price["mrp"],
+                    "priceRange": min_price["deal_price"]
                     'openingHours': opening_hours,
                     'location': {
                         '@type': 'Place',
