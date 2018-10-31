@@ -185,6 +185,11 @@ class DoctorSearchHelper:
 
             thumbnail = doctor.get_thumbnail()
 
+            opening_hours = None
+            if doctor_clinic.availability.exists():
+                opening_hours = '%.2f-%.2f' % (doctor_clinic.availability.first().start,
+                                                   doctor_clinic.availability.first().end),
+
             temp = {
                 "doctor_id": doctor.id,
                 "enabled_for_online_booking": doctor.enabled_for_online_booking,
@@ -229,7 +234,7 @@ class DoctorSearchHelper:
                     },
                     "description": doctor.about,
                     "priceRange": min_price["mrp"],
-                    # 'openingHours': opening_hours,
+                    'openingHours': opening_hours,
                     'location': {
                         '@type': 'Place',
                         'geo': {
@@ -237,9 +242,9 @@ class DoctorSearchHelper:
                             'geoMidpoint': {
                                 '@type': 'GeoCoordinates',
                                 'latitude': doctor_clinic.hospital.location.y if doctor_clinic and
-                                                                                 getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location') else None,
+                                                                                 getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
                                 'longitude': doctor_clinic.hospital.location.x if doctor_clinic and
-                                                                                  getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location') else None,
+                                                                                  getattr(doctor_clinic, 'hospital', None) and getattr(doctor_clinic.hospital, 'location', None) else None,
                             }
                         }
                     }
