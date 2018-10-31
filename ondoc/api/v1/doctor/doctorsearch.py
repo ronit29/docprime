@@ -40,9 +40,10 @@ class DoctorSearchHelper:
             )
 
         if len(procedure_ids)>0:
-            ps = list(DoctorClinicProcedure.objects.filter(procedure_id__in=procedure_ids).values_list('doctor_clinic__doctor_id', flat=True))
-            ps = [str(i) for i in ps]
-            procedure_ids.extend(ps)
+            for id in procedure_ids:
+                ps = list(DoctorClinicProcedure.objects.filter(procedure_id=id).values_list('doctor_clinic__doctor_id', flat=True))
+                ps = [str(i) for i in ps]
+                procedure_ids.extend(ps)
             filtering_params.append(
                 " d.id IN({})".format(",".join(procedure_ids))
             )
@@ -94,7 +95,9 @@ class DoctorSearchHelper:
             if self.query_params.get('sort_on') == 'fees':
                 order_by_field = "deal_price ASC"
                 rank_by = "rank_fees=1"
-        order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC', order_by_field)
+        order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC,'
+                                          ' doctor__doctor_clinics__doctor_clinic_procedures__procedure__procedure_category.preffered_procedure_id DESC'
+                                          , order_by_field)
         # order_by_field = "{}, {} ".format('d.is_live DESC', order_by_field)
         return order_by_field, rank_by
 
@@ -168,7 +171,7 @@ class DoctorSearchHelper:
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
             doctor_clinic_procedure = DoctorClinicProcedure.objects.filter(doctor_clinic=doctor_clinic).values(
-                'id', 'doctor_clinic_id', 'procedure_id', 'procedure__name',
+                'id', 'mrp', 'agreed_price', 'deal_price', 'doctor_clinic_id', 'procedure_id', 'procedure__name',
                 'procedure__details', 'procedure__duration'
             )
             # serializer = serializers.DoctorHospitalSerializer(doctor_clinics, many=True, context={"request": request})
