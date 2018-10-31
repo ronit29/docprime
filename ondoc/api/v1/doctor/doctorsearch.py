@@ -2,6 +2,7 @@ from django.contrib.gis.geos import Point
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
+from django.core import serializers as core_serializer
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor
 from ondoc.procedure.models import DoctorClinicProcedure
@@ -19,6 +20,7 @@ class DoctorSearchHelper:
 
     def get_filtering_params(self):
         """Helper function that prepare dynamic query for filtering"""
+        
         hospital_type_mapping = {hospital_type[1]: hospital_type[0] for hospital_type in
                                  models.Hospital.HOSPITAL_TYPE_CHOICES}
 
@@ -38,14 +40,15 @@ class DoctorSearchHelper:
             filtering_params.append(
                 " gs.id IN({})".format(",".join(specialization_ids))
             )
-
+        procedure_mapped_doctor_ids = []
         if len(procedure_ids)>0:
             for id in procedure_ids:
-                ps = list(DoctorClinicProcedure.objects.filter(procedure_id=id).values_list('doctor_clinic__doctor_id', flat=True))
+                ps = list(DoctorClinicProcedure.objects.filter(procedure_id=id).values_list('doctor_clinic__doctor_id',
+                                                                                            flat=True).distinct('doctor_clinic_id'))
                 ps = [str(i) for i in ps]
-                procedure_ids.extend(ps)
+                procedure_mapped_doctor_ids.extend(ps)
             filtering_params.append(
-                " d.id IN({})".format(",".join(procedure_ids))
+                " d.id IN({})".format(",".join(procedure_mapped_doctor_ids))
             )
 
         if self.query_params.get("sits_at"):
@@ -57,16 +60,10 @@ class DoctorSearchHelper:
             if not len(procedure_ids)>0:
                 filtering_params.append(
                     "deal_price>={}".format(str(self.query_params.get("min_fees"))))
-            elif len(procedure_ids)>0:
-                filtering_params.append(
-                    "dcp.deal_price>={}".format(str(self.query_params.get("min_fees"))))
         if self.query_params.get("max_fees") is not None:
             if not len(procedure_ids)>0:
                 filtering_params.append(
                     "deal_price<={}".format(str(self.query_params.get("max_fees"))))
-            elif len(procedure_ids)>0:
-                filtering_params.append(
-                    "dcp.deal_price<={}".format(str(self.query_params.get("max_fees"))))
         if self.query_params.get("is_female"):
             filtering_params.append(
                 "gender='f'"
@@ -179,8 +176,7 @@ class DoctorSearchHelper:
             doctor_clinic = doctor_clinics[0]
             doctor_clinic_procedure = DoctorClinicProcedure.objects.filter(doctor_clinic=doctor_clinic).values(
                 'id', 'mrp', 'agreed_price', 'deal_price', 'doctor_clinic_id', 'procedure_id', 'procedure__name',
-                'procedure__details', 'procedure__duration'
-            )
+                'procedure__details', 'procedure__duration')
             # serializer = serializers.DoctorHospitalSerializer(doctor_clinics, many=True, context={"request": request})
             filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
@@ -210,7 +206,7 @@ class DoctorSearchHelper:
                     "mrp": min_price["mrp"],
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
-                    "procedures": json.dumps(list(doctor_clinic_procedure))
+                    "procedures": doctor_clinic_procedure
                 }]
 
             thumbnail = doctor.get_thumbnail()
