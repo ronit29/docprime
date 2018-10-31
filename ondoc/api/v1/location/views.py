@@ -255,7 +255,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         return Response({"static_footer": static_footer_urls})
 
     def top_cities(self, sitemap_identifier):
-        query = '''select * from seo_cities sc inner join entity_urls eu
+        query = '''select city from seo_cities sc inner join entity_urls eu
                    on sc.city iLIKE eu.locality_value and eu.sitemap_identifier='%s' 
                    and eu.is_valid=True order by rank limit 10;''' % (sitemap_identifier)
 
@@ -264,7 +264,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         result = []
 
         for data in sql_urls:
-            result.append(data.get('locality_value'))
+            result.append(data.get('city'))
 
         return result
 
