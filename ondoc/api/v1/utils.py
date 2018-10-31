@@ -3,7 +3,7 @@ from rest_framework import permissions
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import F, Func
 from django.utils import timezone
 import math
@@ -652,9 +652,10 @@ class TimeSlotExtraction(object):
         format_data['timing'] = data_list
         return format_data
 
-    def initial_start_times(self, is_thyrocare, is_home_pickup):
+    def initial_start_times(self, is_thyrocare, is_home_pickup, time_slots):
         today_min = None
         tomorrow_min = None
+        today_max = None
 
         now = datetime.datetime.now()
         curr_time = now.hour
@@ -667,7 +668,7 @@ class TimeSlotExtraction(object):
             if is_thyrocare:
                 today_min = 24
                 if curr_time >= 17:
-                    tomorrow_min = 12
+                    tomorrow_min = 24
             else:
                 if is_sunday:
                     today_min = 24
@@ -683,4 +684,25 @@ class TimeSlotExtraction(object):
                 # add 2 hours gap,
                 today_min = curr_time + 2
 
-        return today_min, tomorrow_min
+                # block lab for 2 hours, before last found time slot
+                if time_slots and time_slots[now.weekday()]:
+                    max_val = 0
+                    for s in time_slots[now.weekday()]:
+                        if s["timing"]:
+                            for t in s["timing"]:
+                                max_val = max(t["value"], max_val)
+                    if max_val >= 2:
+                        today_max = max_val - 2
+
+        return today_min, tomorrow_min, today_max
+
+@transaction.atomic
+def consumers_balance_refund():
+    from ondoc.account.models import ConsumerAccount, ConsumerRefund
+    refund_time = timezone.now() - timezone.timedelta(hours=settings.REFUND_INACTIVE_TIME)
+    consumer_accounts = ConsumerAccount.objects.select_for_update().filter(updated_at__lt=refund_time)
+    for consumer_account in consumer_accounts:
+        if consumer_account.balance > 0:
+            print("consumer account balance")
+            ctx_obj = consumer_account.debit_refund()
+            ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)

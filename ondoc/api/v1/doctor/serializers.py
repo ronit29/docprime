@@ -756,10 +756,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             latitude = doctor_hospital.location.y
             longitude = doctor_hospital.location.x
             if doc_hospital.exists():
-                price = doc_hospital.first().availability.first().mrp
                 if doc_hospital.first().availability.exists():
                     opening_hours = '%.2f-%.2f' % (doc_hospital.first().availability.first().start,
                                                    doc_hospital.first().availability.first().end)
+                    price = doc_hospital.first().availability.first().mrp
 
         schema = {
             'name': self.instance.get_display_name(),

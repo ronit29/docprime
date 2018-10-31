@@ -3,7 +3,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
-from ondoc.doctor.models import Hospital, SearchKey
+from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
@@ -408,11 +408,12 @@ class LabBookingClosingManager(models.Manager):
                 if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
                     is_thyrocare = True
 
-            today_min, tomorrow_min = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup)
+            today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list)
             res_data = {
                 "time_slots": resp_list,
                 "today_min": today_min,
-                "tomorrow_min": tomorrow_min
+                "tomorrow_min": tomorrow_min,
+                "today_max": today_max
             }
 
             return res_data
@@ -807,6 +808,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True)
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
+    cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
 
     def allowed_action(self, user_type, request):
         allowed = []
