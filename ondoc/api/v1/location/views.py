@@ -76,6 +76,7 @@ class SpecialityCityFooter(Footer):
 
         return  self.get_urls(query)
 
+
 class SpecialityLocalityFooter(Footer):
     def __init__(self, entity):
         self.specialization_id = int(entity.specialization_id)
@@ -105,7 +106,6 @@ class SpecialityLocalityFooter(Footer):
             response['heading'] = '%s in %s Search Page' % (self.specialization, self.locality)
 
         return response
-
 
     def specialist_in_locality(self):
 
@@ -147,12 +147,8 @@ class SpecialityLocalityFooter(Footer):
 
 class DoctorProfileFooter(Footer):
     def __init__(self, entity):
-        self.specialization_id = int(entity.specialization_id)
         self.locality_id = int(entity.locality_id)
-        self.specialization = entity.specialization
         self.locality = entity.locality_value
-        self.sublocality_id = entity.sublocality_id
-        self.sublocality_value = entity.sublocality_value
 
     def get_footer(self):
         response = {}
@@ -161,15 +157,20 @@ class DoctorProfileFooter(Footer):
         top_specialities_in_locality = self.specialist_in_locality()
         if top_specialities_in_locality:
             response['menu'].append(
-                {'sub_heading': 'Popular Doctors in same %s' %self.sublocality_value,
+                {'sub_heading': 'Popular Doctors in same %s' %self.locality,
                  'url_list': top_specialities_in_locality})
-
-        if response['menu']:
-            response['heading'] = '%s in %s Search Page' % (self.specialization, self.locality)
 
         top_specialities_in_city = self.specialist_in_city()
         if top_specialities_in_city:
-            response['menu'].append({'sub_heading': 'Popular Doctors in%s' % self.locality, 'url_list': top_specialities_in_city})
+            response['menu'].append({'sub_heading': 'Popular Doctors in %s' % self.locality, 'url_list': top_specialities_in_city})
+
+        specialist_in_nearby_localities = self.specialist_in_nearby_localities()
+        if specialist_in_nearby_localities:
+            response['menu'].append({'sub_heading': 'Doctors in nearby localities',
+                                     'url_list': specialist_in_nearby_localities})
+
+        if response['menu']:
+            response['heading'] = 'Dynamic Footer on Doctor Detail Page'
 
         return response
 
@@ -177,9 +178,9 @@ class DoctorProfileFooter(Footer):
 
         query = ''' select url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
                        inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
-                       and eu.sublocality_id=%d and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
-                       and eu.is_valid=True and eu.specialization_id=%d order by rank limit 10''' \
-                % (self.sublocality_id, self.specialization_id)
+                       and eu.locality_id=%d and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
+                       and eu.is_valid=True order by rank limit 10''' \
+                %self.locality_id
 
         return self.get_urls(query)
 
@@ -189,6 +190,14 @@ class DoctorProfileFooter(Footer):
                        and eu.locality_id=%d and eu.sitemap_identifier='SPECIALIZATION_CITY' 
                        and eu.is_valid=True order by rank limit 10''' \
                 % (self.locality_id)
+
+        return self.get_urls(query)
+
+    def specialist_in_nearby_localities(self):
+
+        query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value, ' ', eu.locality_value) title from entity_urls eu 
+                       where sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY'
+                       and locality_id = %d and is_valid=True ''' %self.locality_id
 
         return self.get_urls(query)
 
@@ -252,6 +261,8 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             footer = SpecialityCityFooter(entity)
         elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.SPECIALIZATION_LOCALITY_CITY:
             footer = SpecialityLocalityFooter(entity)
+        elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.DOCTOR_PAGE:
+            footer = DoctorProfileFooter(entity)
 
         if footer:
             response = footer.get_footer()
