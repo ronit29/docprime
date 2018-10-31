@@ -728,9 +728,11 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         doctor_realted_hospitals = obj.doctor_clinics.all()
 
         doctor_realted_hospitals =sorted(doctor_realted_hospitals, key=lambda x: x.hospital.hospital_type)
+        doctor_associated_hospital = None
 
-        doctor_hospital = doctor_realted_hospitals[0]
-        doctor_associated_hospital = doctor_hospital.hospital
+        if len(doctor_realted_hospitals):
+            doctor_hospital = doctor_realted_hospitals[0]
+            doctor_associated_hospital = doctor_hospital.hospital
 
         price = None
         opening_hours = ''
