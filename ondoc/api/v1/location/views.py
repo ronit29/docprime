@@ -40,7 +40,7 @@ class SpecialityCityFooter(Footer):
         if speciality_in_top_cities:
                 response['menu'].append({'sub_heading': '%s in Top Cities' % self.specialization, 'url_list': speciality_in_top_cities})
 
-        speciality_in_popular_localities = self.specialist_in_popular_cities()
+        speciality_in_popular_localities = self.specialist_in_popular_localities()
         if speciality_in_popular_localities:
             response['menu'].append({'sub_heading': '%s in Popular Localities in %s' % (self.specialization, self.locality), 'url_list': speciality_in_popular_localities})
 
@@ -69,7 +69,7 @@ class SpecialityCityFooter(Footer):
 
         return  self.get_urls(query)
 
-    def specialist_in_popular_cities(self):
+    def specialist_in_popular_localities(self):
 
         query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value) title from entity_urls eu where specialization_id = %d and sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY'
                     and locality_id = %d and is_valid=True ''' % (self.specialization_id, self.locality_id)
@@ -112,7 +112,7 @@ class SpecialityLocalityFooter(Footer):
         query = ''' select url, concat(eu.specialization,' in ', eu.sublocality_value, ' ',  eu.locality_value) title from seo_specialization ss 
                     inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                     and eu.sublocality_id=%d and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
-                    and eu.is_valid=True and eu.specialization_id=%d order by rank limit 10''' \
+                    and eu.is_valid=True and eu.specialization_id!=%d order by count desc limit 10''' \
                 % (self.sublocality_id, self.specialization_id)
 
         return self.get_urls(query)
