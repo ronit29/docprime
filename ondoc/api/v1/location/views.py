@@ -287,9 +287,9 @@ class DoctorCityFooter(Footer):
     def specialist_in_city(self):
 
         query = ''' select url, concat(eu.specialization,' in ',eu.locality_value) title from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
-                    and eu.locality_id=%d and eu.sitemap_identifier='SPECIALIZATION_CITY' 
+                    and eu.locality_value ilike '%s' and eu.sitemap_identifier='SPECIALIZATION_CITY' 
                     and eu.is_valid=True order by count desc limit 10''' \
-                % (self.locality_id)
+                % (self.locality)
 
         return  self.get_urls(query)
 
