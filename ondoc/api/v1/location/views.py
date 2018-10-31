@@ -82,9 +82,45 @@ class SpecialityLocalityFooter(Footer):
 class DoctorProfileFooter(Footer):
     pass
 
-class DoctorCityFooter(Footer):
-    pass
 
+class DoctorCityFooter(Footer):
+
+    def __init__(self, entity):
+        self.locality_id = int(entity.locality_id)
+        self.locality = entity.locality_value
+
+    def get_footer(self):
+        response = {}
+        response['menu'] = []
+
+        top_specialities_in_city = self.specialist_in_city()
+        if top_specialities_in_city:
+            response['menu'].append({'sub_heading': 'Top specialities in %s' % self.locality, 'url_list': top_specialities_in_city})
+
+        doctors_in_top_localities = self.doctor_in_top_localities()
+        if doctors_in_top_localities:
+            response['menu'].append({'sub_heading': 'Doctors in Top Localities', 'url_list': doctors_in_top_localities})
+
+        if response['menu']:
+            response['heading'] = 'Dynamic footer on doctors in %s' % self.locality
+
+        return response
+
+    def doctor_in_top_localities(self):
+
+        query = '''select eu.url, concat('Doctors in ',eu.sublocality_value, ' ' , eu.locality_value) title from entity_urls eu where sitemap_identifier ='DOCTORS_LOCALITY_CITY'
+                    and locality_id = %d and is_valid=True ''' % self.locality_id
+
+        return self.get_urls(query)
+
+    def specialist_in_city(self):
+
+        query = ''' select url, concat(eu.specialization,' in ',eu.locality_value) title from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
+                    and eu.locality_id=%d and eu.sitemap_identifier='SPECIALIZATION_CITY' 
+                    and eu.is_valid=True order by rank limit 10''' \
+                % (self.locality_id)
+
+        return  self.get_urls(query)
 
 
 class SearchUrlsViewSet(viewsets.GenericViewSet):
@@ -356,7 +392,9 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
         entity = entity.first()
         footer = None
         if entity.sitemap_identifier == EntityUrls.SitemapIdentifier.SPECIALIZATION_CITY:
-            footer = SpecialityCityFooter(entity)            
+            footer = SpecialityCityFooter(entity)
+        elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.DOCTORS_CITY:
+            footer = DoctorCityFooter(entity)
         elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.SPECIALIZATION_LOCALITY_CITY:
             pass
 
