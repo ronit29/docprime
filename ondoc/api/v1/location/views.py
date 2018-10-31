@@ -127,7 +127,7 @@ class SpecialityLocalityFooter(Footer):
 
     def specialist_in_popular_localities(self):
         if self.centroid:
-            query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value) title from entity_urls eu where
+            query = '''select eu.url, concat(eu.specialization,' in ',eu.sublocality_value, ' ',eu.locality_value ) title from entity_urls eu where
                 specialization_id = %d and sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY'  
                 and st_distance(sublocality_location, '%s')<10000 and is_valid=True 
                 and locality_value ilike '%s' and sublocality_id != %d
