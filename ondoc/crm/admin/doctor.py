@@ -19,6 +19,8 @@ import pytz
 import datetime
 from django.db import transaction
 import logging
+from dal import autocomplete
+
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -181,13 +183,25 @@ class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     readonly_fields = ['deal_price']
 
 
+class DoctorClinicInlineForm(forms.ModelForm):
+    hospital = forms.ModelChoiceField(
+        queryset=Hospital.objects.all(),
+        widget=autocomplete.ModelSelect2(url='hospital-autocomplete')
+    )
+
+    class Meta:
+        model = DoctorClinic
+        fields = ('__all__')
+
+
 class DoctorClinicInline(ReadOnlyInline):
     model = DoctorClinic
+    form = DoctorClinicInlineForm
     extra = 0
     can_delete = True
     formset = DoctorClinicFormSet
     show_change_link = False
-    autocomplete_fields = ['hospital']
+    # autocomplete_fields = ['hospital']
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline]
 
     def get_queryset(self, request):
@@ -512,7 +526,8 @@ class DoctorForm(FormCleanMixin):
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Doctor.ONBOARDING_STATUS)
 
     def validate_qc(self):
-        qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
+        qc_required = {'name': 'req', 'gender': 'req',
+                       # 'practicing_since': 'req',
                        'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count'}
@@ -596,41 +611,40 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
     formset = GenericAdminFormSet
     # can_delete = True
     show_change_link = False
-    exclude = ('hospital_network', 'super_user_permission')
+    exclude = ('hospital_network', )
     verbose_name_plural = "Admins"
 
-    def has_delete_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
-        else:
-            return False
-
-    def has_add_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
-        else:
-            return False
+    # def has_delete_permission(self, request, obj=None):
+    #     if request.user.is_superuser:
+    #         return True
+    #     else:
+    #         return False
+    #
+    # def has_add_permission(self, request, obj=None):
+    #     if request.user.is_superuser:
+    #         return True
+    #     else:
+    #         return False
 
     def get_readonly_fields(self, request, obj=None):
-        if not request.user.is_superuser:
-            return ['phone_number', 'is_disabled', 'write_permission', 'read_permission', 'hospital',  'permission_type',
-                    'user', 'is_doc_admin']
-        else:
-            return ['user']
+        # if not request.user.is_superuser:
+        #     return ['phone_number', 'is_disabled', 'write_permission', 'read_permission', 'hospital',  'permission_type',
+        #             'user', 'is_doc_admin']
+        # else:
+        return ['user']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj=obj, **kwargs)
-        if request.user.is_superuser:
-            if not request.POST:
-                if obj is not None:
-                    try:
-                        formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
-                            assoc_doctors=obj).distinct()
-                    except MultipleObjectsReturned:
-                        pass
+        if not request.POST:
+            if obj is not None:
+                try:
+                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
+                        assoc_doctors=obj).distinct()
+                except MultipleObjectsReturned:
+                    pass
         return formset
 
 
@@ -890,10 +904,10 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                'onboarded_at', 'qc_approved_at','enabled_for_online_booking_at']
 
         if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-            exclude += ['source','batch','lead_url','registered','created_by','about','raw_about',
-            'additional_details','is_insurance_enabled','is_insurance_enabled','is_online_consultation_enabled',
-            'online_consultation_fees', 'is_retail_enabled', 'is_internal', 'is_test_doctor','doctor_signature',
-            'is_enabled','matrix_reference_id','doctor_signature']
+            exclude += ['source', 'batch', 'lead_url', 'registered', 'created_by', 'about', 'raw_about',
+            'additional_details', 'is_insurance_enabled', 'is_insurance_enabled', 'is_online_consultation_enabled',
+            'online_consultation_fees', 'is_retail_enabled', 'is_internal', 'is_test_doctor', 'doctor_signature',
+            'is_enabled', 'matrix_reference_id', 'doctor_signature']
 
         return exclude
 
@@ -1006,35 +1020,35 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     #         formset.save()
     #     except Exception as e:
     #         logger.error(e)
-
-    def save_related(self, request, form, formsets, change):
-        super(type(self), self).save_related(request, form, formsets, change)
-        # now you have all objects in the database
-        doctor = form.instance
-        doc_hosp_form_change = False
-        gen_admin_form_change = False
-        doc_hosp_new_len = doc_hosp_del_len = gen_admin_new_len = gen_admin_del_len = 0
-        for formset in formsets:
-            if isinstance(formset, DoctorClinicFormSet):
-                for form in formset.forms:
-                    if 'hospital' in form.changed_data:
-                        doc_hosp_form_change = True
-                        break
-                doc_hosp_new_len = len(formset.new_objects)
-                doc_hosp_del_len = len(formset.deleted_objects)
-            if isinstance(formset, GenericAdminFormSet):
-                for form in formset.forms:
-                    if form.has_changed():
-                        gen_admin_form_change = True
-                        break
-                gen_admin_new_len = len(formset.new_objects)
-                gen_admin_del_len = len(formset.deleted_objects)
-
-        if doctor is not None:
-            if ((doc_hosp_form_change or doc_hosp_new_len > 0 or doc_hosp_del_len > 0) or
-                    (gen_admin_form_change or gen_admin_new_len > 0 or gen_admin_del_len > 0)):
-                GenericAdmin.create_admin_permissions(doctor)
-                GenericAdmin.create_admin_billing_permissions(doctor)
+    #
+    # def save_related(self, request, form, formsets, change):
+    #     super(type(self), self).save_related(request, form, formsets, change)
+    #     # now you have all objects in the database
+    #     doctor = form.instance
+    #     doc_hosp_form_change = False
+    #     gen_admin_form_change = False
+    #     doc_hosp_new_len = doc_hosp_del_len = gen_admin_new_len = gen_admin_del_len = 0
+    #     for formset in formsets:
+    #         if isinstance(formset, DoctorClinicFormSet):
+    #             for form in formset.forms:
+    #                 if 'hospital' in form.changed_data:
+    #                     doc_hosp_form_change = True
+    #                     break
+    #             doc_hosp_new_len = len(formset.new_objects)
+    #             doc_hosp_del_len = len(formset.deleted_objects)
+    #         if isinstance(formset, GenericAdminFormSet):
+    #             for form in formset.forms:
+    #                 if form.has_changed():
+    #                     gen_admin_form_change = True
+    #                     break
+    #             gen_admin_new_len = len(formset.new_objects)
+    #             gen_admin_del_len = len(formset.deleted_objects)
+    #
+    #     if doctor is not None:
+    #         if ((doc_hosp_form_change or doc_hosp_new_len > 0 or doc_hosp_del_len > 0) or
+    #                 (gen_admin_form_change or gen_admin_new_len > 0 or gen_admin_del_len > 0)):
+    #             GenericAdmin.create_admin_permissions(doctor)
+    #             GenericAdmin.create_admin_billing_permissions(doctor)
 
     def save_model(self, request, obj, form, change):
         if not request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
@@ -1669,3 +1683,10 @@ class VisitReasonAdmin(admin.ModelAdmin):
 
     class Meta:
         model = VisitReason
+
+
+class PracticeSpecializationContentAdmin(admin.ModelAdmin):
+    model = PracticeSpecializationContent
+    list_display = ('specialization',)
+    display = ('specialization', 'content', )
+

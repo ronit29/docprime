@@ -210,12 +210,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         super(Hospital, self).save(*args, **kwargs)
 
-        if self.is_appointment_manager:
-            auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
-                .update(is_disabled=True)
-        else:
-            auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
-                .update(is_disabled=False)
+        # if self.is_appointment_manager:
+        #     auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+        #         .update(is_disabled=True)
+        # else:
+        #     auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+        #         .update(is_disabled=False)
 
         if build_url and self.location and self.is_live:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
@@ -1588,6 +1588,14 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
 
     def __str__(self):
         return "{}".format(self.name)
+
+
+class PracticeSpecializationContent(auth_model.TimeStampedModel):
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+    content = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'practice_specialization_content'
 
 
 class DoctorPracticeSpecialization(auth_model.TimeStampedModel):
