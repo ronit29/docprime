@@ -71,7 +71,12 @@ class LabModelSerializer(serializers.ModelSerializer):
     rating = serializers.SerializerMethodField()
     unrated_appointment = serializers.SerializerMethodField()
     center_visit_enabled = serializers.SerializerMethodField()
+    display_rating_widget = serializers.SerializerMethodField()
 
+    def get_display_rating_widget(self, obj):
+        if obj.rating.count() > 10:
+            return True
+        return False
 
     def get_center_visit_enabled(self, obj):
         if obj and obj.network and settings.THYROCARE_NETWORK_ID:
@@ -176,7 +181,8 @@ class LabModelSerializer(serializers.ModelSerializer):
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'unrated_appointment', 'center_visit_enabled', )
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'unrated_appointment',
+                  'center_visit_enabled', 'display_rating_widget')
 
 
 class LabProfileSerializer(LabModelSerializer):
