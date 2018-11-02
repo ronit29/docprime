@@ -112,11 +112,23 @@ class GenericAdminInline(admin.TabularInline):
     formset = GenericAdminFormSet
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    fields = ['phone_number', 'permission_type', 'read_permission', 'write_permission', 'user']
+    fields = ['phone_number', 'doctor', 'permission_type', 'super_user_permission', 'read_permission', 'write_permission', 'user']
 
     def get_queryset(self, request):
-        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital').filter(doctor=None)
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital')
 
+    def get_formset(self, request, obj=None, **kwargs):
+        from django.core.exceptions import MultipleObjectsReturned
+        formset = super().get_formset(request, obj=obj, **kwargs)
+        if request.user.is_superuser:
+            if not request.POST:
+                if obj is not None:
+                    try:
+                        formset.form.base_fields['doctor'].queryset = Doctor.objects.filter(
+                            hospitals=obj).distinct()
+                    except MultipleObjectsReturned:
+                        pass
+        return formset
 
 class HospitalForm(FormCleanMixin):
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
@@ -185,12 +197,12 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         else:
             return ''
 
-    def save_related(self, request, form, formsets, change):
-        super(type(self), self).save_related(request, form, formsets, change)
-        hospital_changed_list = form.changed_data
-        hospital = form.instance
-        if 'is_billing_enabled' in hospital_changed_list or 'is_appointment_manager' in hospital_changed_list:
-            GenericAdmin.create_hospital_spoc_admin(hospital)
+    # def save_related(self, request, form, formsets, change):
+    #     super(type(self), self).save_related(request, form, formsets, change)
+    #     hospital_changed_list = form.changed_data
+    #     hospital = form.instance
+        # if 'is_billing_enabled' in hospital_changed_list or 'is_appointment_manager' in hospital_changed_list:
+        #     GenericAdmin.create_hospital_spoc_admin(hospital)
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:

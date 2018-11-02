@@ -19,7 +19,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
                                  SpecializationDepartmentMapping, DoctorClinicProcedure, Procedure)
 
-from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
+from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
                                      LabNetwork, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
@@ -123,7 +123,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(BillingAccount,
+        content_types = ContentType.objects.get_for_models(BillingAccount, GenericAdmin, GenericLabAdmin,
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
@@ -216,7 +216,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, DoctorClinicProcedure, SPOCDetails)
+            CompetitorMonthlyVisit, DoctorClinicProcedure, SPOCDetails, GenericAdmin, GenericLabAdmin)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
