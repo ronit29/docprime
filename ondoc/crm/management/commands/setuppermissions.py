@@ -123,7 +123,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(BillingAccount, GenericAdmin, GenericLabAdmin,
+        content_types = ContentType.objects.get_for_models(BillingAccount,
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
@@ -149,7 +149,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(
-            DoctorClinic, DoctorClinicTiming,
+            DoctorClinic, DoctorClinicTiming, GenericAdmin, GenericLabAdmin,
             DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
             DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
             DoctorMobile, DoctorEmail, HospitalSpeciality,
