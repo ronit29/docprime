@@ -526,7 +526,8 @@ class DoctorForm(FormCleanMixin):
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Doctor.ONBOARDING_STATUS)
 
     def validate_qc(self):
-        qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
+        qc_required = {'name': 'req', 'gender': 'req',
+                       # 'practicing_since': 'req',
                        'emails': 'count',
                        'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count'}
