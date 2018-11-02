@@ -355,6 +355,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     batch = models.CharField(max_length=20, blank=True)
     enabled_for_online_booking = models.BooleanField(default=False)
     enabled_for_online_booking_at = models.DateTimeField(null=True, blank=True)
+    is_gold = models.BooleanField(verbose_name='Is Gold', default=False)
 
     def __str__(self):
         return self.name
