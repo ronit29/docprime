@@ -14,6 +14,8 @@ class LabAutocomplete(autocomplete.Select2QuerySetView):
         lab_network = self.forwarded.get('lab_network', None)
         if lab_network:
             queryset = queryset.filter(network=lab_network)
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
         return queryset
 
 
@@ -24,6 +26,8 @@ class TestAutocomplete(autocomplete.Select2QuerySetView):
             return LabTest.objects.none()
         lab = self.forwarded.get('lab', None)
         queryset = LabTest.objects.filter(availablelabs__lab_pricing_group__labs__id=lab)
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
         return queryset
 
 
@@ -44,5 +48,6 @@ class CouponAdmin(admin.ModelAdmin):
         'code', 'is_user_specific', 'type', 'count')
 
     autocomplete_fields = ['lab_network']
+
     search_fields = ['code']
     form = CouponForm
