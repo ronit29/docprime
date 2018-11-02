@@ -800,6 +800,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             validated_data['url'] = kwargs['url']
 
         specialization_id = kwargs.get('specialization_id', None)
+        specialization_dynamic_content = ''
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
@@ -981,7 +982,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 }
             }
 
-            specialization_dynamic_content = ''
             if specialization_id:
                 specialization_content = models.PracticeSpecializationContent.objects.filter(specialization__id=specialization_id).first()
                 if specialization_content:
