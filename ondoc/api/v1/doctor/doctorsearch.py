@@ -199,6 +199,7 @@ class DoctorSearchHelper:
                 "deal_price": filtered_deal_price,
                 "mrp": filtered_mrp,
                 "is_live": doctor.is_live,
+                "is_gold": doctor.is_gold,
                 # "fees": filtered_fees,*********show mrp here
                 "discounted_fees": filtered_deal_price,
                 # "discounted_fees": filtered_fees, **********deal_price
