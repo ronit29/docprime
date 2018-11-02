@@ -5,12 +5,10 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
-                                 SpecializationDepartment, SpecializationField, PracticeSpecialization, VisitReason)
+                                 SpecializationDepartment, SpecializationField, PracticeSpecialization, VisitReason, CancellationReason)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage)
-from ondoc.procedure.models import Procedure, ProcedureCategory
-from ondoc.crm.admin.procedure import ProcedureAdmin, ProcedureCategoryAdmin
 from ondoc.coupon.models import Coupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount
@@ -47,8 +45,9 @@ from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
 from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
 from ondoc.doctor.models import GoogleDetailing
 from .doctor import GoogleDetailingAdmin
-from .seo import SitemapManagerAdmin
+from .seo import SitemapManagerAdmin, SeoSpecializationAdmin
 from ondoc.seo.models import SitemapManger
+from ondoc.seo.models import SeoSpecialization
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -122,3 +121,5 @@ admin.site.register(SitemapManger, SitemapManagerAdmin)
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
 admin.site.register(Coupon)
 admin.site.register(VisitReason, VisitReasonAdmin)
+admin.site.register(CancellationReason)
+admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
