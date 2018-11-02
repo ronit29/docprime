@@ -864,7 +864,7 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
                     'urls': doctor_page_url.lower(),
                     'location_id': query_set_for_personal_url.first().location.id,
                     'specialization_name': specialization_name[0] if len(specialization_name) > 0 else '',
-                    'specialization_id': specialization_name[0].id if len(specialization_name) > 0 else None,
+                    'specialization_id': specializations[0].id if len(specializations) > 0 else None,
                     'seo_parameters': doctor_page_seo_parameters.get('parameters')
                 }
 
