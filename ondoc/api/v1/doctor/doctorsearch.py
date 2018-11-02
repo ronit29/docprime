@@ -74,7 +74,7 @@ class DoctorSearchHelper:
         return " and ".join(filtering_params)
 
     def get_ordering_params(self):
-        order_by_field = 'distance'
+        order_by_field = 'is_gold desc, distance'
         rank_by = "rank_distance=1"
         if self.query_params.get('sort_on'):
             if self.query_params.get('sort_on') == 'experience':
