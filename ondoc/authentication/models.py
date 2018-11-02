@@ -697,8 +697,8 @@ class GenericAdmin(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.clean()
-        if self.permission_type == self.BILLINNG and self.doctor is not None:
-            self.hospital = None
+        # if self.permission_type == self.BILLINNG and self.doctor is not None:
+        #     self.hospital = None
         super(GenericAdmin, self).save(*args, **kwargs)
         GenericAdmin.update_user_admin(self.phone_number)
 
