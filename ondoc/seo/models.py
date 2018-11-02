@@ -1,8 +1,6 @@
 from django.db import models
 from ondoc.authentication.models import TimeStampedModel
 from django.core.validators import FileExtensionValidator
-
-from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import PracticeSpecialization
 
 # Create your models here.
@@ -40,6 +38,3 @@ class SeoSpecialization(TimeStampedModel):
 
     class Meta:
         db_table = "seo_specialization"
-
-
-

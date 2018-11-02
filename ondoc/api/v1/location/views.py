@@ -299,29 +299,14 @@ class DoctorCityFooter(Footer):
 
 class DoctorLocalityCityFooter(Footer):
     def __init__(self, entity):
-        self.sublocality_id = None
-        self.locality_id = None
-        self.sublocality = None
-        self.locality = None
-        self.specialization_id = entity.specialization_id
+        self.sublocality_id = int(entity.sublocality_id)
+        self.locality_id = int(entity.locality_id)
+        self.sublocality = entity.sublocality
+        self.locality = entity.locality
+        self.specialization_id = int(entity.specialization_id)
         self.specialization = entity.specialization
-        location_id = int(entity.extras.get('location_id'))
-        address = EntityAddress.objects.filter(pk=location_id).first()
+        self.centroid = entity.sublocality_location
 
-        if address:
-            self.centroid = address.centroid
-
-            if address.type_blueprint=='SUBLOCALITY':
-                self.sublocality_id = address.id
-                self.sublocality = address.alternative_value
-                address = EntityAddress.objects.filter(pk=address.parent).first()
-                if address:
-                    self.locality_id = address.id
-                    self.locality = address.alternative_value
-
-            else:
-                self.locality_id = address.id
-                self.locality = address.alternative_value
 
     def get_footer(self):
         response = {}
