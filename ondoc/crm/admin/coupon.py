@@ -1,0 +1,48 @@
+from dal import autocomplete
+from django.contrib import admin
+from django import forms
+from ondoc.diagnostic.models import Lab, LabTest
+from ondoc.coupon.models import Coupon
+
+
+class LabAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return Lab.objects.none()
+        queryset = Lab.objects.all()
+        lab_network = self.forwarded.get('lab_network', None)
+        if lab_network:
+            queryset = queryset.filter(network=lab_network)
+        return queryset
+
+
+class TestAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return LabTest.objects.none()
+        lab = self.forwarded.get('lab', None)
+        queryset = LabTest.objects.filter(availablelabs__lab_pricing_group__labs__id=lab)
+        return queryset
+
+
+class CouponForm(forms.ModelForm):
+
+    class Meta:
+        model = Coupon
+        fields = ('__all__')
+        widgets = {
+            'lab': autocomplete.ModelSelect2(url='lab-autocomplete', forward=['lab_network']),
+            'test': autocomplete.ModelSelect2Multiple(url='test-autocomplete', forward=['lab'])
+        }
+
+
+class CouponAdmin(admin.ModelAdmin):
+
+    list_display = (
+        'code', 'is_user_specific', 'type', 'count')
+
+    autocomplete_fields = ['lab_network']
+    search_fields = ['code']
+    form = CouponForm
