@@ -149,6 +149,7 @@ class DoctorSearchHelper:
         response = []
         for doctor in doctor_data:
 
+            is_gold = doctor.enabled_for_online_booking and doctor.is_gold
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
@@ -199,7 +200,7 @@ class DoctorSearchHelper:
                 "deal_price": filtered_deal_price,
                 "mrp": filtered_mrp,
                 "is_live": doctor.is_live,
-                "is_gold": doctor.is_gold,
+                "is_gold": is_gold,
                 # "fees": filtered_fees,*********show mrp here
                 "discounted_fees": filtered_deal_price,
                 # "discounted_fees": filtered_fees, **********deal_price
