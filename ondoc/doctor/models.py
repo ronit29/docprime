@@ -1592,7 +1592,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
 
 class PracticeSpecializationContent(auth_model.TimeStampedModel):
     specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
-    content = models.TextField(null=True, blank=True)
+    content = models.TextField(blank=True)
 
     class Meta:
         db_table = 'practice_specialization_content'
