@@ -3,6 +3,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.doctor.models import Hospital
 from ondoc.notification.models import EmailNotification
+from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
@@ -1104,37 +1105,37 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
                 val = ' '.join(map(str, value))
             else:
                 val = value
-            message += str(key) + "  -  " + str(val) + "\n"
+            message += str(key) + "  -  " + str(val) + "<br>"
         if user.doctor:
             managers_list = []
             for managers in user.doctor.manageable_doctors.all():
                 info = {}
-                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "\n"
-                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "\n"
-                info['user_id'] = (str(managers.user_id) ) if managers.user else "\n"
-                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "\n"
-                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "\n"
+                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "<br>"
+                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "<br>"
+                info['user_id'] = (str(managers.user_id) ) if managers.user else "<br>"
+                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "<br>"
+                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "<br>"
                 managers_list.append(info)
-            managers_string = "\n".join(str(x) for x in managers_list)
+            managers_string = "<br>".join(str(x) for x in managers_list)
         if managers_string:
-            message = message + "\n\nUser's Managers \n"+ managers_string
+            message = message + "<br><br> User's Managers <br>"+ managers_string
 
         manages_list = []
         for manages in user.manages.all():
             info = {}
-            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "\n"
-            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "\n"
-            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "\n"
-            info['user_id'] = (str(user.id)) if user else "\n"
-            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "\n"
+            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "<br>"
+            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "<br>"
+            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "<br>"
+            info['user_id'] = (str(user.id)) if user else "<br>"
+            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "<br>"
             manages_list.append(info)
-        manages_string = "\n".join(str(x) for x in manages_list)
+        manages_string = "<br>".join(str(x) for x in manages_list)
         if manages_string:
-            message = message + "\n\n User Manages \n"+ manages_string
+            message = message + "<br><br> User Manages <br>"+ manages_string
         try:
-            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com"]
+            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com", "harpreet@docprime.com"]
             for x in emails:
-                notif_models.EmailNotification.publish_ops_email(str(x), message, 'Feedback Mail')
+                notif_models.EmailNotification.publish_ops_email(str(x), mark_safe(message), 'Feedback Mail')
             resp['status'] = "success"
         except:
             resp['status'] = "error"
