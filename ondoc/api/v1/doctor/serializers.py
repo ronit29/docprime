@@ -596,6 +596,7 @@ class DoctorListSerializer(serializers.Serializer):
     specialization_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     condition_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
+    procedure_category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
     sits_at = CommaSepratedToListField(required=False, max_length=100, typecast_to=str)
