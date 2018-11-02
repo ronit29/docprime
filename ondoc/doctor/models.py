@@ -857,7 +857,7 @@ class DoctorMobile(auth_model.TimeStampedModel):
     number = models.BigIntegerField(blank=True, null=True)
     is_primary = models.BooleanField(verbose_name='Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name='Phone Number Verified?', default=False)
-    source = models.CharField(max_length=2000, blank=True, null=True)
+    source = models.CharField(max_length=2000, blank=True)
 
     class Meta:
         db_table = "doctor_mobile"

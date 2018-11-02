@@ -12,7 +12,9 @@ from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeS
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
 from django.contrib.gis.geos import Point, GEOSGeometry
+from django.contrib.contenttypes.models import ContentType
 
+from ondoc.authentication.models import SPOCDetails
 
 class Command(BaseCommand):
     help = 'Upload doctors via Excel'
@@ -67,6 +69,60 @@ class Doc():
         if value and isinstance(value, str):
             return value.strip()
         return value
+
+
+    def get_number(self, number, is_primary, city, source):
+        code=[11,44,22,129,40,120,33,215,124]
+        data = {}
+        std_code = None
+        phone = None
+        number = str(number).lstrip('0').strip()
+        number = re.sub('[^0-9]+', ' ', number).strip()
+        comps = number.split(' ')
+        #print(number)
+        if not number:
+            return None
+
+        if source.lower()=='google':
+            return self.get_google_number(comps, source, is_primary)
+
+        if len(comps)==3 and comps[0] and comps[1] and comps[2]:
+            return {'std_code': comps[0], 'number': comps[1] + comps[2], 'is_primary': False, 'source': source}
+        elif len(comps)==2 and comps[0] and comps[1]:
+            if len(comps[0])>4:
+                return {'number': comps[0] + comps[1], 'is_primary': is_primary, 'source': source}
+            else:
+                return {'std_code': comps[0], 'number': comps[1], 'is_primary': False, 'source': source}
+        elif len(comps)>3:
+            print('invalid number' + str(number))
+
+        for cd in code:
+            if number.startswith(str(cd)):
+                data['std_code'] = cd
+                data['number'] = number.replace(str(cd), '', 1)
+                data['is_primary'] = False
+                data['source'] = source
+                return data
+        #print(number)
+        try:
+            number = int(number)
+            if number < 5000000000 or number > 9999999999:
+                print('invalid number' + str(number))
+                return None
+        except Exception as e:
+            print(e)
+            print('invalid number while parsing '+str(number))
+            return None
+
+        return {'number': number, 'is_primary': is_primary, 'source': source}
+
+    def get_google_number(self, comps, source, is_primary):
+        if len(comps)==3 and comps[0] and comps[1] and comps[2]:
+            return {'std_code': comps[0], 'number': comps[1] + comps[2], 'is_primary': False, 'source': source}
+        elif len(comps)==2 and comps[0] and comps[1]:
+            return {'number': comps[0] + comps[1], 'is_primary': is_primary, 'source': source}
+        elif len(comps)>3:
+            print('invalid number' + str(number))
 
 
 class UploadDoctor(Doc):
@@ -129,11 +185,11 @@ class UploadDoctor(Doc):
         if num:
             number_entry.append(num)
 
-        num = self.get_number(alternate_number_1, False, city, '')
+        num = self.get_number(alternate_number_1, False, city, source)
         if num:
             number_entry.append(num)
 
-        num = self.get_number(alternate_number_2, False, city, '')
+        num = self.get_number(alternate_number_2, False, city, source)
         if num:
             number_entry.append(num)
 
@@ -153,44 +209,6 @@ class UploadDoctor(Doc):
         data['license'] = license
         return data
 
-
-    def get_number(self, number, is_primary, city, source):
-        code=[11,44,22,129,40,120,33,215,124]
-        data = {}
-        std_code = None
-        phone = None
-        number = str(number).lstrip('0').strip()
-        number = re.sub('[^0-9]+', ' ', number).strip()
-        comps = number.split(' ')
-        #print(number)
-        if not number:
-            return None
-
-        if len(comps)==3 and comps[0] and comps[1] and comps[2]:
-            return {'std_code': comps[0], 'number': comps[1] + comps[2], 'is_primary': False, 'source': source}
-        elif len(comps)==2 and comps[0] and comps[1]:
-            return {'std_code': comps[0], 'number': comps[1], 'is_primary': False, 'source': source}
-        elif len(comps)>3:
-            print('invalid number' + str(number))
-
-        for cd in code:
-            if number.startswith(str(cd)):
-                data['std_code'] = cd
-                data['number'] = number.replace(str(cd), '', 1)
-                data['is_primary'] = False
-                return data
-        #print(number)
-        try:
-            number = int(number)
-            if number < 5000000000 or number > 9999999999:
-                print('invalid number' + str(number))
-                return None
-        except Exception as e:
-            print(e)
-            print('invalid number while parsing '+str(number))
-            return None
-
-        return {'number': number, 'is_primary': is_primary, 'source': source}
 
     def create_doctor(self, data, source, batch):
 
@@ -270,7 +288,8 @@ class UploadDoctor(Doc):
     def add_doctor_phone_numbers(self, doctor, numbers):
         for num in numbers:
             #print(num)
-            DoctorMobile.objects.get_or_create(doctor=doctor, std_code=num.get('std_code'),number=num.get('number'), is_primary=num.get('is_primary'))
+            #DoctorMobile.objects.get_or_create(doctor=doctor, std_code=num.get('std_code'),number=num.get('number'), is_primary=num.get('is_primary'))
+            DoctorMobile.objects.get_or_create(doctor=doctor, std_code=num.get('std_code'),number=num.get('number'), defaults={'is_primary' : num.get('is_primary'), 'source' : num.get('source')})
 
     def clean_data(self, value):
         if value and isinstance(value, str):
@@ -398,12 +417,15 @@ class UploadSpecialization(Doc):
             doctor = self.get_doctor(identifier)
             practice_specialization = None
             if sp_id:
-                practice_specialization = PracticeSpecialization.objects.filter(pk=sp_id).first()
-                if practice_specialization and doctor:
-                    try:
-                        DoctorPracticeSpecialization.objects.get_or_create(doctor=doctor, specialization=practice_specialization)
-                    except Exception as e:
-                        print('error' + str(e))
+                try:
+                    practice_specialization = PracticeSpecialization.objects.filter(pk=sp_id).first()
+                    if practice_specialization and doctor:
+                        try:
+                            DoctorPracticeSpecialization.objects.get_or_create(doctor=doctor, specialization=practice_specialization)
+                        except Exception as e:
+                            print('error' + str(e))
+                except:
+                    print('error' + str(e))
 
 
 class UploadMembership(Doc):
@@ -450,6 +472,7 @@ class UploadHospital(Doc):
         doctor_obj_dict = dict()
         hospital_obj_dict = dict()
         doc_clinic_obj_dict = dict()
+        hospital_obj = None
         for i in range(2, min(len(rows), lines) + 1):
             identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
             doctor_obj = self.get_doctor(identifier)
@@ -484,6 +507,39 @@ class UploadHospital(Doc):
             if clinic_time_data:
                 DoctorClinicTiming.objects.bulk_create(clinic_time_data)
 
+            primary_number = self.clean_data(sheet.cell(row=i, column=headers.get('clinic_contact_1')).value)
+            alternate_number_1 = self.clean_data(sheet.cell(row=i, column=headers.get('clinic_contact_2')).value)
+            alternate_number_2 = self.clean_data(sheet.cell(row=i, column=headers.get('clinic_contact_3')).value)
+            source = self.clean_data(sheet.cell(row=i, column=headers.get('phone_no_source')).value)
+
+
+            number_entry = []
+
+            num = self.get_number(primary_number, True, '', source)
+            if num:
+                number_entry.append(num)
+
+            num = self.get_number(alternate_number_1, False, '', source)
+            if num:
+                number_entry.append(num)
+
+            num = self.get_number(alternate_number_2, False, '', source)
+            if num:
+                number_entry.append(num)
+
+            try:
+                self.add_clinic_phone_numbers(hospital_obj, number_entry)
+            except Exception as e:
+                print(e)
+
+
+    def add_clinic_phone_numbers(self, hospital, numbers):
+        ct = ContentType.objects.get_for_model(hospital)
+
+        for num in numbers:
+            #print(num)
+            SPOCDetails.objects.get_or_create(content_type=ct, object_id=hospital.id, std_code=num.get('std_code'),number=num.get('number'), defaults={'contact_type':1, 'source':num.get('source')})
+
 
     def get_hospital(self, row, sheet, headers, hospital_obj_dict, source, batch):
         hospital_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_url')).value)
@@ -514,7 +570,7 @@ class UploadHospital(Doc):
         # if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
         #     doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
         # else:
-        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj, followup_charges=0, followup_duration=7)
+        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj, defaults={'followup_charges':0, 'followup_duration':7})
         # doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
 
         return doc_clinic_obj
