@@ -465,13 +465,12 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
-        entity = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Doctor')
+        entity = location_models.EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
         if entity.exists():
             entity = entity.first()
             if not entity.is_valid:
-                valid_entity_url_qs = location_models.EntityUrls.objects.filter(url_type='PAGEURL',
-                                                                           entity_id=entity.entity_id,
-                                                                           entity_type__iexact='Doctor', is_valid='t')
+                valid_entity_url_qs = location_models.EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
+                                                                           entity_id=entity.entity_id, is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs.first().url
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
@@ -978,8 +977,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         for resp in response:
             if id_url_dict.get(resp['id']):
                 resp['url'] = id_url_dict[resp['id']]
+                resp['schema']['url'] = id_url_dict[resp['id']]
             else:
                 resp['url'] = None
+                resp['schema']['url'] = None
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));

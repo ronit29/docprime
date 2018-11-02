@@ -12,3 +12,9 @@ class SitemapManagerAdmin(admin.ModelAdmin):
         qs = super(SitemapManagerAdmin, self).get_queryset(request)
 
         return qs.filter(valid=True)
+
+
+class SeoSpecializationAdmin(admin.ModelAdmin):
+    model = SitemapManger
+    list_display = ['specialization']
+    fields = ['specialization']

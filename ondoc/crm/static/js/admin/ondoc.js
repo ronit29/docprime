@@ -1,14 +1,31 @@
-var $ = django.jQuery;
+ var $ = django.jQuery;
 
 $( document ).ready(function(){
 	$("div.field-cancel_type").hide();
+	$("div.field-cancellation_reason").hide();
+	$("div.field-cancellation_comments").hide();
+	var status = $("div.field-status select option:selected").val();
+    if(status==6){
+            $("div.field-cancel_type").show();
+            $("div.field-cancellation_reason").show();
+            $("div.field-cancellation_comments").show();
+    }
+    else{
+            $("div.field-cancel_type").hide();
+            $("div.field-cancellation_reason").hide();
+            $("div.field-cancellation_comments").hide();
+    }
 	$('div.field-status select').change(function(){
 		var status = $("div.field-status select option:selected").val();
 		if(status==6){
 				$("div.field-cancel_type").show();
+				$("div.field-cancellation_reason").show();
+	            $("div.field-cancellation_comments").show();
 		}
 		else{
 				$("div.field-cancel_type").hide();
+				$("div.field-cancellation_reason").hide();
+	            $("div.field-cancellation_comments").hide();
 		}
 	});
 

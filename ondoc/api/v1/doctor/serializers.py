@@ -155,7 +155,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     start_time = serializers.FloatField()
     end_date = serializers.CharField(required=False)
     end_time = serializers.FloatField(required=False)
-    time_slot_start = serializers.DateTimeField(required=False)    
+    time_slot_start = serializers.DateTimeField(required=False)
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
@@ -669,12 +669,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if self.parent:
             return None
 
-        doctor_specializations = DoctorPracticeSpecialization.objects.filter(doctor=obj).all()
-        specializations = [doctor_specialization.specialization for doctor_specialization in doctor_specializations]
-        clinic = DoctorClinic.objects.filter(doctor=obj).all()
-        clinics = [clinic_hospital for clinic_hospital in clinic]
-        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
-                                                entity_type__iexact='Doctor')
+        specializations = [doctor_specialization.specialization for doctor_specialization in obj.doctorpracticespecializations.all()]
+        clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
+        entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
+                                           is_valid=True)
         sublocality = ''
         locality = ''
         if entity.exists():
@@ -725,16 +723,15 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         description += '. Book appointments online, check fees, address and more.'
 
-        doctor_realted_hospitals = self.instance.hospitals.all().filter(is_live=True)
+        doctor_realted_hospitals = obj.doctor_clinics.all()
 
-        if doctor_realted_hospitals.filter(is_live=True, hospital_type=1).exists():
-            doctor_hospital = doctor_realted_hospitals.filter(is_live=True, hospital_type=1).first()
-        elif doctor_realted_hospitals.filter(is_live=True, hospital_type=2).exists():
-            doctor_hospital = doctor_realted_hospitals.filter(is_live=True, hospital_type=2).first()
-        elif doctor_realted_hospitals.filter(is_live=True, hospital_type=3).exists():
-            doctor_hospital = doctor_realted_hospitals.filter(is_live=True, hospital_type=3).first()
-        else:
-            doctor_hospital = doctor_realted_hospitals.filter(is_live=True).first()
+        #if hospital type is null then use a default large value 
+        doctor_realted_hospitals =sorted(doctor_realted_hospitals, key=lambda x: x.hospital.hospital_type or 100)
+        doctor_associated_hospital = None
+
+        if len(doctor_realted_hospitals):
+            doctor_hospital = doctor_realted_hospitals[0]
+            doctor_associated_hospital = doctor_hospital.hospital
 
         price = None
         opening_hours = ''
@@ -745,19 +742,19 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         latitude = None
         longitude = None
 
-        if doctor_hospital:
-            doc_hospital = self.instance.doctor_clinics.filter(hospital=doctor_hospital)
-            address_locality = doctor_hospital.locality
-            address_city = doctor_hospital.city
-            address_pincode = doctor_hospital.pin_code
-            street_address = doctor_hospital.get_hos_address()
-            latitude = doctor_hospital.location.y
-            longitude = doctor_hospital.location.x
-            if doc_hospital.exists():
-                if doc_hospital.first().availability.exists():
-                    opening_hours = '%.2f-%.2f' % (doc_hospital.first().availability.first().start,
-                                                   doc_hospital.first().availability.first().end)
-                    price = doc_hospital.first().availability.first().mrp
+        if doctor_associated_hospital:
+            address_locality = doctor_associated_hospital.locality
+            address_city = doctor_associated_hospital.city
+            address_pincode = doctor_associated_hospital.pin_code
+            street_address = doctor_associated_hospital.get_hos_address()
+            latitude = doctor_associated_hospital.location.y if getattr(doctor_associated_hospital, 'location', None) else None
+            longitude = doctor_associated_hospital.location.x if getattr(doctor_associated_hospital, 'location', None) else None
+            if doctor_hospital:
+                availability_qs = doctor_hospital.availability
+                if availability_qs.exists():
+                    opening_hours = '%.2f-%.2f' % (availability_qs.first().start,
+                                                   availability_qs.first().end)
+                    price = availability_qs.first().mrp
 
         schema = {
             'name': self.instance.get_display_name(),

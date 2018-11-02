@@ -556,8 +556,8 @@ class ConsumerRefund(TimeStampedModel):
                 "auth": token
             }
             response = requests.get(url=url, params={"refId": ref_id}, headers=headers)
-            print(response.url)
-            print(response.status_code)
+            #print(response.url)
+            #print(response.status_code)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 temp_data = resp_data.get("data")
@@ -578,7 +578,8 @@ class ConsumerRefund(TimeStampedModel):
                             obj.save()
                             print("status updated for - " + str(obj.id))
                 else:
-                    logger.error("Invalid ok status or code mismatch - " + str(response.content))
+                    pass
+                    #logger.error("Invalid ok status or code mismatch - " + str(response.content))
 
     @classmethod
     def update_refund_status(cls):
