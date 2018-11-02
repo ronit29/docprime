@@ -623,14 +623,13 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj=obj, **kwargs)
-        if request.user.is_superuser:
-            if not request.POST:
-                if obj is not None:
-                    try:
-                        formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
-                            assoc_doctors=obj).distinct()
-                    except MultipleObjectsReturned:
-                        pass
+        if not request.POST:
+            if obj is not None:
+                try:
+                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
+                        assoc_doctors=obj).distinct()
+                except MultipleObjectsReturned:
+                    pass
         return formset
 
 

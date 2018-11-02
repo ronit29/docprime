@@ -120,14 +120,13 @@ class GenericAdminInline(admin.TabularInline):
     def get_formset(self, request, obj=None, **kwargs):
         from django.core.exceptions import MultipleObjectsReturned
         formset = super().get_formset(request, obj=obj, **kwargs)
-        if request.user.is_superuser:
-            if not request.POST:
-                if obj is not None:
-                    try:
-                        formset.form.base_fields['doctor'].queryset = Doctor.objects.filter(
-                            hospitals=obj).distinct()
-                    except MultipleObjectsReturned:
-                        pass
+        if not request.POST:
+            if obj is not None:
+                try:
+                    formset.form.base_fields['doctor'].queryset = Doctor.objects.filter(
+                        hospitals=obj).distinct()
+                except MultipleObjectsReturned:
+                    pass
         return formset
 
 class HospitalForm(FormCleanMixin):
