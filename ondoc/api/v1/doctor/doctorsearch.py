@@ -1,4 +1,6 @@
 from django.contrib.gis.geos import Point
+from django.db.models import F
+
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
@@ -183,8 +185,19 @@ class DoctorSearchHelper:
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
             doctor_clinic_procedure = DoctorClinicProcedure.objects.filter(doctor_clinic=doctor_clinic).values(
-                'id', 'mrp', 'agreed_price', 'deal_price', 'doctor_clinic_id', 'procedure_id', 'procedure__name',
-                'procedure__details', 'procedure__duration')
+                'id', 'mrp', 'agreed_price', 'deal_price', 'doctor_clinic_id', 'procedure_id',
+                detail=F('procedure__details'), duration=F('procedure__duration'), name=F('procedure__name'))
+            # if doctor_clinic_procedure:
+            #     procedure_dict = dict()
+            #     procedure_list = []
+            #     for procedure in doctor_clinic_procedure:
+            #         procedure_dict = {"clinic_procedure_id": procedure['id'], "mrp": procedure['mrp'], "agreed_price":
+            #                             procedure['agreed_price'], "deal_price": procedure['deal_price'],
+            #                             "doctor_clinic_id": procedure['doctor_clinic_id'], "procedure_id":
+            #                             procedure['procedure_id'], "procedure_name": procedure['procedure__name'],
+            #                             "procedure_details": procedure['procedure__details'], "duration":
+            #                             procedure['procedure__duration']}
+            #         procedure_list.append(procedure_dict)
             # serializer = serializers.DoctorHospitalSerializer(doctor_clinics, many=True, context={"request": request})
             filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
