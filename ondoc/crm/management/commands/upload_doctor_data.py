@@ -21,6 +21,8 @@ class Command(BaseCommand):
         parser.add_argument('source', type=str, help='data source')
         parser.add_argument('batch', type=int, help='data batch')
         parser.add_argument('url', type=str, help='data url')
+        parser.add_argument('lines', type=int, help='number of excel lines')
+
 
     def handle(self, *args, **options):
 
@@ -28,6 +30,7 @@ class Command(BaseCommand):
         source = options['source']
         batch = options['batch']
         url = options['url']
+        lines = options['lines']
 
         r = requests.get(url)
         content = BytesIO(r.content)
@@ -41,13 +44,13 @@ class Command(BaseCommand):
         hospital = UploadHospital()
         specialization = UploadSpecialization()
 
-        doctor.upload(sheets[0], source, batch)
-        qualification.upload(sheets[1])
-        experience.upload(sheets[2])
-        membership.upload(sheets[3])
-        award.upload(sheets[4])
-        hospital.upload(sheets[5], source, batch)
-        specialization.upload(sheets[6])
+        doctor.upload(sheets[0], source, batch, lines)
+        qualification.upload(sheets[1], lines)
+        experience.upload(sheets[2], lines)
+        membership.upload(sheets[3], lines)
+        award.upload(sheets[4], lines)
+        hospital.upload(sheets[5], source, batch, lines)
+        specialization.upload(sheets[6], lines)
 
 
 
@@ -78,11 +81,11 @@ class UploadDoctor(Doc):
             if url:
                 self.save_image(batch, url, identifier)
 
-    def upload(self, sheet, source, batch):
+    def upload(self, sheet, source, batch, lines):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
 
-        for i in range(2, len(rows) + 1):
+        for i in range(2, min(len(rows), lines) + 1):
             data = self.get_data(row=i, sheet=sheet, headers=headers)
             doctor = self.create_doctor(data, source, batch)
             #self.map_doctor_specialization(doctor, data.get('practice_specialization'))
@@ -119,16 +122,18 @@ class UploadDoctor(Doc):
         primary_number = self.clean_data(sheet.cell(row=row, column=headers.get('primary_number')).value)
         alternate_number_1 = self.clean_data(sheet.cell(row=row, column=headers.get('alternate_number_1')).value)
         alternate_number_2 = self.clean_data(sheet.cell(row=row, column=headers.get('alternate_number_2')).value)
+        source = self.clean_data(sheet.cell(row=row, column=headers.get('phone_no_source')).value)
 
-        num = self.get_number(primary_number, True, city)
+
+        num = self.get_number(primary_number, True, city, source)
         if num:
             number_entry.append(num)
 
-        num = self.get_number(alternate_number_1, False, city)
+        num = self.get_number(alternate_number_1, False, city, '')
         if num:
             number_entry.append(num)
 
-        num = self.get_number(alternate_number_2, False, city)
+        num = self.get_number(alternate_number_2, False, city, '')
         if num:
             number_entry.append(num)
 
@@ -149,7 +154,7 @@ class UploadDoctor(Doc):
         return data
 
 
-    def get_number(self, number, is_primary, city):
+    def get_number(self, number, is_primary, city, source):
         code=[11,44,22,129,40,120,33,215,124]
         data = {}
         std_code = None
@@ -162,9 +167,9 @@ class UploadDoctor(Doc):
             return None
 
         if len(comps)==3 and comps[0] and comps[1] and comps[2]:
-            return {'std_code':comps[0],'number':comps[1]+comps[2],'is_primary':False}
+            return {'std_code': comps[0], 'number': comps[1] + comps[2], 'is_primary': False, 'source': source}
         elif len(comps)==2 and comps[0] and comps[1]:
-            return {'std_code':comps[0],'number':comps[1],'is_primary':False}
+            return {'std_code': comps[0], 'number': comps[1], 'is_primary': False, 'source': source}
         elif len(comps)>3:
             print('invalid number' + str(number))
 
@@ -185,7 +190,7 @@ class UploadDoctor(Doc):
             print('invalid number while parsing '+str(number))
             return None
 
-        return {'number': number, 'is_primary': is_primary}
+        return {'number': number, 'is_primary': is_primary, 'source': source}
 
     def create_doctor(self, data, source, batch):
 
@@ -275,10 +280,10 @@ class UploadDoctor(Doc):
 
 class UploadQualification(Doc):
 
-    def upload(self, sheet):
+    def upload(self, sheet, lines):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
-        for i in range(2, len(rows) + 1):
+        for i in range(2, min(len(rows), lines) + 1):
             data = self.get_data(i, sheet, headers)
             #doctor = self.get_doctor(i, sheet, headers)
             # qualification = self.get_qualification(i, sheet, headers)
@@ -365,10 +370,10 @@ class UploadQualification(Doc):
 
 class UploadExperience(Doc):
 
-    def upload(self, sheet):
+    def upload(self, sheet, lines):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
-        for i in range(2, len(rows) + 1):
+        for i in range(2, min(len(rows), lines) + 1):
             identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
             doctor = self.get_doctor(identifier)
             hospital = self.clean_data(sheet.cell(row=i, column=headers.get('hospital')).value)
@@ -384,10 +389,10 @@ class UploadExperience(Doc):
 
 class UploadSpecialization(Doc):
 
-    def upload(self, sheet):
+    def upload(self, sheet, lines):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
-        for i in range(2, len(rows) + 1):
+        for i in range(2, min(len(rows), lines) + 1):
             identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
             sp_id = self.clean_data(sheet.cell(row=i, column=headers.get('specialization_id')).value)
             doctor = self.get_doctor(identifier)
@@ -403,10 +408,10 @@ class UploadSpecialization(Doc):
 
 class UploadMembership(Doc):
 
-    def upload(self, sheet):
+    def upload(self, sheet, lines):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
-        for i in range(2, len(rows) + 1):
+        for i in range(2, min(len(rows), lines) + 1):
             identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
             doctor = self.get_doctor(identifier)
             member = self.clean_data(sheet.cell(row=i, column=headers.get('memberships')).value)
@@ -420,10 +425,10 @@ class UploadMembership(Doc):
 
 class UploadAward(Doc):
 
-    def upload(self, sheet):
+    def upload(self, sheet, lines):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
-        for i in range(2, len(rows) + 1):
+        for i in range(2, min(len(rows), lines) + 1):
             identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
             doctor = self.get_doctor(identifier)
             award = self.clean_data(sheet.cell(row=i, column=headers.get('award')).value)
@@ -437,7 +442,7 @@ class UploadAward(Doc):
 
 class UploadHospital(Doc):
 
-    def upload(self, sheet, source, batch):
+    def upload(self, sheet, source, batch, lines):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         reverse_day_map = {value[1]: value[0] for value in DoctorClinicTiming.SHORT_DAY_CHOICES}
@@ -445,7 +450,7 @@ class UploadHospital(Doc):
         doctor_obj_dict = dict()
         hospital_obj_dict = dict()
         doc_clinic_obj_dict = dict()
-        for i in range(2, len(rows) + 1):
+        for i in range(2, min(len(rows), lines) + 1):
             identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
             doctor_obj = self.get_doctor(identifier)
             if not doctor_obj:
