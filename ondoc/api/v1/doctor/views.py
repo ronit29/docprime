@@ -1146,5 +1146,5 @@ class HospitalAutocomplete(autocomplete.Select2QuerySetView):
         qs = Hospital.objects.all()
 
         if self.q:
-            qs = qs.filter(name__icontains=self.q)
+            qs = qs.filter(name__icontains=self.q).order_by('name')
         return qs
