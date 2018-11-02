@@ -152,6 +152,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     class Meta:
         db_table = "hospital"
+        ordering = ['name']
 
     def get_thumbnail(self):
         return None

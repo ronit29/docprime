@@ -1,6 +1,7 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
+from ondoc.doctor.models import Hospital
 from ondoc.notification.models import EmailNotification
 from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
@@ -45,7 +46,7 @@ User = get_user_model()
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
-
+from dal import autocomplete
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -1139,3 +1140,11 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
             resp['status'] = "error"
         return Response(resp)
 
+
+class HospitalAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Hospital.objects.all()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs

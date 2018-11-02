@@ -19,6 +19,8 @@ import pytz
 import datetime
 from django.db import transaction
 import logging
+from dal import autocomplete
+
 
 logger = logging.getLogger(__name__)
 
@@ -181,13 +183,25 @@ class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     readonly_fields = ['deal_price']
 
 
+class DoctorClinicInlineForm(forms.ModelForm):
+    hospital = forms.ModelChoiceField(
+        queryset=Hospital.objects.all(),
+        widget=autocomplete.ModelSelect2(url='hospital-autocomplete')
+    )
+
+    class Meta:
+        model = DoctorClinic
+        fields = ('__all__')
+
+
 class DoctorClinicInline(ReadOnlyInline):
     model = DoctorClinic
+    form = DoctorClinicInlineForm
     extra = 0
     can_delete = True
     formset = DoctorClinicFormSet
     show_change_link = False
-    autocomplete_fields = ['hospital']
+    # autocomplete_fields = ['hospital']
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline]
 
     def get_queryset(self, request):
