@@ -37,7 +37,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -1669,3 +1669,10 @@ class VisitReasonAdmin(admin.ModelAdmin):
 
     class Meta:
         model = VisitReason
+
+
+class PracticeSpecializationContentAdmin(admin.ModelAdmin):
+    model = PracticeSpecializationContent
+    list_display = ('specialization',)
+    display = ('specialization', 'content', )
+

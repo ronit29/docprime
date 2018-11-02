@@ -1590,6 +1590,14 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
         return "{}".format(self.name)
 
 
+class PracticeSpecializationContent(auth_model.TimeStampedModel):
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+    content = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'practice_specialization_content'
+
+
 class DoctorPracticeSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorpracticespecializations", on_delete=models.CASCADE)
     specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False)

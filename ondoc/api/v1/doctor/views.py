@@ -35,6 +35,7 @@ from django.db.models import F
 from django.db.models.functions import StrIndex
 import datetime
 import copy
+import re
 import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
@@ -775,6 +776,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             extras = entity.additional_info
             if extras:
                 kwargs['extras'] = extras
+                kwargs['specialization_id'] = entity.specialization_id
                 kwargs['url'] = url
                 kwargs['parameters'] = doctor_query_parameters(extras, request.query_params)
                 response = self.list(request, **kwargs)
@@ -794,6 +796,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             validated_data['extras'] = kwargs['extras']
         if kwargs.get('url'):
             validated_data['url'] = kwargs['url']
+
+        specialization_id = kwargs.get('specialization_id', None)
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
@@ -877,6 +881,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if specializations:
                 title = specializations
                 description = specializations
+
             else:
                 title = 'Doctors'
                 description = 'Doctors'
@@ -974,6 +979,16 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 }
             }
 
+            specialization_dynamic_content = ''
+            if specialization_id:
+                specialization_content = models.PracticeSpecializationContent.objects.filter(specialization__id=specialization_id).first()
+                if specialization_content:
+                    content = str(specialization_content.content)
+                    content = content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    content = regex.sub(" ", content)
+                    specialization_dynamic_content = content
+
         for resp in response:
             if id_url_dict.get(resp['id']):
                 resp['url'] = id_url_dict[resp['id']]
@@ -985,7 +1000,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
-                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb})
+                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb, 'specialization_dynamic_content': specialization_dynamic_content})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
