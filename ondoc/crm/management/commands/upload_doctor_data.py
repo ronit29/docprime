@@ -84,7 +84,7 @@ class Doc():
             return None
 
         if source.lower()=='google':
-            return self.get_google_number(comps, source, is_primary)
+            return self.get_google_number(number, comps, source, is_primary)
 
         if len(comps)==3 and comps[0] and comps[1] and comps[2]:
             return {'std_code': comps[0], 'number': comps[1] + comps[2], 'is_primary': False, 'source': source}
@@ -116,7 +116,7 @@ class Doc():
 
         return {'number': number, 'is_primary': is_primary, 'source': source}
 
-    def get_google_number(self, comps, source, is_primary):
+    def get_google_number(self, number, comps, source, is_primary):
         if len(comps)==3 and comps[0] and comps[1] and comps[2]:
             return {'std_code': comps[0], 'number': comps[1] + comps[2], 'is_primary': False, 'source': source}
         elif len(comps)==2 and comps[0] and comps[1]:
@@ -143,12 +143,17 @@ class UploadDoctor(Doc):
 
         for i in range(2, min(len(rows), lines) + 1):
             data = self.get_data(row=i, sheet=sheet, headers=headers)
-            doctor = self.create_doctor(data, source, batch)
+
+            try:
+                doctor = self.create_doctor(data, source, batch)
+            except Exception as e:
+                print('error' + str(e))
+
             #self.map_doctor_specialization(doctor, data.get('practice_specialization'))
             try:
                 self.add_doctor_phone_numbers(doctor, data.get('numbers'))
-            except:
-                print('error in saving phone number')
+            except Exception as e:
+                print('error' + str(e))
 
     def get_data(self, row, sheet, headers):
         gender_mapping = {value[1]: value[0] for value in Doctor.GENDER_CHOICES}
@@ -424,8 +429,8 @@ class UploadSpecialization(Doc):
                             DoctorPracticeSpecialization.objects.get_or_create(doctor=doctor, specialization=practice_specialization)
                         except Exception as e:
                             print('error' + str(e))
-                except:
-                    print('error' + str(e))
+                except Exception as e2:
+                    print('error' + str(e2))
 
 
 class UploadMembership(Doc):
@@ -477,7 +482,10 @@ class UploadHospital(Doc):
             identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
             doctor_obj = self.get_doctor(identifier)
             if not doctor_obj:
-                print('Doctor not found for identifier: '+identifier)
+                if identifier:
+                    print('Doctor not found for identifier: '+identifier)
+                else:
+                    print('Doctor not found for identifier: ')
                 continue
 
             hospital_obj = self.get_hospital(i, sheet, headers, hospital_obj_dict, source, batch)
@@ -501,29 +509,34 @@ class UploadHospital(Doc):
                         "end": end,
                         "fees": fees,
                         "deal_price":fees,
-                        "mrp":fees
+                        "mrp":fees,
+                        "type":1
                     }
-                    clinic_time_data.append(DoctorClinicTiming(**temp_data))
-            if clinic_time_data:
-                DoctorClinicTiming.objects.bulk_create(clinic_time_data)
+                    try:
+                        DoctorClinicTiming.objects.get_or_create(**temp_data)
+                    except:
+                        print('query error')
+                    #clinic_time_data.append(DoctorClinicTiming(**temp_data))
+            # if clinic_time_data:
+            #     DoctorClinicTiming.objects.bulk_create(clinic_time_data)
 
             primary_number = self.clean_data(sheet.cell(row=i, column=headers.get('clinic_contact_1')).value)
             alternate_number_1 = self.clean_data(sheet.cell(row=i, column=headers.get('clinic_contact_2')).value)
             alternate_number_2 = self.clean_data(sheet.cell(row=i, column=headers.get('clinic_contact_3')).value)
-            source = self.clean_data(sheet.cell(row=i, column=headers.get('phone_no_source')).value)
+            ph_source = self.clean_data(sheet.cell(row=i, column=headers.get('phone_no_source')).value)
 
 
             number_entry = []
 
-            num = self.get_number(primary_number, True, '', source)
+            num = self.get_number(primary_number, True, '', ph_source)
             if num:
                 number_entry.append(num)
 
-            num = self.get_number(alternate_number_1, False, '', source)
+            num = self.get_number(alternate_number_1, False, '', ph_source)
             if num:
                 number_entry.append(num)
 
-            num = self.get_number(alternate_number_2, False, '', source)
+            num = self.get_number(alternate_number_2, False, '', ph_source)
             if num:
                 number_entry.append(num)
 
