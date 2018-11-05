@@ -18,7 +18,6 @@ class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
 
     class Meta:
         db_table = "procedure_category"
-        ordering = ['name']
 
 
 class Procedure(auth_model.TimeStampedModel, SearchKey):
@@ -33,7 +32,6 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
 
     class Meta:
         db_table = "procedure"
-        ordering = ['name']
 
 
 class ProcedureToCategoryMapping(models.Model):
