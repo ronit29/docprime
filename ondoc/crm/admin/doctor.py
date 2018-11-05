@@ -1640,11 +1640,6 @@ class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin)
     search_fields = ['name', ]
 
 
-class ProcedureAdmin(AutoComplete, VersionAdmin):
-    model = Procedure
-    search_fields = ['name']
-
-
 class GoogleDetailingResource(resources.ModelResource):
     identifier = fields.Field(attribute='identifier', column_name='Unique identifier')
     name = fields.Field(attribute='name', column_name='Doc Name')
