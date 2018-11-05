@@ -1217,6 +1217,11 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
               doctor__manageable_doctors__is_disabled=False,
               doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
               doctor__manageable_doctors__write_permission=True) |
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital__isnull=True,
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+              doctor__manageable_doctors__write_permission=True) |
             Q(hospital__manageable_hospitals__doctor__isnull=True,
               hospital__manageable_hospitals__user=user,
               hospital__manageable_hospitals__is_disabled=False,
