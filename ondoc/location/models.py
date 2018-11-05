@@ -913,9 +913,10 @@ class LabPageUrl(object):
     forname = 'labs'
     identifier = 'lb'
 
-    def __init__(self, lab):
+    def __init__(self, lab, sequence):
         self.lab = lab
         self.locality = None
+        self.sequence = sequence
 
     def initialize(self):
         if self.lab:
@@ -975,6 +976,7 @@ class LabPageUrl(object):
             extras['sublocality_value'] = self.sublocality if self.sublocality else ''
             extras['breadcrums'] = []
             data['extras'] = extras
+            data['sequence'] = self.sequence
 
 
             EntityUrls.objects.filter(entity_id=self.lab.id, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).filter(~Q(url = url)).update(is_valid=False)
@@ -986,10 +988,11 @@ class DoctorPageURL(object):
     identifier = 'spt'
     sitemap_identifier = EntityUrls.SitemapIdentifier.DOCTOR_PAGE
 
-    def __init__(self, doctor):
+    def __init__(self, doctor, sequence):
         self.doctor = doctor
         self.locality = None
         self.specializations = []
+        self.sequence = sequence
 
     def init_preferred_hospital(self):
 
@@ -1078,6 +1081,7 @@ class DoctorPageURL(object):
             extras['sublocality_value'] = self.sublocality if self.sublocality else ''
             extras['breadcrums'] = []
             data['extras'] = extras
+            data['sequence'] = self.sequence
 
 
             EntityUrls.objects.filter(entity_id=self.doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(~Q(url = url)).update(is_valid=False)

@@ -14,7 +14,7 @@ def map_doctor_urls():
 
     all_doctors = Doctor.objects.filter(is_live=True, is_test_doctor=False).all()
     for doctor in all_doctors:
-        dp = DoctorPageURL(doctor)
+        dp = DoctorPageURL(doctor, sequence)
         dp.create()
         # success = EntityUrls.create_page_url(doctor, sequence)
         # print("success is", success)
