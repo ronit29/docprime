@@ -53,13 +53,18 @@ class DoctorSearchHelper:
 
         if len(procedure_ids)>0:
             for id in procedure_ids:
-                ps = list(DoctorClinicProcedure.objects.filter(procedure_id=id).values_list('doctor_clinic_id',
-                                                                                            flat=True).distinct())
+                #     ps = list(DoctorClinicProcedure.objects.filter(procedure_id=id).values_list('doctor_clinic_id',
+                #                                                                                 flat=True).distinct())
+                #     ps = [str(i) for i in ps]
+                #     procedure_mapped_doctor_clinic_ids.extend(ps)
+                # if len(procedure_mapped_doctor_clinic_ids)>0:
+                #     filtering_params.append(
+                #         " dcp.id IN({})".format(",".join(procedure_mapped_doctor_clinic_ids)))
+                ps = list(procedure_ids)
                 ps = [str(i) for i in ps]
                 procedure_mapped_doctor_clinic_ids.extend(ps)
-            if len(procedure_mapped_doctor_clinic_ids)>0:
                 filtering_params.append(
-                    " dc.id IN({})".format(",".join(procedure_mapped_doctor_clinic_ids)))
+                    " dcp.procedure_id IN({})".format(",".join(procedure_mapped_doctor_clinic_ids)))
 
         if self.query_params.get("sits_at"):
             filtering_params.append(
