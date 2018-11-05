@@ -10,12 +10,12 @@ def send_sms(message, phone_no):
     return get_connection().send_message(message, phone_no)
 
 
-def send_otp(message, phone_no):
+def send_otp(message, phone_no, retry_send=False):
 
     # print(message)
     # return True
     if str(phone_no) not in settings.OTP_BYPASS_NUMBERS:
-        return get_connection().send_otp(message, phone_no)
+        return get_connection().send_otp(message, phone_no, retry_send=retry_send)
 
 
 def get_connection():

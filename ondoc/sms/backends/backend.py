@@ -10,12 +10,13 @@ from dateutil.relativedelta import relativedelta
 
 class NodeJsSmsBackend(object):
 
-    def send(self, message, phone_no):
+    def send(self, message, phone_no, retry_send=False):
         payload = {
             "type": "sms",
             "data": {
                 "phone_number": phone_no,
-                "content": message
+                "content": message,
+                "retry": retry_send
             }
         }
         publish_message(json.dumps(payload))
@@ -23,9 +24,9 @@ class NodeJsSmsBackend(object):
 
 class BaseSmsBackend(NodeJsSmsBackend):
 
-    def send(self, message, phone_no):
+    def send(self, message, phone_no, retry_send=False):
         if settings.SEND_THROUGH_NODEJS_ENABLED:
-            super().send(message, phone_no)
+            super().send(message, phone_no, retry_send)
             return True
         payload = {'sender': 'DOCPRM', 'route': '4','authkey':settings.SMS_AUTH_KEY}
         payload['message'] = message
@@ -45,10 +46,10 @@ class SmsBackend(BaseSmsBackend):
     def send_message(self, message, phone_no):
         return self.send(message, phone_no)
 
-    def send_otp(self, message, phone_no):
+    def send_otp(self, message, phone_no, retry_send=False):
 
         message = create_otp(phone_no, message)
-        return self.send(message, phone_no)
+        return self.send(message, phone_no, retry_send)
 
 class ConsoleSmsBackend(BaseSmsBackend):
 
@@ -57,7 +58,7 @@ class ConsoleSmsBackend(BaseSmsBackend):
         self.print(message)
         return True
 
-    def send_otp(self, message, phone_no):
+    def send_otp(self, message, phone_no, retry_send=False):
 
         message = create_otp(phone_no, message)
         self.print(message)
@@ -72,11 +73,11 @@ class WhitelistedSmsBackend(BaseSmsBackend):
         else:
             return self.print(message)
 
-    def send_otp(self, message, phone_no):
+    def send_otp(self, message, phone_no, retry_send=False):
 
         message = create_otp(phone_no, message)
         if self.is_number_whitelisted(phone_no):
-            return self.send(message, phone_no)
+            return self.send(message, phone_no, retry_send)
         else:
             return self.print(message)
 
