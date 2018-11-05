@@ -969,4 +969,12 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
     email = serializers.EmailField(required=False)
 
 
+class AdminCreateBodySerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
+    name = serializers.CharField(max_length=24)
+    billing_enabled = serializers.BooleanField()
+    appointment_enabled = serializers.BooleanField()
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
+
 

@@ -109,10 +109,12 @@ class GenericAdminInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+    form = GenericAdminForm
     formset = GenericAdminFormSet
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    fields = ['phone_number', 'doctor', 'permission_type', 'super_user_permission', 'read_permission', 'write_permission', 'user']
+    fields = ['phone_number', 'name', 'doctor', 'permission_type', 'super_user_permission', 'read_permission',
+              'write_permission', 'user']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital')
@@ -128,6 +130,7 @@ class GenericAdminInline(admin.TabularInline):
                 except MultipleObjectsReturned:
                     pass
         return formset
+
 
 class HospitalForm(FormCleanMixin):
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)

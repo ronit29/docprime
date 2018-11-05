@@ -95,10 +95,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         queryset = models.OpdAppointment.objects.filter(hospital__is_live=True, doctor__is_live=True).filter(
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
-              doctor__manageable_doctors__is_disabled=False) |
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL]) |
             Q(hospital__manageable_hospitals__doctor__isnull=True,
               hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__is_disabled=False)
+              hospital__manageable_hospitals__is_disabled=False,
+              hospital__manageable_hospitals__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
+                                                               auth_models.GenericAdmin.ALL])
             ).distinct()
         if not queryset:
             return Response([])
@@ -636,11 +639,11 @@ class PrescriptionFileViewset(OndocViewSet):
                 Q(prescription__appointment__doctor__manageable_doctors__user=user,
                   prescription__appointment__doctor__manageable_doctors__hospital=F(
                       'prescription__appointment__hospital'),
-                  prescription__appointment__doctor__manageable_doctors__permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                  prescription__appointment__doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
                   prescription__appointment__doctor__manageable_doctors__is_disabled=False) |
                 Q(prescription__appointment__hospital__manageable_hospitals__user=user,
                   prescription__appointment__hospital__manageable_hospitals__doctor__isnull=True,
-                  prescription__appointment__hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                  prescription__appointment__hospital__manageable_hospitals__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
                   prescription__appointment__hospital__manageable_hospitals__is_disabled=False)).
                     distinct())
             # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
@@ -705,7 +708,7 @@ class PrescriptionFileViewset(OndocViewSet):
 
     def prescription_permission(self, user, appointment):
         return auth_models.GenericAdmin.objects.filter(user=user, hospital=appointment.hospital,
-                                                permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                                                permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
                                                 write_permission=True).exists()
 
 
@@ -1164,3 +1167,39 @@ class HospitalAutocomplete(autocomplete.Select2QuerySetView):
         if self.q:
             qs = qs.filter(name__icontains=self.q).order_by('name')
         return qs
+
+
+class CreateAdminViewSet(viewsets.GenericViewSet):
+
+    def create(self, request):
+        serializer = serializers.AdminCreateBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+
+    def list_entities(self, request):
+        user = request.user
+        opd_queryset = (models.DoctorClinic.objects.filter(doctor__is_live=True, hospital__is_live=True)
+                        .annotate(doctor_name=F('doctor__name'), hospital_name=F('hospital__name')).filter(
+                                      doctor__manageable_doctors__user=user,
+                                      doctor__manageable_doctors__is_disabled=False,
+                                      doctor__manageable_doctors__super_user_permission=True)
+                        .values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor'))
+
+        opd_queryset_hos = (models.DoctorClinic.objects.filter(doctor__is_live=True, hospital__is_live=True)
+                            .annotate(doctor_name=F('doctor__name'), hospital_name=F('hospital__name')).filter(
+                                      hospital__manageable_hospitals__doctor__isnull=True,
+                                      hospital__manageable_hospitals__user=user,
+                                      hospital__manageable_hospitals__is_disabled=False,
+                                      hospital__manageable_hospitals__super_user_permission=True)
+                            .values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
+                            )
+        final_opd = opd_queryset | opd_queryset_hos
+        lab_queryset = auth_models.GenericLabAdmin.objects \
+                        .filter(user=request.user, is_disabled=False, super_user_permission=True) \
+                        .annotate(lab_name=F('lab__name')) \
+                        .values('lab_network', 'lab', 'lab_name') \
+                        .distinct('lab_network', 'lab')
+        if lab_queryset:
+            final_opd = final_opd | lab_queryset
+        return Response(final_opd)
+

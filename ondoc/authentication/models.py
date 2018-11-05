@@ -573,13 +573,13 @@ class LabUserPermission(TimeStampedModel):
         # TODO PM - Logic to get admin for a particular User
 
 
-class GenericLabAdmin(TimeStampedModel):
+class GenericLabAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLING = 2
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    ALL = 3
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages_lab', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    type_choices = ((APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
+    type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
     lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True,
                                     on_delete=models.CASCADE,
                                     related_name='manageable_lab_network_admins')
@@ -590,6 +590,7 @@ class GenericLabAdmin(TimeStampedModel):
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
+    name = models.CharField(max_length=24, blank=True, null=True)
 
     class Meta:
         db_table = 'generic_lab_admin'
@@ -668,13 +669,14 @@ class GenericLabAdmin(TimeStampedModel):
                                )
 
 
-class GenericAdmin(TimeStampedModel):
+class GenericAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLINNG = 2
+    ALL = 3
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
+    type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
     hospital_network = models.ForeignKey("doctor.HospitalNetwork", null=True, blank=True,
                                          on_delete=models.CASCADE,
                                          related_name='manageable_hospital_networks')
@@ -688,6 +690,7 @@ class GenericAdmin(TimeStampedModel):
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
+    name = models.CharField(max_length=24, blank=True, null=True)
 
     class Meta:
         db_table = 'generic_admin'
@@ -697,6 +700,8 @@ class GenericAdmin(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.clean()
+        # if not self.created_by:
+        #     self.created_by = self.request.user
         # if self.permission_type == self.BILLINNG and self.doctor is not None:
         #     self.hospital = None
         super(GenericAdmin, self).save(*args, **kwargs)

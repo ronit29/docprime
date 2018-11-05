@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospitalView,
                     DoctorBlockCalendarViewSet, PrescriptionFileViewset, SearchedItemsViewSet, DoctorListViewSet,
                     DoctorProfileUserViewSet, DoctorAvailabilityTimingViewSet, HealthTipView, ConfigView,
-                    DoctorAppointmentNoAuthViewSet, DoctorContactNumberViewSet, DoctorFeedbackViewSet, HospitalAutocomplete)
+                    DoctorAppointmentNoAuthViewSet, DoctorContactNumberViewSet, DoctorFeedbackViewSet,
+                    HospitalAutocomplete, CreateAdminViewSet)
 
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
@@ -40,4 +41,6 @@ urlpatterns = [
     path('contact-number/<int:doctor_id>', DoctorContactNumberViewSet.as_view({'get':'retrieve'}), name='doctor-contact-number'),
     path('feedback', DoctorFeedbackViewSet.as_view({'post': 'feedback'}), name='doctor-feedback'),
     path('hospital-autocomplete', HospitalAutocomplete.as_view(), name='hospital-autocomplete'),
+    path('create_admin', CreateAdminViewSet.as_view({'post': 'create'}), name='create_admin'),
+    path('list_admin_entities', CreateAdminViewSet.as_view({'get': 'list_entities'}), name='list_entities'),
 ]

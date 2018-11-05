@@ -1215,17 +1215,17 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
               doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
               doctor__manageable_doctors__write_permission=True) |
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital__isnull=True,
               doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
               doctor__manageable_doctors__write_permission=True) |
             Q(hospital__manageable_hospitals__doctor__isnull=True,
               hospital__manageable_hospitals__user=user,
               hospital__manageable_hospitals__is_disabled=False,
-              hospital__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT,
+              hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
               hospital__manageable_hospitals__write_permission=True)).
                              values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
                              )
