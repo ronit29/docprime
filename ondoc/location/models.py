@@ -906,6 +906,79 @@ entity_as_mapping = {
     'LAB': EntityHelperAsLab
 }
 
+
+class LabPageUrl(object):
+    sitemap_identifier = EntityUrls.SitemapIdentifier.LAB_PAGE
+    forname = 'labs'
+    identifier = 'lb'
+
+    def __init__(self, lab):
+        self.lab = lab
+
+    def initialize(self):
+        if self.lab:
+            sublocality = self.lab.entity.filter(type="SUBLOCALITY", valid=True).first()
+            if sublocality:
+                self.sublocality = sublocality.name
+                self.sublocality_id = sublocality.id
+                self.sublocality_longitude = sublocality.entity.location.centroid.x
+                self.sublocality_latitude = sublocality.entity.location.centroid.y
+
+            locality = self.lab.entity.filter(type="LOCALITY", valid=True).first()
+            if locality:
+                self.locality = locality.name
+                self.locality_id = locality.id
+                self.locality_longitude = locality.entity.location.centroid.x
+                self.locality_latitude = locality.entity.location.centroid.y
+
+    def create(self):
+        if self.lab and self.locality:
+
+            url = "%s" % self.lab.name
+            if self.locality and self.sublocality:
+                url = url + "-in-%s-%s-lpp" % (self.sublocality, self.locality)
+            elif self.locality:
+                url = url + "-in-%s-lpp" % self.locality
+
+
+            data = {}
+            data['url'] = url
+            data['is_valid'] = True
+            data['url_type'] = EntityUrls.UrlType.PAGEURL
+            data['entity_type'] = 'Lab'
+            data['entity_id'] = self.lab.id
+            data['sitemap_identifier'] = EntityUrls.SitemapIdentifier.LAB_PAGE
+            data['locality_id'] = self.locality_id
+            data['locality_value'] = self.locality
+            data['locality_latitude'] = self.locality_latitude
+            data['locality_longitude'] = self.locality_longitude
+
+            if self.locality_latitude and self.locality_longitude:
+                data['locality_location'] = Point(self.locality_longitude, self.locality_latitude)
+
+            if self.sublocality_latitude and self.sublocality_longitude:
+                data['sublocality_location'] = Point(self.sublocality_longitude, self.sublocality_latitude)
+
+            data['sublocality_id'] = self.sublocality_id
+            data['sublocality_value'] = self.sublocality
+            data['sublocality_latitude'] = self.sublocality_latitude
+            data['sublocality_longitude'] = self.sublocality_longitude
+            data['location'] = self.lab.location
+
+            extras = {}
+            extras['related_entity_id'] = self.lab.id
+            extras['location_id'] = self.sublocality_id if self.sublocality_id else self.locality_id
+            extras['locality_value'] = self.locality if self.locality else ''
+            extras['sublocality_value'] = self.sublocality if self.sublocality else ''
+            extras['breadcrums'] = []
+            data['extras'] = extras
+
+
+            EntityUrls.objects.filter(entity_id=self.lab.id, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).filter(~Q(url = url)).update(is_valid=False)
+            EntityUrls.objects.filter(entity_id=self.lab.id, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE, url=url).delete()
+            EntityUrls.objects.create(**data)
+
+
 class DoctorPageURL(object):
     identifier = 'spt'
     sitemap_identifier = EntityUrls.SitemapIdentifier.DOCTOR_PAGE
