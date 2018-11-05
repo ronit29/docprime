@@ -656,7 +656,8 @@ class EntityUrls(TimeStampedModel):
                 if url_dict.get('page_urls'):
                     page_url_dict = url_dict['page_urls']
                     url = page_url_dict.get('urls')
-                    specialization = page_url_dict.get('specialization_name')
+                    specialization = page_url_dict.get('specialization_name', '')
+                    specialization_id = page_url_dict.get('specialization_id', None)
                     seo_parameters = page_url_dict.get('seo_parameters')
                     if seo_parameters:
                         locality_id = seo_parameters.get('locality_id')
@@ -718,7 +719,7 @@ class EntityUrls(TimeStampedModel):
                                              sublocality_value=sublocality_value, locality_id=locality_id,
                                              sublocality_id=sublocality_id, locality_longitude=locality_longitude,
                                              locality_latitude=locality_latitude, sublocality_longitude=sublocality_longitude,
-                                             sublocality_latitude=sublocality_latitude)
+                                             sublocality_latitude=sublocality_latitude, specialization_id=specialization_id)
                         entity_url_obj.save()
                     else:
                         entity_url_obj = entity_url_objs.first()
@@ -731,7 +732,7 @@ class EntityUrls(TimeStampedModel):
                                                  entity_id=entity_object.id,sitemap_identifier=sitemap_identifier,
                                                  sequence=sequence, specialization=specialization, locality_value=locality_value,
                                                  sublocality_value=sublocality_value, locality_id=locality_id,
-                                                 sublocality_id=sublocality_id)
+                                                 sublocality_id=sublocality_id, specialization_id=specialization_id)
                             entity_url_obj.save()
                         else:
                             entity_url_obj.extras = extra
@@ -862,7 +863,8 @@ class EntityHelperAsDoctor(EntityUrlsHelper):
                 urls['page_urls'] = {
                     'urls': doctor_page_url.lower(),
                     'location_id': query_set_for_personal_url.first().location.id,
-                    'specialization_name': specialization_name,
+                    'specialization_name': specialization_name[0] if len(specialization_name) > 0 else '',
+                    'specialization_id': specializations[0].id if len(specializations) > 0 else None,
                     'seo_parameters': doctor_page_seo_parameters.get('parameters')
                 }
 

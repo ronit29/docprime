@@ -1,7 +1,9 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
+from ondoc.doctor.models import Hospital
 from ondoc.notification.models import EmailNotification
+from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
@@ -35,6 +37,7 @@ from django.db.models import F
 from django.db.models.functions import StrIndex
 import datetime
 import copy
+import re
 import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
@@ -45,7 +48,7 @@ User = get_user_model()
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
-
+from dal import autocomplete
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -775,6 +778,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             extras = entity.additional_info
             if extras:
                 kwargs['extras'] = extras
+                kwargs['specialization_id'] = entity.specialization_id
                 kwargs['url'] = url
                 kwargs['parameters'] = doctor_query_parameters(extras, request.query_params)
                 response = self.list(request, **kwargs)
@@ -794,6 +798,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             validated_data['extras'] = kwargs['extras']
         if kwargs.get('url'):
             validated_data['url'] = kwargs['url']
+
+        specialization_id = kwargs.get('specialization_id', None)
+        specialization_dynamic_content = ''
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
@@ -877,6 +884,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if specializations:
                 title = specializations
                 description = specializations
+
             else:
                 title = 'Doctors'
                 description = 'Doctors'
@@ -974,6 +982,15 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 }
             }
 
+            if specialization_id:
+                specialization_content = models.PracticeSpecializationContent.objects.filter(specialization__id=specialization_id).first()
+                if specialization_content:
+                    content = str(specialization_content.content)
+                    content = content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    content = regex.sub(" ", content)
+                    specialization_dynamic_content = content
+
         for resp in response:
             if id_url_dict.get(resp['id']):
                 resp['url'] = id_url_dict[resp['id']]
@@ -985,7 +1002,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": saved_search_result.result_count,
-                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb})
+                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb, 'search_content': specialization_dynamic_content})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
@@ -1103,39 +1120,47 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
                 val = ' '.join(map(str, value))
             else:
                 val = value
-            message += str(key) + "  -  " + str(val) + "\n"
+            message += str(key) + "  -  " + str(val) + "<br>"
         if user.doctor:
             managers_list = []
             for managers in user.doctor.manageable_doctors.all():
                 info = {}
-                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "\n"
-                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "\n"
-                info['user_id'] = (str(managers.user_id) ) if managers.user else "\n"
-                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "\n"
-                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "\n"
+                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "<br>"
+                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "<br>"
+                info['user_id'] = (str(managers.user_id) ) if managers.user else "<br>"
+                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "<br>"
+                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "<br>"
                 managers_list.append(info)
-            managers_string = "\n".join(str(x) for x in managers_list)
+            managers_string = "<br>".join(str(x) for x in managers_list)
         if managers_string:
-            message = message + "\n\nUser's Managers \n"+ managers_string
+            message = message + "<br><br> User's Managers <br>"+ managers_string
 
         manages_list = []
         for manages in user.manages.all():
             info = {}
-            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "\n"
-            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "\n"
-            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "\n"
-            info['user_id'] = (str(user.id)) if user else "\n"
-            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "\n"
+            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "<br>"
+            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "<br>"
+            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "<br>"
+            info['user_id'] = (str(user.id)) if user else "<br>"
+            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "<br>"
             manages_list.append(info)
-        manages_string = "\n".join(str(x) for x in manages_list)
+        manages_string = "<br>".join(str(x) for x in manages_list)
         if manages_string:
-            message = message + "\n\n User Manages \n"+ manages_string
+            message = message + "<br><br> User Manages <br>"+ manages_string
         try:
-            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com"]
+            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com", "harpreet@docprime.com"]
             for x in emails:
-                notif_models.EmailNotification.publish_ops_email(str(x), message, 'Feedback Mail')
+                notif_models.EmailNotification.publish_ops_email(str(x), mark_safe(message), 'Feedback Mail')
             resp['status'] = "success"
         except:
             resp['status'] = "error"
         return Response(resp)
 
+
+class HospitalAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Hospital.objects.all()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q).order_by('name')
+        return qs

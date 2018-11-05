@@ -210,12 +210,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         super(Hospital, self).save(*args, **kwargs)
 
-        if self.is_appointment_manager:
-            auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
-                .update(is_disabled=True)
-        else:
-            auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
-                .update(is_disabled=False)
+        # if self.is_appointment_manager:
+        #     auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+        #         .update(is_disabled=True)
+        # else:
+        #     auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+        #         .update(is_disabled=False)
 
         if build_url and self.location and self.is_live:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
@@ -355,6 +355,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     batch = models.CharField(max_length=20, blank=True)
     enabled_for_online_booking = models.BooleanField(default=False)
     enabled_for_online_booking_at = models.DateTimeField(null=True, blank=True)
+    is_gold = models.BooleanField(verbose_name='Is Gold', default=False)
 
     def __str__(self):
         return self.name
@@ -856,6 +857,7 @@ class DoctorMobile(auth_model.TimeStampedModel):
     number = models.BigIntegerField(blank=True, null=True)
     is_primary = models.BooleanField(verbose_name='Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name='Phone Number Verified?', default=False)
+    source = models.CharField(max_length=2000, blank=True)
 
     class Meta:
         db_table = "doctor_mobile"
@@ -1588,6 +1590,14 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
 
     def __str__(self):
         return "{}".format(self.name)
+
+
+class PracticeSpecializationContent(auth_model.TimeStampedModel):
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+    content = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'practice_specialization_content'
 
 
 class DoctorPracticeSpecialization(auth_model.TimeStampedModel):

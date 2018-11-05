@@ -697,8 +697,8 @@ class GenericAdmin(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.clean()
-        if self.permission_type == self.BILLINNG and self.doctor is not None:
-            self.hospital = None
+        # if self.permission_type == self.BILLINNG and self.doctor is not None:
+        #     self.hospital = None
         super(GenericAdmin, self).save(*args, **kwargs)
         GenericAdmin.update_user_admin(self.phone_number)
 
@@ -1016,7 +1016,7 @@ class SPOCDetails(TimeStampedModel):
     CONTACT_TYPE_CHOICES = [(OTHER, "Other"), (SPOC, "Single Point of Contact"), (MANAGER, "Manager"), (OWNER, "Owner")]
     contact_type = models.PositiveSmallIntegerField(
         choices=CONTACT_TYPE_CHOICES)
-
+    source = models.CharField(max_length=2000, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
