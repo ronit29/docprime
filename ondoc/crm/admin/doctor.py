@@ -39,7 +39,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
-                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure,
+                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent)
 from ondoc.authentication.models import User
 from .common import *

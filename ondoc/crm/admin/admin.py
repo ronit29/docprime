@@ -6,7 +6,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
-                                 SpecializationDepartment, SpecializationField, PracticeSpecialization, Procedure,
+                                 SpecializationDepartment, SpecializationField, PracticeSpecialization,
                                  VisitReason, CancellationReason, PracticeSpecializationContent)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
