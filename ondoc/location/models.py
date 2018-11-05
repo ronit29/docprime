@@ -915,24 +915,26 @@ class LabPageUrl(object):
 
     def __init__(self, lab):
         self.lab = lab
+        self.locality = None
 
     def initialize(self):
         if self.lab:
             sublocality = self.lab.entity.filter(type="SUBLOCALITY", valid=True).first()
             if sublocality:
-                self.sublocality = sublocality.name
-                self.sublocality_id = sublocality.id
-                self.sublocality_longitude = sublocality.entity.location.centroid.x
-                self.sublocality_latitude = sublocality.entity.location.centroid.y
+                self.sublocality = sublocality.location.alternative_value
+                self.sublocality_id = sublocality.location.id
+                self.sublocality_longitude = sublocality.location.centroid.x
+                self.sublocality_latitude = sublocality.location.centroid.y
 
             locality = self.lab.entity.filter(type="LOCALITY", valid=True).first()
             if locality:
-                self.locality = locality.name
-                self.locality_id = locality.id
-                self.locality_longitude = locality.entity.location.centroid.x
-                self.locality_latitude = locality.entity.location.centroid.y
+                self.locality = locality.location.alternative_value
+                self.locality_id = locality.location.id
+                self.locality_longitude = locality.location.centroid.x
+                self.locality_latitude = locality.location.centroid.y
 
     def create(self):
+        self.initialize()
         if self.lab and self.locality:
 
             url = "%s" % self.lab.name
