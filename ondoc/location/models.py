@@ -914,6 +914,7 @@ class LabPageUrl(object):
 
     def __init__(self, lab):
         self.lab = lab
+        self.locality = None
 
     def initialize(self):
         if self.lab:
