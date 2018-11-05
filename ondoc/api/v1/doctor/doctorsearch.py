@@ -7,7 +7,7 @@ from ondoc.api.v1.doctor import serializers
 from django.core import serializers as core_serializer
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor
-from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory
+from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping
 from datetime import datetime
 import re
 import json
@@ -44,22 +44,22 @@ class DoctorSearchHelper:
                 " gs.id IN({})".format(",".join(specialization_ids))
             )
 
-        procedure_mapped_doctor_ids = []
+        procedure_mapped_doctor_clinic_ids = []
 
         if len(category_ids) > 0 and not len(procedure_ids) > 0:
             preferred_procedure_ids = list(
-                ProcedureCategory.objects.filter(pk__in=category_ids).values_list('preferred_procedure_id'))
+                ProcedureCategory.objects.filter(pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True))
             procedure_ids = preferred_procedure_ids
 
         if len(procedure_ids)>0:
             for id in procedure_ids:
-                ps = list(DoctorClinicProcedure.objects.filter(procedure_id=id).values_list('doctor_clinic__doctor_id',
+                ps = list(DoctorClinicProcedure.objects.filter(procedure_id=id).values_list('doctor_clinic_id',
                                                                                             flat=True).distinct())
                 ps = [str(i) for i in ps]
-                procedure_mapped_doctor_ids.extend(ps)
-            if len(procedure_mapped_doctor_ids)>0:
+                procedure_mapped_doctor_clinic_ids.extend(ps)
+            if len(procedure_mapped_doctor_clinic_ids)>0:
                 filtering_params.append(
-                    " d.id IN({})".format(",".join(procedure_mapped_doctor_ids)))
+                    " dc.id IN({})".format(",".join(procedure_mapped_doctor_clinic_ids)))
 
         if self.query_params.get("sits_at"):
             filtering_params.append(
