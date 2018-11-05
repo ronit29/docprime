@@ -25,6 +25,50 @@ class Footer(object):
         sql_urls = RawSql(query).fetch_all()
         return sql_urls
 
+class LabCityFooter(Footer):
+    def __init__(self, entity):
+        self.locality_id = int(entity.locality_id)
+        self.locality = entity.locality_value
+        self.centroid = entity.locality_location
+
+    def get_footer(self):
+            response = {}
+            response['menu'] = []
+
+            labs_in_top_cities = self.labs_in_top_cities()
+            if labs_in_top_cities:
+                response['menu'].append(
+                    {'sub_heading': 'Labs in Top Cities', 'url_list': labs_in_top_cities})
+
+            # top_specialities_in_city = self.specialist_in_city()
+            # if top_specialities_in_city:
+            #     response['menu'].append(
+            #         {'sub_heading': 'Top specialities in %s' % self.locality, 'url_list': top_specialities_in_city})
+
+            top_labs_in_cities = self.top_labs_in_cities()
+            if top_labs_in_cities:
+                response['menu'].append(
+                    {'sub_heading' : 'Top Labs in Cities', 'url_list': top_labs_in_cities})
+
+            if response['menu']:
+                response['heading'] = 'Dynamic footer on doctors in %s' % self.locality
+
+            return response
+
+    def labs_in_top_cities(self):
+            query = '''select url, concat('Labs in ', eu.locality_value) title from entity_urls eu inner join
+                        seo_cities sc on eu.locality_value =  sc.city 
+                        and  eu.sitemap_identifier = 'LAB_CITY' and eu.is_valid = True order by rank limit 10'''
+
+            return self.get_urls(query)
+
+    def top_labs_in_cities(self):
+            query = '''select url, concat( lab ,'in', eu.locality_value) title from entity_urls eu inner join 
+                        seo_lab_network ln on eu.entity_id = ln.lab_id
+                        and eu.sitemap_identifier = 'LAB_PAGE' and eu.is_valid = True order by rank limit 10'''
+
+            return self.get_urls(query)
+
 
 class SpecialityCityFooter(Footer):
     def __init__(self, entity):
@@ -287,7 +331,7 @@ class DoctorCityFooter(Footer):
     def specialist_in_city(self):
 
         query = ''' select url, concat(eu.specialization,' in ',eu.locality_value) title from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
-                    and eu.locality_value ilike '%s' and eu.sitemap_identifier='SPECIALIZATION_CITY' 
+                    and eu.locality_value ilike '%s' and eu.sitemap_identifier='SPECIALIZATION_CITY'  
                     and eu.is_valid=True order by count desc limit 10''' \
                 % (self.locality)
 
@@ -318,7 +362,8 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
                 footer = DoctorProfileFooter(entity)
             elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.DOCTORS_CITY:
                 footer = DoctorCityFooter(entity)
-
+            elif entity.sitemap_identifier == EntityUrls.SitemapIdentifier.LAB_CITY:
+                footer = LabCityFooter(entity)
             if footer:
                 response = footer.get_footer()
         except Exception as e:
