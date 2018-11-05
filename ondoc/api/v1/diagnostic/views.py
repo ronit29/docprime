@@ -861,6 +861,14 @@ class LabTimingListView(mixins.ListModelMixin,
 
         resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
 
+        # for agent do not set any time limitations
+        if hasattr(request, "agent") and request.agent:
+            resp_data = {
+                "time_slots" : resp_data["time_slots"],
+                "today_min": None,
+                "tomorrow_min": None,
+                "today_max": None
+            }
         return Response(resp_data)
 
 

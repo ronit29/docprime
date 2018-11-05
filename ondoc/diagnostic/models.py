@@ -375,7 +375,8 @@ class LabBookingClosingManager(models.Manager):
             return {
                 "time_slots": [],
                 "today_min": None,
-                "tomorrow_min": None
+                "tomorrow_min": None,
+                "today_max": None
             }
 
         else:
