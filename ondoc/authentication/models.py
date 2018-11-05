@@ -1016,7 +1016,7 @@ class SPOCDetails(TimeStampedModel):
     CONTACT_TYPE_CHOICES = [(OTHER, "Other"), (SPOC, "Single Point of Contact"), (MANAGER, "Manager"), (OWNER, "Owner")]
     contact_type = models.PositiveSmallIntegerField(
         choices=CONTACT_TYPE_CHOICES)
-
+    source = models.CharField(max_length=2000, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
@@ -1175,45 +1175,45 @@ class SPOCDetails(TimeStampedModel):
             "bill_read_permission": bill_read_permission
         }
 
-    def save(self, *args, **kwargs):
-        from ondoc.doctor.models import Hospital, HospitalNetwork
-        from ondoc.diagnostic.models import LabNetwork
-        prev_instance = SPOCDetails.objects.filter(pk=self.id).first()
-        if prev_instance:
-            admin_to_be_deleted = None
-            if isinstance(self.content_object, Hospital):
-                admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=prev_instance.number, hospital=self.content_object)
-            elif isinstance(self.content_object, HospitalNetwork):
-                admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=prev_instance.number, hospital_network=self.content_object)
-            elif isinstance(self.content_object, LabNetwork):
-                admin_to_be_deleted = GenericLabAdmin.objects.filter(phone_number=prev_instance.number, lab_network=self.content_object)
-            if admin_to_be_deleted:
-                admin_to_be_deleted.delete()
-        saved_obj = super(SPOCDetails, self).save(*args, **kwargs)
-        admin_objs = self.get_admin_objs()
-        if admin_objs:
-            if isinstance(self.content_object, Hospital) or isinstance(self.content_object, HospitalNetwork):
-                GenericAdmin.objects.bulk_create(admin_objs)
-            elif isinstance(self.content_object, LabNetwork):
-                GenericLabAdmin.objects.bulk_create(admin_objs)
-        return saved_obj
+    # def save(self, *args, **kwargs):
+    #     from ondoc.doctor.models import Hospital, HospitalNetwork
+    #     from ondoc.diagnostic.models import LabNetwork
+    #     prev_instance = SPOCDetails.objects.filter(pk=self.id).first()
+    #     if prev_instance:
+    #         admin_to_be_deleted = None
+    #         if isinstance(self.content_object, Hospital):
+    #             admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=prev_instance.number, hospital=self.content_object)
+    #         elif isinstance(self.content_object, HospitalNetwork):
+    #             admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=prev_instance.number, hospital_network=self.content_object)
+    #         elif isinstance(self.content_object, LabNetwork):
+    #             admin_to_be_deleted = GenericLabAdmin.objects.filter(phone_number=prev_instance.number, lab_network=self.content_object)
+    #         if admin_to_be_deleted:
+    #             admin_to_be_deleted.delete()
+    #     saved_obj = super(SPOCDetails, self).save(*args, **kwargs)
+    #     admin_objs = self.get_admin_objs()
+    #     if admin_objs:
+    #         if isinstance(self.content_object, Hospital) or isinstance(self.content_object, HospitalNetwork):
+    #             GenericAdmin.objects.bulk_create(admin_objs)
+    #         elif isinstance(self.content_object, LabNetwork):
+    #             GenericLabAdmin.objects.bulk_create(admin_objs)
+    #     return saved_obj
 
-    def delete(self, *args, **kwargs):
-        from ondoc.doctor.models import Hospital, HospitalNetwork
-        from ondoc.diagnostic.models import LabNetwork
-        admin_to_be_deleted = None
-        if isinstance(self.content_object, Hospital):
-            admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=self.number,
-                                                              hospital=self.content_object)
-        elif isinstance(self.content_object, HospitalNetwork):
-            admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=self.number,
-                                                              hospital_network=self.content_object)
-        elif isinstance(self.content_object, LabNetwork):
-            admin_to_be_deleted = GenericLabAdmin.objects.filter(phone_number=self.number,
-                                                                 lab_network=self.content_object)
-        if admin_to_be_deleted:
-            admin_to_be_deleted.delete()
-        return super(SPOCDetails, self).delete(*args, **kwargs)
+    # def delete(self, *args, **kwargs):
+    #     from ondoc.doctor.models import Hospital, HospitalNetwork
+    #     from ondoc.diagnostic.models import LabNetwork
+    #     admin_to_be_deleted = None
+    #     if isinstance(self.content_object, Hospital):
+    #         admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=self.number,
+    #                                                           hospital=self.content_object)
+    #     elif isinstance(self.content_object, HospitalNetwork):
+    #         admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=self.number,
+    #                                                           hospital_network=self.content_object)
+    #     elif isinstance(self.content_object, LabNetwork):
+    #         admin_to_be_deleted = GenericLabAdmin.objects.filter(phone_number=self.number,
+    #                                                              lab_network=self.content_object)
+    #     if admin_to_be_deleted:
+    #         admin_to_be_deleted.delete()
+    #     return super(SPOCDetails, self).delete(*args, **kwargs)
 
     def __str__(self):
         return self.name

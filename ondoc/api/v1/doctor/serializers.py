@@ -639,11 +639,15 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     rating_graph = serializers.SerializerMethodField()
     breadcrumb = serializers.SerializerMethodField()
     unrated_appointment = serializers.SerializerMethodField()
+    is_gold = serializers.SerializerMethodField()
 
     def get_display_rating_widget(self, obj):
         if obj.rating.count() > 10:
             return True
         return False
+
+    def get_is_gold(self, obj):
+        return obj.is_gold and obj.enabled_for_online_booking
 
     def get_rating(self, obj):
         queryset = obj.rating.exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
@@ -818,7 +822,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
-                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget')
+                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):

@@ -301,8 +301,8 @@ class DoctorLocalityCityFooter(Footer):
     def __init__(self, entity):
         self.sublocality_id = int(entity.sublocality_id)
         self.locality_id = int(entity.locality_id)
-        self.sublocality = entity.sublocality
-        self.locality = entity.locality
+        self.sublocality = entity.sublocality_value
+        self.locality = entity.locality_value
         self.specialization_id = int(entity.specialization_id)
         self.specialization = entity.specialization
         self.centroid = entity.sublocality_location
