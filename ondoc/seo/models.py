@@ -42,7 +42,7 @@ class SeoSpecialization(TimeStampedModel):
 
 
 class SeoLabNetwork(TimeStampedModel):
-    lab = models.ForeignKey(LabNetwork, on_delete=models.CASCADE, null=False, blank=True)
+    lab_network = models.ForeignKey(LabNetwork, on_delete=models.CASCADE, null=False, blank=True)
     rank = models.PositiveIntegerField(default=0, null=True)
 
     class Meta:
