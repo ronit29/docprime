@@ -932,6 +932,7 @@ class LabPageUrl(object):
                 self.locality_latitude = locality.location.centroid.y
 
     def create(self):
+        self.initialize()
         if self.lab and self.locality:
 
             url = "%s" % self.lab.name
