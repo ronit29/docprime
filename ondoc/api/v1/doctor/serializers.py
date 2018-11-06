@@ -15,7 +15,7 @@ from ondoc.coupon.models import Coupon
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.ratings import serializers as rating_serializer
-from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot
+from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot, GenericAdminEntity
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 import math
@@ -969,4 +969,16 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
     email = serializers.EmailField(required=False)
 
 
+class AdminCreateBodySerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
+    name = serializers.CharField(max_length=24)
+    billing_enabled = serializers.BooleanField()
+    appointment_enabled = serializers.BooleanField()
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
 
+
+class EntityListQuerySerializer(serializers.Serializer):
+
+    entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
+    id = serializers.IntegerField()

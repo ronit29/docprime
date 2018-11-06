@@ -221,5 +221,7 @@ class CitiesAdmin(ImportMixin, admin.ModelAdmin):
     list_display = ('name',)
     resource_class = CitiesResource
 
-
-
+class GenericAdminForm(forms.ModelForm):
+    class Meta:
+        widgets = {'name': forms.TextInput(attrs={'size': 13}),
+                   'phone_number': forms.NumberInput(attrs={'size': 8})}

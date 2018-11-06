@@ -709,3 +709,10 @@ def consumers_balance_refund():
                     print("consumer account balance " + str(consumer_account.balance))
                     ctx_obj = consumer_account.debit_refund()
                     ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+
+
+class GenericAdminEntity():
+    DOCTOR = 1
+    HOSPITAL = 2
+    LAB = 3
+    EntityChoices = [(DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'), (LAB, 'Lab')]
