@@ -44,7 +44,7 @@ class DoctorSearchHelper:
                 " gs.id IN({})".format(",".join(specialization_ids))
             )
 
-        procedure_mapped_doctor_clinic_ids = []
+        procedure_mapped_ids = []
 
         if len(category_ids) > 0 and not len(procedure_ids) > 0:
             preferred_procedure_ids = list(
@@ -52,19 +52,11 @@ class DoctorSearchHelper:
             procedure_ids = preferred_procedure_ids
 
         if len(procedure_ids)>0:
-            for id in procedure_ids:
-                #     ps = list(DoctorClinicProcedure.objects.filter(procedure_id=id).values_list('doctor_clinic_id',
-                #                                                                                 flat=True).distinct())
-                #     ps = [str(i) for i in ps]
-                #     procedure_mapped_doctor_clinic_ids.extend(ps)
-                # if len(procedure_mapped_doctor_clinic_ids)>0:
-                #     filtering_params.append(
-                #         " dcp.id IN({})".format(",".join(procedure_mapped_doctor_clinic_ids)))
-                ps = list(procedure_ids)
-                ps = [str(i) for i in ps]
-                procedure_mapped_doctor_clinic_ids.extend(ps)
-                filtering_params.append(
-                    " dcp.procedure_id IN({})".format(",".join(procedure_mapped_doctor_clinic_ids)))
+            ps = list(procedure_ids)
+            ps = [str(i) for i in ps]
+            procedure_mapped_ids.extend(ps)
+            filtering_params.append(
+                " dcp.procedure_id IN({})".format(",".join(procedure_mapped_ids)))
 
         if self.query_params.get("sits_at"):
             filtering_params.append(
@@ -183,6 +175,8 @@ class DoctorSearchHelper:
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
+        category_ids = self.query_params.get("procedure_category_ids", [])
+        procedure_ids = self.query_params.get("procedure_ids", [])
         response = []
         for doctor in doctor_data:
 
@@ -190,9 +184,26 @@ class DoctorSearchHelper:
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
-            doctor_clinic_procedure = DoctorClinicProcedure.objects.filter(doctor_clinic=doctor_clinic).values(
-                'id', 'mrp', 'agreed_price', 'deal_price', 'doctor_clinic_id', 'procedure_id',
-                detail=F('procedure__details'), duration=F('procedure__duration'), name=F('procedure__name'))
+            if len(category_ids) > 0 and not len(procedure_ids) > 0:
+                category_related_procedure_ids = ProcedureToCategoryMapping.objects.filter(
+                    parent_category_id__in=category_ids).values_list('procedure_id', flat=True)
+                category_related_procedures = DoctorClinicProcedure.objects.filter(
+                    procedure_id__in=category_related_procedure_ids,
+                    doctor_clinic_id=doctor_clinic.id).values('mrp', 'agreed_price', 'deal_price', 'procedure_id',
+                                                              detail=F('procedure__details'),
+                                                              duration=F('procedure__duration'),
+                                                              name=F('procedure__name'))
+                preferred_procedure_ids = list(ProcedureCategory.objects.filter(pk__in=category_ids,
+                                            is_live=True).values_list('preferred_procedure_id', flat=True))
+                procedure_ids = preferred_procedure_ids
+            if len(procedure_ids) > 0:
+                doctor_clinic_procedure = DoctorClinicProcedure.objects.filter(doctor_clinic=doctor_clinic,
+                                                                               procedure_id__in=procedure_ids).values(
+                                                                               'id', 'mrp', 'agreed_price', 'deal_price'
+                                                                               , 'doctor_clinic_id', 'procedure_id',
+                                                                               detail=F('procedure__details'), duration=
+                                                                               F('procedure__duration'), name=
+                                                                               F('procedure__name'))
             # if doctor_clinic_procedure:
             #     procedure_dict = dict()
             #     procedure_list = []
@@ -233,7 +244,8 @@ class DoctorSearchHelper:
                     "mrp": min_price["mrp"],
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
-                    "procedures": doctor_clinic_procedure
+                    "procedures": doctor_clinic_procedure,
+                    "category_related_procedures": category_related_procedures
                 }]
 
             thumbnail = doctor.get_thumbnail()
