@@ -59,7 +59,7 @@ class LabProfileFooter(Footer):
             labs_in_same_locality = self.labs_in_same_locality()
             if labs_in_same_locality:
                 response['menu'].append(
-                    {'sub_heading': 'Other labs in same or nearby localities', 'url_list': labs_in_same_locality})
+                    {'sub_heading': 'Other labs in same or nearby localities', 'url_list':labs_in_same_locality})
 
         if self.locality and self.centroid:
             labs_in_nearby_localities = self.labs_in_nearby_localities()
@@ -77,7 +77,7 @@ class LabProfileFooter(Footer):
         return response
 
     def labs_in_same_locality(self):
-           query = '''select lb.name, concat(lb.name , ' in ', eu.sublocality_value, ' ', eu.locality_value) title from entity_urls eu inner join 
+           query = '''select eu.url, lb.name, concat(lb.name ) title from entity_urls eu inner join 
                         lab lb on eu.entity_id = lb.id
                         and eu.sitemap_identifier = 'LAB_PAGE' and eu.locality_value ilike '%s' and st_distance(lb.location, '%s') < 10000
                         and eu.is_valid = True 
