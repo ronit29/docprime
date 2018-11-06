@@ -31,6 +31,7 @@ class LabProfileFooter(Footer):
         self.locality_id = None
         self.sublocality = entity.sublocality_value
         self.locality = entity.locality_value
+        self.sublocality_location = entity.sublocality_location
 
         location_id = int(entity.extras.get('location_id'))
         address = EntityAddress.objects.filter(pk=location_id).first()
@@ -58,14 +59,15 @@ class LabProfileFooter(Footer):
             labs_in_same_locality = self.labs_in_same_locality()
             if labs_in_same_locality:
                 response['menu'].append(
-                    {'sub_heading': 'Other labs in same locality', 'url_list': labs_in_same_locality})
+                    {'sub_heading': 'Other labs in same or nearby localities', 'url_list': labs_in_same_locality})
 
-        if self.locality:
+        if self.locality and self.centroid:
             labs_in_nearby_localities = self.labs_in_nearby_localities()
             if labs_in_nearby_localities:
                 response['menu'].append(
                     {'sub_heading':'Labs in Nearby Localities','url_list':labs_in_nearby_localities})
 
+        if self.centroid:
             popular_labs_in_city = self.popular_labs_in_city()
             if popular_labs_in_city:
                 response['menu'].append(
@@ -77,35 +79,40 @@ class LabProfileFooter(Footer):
     def labs_in_same_locality(self):
            query = '''select lb.name, concat(lb.name , ' in ', eu.sublocality_value, ' ', eu.locality_value) title from entity_urls eu inner join 
                         lab lb on eu.entity_id = lb.id
-                        and eu.sitemap_identifier = 'LAB_PAGE' and eu.sublocality_value = '%s' and eu.locality_value = '%s'
-                        and eu.is_valid = True inner join seo_lab_network sln on lb.lab_network_id = sln.lab_id
-                        left join lab_network ln on ln.id=sln.lab_id order by rank limit 10''' %(self.sublocality, self.locality)
+                        and eu.sitemap_identifier = 'LAB_PAGE' and eu.locality_value ilike '%s' and st_distance(lb.location, '%s') < 10000
+                        and eu.is_valid = True 
+                        order by st_distance(lb.location, '%s') asc limit 10
+                        ''' %(self.locality, self.centroid, self.centroid)
 
            return self.get_urls(query)
 
     def labs_in_nearby_localities(self):
         query = '''select url, concat('Labs in ', sublocality_value, locality_value) title from entity_urls where 
                     sitemap_identifier = 'LAB_LOCALITY_CITY'and is_valid = True and locality_value = '%s' and st_distance(sublocality_location, '%s')<10000 
-                    order by count desc limit 10''' %(self.locality, self.sublocality_location)
+                    order by count desc limit 10''' %(self.locality, self.centroid)
 
         return self.get_urls(query)
 
     def popular_labs_in_city(self):
         result = []
-        query = '''select * from
-                    (
-                    select url, lb.name title,
-                    row_number() over (partition by ln.id order by st_distance(lb.location, '%s')asc ) as row_number 
-                    from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' and 
-                    st_distance(lb.location, '%s')<10000 
-                    and eu.is_valid = True inner join seo_lab_network sln on lb.network_id = sln.lab_id
-                    left join lab_network ln on ln.id=sln.lab_id  order by rank
-                    )a where row_number=1 and lb.name not in 
-                    (select lb.name from entity_urls eu inner join 
-                        lab lb on eu.entity_id = lb.id
-                        and eu.sitemap_identifier = 'LAB_PAGE' and eu.sublocality_value = '%s' and eu.locality_value = '%s'
-                        and eu.is_valid = True inner join seo_lab_network sln on lb.network_id = sln.lab_network_id
-                        left join lab_network ln on ln.id=sln.lab_id order by rank) limit 10s''' %(self.sublocality_location, self.sublocality_location,self.sub_locality, self.locality)
+        query = '''select a.url, a.title from
+                      (
+                select url, lb.name title,
+                row_number() over (partition by ln.id order by st_distance(lb.location, '%s') ASC) as row_number 
+                from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' and 
+                eu.is_valid = True  and eu.locality_value ilike '%s' and
+                st_distance(lb.location, '%s')	<10000
+                inner join seo_lab_network sln on lb.network_id = sln.lab_network_id 
+                inner join lab_network ln on ln.id=sln.lab_network_id  order by rank
+                                    )a where row_number=1 and url NOT IN(
+                                    
+                select url  from entity_urls eu inner join 
+                                    lab lb on eu.entity_id = lb.id
+                                    and eu.sitemap_identifier = 'LAB_PAGE' and eu.locality_value ilike '%s' and st_distance(lb.location, '%s') < 10000
+                                    and eu.is_valid = True 
+                                    order by st_distance(lb.location, '%s') asc limit 10
+            )limit 10'''%(self.centroid, self.locality, self.centroid, self.locality, self.centroid, self.centroid)
+
 
         query_result = self.get_urls(query)
 
@@ -160,10 +167,10 @@ class LabLocalityCityFooter(Footer):
                         select url, lb.name title,
                         row_number() over (partition by ln.id order by st_distance(lb.location, '%s')asc ) as row_number 
                         from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' and 
-                        st_distance(lb.location, '%s')<10000 and eu.locality_id = %d and
+                        st_distance(lb.location, '%s')<10000 and eu.sublocality_value ilike '%s'  
                         and eu.is_valid = True inner join seo_lab_network sln on lb.network_id = sln.lab_network_id
                         left join lab_network ln on ln.id=sln.lab_network_id  order by rank
-                        )a where row_number=1 limit 10''' %(self.sublocality_location, self.sublocality_location, self.locality_id)
+                        )a where row_number=1 limit 10''' %(self.sublocality_location, self.sublocality_location, self.sub_locality)
 
         query_result = self.get_urls(query)
 
@@ -217,10 +224,10 @@ class LabCityFooter(Footer):
                         select url, lb.name title,
                         row_number() over (partition by ln.id order by st_distance(lb.location, '%s')asc ) as row_number 
                         from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' 
-                        and st_distance(lb.location, '%s')<10000 
+                        and st_distance(lb.location, '%s')<10000 and eu.locality_value ilike '%s'
                         and eu.is_valid = True inner join seo_lab_network sln on lb.network_id = sln.lab_network_id
                         left join lab_network ln on ln.id=sln.lab_network_id  order by rank
-                        )a where row_number=1 limit 10''' %(self.centroid, self.centroid)
+                        )a where row_number=1 limit 10''' %(self.centroid, self.centroid, self.locality)
 
         query_result = self.get_urls(query)
 
