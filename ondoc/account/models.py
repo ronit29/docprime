@@ -593,3 +593,20 @@ class Invoice(TimeStampedModel):
     reference_id = models.PositiveIntegerField()
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
     file = models.FileField(upload_to='invoices', null=True, blank=True)
+
+
+
+class OrderLog(TimeStampedModel):
+    product_id = models.CharField(max_length=10, blank=True, null=True)
+    referer_data = JSONField(blank=True, null=True)
+    url = models.CharField(max_length=250, blank=True, null=True)
+    order_id = models.CharField(max_length=20, blank=True, null=True)
+    appointment_id = models.CharField(max_length=20, blank=True, null=True)
+    user = models.CharField(max_length=20, blank=True, null=True)
+    is_agent = models.BooleanField(default=False)
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = "order_log"

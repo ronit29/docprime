@@ -6,7 +6,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization, Procedure,
-                                 VisitReason, CancellationReason)
+                                 VisitReason, CancellationReason, PracticeSpecializationContent)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage)
@@ -20,7 +20,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
                      DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
                      SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,
-                     CompetitorInfoImportAdmin, ProcedureAdmin, VisitReasonAdmin)
+                     CompetitorInfoImportAdmin, ProcedureAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -123,4 +123,7 @@ admin.site.register(Coupon)
 admin.site.register(VisitReason, VisitReasonAdmin)
 admin.site.register(CancellationReason)
 admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
+
 admin.site.register(SeoLabNetwork, SeoLabNetworkAdmin)
+admin.site.register(PracticeSpecializationContent, PracticeSpecializationContentAdmin)
+
