@@ -1689,4 +1689,5 @@ class PracticeSpecializationContentAdmin(admin.ModelAdmin):
     model = PracticeSpecializationContent
     list_display = ('specialization',)
     display = ('specialization', 'content', )
+    autocomplete_fields = ('specialization', )
 
