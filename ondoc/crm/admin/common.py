@@ -7,7 +7,7 @@ from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
 
-from ondoc.common.models import Cities
+from ondoc.common.models import Cities, MatrixCityMapping
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin
 
@@ -220,6 +220,25 @@ class CitiesAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name',)
     resource_class = CitiesResource
+
+
+class MatrixCityResource(resources.ModelResource):
+    city_id = fields.Field(attribute='city_id', column_name='id')
+    name = fields.Field(attribute='name', column_name='City')
+
+    class Meta:
+        model = MatrixCityMapping
+        import_id_fields = ('id',)
+
+    def before_save_instance(self, instance, using_transactions, dry_run):
+        super().before_save_instance(instance, using_transactions, dry_run)
+
+
+class MatrixCityAdmin(ImportMixin, admin.ModelAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name',)
+    resource_class = MatrixCityResource
+
 
 class GenericAdminForm(forms.ModelForm):
     class Meta:

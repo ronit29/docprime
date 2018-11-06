@@ -4,7 +4,7 @@ from django.conf import settings
 from rest_framework import status
 import json
 import requests
-from ondoc.common.models import Cities
+from ondoc.common.models import Cities, MatrixCityMapping
 from ondoc.location.models import EntityUrls
 from ondoc.doctor.models import SourceIdentifier, DoctorPopularity
 
@@ -15,7 +15,7 @@ def push_doctors():
 
     for doctor in doctors:
         doctor_hospitals = doctor.hospitals.all()
-        hospital_list = list(filter(lambda hospital: Cities.objects.filter(name__iexact=hospital.city.lower()).exists(),
+        hospital_list = list(filter(lambda hospital: MatrixCityMapping.objects.filter(name__iexact=hospital.city.lower()).exists(),
                                     doctor_hospitals))
 
         doctor_mobiles_list = doctor.mobiles.all()
@@ -57,7 +57,7 @@ def push_doctors():
                 "DocPrimeUserId ": 0,
                 "EmployeeId": "",
                 "LeadSource":"pr",
-                "CityId": Cities.objects.filter(name__iexact=hospital_list[0].city.lower()).first().id,
+                "CityId": MatrixCityMapping.objects.filter(name__iexact=hospital_list[0].city.lower()).first().city_id,
                 "Gender": 1 if doctor.gender == 'm' else 2 if doctor.gender == 'f' else 0,
                 "LeadID": lead_id,
                 "IsKey": is_key,
