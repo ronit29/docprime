@@ -157,14 +157,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
-        entity = EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Lab')
+        entity = EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by('-is_valid')
         if entity.exists():
             entity = entity.first()
             if not entity.is_valid:
-                valid_entity_url_qs = EntityUrls.objects.filter(url_type='PAGEURL',
-                                                                                entity_id=entity.entity_id,
-                                                                                entity_type__iexact='Lab',
-                                                                                is_valid='t')
+                valid_entity_url_qs = EntityUrls.objects.filter(url_type='PAGEURL', entity_id=entity.entity_id,
+                                                                entity_type__iexact='Lab', is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs.first().url
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
