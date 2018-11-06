@@ -87,7 +87,7 @@ class LabProfileFooter(Footer):
            return self.get_urls(query)
 
     def labs_in_nearby_localities(self):
-        query = '''select url, concat('Labs in ', sublocality_value, locality_value) title from entity_urls where 
+        query = '''select url, concat('Labs in ', sublocality_value,' ', locality_value) title from entity_urls where 
                     sitemap_identifier = 'LAB_LOCALITY_CITY'and is_valid = True and locality_value = '%s' and st_distance(sublocality_location, '%s')<10000 
                     order by count desc limit 10''' %(self.locality, self.centroid)
 
@@ -212,7 +212,7 @@ class LabCityFooter(Footer):
 
     def labs_in_top_cities(self):
             query = '''select url, concat('Labs in ', eu.locality_value) title from entity_urls eu inner join
-                        seo_cities sc on eu.locality_value =  sc.city 
+                        seo_cities sc on eu.locality_value ilike sc.city 
                         and  eu.sitemap_identifier = 'LAB_CITY' and eu.is_valid = True order by rank limit 10'''
 
             return self.get_urls(query)
