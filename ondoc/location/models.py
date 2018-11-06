@@ -944,6 +944,7 @@ class LabPageUrl(object):
             elif self.locality:
                 url = url + "-in-%s-lpp" % self.locality
 
+            url = slugify(url)
 
             data = {}
             data['url'] = url
