@@ -428,18 +428,32 @@ class DoctorProfileView(viewsets.GenericViewSet):
         LAB_ONLY = 2
         OPD_AND_LAB = 3
 
-        if auth_models.GenericAdmin.objects.filter(user=user,
-                                                   is_disabled=False).exists() and auth_models.GenericLabAdmin.objects.filter(
-                user=user, is_disabled=False).exists():
+        generic_admin = auth_models.GenericAdmin.objects.filter(user=user,
+                                                is_disabled=False)
+        generic_lab_admin = auth_models.GenericLabAdmin.objects.filter(user=user,
+                                                                is_disabled=False)
+
+        if generic_admin.exists() and generic_lab_admin.exists():
             resp_data["access_type"] = OPD_AND_LAB
-        elif auth_models.GenericAdmin.objects.filter(user=user, is_disabled=False).exists():
+        elif generic_admin.exists():
             resp_data["access_type"] = OPD_ONLY
-        elif auth_models.GenericLabAdmin.objects.filter(user=user, is_disabled=False).exists():
+        elif generic_lab_admin.exists():
             resp_data["access_type"] = LAB_ONLY
         # Check access_type END
 
         resp_data["count"] = queryset
         resp_data['lab_appointment_count'] = lab_appointment_count
+
+        generic_super_user_admin=generic_admin.filter(super_user_permission=True)
+        if generic_super_user_admin.exists():
+            resp_data['is_super_user'] = True
+
+        generic_super_user_lab_admin=generic_lab_admin.filter(super_user_permission=True)
+        if generic_super_user_lab_admin.exists():
+            resp_data['is_super_user_lab'] = True
+
+
+
         return Response(resp_data)
 
 
