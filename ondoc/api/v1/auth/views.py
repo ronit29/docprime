@@ -24,7 +24,7 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken)
 from ondoc.notification.models import SmsNotification, EmailNotification
-from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
+from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -989,6 +989,21 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                                                    response.get('statusCode'))
         except Exception as e:
             logger.error("Error - " + str(e))
+
+
+        # log redirects
+        log_data = { "url" : REDIRECT_URL }
+        if order_obj:
+            log_data["product_id"] = order_obj.product_id
+            log_data["order_id"] = order_obj.id
+        if appointment_obj:
+            log_data["appointment_id"] = appointment_obj.id
+        log_data['referer_data'] = { 'HTTP_USER_AGENT' : request.META['HTTP_USER_AGENT'], 'HTTP_HOST' : request.META['HTTP_HOST'] }
+        if request.user:
+            log_data['user'] = request.user.id
+        if hasattr(request, 'agent'):
+            log_data['is_agent'] = True
+        OrderLog.objects.create(**log_data)
 
         # return Response({"url": REDIRECT_URL})
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
