@@ -66,7 +66,7 @@ class DoctorSearchHelper:
                                                          self.query_params.get("sits_at")]))
             )
 
-        if len(procedure_ids) > 0:  # NEW_LOGIC if we have to search procedure no min max fees
+        if len(procedure_ids) == 0:  # NEW_LOGIC if we have to search procedure no min max fees
             if self.query_params.get("min_fees") is not None:
                 if not len(procedure_ids) > 0:
                     filtering_params.append(
@@ -109,16 +109,15 @@ class DoctorSearchHelper:
 
     def get_ordering_params(self):
         if self.query_params.get("procedure_ids", []) or self.query_params.get("procedure_category_ids", []):  # NEW_LOGIC
-            order_by_field = 'is_gold desc, count_per_clinic desc, distance'  # NEW_LOGIC NoT SuRe if gold should come first?????
+            order_by_field = 'count_per_clinic desc, distance, sum_per_clinic'  # NEW_LOGIC
             rank_by = "rank_procedure=1"
             if self.query_params.get('sort_on'):
                 if self.query_params.get('sort_on') == 'experience':
                     order_by_field = 'practicing_since ASC'
                 if self.query_params.get('sort_on') == 'fees':
-                    order_by_field = "count_per_clinic desc, sum_per_clinic ASC"
+                    order_by_field = "count_per_clinic DESC, sum_per_clinic ASC, distance ASC"
                     rank_by = "rank_fees=1"
-            order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC'
-                                              , order_by_field)
+            order_by_field = "{} ".format(order_by_field)
         else:
             order_by_field = 'is_gold desc, distance'
             rank_by = "rank_distance=1"
@@ -145,41 +144,43 @@ class DoctorSearchHelper:
 
         if self.query_params.get("procedure_ids", []) or self.query_params.get("procedure_category_ids", []):  # NEW_LOGIC
             query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
-                           "FROM (SELECT ROW_NUMBER() OVER (partition BY doctor_id order by count_per_clinic DESC, " \
-                           "distance ASC, sum_per_clinic ASC ) as rank_procedure, " \
+                           "FROM (SELECT ROW_NUMBER() OVER (PARTITION BY doctor_id ORDER BY count_per_clinic DESC, " \
+                           "distance ASC, sum_per_clinic ASC ) AS rank_procedure, " \
                            "count_per_clinic, " \
-                           "Row_number() OVER( partition BY doctor_id ORDER BY count_per_clinic DESC, sum_per_clinic ASC, distance ASC) as rank_fees, " \
+                           "Row_number() OVER( PARTITION BY doctor_id ORDER BY count_per_clinic DESC, sum_per_clinic ASC, distance ASC) as rank_fees, " \
                            "sum_per_clinic, " \
-                           "Row_number() OVER( partition BY doctor_id  ORDER BY " \
+                           "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
                            "distance, count_per_clinic DESC, sum_per_clinic ASC) rank_distance, " \
                            "distance, " \
-                           "procedure_deal_price, doctor_id, doctor_clinic_id, doctor_clinic_timing_id, " \
+                           "procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, " \
                            "procedure_id, doctor_clinic_deal_price, hospital_id " \
                            "FROM (SELECT " \
-                           "COUNT(procedure_id) OVER (partition BY dc.id) as count_per_clinic, " \
-                           "SUM(dcp.deal_price) OVER (partition BY dc.id) as sum_per_clinic, " \
-                           "St_distance(St_setsrid(St_point({lng}, {lat}), 4326), h.location) as distance, " \
-                           "dcp.deal_price as procedure_deal_price, " \
-                           "d.id as doctor_id, " \
-                           "dc.id as doctor_clinic_id,  dct.id as doctor_clinic_timing_id, dcp.id as doctor_clinic_procedure_id, " \
-                           "dcp.procedure_id, dct.deal_price as doctor_clinic_deal_price, " \
-                           "dc.hospital_id as hospital_id FROM   doctor d " \
+                           "COUNT(procedure_id) OVER (PARTITION BY dc.id) AS count_per_clinic, " \
+                           "SUM(dcp.deal_price) OVER (PARTITION BY dc.id) AS sum_per_clinic, " \
+                           "St_distance(St_setsrid(St_point({lng}, {lat}), 4326), h.location) AS distance, " \
+                           "dcp.deal_price AS procedure_deal_price, " \
+                           "d.id AS doctor_id, practicing_since, " \
+                           "dc.id AS doctor_clinic_id,  dct.id AS doctor_clinic_timing_id, dcp.id AS doctor_clinic_procedure_id, " \
+                           "dcp.procedure_id, dct.deal_price AS doctor_clinic_deal_price, " \
+                           "dc.hospital_id AS hospital_id FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
-                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id AND h.is_live=true " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
-                           "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
-                           "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
-                           "WHERE d.is_live=true and {fltr_prmts} and " \
-                           "St_distance(St_setsrid(St_point({lng}, {lat}), 4326 ), h.location) < {max_dist} and " \
+                           "LEFT JOIN doctor_practice_specialization ds ON ds.doctor_id = d.id " \
+                           "LEFT JOIN practice_specialization gs ON ds.specialization_id = gs.id " \
+                           "WHERE d.is_live=true AND {fltr_prmts} AND " \
+                           "St_distance(St_setsrid(St_point({lng}, {lat}), 4326 ), h.location) < {max_dist} AND " \
                            "St_distance(St_setsrid(St_point({lng}, {lat}), 4326 ), h.location) >= {min_dist} " \
-                           "ORDER BY {ordr_by}) as tempTable) x WHERE {where_prms}".format(lng=longitude,
-                                                                                           lat=latitude,
-                                                                                           fltr_prmts=filtering_params,
-                                                                                           max_dist=max_distance,
-                                                                                           min_dist=min_distance,
-                                                                                           ordr_by=order_by_field,
-                                                                                           where_prms=rank_by)
+                           "ORDER BY d.is_live DESC, d.enabled_for_online_booking DESC, " \
+                           "d.is_license_verified DESC, is_gold desc ) AS tempTable) " \
+                           "x WHERE {where_prms} ORDER BY {odr_prm}".format(lng=longitude,
+                                                                            lat=latitude,
+                                                                            fltr_prmts=filtering_params,
+                                                                            max_dist=max_distance,
+                                                                            min_dist=min_distance,
+                                                                            odr_prm=order_by_field,
+                                                                            where_prms=rank_by)
 
         else:
             query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
