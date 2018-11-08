@@ -4,9 +4,9 @@ from django.conf import settings
 from rest_framework import status
 import json
 import requests
-from ondoc.common.models import Cities
+from ondoc.common.models import Cities, MatrixCityMapping
 from ondoc.location.models import EntityUrls
-from ondoc.doctor.models import SourceIdentifier
+from ondoc.doctor.models import SourceIdentifier, DoctorPopularity
 
 def push_doctors():
     doctors = Doctor.objects.filter(source='pr', matrix_lead_id__isnull=True)
@@ -15,7 +15,7 @@ def push_doctors():
 
     for doctor in doctors:
         doctor_hospitals = doctor.hospitals.all()
-        hospital_list = list(filter(lambda hospital: Cities.objects.filter(name__iexact=hospital.city.lower()).exists(),
+        hospital_list = list(filter(lambda hospital: MatrixCityMapping.objects.filter(name__iexact=hospital.city.lower()).exists(),
                                     doctor_hospitals))
 
         doctor_mobiles_list = doctor.mobiles.all()
@@ -31,16 +31,21 @@ def push_doctors():
 
             #mobile = "%s-%s" % (doctor_mobiles_list[0].std_code, doctor_mobiles_list[0].number)
 
-
         si = SourceIdentifier.objects.filter(reference_id = doctor.id, type=1).first()
         unique_id = None
+        popularity_score = 0.0
+        is_key = 0
         if si:
             unique_id = si.unique_identifier
+            if unique_id:
+                doc_popularity = DoctorPopularity.objects.filter(unique_identifier=unique_id).first()
+                if doc_popularity and doc_popularity.popularity_score and doc_popularity.popularity_score > 0.0:
+                    popularity_score = doc_popularity.popularity_score
+                    is_key = 1
 
         lead_id = 0
         if doctor.matrix_lead_id:
             lead_id = doctor.matrix_lead_id
-
 
         if len(hospital_list) > 0 and mobile:
             request_data = {
@@ -52,9 +57,11 @@ def push_doctors():
                 "DocPrimeUserId ": 0,
                 "EmployeeId": "",
                 "LeadSource":"pr",
-                "CityId": Cities.objects.filter(name__iexact=hospital_list[0].city.lower()).first().id,
+                "CityId": MatrixCityMapping.objects.filter(name__iexact=hospital_list[0].city.lower()).first().city_id,
                 "Gender": 1 if doctor.gender == 'm' else 2 if doctor.gender == 'f' else 0,
-                "LeadID": lead_id
+                "LeadID": lead_id,
+                "IsKey": is_key,
+                "Popularity": popularity_score
             }
 
             try:

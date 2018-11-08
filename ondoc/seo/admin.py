@@ -35,5 +35,9 @@ class RobotAdmin(admin.ModelAdmin):
        return Robot.objects.all().order_by('-created_at')
 
 
+
+
+
+
 admin.site.register(Sitemap, SitemapAdmin)
 admin.site.register(Robot, RobotAdmin)

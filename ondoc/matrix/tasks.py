@@ -76,7 +76,7 @@ def prepare_and_hit(self, data):
         'AppointmentDetails': appointment_details
     }
 
-    logger.error(json.dumps(request_data))
+    #logger.error(json.dumps(request_data))
 
     url = settings.MATRIX_API_URL
     matrix_api_token = settings.MATRIX_API_TOKEN
@@ -103,7 +103,8 @@ def prepare_and_hit(self, data):
 
     print(str(resp_data))
     if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
-        logger.info("[SUCCESS] Appointment successfully published to the matrix system")
+        #logger.info("[SUCCESS] Appointment successfully published to the matrix system")
+        pass
     else:
         logger.info("[ERROR] Appointment could not be published to the matrix system")
 
@@ -182,7 +183,7 @@ def push_signup_lead_to_matrix(self, data):
             'UtmTerm': utm.get('utm_term', ''),
         }
 
-        logger.error(json.dumps(request_data))
+        #logger.error(json.dumps(request_data))
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
@@ -199,7 +200,7 @@ def push_signup_lead_to_matrix(self, data):
             self.retry([data], countdown=countdown_time)
 
         resp_data = response.json()
-        logger.error(response.text)
+        #logger.error(response.text)
 
         # save the appointment with the matrix lead id.
         online_lead_obj.matrix_lead_id = resp_data.get('Id', None)
@@ -210,7 +211,8 @@ def push_signup_lead_to_matrix(self, data):
 
         print(str(resp_data))
         if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
-            logger.info("[SUCCESS] Lead successfully published to the matrix system")
+            #logger.info("[SUCCESS] Lead successfully published to the matrix system")
+            pass
         else:
             logger.info("[ERROR] Lead could not be published to the matrix system")
 
@@ -255,7 +257,7 @@ def push_order_to_matrix(self, data):
             }
         }
 
-        logger.error(json.dumps(request_data))
+        #logger.error(json.dumps(request_data))
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN

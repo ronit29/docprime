@@ -610,9 +610,9 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
     formset = GenericAdminFormSet
-    # can_delete = True
+    form = GenericAdminForm
     show_change_link = False
-    exclude = ('hospital_network', )
+    exclude = ('hospital_network', 'is_doc_admin')
     verbose_name_plural = "Admins"
 
     # def has_delete_permission(self, request, obj=None):
@@ -1685,4 +1685,5 @@ class PracticeSpecializationContentAdmin(admin.ModelAdmin):
     model = PracticeSpecializationContent
     list_display = ('specialization',)
     display = ('specialization', 'content', )
+    autocomplete_fields = ('specialization', )
 
