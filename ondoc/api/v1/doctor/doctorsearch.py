@@ -29,29 +29,31 @@ class DoctorSearchHelper:
         filtering_params = ['d.is_test_doctor is False',
                             'd.is_internal is False']
 
-        specialization_ids = self.query_params.get("specialization_ids",[])
+        specialization_ids = self.query_params.get("specialization_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
-        procedure_ids = self.query_params.get("procedure_ids", [])
-        category_ids = self.query_params.get("procedure_category_ids", [])
+        procedure_ids = self.query_params.get("procedure_ids", [])  # NEW_LOGIC
+        procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
 
-        if len(condition_ids)>0:
-            cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
+        if len(condition_ids) > 0:
+            cs = list(models.MedicalConditionSpecialization.objects.filter(
+                medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
             cs = [str(i) for i in cs]
             specialization_ids.extend(cs)
 
-        if len(specialization_ids)>0:
+        if len(specialization_ids) > 0:
             filtering_params.append(
                 " gs.id IN({})".format(",".join(specialization_ids))
             )
 
-        procedure_mapped_ids = []
+        procedure_mapped_ids = []  # NEW_LOGIC
 
-        if len(category_ids) > 0 and not len(procedure_ids) > 0:
+        if len(procedure_category_ids) > 0 and not len(procedure_ids) > 0:  # NEW_LOGIC
             preferred_procedure_ids = list(
-                ProcedureCategory.objects.filter(pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True))
+                ProcedureCategory.objects.filter(pk__in=procedure_category_ids, is_live=True).values_list(
+                    'preferred_procedure_id', flat=True))
             procedure_ids = preferred_procedure_ids
 
-        if len(procedure_ids)>0:
+        if len(procedure_ids) > 0:  # NEW_LOGIC
             ps = list(procedure_ids)
             ps = [str(i) for i in ps]
             procedure_mapped_ids.extend(ps)
@@ -63,30 +65,36 @@ class DoctorSearchHelper:
                 "hospital_type IN({})".format(", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in
                                                          self.query_params.get("sits_at")]))
             )
-        if self.query_params.get("min_fees") is not None:
-            if not len(procedure_ids)>0:
-                filtering_params.append(
-                    "dct.deal_price>={}".format(str(self.query_params.get("min_fees"))))
-        if self.query_params.get("max_fees") is not None:
-            if not len(procedure_ids)>0:
-                filtering_params.append(
-                    "dct.deal_price<={}".format(str(self.query_params.get("max_fees"))))
+
+        if len(procedure_ids) > 0:  # NEW_LOGIC if we have to search procedure no min max fees
+            if self.query_params.get("min_fees") is not None:
+                if not len(procedure_ids) > 0:
+                    filtering_params.append(
+                        "dct.deal_price>={}".format(str(self.query_params.get("min_fees"))))
+            if self.query_params.get("max_fees") is not None:
+                if not len(procedure_ids) > 0:
+                    filtering_params.append(
+                        "dct.deal_price<={}".format(str(self.query_params.get("max_fees"))))
+
         if self.query_params.get("is_female"):
             filtering_params.append(
                 "gender='f'"
             )
+
         if self.query_params.get("is_available"):
             current_time = datetime.now()
             current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2) + .75
             filtering_params.append(
                 'dct.day={} and dct.end>={}'.format(str(current_time.weekday()), str(current_hour))
             )
+
         if self.query_params.get("doctor_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             filtering_params.append(
                 "d.search_key ilike '%{}%'".format(search_key))
+
         if self.query_params.get("hospital_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("hospital_name"))
             search_key = " ".join(search_key).lower()
@@ -96,20 +104,33 @@ class DoctorSearchHelper:
 
         if not filtering_params:
             return "1=1"
+
         return " and ".join(filtering_params)
 
     def get_ordering_params(self):
-        order_by_field = 'is_gold desc, distance'
-        rank_by = "rank_distance=1"
-        if self.query_params.get('sort_on'):
-            if self.query_params.get('sort_on') == 'experience':
-                order_by_field = 'practicing_since ASC'
-            if self.query_params.get('sort_on') == 'fees':
-                order_by_field = "deal_price ASC"
-                rank_by = "rank_fees=1"
-        order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC'
-                                          , order_by_field)
-        # order_by_field = "{}, {} ".format('d.is_live DESC', order_by_field)
+        if self.query_params.get("procedure_ids", []) or self.query_params.get("procedure_category_ids", []):  # NEW_LOGIC
+            order_by_field = 'is_gold desc, count_per_clinic desc, distance'  # NEW_LOGIC NoT SuRe if gold should come first?????
+            rank_by = "rank_procedure=1"
+            if self.query_params.get('sort_on'):
+                if self.query_params.get('sort_on') == 'experience':
+                    order_by_field = 'practicing_since ASC'
+                if self.query_params.get('sort_on') == 'fees':
+                    order_by_field = "count_per_clinic desc, sum_per_clinic ASC"
+                    rank_by = "rank_fees=1"
+            order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC'
+                                              , order_by_field)
+        else:
+            order_by_field = 'is_gold desc, distance'
+            rank_by = "rank_distance=1"
+            if self.query_params.get('sort_on'):
+                if self.query_params.get('sort_on') == 'experience':
+                    order_by_field = 'practicing_since ASC'
+                if self.query_params.get('sort_on') == 'fees':
+                    order_by_field = "deal_price ASC"
+                    rank_by = "rank_fees=1"
+            order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC'
+                                              , order_by_field)
+            # order_by_field = "{}, {} ".format('d.is_live DESC', order_by_field)
         return order_by_field, rank_by
 
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
@@ -122,33 +143,71 @@ class DoctorSearchHelper:
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
         # max_distance = 10000000000000000000000
 
-        query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id, " \
-                       "doctor_clinic_procedure_id " \
-                       "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
-                       "ORDER BY dct.deal_price ASC) rank_fees, " \
-                       "Row_number() OVER( partition BY dc.doctor_id  ORDER BY " \
-                       "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location),dct.deal_price ASC) rank_distance, " \
-                       "St_distance(St_setsrid(St_point(%s, %s), 4326), h.location) distance, d.id as doctor_id, " \
-                       "dc.id as doctor_clinic_id,  " \
-                       "dct.id as doctor_clinic_timing_id, " \
-                       "dcp.id as doctor_clinic_procedure_id, " \
-                       "dc.hospital_id as hospital_id FROM   doctor d " \
-                       "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
-                       "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
-                       "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
-                       "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
-                       "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
-                       "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
-                       "WHERE d.is_live=true and %s " \
-                       "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) < %s" \
-                       "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) >= %s " \
-                       "ORDER  BY %s ) x " \
-                       "where %s" % (longitude, latitude,
-                                     longitude, latitude,
-                                     filtering_params,
-                                     longitude, latitude, max_distance,
-                                     longitude, latitude, min_distance,
-                                     order_by_field, rank_by)
+        if self.query_params.get("procedure_ids", []) or self.query_params.get("procedure_category_ids", []):  # NEW_LOGIC
+            query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
+                           "FROM (SELECT ROW_NUMBER() OVER (partition BY doctor_id order by count_per_clinic DESC, " \
+                           "distance ASC, sum_per_clinic ASC ) as rank_procedure, " \
+                           "count_per_clinic, " \
+                           "Row_number() OVER( partition BY doctor_id ORDER BY count_per_clinic DESC, sum_per_clinic ASC, distance ASC) as rank_fees, " \
+                           "sum_per_clinic, " \
+                           "Row_number() OVER( partition BY doctor_id  ORDER BY " \
+                           "distance, count_per_clinic DESC, sum_per_clinic ASC) rank_distance, " \
+                           "distance, " \
+                           "procedure_deal_price, doctor_id, doctor_clinic_id, doctor_clinic_timing_id, " \
+                           "procedure_id, doctor_clinic_deal_price, hospital_id " \
+                           "FROM (SELECT " \
+                           "COUNT(procedure_id) OVER (partition BY dc.id) as count_per_clinic, " \
+                           "SUM(dcp.deal_price) OVER (partition BY dc.id) as sum_per_clinic, " \
+                           "St_distance(St_setsrid(St_point({lng}, {lat}), 4326), h.location) as distance, " \
+                           "dcp.deal_price as procedure_deal_price, " \
+                           "d.id as doctor_id, " \
+                           "dc.id as doctor_clinic_id,  dct.id as doctor_clinic_timing_id, dcp.id as doctor_clinic_procedure_id, " \
+                           "dcp.procedure_id, dct.deal_price as doctor_clinic_deal_price, " \
+                           "dc.hospital_id as hospital_id FROM   doctor d " \
+                           "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
+                           "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
+                           "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
+                           "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
+                           "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
+                           "WHERE d.is_live=true and {fltr_prmts} and " \
+                           "St_distance(St_setsrid(St_point({lng}, {lat}), 4326 ), h.location) < {max_dist} and " \
+                           "St_distance(St_setsrid(St_point({lng}, {lat}), 4326 ), h.location) >= {min_dist} " \
+                           "ORDER BY {ordr_by}) as tempTable) x WHERE {where_prms}".format(lng=longitude,
+                                                                                           lat=latitude,
+                                                                                           fltr_prmts=filtering_params,
+                                                                                           max_dist=max_distance,
+                                                                                           min_dist=min_distance,
+                                                                                           ordr_by=order_by_field,
+                                                                                           where_prms=rank_by)
+
+        else:
+            query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
+                           "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
+                           "ORDER BY dct.deal_price ASC) rank_fees, " \
+                           "Row_number() OVER( partition BY dc.doctor_id  ORDER BY " \
+                           "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location),dct.deal_price ASC) rank_distance, " \
+                           "St_distance(St_setsrid(St_point(%s, %s), 4326), h.location) distance, d.id as doctor_id, " \
+                           "dc.id as doctor_clinic_id,  " \
+                           "dct.id as doctor_clinic_timing_id, " \
+                           "dc.hospital_id as hospital_id FROM doctor d " \
+                           "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
+                           "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
+                           "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
+                           "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
+                           "WHERE d.is_live=true and %s " \
+                           "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) < %s " \
+                           "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) >= %s " \
+                           "ORDER  BY %s ) x " \
+                           "where %s" % (longitude, latitude,
+                                         longitude, latitude,
+                                         filtering_params,
+                                         longitude, latitude, max_distance,
+                                         longitude, latitude, min_distance,
+                                         order_by_field, rank_by)
+
+
         return query_string
 
     def count_hospitals(self, doctor):
