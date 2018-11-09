@@ -274,7 +274,7 @@ def push_order_to_matrix(self, data):
             self.retry([data], countdown=countdown_time)
         else:
             resp_data = response.json()
-            logger.error(response.text)
+            #logger.error(response.text)
 
             # save the order with the matrix lead id.
             order_obj.matrix_lead_id = resp_data.get('Id', None)
@@ -282,7 +282,7 @@ def push_order_to_matrix(self, data):
 
             order_obj.save()
 
-            print(str(resp_data))
+            #print(str(resp_data))
             if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
                 #logger.info("[SUCCESS] Order successfully published to the matrix system")
                 pass
