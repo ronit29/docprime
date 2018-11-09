@@ -995,6 +995,11 @@ class DoctorPageURL(object):
         self.specializations = []
         self.sequence = sequence
 
+        self.sublocality = None
+        self.sublocality_id = None
+        self.sublocality_longitude = None
+        self.sublocality_latitude = None
+
     def init_preferred_hospital(self):
 
         hospital = None

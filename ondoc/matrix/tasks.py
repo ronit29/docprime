@@ -284,7 +284,8 @@ def push_order_to_matrix(self, data):
 
             print(str(resp_data))
             if isinstance(resp_data, dict) and resp_data.get('IsSaved', False):
-                logger.info("[SUCCESS] Order successfully published to the matrix system")
+                #logger.info("[SUCCESS] Order successfully published to the matrix system")
+                pass
             else:
                 logger.info("[ERROR] Order could not be published to the matrix system")
 

@@ -188,8 +188,8 @@ class DoctorSearchHelper:
 
             opening_hours = None
             if doctor_clinic.availability.exists():
-                opening_hours = '%.2f-%.2f' % (doctor_clinic.availability.first().start,
-                                                   doctor_clinic.availability.first().end),
+                opening_hours = '%.2f-%.2f' % (doctor_clinic.availability.all()[0].start,
+                                                   doctor_clinic.availability.all()[0].end),
 
             temp = {
                 "doctor_id": doctor.id,

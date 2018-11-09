@@ -761,9 +761,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             if doctor_hospital:
                 availability_qs = doctor_hospital.availability
                 if availability_qs.exists():
-                    opening_hours = '%.2f-%.2f' % (availability_qs.first().start,
-                                                   availability_qs.first().end)
-                    price = availability_qs.first().mrp
+                    av = availability_qs.all()[0]
+                    opening_hours = '%.2f-%.2f' % (av.start,
+                                                   av.end)
+                    price = av.mrp
 
         schema = {
             'name': self.instance.get_display_name(),
