@@ -511,7 +511,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'doctor_clinics__hospital',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
+                                    'qualifications__college',
                                     'doctorpracticespecializations__specialization',
+                                    'images',
                                     'rating'
                                     )
                   .filter(pk=pk).first())
@@ -827,11 +829,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                                   order_by_field, rank_by)
             doctor_search_result = RawSql(query_string).fetch_all()
             result_count = len(doctor_search_result)
-            saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
-                                                                           result_count=result_count)
+            # sa
+            # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
+            #                                                                result_count=result_count)
         else:
             saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
-        doctor_ids = paginate_queryset([data.get("doctor_id") for data in saved_search_result.results], request)
+        doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
         preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
         doctor_data = models.Doctor.objects.filter(
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
@@ -841,7 +844,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "qualifications__qualification", "qualifications__specialization",
                                                 "qualifications__college", "doctor_clinics__doctorclinicprocedure_set").order_by(preserved)
 
-        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
+        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
@@ -1018,8 +1021,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
-        return Response({"result": response, "count": saved_search_result.result_count,
-                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb, 'search_content': specialization_dynamic_content})
+        return Response({"result": response, "count": result_count,
+                         'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb, 'search_content': specialization_dynamic_content})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):

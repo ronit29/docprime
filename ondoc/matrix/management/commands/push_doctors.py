@@ -29,7 +29,16 @@ def push_doctors():
             if doctor_mobiles_list[0].std_code:
                 mobile = str(doctor_mobiles_list[0].std_code)+str(mobile)
 
+        if not mobile and doctor_hospitals.exists():
+            spoc = doctor_hospitals.first().spoc_details.objects.all().first()
+            if spoc:
+                if spoc.std_code:
+                    mobile = str(spoc.std_code)+str(spoc.number)
+                else:
+                    mobile = str(spoc.number)
+
             #mobile = "%s-%s" % (doctor_mobiles_list[0].std_code, doctor_mobiles_list[0].number)
+        print('mobile is '+str(mobile))    
 
         si = SourceIdentifier.objects.filter(reference_id = doctor.id, type=1).first()
         unique_id = None
@@ -61,7 +70,7 @@ def push_doctors():
                 "Gender": 1 if doctor.gender == 'm' else 2 if doctor.gender == 'f' else 0,
                 "LeadID": lead_id,
                 "IsKey": is_key,
-                "Popularity": popularity_score
+                "Popularity": str(popularity_score)
             }
 
             try:
@@ -75,6 +84,7 @@ def push_doctors():
 
                     # save the appointment with the matrix lead id.
                     doctor.matrix_lead_id = resp_data.get('Id', None)
+                    print('lead id is ' + doctor.matrix_lead_id)
                     doctor.matrix_lead_id = int(doctor.matrix_lead_id)
 
                     doctor.save()
