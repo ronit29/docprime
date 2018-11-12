@@ -830,7 +830,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
             doctor_search_result = RawSql(query_string.get('query'),[query_string.get('longitude'), query_string.get('latitude'),
                                                                      query_string.get('longitude'), query_string.get('latitude'),
-                                                                     query_string.get('filtering_params'), query_string.get('longitude'),
+                                                                     query_string.get('longitude'),
                                                                      query_string.get('latitude'),query_string.get('max_distance'),
                                                                      query_string.get('longitude'), query_string.get('latitude'),
                                                                      query_string.get('min_distance')]).fetch_all()

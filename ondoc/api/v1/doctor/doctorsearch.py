@@ -96,6 +96,7 @@ class DoctorSearchHelper:
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
         # max_distance = 10000000000000000000000
         data = dict()
+
         query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                        "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
@@ -110,11 +111,11 @@ class DoctorSearchHelper:
                        "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                        "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
                        "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
-                       "WHERE d.is_live=true and %s " \
+                       "WHERE d.is_live=true and {filtering_params} " \
                        "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) < %s" \
                        "and St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location) >= %s " \
-                        "ORDER  BY {ordering_field} ) x " \
-                        "where {rank_field}" % ({'ordering_field' : order_by_field, 'rank_field' : rank_by})
+                        "ORDER  BY {order_by_field} ) x " \
+                        "where {rank_by}".format(filtering_params=filtering_params, order_by_field=order_by_field, rank_by = rank_by)
                        # "ORDER  BY {ordering_field} ) x " \
                        #  "where {rank_field}" % ({'ordering_field': order_by_field, 'rank_field': rank_by})
                        # % (longitude, latitude,
@@ -126,7 +127,6 @@ class DoctorSearchHelper:
         data["query"] = query_string
         data["longitude"] =longitude
         data["latitude"]= latitude
-        data["filtering_params"] = filtering_params
         data["max_distance"] = max_distance
         data["min_distance"] = min_distance
         return data
