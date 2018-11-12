@@ -645,7 +645,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['payment_required'] = False
                 return resp
             else:
-                balance = consumer_account.balance + appointment_details.effective_price
+                current_balance = consumer_account.balance + appointment_details.effective_price
                 new_appointment_details['time_slot_start'] = str(new_appointment_details['time_slot_start'])
                 action = ''
                 temp_app_details = copy.deepcopy(new_appointment_details)
@@ -661,7 +661,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                     product_id=product_id,
                     action=action,
                     action_data=temp_app_details,
-                    amount=new_appointment_details.get('effective_price') - balance,
+                    amount=new_appointment_details.get('effective_price') - current_balance,
+                    wallet_amount=current_balance,
                     # reference_id=appointment_details.id,
                     payment_status=account_models.Order.PAYMENT_PENDING
                 )
@@ -941,41 +942,40 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 pg_resp_code = None
 
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId"), reference_id__isnull=True).first()
-            if pg_resp_code == 1:
-                if not order_obj:
-                    REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+            if pg_resp_code == 1 and order_obj:
+                response_data = None
+                resp_serializer = serializers.TransactionSerializer(data=response)
+                if resp_serializer.is_valid():
+                    response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
+                    if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                        pg_tx_queryset = None
+                        try:
+                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                        except Exception as e:
+                            logger.error("Error in saving PG Transaction Data - " + str(e))
+
+                        try:
+                            if pg_tx_queryset:
+                                appointment_obj = order_obj.process_order()
+                        except Exception as e:
+                            logger.error("Error in building appointment - " + str(e))
                 else:
-                    response_data = None
-                    resp_serializer = serializers.TransactionSerializer(data=response)
-                    if resp_serializer.is_valid():
-                        response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-                        if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
-                            pg_tx_queryset = None
-                            try:
-                                pg_tx_queryset = PgTransaction.objects.create(**response_data)
-                            except Exception as e:
-                                logger.error("Error in saving PG Transaction Data - " + str(e))
+                    logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
 
-                            try:
-                                appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
-                            except Exception as e:
-                                logger.error("Error in building appointment - " + str(e))
-                    else:
-                        logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
 
-                    if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                        if appointment_obj:
-                            REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
-                        elif order_obj:
-                            REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
-                                order_obj.action_data.get("lab"), response.get('statusCode'))
-                    elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                        if appointment_obj:
-                            REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
-                        elif order_obj:
-                            REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
-                                                                       order_obj.action_data.get("hospital"),
-                                                                       response.get('statusCode'))
+                if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
+                    if appointment_obj:
+                        REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
+                    elif order_obj:
+                        REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
+                            order_obj.action_data.get("lab"), response.get('statusCode'))
+                elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
+                    if appointment_obj:
+                        REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
+                    elif order_obj:
+                        REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
+                                                                   order_obj.action_data.get("hospital"),
+                                                                   response.get('statusCode'))
             else:
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
@@ -1033,35 +1033,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['pb_gateway_name'] = response.get('pbGatewayName')
 
         return data
-
-    @transaction.atomic
-    def block_pay_schedule_transaction(self, pg_data, order_obj):
-
-        consumer_account = ConsumerAccount.objects.get_or_create(user=pg_data["user"])
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=pg_data["user"])
-
-        tx_amount = order_obj.amount
-
-        consumer_account.credit_payment(pg_data, tx_amount)
-
-        appointment_obj = None
-        try:
-            appointment_data = order_obj.action_data
-            if order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                serializer = OpdAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid(raise_exception=True)
-                appointment_data = serializer.validated_data
-            elif order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                serializer = LabAppTransactionModelSerializer(data=appointment_data)
-                serializer.is_valid(raise_exception=True)
-                appointment_data = serializer.validated_data
-
-            appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
-            # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
-        except Exception as e:
-            logger.error("Internal error in creating/rescheduling appointment in pg flow with exception - " + str(e))
-
-        return appointment_obj
 
     @transaction.atomic
     def block_schedule_transaction(self, data):

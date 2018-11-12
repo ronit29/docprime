@@ -191,6 +191,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+
         time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
         doctor_clinic_timing = models.DoctorClinicTiming.objects.filter(
             doctor_clinic__doctor=data.get('doctor'),
@@ -238,7 +239,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "coupon": coupon_list,
             "discount": coupon_discount
         }
-        resp = self.extract_payment_details(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID)
+        resp = self.create_order(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID)
+
         return Response(data=resp)
 
     def update(self, request, pk=None):
@@ -269,13 +271,18 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return Response(response)
 
     @transaction.atomic
-    def extract_payment_details(self, request, appointment_details, product_id):
+    def create_order(self, request, appointment_details, product_id):
+
         remaining_amount = 0
         user = request.user
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
         resp = {}
+
+        resp['is_agent'] = False
+        if hasattr(request, 'agent') and request.agent:
+            resp['is_agent'] = True
 
         can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
         if can_use_insurance:
@@ -286,26 +293,23 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp['message'] = insurance_fail_message
             return resp
 
-        temp_app_details = copy.deepcopy(appointment_details)
-        temp_app_details = opdappointment_transform(temp_app_details)
+        appointment_action_data = copy.deepcopy(appointment_details)
+        appointment_action_data = opdappointment_transform(appointment_action_data)
 
-        account_models.Order.disable_pending_orders(temp_app_details, product_id,
+        account_models.Order.disable_pending_orders(appointment_action_data, product_id,
                                                     account_models.Order.OPD_APPOINTMENT_CREATE)
-        resp['is_agent'] = False
-        if hasattr(request, 'agent') and request.agent:
-            resp['is_agent'] = True
-            balance = 0
 
-        if (appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
-             balance < appointment_details.get("effective_price")):
+        if ( (appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
+            balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
 
             payable_amount = appointment_details.get("effective_price") - balance
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.OPD_APPOINTMENT_CREATE,
-                action_data=temp_app_details,
+                action_data=appointment_action_data,
                 amount=payable_amount,
+                wallet_amount=balance,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = payable_amount
@@ -324,12 +328,24 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             except:
                 pass
         else:
-            opd_obj = models.OpdAppointment.create_appointment(appointment_details)
-            if appointment_details["payment_type"] == models.OpdAppointment.PREPAID:
-                consumer_account.debit_schedule(opd_obj, product_id, appointment_details.get("effective_price"))
+            wallet_amount = 0
+            if appointment_details['payment_type'] == models.OpdAppointment.PREPAID:
+                wallet_amount = appointment_details.get("effective_price")
+
+            order = account_models.Order.objects.create(
+                product_id=product_id,
+                action=account_models.Order.OPD_APPOINTMENT_CREATE,
+                action_data=appointment_action_data,
+                amount=0,
+                wallet_amount=wallet_amount,
+                payment_status=account_models.Order.PAYMENT_PENDING
+            )
+
+            appointment_object = order.process_order()
             resp["status"] = 1
             resp["payment_required"] = False
-            resp["data"] = {"id": opd_obj.id, "type": serializers.OpdAppointmentSerializer.DOCTOR_TYPE}
+            resp["data"] = {"id": appointment_object.id, "type": serializers.OpdAppointmentSerializer.DOCTOR_TYPE}
+
         return resp
 
     def payment_details(self, request, appointment_details, product_id, order_id):
