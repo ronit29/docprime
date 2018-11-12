@@ -31,7 +31,7 @@ class ProcedureListViewSet(GenericViewSet):
         else:
             procedure_queryset = self.get_queryset()[:20]
 
-        procedure_list_serializer = procedure_serializer.ProcedureSerializer(procedure_queryset, many=True)
+        procedure_list_serializer = procedure_serializer.ProcedureInSerializer(procedure_queryset, many=True)
         procedure_data['procedures'] = procedure_list_serializer.data
         return Response(procedure_data)
 

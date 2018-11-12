@@ -3,6 +3,11 @@ from ondoc.procedure.models import Procedure, DoctorClinicProcedure, ProcedureTo
 
 
 class ProcedureSerializer(serializers.ModelSerializer):
+    model = Procedure
+    fields = ('id', 'name')
+
+
+class ProcedureInSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
 
     class Meta:
@@ -20,7 +25,7 @@ class ProcedureSerializer(serializers.ModelSerializer):
 
 
 class DoctorClinicProcedureSerializer(serializers.ModelSerializer):
-    procedure = ProcedureSerializer(read_only=True)
+    procedure = ProcedureInSerializer(read_only=True)
     hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     procedure_category_id = serializers.SerializerMethodField()
     procedure_category_name = serializers.SerializerMethodField()

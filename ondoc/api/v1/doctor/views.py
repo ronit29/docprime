@@ -1,4 +1,5 @@
-from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer
+from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
+    ProcedureSerializer
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
@@ -1065,10 +1066,15 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 resp['url'] = None
                 resp['schema']['url'] = None
 
+        validated_data.get('procedure_categories', [])
+        procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))
+        procedure_categories = list(ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id', 'name'))
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
         return Response({"result": response, "count": result_count,
-                         'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb, 'search_content': specialization_dynamic_content})
+                         'specializations': specializations, 'conditions': conditions, "seo": seo,
+                         "breadcrumb": breadcrumb, 'search_content': specialization_dynamic_content,
+                         'procedures': procedures, 'procedure_categories': procedure_categories})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
