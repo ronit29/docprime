@@ -187,6 +187,9 @@ class CustomUserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
     use_in_migrations = True
 
+    def get_queryset(self):
+        return super().get_queryset().prefetch_related('staffprofile')
+
     def _create_user(self, email, password, **extra_fields):
         """Create and save a User with the given email and password."""
         if not email:
@@ -237,9 +240,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        if self.user_type==1 and hasattr(self, 'staffprofile'):
-            return self.staffprofile.name
-        return str(self.phone_number)
+        name = self.phone_number
+        try:
+            name = self.staffprofile.name
+        except:
+            pass
+        return name
+        # if self.user_type==1 and hasattr(self, 'staffprofile'):
+        #     return self.staffprofile.name
+        # return str(self.phone_number)
 
 
     def get_unrated_opd_appointment(self):

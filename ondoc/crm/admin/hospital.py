@@ -120,13 +120,10 @@ class GenericAdminInline(admin.TabularInline):
     def get_formset(self, request, obj=None, **kwargs):
         from django.core.exceptions import MultipleObjectsReturned
         formset = super().get_formset(request, obj=obj, **kwargs)
-        if not request.POST:
-            if obj is not None:
-                try:
-                    formset.form.base_fields['doctor'].queryset = Doctor.objects.filter(
+        if not request.POST and obj is not None:
+            formset.form.base_fields['doctor'].queryset = Doctor.objects.filter(
                         hospitals=obj).distinct()
-                except MultipleObjectsReturned:
-                    pass
+
         return formset
 
 
@@ -240,7 +237,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     def doctor_count(self, instance):
         if instance.id:
-            count  = len(set(instance.assoc_doctors.values_list('id', flat=True)))
+            count = instance.assoc_doctors.count()
+            #count  = len(set(instance.assoc_doctors.values_list('id', flat=True)))
             #count = DoctorHospital.objects.filter(hospital_id=instance.id).count()
             return count
 
