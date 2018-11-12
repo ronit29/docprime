@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q
+
+from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
@@ -27,6 +29,7 @@ from dateutil import tz
 from django.conf import settings
 
 from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.procedure.models import DoctorClinicProcedure
 
 logger = logging.getLogger(__name__)
 
@@ -342,7 +345,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             instance.doctor_clinic.hospital.get_thumbnail()) if instance.doctor_clinic.hospital.get_thumbnail() else None
 
     def get_day(self, attrs):
-        day  = attrs.day
+        day = attrs.day
         return dict(DoctorClinicTiming.DAY_CHOICES).get(day)
 
     def validate(self, data):
@@ -632,6 +635,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     is_license_verified = serializers.BooleanField(read_only=True)
     # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
     hospitals = serializers.SerializerMethodField(read_only=True)
+    procedures = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
     enabled_for_online_booking = serializers.BooleanField(read_only=True)
     availability = None
@@ -812,6 +816,17 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 return breadcrums
         return breadcrums
 
+    def get_procedures(self, obj):
+        if obj:
+            data = obj.doctor_clinics.all()
+            final_queryset = DoctorClinicProcedure.objects.none()
+            for doctor_clinic in data:
+                temp_queryset = doctor_clinic.doctorclinicprocedure_set.all()
+                final_queryset = final_queryset.union(temp_queryset)
+            serializer = DoctorClinicProcedureSerializer(final_queryset, many=True)
+            return serializer.data
+        return None
+
     def get_hospitals(self, obj):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__hospital__is_live=True).select_related(
@@ -823,7 +838,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
-                  'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
+                  'hospital_count', 'hospitals', 'procedures', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
                   'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold')
 
@@ -985,3 +1000,9 @@ class EntityListQuerySerializer(serializers.Serializer):
 
     entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
     id = serializers.IntegerField()
+
+
+class DoctorDetailsRequestSerializer(serializers.Serializer):
+
+    url = serializers.CharField()
+    procedure_categories = CommaSepratedToListField(required=False, max_length=500)

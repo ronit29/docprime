@@ -33,6 +33,15 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
     class Meta:
         db_table = "procedure"
 
+    def get_primary_parent_category(self):
+        parent = None
+        temp_primary = ProcedureToCategoryMapping.objects.filter(is_primary=True, procedure=self).first()
+        if temp_primary:
+            parent = temp_primary.parent_category
+        elif self.categories.count():
+            parent = self.categories.all().first()
+        return parent
+
 
 class ProcedureToCategoryMapping(models.Model):
     procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE,
@@ -115,3 +124,14 @@ class DoctorClinicProcedure(auth_model.TimeStampedModel):
     class Meta:
         db_table = "doctor_clinic_procedure"
         unique_together = ('procedure', 'doctor_clinic')
+
+
+class CommonProcedureCategory(auth_model.TimeStampedModel):
+    procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE)
+    priority = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return "{}".format(self.procedure.name)
+
+    class Meta:
+        db_table = "common_procedure_category"

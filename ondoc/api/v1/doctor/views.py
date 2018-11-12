@@ -8,6 +8,7 @@ from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
@@ -461,7 +462,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def prepare_response(self, response_data):
         hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
+        procedures = sorted(response_data.pop('procedures'), key=itemgetter("hospital_id"))
         availability = []
+        procedures_per_hospital = dict([(k, list(g)) for k, g in groupby(procedures, lambda x: x['hospital_id'])])
         for key, group in groupby(hospitals, lambda x: x['hospital_id']):
             hospital_groups = list(group)
             hospital_groups = sorted(hospital_groups, key=itemgetter("discounted_fees"))
@@ -474,17 +477,22 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("end", None)
             hospital.pop("day",  None)
             hospital.pop("discounted_fees", None)
+            temp_procedure = procedures_per_hospital.get(key, [])
+            hospital['procedures'] = temp_procedure
             availability.append(hospital)
         response_data['hospitals'] = availability
         return response_data
 
     @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
-        url = request.GET.get('url')
+        serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        url = validated_data.get('url')
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
-
         url = url.lower()
+        procedure_categories = validated_data.get('procedure_categories', None)
         entity = location_models.EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).order_by('-is_valid')
         if entity.exists():
             entity = entity.first()
@@ -498,30 +506,33 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     return Response(status=status.HTTP_400_BAD_REQUEST)
 
             entity_id = entity.entity_id
-            response = self.retrieve(request, entity_id)
+            response = self.retrieve(request, entity_id, procedure_categories)
             return response
 
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, pk):
+    def retrieve(self, request, pk, procedure_categories=None):
         response_data = []
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
+                                    'doctor_clinics__doctorclinicprocedure_set',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
                                     'qualifications__college',
                                     'doctorpracticespecializations__specialization',
                                     'images',
-                                    'rating'
+                                    'rating',
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
         #     return Response(status=status.HTTP_400_BAD_REQUEST)
         if doctor:
             serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
-                                                                     context={"request": request})
+                                                                     context={"request": request
+                                                                              # ,"procedure_categories": procedure_categories
+                                                                              })
 
             entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
                                                 entity_type__iexact='Doctor').values('url')
@@ -751,7 +762,20 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
             'search_index').values("id", "name")[:5]
 
-        return Response({"conditions": conditions_serializer.data, "specializations": specializations})
+        procedures = Procedure.objects.filter(
+            Q(search_key__icontains=name) |
+            Q(search_key__icontains=' ' + name) |
+            Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))
+                                                      ).order_by('search_index').values("id", "name")[:5]
+
+        procedure_categories = ProcedureCategory.objects.filter(
+            Q(search_key__icontains=name) |
+            Q(search_key__icontains=' ' + name) |
+            Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))
+                                                      ).order_by('search_index').values("id", "name")[:5]
+
+        return Response({"conditions": conditions_serializer.data, "specializations": specializations,
+                         "procedures": procedures, "procedure_categories": procedure_categories})
 
     @transaction.non_atomic_requests
     def common_conditions(self, request):
@@ -764,7 +788,12 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
         common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("priority")[:10]
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
-        return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data})
+
+        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure').all().order_by("priority")[:10]
+        common_procedure_categories_serializer = serializers.CommonSpecializationsSerializer(common_procedure_categories, many=True)
+
+        return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
+                         "procedure_categories": common_procedure_categories_serializer.data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
