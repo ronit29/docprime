@@ -948,7 +948,7 @@ class BillingAccount(models.Model):
         from ondoc.api.v1.utils import RawSql
         merchant_id = None
         query = '''select nextval('merchant_id_seq') as inc'''
-        seq = RawSql(query).fetch_all()
+        seq = RawSql(query,[]).fetch_all()
         if seq:
             merchant_id = seq[0]['inc'] if seq[0]['inc'] else None
         return merchant_id

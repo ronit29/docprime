@@ -6,7 +6,7 @@ from ondoc.location.models import EntityUrls, DoctorPageURL
 
 def map_doctor_urls():
     query = '''select nextval('entity_url_version_seq') as inc'''
-    seq = RawSql(query).fetch_all()
+    seq = RawSql(query,[]).fetch_all()
     if seq:
         sequence = seq[0]['inc'] if seq[0]['inc'] else 0
     else:
