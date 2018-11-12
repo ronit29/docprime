@@ -48,8 +48,8 @@ class DoctorClinicProcedureDetailSerializer(serializers.Serializer):
 
 
 class CommonProcedureCategorySerializer(serializers.ModelSerializer):
-    id = serializers.ReadOnlyField(source='procedure.id')
-    name = serializers.ReadOnlyField(source='procedure.name')
+    id = serializers.ReadOnlyField(source='procedure_category.id')
+    name = serializers.ReadOnlyField(source='procedure_category.name')
 
     class Meta:
         model = CommonProcedureCategory

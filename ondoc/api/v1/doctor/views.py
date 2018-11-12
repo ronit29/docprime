@@ -1,3 +1,4 @@
+from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
@@ -789,8 +790,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         common_specializations = models.CommonSpecialization.objects.select_related('specialization').all().order_by("priority")[:10]
         specializations_serializer = serializers.CommonSpecializationsSerializer(common_specializations, many=True, context={'request': request})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure').all().order_by("priority")[:10]
-        common_procedure_categories_serializer = serializers.CommonSpecializationsSerializer(common_procedure_categories, many=True)
+        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').all().order_by("priority")[:10]
+        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories, many=True)
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data})
