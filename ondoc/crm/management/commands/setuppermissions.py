@@ -306,6 +306,8 @@ class Command(BaseCommand):
         #Create report team
         self.create_report_team()
 
+        self.create_elastic_group()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
