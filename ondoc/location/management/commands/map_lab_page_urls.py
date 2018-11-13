@@ -16,8 +16,11 @@ def map_lab_location_urls():
 
     all_labs = Lab.objects.filter(is_live=True).all().annotate(distance=Distance('location', Point(float(77.0694707),float(28.4502948), srid=4326))).order_by('distance')[:5000]
     for lab in all_labs:
-        lp = LabPageUrl(lab, sequence)
-        lp.create()
+        try:
+            lp = LabPageUrl(lab, sequence)
+            lp.create()
+        except Exception as e:
+            print(str(e))
 
 
 class Command(BaseCommand):

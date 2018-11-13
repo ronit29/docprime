@@ -918,6 +918,11 @@ class LabPageUrl(object):
         self.locality = None
         self.sequence = sequence
 
+        self.sublocality = None
+        self.sublocality_id = None
+        self.sublocality_longitude = None
+        self.sublocality_latitude = None
+
     def initialize(self):
         if self.lab:
             sublocality = self.lab.entity.filter(type="SUBLOCALITY", valid=True).first()
@@ -936,7 +941,9 @@ class LabPageUrl(object):
 
     def create(self):
         self.initialize()
+
         if self.lab and self.locality:
+            print("inside with id", self.lab.id)
 
             url = "%s" % self.lab.name
             if self.locality and self.sublocality:
@@ -1043,7 +1050,7 @@ class DoctorPageURL(object):
         url = None
 
         if self.hospital and self.locality and self.specializations and len(self.specializations)>0:
-            print('inside')
+            print("inside with id", self.doctor.id)
             specialization_name = [specialization.name for specialization in self.specializations]
 
             url = "dr-%s-%s" %(self.doctor.name, "-".join(specialization_name))
