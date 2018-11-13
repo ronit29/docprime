@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from django.db import transaction
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, F
 from . import serializers
 from django.conf import settings
 import requests, re, json
@@ -31,19 +31,17 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         input_data = serializer.validated_data
         product_id = input_data.get("product_id")
 
-        obj = CouponsMixin()
+        lab_id = input_data.get("lab_id", None)
+        test_ids = input_data.get("test_ids", [])
 
-        types = []
         if product_id and product_id == Order.DOCTOR_PRODUCT_ID:
             types = [Coupon.ALL, Coupon.DOCTOR]
         elif product_id and product_id == Order.LAB_PRODUCT_ID:
             types = [Coupon.ALL, Coupon.LAB]
         else:
             types = [Coupon.ALL, Coupon.DOCTOR, Coupon.LAB]
-
         coupon_qs = (Q(is_user_specific=False) & Q(type__in=types))
 
-        user = None
         if request.user.is_authenticated:
             user = request.user
             coupon_qs = coupon_qs | (Q(is_user_specific=True) & Q(user_specific_coupon__user=user) & Q(type__in=types))
@@ -52,11 +50,17 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 .annotate(opd_used_count=Count('opd_appointment_coupon', filter=(Q(opd_appointment_coupon__user=user) & ~Q(opd_appointment_coupon__status__in=[OpdAppointment.CANCELLED]))),
                           lab_used_count=Count('lab_appointment_coupon', filter=(Q(lab_appointment_coupon__user=user) & ~Q(lab_appointment_coupon__status__in=[LabAppointment.CANCELLED]))))\
                 .filter(coupon_qs).prefetch_related('lab_appointment_coupon', 'opd_appointment_coupon')
+
+            if product_id and product_id == Order.LAB_PRODUCT_ID:
+                lab_qs = Q(lab_id=lab_id)
+                if test_ids:
+                    lab_qs = lab_qs & Q(test__in=test_ids)
+                lab_qs = lab_qs | ( Q(lab_network= F("lab__network_id")) )
+                coupons_data = coupons_data.filter(lab_qs)
         else:
             coupons_data = Coupon.objects.filter(coupon_qs)
 
         applicable_coupons = []
-
         for coupon in coupons_data:
             used_count = 0
             if hasattr(coupon, "opd_used_count") and hasattr(coupon, "lab_used_count"):

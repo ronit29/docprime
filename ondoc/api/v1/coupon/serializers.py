@@ -2,13 +2,15 @@ from rest_framework import serializers
 from ondoc.account.models import Order
 from ondoc.diagnostic.models import Lab, LabTest
 from django.contrib.auth import get_user_model
+from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 
 User = get_user_model()
 
 
 class ProductIDSerializer(serializers.Serializer):
     product_id = serializers.ChoiceField(required=False, choices=Order.PRODUCT_IDS)
-
+    lab_id = serializers.PrimaryKeyRelatedField(required=False, queryset=Lab.objects.filter(is_live=True))
+    test_ids = CommaSepratedToListField(required=False)
 
 class CouponListSerializer(serializers.Serializer):
 
