@@ -827,13 +827,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             order_by_field, rank_by = doctor_search_helper.get_ordering_params()
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
+            doctor_search_result = RawSql(query_string.get('query'),
+                                         query_string.get('parameters')).fetch_all()
 
-            doctor_search_result = RawSql(query_string.get('query'),[query_string.get('longitude'), query_string.get('latitude'),
-                                                                     query_string.get('longitude'), query_string.get('latitude'),
-                                                                     query_string.get('longitude'),
-                                                                     query_string.get('latitude'),query_string.get('max_distance'),
-                                                                     query_string.get('longitude'), query_string.get('latitude'),
-                                                                     query_string.get('min_distance')]).fetch_all()
             result_count = len(doctor_search_result)
             # sa
             # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,

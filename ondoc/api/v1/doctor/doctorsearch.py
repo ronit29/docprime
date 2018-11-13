@@ -125,10 +125,7 @@ class DoctorSearchHelper:
                        #               longitude, latitude, min_distance,
                        #               order_by_field, rank_by)
         data["query"] = query_string
-        data["longitude"] =longitude
-        data["latitude"]= latitude
-        data["max_distance"] = max_distance
-        data["min_distance"] = min_distance
+        data["parameters"] = [longitude,latitude, longitude, latitude,longitude,latitude,max_distance, longitude, latitude, min_distance]
         return data
 
 
