@@ -158,8 +158,8 @@ class DoctorSearchHelper:
                            "procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, " \
                            "procedure_id, doctor_clinic_deal_price, hospital_id " \
                            "FROM (SELECT " \
-                           "COUNT(procedure_id) OVER (PARTITION BY dc.id) AS count_per_clinic, " \
-                           "SUM(dcp.deal_price) OVER (PARTITION BY dc.id) AS sum_per_clinic, " \
+                           "COUNT(procedure_id) OVER (PARTITION BY dct.id) AS count_per_clinic, " \
+                           "SUM(dcp.deal_price) OVER (PARTITION BY dct.id) AS sum_per_clinic, " \
                            "St_distance(St_setsrid(St_point({lng}, {lat}), 4326), h.location) AS distance, " \
                            "dcp.deal_price AS procedure_deal_price, " \
                            "d.id AS doctor_id, practicing_since, " \
@@ -310,27 +310,37 @@ class DoctorSearchHelper:
             else:
                 result_for_a_hospital = defaultdict(list)
                 all_procedures_in_hospital = doctor_clinic.doctorclinicprocedure_set.all()
-                category_ids
-
                 for doctorclinicprocedure in all_procedures_in_hospital:
                     primary_parent = doctorclinicprocedure.procedure.get_primary_parent_category()
                     if primary_parent:
                         if primary_parent.pk in category_ids:
-                            result_for_a_hospital[primary_parent.pk].append(doctorclinicprocedure)
+                            result_for_a_hospital[primary_parent.pk].append(doctorclinicprocedure.procedure.pk)
 
-
-                selected_procedures_data = DoctorClinicProcedure.objects.filter(
-                    procedure_id__in=selected_procedure_ids,
-                    doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
-                other_procedures_data = DoctorClinicProcedure.objects.filter(
-                    procedure_id__in=other_procedure_ids,
-                    doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
-
+                # selected_procedures_data = DoctorClinicProcedure.objects.filter(
+                #     procedure_id__in=selected_procedure_ids,
+                #     doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
+                selected_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(procedure_id__in=selected_procedure_ids)
+                # other_procedures_data = DoctorClinicProcedure.objects.filter(
+                #     procedure_id__in=other_procedure_ids,
+                #     doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
+                other_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(procedure_id__in=other_procedure_ids)
                 selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data, context={'is_selected': True}, many=True)
                 other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data, context={'is_selected': False}, many=True)
                 selected_procedures_list = list(selected_procedures_serializer.data)
                 other_procedures_list = list(other_procedures_serializer.data)
-                procedures = selected_procedures_list+other_procedures_list
+                # result_for_a_hospital_data = [(procedure.pop('procedure_category_id'),
+                #                                procedure.pop('procedure_category_name'))
+                final_result_procedures = OrderedDict()
+                procedures = selected_procedures_list + other_procedures_list
+                for procedure in procedures:
+                    temp_category_id = procedure.pop('procedure_category_id')
+                    temp_category_name = procedure.pop('procedure_category_name')
+                    if temp_category_id in final_result_procedures:
+                        final_result_procedures[temp_category_id]['procedures'].append(procedure)
+                    else:
+                        final_result_procedures[temp_category_id] = OrderedDict()
+                        final_result_procedures[temp_category_id]['name'] = temp_category_name
+                        final_result_procedures[temp_category_id]['procedures'] = [procedure]
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
                 hospitals = [{
                     "hospital_name": doctor_clinic.hospital.name,
@@ -344,7 +354,7 @@ class DoctorSearchHelper:
                     "mrp": min_price["mrp"],
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
-                    "procedures":procedures
+                    "procedure_categories": final_result_procedures
                 }]
 
             thumbnail = doctor.get_thumbnail()
