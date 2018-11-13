@@ -967,6 +967,13 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                        order_obj.action_data.get("hospital"),
                                                                        response.get('statusCode'))
+                    elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
+                        if appointment_obj:
+                            REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
+                        elif order_obj:
+                            REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
+                                                                       order_obj.action_data.get("hospital"),
+                                                                       response.get('statusCode'))
             else:
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
@@ -1049,7 +1056,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 appointment_obj = order_obj.process_order(consumer_account, pg_data, appointment_data)
                 # appointment_obj = order_obj.process_order(consumer_account, pg_txn_obj, appointment_data)
             elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
-                insurance_obj = order_obj.process_insurance_order(consumer_account, pg_data, order_obj, valid_data)
+                appointment_obj = order_obj.process_insurance_order(consumer_account, pg_data, order_obj, valid_data)
 
         except:
             pass

@@ -133,20 +133,29 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                                             status.HTTP_404_NOT_FOUND)
                     # pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
                     # User Profile creation or updation
-                if member['profile']:
-
-                    profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
+                if member['profile'] or UserProfile.objects.filter(name=name, user=request.user).exists():
+                    existing_profile = UserProfile.objects.filter(name=name, user=request.user).first()
+                    if member['profile']:
+                        profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
                                                                                          'gender', 'user_id', 'dob',
-                                                                                         'phone_number')
+                                                                                         'phone_number').first()
+                    else:
+                        if existing_profile:
+                            profile = UserProfile.objects.filter(id=existing_profile.id).values('id', 'name', 'email',
+                                                                                                 'gender', 'user_id',
+                                                                                                 'dob',
+                                                                                                 'phone_number').first()
 
-                    if profile.exists():
-                        if profile[0].get('user_id') == request.user.pk:
+                    if profile:
+                        if profile.get('user_id') == request.user.pk:
                             member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
                                                             dob=member['dob'])
 
                             if member['relation'].lower() == 'self'.lower():
-                                logged_in_user_id = member['profile'].id
-
+                                if member['profile']:
+                                    logged_in_user_id = member['profile'].id
+                                else:
+                                    logged_in_user_id = existing_profile.id
                         else:
                             return Response({"message": "User is not valid"},
                                             status.HTTP_404_NOT_FOUND)

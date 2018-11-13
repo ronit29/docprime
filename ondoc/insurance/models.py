@@ -11,6 +11,8 @@ from ondoc.account.models import Order
 
 class Insurer(auth_model.TimeStampedModel):
     name = models.CharField(max_length=100)
+    max_float = models.PositiveIntegerField(default=None)
+    min_float = models.PositiveIntegerField(default=None)
     is_disabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
@@ -24,8 +26,7 @@ class Insurer(auth_model.TimeStampedModel):
 class InsurerFloat(auth_model.TimeStampedModel):
 
     insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
-    max_float = models.DecimalField(max_digits=10, decimal_places=2, null=True)
-    current_float = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    current_float = models.PositiveIntegerField(default=None)
 
     def __str__(self):
         return self.insurer
@@ -133,10 +134,10 @@ class InsuredMembers(auth_model.TimeStampedModel):
                                                                     last_name=member.get('last_name'),
                                                                     dob=member.get('dob'), email=member.get('email'),
                                                                     relation=member.get('relation'),
-                                                                    address=member.get('relation'),
+                                                                    address=member.get('address'),
                                                                     pincode=member.get('pincode'),
-                                                                    phone_number=member.get('phone_number'),
-                                                                    gender=member.get('gender'),
+                                                                    phone_number=member.get('member_profile').get('phone_number'),
+                                                                    gender=member.get('member_profile').get('gender'),
                                                                     profile=user_profile,
                                                                     insurer=insurer,
                                                                  insurance_plan=insurance_plan_id
@@ -167,7 +168,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
     insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
     order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING, null=True)
-    amount = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    amount = models.PositiveIntegerField(default=None)
     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
     status_type = models.CharField(max_length=50)
     insured_members = JSONField(blank=True, null=True)
@@ -187,8 +188,8 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
                                                                 user=data.get('user'),
                                                                 status_type=InsuranceTransaction.CREATED,
                                                                 insured_members=insured_members,
-                                                                            amount=data.get('amount'),
-                                                                            order=order)
+                                                                amount=data.get('amount'),
+                                                                order=order)
 
             # insurance_transaction_obj = InsuranceTransaction.objects.create(**data)
         except Exception as e:
