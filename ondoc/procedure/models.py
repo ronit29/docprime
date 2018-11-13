@@ -35,11 +35,12 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
 
     def get_primary_parent_category(self):
         parent = None
-        temp_primary = ProcedureToCategoryMapping.objects.filter(is_primary=True, procedure=self).first()
-        if temp_primary:
-            parent = temp_primary.parent_category
-        elif self.categories.count():
-            parent = self.categories.all().first()
+        first_primary = self.parent_categories_mapping.filter(is_primary=True).first()
+        first_parent = self.categories.all().first()
+        if first_primary:
+            parent = first_primary.parent_category
+        elif first_parent:
+            parent = first_parent
         return parent
 
 
