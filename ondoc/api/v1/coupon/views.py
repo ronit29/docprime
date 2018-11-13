@@ -48,7 +48,9 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             user = request.user
             coupon_qs = coupon_qs | (Q(is_user_specific=True) & Q(user_specific_coupon__user=user) & Q(type__in=types))
 
-            coupons_data = Coupon.objects.annotate(opd_used_count=Count('opd_appointment_coupon', filter=Q(opd_appointment_coupon__user=user)), lab_used_count=Count('lab_appointment_coupon', filter=Q(opd_appointment_coupon__user=user)))\
+            coupons_data = Coupon.objects\
+                .annotate(opd_used_count=Count('opd_appointment_coupon', filter=(Q(opd_appointment_coupon__user=user) & ~Q(opd_appointment_coupon__status__in=[OpdAppointment.CANCELLED]))),
+                          lab_used_count=Count('lab_appointment_coupon', filter=(Q(lab_appointment_coupon__user=user) & ~Q(lab_appointment_coupon__status__in=[LabAppointment.CANCELLED]))))\
                 .filter(coupon_qs).prefetch_related('lab_appointment_coupon', 'opd_appointment_coupon')
         else:
             coupons_data = Coupon.objects.filter(coupon_qs)
@@ -57,7 +59,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
         for coupon in coupons_data:
             used_count = 0
-            if coupon.opd_used_count or coupon.lab_used_count:
+            if hasattr(coupon, "opd_used_count") and hasattr(coupon, "lab_used_count"):
                 used_count = coupon.opd_used_count + coupon.lab_used_count
 
             if used_count < coupon.count:
