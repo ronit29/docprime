@@ -33,7 +33,7 @@ from ondoc.reports import models as report_models
 from ondoc.diagnostic.models import LabPricing
 
 from ondoc.web.models import Career, OnlineLead
-
+from ondoc.ratings_review import models as rating_models
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 
 from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin
@@ -321,6 +321,21 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+        #Review team Group
+        group, created = Group.objects.get_or_create(name=constants['REVIEW_TEAM_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(rating_models.RatingsReview, rating_models.ReviewCompliments)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
 
         # Create Doctor Mapping team Group
         group, created = Group.objects.get_or_create(name=constants['DOCTOR_MAPPING_TEAM'])
