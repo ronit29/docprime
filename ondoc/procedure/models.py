@@ -25,7 +25,7 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
                                         through_fields=('procedure', 'parent_category'), related_name='procedures')
     name = models.CharField(max_length=500, unique=True)
     details = models.CharField(max_length=2000)
-    duration = models.CharField(max_length=100)
+    duration = models.IntegerField(default=60)
 
     def __str__(self):
         return self.name
