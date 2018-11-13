@@ -1,6 +1,6 @@
 import nested_admin
 from django.contrib.gis import admin
-from .models import Article, ArticleImage, ArticleCategory, ArticleLinkedUrl, LinkedArticle
+from .models import Article, ArticleImage, ArticleCategory, ArticleLinkedUrl, LinkedArticle, ArticleContentBox
 from reversion.admin import VersionAdmin
 from django.contrib.admin import ModelAdmin, TabularInline
 from django.utils.safestring import mark_safe
@@ -94,3 +94,4 @@ class ArticleImageAdmin(ModelAdmin):
 admin.site.register(Article, ArticleAdmin)
 admin.site.register(ArticleImage, ArticleImageAdmin)
 admin.site.register(ArticleCategory)
+admin.site.register(ArticleContentBox)

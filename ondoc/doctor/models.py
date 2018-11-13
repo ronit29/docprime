@@ -520,7 +520,7 @@ class DoctorClinic(auth_model.TimeStampedModel):
     followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
     followup_charges = models.PositiveSmallIntegerField(blank=True, null=True)
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=False)
-
+    priority = models.PositiveSmallIntegerField(blank=True, null=True, default=0)
     class Meta:
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
