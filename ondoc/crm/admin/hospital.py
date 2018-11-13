@@ -11,6 +11,7 @@ from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
 from ondoc.authentication.models import GenericAdmin, User, QCModel
 from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
+from django import forms
 
 
 class HospitalImageInline(admin.TabularInline):
@@ -76,6 +77,9 @@ class HospitalSpecialityInline(admin.TabularInline):
 #     show_change_link = False
 class GenericAdminFormSet(forms.BaseInlineFormSet):
     def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
         appnt_manager_flag = self.instance.is_appointment_manager
         if self.cleaned_data:
             phone_number = False
@@ -86,8 +90,7 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
             if phone_number:
                 if not appnt_manager_flag:
                     if not(len(self.deleted_forms) == len(self.cleaned_data)):
-                        raise forms.ValidationError(
-                            "'Enabled for Managing Appointment' should be set if a Admin is Entered.")
+                        raise forms.ValidationError("Enabled for Managing Appointment should be set if a Admin is Entered.")
             else:
                 if appnt_manager_flag:
                     raise forms.ValidationError(
@@ -112,10 +115,10 @@ class GenericAdminInline(admin.TabularInline):
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
     fields = ['phone_number', 'name', 'doctor', 'permission_type', 'super_user_permission', 'read_permission',
-              'write_permission', 'user']
+              'write_permission', 'user', 'source_type']
 
     def get_queryset(self, request):
-        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital')
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
 
     def get_formset(self, request, obj=None, **kwargs):
         from django.core.exceptions import MultipleObjectsReturned
@@ -131,6 +134,7 @@ class GenericAdminInline(admin.TabularInline):
 
 
 class HospitalForm(FormCleanMixin):
+
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
 
     def clean_location(self):
@@ -182,10 +186,11 @@ class HospCityFilter(SimpleListFilter):
         if self.value():
             return queryset.filter(city__iexact=self.value()).distinct()
 
+
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', HospCityFilter, CreatedByFilter)
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', )
-    exclude = ('search_key', 'live_at', 'qc_approved_at' )
+    exclude = ('search_key', 'live_at', 'qc_approved_at')
 
     def associated_doctors(self, instance):
         if instance.id:
@@ -196,13 +201,6 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             return mark_safe(html)
         else:
             return ''
-
-    # def save_related(self, request, form, formsets, change):
-    #     super(type(self), self).save_related(request, form, formsets, change)
-    #     hospital_changed_list = form.changed_data
-    #     hospital = form.instance
-        # if 'is_billing_enabled' in hospital_changed_list or 'is_appointment_manager' in hospital_changed_list:
-        #     GenericAdmin.create_hospital_spoc_admin(hospital)
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
@@ -219,6 +217,17 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
         super().save_model(request, obj, form, change)
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+
+        for instance in instances:
+            if isinstance(instance, GenericAdmin):
+                if (not instance.created_by):
+                    instance.created_by = request.user
+                if (not instance.id):
+                    instance.source_type = GenericAdmin.HOSPITAL
+                instance.save()
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

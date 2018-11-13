@@ -187,6 +187,10 @@ class CustomUserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
     use_in_migrations = True
 
+
+    def get_queryset(self):
+        return super(CustomUserManager, self).get_queryset().prefetch_related('staffprofile')
+
     def _create_user(self, email, password, **extra_fields):
         """Create and save a User with the given email and password."""
         if not email:
@@ -673,7 +677,10 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLINNG = 2
     ALL = 3
-
+    DOCTOR = 1
+    HOSPITAL =2
+    OTHER = 3
+    source_choices = ((OTHER, 'Other'), (DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
     type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
@@ -691,6 +698,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
     name = models.CharField(max_length=24, blank=True, null=True)
+    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=OTHER)
 
     class Meta:
         db_table = 'generic_admin'
