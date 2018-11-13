@@ -3,8 +3,9 @@ from ondoc.procedure.models import Procedure, DoctorClinicProcedure, ProcedureTo
 
 
 class ProcedureSerializer(serializers.ModelSerializer):
-    model = Procedure
-    fields = ('id', 'name')
+    class Meta:
+        model = Procedure
+        fields = ('id', 'name', 'details', 'duration')
 
 
 class ProcedureInSerializer(serializers.ModelSerializer):
@@ -25,26 +26,31 @@ class ProcedureInSerializer(serializers.ModelSerializer):
 
 
 class DoctorClinicProcedureSerializer(serializers.ModelSerializer):
-    procedure = ProcedureInSerializer(read_only=True)
+    procedure = ProcedureSerializer(read_only=True)
     hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     procedure_category_id = serializers.SerializerMethodField()
     procedure_category_name = serializers.SerializerMethodField()
-    doctor_clinic = None
+    is_selected = serializers.SerializerMethodField()
 
     class Meta:
         model = DoctorClinicProcedure
         fields = ('hospital_id', 'procedure', 'mrp', 'agreed_price', 'deal_price',
-                  'procedure_category_id', 'procedure_category_name')
+                  'procedure_category_id', 'procedure_category_name', 'is_selected')
+
+    def get_is_selected(self, obj):
+        return self.context.get('is_selected', False)
 
     def get_procedure_category_id(self, obj):
         parent = obj.procedure.get_primary_parent_category()
         if parent:
             return parent.pk
+        return None
 
     def get_procedure_category_name(self, obj):
         parent = obj.procedure.get_primary_parent_category()
         if parent:
             return parent.name
+        return ''
 
 
 class DoctorClinicProcedureDetailSerializer(serializers.Serializer):

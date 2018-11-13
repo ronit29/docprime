@@ -1,6 +1,7 @@
 from django.contrib.gis.geos import Point
 from django.db.models import F
 
+from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
 from ondoc.api.v1.doctor import serializers
@@ -12,6 +13,7 @@ from datetime import datetime
 import re
 import json
 from ondoc.location.models import EntityAddress
+from collections import OrderedDict
 
 
 class DoctorSearchHelper:
@@ -296,16 +298,16 @@ class DoctorSearchHelper:
             else:
                 selected_procedures_data = DoctorClinicProcedure.objects.filter(
                     procedure_id__in=selected_procedure_ids,
-                    doctor_clinic_id=doctor_clinic.id).values('mrp', 'agreed_price', 'deal_price', 'procedure_id',
-                                                              detail=F('procedure__details'),
-                                                              duration=F('procedure__duration'),
-                                                              name=F('procedure__name'))  # OPTIMISE_SHASHANK_SINGH
+                    doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
                 other_procedures_data = DoctorClinicProcedure.objects.filter(
                     procedure_id__in=other_procedure_ids,
-                    doctor_clinic_id=doctor_clinic.id).values('mrp', 'agreed_price', 'deal_price', 'procedure_id',
-                                                              detail=F('procedure__details'),
-                                                              duration=F('procedure__duration'),
-                                                              name=F('procedure__name'))  # OPTIMISE_SHASHANK_SINGH
+                    doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
+
+                selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data, context={'is_selected': True}, many=True)
+                other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data, context={'is_selected': False}, many=True)
+                selected_procedures_list = list(selected_procedures_serializer.data)
+                other_procedures_list = list(other_procedures_serializer.data)
+                procedures = selected_procedures_list+other_procedures_list
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
                 hospitals = [{
                     "hospital_name": doctor_clinic.hospital.name,
@@ -319,10 +321,7 @@ class DoctorSearchHelper:
                     "mrp": min_price["mrp"],
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
-                    # "procedures": doctor_clinic_procedure,
-                    "selected_procedures": selected_procedures_data,
-                    "other_procedures": other_procedures_data,
-                    # "procedures":procedures
+                    "procedures":procedures
                 }]
 
             thumbnail = doctor.get_thumbnail()
