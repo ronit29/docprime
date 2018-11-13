@@ -586,6 +586,9 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLING = 2
     ALL = 3
+    CRM = 1
+    APP = 2
+    source_choices = ((CRM, 'CRM'), (APP, 'App'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages_lab', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
     type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
@@ -600,6 +603,7 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
     name = models.CharField(max_length=24, blank=True, null=True)
+    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=CRM)
 
     class Meta:
         db_table = 'generic_lab_admin'
@@ -685,7 +689,10 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     DOCTOR = 1
     HOSPITAL =2
     OTHER = 3
-    source_choices = ((OTHER, 'Other'), (DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'),)
+    CRM = 1
+    APP = 2
+    entity_choices = ((OTHER, 'Other'), (DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'),)
+    source_choices = ((CRM, 'CRM'), (APP, 'App'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
     type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
@@ -703,7 +710,9 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
     name = models.CharField(max_length=24, blank=True, null=True)
-    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=OTHER)
+    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=CRM)
+    entity_type = models.PositiveSmallIntegerField(max_length=20, choices=entity_choices, default=OTHER)
+
 
     class Meta:
         db_table = 'generic_admin'

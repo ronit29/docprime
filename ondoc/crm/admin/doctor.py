@@ -608,10 +608,10 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
 class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
-    formset = GenericAdminFormSet
+    # formset = GenericAdminFormSet
     form = GenericAdminForm
     show_change_link = False
-    exclude = ('hospital_network', )
+    exclude = ('hospital_network', 'source_type')
     verbose_name_plural = "Admins"
 
     # def has_delete_permission(self, request, obj=None):
@@ -1020,7 +1020,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                 if (not instance.created_by):
                     instance.created_by = request.user
                 if (not instance.id):
-                    instance.source_type = GenericAdmin.DOCTOR
+                    instance.source_type = GenericAdmin.CRM
+                    instance.entity_type = GenericAdmin.DOCTOR
                 instance.save()
 
     # def save_related(self, request, form, formsets, change):

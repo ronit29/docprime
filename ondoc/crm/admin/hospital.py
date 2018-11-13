@@ -115,7 +115,7 @@ class GenericAdminInline(admin.TabularInline):
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
     fields = ['phone_number', 'name', 'doctor', 'permission_type', 'super_user_permission', 'read_permission',
-              'write_permission', 'user', 'source_type']
+              'write_permission', 'user', 'entity_type']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
@@ -223,7 +223,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
                 if (not instance.created_by):
                     instance.created_by = request.user
                 if (not instance.id):
-                    instance.source_type = GenericAdmin.HOSPITAL
+                    instance.entity_type = GenericAdmin.HOSPITAL
+                    instance.source_type = GenericAdmin.CRM
                 instance.save()
 
     def get_queryset(self, request):
