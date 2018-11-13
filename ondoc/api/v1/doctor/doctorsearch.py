@@ -14,6 +14,7 @@ import re
 import json
 from ondoc.location.models import EntityAddress
 from collections import OrderedDict
+from collections import defaultdict
 
 
 class DoctorSearchHelper:
@@ -49,7 +50,7 @@ class DoctorSearchHelper:
 
         procedure_mapped_ids = []  # NEW_LOGIC
 
-        if len(procedure_category_ids) > 0 and not len(procedure_ids) > 0:  # NEW_LOGIC
+        if procedure_category_ids and not procedure_ids:  # NEW_LOGIC
             preferred_procedure_ids = list(
                 ProcedureCategory.objects.filter(pk__in=procedure_category_ids, is_live=True).values_list(
                     'preferred_procedure_id', flat=True))
@@ -244,7 +245,8 @@ class DoctorSearchHelper:
         other_procedure_ids = []
         if category_ids and not procedure_ids:
             all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-                parent_category_id__in=category_ids).values_list('procedure_id', flat=True)  # OPTIMISE_SHASHANK_SINGH
+                parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
+                                                                                                flat=True)  # OPTIMISE_SHASHANK_SINGH
             all_procedures_under_category = set(all_procedures_under_category)
             selected_procedure_ids = ProcedureCategory.objects.filter(
                 pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True)
@@ -252,15 +254,25 @@ class DoctorSearchHelper:
             other_procedure_ids = all_procedures_under_category - selected_procedure_ids
         elif category_ids and procedure_ids:
             all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-                parent_category_id__in=category_ids).values_list('procedure_id',
+                parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
                                                                  flat=True)  # OPTIMISE_SHASHANK_SINGH
             all_procedures_under_category = set(all_procedures_under_category)
             selected_procedure_ids = procedure_ids
             selected_procedure_ids = set(selected_procedure_ids)
             other_procedure_ids = all_procedures_under_category - selected_procedure_ids
-            pass
-        elif procedure_ids:
+        elif procedure_ids and not category_ids:
             selected_procedure_ids = procedure_ids
+            all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
+                procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)  # OPTIMISE_SHASHANK_SINGH
+            all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
+                parent_category_id__in=all_parent_procedures_category_ids).values_list('procedure_id',
+                                                                                       flat=True)  # OPTIMISE_SHASHANK_SINGH
+            all_procedures_under_category = set(all_procedures_under_category)
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
+
+
+        # boiler_code_for_categories =
 
         for doctor in doctor_data:
 
@@ -296,6 +308,17 @@ class DoctorSearchHelper:
             if not doctor_clinic:
                 hospitals = []
             else:
+                result_for_a_hospital = defaultdict(list)
+                all_procedures_in_hospital = doctor_clinic.doctorclinicprocedure_set.all()
+                category_ids
+
+                for doctorclinicprocedure in all_procedures_in_hospital:
+                    primary_parent = doctorclinicprocedure.procedure.get_primary_parent_category()
+                    if primary_parent:
+                        if primary_parent.pk in category_ids:
+                            result_for_a_hospital[primary_parent.pk].append(doctorclinicprocedure)
+
+
                 selected_procedures_data = DoctorClinicProcedure.objects.filter(
                     procedure_id__in=selected_procedure_ids,
                     doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH

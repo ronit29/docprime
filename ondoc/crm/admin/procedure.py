@@ -42,9 +42,15 @@ class ProcedureToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         if any(self.errors):
             return
         all_parent_categories = []
+        count_is_primary = 0
         for value in self.cleaned_data:
             if not value.get("DELETE"):
                 all_parent_categories.append(value.get('parent_category'))
+                if value.get('is_primary', False):
+                    count_is_primary += 1
+
+        if not count_is_primary == 1:
+            raise forms.ValidationError("Must have one and only one primary parent category.")
         if all_parent_categories and ProcedureCategoryMapping.objects.filter(parent_category__in=all_parent_categories,
                                                                              child_category__in=all_parent_categories).count():
             raise forms.ValidationError("Some Categories are already related, so can't be added together.")

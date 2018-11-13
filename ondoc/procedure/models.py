@@ -36,11 +36,8 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
     def get_primary_parent_category(self):
         parent = None
         first_primary = self.parent_categories_mapping.filter(is_primary=True).first()
-        first_parent = self.categories.all().first()
         if first_primary:
             parent = first_primary.parent_category
-        elif first_parent:
-            parent = first_parent
         return parent
 
 
@@ -121,6 +118,9 @@ class DoctorClinicProcedure(auth_model.TimeStampedModel):
     mrp = models.IntegerField(default=0)
     agreed_price = models.IntegerField(default=0)
     deal_price = models.IntegerField(default=0)
+
+    def __str__(self):
+        return '{} in {}'.format(str(self.procedure), str(self.doctor_clinic))
 
     class Meta:
         db_table = "doctor_clinic_procedure"

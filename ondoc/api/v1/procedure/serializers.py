@@ -15,7 +15,8 @@ class ProcedureInSerializer(serializers.ModelSerializer):
         model = Procedure
         fields = ('id'
                   , 'name'
-                  , 'details')
+                  # , 'details'
+                  )
 
     def get_name(self, obj):  # Find a parent name in which it lies
         name = '{}'.format(obj.name)
@@ -30,7 +31,7 @@ class DoctorClinicProcedureSerializer(serializers.ModelSerializer):
     hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     procedure_category_id = serializers.SerializerMethodField()
     procedure_category_name = serializers.SerializerMethodField()
-    is_selected = serializers.SerializerMethodField()
+    is_selected = serializers.SerializerMethodField(default=False)
 
     class Meta:
         model = DoctorClinicProcedure

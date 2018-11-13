@@ -784,16 +784,20 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             Q(search_key__icontains=name) |
             Q(search_key__icontains=' ' + name) |
             Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))
-                                                      ).order_by('search_index').values("id", "name")[:5]
+                                                      ).order_by('search_index')[:5]
+        serializer = ProcedureInSerializer(procedures, many=True)
+        procedures = serializer.data
 
-        procedure_categories = ProcedureCategory.objects.filter(
-            Q(search_key__icontains=name) |
-            Q(search_key__icontains=' ' + name) |
-            Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))
-                                                      ).order_by('search_index').values("id", "name")[:5]
+        # procedure_categories = ProcedureCategory.objects.filter(
+        #     Q(search_key__icontains=name) |
+        #     Q(search_key__icontains=' ' + name) |
+        #     Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))
+        #                                               ).order_by('search_index').values("id", "name")[:5]
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations,
-                         "procedures": procedures, "procedure_categories": procedure_categories})
+                         "procedures": procedures
+                            # , "procedure_categories": procedure_categories
+                         })
 
     @transaction.non_atomic_requests
     def common_conditions(self, request):
