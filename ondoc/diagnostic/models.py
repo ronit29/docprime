@@ -795,7 +795,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     matrix_lead_id = models.IntegerField(null=True)
     is_rated = models.BooleanField(default=False)
     rating_declined = models.BooleanField(default=False)
-    coupon = models.ManyToManyField(Coupon, blank=True, null=True)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="lab_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     def allowed_action(self, user_type, request):

@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from django.db import transaction
+from django.db.models import Q, Sum, Count
 from . import serializers
 from django.conf import settings
 import requests, re, json
@@ -31,42 +32,41 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         product_id = input_data.get("product_id")
 
         obj = CouponsMixin()
-        if not product_id:
-            coupons_data = Coupon.objects.all()
-        elif product_id in [Order.LAB_PRODUCT_ID, Order.DOCTOR_PRODUCT_ID]:
-            if product_id == Order.DOCTOR_PRODUCT_ID:
-                coupons_data = Coupon.objects.filter(type__in=[Coupon.DOCTOR, Coupon.ALL])
-                obj = OpdAppointment()
-            elif product_id == Order.LAB_PRODUCT_ID:
-                coupons_data = Coupon.objects.filter(type__in=[Coupon.LAB, Coupon.ALL])
-                obj = LabAppointment()
-        else:
-            return Response({"status": 0, "message": "Invalid Product ID"}, status.HTTP_404_NOT_FOUND)
 
+        types = []
+        if product_id and product_id == Order.DOCTOR_PRODUCT_ID:
+            types = [Coupon.ALL, Coupon.DOCTOR]
+        elif product_id and product_id == Order.LAB_PRODUCT_ID:
+            types = [Coupon.ALL, Coupon.LAB]
+        else:
+            types = [Coupon.ALL, Coupon.DOCTOR, Coupon.LAB]
+
+        coupon_qs = (Q(is_user_specific=False) & Q(type__in=types))
+
+        user = None
         if request.user.is_authenticated:
             user = request.user
-            is_user = True
+            coupon_qs = coupon_qs | (Q(is_user_specific=True) & Q(user_specific_coupon__user=user) & Q(type__in=types))
+
+            coupons_data = Coupon.objects.annotate(opd_used_count=Count('opd_appointment_coupon', filter=Q(opd_appointment_coupon__user=user)), lab_used_count=Count('lab_appointment_coupon', filter=Q(opd_appointment_coupon__user=user)))\
+                .filter(coupon_qs).prefetch_related('lab_appointment_coupon', 'opd_appointment_coupon')
         else:
-            is_user = False
+            coupons_data = Coupon.objects.filter(coupon_qs)
 
         applicable_coupons = []
 
         for coupon in coupons_data:
+            used_count = 0
+            if coupon.opd_used_count or coupon.lab_used_count:
+                used_count = coupon.opd_used_count + coupon.lab_used_count
 
-            if is_user:
-                is_valid_user_coupon = obj.validate_user_coupon(user=user, coupon_obj=coupon)
-            elif not is_user and coupon.is_user_specific:
-                continue
-            else:
-                is_valid_user_coupon = {"is_valid": None, "used_count": 0}
-
-            if (is_user and is_valid_user_coupon.get("is_valid")) or not is_user:
+            if used_count < coupon.count:
                 applicable_coupons.append({"coupon_type": coupon.type,
                                            "coupon_id": coupon.id,
                                            "code": coupon.code,
                                            "desc": coupon.description,
                                            "coupon_count": coupon.count,
-                                           "used_count": is_valid_user_coupon.get("used_count"),
+                                           "used_count": used_count,
                                            "tnc": coupon.tnc})
 
         return Response(applicable_coupons)

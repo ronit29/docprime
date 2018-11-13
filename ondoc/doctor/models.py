@@ -1085,7 +1085,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     matrix_lead_id = models.IntegerField(null=True)
     is_rated = models.BooleanField(default=False)
     rating_declined = models.BooleanField(default=False)
-    coupon = models.ManyToManyField(Coupon, blank=True, null=True)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="opd_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     def __str__(self):
