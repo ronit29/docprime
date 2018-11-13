@@ -1,6 +1,6 @@
 from django.db import models
 from ondoc.authentication.models import TimeStampedModel
-from .task import fetch_and_upload_json
+from .tasks import fetch_and_upload_json
 from django.core.validators import FileExtensionValidator
 
 # Create your models here.
