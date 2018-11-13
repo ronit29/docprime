@@ -796,3 +796,56 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
             result.append(data.get('city'))
 
         return result
+
+    def top_specialities_in_top_cities(self,request):
+        static_footer_urls =[]
+        cities = self.top_cities(EntityUrls.SitemapIdentifier.DOCTORS_CITY)
+        list = []
+        for city in cities:
+            if city:
+
+                query = ''' select url, concat(eu.specialization,' in ', eu.locality_value) title 
+                            from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
+                            and eu.locality_value ilike '%s' and eu.sitemap_identifier='SPECIALIZATION_CITY' 
+                            and eu.is_valid=True order by count desc limit 10''' % (city)
+                sql_urls = RawSql(query).fetch_all()
+                list.append({'title' : 'Doctors in %s'%(city), 'top_specialities_in_top_city_urls':sql_urls})
+                # static_footer_urls.append({'title' : title, 'result' : list})
+        return Response(list)
+
+
+#
+#
+# class Specialitiesfooter(Footer):
+#     def __init__(self, entity):
+#         self.specialization_id = int(entity.specialization_id)
+#         self.locality_id = int(entity.locality_id)
+#         self.specialization = entity.specialization
+#         self.locality = entity.locality_value
+#         self.location = entity.locality_location
+#
+#
+#     def get_footer(self):
+#         response = {}
+#         response['menu'] = []
+#
+#         top_specialities_in_top_cities = self.top_specialities_in_top_cities()
+#         if top_specialities_in_top_cities:
+#             response['menu'].append({'sub_heading': 'Top %s in %s' %(self.specialization, self.locality), 'url_list': top_specialities_in_top_cities})
+#
+#
+#
+#     def top_specialities_in_top_cities(self):
+#
+#
+#             for cities in top_cities:
+#                 city  = '''select city from seo_cities sc inner join entity_urls eu
+#                            on sc.city iLIKE eu.locality_value and eu.sitemap_identifier='SPECIALIZATION_CITY'
+#                            and eu.is_valid=True order by rank limit 10'''
+#
+#                 query = ''' select url, concat(eu.specialization,' in ', city) title
+#                     from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id
+#                     and eu.locality_value ilike '%s' and eu.sitemap_identifier='SPECIALIZATION_CITY'
+#                     and eu.is_valid=True order by count desc limit 10''' % (self.locality)
+#
+#                 return self.get_urls(query)
