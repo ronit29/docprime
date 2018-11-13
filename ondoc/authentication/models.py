@@ -1247,3 +1247,15 @@ class SPOCDetails(TimeStampedModel):
 
     class Meta:
         db_table = "spoc_details"
+
+
+class DoctorNumber(TimeStampedModel):
+    phone_number = models.CharField(max_length=10)
+    doctor = models.ForeignKey("doctor.Doctor", on_delete=models.CASCADE, related_name='doctor_number')
+
+    class Meta:
+        db_table = 'doctor_number'
+        unique_together = (("phone_number", "doctor"), )
+
+    def __str__(self):
+        return '{}-{}'.format(self.phone_number, self.doctor)

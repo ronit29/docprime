@@ -8,7 +8,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
                                  CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
-from ondoc.authentication.models import UserProfile
+from ondoc.authentication.models import UserProfile, DoctorNumber
 from django.db.models import Avg
 from django.db.models import Q
 from ondoc.coupon.models import Coupon
@@ -972,14 +972,22 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
 
 class AdminCreateBodySerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
-    name = serializers.CharField(max_length=24)
+    name = serializers.CharField(max_length=24, required=False)
     billing_enabled = serializers.BooleanField()
     appointment_enabled = serializers.BooleanField()
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
+    # doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
+    # hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
+    entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
+    id = serializers.IntegerField()
+    type = serializers.ChoiceField(choices=User.USER_TYPE_CHOICES)
+    doc_profile = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False)
 
+    def validate(self, attrs):
+        if attrs['type'] == User.DOCTOR and not attrs['doc_profile']:
+            raise serializers.ValidationError("DocProfile is Required.")
+        if DoctorNumber.objects.filter(doctor=attrs['doc_profile'], phone_number=attrs['phone_number']).exists():
+            raise serializers.ValidationError("DocProfile already Allocated.")
 
 class EntityListQuerySerializer(serializers.Serializer):
-
     entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
     id = serializers.IntegerField()

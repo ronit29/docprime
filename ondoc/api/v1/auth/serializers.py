@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         UserPermission, Address, GenericAdmin, UserSecretKey,
+                                         DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor.models import DoctorMobile
 from ondoc.diagnostic.models import AvailableLabTest
@@ -56,7 +56,7 @@ class DoctorLoginSerializer(serializers.Serializer):
         if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.DOCTOR).exists():
             doctor_not_exists = admin_not_exists = False
             lab_admin_not_exists = False
-            if not DoctorMobile.objects.filter(number=attrs['phone_number'], is_primary=True).exists():
+            if not DoctorNumber.objects.filter(phone_number=attrs['phone_number'], is_primary=True).exists():
                 doctor_not_exists = True
             if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 admin_not_exists = True

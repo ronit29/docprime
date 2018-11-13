@@ -9,7 +9,6 @@ from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import mixins, viewsets, status
-from rest_framework.exceptions import ValidationError as RestValidationError
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
 from django.db import transaction, IntegrityError
@@ -18,11 +17,10 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When
 from django.forms.models import model_to_dict
 from ondoc.sms.api import send_otp
-from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken)
+                                         AgentToken, DoctorNumber)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog
 from django.contrib.auth import get_user_model
@@ -73,7 +71,7 @@ class LoginOTP(GenericViewSet):
         response = {'exists': 0}
         # if request.data.get("phone_number"):
         #     expire_otp(phone_number=request.data.get("phone_number"))
-        serializer = serializers.OTPSerializer(data=request.data)
+        serializer = serializers.OTPSFerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
@@ -192,7 +190,8 @@ class UserViewset(GenericViewSet):
         user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
 
         if not user:
-            doctor_mobile = DoctorMobile.objects.filter(number=phone_number, is_primary=True)
+            # doctor_mobile = DoctorMobile.objects.filter(number=phone_number, is_primary=True)
+            doctor_mobile = DoctorNumber.objects.filter(phone_number=phone_number)
             user = User.objects.create(phone_number=data['phone_number'], is_phone_number_verified=True, user_type=User.DOCTOR)
             if doctor_mobile.exists():
                 doctor = doctor_mobile.first().doctor

@@ -1,7 +1,7 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
-from ondoc.doctor.models import Hospital
+from ondoc.doctor.models import Hospital, Doctor
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -1188,15 +1188,31 @@ class HospitalAutocomplete(autocomplete.Select2QuerySetView):
 
 class CreateAdminViewSet(viewsets.GenericViewSet):
 
+    def get_queryset(self):
+        return auth_models.GenericAdmin.objects.none()
+
     def create(self, request):
         serializer = serializers.AdminCreateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
+        if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
+            doc = Doctor.objects.get(id=valid_data['id'])
+        elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
+            hosp = Hospital.objects.get(id=valid_data['id'])
+            if valid_data['type'] == User.DOCTOR:
+                auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('number'), doctor=valid_data.get('profile'))
+
+    def assoc_doctors(self, request, pk=None):
+        hospital = get_object_or_404(Hospital, pk=pk)
+        queryset = hospital.assoc_doctors
+        return Response(queryset.values('name', 'id'))
+
 
     def list_entities(self, request):
         user = request.user
         opd_list = []
-        opd_queryset = (models.DoctorClinic.objects.prefetch_related('doctor__manageable_doctors')
+        opd_queryset = (models.DoctorClinic.objects
+                        .select_related('doctor', 'doctor__manageable_doctors')
                         .filter(doctor__is_live=True, hospital__is_live=True)
                         .annotate(doctor_name=F('doctor__name')).filter(
                                       doctor__manageable_doctors__user=user,
@@ -1204,10 +1220,11 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                       doctor__manageable_doctors__super_user_permission=True)
                         .values('doctor', 'doctor_name').distinct('doctor'))
         if opd_queryset:
-            for k in opd_queryset.all():
+            for k in opd_queryset:
                 k.update({'entity_type': GenericAdminEntity.DOCTOR})
                 opd_list.append(k)
-        opd_queryset_hos = (models.DoctorClinic.objects.prefetch_related('hospital__manageable_hospitals')
+        opd_queryset_hos = (models.DoctorClinic.objects
+                            .select_related('hospital', 'hospital__manageable_hospitals')
                             .filter(doctor__is_live=True, hospital__is_live=True)
                             .annotate(hospital_name=F('hospital__name')).filter(
                                       (Q(hospital__is_appointment_manager=True) | Q(hospital__is_billing_enabled=True)),
@@ -1217,16 +1234,16 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                             .values('hospital', 'hospital_name').distinct('hospital')
                             )
         if opd_queryset_hos:
-            for h in opd_queryset_hos.all():
+            for h in opd_queryset_hos:
                 h.update({'entity_type': GenericAdminEntity.HOSPITAL})
                 opd_list.append(h)
         lab_queryset = auth_models.GenericLabAdmin.objects \
-                        .filter(user=request.user, is_disabled=False, super_user_permission=True) \
+                        .filter(user=user, is_disabled=False, super_user_permission=True) \
                         .annotate(lab_name=F('lab__name')) \
                         .values('lab', 'lab_name') \
                         .distinct('lab')
         if lab_queryset:
-            for l in lab_queryset.all():
+            for l in lab_queryset:
                 l.update({'entity_type': GenericAdminEntity.LAB})
                 opd_list.append(l)
         return Response(opd_list)
@@ -1235,7 +1252,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         serializer = serializers.EntityListQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        queryset = auth_models.GenericAdmin.objects.exclude(user=request.user)
+        queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital').exclude(user=request.user)
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
             query = queryset.filter(doctor_id=valid_data.get('id'))\
                 .annotate(hospital_name=F('hospital__name'))\
