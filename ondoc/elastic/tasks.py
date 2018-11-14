@@ -11,7 +11,7 @@ from ondoc.elastic import models as elastic_models
 logger = logging.getLogger(__name__)
 from django.template.defaultfilters import slugify
 from django.core.files.storage import default_storage
-
+import os
 
 @task(bind=True, max_retries=2)
 def fetch_and_upload_json(self, data):
@@ -370,8 +370,8 @@ def fetch_and_upload_json(self, data):
             response_list = list()
             new_file_name = str(slugify('%s' % str(obj.created_at)))
             new_file_name = '%s.json' % new_file_name
-            file = default_storage.open('demoelastic/%s' % new_file_name, 'w')
-            file.write('[')
+            file = default_storage.open('demoelastic/%s' % new_file_name, 'wb')
+            file.write('['.encode())
             for sql_rows in results:
                 for result in sql_rows:
                     dic = dict()
@@ -384,17 +384,15 @@ def fetch_and_upload_json(self, data):
 
                     response_list.append(dic)
 
-                content = json.dumps(response_list)
+                content = json.dumps(response_list).encode()
                 file.write(content[1:len(content)-1])
-                file.write(',')
+                file.write(','.encode())
 
-            file.write('{}')
-            file.write(']')
+            file.seek(-1, os.SEEK_END)
+            file.write(']'.encode())
             file.close()
 
             obj.path = file.name
             obj.save()
-
-
     except Exception as e:
         logger.error("Error in Celery. Failed creating json and uploading S3 - " + str(e))
