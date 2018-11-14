@@ -365,7 +365,7 @@ def fetch_and_upload_json(self, data):
                     on x.lab_id = a.la_id
             )'''
 
-            results = RawSql(query).fetch_lazily(2)
+            results = RawSql(query).fetch_lazily(10000)
 
             new_file_name = str(slugify('%s' % str(obj.created_at)))
             new_file_name = '%s.json' % new_file_name
