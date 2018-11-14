@@ -39,6 +39,7 @@ from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin
 
 from ondoc.seo.models import Sitemap
+from ondoc.elastic.models import DemoElastic
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
@@ -305,6 +306,8 @@ class Command(BaseCommand):
         #Create report team
         self.create_report_team()
 
+        self.create_elastic_group()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
@@ -468,4 +471,21 @@ class Command(BaseCommand):
         for cl, ct in content_types.items():
             Permission.objects.get_or_create(content_type=ct, codename='change_' + ct.model)
             permissions = Permission.objects.filter(content_type=ct, codename='change_' + ct.model)
+            group.permissions.add(*permissions)
+
+
+    def create_elastic_group(self):
+
+        group, created = Group.objects.get_or_create(name=constants['ELASTIC_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(DemoElastic)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
             group.permissions.add(*permissions)

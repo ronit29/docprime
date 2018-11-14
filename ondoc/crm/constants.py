@@ -16,5 +16,6 @@ constants = {
     'SUPER_QC_GROUP': 'super_qc_group',
     'DATA_EXPORT_GROUP': 'data_export',
     'DOCTOR_SALES_GROUP': 'doctor_sales_group',
-    'REVIEW_TEAM_GROUP': 'review_team_group'
+    'REVIEW_TEAM_GROUP': 'review_team_group',
+    'ELASTIC_TEAM': 'elastic_team'
 }
