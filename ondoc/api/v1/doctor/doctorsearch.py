@@ -240,6 +240,8 @@ class DoctorSearchHelper:
                                        doctor_search_result}
         category_ids = self.query_params.get("procedure_category_ids", [])
         procedure_ids = self.query_params.get("procedure_ids", [])
+        category_ids = [int(x) for x in category_ids]
+        procedure_ids = [int(x) for x in procedure_ids]
         response = []
         selected_procedure_ids = []
         other_procedure_ids = []

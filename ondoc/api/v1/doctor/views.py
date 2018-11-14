@@ -539,7 +539,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'qualifications__qualification',
                                     'qualifications__specialization',
                                     'qualifications__college',
-                                    'doctorpracticespecializations__specialization',
+                                    'doctorpractices'
+                                    'pecializations__specialization',
                                     'images',
                                     'rating',
                                     )
