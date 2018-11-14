@@ -326,8 +326,8 @@ class DoctorSearchHelper:
                 #     procedure_id__in=other_procedure_ids,
                 #     doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
                 other_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(procedure_id__in=other_procedure_ids)
-                selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data, context={'is_selected': True}, many=True)
-                other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data, context={'is_selected': False}, many=True)
+                selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data, context={'is_selected': True, 'category_ids': category_ids if category_ids else None}, many=True)
+                other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data, context={'is_selected': False, 'category_ids': category_ids if category_ids else None}, many=True)
                 selected_procedures_list = list(selected_procedures_serializer.data)
                 other_procedures_list = list(other_procedures_serializer.data)
                 # result_for_a_hospital_data = [(procedure.pop('procedure_category_id'),

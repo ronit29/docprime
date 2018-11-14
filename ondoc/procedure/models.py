@@ -33,11 +33,18 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
     class Meta:
         db_table = "procedure"
 
-    def get_primary_parent_category(self):
+    def get_primary_parent_category(self, parent_category_ids=None):
         parent = None
-        first_primary = self.parent_categories_mapping.filter(is_primary=True).first()
-        if first_primary:
-            parent = first_primary.parent_category
+        if parent_category_ids:
+            first_parent = self.parent_categories_mapping.filter(parent_category_id__in=parent_category_ids,
+                                                                 is_primary=True).order_by('pk').first()
+            if not first_parent:
+                first_parent = self.parent_categories_mapping.filter(
+                    parent_category_id__in=parent_category_ids).order_by('pk').first()
+        else:
+            first_parent = self.parent_categories_mapping.filter(is_primary=True).first()
+        if first_parent:
+            parent = first_parent.parent_category
         return parent
 
 

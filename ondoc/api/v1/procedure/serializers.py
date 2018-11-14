@@ -42,7 +42,8 @@ class DoctorClinicProcedureSerializer(serializers.ModelSerializer):
         return self.context.get('is_selected', False)
 
     def get_procedure_category_id(self, obj):
-        parent = obj.procedure.get_primary_parent_category()
+        parent_category_ids = self.context.get('category_ids', None)
+        parent = obj.procedure.get_primary_parent_category(parent_category_ids)
         if parent:
             return parent.pk
         return None
