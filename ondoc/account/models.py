@@ -635,6 +635,7 @@ class OrderLog(TimeStampedModel):
     appointment_id = models.CharField(max_length=20, blank=True, null=True)
     user = models.CharField(max_length=20, blank=True, null=True)
     is_agent = models.BooleanField(default=False)
+    pg_data = JSONField(blank=True, null=True)
 
     def __str__(self):
         return "{}".format(self.id)

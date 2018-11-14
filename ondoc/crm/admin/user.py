@@ -40,6 +40,7 @@ class CustomUserAdmin(UserAdmin,VersionAdmin):
     inlines = [
         StaffProfileInline
     ]
+    search_fields = ['email', 'phone_number']
     list_display = ('email','phone_number', 'is_active')
     list_select_related = ('staffprofile',)
     # form = CustomUserChangeForm

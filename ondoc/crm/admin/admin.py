@@ -52,6 +52,8 @@ from .seo import SitemapManagerAdmin, SeoSpecializationAdmin, SeoLabNetworkAdmin
 from ondoc.seo.models import SitemapManger
 from ondoc.seo.models import SeoSpecialization
 from ondoc.seo.models import SeoLabNetwork
+from ondoc.elastic.models import DemoElastic
+from .elastic import DemoElasticAdmin
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -132,3 +134,5 @@ admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
 admin.site.register(SeoLabNetwork, SeoLabNetworkAdmin)
 admin.site.register(PracticeSpecializationContent, PracticeSpecializationContentAdmin)
 admin.site.register(CommonProcedureCategory)
+admin.site.register(DemoElastic, DemoElasticAdmin)
+

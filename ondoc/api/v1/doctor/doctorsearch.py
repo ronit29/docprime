@@ -122,17 +122,18 @@ class DoctorSearchHelper:
                     rank_by = "rank_fees=1"
             order_by_field = "{} ".format(order_by_field)
         else:
-            order_by_field = 'is_gold desc, distance'
+            order_by_field = 'is_gold desc, distance,  dc.priority desc'
             rank_by = "rank_distance=1"
             if self.query_params.get('sort_on'):
                 if self.query_params.get('sort_on') == 'experience':
-                    order_by_field = 'practicing_since ASC'
+                    order_by_field = 'practicing_since ASC, dc.priority desc'
                 if self.query_params.get('sort_on') == 'fees':
-                    order_by_field = "deal_price ASC"
+                    order_by_field = "deal_price ASC, dc.priority desc"
                     rank_by = "rank_fees=1"
             order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC'
                                               , order_by_field)
             # order_by_field = "{}, {} ".format('d.is_live DESC', order_by_field)
+
         return order_by_field, rank_by
 
     def prepare_raw_query(self, filtering_params, order_by_field, rank_by):
@@ -176,7 +177,7 @@ class DoctorSearchHelper:
                            "St_distance(St_setsrid(St_point({lng}, {lat}), 4326 ), h.location) < {max_dist} AND " \
                            "St_distance(St_setsrid(St_point({lng}, {lat}), 4326 ), h.location) >= {min_dist} " \
                            "ORDER BY d.is_live DESC, d.enabled_for_online_booking DESC, " \
-                           "d.is_license_verified DESC, is_gold desc ) AS tempTable) " \
+                           "d.is_license_verified DESC, is_gold desc,  dc.priority desc ) AS tempTable) " \
                            "x WHERE {where_prms} ORDER BY {odr_prm}".format(lng=longitude,
                                                                             lat=latitude,
                                                                             fltr_prmts=filtering_params,

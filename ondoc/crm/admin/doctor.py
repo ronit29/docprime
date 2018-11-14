@@ -609,10 +609,10 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
 class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
-    formset = GenericAdminFormSet
+    # formset = GenericAdminFormSet
     form = GenericAdminForm
     show_change_link = False
-    exclude = ('hospital_network', 'is_doc_admin')
+    exclude = ('hospital_network', 'source_type')
     verbose_name_plural = "Admins"
 
     # def has_delete_permission(self, request, obj=None):
@@ -1013,15 +1013,23 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             form.base_fields['assigned_to'].disabled = True
         return form
 
-    # def save_formset(self, request, form, formset, change):
-    #     for form in formset.forms:
-    #         if hasattr(form.instance, 'created_by'):
-    #             form.instance.created_by = request.user
-    #     try:
-    #         formset.save()
-    #     except Exception as e:
-    #         logger.error(e)
-    #
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+
+        for obj in formset.deleted_objects:
+            obj.delete()
+
+        for instance in instances:
+            if isinstance(instance, GenericAdmin):
+                if (not instance.created_by):
+                    instance.created_by = request.user
+                if (not instance.id):
+                    instance.source_type = GenericAdmin.CRM
+                    instance.entity_type = GenericAdmin.DOCTOR
+            instance.save()
+        formset.save_m2m()
+
+
     # def save_related(self, request, form, formsets, change):
     #     super(type(self), self).save_related(request, form, formsets, change)
     #     # now you have all objects in the database

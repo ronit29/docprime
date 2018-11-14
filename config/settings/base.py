@@ -132,7 +132,8 @@ LOCAL_APPS = (
     'ondoc.seo',
     'ondoc.ratings_review',
     'ondoc.geoip',
-    'ondoc.procedure'
+    'ondoc.procedure',
+    'ondoc.elastic'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
