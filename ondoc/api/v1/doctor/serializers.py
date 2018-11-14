@@ -981,6 +981,7 @@ class AdminCreateBodySerializer(serializers.Serializer):
     id = serializers.IntegerField()
     type = serializers.ChoiceField(choices=User.USER_TYPE_CHOICES)
     doc_profile = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False)
+    assoc_doc = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all()), required=False)
 
     def validate(self, attrs):
         if attrs['type'] == User.DOCTOR and not attrs['doc_profile']:
