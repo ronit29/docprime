@@ -1,3 +1,4 @@
+import datetime
 from django.db import models
 from ondoc.authentication import models as auth_model
 from ondoc.account import models as account_model
@@ -5,6 +6,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from ondoc.authentication.models import UserProfile, User
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
+from datetime import timedelta
 from ondoc.account.models import Order
 
 
@@ -55,6 +57,7 @@ class InsurancePlans(auth_model.TimeStampedModel):
     insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
     type = models.CharField(max_length=100)
     amount = models.PositiveIntegerField(default=None)
+    policy_tenure = models.PositiveIntegerField(default=None)
     is_disabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
@@ -75,7 +78,6 @@ class InsuranceThreshold(auth_model.TimeStampedModel):
     min_age = models.PositiveIntegerField(default=None)
     max_age = models.PositiveIntegerField(default=None)
     child_min_age = models.PositiveIntegerField(default=None)
-    tenure = models.PositiveIntegerField(default=None)
     is_disabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
@@ -170,6 +172,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING, null=True)
     amount = models.PositiveIntegerField(default=None)
     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
+    transaction_date = models.DateTimeField(blank=True, null=True)
     status_type = models.CharField(max_length=50)
     insured_members = JSONField(blank=True, null=True)
     policy_number = models.CharField(max_length=50, blank=False, null=True, default=None)
@@ -181,7 +184,6 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     def create_insurance_transaction(self, data, insured_members, order):
         insurer = Insurer.objects.get(id=data.get('insurer').id)
         insurance_plan = InsurancePlans.objects.get(id=data.get('insurance_plan').id)
-        # order = account_models.Order.objects.get(id=data.get('order').id)
         try:
             insurance_transaction_obj = InsuranceTransaction.objects.create(insurer=insurer,
                                                                 insurance_plan=insurance_plan,
@@ -189,7 +191,9 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
                                                                 status_type=InsuranceTransaction.CREATED,
                                                                 insured_members=insured_members,
                                                                 amount=data.get('amount'),
-                                                                order=order)
+                                                                order=order,
+                                                                transaction_date=datetime.datetime.now(),
+                                                                )
 
             # insurance_transaction_obj = InsuranceTransaction.objects.create(**data)
         except Exception as e:
@@ -201,6 +205,9 @@ class UserInsurance(auth_model.TimeStampedModel):
     insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING, null=True)
     insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING, null=True)
     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
+    purchase_date = models.DateTimeField(blank=True, null=True)
+    expiry_date = models.DateTimeField(blank=True, null=True)
+    policy_number = models.CharField(max_length=50, blank=True, null=True)
     insurance_transaction = models.ForeignKey(InsuranceTransaction, on_delete=models.DO_NOTHING, null=True)
     insured_members = JSONField(blank=True, null=True)
 
@@ -212,15 +219,24 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     @classmethod
     def create_user_insurance(self, insurance_data, insured_members, insurance_transaction):
-        insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
-        insurance_plan = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
-        user = User.objects.get(id=insurance_data.get('user'))
+        try:
+            insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
+            insurance_plan = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
+            insurance_transaction_obj = InsuranceTransaction.objects.get(id=insurance_transaction.id)
+            tenure = insurance_plan.policy_tenure
+            expiry_date = insurance_transaction_obj.transaction_date + timedelta(days=tenure*365)
+            user = User.objects.get(id=insurance_data.get('user'))
+        except Exception as e:
+            print(str(e))
         user_insurance = UserInsurance.objects.create(insurer=insurer,
-                                              insurance_plan=insurance_plan,
-                                              user=user,
-                                              insurance_transaction_id=insurance_transaction.id,
-                                              insured_members=insured_members)
-        user_insurance.save()
+                                                      insurance_plan=insurance_plan,
+                                                      user=user,
+                                                      insurance_transaction=insurance_transaction_obj,
+                                                      insured_members=insured_members,
+                                                      policy_number=insurance_transaction.policy_number,
+                                                      purchase_date=insurance_transaction.transaction_date.date(),
+                                                      expiry_date=expiry_date.date()
+                                                      )
         return user_insurance
 
 # class ProfileInsurance(auth_model.TimeStampedModel):

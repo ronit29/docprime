@@ -3,7 +3,7 @@ from . import serializers
 from rest_framework.response import Response
 from django.http import JsonResponse, HttpResponse
 from ondoc.account import models as account_models
-from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans)
+from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -217,3 +217,26 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         )
         # resp['data'], resp["payment_required"] = utils.payment_details(request, order)
         return Response(resp)
+
+
+class InsuranceProfileViewSet(viewsets.GenericViewSet):
+
+    def profile(self, request):
+        user_id = request.user.pk
+        resp = {}
+        if user_id:
+            user = User.objects.get(id=user_id)
+            user_insurance = UserInsurance.objects.filter(user=user).values('insurer__name',
+                                                                            'insurance_transaction__amount',
+                                                                            'insured_members',
+                                                                            'purchase_date',
+                                                                            'expiry_date',
+                                                                            'policy_number',
+                                                                            )
+            resp['profile'] = user_insurance[0]
+        else:
+            return Response({"message": "User is not valid"},
+                            status.HTTP_404_NOT_FOUND)
+
+        return Response(resp)
+
