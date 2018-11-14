@@ -365,14 +365,14 @@ def fetch_and_upload_json(self, data):
                     on x.lab_id = a.la_id
             )'''
 
-            results = RawSql(query).fetch_lazily(10000)
+            results = RawSql(query).fetch_lazily(2)
 
-            response_list = list()
             new_file_name = str(slugify('%s' % str(obj.created_at)))
             new_file_name = '%s.json' % new_file_name
             file = default_storage.open('demoelastic/%s' % new_file_name, 'wb')
             file.write('['.encode())
             for sql_rows in results:
+                response_list = list()
                 for result in sql_rows:
                     dic = dict()
                     for k, v in result.items():
@@ -389,6 +389,7 @@ def fetch_and_upload_json(self, data):
                 file.write(','.encode())
 
             file.seek(-1, os.SEEK_END)
+            file.truncate()
             file.write(']'.encode())
             file.close()
 
