@@ -17,7 +17,7 @@ def get_doctor_detail_from_google(place_sheet_obj, cache):
         if not place_sheet_obj.doctor_place_search:
             # Hitting the google api for find the place for doctor_clinic_address.
             request_parameter = place_sheet_obj.doctor_clinic_address
-            key = hashlib.md5(request_parameter).hexdigest()
+            key = hashlib.md5(request_parameter.encode('utf-8')).hexdigest()
             response = cache.get(key)
 
             if not response:
