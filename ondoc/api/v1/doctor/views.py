@@ -1,16 +1,17 @@
+from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
-    ProcedureSerializer
+    ProcedureSerializer, DoctorClinicProcedureSerializer
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
-from ondoc.doctor.models import Hospital
+from ondoc.doctor.models import Hospital, DoctorClinic
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
-from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory
+from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
@@ -470,9 +471,6 @@ class DoctorProfileView(viewsets.GenericViewSet):
         generic_super_user_lab_admin=generic_lab_admin.filter(super_user_permission=True)
         if generic_super_user_lab_admin.exists():
             resp_data['is_super_user_lab'] = True
-
-
-
         return Response(resp_data)
 
 
@@ -480,9 +478,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def prepare_response(self, response_data):
         hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
-        procedures = sorted(response_data.pop('procedures'), key=itemgetter("hospital_id"))
+        procedures = response_data.pop('procedures')
         availability = []
-        procedures_per_hospital = dict([(k, list(g)) for k, g in groupby(procedures, lambda x: x['hospital_id'])])
         for key, group in groupby(hospitals, lambda x: x['hospital_id']):
             hospital_groups = list(group)
             hospital_groups = sorted(hospital_groups, key=itemgetter("discounted_fees"))
@@ -495,22 +492,17 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("end", None)
             hospital.pop("day",  None)
             hospital.pop("discounted_fees", None)
-            temp_procedure = procedures_per_hospital.get(key, [])
-            hospital['procedures'] = temp_procedure
+            hospital['procedure_categories'] = procedures.get(key) if procedures else None
             availability.append(hospital)
         response_data['hospitals'] = availability
         return response_data
 
     @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
-        serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        url = validated_data.get('url')
+        url = request.query_params.get('url', None)
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
         url = url.lower()
-        procedure_categories = validated_data.get('procedure_categories', None)
         entity = location_models.EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).order_by('-is_valid')
         if entity.exists():
             entity = entity.first()
@@ -524,14 +516,49 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     return Response(status=status.HTTP_400_BAD_REQUEST)
 
             entity_id = entity.entity_id
-            response = self.retrieve(request, entity_id, procedure_categories)
+            response = self.retrieve(request, entity_id)
             return response
 
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, pk, procedure_categories=None):
+    def retrieve(self, request, pk):
+        serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
         response_data = []
+        category_ids = validated_data.get('procedure_category_ids')
+        procedure_ids = validated_data.get('procedure_ids')
+        selected_procedure_ids = []
+        other_procedure_ids = []
+        if category_ids and not procedure_ids:
+            all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
+                parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
+                                                                                                flat=True)  # OPTIMISE_SHASHANK_SINGH
+            all_procedures_under_category = set(all_procedures_under_category)
+            selected_procedure_ids = ProcedureCategory.objects.filter(
+                pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True)
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
+        elif category_ids and procedure_ids:
+            all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
+                parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
+                                                                 flat=True)  # OPTIMISE_SHASHANK_SINGH
+            all_procedures_under_category = set(all_procedures_under_category)
+            selected_procedure_ids = procedure_ids
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
+        elif procedure_ids and not category_ids:
+            selected_procedure_ids = procedure_ids
+            all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
+                procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)  # OPTIMISE_SHASHANK_SINGH
+            all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
+                parent_category_id__in=all_parent_procedures_category_ids).values_list('procedure_id',
+                                                                                       flat=True)  # OPTIMISE_SHASHANK_SINGH
+            all_procedures_under_category = set(all_procedures_under_category)
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
+
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
@@ -550,7 +577,12 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         if doctor:
             serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                      context={"request": request
-                                                                              # ,"procedure_categories": procedure_categories
+                                                                         ,
+                                                                              "selected_procedure_ids": selected_procedure_ids
+                                                                         , "other_procedure_ids": other_procedure_ids
+                                                                         , "category_ids": category_ids
+                                                                         , "hospital_id": validated_data.get(
+                                                                             'hospital_id')
                                                                               })
 
             entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',

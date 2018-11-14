@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q
-
+from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
@@ -817,14 +817,76 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return breadcrums
 
     def get_procedures(self, obj):
-        if obj:
+        selected_clinic = self.context.get('hospital_id')
+        category_ids = self.context.get('category_ids')
+        selected_procedure_ids = self.context.get('selected_procedure_ids')
+        other_procedure_ids = self.context.get('other_procedure_ids')
+        if obj and selected_clinic or category_ids or selected_procedure_ids or other_procedure_ids:
             data = obj.doctor_clinics.all()
-            final_queryset = DoctorClinicProcedure.objects.none()
+            result_for_a_doctor = OrderedDict()
             for doctor_clinic in data:
-                temp_queryset = doctor_clinic.doctorclinicprocedure_set.all()
-                final_queryset = final_queryset.union(temp_queryset)
-            serializer = DoctorClinicProcedureSerializer(final_queryset, many=True)
-            return serializer.data
+                # result_for_a_hospital = defaultdict(list)
+                # all_procedures_in_hospital = doctor_clinic.doctorclinicprocedure_set.all()
+                # for doctorclinicprocedure in all_procedures_in_hospital:
+                #     primary_parent = doctorclinicprocedure.procedure.get_primary_parent_category()
+                #     if primary_parent:
+                #         if primary_parent.pk in category_ids:
+                #             result_for_a_hospital[primary_parent.pk].append(doctorclinicprocedure.procedure.pk)
+
+                # selected_procedures_data = DoctorClinicProcedure.objects.filter(
+                #     procedure_id__in=selected_procedure_ids,
+                #     doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
+                selected_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(
+                    procedure_id__in=selected_procedure_ids)
+                # other_procedures_data = DoctorClinicProcedure.objects.filter(
+                #     procedure_id__in=other_procedure_ids,
+                #     doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
+                other_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(
+                    procedure_id__in=other_procedure_ids)
+
+                if selected_clinic and selected_clinic == doctor_clinic.hospital.pk:
+
+                    selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
+                                                                                     context={'is_selected': True,
+                                                                                              'category_ids': category_ids if category_ids else None},
+                                                                                     many=True)
+                else:
+                    selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
+                                                                                     context={'is_selected': False,
+                                                                                              'category_ids': category_ids if category_ids else None},
+                                                                                     many=True)
+                other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data,
+                                                                              context={'is_selected': False,
+                                                                                       'category_ids': category_ids if category_ids else None},
+                                                                              many=True)
+                selected_procedures_list = list(selected_procedures_serializer.data)
+                other_procedures_list = list(other_procedures_serializer.data)
+                # result_for_a_hospital_data = [(procedure.pop('procedure_category_id'),
+                #                                procedure.pop('procedure_category_name'))
+                final_result_procedures = OrderedDict()
+                procedures = selected_procedures_list + other_procedures_list
+                for procedure in procedures:
+                    temp_category_id = procedure.pop('procedure_category_id')
+                    temp_category_name = procedure.pop('procedure_category_name')
+                    if temp_category_id in final_result_procedures:
+                        final_result_procedures[temp_category_id]['procedures'].append(procedure)
+                    else:
+                        final_result_procedures[temp_category_id] = OrderedDict()
+                        final_result_procedures[temp_category_id]['name'] = temp_category_name
+                        final_result_procedures[temp_category_id]['procedures'] = [procedure]
+
+                final_result = []
+                for key, value in final_result_procedures.items():
+                    value['procedure_category_id'] = key
+                    final_result.append(value)
+
+                result_for_a_doctor[doctor_clinic.hospital.pk] = final_result
+
+
+                #########################
+            if selected_clinic and result_for_a_doctor.get(selected_clinic, None):
+                result_for_a_doctor.move_to_end(selected_clinic, last=False)
+            return result_for_a_doctor
         return None
 
     def get_hospitals(self, obj):
@@ -1003,6 +1065,9 @@ class EntityListQuerySerializer(serializers.Serializer):
 
 
 class DoctorDetailsRequestSerializer(serializers.Serializer):
+    procedure_category_ids = CommaSepratedToListField(required=False, max_length=500)
+    procedure_ids = CommaSepratedToListField(required=False, max_length=500)
+    hospital_id = serializers.IntegerField(required=True)
 
-    url = serializers.CharField()
-    procedure_categories = CommaSepratedToListField(required=False, max_length=500)
+    def validate(self, attrs):
+        return super().validate(attrs)

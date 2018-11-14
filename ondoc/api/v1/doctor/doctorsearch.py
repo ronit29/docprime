@@ -311,13 +311,13 @@ class DoctorSearchHelper:
             if not doctor_clinic:
                 hospitals = []
             else:
-                result_for_a_hospital = defaultdict(list)
-                all_procedures_in_hospital = doctor_clinic.doctorclinicprocedure_set.all()
-                for doctorclinicprocedure in all_procedures_in_hospital:
-                    primary_parent = doctorclinicprocedure.procedure.get_primary_parent_category()
-                    if primary_parent:
-                        if primary_parent.pk in category_ids:
-                            result_for_a_hospital[primary_parent.pk].append(doctorclinicprocedure.procedure.pk)
+                # result_for_a_hospital = defaultdict(list)
+                # all_procedures_in_hospital = doctor_clinic.doctorclinicprocedure_set.all()
+                # for doctorclinicprocedure in all_procedures_in_hospital:
+                #     primary_parent = doctorclinicprocedure.procedure.get_primary_parent_category()
+                #     if primary_parent:
+                #         if primary_parent.pk in category_ids:
+                #             result_for_a_hospital[primary_parent.pk].append(doctorclinicprocedure.procedure.pk)
 
                 # selected_procedures_data = DoctorClinicProcedure.objects.filter(
                 #     procedure_id__in=selected_procedure_ids,
