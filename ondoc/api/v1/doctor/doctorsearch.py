@@ -341,6 +341,11 @@ class DoctorSearchHelper:
                         final_result_procedures[temp_category_id] = OrderedDict()
                         final_result_procedures[temp_category_id]['name'] = temp_category_name
                         final_result_procedures[temp_category_id]['procedures'] = [procedure]
+
+                final_result = []
+                for key, value in final_result_procedures.items():
+                    value['procedure_category_id'] = key
+                    final_result.append(value)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
                 hospitals = [{
                     "hospital_name": doctor_clinic.hospital.name,
@@ -354,7 +359,7 @@ class DoctorSearchHelper:
                     "mrp": min_price["mrp"],
                     "discounted_fees": min_price["deal_price"],
                     "timings": clinic_convert_timings(doctor_clinic.availability.all(), is_day_human_readable=False),
-                    "procedure_categories": final_result_procedures
+                    "procedure_categories": final_result
                 }]
 
             thumbnail = doctor.get_thumbnail()
