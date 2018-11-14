@@ -9,7 +9,9 @@ from ondoc.api.v1.utils import RawSql
 from io import StringIO, BytesIO
 from ondoc.elastic import models as elastic_models
 logger = logging.getLogger(__name__)
-
+from django.template.defaultfilters import slugify
+from django.core.files.storage import default_storage
+import os
 
 @task(bind=True, max_retries=2)
 def fetch_and_upload_json(self, data):
@@ -144,7 +146,7 @@ def fetch_and_upload_json(self, data):
                     replace(replace(replace(h."name",'"',''),'[',''),']',''),
                     'city', h.city,
                     'sublocality',
-                    replace(replace(replace(h.sublocality,'"',''),'[',''),']',''),    
+                    replace(replace(replace(h.sublocality,'"',''),'[',''),']',''),
                     'location',concat_ws(',',ST_Y(location::geometry),ST_X(location::geometry)),
                     'state', h.state)
                     ))) as doc_calender
@@ -208,7 +210,7 @@ def fetch_and_upload_json(self, data):
                     ci.unique_identifier = dp.unique_identifier)
                     f on f.doctor_id = c.id
                 ) y
-            
+
             ) a
             union
             (
@@ -362,27 +364,35 @@ def fetch_and_upload_json(self, data):
                     on b.l_id = c.lab_id) x
                     on x.lab_id = a.la_id
             )'''
-            results = RawSql(query).fetch_all()
+
+            results = RawSql(query).fetch_lazily(10000)
+
             response_list = list()
-            for result in results:
-                dic = dict()
-                for k, v in result.items():
-                    try:
-                        json.dumps(v)
-                    except TypeError:
-                        v = str(v)
-                    dic[k] = v
+            new_file_name = str(slugify('%s' % str(obj.created_at)))
+            new_file_name = '%s.json' % new_file_name
+            file = default_storage.open('demoelastic/%s' % new_file_name, 'wb')
+            file.write('['.encode())
+            for sql_rows in results:
+                for result in sql_rows:
+                    dic = dict()
+                    for k, v in result.items():
+                        try:
+                            json.dumps(v)
+                        except TypeError:
+                            v = str(v)
+                        dic[k] = v
 
-                response_list.append(dic)
+                    response_list.append(dic)
 
-            name = '%s.json' % (str(obj.created_at))
-            string_io_obj = BytesIO()
-            string_io_obj.write(json.dumps(response_list).encode())
-            string_io_obj.seek(0)
-            file_obj = InMemoryUploadedFile(string_io_obj, None, name, 'text/json',
-                                            string_io_obj.tell(), None)
+                content = json.dumps(response_list).encode()
+                file.write(content[1:len(content)-1])
+                file.write(','.encode())
 
-            obj.file = file_obj
+            file.seek(-1, os.SEEK_END)
+            file.write(']'.encode())
+            file.close()
+
+            obj.path = file.name
             obj.save()
     except Exception as e:
         logger.error("Error in Celery. Failed creating json and uploading S3 - " + str(e))

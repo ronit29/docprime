@@ -411,16 +411,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     When(is_home_collection_enabled=False,
                          then=Value(0)),
                     output_field=DecimalField())
-                distance_related_charges = Case(
-                    When(is_home_collection_enabled=False, then=Value(0)),
-                    When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=True),
-                         then=Value(0)),
-                    When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=False),
-                         then=Value(1)),
-                    output_field=IntegerField())
+                # distance_related_charges = Case(
+                #     When(is_home_collection_enabled=False, then=Value(0)),
+                #     When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=True),
+                #          then=Value(0)),
+                #     When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=False),
+                #          then=Value(1)),
+                #     output_field=IntegerField())
             else:
                 home_pickup_calculation = Value(0, DecimalField())
-                distance_related_charges = Value(0, IntegerField())
+                # distance_related_charges = Value(0, IntegerField())
 
             deal_price_calculation = Case(
                 When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
