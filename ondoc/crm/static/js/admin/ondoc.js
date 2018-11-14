@@ -1,3 +1,4 @@
+var jQuery = django.jQuery
 jQuery(document).ready(function(){
     if (jQuery("div.field-cancel_type") && jQuery("div.field-cancellation_reason") && jQuery("div.field-cancellation_comments")){
         jQuery("div.field-cancel_type").hide();

@@ -115,6 +115,7 @@ class EntityLocationRelationship(TimeStampedModel):
     valid = models.BooleanField(default=True)
     location = models.ForeignKey(EntityAddress, related_name='associated_relations', on_delete=models.CASCADE)
     type = models.CharField(max_length=128, blank=False, null=False, choices=EntityAddress.AllowedKeys.as_choices())
+    entity_geo_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
 
     @classmethod
     def create(cls, *args, **kwargs):
@@ -131,7 +132,8 @@ class EntityLocationRelationship(TimeStampedModel):
             ea_list = EntityAddress.get_or_create(**kwargs)
             if len(ea_list) >= 1:
                 for ea in ea_list:
-                    entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type, location=ea)
+                    entity_location_relation = cls(content_object=kwargs.get('content_object'), type=ea.type,
+                                                   location=ea, entity_geo_location=kwargs.get('content_object').location)
                     entity_location_relation.save()
             return True
         except Exception as e:

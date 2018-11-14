@@ -990,20 +990,24 @@ class TransactionViewSet(viewsets.GenericViewSet):
         except Exception as e:
             logger.error("Error - " + str(e))
 
-
-        # log redirects
-        log_data = { "url" : REDIRECT_URL }
-        if order_obj:
-            log_data["product_id"] = order_obj.product_id
-            log_data["order_id"] = order_obj.id
-        if appointment_obj:
-            log_data["appointment_id"] = appointment_obj.id
-        log_data['referer_data'] = { 'HTTP_USER_AGENT' : request.META['HTTP_USER_AGENT'], 'HTTP_HOST' : request.META['HTTP_HOST'] }
-        if request.user:
-            log_data['user'] = request.user.id
-        if hasattr(request, 'agent'):
-            log_data['is_agent'] = True
-        OrderLog.objects.create(**log_data)
+        try:
+            # log redirects
+            log_data = { "url" : REDIRECT_URL }
+            if order_obj:
+                log_data["product_id"] = order_obj.product_id
+                log_data["order_id"] = order_obj.id
+            if appointment_obj:
+                log_data["appointment_id"] = appointment_obj.id
+            log_data['referer_data'] = { 'HTTP_USER_AGENT' : request.META['HTTP_USER_AGENT'], 'HTTP_HOST' : request.META['HTTP_HOST'] }
+            if request.user:
+                log_data['user'] = request.user.id
+            if hasattr(request, 'agent'):
+                log_data['is_agent'] = True
+            if response:
+                log_data['pg_data'] = response
+            OrderLog.objects.create(**log_data)
+        except Exception as e:
+            logger.error("Error in logging Order - " + str(e))
 
         # return Response({"url": REDIRECT_URL})
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)

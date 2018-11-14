@@ -1015,6 +1015,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
 
+        for obj in formset.deleted_objects:
+            obj.delete()
+
         for instance in instances:
             if isinstance(instance, GenericAdmin):
                 if (not instance.created_by):
@@ -1022,7 +1025,9 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
                 if (not instance.id):
                     instance.source_type = GenericAdmin.CRM
                     instance.entity_type = GenericAdmin.DOCTOR
-                instance.save()
+            instance.save()
+        formset.save_m2m()
+
 
     # def save_related(self, request, form, formsets, change):
     #     super(type(self), self).save_related(request, form, formsets, change)
