@@ -1,8 +1,10 @@
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
 import nested_admin
-from ondoc.authentication.models import BillingAccount, SPOCDetails
+from ondoc.authentication.models import BillingAccount, SPOCDetails, DoctorNumber
 from .forms import BillingAccountFormSet, BillingAccountForm, SPOCDetailsForm
+from reversion.admin import VersionAdmin
+
 
 
 class BillingAccountInline(GenericTabularInline, nested_admin.NestedTabularInline):
@@ -23,3 +25,12 @@ class SPOCDetailsInline(GenericTabularInline):
     model = SPOCDetails
     show_change_link = False
     fields = ['name', 'std_code', 'number', 'email', 'details', 'contact_type']
+
+
+class DoctorNumberAdmin(VersionAdmin):
+    list_display = ('doctor', 'phone_number', 'updated_at')
+    search_fields = ['phone_number', 'doctor']
+    date_hierarchy = 'created_at'
+    autocomplete_fields = ['doctor']
+
+admin.site.register(DoctorNumber, DoctorNumberAdmin)
