@@ -650,7 +650,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return obj.is_gold and obj.enabled_for_online_booking
 
     def get_rating(self, obj):
-        queryset = obj.rating.exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+        queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(queryset, many=True)
         return reviews.data[:5]
 
