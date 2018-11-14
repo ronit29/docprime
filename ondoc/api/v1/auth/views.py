@@ -8,6 +8,7 @@ from django.http import HttpResponseRedirect
 from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from dal import autocomplete
 from rest_framework import mixins, viewsets, status
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
@@ -1526,3 +1527,14 @@ class ContactUsViewSet(GenericViewSet):
         validated_data = serializer.validated_data
         ContactUs.objects.create(**validated_data)
         return Response({'message': 'success'})
+
+
+class DoctorNumberAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Doctor.objects.all()
+        # dn = DoctorNumber.objects.values_list('doctor', flat=True)
+        #
+        # qs = Doctor.objects.exclude(id__in=dn)
+        if self.q:
+            qs = qs.filter(name__icontains=self.q).order_by('name')
+        return qs
