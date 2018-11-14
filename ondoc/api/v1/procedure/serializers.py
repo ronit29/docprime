@@ -49,10 +49,11 @@ class DoctorClinicProcedureSerializer(serializers.ModelSerializer):
         return None
 
     def get_procedure_category_name(self, obj):
-        parent = obj.procedure.get_primary_parent_category()
+        parent_category_ids = self.context.get('category_ids', None)
+        parent = obj.procedure.get_primary_parent_category(parent_category_ids)
         if parent:
             return parent.name
-        return ''
+        return None
 
 
 class DoctorClinicProcedureDetailSerializer(serializers.Serializer):
