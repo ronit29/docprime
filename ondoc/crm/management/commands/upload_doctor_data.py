@@ -46,13 +46,13 @@ class Command(BaseCommand):
         hospital = UploadHospital()
         specialization = UploadSpecialization()
 
-        doctor.upload(sheets[0], source, batch, lines)
-        qualification.upload(sheets[1], lines)
-        experience.upload(sheets[2], lines)
-        membership.upload(sheets[3], lines)
-        award.upload(sheets[4], lines)
-        hospital.upload(sheets[5], source, batch, lines)
-        specialization.upload(sheets[6], lines)
+        doctor.p_image(sheets[0], source, batch)
+        # qualification.upload(sheets[1], lines)
+        # experience.upload(sheets[2], lines)
+        # membership.upload(sheets[3], lines)
+        # award.upload(sheets[4], lines)
+        # hospital.upload(sheets[5], source, batch, lines)
+        # specialization.upload(sheets[6], lines)
 
 
 
@@ -130,12 +130,19 @@ class UploadDoctor(Doc):
     def p_image(self, sheet, source, batch):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
-
+        counter = 0
         for i in range(2, len(rows) + 1):
+            print('processing = '+str(i))
             identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
             url = self.clean_data(sheet.cell(row=i, column=headers.get('url')).value)
             if url:
-                self.save_image(batch, url, identifier)
+                counter +=1
+                print('found count='+str(counter))
+                print('url not found')
+                try:
+                    self.save_image(batch, url, identifier)
+                except Exception as e:
+                    print('exception '+str(e))
 
     def upload(self, sheet, source, batch, lines):
         rows = [row for row in sheet.rows]
