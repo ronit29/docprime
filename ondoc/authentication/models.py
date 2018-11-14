@@ -866,19 +866,22 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
             cls.objects.bulk_create(admin_objs)
 
     @classmethod
-    def create_permission_object(cls, user, doctor, phone_number, hospital_network, hospital, permission_type,
-                                 is_doc_admin, is_disabled, super_user_permission, write_permission, read_permission):
+    def create_permission_object(cls, user, doctor, phone_number, hospital, permission_type, is_disabled,
+                             super_user_permission, write_permission, created_by, source_type, entity_type):
         return GenericAdmin(user=user,
                             doctor=doctor,
                             phone_number=phone_number,
-                            hospital_network=hospital_network,
+                            hospital_network=None,
                             hospital=hospital,
                             permission_type=permission_type,
-                            is_doc_admin=is_doc_admin,
+                            is_doc_admin=False,
                             is_disabled=is_disabled,
                             super_user_permission=super_user_permission,
                             write_permission=write_permission,
-                            read_permission=read_permission
+                            read_permission=True,
+                            created_by=created_by,
+                            source_type=source_type,
+                            entity_type=entity_type
                             )
 
     @classmethod
