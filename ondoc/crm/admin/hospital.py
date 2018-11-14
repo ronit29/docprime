@@ -218,6 +218,9 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
 
+        for obj in formset.deleted_objects:
+            obj.delete()
+
         for instance in instances:
             if isinstance(instance, GenericAdmin):
                 if (not instance.created_by):
@@ -225,7 +228,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
                 if (not instance.id):
                     instance.entity_type = GenericAdmin.HOSPITAL
                     instance.source_type = GenericAdmin.CRM
-                instance.save()
+            instance.save()
+        formset.save_m2m()
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
