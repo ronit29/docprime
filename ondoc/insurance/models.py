@@ -7,8 +7,6 @@ from ondoc.authentication.models import UserProfile, User
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from datetime import timedelta
-from ondoc.account.models import Order
-
 
 
 class Insurer(auth_model.TimeStampedModel):
@@ -44,13 +42,12 @@ class InsurerFloat(auth_model.TimeStampedModel):
             current_float = insurer_float.current_float
             if amount <= current_float:
                 updated_current_float = current_float - amount
-                # insurer_float.update(current_float=updated_current_float)
-                #insurer_float = insurer_float.first()
-                insurer_float.current_float=updated_current_float
+                insurer_float.current_float = updated_current_float
                 insurer_float.save()
+            else:
+                return False
         else:
             return False
-
 
 
 class InsurancePlans(auth_model.TimeStampedModel):
@@ -184,8 +181,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     def create_insurance_transaction(self, data, insured_members, order):
         insurer = Insurer.objects.get(id=data.get('insurer').id)
         insurance_plan = InsurancePlans.objects.get(id=data.get('insurance_plan').id)
-        try:
-            insurance_transaction_obj = InsuranceTransaction.objects.create(insurer=insurer,
+        insurance_transaction_obj = InsuranceTransaction.objects.create(insurer=insurer,
                                                                 insurance_plan=insurance_plan,
                                                                 user=data.get('user'),
                                                                 status_type=InsuranceTransaction.CREATED,
@@ -195,9 +191,6 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
                                                                 transaction_date=datetime.datetime.now(),
                                                                 )
 
-            # insurance_transaction_obj = InsuranceTransaction.objects.create(**data)
-        except Exception as e:
-            print(str(e))
         return insurance_transaction_obj
 
 
@@ -219,15 +212,12 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     @classmethod
     def create_user_insurance(self, insurance_data, insured_members, insurance_transaction):
-        try:
-            insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
-            insurance_plan = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
-            insurance_transaction_obj = InsuranceTransaction.objects.get(id=insurance_transaction.id)
-            tenure = insurance_plan.policy_tenure
-            expiry_date = insurance_transaction_obj.transaction_date + timedelta(days=tenure*365)
-            user = User.objects.get(id=insurance_data.get('user'))
-        except Exception as e:
-            print(str(e))
+        insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
+        insurance_plan = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
+        insurance_transaction_obj = InsuranceTransaction.objects.get(id=insurance_transaction.id)
+        tenure = insurance_plan.policy_tenure
+        expiry_date = insurance_transaction_obj.transaction_date + timedelta(days=tenure*365)
+        user = User.objects.get(id=insurance_data.get('user'))
         user_insurance = UserInsurance.objects.create(insurer=insurer,
                                                       insurance_plan=insurance_plan,
                                                       user=user,
@@ -238,17 +228,4 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                       expiry_date=expiry_date.date()
                                                       )
         return user_insurance
-
-# class ProfileInsurance(auth_model.TimeStampedModel):
-#     insurance = models.ForeignKey(Insurance, on_delete=models.DO_NOTHING)
-#     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
-#     profile = models.ManyToManyField(auth_model.UserProfile)
-#     product_id = models.PositiveSmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
-#     insured_amount = models.DecimalField(max_digits=10, decimal_places=2)
-#     insurance_amount = models.DecimalField(max_digits=10, decimal_places=2)
-#
-#     class Meta:
-#         db_table = "profile_insurance"
-
-
 

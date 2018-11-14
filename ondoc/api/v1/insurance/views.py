@@ -1,17 +1,16 @@
 from rest_framework import viewsets
 from . import serializers
 from rest_framework.response import Response
-from django.http import JsonResponse, HttpResponse
 from ondoc.account import models as account_models
-from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance)
+from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance,
+                                    InsuranceTransaction)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, permissions
-import json
+from django.db.models import F
 import datetime
 from ondoc.authentication.models import User
-from ondoc.api.v1 import utils
 
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):
@@ -22,9 +21,6 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
     def list(self, request):
         insurer_data = self.get_queryset()
         body_serializer = serializers.InsurerSerializer(insurer_data, many=True)
-
-        # body_serializer.is_valid(raise_exception=True)
-        # valid_data = body_serializer.validated_data
         return Response(body_serializer.data)
 
 
@@ -36,56 +32,32 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         return Insurer.objects.filter(is_live=True)
 
     def memberlist(self, request):
-
-        serializer = serializers.InsuredTransactionIdsSerializer(data=request.data)
-
+        data = {}
+        data['id'] = request.query_params.get('id')
+        serializer = serializers.InsuredTransactionIdsSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        parameters = serializer.validated_data
+        parameter = serializer.validated_data
+        member_list = InsuranceTransaction.objects.filter(id=parameter['id'].id).values('insured_members',
+                                                                                        insurer_name=F('insurer__name'))
 
-        result = list()
-        if parameters.get('ids'):
-
-            for id in parameters.get('ids'):
-                resp = id.insured_members
-                # resp = {}
-                # resp = {"id": id.id, "first_name": id.first_name, "last_name": id.last_name, "dob": id.dob, "email":id.email,
-                #         "relation": id.relation, "gender": id.gender, "phone_number": id.phone_number, "hypertension": id.hypertension,
-                #         "liver_disease": id.liver_disease, "heart_disease": id.heart_disease, "diabetes": id.diabetes}
-                result.append(resp)
-
-        return Response({"insured_members": result})
+        return Response(member_list[0])
 
     def update(self, request):
-        serializer = serializers.InsuredMemberIdsSerializer(data=request.data)
+        serializer = serializers.InsuredMemberIdsSerializer(data=request.data.get('members'), many=True)
         serializer.is_valid(raise_exception=True)
-        parameters = serializer.validated_data
-
-        member_id = parameters.get('id')
-
-        if member_id:
-
-            resp = {}
-
-            if parameters.get('hypertension'):
-                member_id.hypertension = parameters.get('hypertension')
-
-            if parameters.get('liver_disease'):
-                member_id.liver_disease = parameters.get('liver_disease')
-
-            if parameters.get('heart_disease'):
-                member_id.heart_disease = parameters.get('heart_disease')
-
-            if parameters.get('diabetes'):
-                member_id.diabetes = parameters.get('diabetes')
-
-            resp = {"id": member_id.id, "first_name": member_id.first_name, "last_name": member_id.last_name, "dob": member_id.dob,
-                    "email":member_id.email, "relation": member_id.relation, "gender": member_id.gender, "phone_number": member_id.phone_number,
-                    "hypertension": member_id.hypertension, "liver_disease": member_id.liver_disease, "heart_disease": member_id.heart_disease,
-                    "diabetes": member_id.diabetes}
-
-        return Response(resp)
-
-
+        member_list = serializer.validated_data
+        for member in member_list:
+            insured_member = InsuredMembers.objects.filter(id=member.get('id').id).first()
+            if not member.get('hypertension') is None:
+                insured_member.hypertension = member.get('hypertension')
+            if not member.get('diabetes') is None:
+                insured_member.diabetes = member.get('diabetes')
+            if not member.get('heart_disease') is None:
+                insured_member.heart_disease = member.get('heart_disease')
+            if not member.get('liver_disease') is None:
+                insured_member.liver_disease = member.get('liver_disease')
+            insured_member.save()
+        return Response({"message": "User Profile Updated Successfully"}, status.HTTP_200_OK)
 
     def summary(self, request):
         serializer = serializers.InsuredMemberSerializer(data=request.data)
@@ -104,18 +76,21 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                 profile = {}
                 name = member['first_name'] + " " + member['last_name']
                 dob = member['dob']
+                # Calculate day difference between dob and current date
                 current_date = datetime.datetime.now().date()
                 days_diff = current_date - dob
                 days_diff = days_diff.days
                 years_diff = days_diff / 365
                 years_diff = int(years_diff)
                 if valid_data.get('insurance_plan'):
+                    # Age Validation for parent and child
                     insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
                                                                         valid_data.get('insurance_plan').id,
                                                                         insurer_id=valid_data.get('insurer')).first()
                     adult_max_age = insurance_threshold.max_age
                     adult_min_age = insurance_threshold.min_age
                     child_min_age = insurance_threshold.child_min_age
+                    # Age validation for parent in years
                     if member['member_type'] == "adult":
                         if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
                             pre_insured_members['dob'] = member['dob']
@@ -125,15 +100,17 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                         elif adult_min_age >= years_diff:
                             return Response({"message": "Adult Age would be more than " + str(adult_min_age) + " years"},
                                             status.HTTP_404_NOT_FOUND)
+                    # Age validation for child in days
                     if member['member_type'] == "child":
                         if child_min_age <= days_diff:
                             pre_insured_members['dob'] = member['dob']
                         else:
                             return Response({"message": "Child Age would be more than " + str(child_min_age) + " days"},
                                             status.HTTP_404_NOT_FOUND)
-                    # pre_insured_members['profile'] = UserProfile.objects.filter(id=profile.id).values()
-                    # User Profile creation or updation
+
+                # User Profile creation or updation
                 if member['profile'] or UserProfile.objects.filter(name=name, user=request.user).exists():
+                    # Check whether Profile exist with same name
                     existing_profile = UserProfile.objects.filter(name=name, user=request.user).first()
                     if member['profile']:
                         profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
@@ -160,6 +137,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                             return Response({"message": "User is not valid"},
                                             status.HTTP_404_NOT_FOUND)
 
+                # Create Profile if not exist with name or not exist in profile id from request
                 else:
                     member_profile = UserProfile.objects.create(name=name,
                                                                 email=member['email'], gender=member['gender'],
@@ -192,8 +170,6 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                                                                                                          'user_id',
                                                                                                          'dob',
                                                                                                          'phone_number')
-            # user = User.objects.filter(id=request.user.pk).values('id','phone_number', 'email', 'user_type',
-            #                                                       'is_superuser', 'is_active', 'is_staff')
 
             resp['insurance'] = {"profile": user_profile[0], "members": insured_members_list, "insurer": insurer[0],
                                  "insurance_plan": insurance_plan[0], "user": request.user.pk}
@@ -202,8 +178,6 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
     def create(self, request):
         insurance_data = request.data.get('insurance')
         insurance_plan = insurance_data.get('insurance_plan')
-        insurer = insurance_data.get('insurer')
-        insured_member = insurance_data.get('members')
         if insurance_plan:
             amount = insurance_plan.get('amount')
         resp = {}
@@ -215,23 +189,24 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             reference_id=1,
             payment_status=account_models.Order.PAYMENT_PENDING
         )
-        # resp['data'], resp["payment_required"] = utils.payment_details(request, order)
         return Response(resp)
 
 
 class InsuranceProfileViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def profile(self, request):
         user_id = request.user.pk
         resp = {}
         if user_id:
             user = User.objects.get(id=user_id)
-            user_insurance = UserInsurance.objects.filter(user=user).values('insurer__name',
-                                                                            'insurance_transaction__amount',
-                                                                            'insured_members',
+            user_insurance = UserInsurance.objects.filter(user=user).values('insured_members',
                                                                             'purchase_date',
                                                                             'expiry_date',
                                                                             'policy_number',
+                                                                            insurer_name=F('insurer__name'),
+                                                                            insurance_amount=F('insurance_transaction__amount'),
                                                                             )
             resp['profile'] = user_insurance[0]
         else:
