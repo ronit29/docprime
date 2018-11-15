@@ -36,12 +36,12 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
         resp = {}
         for la in obj.related_articles.all():
             if not resp.get(la.content_box.name):
-                resp[la.content_box.name] = {'content_box_title': la.content_box.name, 'urls': []}
+                resp[la.content_box.name] = {'content_box_title': la.content_box.title, 'urls': []}
             resp[la.content_box.name]['urls'].append({'title': la.title, 'url': la.linked_article.url})
 
         for lu in obj.articlelinkedurl_set.all():
             if not resp.get(lu.content_box.name):
-                resp[lu.content_box.name] = {'content_box_title': lu.content_box.name, 'urls': []}
+                resp[lu.content_box.name] = {'content_box_title': lu.content_box.title, 'urls': []}
             resp[lu.content_box.name]['urls'].append({'title': lu.title, 'url': lu.url})
         final_result = []
         for key, value in resp.items():
