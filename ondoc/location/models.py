@@ -194,7 +194,7 @@ class EntityUrls(TimeStampedModel):
         from ondoc.api.v1.utils import RawSql
         query = '''select nextval('entity_url_version_seq') as inc;'''
 
-        seq = RawSql(query).fetch_all()
+        seq = RawSql(query, []).fetch_all()
         if seq:
             sequence = seq[0]['inc'] if seq[0]['inc'] else 0
         else:
@@ -473,7 +473,7 @@ class EntityUrls(TimeStampedModel):
         from ondoc.api.v1.utils import RawSql
         query = '''select nextval('entity_url_version_seq') as inc;'''
 
-        seq = RawSql(query).fetch_all()
+        seq = RawSql(query,[]).fetch_all()
         if seq:
             sequence = seq[0]['inc'] if seq[0]['inc'] else 0
         else:
@@ -920,6 +920,11 @@ class LabPageUrl(object):
         self.locality = None
         self.sequence = sequence
 
+        self.sublocality = None
+        self.sublocality_id = None
+        self.sublocality_longitude = None
+        self.sublocality_latitude = None
+
     def initialize(self):
         if self.lab:
             sublocality = self.lab.entity.filter(type="SUBLOCALITY", valid=True).first()
@@ -1045,7 +1050,7 @@ class DoctorPageURL(object):
         url = None
 
         if self.hospital and self.locality and self.specializations and len(self.specializations)>0:
-            print('inside')
+
             specialization_name = [specialization.name for specialization in self.specializations]
 
             url = "dr-%s-%s" %(self.doctor.name, "-".join(specialization_name))
