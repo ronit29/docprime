@@ -1303,7 +1303,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         if hos_data:
             hos_list = [i for i in hos_data]
         result_data = opd_list + hos_list
-        lab_queryset = lab_models.Lab.objects.prefetch_related('manageable_lab_admins').filter(is_live= True,
+        lab_queryset = lab_models.Lab.objects.prefetch_related('manageable_lab_admins').filter(is_live= True,
                                 manageable_lab_admins__user=user,
                                 manageable_lab_admins__is_disabled=False,
                                 manageable_lab_admins__super_user_permission=True).distinct('id')
@@ -1317,23 +1317,52 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         return Response(result_data)
 
     def list_entity_admins(self, request):
+        response = None
+        temp = {}
         serializer = serializers.EntityListQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital').exclude(user=request.user)
+        queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital').prefetch_related('doctor__doctor_clinic').exclude(user=request.user)
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
-            query = queryset.filter(doctor_id=valid_data.get('id'))\
-                .annotate(hospital_name=F('hospital__name'))\
-                .values('phone_number', 'name', 'super_user_permission', 'is_disabled', 'permission_type', 'hospital', 'hospital_name')
+            query = queryset.filter(Q(doctor_id=valid_data.get('id')),
+                                    Q(entity_type=GenericAdminEntity.DOCTOR),
+                                    (
+                                        Q(hospital__isnull=True)|
+                                        Q(hospital__isnull=False, doctor__doctor_clinics__hospital=F('hospital'))
+                                    )
+                                    )\
+                .annotate(hospital_id=F('doctor__doctor_clinics__hospital__id'))\
+                .values('phone_number', 'name', 'is_disabled', 'permission_type', 'hospital_id', 'updated_at')
+            for x in query:
+                if temp.get(x['phone_number']):
+                    temp[x['phone_number']]['hospital_id'].append(x['hospital_id'])
+                else:
+                    x['hospital_id'] = [x['hospital_id']]
+                    temp[x['phone_number']] = x
+            response = list(temp.values())
+
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
-            query = queryset.filter(hospital_id=valid_data.get('id'))\
-                .annotate(doctor_name=F('doctor__name')) \
-                .values('phone_number', 'name', 'super_user_permission', 'is_disabled', 'permission_type', 'doctor', 'doctor_name')
+            response = queryset.filter(Q(hospital_id=valid_data.get('id'), entity_type=GenericAdminEntity.HOSPITAL),
+                                       (
+                                            Q(doctor__isnull=True) |
+                                            Q(doctor__isnull=False, hospital__hospital_doctors__doctor=F('doctor'))
+                                       )
+
+                                       )\
+                .annotate(doctor_id=F('hospital__hospital_doctors__doctor__id')) \
+                .values('phone_number', 'name', 'is_disabled', 'permission_type', 'doctor_id', 'updated_at')
+            for x in response:
+                if temp.get(x['phone_number']):
+                    temp[x['phone_number']]['doctor_id'].append(x['doctor_id'])
+                else:
+                    x['doctor_id'] = [x['doctor_id']]
+                    temp[x['phone_number']] = x
+            response = list(temp.values())
         elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
-            query = auth_models.GenericLabAdmin.objects\
+            response = auth_models.GenericLabAdmin.objects\
                 .exclude(user=request.user)\
                 .filter(lab_id=valid_data.get('id'))\
-                .values('phone_number', 'name', 'super_user_permission', 'is_disabled', 'permission_type')
-        if query:
-            return Response(query)
+                .values('phone_number', 'name', 'updated_at', 'is_disabled', 'permission_type')
+        if response:
+            return Response(response)
         return Response([])

@@ -1012,14 +1012,8 @@ class HospitalEntitySerializer(HospitalModelSerializer):
 
 class DoctorEntitySerializer(serializers.ModelSerializer):
     thumbnail = serializers.SerializerMethodField()
-    general_specialization = DoctorPracticeSpecializationSerializer(read_only=True, many=True, source='doctorpracticespecializations')
-    qualifications = serializers.SerializerMethodField()
+    qualifications = DoctorQualificationSerializer(read_only=True, many=True)
     entity_type = serializers.SerializerMethodField()
-
-    def get_qualifications(self, obj):
-        if obj.qualifications.exists():
-            return obj.qualifications.first().qualification.name
-        return None
 
     def get_entity_type(self, obj):
         return GenericAdminEntity.DOCTOR
@@ -1034,4 +1028,4 @@ class DoctorEntitySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Doctor
-        fields = ('id', 'thumbnail', 'name', 'entity_type', 'qualifications', 'general_specialization')
+        fields = ('id', 'thumbnail', 'name', 'entity_type', 'qualifications')
