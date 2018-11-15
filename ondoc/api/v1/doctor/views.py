@@ -1200,12 +1200,40 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             pem_type = auth_models.GenericAdmin.ALL
         elif valid_data.get('billing_enabled') and not valid_data.get('appointment_enabled'):
             pem_type = auth_models.GenericAdmin.BILLINNG
+
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
             doct = Doctor.objects.get(id=valid_data['id'])
+            if valid_data.get('assoc_hosp'):
+                create_admins = []
+                for hos in valid_data['assoc_hosp']:
+                    user=None
+
+                    user_queryset = User.objects.filter(user_type=User.DOCTOR, phone_number=valid_data['phone_number']).first()
+                    if user_queryset:
+                        user = user_queryset
+                    ad = auth_models.GenericAdmin.create_permission_object(user=user, doctor=doct,
+                                                                      phone_number=valid_data['phone_number'],
+                                                                      hospital=hos,
+                                                                      permission_type=pem_type,
+                                                                      is_disabled=False,
+                                                                      super_user_permission=False,
+                                                                      write_permission=True,
+                                                                      created_by=request.user,
+                                                                      source_type=auth_models.GenericAdmin.APP,
+                                                                      entity_type=GenericAdminEntity.DOCTOR)
+                    create_admins.append(ad)
+                try:
+                    auth_models.GenericAdmin.objects.bulk_create(create_admins)
+                except Exception as e:
+                    return Response({'error': 'something went wrong!'})
+
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
             hosp = Hospital.objects.get(id=valid_data['id'])
             if valid_data['type'] == User.DOCTOR:
-                auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('number'), doctor=valid_data.get('profile'))
+                try:
+                    auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('number'), doctor=valid_data.get('profile'))
+                except Exception as e:
+                    return Response({'error': 'something went wrong!'})
             if valid_data.get('assoc_doc'):
                 create_admins = []
                 for doc in valid_data['assoc_doc']:
@@ -1214,7 +1242,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     user_queryset = User.objects.filter(user_type=User.DOCTOR, phone_number=valid_data['phone_number']).first()
                     if user_queryset:
                         user = user_queryset
-                    auth_models.GenericAdmin.create_permission_object(user=user, doctor=doc,
+                    ad = auth_models.GenericAdmin.create_permission_object(user=user, doctor=doc,
                                                                       phone_number=valid_data['phone_number'], hospital=hosp,
                                                                       permission_type=pem_type,
                                                                       is_disabled=False,
@@ -1223,15 +1251,22 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                                                       created_by=request.user,
                                                                       source_type=auth_models.GenericAdmin.APP,
                                                                       entity_type=GenericAdminEntity.HOSPITAL)
+                    create_admins.append(ad)
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
                     return Response({'error': 'something went wrong!'})
+        
         return Response({'success': 'Created Successfully'})
 
     def assoc_doctors(self, request, pk=None):
         hospital = get_object_or_404(Hospital, pk=pk)
         queryset = hospital.assoc_doctors
+        return Response(queryset.values('name', 'id'))
+
+    def assoc_hosp(self, request, pk=None):
+        doctor = get_object_or_404(Doctor, pk=pk)
+        queryset = doctor.prefetch_related('hospitals').hospitals.filter(is_appointment_manager=False)
         return Response(queryset.values('name', 'id'))
 
 
@@ -1244,7 +1279,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                         .annotate(doctor_name=F('doctor__name')).filter(
                                       doctor__manageable_doctors__user=user,
                                       doctor__manageable_doctors__is_disabled=False,
-                                      doctor__manageable_doctors__super_user_permission=True)
+                                      doctor__manageable_doctors__super_user_permission=True,
+                                      doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR  )
                         .values('doctor', 'doctor_name').distinct('doctor'))
         if opd_queryset:
             for k in opd_queryset:
@@ -1257,7 +1293,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                       (Q(hospital__is_appointment_manager=True) | Q(hospital__is_billing_enabled=True)),
                                       hospital__manageable_hospitals__user=user,
                                       hospital__manageable_hospitals__is_disabled=False,
-                                      hospital__manageable_hospitals__super_user_permission=True)
+                                      hospital__manageable_hospitals__super_user_permission=True,
+                                      hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
                             .values('hospital', 'hospital_name').distinct('hospital')
                             )
         if opd_queryset_hos:

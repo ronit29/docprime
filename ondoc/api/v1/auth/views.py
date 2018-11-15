@@ -72,7 +72,7 @@ class LoginOTP(GenericViewSet):
         response = {'exists': 0}
         # if request.data.get("phone_number"):
         #     expire_otp(phone_number=request.data.get("phone_number"))
-        serializer = serializers.OTPSFerializer(data=request.data)
+        serializer = serializers.OTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data

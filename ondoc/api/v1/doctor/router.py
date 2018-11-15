@@ -45,4 +45,5 @@ urlpatterns = [
     path('list_admin_entities', CreateAdminViewSet.as_view({'get': 'list_entities'}), name='list_entities'),
     path('list_admins', CreateAdminViewSet.as_view({'get': 'list_entity_admins'}), name='list_admins'),
     path('admins_assoc_doctors/<int:pk>', CreateAdminViewSet.as_view({'get': 'assoc_doctors'}), name='assoc_doctors'),
+    path('admins_assoc_hosp/<int:pk>', CreateAdminViewSet.as_view({'get': 'assoc_hosp'}), name='assoc_hosp'),
 ]

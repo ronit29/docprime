@@ -975,19 +975,24 @@ class AdminCreateBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=24, required=False)
     billing_enabled = serializers.BooleanField()
     appointment_enabled = serializers.BooleanField()
-    # doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
-    # hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
     entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
     id = serializers.IntegerField()
     type = serializers.ChoiceField(choices=User.USER_TYPE_CHOICES)
     doc_profile = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False)
     assoc_doc = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all()), required=False)
+    assoc_hosp = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all()),
+                                      required=False)
 
     def validate(self, attrs):
         if attrs['type'] == User.DOCTOR and not attrs['doc_profile']:
             raise serializers.ValidationError("DocProfile is Required.")
-        if DoctorNumber.objects.filter(doctor=attrs['doc_profile'], phone_number=attrs['phone_number']).exists():
-            raise serializers.ValidationError("DocProfile already Allocated.")
+        if attrs['entity_type'] == GenericAdminEntity.DOCTOR and not attrs['assoc_hosp']:
+            raise serializers.ValidationError("Associated Hospitals  are Required.")
+        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and not attrs['assoc_doc']:
+            raise serializers.ValidationError("Associated Doctors are Required.")
+        return attrs
+        # if DoctorNumber.objects.filter(doctor=attrs['doc_profile'], phone_number=attrs['phone_number']).exists():
+        #     raise serializers.ValidationError("DocProfile already Allocated.")
 
 class EntityListQuerySerializer(serializers.Serializer):
     entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)

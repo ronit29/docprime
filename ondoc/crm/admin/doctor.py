@@ -608,10 +608,10 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
 class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
-    # formset = GenericAdminFormSet
+    formset = GenericAdminFormSet
     form = GenericAdminForm
     show_change_link = False
-    exclude = ('hospital_network', 'source_type')
+    exclude = ('hospital_network', 'source_type', 'is_doc_admin')
     verbose_name_plural = "Admins"
 
     # def has_delete_permission(self, request, obj=None):
