@@ -119,11 +119,12 @@ class RatingsModelSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
 
     def get_user_name(self, obj):
-        name= None
-        if obj.appointment_type == RatingsReview.OPD:
-            app = doc_models.OpdAppointment.objects.filter(id=obj.appointment_id).first()
-        else:
-            app = lab_models.LabAppointment.objects.filter(id=obj.appointment_id).first()
+        name = app = None
+        app_obj = self.context.get('app')
+        for ap in app_obj:
+            if obj.appointment_id == ap.id:
+                app = ap
+                break
         if app:
             profile = app.profile
             if profile:
@@ -138,7 +139,9 @@ class RatingsModelSerializer(serializers.ModelSerializer):
 
     def get_compliment(self, obj):
         compliments_string = ''
-        c_list = obj.compliment.values_list('message', flat=True)
+        c_list = []
+        for cm in obj.compliment.all():
+            c_list.append(cm.message)
         if c_list:
             compliments_string = (', ').join(c_list)
         return compliments_string
