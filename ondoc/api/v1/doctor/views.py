@@ -193,7 +193,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-
+        procedures = data.get('procedure_ids', [])
+        # procedure_categories = data.get('procedure_category_ids', [])
+        selected_hospital = data.get('hospital')
+        doctor = data.get('doctor')
         time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
         doctor_clinic_timing = models.DoctorClinicTiming.objects.filter(
             doctor_clinic__doctor=data.get('doctor'),
@@ -207,8 +210,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "gender": profile_model.gender,
             "dob": str(profile_model.dob)
         }
-        req_data = request.data
-
         coupon_list = []
         coupon_discount = 0
         if data.get("coupon_code"):
@@ -217,13 +218,40 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             for coupon in data.get("coupon_code"):
                 coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
 
-        if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-            effective_price = doctor_clinic_timing.deal_price
-        elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
-            if coupon_discount >= doctor_clinic_timing.deal_price:
-                effective_price = 0
-            else:
-                effective_price = doctor_clinic_timing.deal_price - coupon_discount
+        extras_details = []
+        if not procedures:
+            if data.get("payment_type") == models.OpdAppointment.INSURANCE:
+                effective_price = doctor_clinic_timing.deal_price
+            elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
+                if coupon_discount >= doctor_clinic_timing.deal_price:
+                    effective_price = 0
+                else:
+                    effective_price = doctor_clinic_timing.deal_price - coupon_discount
+            deal_price = doctor_clinic_timing.deal_price
+            mrp = doctor_clinic_timing.mrp
+        else:
+            # TODO: SHASHANK_SINGH
+            total_deal_price, total_effective_price, total_mrp = 0, 0, 0
+            # total_deal_price, total_effective_price, total_mrp = get_procedure_prices(procedure_categories, procedures, hospital_id)
+            if data.get("payment_type") == models.OpdAppointment.INSURANCE:
+                effective_price = total_effective_price
+            elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
+                if coupon_discount >= total_deal_price:
+                    effective_price = 0
+                else:
+                    effective_price = total_deal_price - coupon_discount
+            deal_price = total_deal_price
+            mrp = total_mrp
+
+            doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
+            doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by('procedure_id')
+            for doctor_clinic_procedure in doctor_clinic_procedures:
+                temp_extra = {'procedure_id': doctor_clinic_procedure.procedure.id,
+                              'procedure_name': doctor_clinic_procedure.procedure.name,
+                              'deal_price': doctor_clinic_procedure.deal_price,
+                              'agreed_price': doctor_clinic_procedure.agreed_price,
+                              'mrp': doctor_clinic_procedure.mrp}
+                extras_details.append(temp_extra)
 
         opd_data = {
             "doctor": data.get("doctor"),
@@ -233,9 +261,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "user": request.user,
             "booked_by": request.user,
             "fees": doctor_clinic_timing.fees,
-            "deal_price": doctor_clinic_timing.deal_price,
+            "deal_price": deal_price,
             "effective_price": effective_price,
-            "mrp": doctor_clinic_timing.mrp,
+            "mrp": mrp,
+            "procedures": procedures,
+            "extras_details": extras_details,
             "time_slot_start": time_slot_start,
             "payment_type": data.get("payment_type"),
             "coupon": coupon_list,
@@ -286,9 +316,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if hasattr(request, 'agent') and request.agent:
             resp['is_agent'] = True
 
+        if not appointment_details.get('procedures'):
+            insurance_effective_price = appointment_details['fees']
+        else:
+            insurance_effective_price = appointment_details['deal_price']
+
         can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
         if can_use_insurance:
-            appointment_details['effective_price'] = appointment_details['fees']
+            appointment_details['effective_price'] = insurance_effective_price
             appointment_details['payment_type'] = models.OpdAppointment.INSURANCE
         elif appointment_details['payment_type'] == models.OpdAppointment.INSURANCE:
             resp['status'] = 0
@@ -301,8 +336,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         account_models.Order.disable_pending_orders(appointment_action_data, product_id,
                                                     account_models.Order.OPD_APPOINTMENT_CREATE)
 
-        if ( (appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
-            balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
+        if ((appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
+             balance < appointment_details.get("effective_price")) or resp['is_agent']):
 
             payable_amount = appointment_details.get("effective_price") - balance
 

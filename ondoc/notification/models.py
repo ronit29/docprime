@@ -480,6 +480,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
 
     @classmethod
     def ops_notification_alert(cls, data_obj, email_list, product, alert_type):
+        # TODO: SHASHANK_SINGH not sure about this code if i have to change something.
         status_choices = readable_status_choices(product)
 
         html_body = None

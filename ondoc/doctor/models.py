@@ -1087,6 +1087,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
+    procedures = models.ManyToManyField('procedure.Procedure', null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1122,7 +1123,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
         coupon_list = appointment_data.pop("coupon", None)
+        procedure_ids = appointment_data.pop('procedures', [])
+        appointment_data.pop("extra_details", None)
+        # TODO: SHASHANK_SINGH maybe remove extra_details
         app_obj = cls.objects.create(**appointment_data)
+        app_obj.procedures.add(*procedure_ids)
         if coupon_list:
             app_obj.coupon.add(*coupon_list)
         return app_obj

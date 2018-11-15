@@ -250,8 +250,11 @@ def opdappointment_transform(app_data):
     app_data["profile"] = app_data["profile"].id
     app_data["user"] = app_data["user"].id
     app_data["booked_by"] = app_data["booked_by"].id
+    if app_data.get("procedures"):
+        app_data["procedures"] = list([procedure.id for procedure in app_data["procedures"]])
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
+    # TODO: SHASHANK_SINGH see what to do with procedures
     return app_data
 
 
@@ -305,6 +308,7 @@ def is_valid_testing_lab_data(user, lab):
 
 
 def payment_details(request, order):
+    # TODO: SHASHANK_SINGH what to do?
     from ondoc.authentication.models import UserProfile
     from ondoc.account.models import PgTransaction, Order
     payment_required = True

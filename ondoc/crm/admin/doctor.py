@@ -1245,7 +1245,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'contact_details', 'profile', 'profile_detail', 'user', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
+                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'procedures')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
@@ -1253,7 +1253,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time')
+                    'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
+                    'start_date', 'start_time', 'procedures')
         else:
             return ()
 
@@ -1266,7 +1267,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures')
         else:
             return ()
 

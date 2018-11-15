@@ -29,7 +29,7 @@ from dateutil import tz
 from django.conf import settings
 
 from ondoc.location.models import EntityUrls, EntityAddress
-from ondoc.procedure.models import DoctorClinicProcedure
+from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory
 
 logger = logging.getLogger(__name__)
 
@@ -141,8 +141,9 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     time_slot_start = serializers.DateTimeField()
     payment_type = serializers.IntegerField()
-    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    procedures = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
@@ -161,10 +162,20 @@ class CreateAppointmentSerializer(serializers.Serializer):
     time_slot_start = serializers.DateTimeField(required=False)
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
-
+    procedure_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Procedure.objects.filter()), required=False)
+    # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
     def validate(self, data):
+        # TODO: SHASHANK_SINGH - timeslot in .5 multiples, no need for below code
+        # procedures = data.get('procedure_ids', [])
+        # procedure_categories = data.get('procedure_ids', [])
+        # procedure_category_ids = [procedure.id for procedure in procedures]
+        # if procedures and procedure_categories:
+        #     for procedure in procedures:
+        #         if not procedure.categories.filter(pk__in=procedure_category_ids).count():
+        #             raise serializers.ValidationError("Procedure is not in given categories.")
+
         ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.BOOKED, OpdAppointment.ACCEPTED,
                                      OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.RESCHEDULED_DOCTOR]
         MAX_APPOINTMENTS_ALLOWED = 3
