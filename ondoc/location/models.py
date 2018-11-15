@@ -290,8 +290,8 @@ class EntityUrls(TimeStampedModel):
             ,count(*) count from entity_address ea
             inner join hospital h on h.is_live=true
             and (
-            (type_blueprint='LOCALITY' and st_distance(ea.centroid,h.location)<15000) or
-            (type_blueprint='SUBLOCALITY' and st_distance(ea.centroid,h.location)<5000)
+            (type_blueprint='LOCALITY' and ST_DWithin(ea.centroid,h.location,15000)) or
+            (type_blueprint='SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))
             )
             inner join doctor_clinic dc on dc.hospital_id = h.id
             inner join doctor d on dc.doctor_id = d.id and d.is_live=true
@@ -385,8 +385,8 @@ class EntityUrls(TimeStampedModel):
             ,count(*) count from entity_address ea
             inner join hospital h on h.is_live=true
             and (
-            (type_blueprint='LOCALITY' and st_distance(ea.centroid,h.location)<15000) or
-            (type_blueprint='SUBLOCALITY' and st_distance(ea.centroid,h.location)<5000)
+            (type_blueprint='LOCALITY' and ST_DWithin(ea.centroid,h.location,15000)) or
+            (type_blueprint='SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))
             )
             inner join doctor_clinic dc on dc.hospital_id = h.id
             inner join doctor d on dc.doctor_id = d.id and d.is_live=true
@@ -565,8 +565,8 @@ class EntityUrls(TimeStampedModel):
                        ,count(*) count from entity_address ea
                        inner join lab l on l.is_live=true 
                        and (
-                       (type_blueprint='LOCALITY' and st_distance(ea.centroid,l.location)<15000) or
-                       (type_blueprint='SUBLOCALITY' and st_distance(ea.centroid,l.location)<5000)
+                       (type_blueprint='LOCALITY' and ST_DWithin(ea.centroid,l.location,15000)) or
+                       (type_blueprint='SUBLOCALITY' and ST_DWithin(ea.centroid,l.location,5000))
                        )
                        where type_blueprint in ('LOCALITY','SUBLOCALITY')
                        group by ea.id)x where count>=3)y
