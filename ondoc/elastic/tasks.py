@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 from django.template.defaultfilters import slugify
 from django.core.files.storage import default_storage
 import os
+from django.db import connection, transaction
+import psycopg2
+from decimal import Decimal
 
 @task(bind=True, max_retries=2)
 def fetch_and_upload_json(self, data):
@@ -365,31 +368,53 @@ def fetch_and_upload_json(self, data):
                     on x.lab_id = a.la_id
             )'''
 
-            results = RawSql(query).fetch_lazily(10000)
+            def default(obj):
+                if isinstance(obj, Decimal):
+                    return str(obj)
+                raise TypeError("Object of type '%s' is not JSON serializable" % type(obj).__name__)
 
             new_file_name = str(slugify('%s' % str(obj.created_at)))
-            new_file_name = '%s.json' % new_file_name
-            file = default_storage.open('demoelastic/%s' % new_file_name, 'wb')
-            file.write('['.encode())
-            for sql_rows in results:
-                response_list = list()
-                for result in sql_rows:
-                    dic = dict()
-                    for k, v in result.items():
-                        try:
-                            json.dumps(v)
-                        except TypeError:
-                            v = str(v)
-                        dic[k] = v
+            new_file_name = 'demoelastic/%s.json' % new_file_name
 
-                    response_list.append(dic)
+            f = default_storage.open(new_file_name, 'wb')
+            f.write('['.encode())
+            f.close()
 
-                content = json.dumps(response_list).encode()
-                file.write(content[1:len(content)-1])
-                file.write(','.encode())
+            batch_size = 10000
+            with transaction.atomic():
 
-            file.seek(-1, os.SEEK_END)
-            file.truncate()
+                with connection.connection.cursor(name='elasticdata', cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                    cursor.itersize = batch_size
+                    cursor.execute(query)
+                    counter = 0
+                    response_list = list()
+                    for row in cursor:
+                        response_list.append(row)
+                        if len(response_list)>=batch_size:
+                            file = default_storage.open(new_file_name, 'ab')
+                            content = json.dumps(response_list, default=default)
+                            if not counter == 0:
+                                file.write(','.encode())
+
+                            file.write(content[1:len(content)-1])
+                            file.close()
+
+                            response_list = list()
+                            counter+=1
+                            #print(str(counter))
+
+                    # write all remaining records
+                    if len(response_list)>0:
+                            content = json.dumps(response_list, default=default)
+                            file = default_storage.open(new_file_name, 'ab')
+                            if not counter == 0:
+                                file.write(','.encode())
+
+                            file.write(content[1:len(content)-1])
+                            file.close()
+
+
+            file = default_storage.open(new_file_name, 'ab')
             file.write(']'.encode())
             file.close()
 
