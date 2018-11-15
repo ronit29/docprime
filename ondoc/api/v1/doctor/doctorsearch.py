@@ -81,15 +81,16 @@ class DoctorSearchHelper:
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             filtering_params.append(
-                "d.search_key ilike '%(%(search_key)s)%'"
+                "d.search_key ilike '%(%(doctor_name)s)%'"
                     )
-            params['search_key'] = search_key
+            params['doctor_name'] = search_key
         if self.query_params.get("hospital_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("hospital_name"))
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             filtering_params.append(
-                "h.search_key ilike '%(%(search_key)s)%'")
+                "h.search_key ilike '%(%(hospital_name)s)%'")
+            params['hospital_name'] = search_key
 
         if not filtering_params:
             return "1=1"
