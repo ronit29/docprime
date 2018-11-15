@@ -529,7 +529,7 @@ class DoctorForm(FormCleanMixin):
         qc_required = {'name': 'req', 'gender': 'req',
                        # 'practicing_since': 'req',
                        'emails': 'count',
-                       'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
+                       'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
