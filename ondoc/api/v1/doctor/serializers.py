@@ -655,7 +655,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         if clinics:
             hospital = clinics[0]
-            if hospital.hospital:
+            if hospital.hospital and hospital.hospital.location:
                 lat = hospital.hospital.location.y
                 long = hospital.hospital.location.x
                 hosp_entity_relation = hospital.hospital.entity.all().prefetch_related('location')
