@@ -7,17 +7,23 @@ logger = logging.getLogger(__name__)
 import json
 from .models import GoogleDetailing
 from copy import deepcopy
+import hashlib
 
 
-def get_doctor_detail_from_google(place_sheet_obj):
+def get_doctor_detail_from_google(place_sheet_obj, cache):
     api_key = settings.REVERSE_GEOCODING_API_KEY
     try:
         # For doctor_clinic_address.
         if not place_sheet_obj.doctor_place_search:
             # Hitting the google api for find the place for doctor_clinic_address.
             request_parameter = place_sheet_obj.doctor_clinic_address
-            response = requests.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery',
-                                    params={'key': api_key, 'input': request_parameter})
+            key = hashlib.md5(request_parameter.encode('utf-8')).hexdigest()
+            response = cache.get(key)
+
+            if not response:
+                response = requests.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery',
+                                        params={'key': api_key, 'input': request_parameter})
+                cache[key] = response
             if response.status_code != status.HTTP_200_OK or not response.ok:
                 print("[ERROR] Google API for fetching doctor_clinic_address place id.")
                 print("[ERROR] %s", response.reason)
@@ -38,8 +44,12 @@ def get_doctor_detail_from_google(place_sheet_obj):
             else:
                 if not place_sheet_obj.doctor_detail:
                     # Now hitting the google api for fetching details of the doctor regarding place_id obtained above.
-                    response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
-                                            params={'key': api_key, 'place_id': place_id})
+                    response = cache.get(place_id)
+
+                    if not response:
+                        response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
+                                                params={'key': api_key, 'place_id': place_id})
+                        cache[place_id] = response
                     if response.status_code != status.HTTP_200_OK or not response.ok:
                         print("[ERROR] Google API for fetching detail on basis of place_id")
                         print("[ERROR] %s", response.reason)
@@ -78,16 +88,22 @@ def get_doctor_detail_from_google(place_sheet_obj):
         return False
 
 
-def get_clinic_detail_from_google(place_sheet_obj):
+def get_clinic_detail_from_google(place_sheet_obj, cache):
     api_key = settings.REVERSE_GEOCODING_API_KEY
     try:
         # For clinic_address.
         if not place_sheet_obj.clinic_place_search:
             # Hitting the google api for find the place for clinic_address.
             request_parameter = place_sheet_obj.clinic_address
-            response = requests.get(
-                'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery',
-                params={'key': api_key, 'input': request_parameter})
+            key = hashlib.md5(request_parameter.encode('utf-8')).hexdigest()
+            response = cache.get(key)
+
+            if not response:
+                response = requests.get(
+                    'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery',
+                    params={'key': api_key, 'input': request_parameter})
+                cache[key] = response
+
             if response.status_code != status.HTTP_200_OK or not response.ok:
                 print("[ERROR] Google API for fetching clinic_address place id.")
                 print("[ERROR] %s", response.reason)
@@ -109,8 +125,13 @@ def get_clinic_detail_from_google(place_sheet_obj):
             else:
                 if not place_sheet_obj.clinic_detail:
                     # Now hitting the google api for fetching details of the clinic regarding place_id obtained above.
-                    response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
-                                            params={'key': api_key, 'place_id': place_id})
+                    response = cache.get(place_id)
+
+                    if not response:
+                        response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
+                                                params={'key': api_key, 'place_id': place_id})
+                        cache[place_id] = response
+
                     if response.status_code != status.HTTP_200_OK or not response.ok:
                         print("[ERROR] Google API for fetching detail on basis of place_id")
                         print("[ERROR] %s", response.reason)

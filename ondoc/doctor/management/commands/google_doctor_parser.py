@@ -4,14 +4,15 @@ from ondoc.doctor.service import get_doctor_detail_from_google, get_clinic_detai
 
 
 def google_doctor_parser():
-    for doctor in GoogleDetailing.objects.all().order_by('id'):
-        success = get_doctor_detail_from_google(doctor)
+    cache = {}
+    for doctor in GoogleDetailing.objects.filter(doctor_place_search__isnull=True).order_by('id'):
+        success = get_doctor_detail_from_google(doctor, cache)
         if success:
             print("Successfull for id ", doctor.id)
         else:
             print("Failed for id ", doctor.id)
 
-        success = get_clinic_detail_from_google(doctor)
+        success = get_clinic_detail_from_google(doctor, cache)
         if success:
             print("Successfull for id ", doctor.id)
         else:

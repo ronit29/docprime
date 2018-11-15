@@ -263,11 +263,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter').filter(lab_pricing_group__labs__id=lab_id,
+        queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter')\
+                                                            .filter(lab_pricing_group__labs__id=lab_id,
                                                                     lab_pricing_group__labs__is_test_lab=False,
                                                                     lab_pricing_group__labs__is_live=True,
+                                                                    enabled=True,
                                                                     test__in=test_ids)
-        lab_obj = Lab.objects.prefetch_related('rating').filter(id=lab_id, is_live=True).first()
+        lab_obj = Lab.objects.prefetch_related('rating','lab_documents').filter(id=lab_id, is_live=True).first()
         if not lab_obj:
             return Response(status=status.HTTP_404_NOT_FOUND)
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
@@ -409,16 +411,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     When(is_home_collection_enabled=False,
                          then=Value(0)),
                     output_field=DecimalField())
-                distance_related_charges = Case(
-                    When(is_home_collection_enabled=False, then=Value(0)),
-                    When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=True),
-                         then=Value(0)),
-                    When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=False),
-                         then=Value(1)),
-                    output_field=IntegerField())
+                # distance_related_charges = Case(
+                #     When(is_home_collection_enabled=False, then=Value(0)),
+                #     When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=True),
+                #          then=Value(0)),
+                #     When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=False),
+                #          then=Value(1)),
+                #     output_field=IntegerField())
             else:
                 home_pickup_calculation = Value(0, DecimalField())
-                distance_related_charges = Value(0, IntegerField())
+                # distance_related_charges = Value(0, IntegerField())
 
             deal_price_calculation = Case(
                 When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
@@ -433,7 +435,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                distance=Max(Distance('location', pnt)),
                                                name=Max('name'),
                                                pickup_charges=Max(home_pickup_calculation),
-                                               distance_related_charges=Max(distance_related_charges),
                                                order_priority=Max('order_priority')).filter(count__gte=len(ids)))
 
             if min_price is not None:
@@ -458,7 +459,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by("-order_priority", F("price")+F("pickup_charges"), "distance_related_charges", "distance")
+                queryset = queryset.order_by("-order_priority", F("price")+F("pickup_charges"), "distance")
             elif order_by == 'distance':
                 queryset = queryset.order_by("-order_priority", "distance")
             elif order_by == 'name':
@@ -472,7 +473,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def form_lab_whole_data(self, queryset):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.prefetch_related('lab_documents', 'lab_image', 'lab_timings').filter(id__in=ids)
+        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges').filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
 
@@ -520,6 +521,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         next_lab_timing_dict[day] = next_lab_timing
                         next_lab_timing_data_dict[day] = next_lab_timing_data
                         break
+
+            if row["lab"].home_collection_charges.exists():
+                row["distance_related_charges"] = 1
+            else:
+                row["distance_related_charges"] = 0
 
             row["lab_timing"] = lab_timing
             row["lab_timing_data"] = lab_timing_data

@@ -620,13 +620,17 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
 
+        for obj in formset.deleted_objects:
+            obj.delete()
+
         for instance in instances:
             if isinstance(instance, GenericLabAdmin):
                 if (not instance.created_by):
                     instance.created_by = request.user
                 if (not instance.id):
                     instance.source_type = GenericAdmin.CRM
-                instance.save()
+            instance.save()
+        formset.save_m2m()
 
     # def save_related(self, request, form, formsets, change):
     #     super(type(self), self).save_related(request, form, formsets, change)

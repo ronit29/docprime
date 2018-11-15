@@ -144,6 +144,7 @@ def clinic_convert_timings(timings, is_day_human_readable=True):
 class RawSql:
     def __init__(self, query):
         self.query = query
+        self.cursor = None
 
     def fetch_all(self):
         with connection.cursor() as cursor:
@@ -155,6 +156,26 @@ class RawSql:
             ]
         return result
 
+    def iter_rows(self, size):
+        if self.cursor:
+            columns = [col[0] for col in self.cursor.description]
+            while True:
+                rows = self.cursor.fetchmany(size)
+                if not rows:
+                    self.cursor.close()
+                    break
+
+                result = [
+                    dict(zip(columns, row))
+                    for row in rows
+                ]
+
+                yield result
+
+    def fetch_lazily(self, size):
+        self.cursor = connection.cursor()
+        self.cursor.execute(self.query)
+        return self.iter_rows(size)
 
 class AgreedPriceCalculate(Func):
     function = 'labtest_agreed_price_calculate'

@@ -3,7 +3,7 @@ from ondoc.location.models import EntityUrls
 from django.contrib.sitemaps import Sitemap
 from ondoc.seo.models import SitemapManger
 from django.conf import settings
-
+import datetime
 
 class IndexSitemap(Sitemap):
     def __init__(self):
@@ -30,6 +30,11 @@ class SpecializationLocalityCitySitemap(Sitemap):
 
     def location(self, obj):
         return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime(2018, 11, 12, hour=2, minute=10, second=0, microsecond=0)
+
+
 
 
 class SpecializationCitySitemap(Sitemap):
