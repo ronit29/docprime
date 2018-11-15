@@ -1256,13 +1256,13 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
                     return Response({'error': 'something went wrong!'})
-        
+
         return Response({'success': 'Created Successfully'})
 
     def assoc_doctors(self, request, pk=None):
         hospital = get_object_or_404(Hospital, pk=pk)
         queryset = hospital.assoc_doctors
-        return Response(queryset.values('name', 'id'))
+        return Response(queryset.extra(select={'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END'}).values('name', 'id', 'assigned'))
 
     def assoc_hosp(self, request, pk=None):
         doctor = get_object_or_404(Doctor, pk=pk)
