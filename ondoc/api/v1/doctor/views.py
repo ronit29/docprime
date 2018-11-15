@@ -493,8 +493,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("day",  None)
             hospital.pop("discounted_fees", None)
             hospital['procedure_categories'] = procedures.get(key) if procedures else None
-            hospital['is_selected'] = bool(key == selected_hospital)
-            availability.append(hospital)
+            if key == selected_hospital:
+                availability.insert(0, hospital)
+            else:
+                availability.append(hospital)
         response_data['hospitals'] = availability
         return response_data
 
@@ -546,63 +548,69 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'rating',
                                     )
                   .filter(pk=pk).first())
-        if category_ids and not procedure_ids:
-            # all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-            #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-            #                                                                                     flat=True)  # OPTIMISE_SHASHANK_SINGH
-            all_clinics_of_doctor = doctor.doctor_clinics.all()
-            all_procedures_under_doctor = []
-            for doctor_clinic in all_clinics_of_doctor:
-                all_procedures_under_doctor.extend(doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
-            all_procedures_under_doctor = set(all_procedures_under_doctor)
-            selected_procedure_ids = ProcedureCategory.objects.filter(
-                pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True)
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
-        elif category_ids and procedure_ids:
-            # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
-            #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-            #                                                      flat=True)  # OPTIMISE_SHASHANK_SINGH
-            all_clinics_of_doctor = doctor.doctor_clinics.all()
-            all_procedures_under_doctor = []
-            for doctor_clinic in all_clinics_of_doctor:
-                all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
-            all_procedures_under_doctor = set(all_procedures_under_doctor)
-            selected_procedure_ids = procedure_ids
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
-        elif procedure_ids and not category_ids:
-            selected_procedure_ids = procedure_ids
-            all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
-                procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)  # OPTIMISE_SHASHANK_SINGH
-            # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
-            #     parent_category_id__in=all_parent_procedures_category_ids).values_list('procedure_id',
-            #                                                                            flat=True)  # OPTIMISE_SHASHANK_SINGH
-            all_clinics_of_doctor = doctor.doctor_clinics.all()
-            all_procedures_under_doctor = []
-            for doctor_clinic in all_clinics_of_doctor:
-                all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
-            all_procedures_under_doctor = set(all_procedures_under_doctor)
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+        if selected_hospital:
+            if category_ids and not procedure_ids:
+                # all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
+                #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
+                #                                                                                     flat=True)  # OPTIMISE_SHASHANK_SINGH
+                all_clinics_of_doctor = doctor.doctor_clinics.all()
+                all_procedures_under_doctor = []
+                for doctor_clinic in all_clinics_of_doctor:
+                    all_procedures_under_doctor.extend(doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
+                all_procedures_under_doctor = set(all_procedures_under_doctor)
+                selected_procedure_ids = ProcedureCategory.objects.filter(
+                    pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True)
+                selected_procedure_ids = set(selected_procedure_ids)
+                other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+            elif category_ids and procedure_ids:
+                # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
+                #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
+                #                                                      flat=True)  # OPTIMISE_SHASHANK_SINGH
+                all_clinics_of_doctor = doctor.doctor_clinics.all()
+                all_procedures_under_doctor = []
+                for doctor_clinic in all_clinics_of_doctor:
+                    all_procedures_under_doctor.extend(
+                        doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
+                all_procedures_under_doctor = set(all_procedures_under_doctor)
+                selected_procedure_ids = procedure_ids
+                selected_procedure_ids = set(selected_procedure_ids)
+                other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+            elif procedure_ids and not category_ids:
+                selected_procedure_ids = procedure_ids
+                # all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
+                #     procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)  # OPTIMISE_SHASHANK_SINGH
+                # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
+                #     parent_category_id__in=all_parent_procedures_category_ids).values_list('procedure_id',
+                #                                                                            flat=True)  # OPTIMISE_SHASHANK_SINGH
+                all_clinics_of_doctor = doctor.doctor_clinics.all()
+                all_procedures_under_doctor = []
+                for doctor_clinic in all_clinics_of_doctor:
+                    all_procedures_under_doctor.extend(
+                        doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
+                all_procedures_under_doctor = set(all_procedures_under_doctor)
+                selected_procedure_ids = set(selected_procedure_ids)
+                other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
 
 
-        # if not doctor or not is_valid_testing_data(request.user, doctor):
-        #     return Response(status=status.HTTP_400_BAD_REQUEST)
+            # if not doctor or not is_valid_testing_data(request.user, doctor):
+            #     return Response(status=status.HTTP_400_BAD_REQUEST)
+            if doctor:
+                serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+                                                                         context={"request": request
+                                                                             ,
+                                                                                  "selected_procedure_ids": selected_procedure_ids
+                                                                             , "other_procedure_ids": other_procedure_ids
+                                                                             , "category_ids": category_ids
+                                                                             , "hospital_id": selected_hospital
+                                                                                  })
+
+        else:
+            if doctor:
+                serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+                                                                         context={"request": request})
         if doctor:
-            serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
-                                                                     context={"request": request
-                                                                         ,
-                                                                              "selected_procedure_ids": selected_procedure_ids
-                                                                         , "other_procedure_ids": other_procedure_ids
-                                                                         , "category_ids": category_ids
-                                                                         , "hospital_id": selected_hospital
-                                                                              })
-
             entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
-                                                entity_type__iexact='Doctor').values('url')
+                                               entity_type__iexact='Doctor').values('url')
             response_data = self.prepare_response(serializer.data, selected_hospital)
 
             response_data['url'] = entity.first()['url'] if len(entity) == 1 else None
