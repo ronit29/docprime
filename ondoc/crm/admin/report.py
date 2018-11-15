@@ -50,7 +50,7 @@ class ReportAdmin(admin.ModelAdmin):
         if not object:
             return render(request, 'access_denied.html')
         query_string = object.sql
-        result = RawSql(query_string).fetch_all()
+        result = RawSql(query_string,[]).fetch_all()
         if result:
             table_class = get_table_class(result[0])
             table = table_class(result)
