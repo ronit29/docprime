@@ -476,7 +476,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
 
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
-    def prepare_response(self, response_data):
+    def prepare_response(self, response_data, selected_hospital):
         hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
         procedures = response_data.pop('procedures')
         availability = []
@@ -493,6 +493,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("day",  None)
             hospital.pop("discounted_fees", None)
             hospital['procedure_categories'] = procedures.get(key) if procedures else None
+            hospital['is_selected'] = bool(key == selected_hospital)
             availability.append(hospital)
         response_data['hospitals'] = availability
         return response_data
@@ -529,36 +530,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         response_data = []
         category_ids = validated_data.get('procedure_category_ids')
         procedure_ids = validated_data.get('procedure_ids')
+        selected_hospital = validated_data.get('hospital_id')
         selected_procedure_ids = []
         other_procedure_ids = []
-        if category_ids and not procedure_ids:
-            all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-                parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-                                                                                                flat=True)  # OPTIMISE_SHASHANK_SINGH
-            all_procedures_under_category = set(all_procedures_under_category)
-            selected_procedure_ids = ProcedureCategory.objects.filter(
-                pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True)
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
-        elif category_ids and procedure_ids:
-            all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-                parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-                                                                 flat=True)  # OPTIMISE_SHASHANK_SINGH
-            all_procedures_under_category = set(all_procedures_under_category)
-            selected_procedure_ids = procedure_ids
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
-        elif procedure_ids and not category_ids:
-            selected_procedure_ids = procedure_ids
-            all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
-                procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)  # OPTIMISE_SHASHANK_SINGH
-            all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-                parent_category_id__in=all_parent_procedures_category_ids).values_list('procedure_id',
-                                                                                       flat=True)  # OPTIMISE_SHASHANK_SINGH
-            all_procedures_under_category = set(all_procedures_under_category)
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
-
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
@@ -572,6 +546,49 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'rating',
                                     )
                   .filter(pk=pk).first())
+        if category_ids and not procedure_ids:
+            # all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
+            #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
+            #                                                                                     flat=True)  # OPTIMISE_SHASHANK_SINGH
+            all_clinics_of_doctor = doctor.doctor_clinics.all()
+            all_procedures_under_doctor = []
+            for doctor_clinic in all_clinics_of_doctor:
+                all_procedures_under_doctor.extend(doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
+            all_procedures_under_doctor = set(all_procedures_under_doctor)
+            selected_procedure_ids = ProcedureCategory.objects.filter(
+                pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True)
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+        elif category_ids and procedure_ids:
+            # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
+            #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
+            #                                                      flat=True)  # OPTIMISE_SHASHANK_SINGH
+            all_clinics_of_doctor = doctor.doctor_clinics.all()
+            all_procedures_under_doctor = []
+            for doctor_clinic in all_clinics_of_doctor:
+                all_procedures_under_doctor.extend(
+                    doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
+            all_procedures_under_doctor = set(all_procedures_under_doctor)
+            selected_procedure_ids = procedure_ids
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+        elif procedure_ids and not category_ids:
+            selected_procedure_ids = procedure_ids
+            all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
+                procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)  # OPTIMISE_SHASHANK_SINGH
+            # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
+            #     parent_category_id__in=all_parent_procedures_category_ids).values_list('procedure_id',
+            #                                                                            flat=True)  # OPTIMISE_SHASHANK_SINGH
+            all_clinics_of_doctor = doctor.doctor_clinics.all()
+            all_procedures_under_doctor = []
+            for doctor_clinic in all_clinics_of_doctor:
+                all_procedures_under_doctor.extend(
+                    doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
+            all_procedures_under_doctor = set(all_procedures_under_doctor)
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+
+
         # if not doctor or not is_valid_testing_data(request.user, doctor):
         #     return Response(status=status.HTTP_400_BAD_REQUEST)
         if doctor:
@@ -581,13 +598,12 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                                                               "selected_procedure_ids": selected_procedure_ids
                                                                          , "other_procedure_ids": other_procedure_ids
                                                                          , "category_ids": category_ids
-                                                                         , "hospital_id": validated_data.get(
-                                                                             'hospital_id')
+                                                                         , "hospital_id": selected_hospital
                                                                               })
 
             entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
                                                 entity_type__iexact='Doctor').values('url')
-            response_data = self.prepare_response(serializer.data)
+            response_data = self.prepare_response(serializer.data, selected_hospital)
 
             response_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         return Response(response_data)

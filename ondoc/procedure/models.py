@@ -35,13 +35,14 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
 
     def get_primary_parent_category(self, parent_category_ids=None):
         parent = None
+        first_parent = None
         if parent_category_ids:
             first_parent = self.parent_categories_mapping.filter(parent_category_id__in=parent_category_ids,
-                                                                 is_primary=True).order_by('pk').first()  # OPTIMIZE_SHASHANK_SINGH
+                                                                 is_primary=True).first()  # OPTIMIZE_SHASHANK_SINGH
             if not first_parent:
                 first_parent = self.parent_categories_mapping.filter(
                     parent_category_id__in=parent_category_ids).order_by('pk').first()  # OPTIMIZE_SHASHANK_SINGH
-        else:
+        if not first_parent:
             first_parent = self.parent_categories_mapping.filter(is_primary=True).first()  # OPTIMIZE_SHASHANK_SINGH
         if first_parent:
             parent = first_parent.parent_category
