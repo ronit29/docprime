@@ -17,9 +17,9 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization,
                                  MedicalCondition, PracticeSpecialization, SpecializationDepartment, SpecializationField,
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
-                                 SpecializationDepartmentMapping, DoctorClinicProcedure, Procedure)
+                                 SpecializationDepartmentMapping)
 
-from ondoc.diagnostic.models import (Lab, LabTiming, LabImage,
+from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
                                      LabNetwork, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
@@ -33,12 +33,13 @@ from ondoc.reports import models as report_models
 from ondoc.diagnostic.models import LabPricing
 
 from ondoc.web.models import Career, OnlineLead
-
+from ondoc.ratings_review import models as rating_models
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 
-from ondoc.authentication.models import BillingAccount
+from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin
 
 from ondoc.seo.models import Sitemap
+from ondoc.elastic.models import DemoElastic
 
 class Command(BaseCommand):
     help = 'Create groups and setup permissions for teams'
@@ -70,7 +71,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
-            DoctorClinicProcedure)
+            SPOCDetails)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -126,8 +127,8 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(BillingAccount,
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
-                                                           SpecializationField, PracticeSpecialization,
-                                                           SpecializationDepartmentMapping,Procedure
+                                                           SpecializationField,
+                                                           SpecializationDepartmentMapping
                                                            )
 
         for cl, ct in content_types.items():
@@ -149,7 +150,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(
-            DoctorClinic, DoctorClinicTiming,
+            DoctorClinic, DoctorClinicTiming, GenericAdmin, GenericLabAdmin,
             DoctorQualification, DoctorLanguage, DoctorAward, DoctorAssociation,
             DoctorExperience, DoctorMedicalService, DoctorImage, DoctorDocument,
             DoctorMobile, DoctorEmail, HospitalSpeciality,
@@ -157,7 +158,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, DoctorClinicProcedure)
+            CompetitorMonthlyVisit, SPOCDetails)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -197,7 +198,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(
             Qualification, Specialization, Language, MedicalService, College, LabTest,
             LabTestType, LabService, TestParameter, ParameterLabTest, LabTestPackage, PracticeSpecialization,
-            SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping, Procedure)
+            SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -216,7 +217,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, DoctorClinicProcedure)
+            CompetitorMonthlyVisit, SPOCDetails, GenericAdmin, GenericLabAdmin)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -305,6 +306,8 @@ class Command(BaseCommand):
         #Create report team
         self.create_report_team()
 
+        self.create_elastic_group()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
@@ -322,6 +325,21 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        #Review team Group
+        group, created = Group.objects.get_or_create(name=constants['REVIEW_TEAM_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(rating_models.RatingsReview, rating_models.ReviewCompliments)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+
         # Create Doctor Mapping team Group
         group, created = Group.objects.get_or_create(name=constants['DOCTOR_MAPPING_TEAM'])
         group.permissions.clear()
@@ -336,6 +354,28 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        group, created = Group.objects.get_or_create(name=constants['DOCTOR_SALES_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(DoctorEmail, DoctorMobile, DoctorClinic, DoctorClinicTiming)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(Doctor, DoctorClinic, DoctorPracticeSpecialization,
+                                                           DoctorQualification, DoctorLanguage)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
         self.stdout.write('Successfully created groups and permissions')
 
     def create_about_doctor_group(self):
@@ -345,7 +385,6 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(AboutDoctor, DoctorPracticeSpecialization, DoctorQualification,
                                                            DoctorClinicTiming, DoctorClinic, DoctorLanguage,
                                                            DoctorAward, DoctorAssociation, DoctorExperience,
-                                                           DoctorClinicProcedure,
                                                            for_concrete_models=False)
 
         for cl, ct in content_types.items():
@@ -431,4 +470,21 @@ class Command(BaseCommand):
         for cl, ct in content_types.items():
             Permission.objects.get_or_create(content_type=ct, codename='change_' + ct.model)
             permissions = Permission.objects.filter(content_type=ct, codename='change_' + ct.model)
+            group.permissions.add(*permissions)
+
+
+    def create_elastic_group(self):
+
+        group, created = Group.objects.get_or_create(name=constants['ELASTIC_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(DemoElastic)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
             group.permissions.add(*permissions)

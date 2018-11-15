@@ -135,3 +135,29 @@ def send_opd_notifications(appointment_id):
             notification_type=notification_models.NotificationAction.DOCTOR_INVOICE,
         )
 
+@task
+def send_opd_rating_message(appointment_id, type):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from django.conf import settings
+    from django.utils.safestring import mark_safe
+
+    data = {}
+    name = ''
+    if type == 'opd':
+        appointment = OpdAppointment.objects.filter(id=appointment_id, is_rated=False, status=OpdAppointment.COMPLETED).first()
+        name = appointment.doctor.name if appointment else None
+    else:
+        appointment = LabAppointment.objects.filter(id=appointment_id, is_rated=False, status=LabAppointment.COMPLETED).first()
+        name = appointment.lab.name if appointment else None
+    if appointment:
+        number = appointment.user.phone_number
+        data['phone_number'] = number
+        app_url = settings.CONSUMER_APP_DOMAIN
+        text_url = str(app_url)+ "/" + str(type) + "/appointment/" + str(appointment_id)
+        text = '''You have successfully completed your appointment with %s . Rate your experience %s''' % (name, text_url)
+        data['text'] = mark_safe(text)
+        notification_models.SmsNotification.send_rating_link(data)
+
+
+

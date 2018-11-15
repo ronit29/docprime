@@ -30,7 +30,7 @@ class Image(models.Model):
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
         return "{}/{}/{}".format(first,prefix,last)
-    
+
 
     def has_image_changed(self):
         if not self.pk:
@@ -187,6 +187,9 @@ class CustomUserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
     use_in_migrations = True
 
+    def get_queryset(self):
+        return super().get_queryset().prefetch_related('staffprofile')
+
     def _create_user(self, email, password, **extra_fields):
         """Create and save a User with the given email and password."""
         if not email:
@@ -237,9 +240,38 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        if self.user_type==1 and hasattr(self, 'staffprofile'):
-            return self.staffprofile.name
-        return str(self.phone_number)
+        name = self.phone_number
+        try:
+            name = self.staffprofile.name
+        except:
+            pass
+        return name
+        # if self.user_type==1 and hasattr(self, 'staffprofile'):
+        #     return self.staffprofile.name
+        # return str(self.phone_number)
+
+
+    def get_unrated_opd_appointment(self):
+        from ondoc.doctor import models as doc_models
+        opd_app = None
+        opd_all = self.appointments.all().order_by('-id')
+        for opd in opd_all:
+            if opd.status == doc_models.OpdAppointment.COMPLETED:
+                if opd.is_rated == False and opd.rating_declined == False:
+                    opd_app = opd
+                break
+        return opd_app
+
+    def get_unrated_lab_appointment(self):
+        from ondoc.diagnostic import models as lab_models
+        lab_app = None
+        lab_all = self.lab_appointments.all().order_by('-id')
+        for lab in lab_all:
+            if lab.status == lab_models.LabAppointment.COMPLETED:
+                if lab.is_rated == False and lab.rating_declined == False:
+                    lab_app = lab
+                break
+        return lab_app
 
     def save(self, *args, **kwargs):
         if self.email:
@@ -349,7 +381,7 @@ class UserProfile(TimeStampedModel):
 
 
 class OtpVerifications(TimeStampedModel):
-    OTP_EXPIRY_TIME = 60  # In minutes
+    OTP_EXPIRY_TIME = 120  # In minutes
     phone_number = models.CharField(max_length=10)
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)
@@ -551,13 +583,16 @@ class LabUserPermission(TimeStampedModel):
         # TODO PM - Logic to get admin for a particular User
 
 
-class GenericLabAdmin(TimeStampedModel):
+class GenericLabAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLING = 2
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    ALL = 3
+    CRM = 1
+    APP = 2
+    source_choices = ((CRM, 'CRM'), (APP, 'App'),)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages_lab', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    type_choices = ((APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
+    type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
     lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True,
                                     on_delete=models.CASCADE,
                                     related_name='manageable_lab_network_admins')
@@ -568,6 +603,8 @@ class GenericLabAdmin(TimeStampedModel):
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
+    name = models.CharField(max_length=24, blank=True, null=True)
+    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=CRM)
 
     class Meta:
         db_table = 'generic_lab_admin'
@@ -621,24 +658,45 @@ class GenericLabAdmin(TimeStampedModel):
                         is_disabled = False
                     if mgr.number and not mgr.lab.manageable_lab_admins.filter(phone_number=mgr.number).exists():
                         admin_object = GenericLabAdmin(lab=lab,
-                                      phone_number=mgr.number,
-                                      lab_network=None,
-                                      permission_type=GenericLabAdmin.APPOINTMENT,
-                                      is_disabled=is_disabled,
-                                      super_user_permission=True,
-                                      write_permission=True,
-                                      read_permission=True,
-                                      )
+                                                       phone_number=mgr.number,
+                                                       lab_network=None,
+                                                       permission_type=GenericLabAdmin.APPOINTMENT,
+                                                       is_disabled=is_disabled,
+                                                       super_user_permission=True,
+                                                       write_permission=True,
+                                                       read_permission=True,
+                                                       )
                         admin_object.save()
 
+    @classmethod
+    def create_permission_object(cls, user, phone_number, lab_network, lab, permission_type,
+                                 is_disabled, super_user_permission, write_permission, read_permission):
+        return GenericLabAdmin(user=user,
+                               phone_number=phone_number,
+                               lab_network=lab_network,
+                               lab=lab,
+                               permission_type=permission_type,
+                               is_disabled=is_disabled,
+                               super_user_permission=super_user_permission,
+                               write_permission=write_permission,
+                               read_permission=read_permission
+                               )
 
-class GenericAdmin(TimeStampedModel):
+
+class GenericAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLINNG = 2
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    ALL = 3
+    DOCTOR = 1
+    HOSPITAL =2
+    OTHER = 3
+    CRM = 1
+    APP = 2
+    entity_choices = ((OTHER, 'Other'), (DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'),)
+    source_choices = ((CRM, 'CRM'), (APP, 'App'),)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
+    type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
     hospital_network = models.ForeignKey("doctor.HospitalNetwork", null=True, blank=True,
                                          on_delete=models.CASCADE,
                                          related_name='manageable_hospital_networks')
@@ -652,6 +710,10 @@ class GenericAdmin(TimeStampedModel):
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
+    name = models.CharField(max_length=24, blank=True, null=True)
+    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=CRM)
+    entity_type = models.PositiveSmallIntegerField(max_length=20, choices=entity_choices, default=OTHER)
+
 
     class Meta:
         db_table = 'generic_admin'
@@ -661,11 +723,12 @@ class GenericAdmin(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.clean()
-        if self.permission_type == self.BILLINNG and self.doctor is not None:
-            self.hospital = None
+        # if not self.created_by:
+        #     self.created_by = self.request.user
+        # if self.permission_type == self.BILLINNG and self.doctor is not None:
+        #     self.hospital = None
         super(GenericAdmin, self).save(*args, **kwargs)
         GenericAdmin.update_user_admin(self.phone_number)
-
 
     def delete(self, *args, **kwargs):
         self.clean()
@@ -783,6 +846,25 @@ class GenericAdmin(TimeStampedModel):
                                             super_user_permission=True,
                                             write_permission=True,
                                             read_permission=True)
+
+    @classmethod
+    def create_hospital_spoc_admin(cls, hospital):
+        spoc_objs = (
+            SPOCDetails.objects.filter(object_id=hospital.id, content_type=ContentType.objects.get_for_model(hospital),
+                                       std_code__isnull=True))
+        spoc_numbers = list()
+        admin_objs = list()
+
+        for obj in spoc_objs:
+            spoc_numbers.append(obj.number)
+            admin_objs.extend(obj.get_admin_objs())
+
+        admin_to_be_deleted = cls.objects.filter(~Q(phone_number__in=spoc_numbers), Q(hospital=hospital))
+        if admin_to_be_deleted:
+            admin_to_be_deleted.delete()
+
+        if admin_objs:
+            cls.objects.bulk_create(admin_objs)
 
     @classmethod
     def create_permission_object(cls, user, doctor, phone_number, hospital_network, hospital, permission_type,
@@ -949,9 +1031,220 @@ class AgentToken(TimeStampedModel):
         db_table = 'agent_token'
 
 
+class SPOCDetails(TimeStampedModel):
+    OTHER = 1
+    SPOC = 2
+    MANAGER = 3
+    OWNER = 4
+    name = models.CharField(max_length=200)
+    std_code = models.IntegerField(blank=True, null=True)
+    number = models.BigIntegerField(blank=True, null=True)
+    email = models.EmailField(max_length=100, blank=True, null=True)
+    details = models.CharField(max_length=200, blank=True)
+    CONTACT_TYPE_CHOICES = [(OTHER, "Other"), (SPOC, "Single Point of Contact"), (MANAGER, "Manager"), (OWNER, "Owner")]
+    contact_type = models.PositiveSmallIntegerField(
+        choices=CONTACT_TYPE_CHOICES)
+    source = models.CharField(max_length=2000, blank=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
 
+    def get_admin_objs(self):
+        from ondoc.doctor.models import Hospital, HospitalNetwork
+        from ondoc.diagnostic.models import LabNetwork
+        if self.std_code is None:
+            if isinstance(self.content_object, Hospital):
+                return self.get_hospital_admin_objs()
+            elif isinstance(self.content_object, HospitalNetwork):
+                return self.get_hospital_network_admin_objs()
+            elif isinstance(self.content_object, LabNetwork):
+                return self.get_lab_network_admin_objs()
+        else:
+            return []
 
+    def app_admin_obj_hospitals(self, perm_dict, hospital_obj, hospital_network_obj, user):
+        admin_objs = list()
+        if perm_dict.get("is_app_admin"):
+            admin_objs.append(GenericAdmin.create_permission_object(user=user,
+                                                                    doctor=None,
+                                                                    phone_number=self.number,
+                                                                    hospital_network=hospital_network_obj,
+                                                                    hospital=hospital_obj,
+                                                                    permission_type=GenericAdmin.APPOINTMENT,
+                                                                    is_doc_admin=False,
+                                                                    is_disabled=False,
+                                                                    super_user_permission=False,
+                                                                    write_permission=perm_dict.get(
+                                                                        "app_write_permission"),
+                                                                    read_permission=perm_dict.get(
+                                                                        "app_read_permission"), ))
+        return admin_objs
 
+    def bill_admin_obj_hospitals(self, perm_dict, hospital_obj, hospital_network_obj, user):
+        admin_objs = list()
+        if perm_dict.get("is_billing_admin"):
+            admin_objs.append(GenericAdmin.create_permission_object(user=user,
+                                                                    doctor=None,
+                                                                    phone_number=self.number,
+                                                                    hospital_network=hospital_network_obj,
+                                                                    hospital=hospital_obj,
+                                                                    permission_type=GenericAdmin.BILLINNG,
+                                                                    is_doc_admin=False,
+                                                                    is_disabled=False,
+                                                                    super_user_permission=False,
+                                                                    write_permission=perm_dict.get(
+                                                                        "bill_write_permission"),
+                                                                    read_permission=perm_dict.get(
+                                                                        "bill_read_permission"), ))
+        return admin_objs
 
+    def app_admin_obj_labs(self, perm_dict, lab_obj, lab_network_obj, user):
+        admin_objs = list()
+        if perm_dict.get("is_app_admin"):
+            admin_objs.append(GenericLabAdmin.create_permission_object(user=user,
+                                                                       phone_number=self.number,
+                                                                       lab_network=lab_network_obj,
+                                                                       lab=lab_obj,
+                                                                       permission_type=GenericAdmin.APPOINTMENT,
+                                                                       is_disabled=False,
+                                                                       super_user_permission=False,
+                                                                       write_permission=perm_dict.get(
+                                                                           "app_write_permission"),
+                                                                       read_permission=perm_dict.get(
+                                                                           "app_read_permission"), ))
+        return admin_objs
 
+    def bill_admin_obj_labs(self, perm_dict, lab_obj, lab_network_obj, user):
+        admin_objs = list()
+        if perm_dict.get("is_billing_admin"):
+            admin_objs.append(GenericLabAdmin.create_permission_object(user=user,
+                                                                       phone_number=self.number,
+                                                                       lab_network=lab_network_obj,
+                                                                       lab=lab_obj,
+                                                                       permission_type=GenericAdmin.BILLINNG,
+                                                                       is_disabled=False,
+                                                                       super_user_permission=False,
+                                                                       write_permission=perm_dict.get(
+                                                                           "bill_write_permission"),
+                                                                       read_permission=perm_dict.get(
+                                                                           "bill_read_permission"), ))
+        return admin_objs
 
+    def get_hospital_admin_objs(self):
+        perm_dict = self.get_spoc_permissions()
+        hospital = self.content_object
+        user_obj = User.objects.filter(phone_number=self.number, user_type=User.DOCTOR).first()
+        if not user_obj:
+            user_obj = None
+        admin_objs = list()
+        # if hospital.is_billing_enabled:
+        #     admin_objs.extend(self.bill_admin_obj_hospitals(perm_dict, hospital, None, user_obj))
+        # if hospital.is_appointment_manager:
+        #     admin_objs.extend(self.app_admin_obj_hospitals(perm_dict, hospital, None, user_obj))
+        admin_objs.extend(self.bill_admin_obj_hospitals(perm_dict, hospital, None, user_obj))
+        admin_objs.extend(self.app_admin_obj_hospitals(perm_dict, hospital, None, user_obj))
+        return admin_objs
+
+    def get_hospital_network_admin_objs(self):
+        perm_dict = self.get_spoc_permissions()
+        hospital_network = self.content_object
+        user_obj = User.objects.filter(phone_number=self.number).first()
+        if not user_obj:
+            user_obj = None
+        admin_objs = list()
+        admin_objs.extend(self.app_admin_obj_hospitals(perm_dict, None, hospital_network, user_obj))
+        admin_objs.extend(self.bill_admin_obj_hospitals(perm_dict, None, hospital_network, user_obj))
+        return admin_objs
+
+    def get_lab_network_admin_objs(self):
+        perm_dict = self.get_spoc_permissions()
+        lab_network = self.content_object
+        user_obj = User.objects.filter(phone_number=self.number).first()
+        if not user_obj:
+            user_obj = None
+        admin_objs = list()
+        admin_objs.extend(self.app_admin_obj_labs(perm_dict, None, lab_network, user_obj))
+        admin_objs.extend(self.bill_admin_obj_labs(perm_dict, None, lab_network, user_obj))
+        return admin_objs
+
+    def get_spoc_permissions(self):
+        is_app_admin = True
+        is_billing_admin = False
+        app_write_permission = False
+        app_read_permission = False
+        bill_write_permission = False
+        bill_read_permission = False
+        if self.contact_type == self.MANAGER:
+            app_write_permission = True
+            # app_read_permission = True
+
+            is_billing_admin = True
+            bill_write_permission = True
+            # bill_read_permission = True
+        elif self.contact_type == self.SPOC:
+            app_write_permission = True
+            # app_read_permission = True
+        elif self.contact_type == self.OWNER:
+            app_write_permission = True
+            # app_read_permission = True
+
+            is_billing_admin = True
+            bill_write_permission = True
+            # bill_read_permission = True
+        elif self.contact_type == self.OTHER:
+            app_read_permission = True
+
+        return {
+            "is_app_admin": is_app_admin,
+            "is_billing_admin": is_billing_admin,
+            "app_write_permission": app_write_permission,
+            "app_read_permission": app_read_permission,
+            "bill_write_permission": bill_write_permission,
+            "bill_read_permission": bill_read_permission
+        }
+
+    # def save(self, *args, **kwargs):
+    #     from ondoc.doctor.models import Hospital, HospitalNetwork
+    #     from ondoc.diagnostic.models import LabNetwork
+    #     prev_instance = SPOCDetails.objects.filter(pk=self.id).first()
+    #     if prev_instance:
+    #         admin_to_be_deleted = None
+    #         if isinstance(self.content_object, Hospital):
+    #             admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=prev_instance.number, hospital=self.content_object)
+    #         elif isinstance(self.content_object, HospitalNetwork):
+    #             admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=prev_instance.number, hospital_network=self.content_object)
+    #         elif isinstance(self.content_object, LabNetwork):
+    #             admin_to_be_deleted = GenericLabAdmin.objects.filter(phone_number=prev_instance.number, lab_network=self.content_object)
+    #         if admin_to_be_deleted:
+    #             admin_to_be_deleted.delete()
+    #     saved_obj = super(SPOCDetails, self).save(*args, **kwargs)
+    #     admin_objs = self.get_admin_objs()
+    #     if admin_objs:
+    #         if isinstance(self.content_object, Hospital) or isinstance(self.content_object, HospitalNetwork):
+    #             GenericAdmin.objects.bulk_create(admin_objs)
+    #         elif isinstance(self.content_object, LabNetwork):
+    #             GenericLabAdmin.objects.bulk_create(admin_objs)
+    #     return saved_obj
+
+    # def delete(self, *args, **kwargs):
+    #     from ondoc.doctor.models import Hospital, HospitalNetwork
+    #     from ondoc.diagnostic.models import LabNetwork
+    #     admin_to_be_deleted = None
+    #     if isinstance(self.content_object, Hospital):
+    #         admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=self.number,
+    #                                                           hospital=self.content_object)
+    #     elif isinstance(self.content_object, HospitalNetwork):
+    #         admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=self.number,
+    #                                                           hospital_network=self.content_object)
+    #     elif isinstance(self.content_object, LabNetwork):
+    #         admin_to_be_deleted = GenericLabAdmin.objects.filter(phone_number=self.number,
+    #                                                              lab_network=self.content_object)
+    #     if admin_to_be_deleted:
+    #         admin_to_be_deleted.delete()
+    #     return super(SPOCDetails, self).delete(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "spoc_details"

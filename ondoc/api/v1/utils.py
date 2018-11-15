@@ -3,7 +3,7 @@ from rest_framework import permissions
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import F, Func
 from django.utils import timezone
 import math
@@ -22,6 +22,9 @@ import string
 from django.conf import settings
 from dateutil.parser import parse
 from dateutil import tz
+from decimal import Decimal
+from collections import OrderedDict
+import datetime
 from django.utils.dateparse import parse_datetime
 User = get_user_model()
 
@@ -240,12 +243,15 @@ def opdappointment_transform(app_data):
     app_data["fees"] = str(app_data["fees"])
     app_data["effective_price"] = str(app_data["effective_price"])
     app_data["mrp"] = str(app_data["mrp"])
+    app_data["discount"] = str(app_data["discount"])
     app_data["time_slot_start"] = str(app_data["time_slot_start"])
     app_data["doctor"] = app_data["doctor"].id
     app_data["hospital"] = app_data["hospital"].id
     app_data["profile"] = app_data["profile"].id
     app_data["user"] = app_data["user"].id
     app_data["booked_by"] = app_data["booked_by"].id
+    if app_data.get("coupon"):
+        app_data["coupon"] = list(app_data["coupon"])
     return app_data
 
 
@@ -254,11 +260,14 @@ def labappointment_transform(app_data):
     app_data["agreed_price"] = str(app_data["agreed_price"])
     app_data["deal_price"] = str(app_data["deal_price"])
     app_data["effective_price"] = str(app_data["effective_price"])
+    app_data["discount"] = str(app_data["discount"])
     app_data["time_slot_start"] = str(app_data["time_slot_start"])
     app_data["lab"] = app_data["lab"].id
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
+    if app_data.get("coupon"):
+        app_data["coupon"] = list(app_data["coupon"])
     return app_data
 
 
@@ -307,7 +316,7 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
-    profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
+    # profile = UserProfile.objects.get(pk=order.action_data.get("profile"))
     pgdata = {
         'custId': user.id,
         'mobile': user.phone_number,
@@ -317,7 +326,7 @@ def payment_details(request, order):
         'furl': furl,
         'referenceId': "",
         'orderId': order.id,
-        'name': profile.name,
+        'name': order.action_data.get("profile_detail").get("name"),
         'txAmount': str(order.amount),
     }
     secret_key = client_key = ""
@@ -464,3 +473,249 @@ def form_pg_refund_data(refund_objs):
             params["checkSum"] = PgTransaction.create_pg_hash(params, secret_key, client_key)
             pg_data.append(params)
     return pg_data
+
+
+class CouponsMixin(object):
+
+    # def used_coupon_count(self, user, coupon_code):
+    #     from ondoc.coupon.models import Coupon
+    #     from ondoc.doctor.models import OpdAppointment
+    #     from ondoc.diagnostic.models import LabAppointment
+    #
+    #     data = Coupon.objects.filter(code__exact=coupon_code).first()
+    #
+    #     count = 0
+    #     if data:
+    #         if str(data.type) == str(Coupon.DOCTOR) or str(data.type) == str(Coupon.ALL):
+    #             count += OpdAppointment.objects.filter(user=user,
+    #                                                    status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
+    #                                                                OpdAppointment.RESCHEDULED_DOCTOR,
+    #                                                                OpdAppointment.RESCHEDULED_PATIENT,
+    #                                                                OpdAppointment.ACCEPTED,
+    #                                                                OpdAppointment.COMPLETED],
+    #                                                    coupon__code__exact=coupon_code).count()
+    #         if str(data.type) == str(Coupon.LAB) or str(data.type) == str(Coupon.ALL):
+    #             count += LabAppointment.objects.filter(user=user,
+    #                                                    status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
+    #                                                                LabAppointment.RESCHEDULED_LAB,
+    #                                                                LabAppointment.RESCHEDULED_PATIENT,
+    #                                                                LabAppointment.ACCEPTED,
+    #                                                                LabAppointment.COMPLETED],
+    #                                                    coupon__code__exact=coupon_code).count()
+    #     return count
+
+    def validate_coupon(self, user, coupon_code):
+        from ondoc.coupon.models import Coupon
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        data = Coupon.objects.filter(code__exact=coupon_code).first()
+
+        if data:
+            if isinstance(self, OpdAppointment) and data.type not in [Coupon.DOCTOR, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+            elif isinstance(self, LabAppointment) and data.type not in [Coupon.LAB, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+
+            if (timezone.now() - max(data.created_at, user.date_joined)).days > data.validity:
+                return {"is_valid": False, "used_count": None}
+
+            allowed_coupon_count = data.count
+            count = data.used_coupon_count(user)
+
+            if count < allowed_coupon_count:
+                return {"is_valid": True, "used_count": count}
+            else:
+                return {"is_valid": False, "used_count": count}
+        else:
+            return {"is_valid": False, "used_count": None}
+
+    def get_discount(self, coupon_code, price):
+        from ondoc.coupon.models import Coupon
+
+        data = Coupon.objects.filter(code__exact=coupon_code).first()
+        discount = 0
+
+        if data:
+            if data.min_order_amount is not None and price < data.min_order_amount:
+                return 0
+
+            if data.flat_discount is not None:
+                discount = data.flat_discount
+            elif data.percentage_discount is not None:
+                discount = math.floor(price * data.percentage_discount / 100)
+
+            if data.max_discount_amount is not None:
+                discount =  min(data.max_discount_amount, discount)
+
+            if discount > price:
+                discount = price
+
+            return discount
+                # else:
+                #     return discount
+        else:
+            return 0
+
+
+class TimeSlotExtraction(object):
+    MORNING = "Morning"
+    AFTERNOON = "Afternoon"
+    EVENING = "Evening"
+    TIME_SPAN = 15  # In minutes
+    timing = dict()
+    price_available = dict()
+
+    def __init__(self):
+        for i in range(7):
+            self.timing[i] = dict()
+            self.price_available[i] = dict()
+
+    def form_time_slots(self, day, start, end, price=None, is_available=True,
+                        deal_price=None, mrp=None, is_doctor=False):
+        start = Decimal(str(start))
+        end = Decimal(str(end))
+        time_span = self.TIME_SPAN
+
+        float_span = (Decimal(time_span) / Decimal(60))
+        if not self.timing[day].get('timing'):
+            self.timing[day]['timing'] = dict()
+            self.timing[day]['timing'][self.MORNING] = OrderedDict()
+            self.timing[day]['timing'][self.AFTERNOON] = OrderedDict()
+            self.timing[day]['timing'][self.EVENING] = OrderedDict()
+        temp_start = start
+        while temp_start <= end:
+            day_slot, am_pm = self.get_day_slot(temp_start)
+            time_str = self.form_time_string(temp_start, am_pm)
+            self.timing[day]['timing'][day_slot][temp_start] = time_str
+            price_available = {"price": price, "is_available": is_available}
+            if is_doctor:
+                price_available.update({
+                    "mrp": mrp,
+                    "deal_price": deal_price
+                })
+            self.price_available[day][temp_start] = price_available
+            temp_start += float_span
+
+    def get_day_slot(self, time):
+        am = 'AM'
+        pm = 'PM'
+        if time < 12:
+            return self.MORNING, am
+        elif time < 16:
+            return self.AFTERNOON, pm
+        else:
+            return self.EVENING, pm
+
+    def form_time_string(self, time, am_pm):
+
+        day_time_hour = int(time)
+        day_time_min = (time - day_time_hour) * 60
+
+        if day_time_hour > 12:
+            day_time_hour -= 12
+
+        day_time_hour_str = str(int(day_time_hour))
+        if int(day_time_hour) < 10:
+            day_time_hour_str = '0' + str(int(day_time_hour))
+
+        day_time_min_str = str(int(day_time_min))
+        if int(day_time_min) < 10:
+            day_time_min_str = '0' + str(int(day_time_min))
+
+        time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
+
+        return time_str
+
+    def get_timing_list(self):
+        whole_timing_data = dict()
+        for i in range(7):
+            whole_timing_data[i] = list()
+            pa = self.price_available[i]
+            if self.timing[i].get('timing'):
+                # data = self.format_data(self.timing[i]['timing'][self.MORNING], pa)
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
+                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
+
+        return whole_timing_data
+
+    def format_data(self, data, day_time, pa):
+        data_list = list()
+        for k, v in data.items():
+            if 'mrp' in pa[k].keys() and 'deal_price' in pa[k].keys():
+                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                  "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                  "is_available": pa[k]["is_available"]})
+            else:
+                data_list.append({"value": k, "text": v, "price": pa[k]["price"],
+                                  "is_available": pa[k]["is_available"]})
+        format_data = dict()
+        format_data['title'] = day_time
+        format_data['timing'] = data_list
+        return format_data
+
+    def initial_start_times(self, is_thyrocare, is_home_pickup, time_slots):
+        today_min = None
+        tomorrow_min = None
+        today_max = None
+
+        now = datetime.datetime.now()
+        curr_time = now.hour
+        curr_minute = round(round(float(now.minute) / 60, 2) * 2) / 2
+        curr_time += curr_minute
+        is_sunday = now.weekday() == 6
+
+        # TODO: put time gaps in config
+        if is_home_pickup:
+            if is_thyrocare:
+                today_min = 24
+                if curr_time >= 17:
+                    tomorrow_min = 24
+            else:
+                if is_sunday:
+                    today_min = 24
+                else:
+                    if curr_time < 13:
+                        today_min = curr_time + 4
+                    elif curr_time >= 13:
+                        today_min = 24
+                if curr_time >= 17:
+                    tomorrow_min = 12
+        else:
+            if not is_thyrocare:
+                # add 2 hours gap,
+                today_min = curr_time + 2
+
+                # block lab for 2 hours, before last found time slot
+                if time_slots and time_slots[now.weekday()]:
+                    max_val = 0
+                    for s in time_slots[now.weekday()]:
+                        if s["timing"]:
+                            for t in s["timing"]:
+                                max_val = max(t["value"], max_val)
+                    if max_val >= 2:
+                        today_max = max_val - 2
+
+        return today_min, tomorrow_min, today_max
+
+
+def consumers_balance_refund():
+    from ondoc.account.models import ConsumerAccount, ConsumerRefund
+    refund_time = timezone.now() - timezone.timedelta(hours=settings.REFUND_INACTIVE_TIME)
+    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time)
+    for account in consumer_accounts:
+        with transaction.atomic():
+            consumer_account = ConsumerAccount.objects.select_for_update().filter(pk=account.id).first()
+            if consumer_account:
+                if consumer_account.balance > 0:
+                    print("consumer account balance " + str(consumer_account.balance))
+                    ctx_obj = consumer_account.debit_refund()
+                    ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+
+
+class GenericAdminEntity():
+    DOCTOR = 1
+    HOSPITAL = 2
+    LAB = 3
+    EntityChoices = [(DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'), (LAB, 'Lab')]

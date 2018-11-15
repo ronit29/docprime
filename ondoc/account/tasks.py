@@ -12,6 +12,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+@task()
+def consumer_refund_update():
+    from ondoc.api.v1.utils import consumers_balance_refund
+    from ondoc.account.models import ConsumerRefund
+    consumers_balance_refund()
+    ConsumerRefund.request_pending_refunds()
+    ConsumerRefund.update_refund_status()
+
+
 @task(bind=True)
 def refund_status_update(self):
     from ondoc.account.models import ConsumerRefund, PgTransaction

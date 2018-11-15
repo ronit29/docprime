@@ -21,11 +21,11 @@ User = get_user_model()
 
 
 class OTPSerializer(serializers.Serializer):
-    phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
 
 
 class OTPVerificationSerializer(serializers.Serializer):
-    phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000, max_value=999999)
 
     def validate(self, attrs):
@@ -43,7 +43,7 @@ class OTPVerificationSerializer(serializers.Serializer):
 
 
 class DoctorLoginSerializer(serializers.Serializer):
-    phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
 
     def validate(self, attrs):
@@ -79,7 +79,7 @@ class DoctorLoginSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    phone_number = serializers.IntegerField(min_value=7000000000,max_value=9999999999)
+    phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
     otp = serializers.IntegerField(min_value=100000,max_value=999999)
 
     def validate(self, attrs):
@@ -361,21 +361,24 @@ class OnlineLeadSerializer(serializers.ModelSerializer):
     name = serializers.CharField(max_length=255)
     speciality = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
     mobile = serializers.IntegerField(allow_null=False, max_value=9999999999, min_value=1000000000)
-    city_name = serializers.IntegerField()
+    city_name = serializers.IntegerField(required=False)
     email = serializers.EmailField()
     utm_params = serializers.JSONField(required=False)
+    source = serializers.CharField(max_length=128, required=False, allow_null=True, allow_blank=True)
 
     def validate(self, attrs):
-        if not common_models.Cities.objects.filter(id=attrs['city_name']).exists():
-            raise serializers.ValidationError('city_name should be integer.')
+        if attrs['city_name'] > 0:
+            if not common_models.Cities.objects.filter(id=attrs['city_name']).exists():
+                raise serializers.ValidationError('City not found for given city.')
 
-        attrs['city_name'] = common_models.Cities.objects.filter(id=attrs['city_name']).first()
-
+            attrs['city_name'] = common_models.Cities.objects.filter(id=attrs['city_name']).first()
+        else:
+            attrs['city_name'] = None
         return attrs
 
     class Meta:
         model = OnlineLead
-        fields = ('member_type', 'name', 'speciality', 'mobile', 'city_name', 'email', 'utm_params')
+        fields = ('member_type', 'name', 'speciality', 'mobile', 'city_name', 'email', 'utm_params', 'source')
 
 
 class CareerSerializer(serializers.ModelSerializer):

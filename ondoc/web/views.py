@@ -67,7 +67,7 @@ def user_appointment_via_agent(request):
 
 
 def doctor_login_via_agent(request):
-    if not (request.user.is_superuser):
+    if not (request.user.is_superuser or request.user.groups.filter(name='provider_group').exists()):
         return HttpResponseRedirect('%s' % settings.ADMIN_BASE_URL)
     api_domain = '%s%s' % ('', '/api/v1/admin/agent/user/login')
     appDomain = '%s%s' % (settings.PROVIDER_APP_DOMAIN, '/agent/login')

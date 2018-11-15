@@ -89,7 +89,8 @@ DJANGO_APPS = (
     'django.contrib.gis',
     'reversion',
     'storages',
-
+    'django.contrib.sites',
+    'django.contrib.sitemaps',
 )
 
 THIRD_PARTY_APPS = (
@@ -104,7 +105,8 @@ THIRD_PARTY_APPS = (
     'django_tables2',
     'anymail',
     'nested_admin',
-    'ipware'
+    'ipware',
+    'django_user_agents'
 )
 
 LOCAL_APPS = (
@@ -128,7 +130,10 @@ LOCAL_APPS = (
     'ondoc.common',
     'ondoc.tracking',
     'ondoc.seo',
+    'ondoc.ratings_review',
     'ondoc.geoip',
+    'ondoc.procedure',
+    'ondoc.elastic'
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -144,6 +149,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_user_agents.middleware.UserAgentMiddleware'
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -196,6 +202,8 @@ STATICFILES_FINDERS = (
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = str(APPS_DIR('media'))
+
+SITE_ID = 1
 
 # TEMPLATES
 # ------------------------------------------------------------------------------
@@ -287,6 +295,7 @@ MATRIX_API_URL= env('MATRIX_API_URL')
 MATRIX_API_TOKEN = env('MATRIX_API_TOKEN')
 MATRIX_AUTH_TOKEN = env('MATRIX_USER_TOKEN')
 CHAT_API_URL = env('CHAT_API_URL')
+CHAT_PRESCRIPTION_URL = env('CHAT_PRESCRIPTION_URL')
 PG_SECRET_KEY_P1 = env('PG_SECRET_KEY_P1')
 PG_CLIENT_KEY_P1 = env('PG_CLIENT_KEY_P1')
 PG_SECRET_KEY_P2 = env('PG_SECRET_KEY_P2')
@@ -297,6 +306,7 @@ PG_REFUND_URL = env('PG_REFUND_URL')
 PG_REFUND_AUTH_TOKEN = env('PG_REFUND_AUTH_TOKEN')
 PG_REFUND_STATUS_API_URL = env('PG_REFUND_STATUS_API_URL')
 PG_REFUND_STATUS_POLL_TIME = 60  # In min
+REFUND_INACTIVE_TIME = 24  # In hours
 AUTO_CANCEL_OPD_DELAY = 3000  # In min
 AUTO_CANCEL_LAB_DELAY = 30  # In min
 OPS_EMAIL_ID = env.list('OPS_EMAIL_ID')
@@ -307,6 +317,7 @@ MAXMIND_ACCOUNT_ID = env('MAXMIND_ACCOUNT_ID')
 MAXMIND_LICENSE_KEY = env('MAXMIND_LICENSE_KEY')
 MAXMIND_CITY_API_URL = env('MAXMIND_CITY_API_URL')
 OTP_BYPASS_NUMBERS = env.list('OTP_BYPASS_NUMBERS')
+#GOOGLE_MAP_API_KEY = env('GOOGLE_MAP_API_KEY')
 
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),

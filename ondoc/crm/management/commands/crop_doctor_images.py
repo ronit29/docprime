@@ -8,7 +8,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         for di in DoctorImage.objects.all():
-            if settings.DEBUG:
+            if di.cropped_image == '' and di.doctor.source == 'pr':
                 try:
                     di.crop_image()
                 except Exception as e:

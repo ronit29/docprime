@@ -5,6 +5,7 @@ import datetime
 
 
 class ArticleCategory(TimeStampedModel):
+
     name = models.CharField(blank=False, null=False, max_length=500)
     identifier = models.CharField(max_length=48, blank=False, null=True)
     url = models.CharField(blank=False, null=True, max_length=500, unique=True)
@@ -73,11 +74,23 @@ class ArticleImage(TimeStampedModel, CreatedByModel):
     class Meta:
         db_table = "article_image"
 
+class ArticleContentBox(TimeStampedModel):
+    name = models.CharField(max_length=1000)
+    title = models.CharField(max_length=1000)
+    rank = models.PositiveSmallIntegerField(default=0, blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'article_content_box'
+
 
 class ArticleLinkedUrl(TimeStampedModel):
     article = models.ForeignKey(Article, on_delete=models.CASCADE)
     url = models.CharField(max_length=2000, unique=True)
     title = models.CharField(max_length=500)
+    content_box = models.ForeignKey(ArticleContentBox,null=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return self.title
@@ -90,6 +103,7 @@ class LinkedArticle(TimeStampedModel):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_articles')
     linked_article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='related_article')
     title = models.CharField(max_length=500, null=True, blank=False)
+    content_box = models.ForeignKey(ArticleContentBox,null=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return "{}-{}".format(self.article.title, self.linked_article.title)

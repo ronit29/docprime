@@ -21,7 +21,6 @@ from django.utils.html import format_html_join
 import pytz
 
 from ondoc.account.models import Order
-from ondoc.api.v1.diagnostic.views import TimeSlotExtraction
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
@@ -264,7 +263,7 @@ class GenericLabAdminInline(admin.TabularInline):
     show_change_link = False
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    fields = ['user', 'phone_number', 'lab', 'permission_type', 'is_disabled', 'read_permission', 'write_permission']
+    fields = ['user', 'phone_number', 'lab', 'permission_type', 'super_user_permission', 'is_disabled', 'read_permission', 'write_permission']
 
 
 class LabDocumentFormSet(forms.BaseInlineFormSet):
@@ -617,23 +616,39 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
         super().save_model(request, obj, form, change)
 
-    def save_related(self, request, form, formsets, change):
-        super(type(self), self).save_related(request, form, formsets, change)
-        lab = form.instance
-        lab_mgr_form_change = False
-        lab_mgr_new_len = lab_mgr_del_len = 0
-        for formset in formsets:
-            if isinstance(formset, LabManagerFormSet):
-                for form in formset.forms:
-                    if 'contact_type' in form.changed_data or 'number' in form.changed_data:
-                        lab_mgr_form_change = True
-                        break
-                lab_mgr_new_len = len(formset.new_objects)
-                lab_mgr_del_len = len(formset.deleted_objects)
 
-        if lab is not None:
-            if (lab_mgr_form_change or lab_mgr_new_len > 0 or lab_mgr_del_len > 0):
-                GenericLabAdmin.create_admin_permissions(lab)
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+
+        for obj in formset.deleted_objects:
+            obj.delete()
+
+        for instance in instances:
+            if isinstance(instance, GenericLabAdmin):
+                if (not instance.created_by):
+                    instance.created_by = request.user
+                if (not instance.id):
+                    instance.source_type = GenericAdmin.CRM
+            instance.save()
+        formset.save_m2m()
+
+    # def save_related(self, request, form, formsets, change):
+    #     super(type(self), self).save_related(request, form, formsets, change)
+    #     lab = form.instance
+    #     lab_mgr_form_change = False
+    #     lab_mgr_new_len = lab_mgr_del_len = 0
+    #     for formset in formsets:
+    #         if isinstance(formset, LabManagerFormSet):
+    #             for form in formset.forms:
+    #                 if 'contact_type' in form.changed_data or 'number' in form.changed_data:
+    #                     lab_mgr_form_change = True
+    #                     break
+    #             lab_mgr_new_len = len(formset.new_objects)
+    #             lab_mgr_del_len = len(formset.deleted_objects)
+    #
+    #     if lab is not None:
+    #         if (lab_mgr_form_change or lab_mgr_new_len > 0 or lab_mgr_del_len > 0):
+    #             GenericLabAdmin.create_admin_permissions(lab)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(LabAdmin, self).get_form(request, obj=obj, **kwargs)
@@ -681,6 +696,21 @@ class LabAppointmentForm(forms.ModelForm):
         if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
             raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
 
+        if not cleaned_data.get('status') is LabAppointment.CANCELLED and (cleaned_data.get(
+                'cancellation_reason') or cleaned_data.get('cancellation_comments')):
+            raise forms.ValidationError(
+                "Reason/Comment for cancellation can only be entered on cancelled appointment")
+
+        if cleaned_data.get('status') is LabAppointment.CANCELLED and not cleaned_data.get('cancellation_reason'):
+            raise forms.ValidationError("Reason for Cancelled appointment should be set.")
+
+        if cleaned_data.get('status') is LabAppointment.CANCELLED and cleaned_data.get(
+                'cancellation_reason') and 'others' in cleaned_data.get(
+                'cancellation_reason').name.lower() and not cleaned_data.get('cancellation_comments'):
+            raise forms.ValidationError(
+                "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
+
+
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
 
@@ -706,7 +736,7 @@ class LabAppointmentForm(forms.ModelForm):
 
 class LabAppointmentAdmin(admin.ModelAdmin):
     form = LabAppointmentForm
-    list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at',)
+    list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at', 'updated_at')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
 
@@ -746,7 +776,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
             return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_test', 'lab_contact_details', 'profile', 'user',
-                    'profile_detail', 'status', 'cancel_type', 'price', 'agreed_price',
+                    'profile_detail', 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
+                    'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
@@ -754,7 +785,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                     'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
-                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type','start_date', 'start_time')
+                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
+                    'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time')
         else:
             return ()
 
@@ -997,4 +1029,12 @@ class CommonDiagnosticConditionAdmin(VersionAdmin):
 
 class CommonTestAdmin(VersionAdmin):
     autocomplete_fields = ['test']
+
+
+class CommonPackageAdmin(VersionAdmin):
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(CommonPackageAdmin, self).get_form(request, obj=obj, **kwargs)
+        form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True)
+        return form
 

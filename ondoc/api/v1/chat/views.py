@@ -2,7 +2,7 @@ from ondoc.chat import models
 from ondoc.doctor import models as doc_models
 from ondoc.authentication import models as auth_models
 from ondoc.api.v1.doctor import serializers as doc_serializers
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from ondoc.authentication.backends import JWTAuthentication
@@ -139,3 +139,28 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                 return Response(response_data)
         return Response([])
 
+
+class ChatPrescriptionViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def retrieve(self, request):
+
+        SUCCESS_OK_STATUS = '1'
+        FAILURE_OK_STATUS = '0'
+
+        user = request.user
+
+        url = settings.CHAT_PRESCRIPTION_URL + user.phone_number
+
+        response = requests.get(url=url)
+
+        if response.status_code == status.HTTP_200_OK:
+            try:
+                resp_data = response.json()
+                return Response({"status": SUCCESS_OK_STATUS, "data":resp_data})
+            except:
+                return Response({"status": FAILURE_OK_STATUS})
+        else:
+            return Response({"status": FAILURE_OK_STATUS})

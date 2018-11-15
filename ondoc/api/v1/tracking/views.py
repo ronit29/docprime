@@ -44,6 +44,8 @@ class EventCreateViewSet(GenericViewSet):
                         ud['utm_medium'] = data.get('utm_medium')
                         ud['utm_source'] = data.get('utm_source')
                         ud['utm_term'] = data.get('utm_term')
+                        ud['source'] = data.get('source')
+                        ud['referrer'] = data.get('referrer')
                         visit.data = ud
                         visit.save()
                 elif event_name=='visitor-info':

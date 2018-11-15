@@ -23,8 +23,8 @@ from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital,
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken)
-from ondoc.notification.models import SmsNotification
-from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
+from ondoc.notification.models import SmsNotification, EmailNotification
+from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -73,14 +73,15 @@ class LoginOTP(GenericViewSet):
     def generate(self, request, format=None):
 
         response = {'exists': 0}
-        if request.data.get("phone_number"):
-            expire_otp(phone_number=request.data.get("phone_number"))
+        # if request.data.get("phone_number"):
+        #     expire_otp(phone_number=request.data.get("phone_number"))
         serializer = serializers.OTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
         phone_number = data['phone_number']
         req_type = request.query_params.get('type')
+        retry_send = request.query_params.get('retry', False)
 
         if req_type == 'doctor':
             doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
@@ -101,14 +102,14 @@ class LoginOTP(GenericViewSet):
 
             if lab_queryset.exists() or doctor_queryset.exists():
                 response['exists'] = 1
-                send_otp("OTP for login is {}", phone_number)
+                send_otp("OTP for login is {}", phone_number, retry_send)
 
             # if queryset.exists():
             #     response['exists'] = 1
             #     send_otp("OTP for DocPrime login is {}", phone_number)
 
         else:
-            send_otp("OTP for login is {}", phone_number)
+            send_otp("OTP for login is {}", phone_number, retry_send)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists'] = 1
 
@@ -322,7 +323,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             data['phone_number'] = request.user.phone_number
         serializer = serializers.UserProfileSerializer(data=data, context= {'request':request})
         serializer.is_valid(raise_exception=True)
-        if UserProfile.objects.filter(name=data['name'], user=request.user).exists():
+        if UserProfile.objects.filter(name__iexact=data['name'], user=request.user).exists():
             # return Response({
             #     "request_errors": {"code": "invalid",
             #                        "message": "Profile with the given name already exists."
@@ -505,11 +506,19 @@ class UserAppointmentsViewSet(OndocViewSet):
                     temp_lab_test = lab_test_queryset.values('lab_pricing_group__labs').annotate(total_mrp=Sum("mrp"),
                                                                              total_deal_price=Sum(deal_price_calculation),
                                                                              total_agreed_price=Sum(agreed_price_calculation))
-                    old_deal_price = lab_appointment.deal_price
-                    old_effective_price = lab_appointment.effective_price
-                    coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
+                    # old_deal_price = lab_appointment.deal_price
+                    # old_effective_price = lab_appointment.effective_price
+                    coupon_discount = lab_appointment.discount
+                    # coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
                     new_deal_price = temp_lab_test[0].get("total_deal_price")
-                    new_effective_price = new_deal_price - coupon_price
+
+                    if lab_appointment.home_pickup_charges:
+                        new_deal_price += lab_appointment.home_pickup_charges
+
+                    if new_deal_price <= coupon_discount:
+                        new_effective_price = 0
+                    else:
+                        new_effective_price = new_deal_price - coupon_discount
                     # new_appointment = dict()
 
                     new_appointment = {
@@ -525,7 +534,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                         "profile_detail": lab_appointment.profile_detail,
                         "status": lab_appointment.status,
                         "payment_type": lab_appointment.payment_type,
-                        "lab_test": lab_appointment.lab_test
+                        "lab_test": lab_appointment.lab_test,
+                        "discount": coupon_discount
                     }
 
                     resp = self.extract_payment_details(request, lab_appointment, new_appointment,
@@ -564,11 +574,13 @@ class UserAppointmentsViewSet(OndocViewSet):
                     if doctor_hospital:
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
-                        # COUPON PROCESS to be Discussed
-                        coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
-                        new_appointment = dict()
+                        coupon_discount = opd_appointment.discount
 
-                        new_effective_price = doctor_hospital.deal_price - coupon_price
+                        if coupon_discount > doctor_hospital.deal_price:
+                            new_effective_price = 0
+                        else:
+                            new_effective_price = doctor_hospital.deal_price - coupon_discount
+
                         new_appointment = {
                             "id": opd_appointment.id,
                             "doctor": opd_appointment.doctor,
@@ -583,7 +595,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "effective_price": new_effective_price,
                             "mrp": doctor_hospital.mrp,
                             "time_slot_start": time_slot_start,
-                            "payment_type": opd_appointment.payment_type
+                            "payment_type": opd_appointment.payment_type,
+                            "discount": coupon_discount
                         }
                         resp = self.extract_payment_details(request, opd_appointment, new_appointment,
                                                             account_models.Order.DOCTOR_PRODUCT_ID)
@@ -634,7 +647,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp['payment_required'] = False
                 return resp
             else:
-                balance = consumer_account.balance + appointment_details.effective_price
+                current_balance = consumer_account.balance + appointment_details.effective_price
                 new_appointment_details['time_slot_start'] = str(new_appointment_details['time_slot_start'])
                 action = ''
                 temp_app_details = copy.deepcopy(new_appointment_details)
@@ -650,8 +663,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                     product_id=product_id,
                     action=action,
                     action_data=temp_app_details,
-                    amount=new_appointment_details.get('effective_price') - balance,
-                    reference_id=appointment_details.id,
+                    amount=new_appointment_details.get('effective_price') - current_balance,
+                    wallet_amount=current_balance,
+                    # reference_id=appointment_details.id,
                     payment_status=account_models.Order.PAYMENT_PENDING
                 )
                 new_appointment_details["payable_amount"] = new_appointment_details.get('effective_price') - balance
@@ -896,6 +910,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.TransactionSerializer
     queryset = PgTransaction.objects.none()
 
+    @transaction.atomic
     def save(self, request):
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
@@ -930,50 +945,41 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 logger.error("ValueError : statusCode is not type integer")
                 pg_resp_code = None
 
-            order_obj = Order.objects.filter(pk=response.get("orderId")).first()
-            if pg_resp_code == 1:
-                if not order_obj:
-                    REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
+            order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId"), reference_id__isnull=True).first()
+            if pg_resp_code == 1 and order_obj:
+                response_data = None
+                resp_serializer = serializers.TransactionSerializer(data=response)
+                if resp_serializer.is_valid():
+                    response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
+                    if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                        pg_tx_queryset = None
+                        try:
+                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                        except Exception as e:
+                            logger.error("Error in saving PG Transaction Data - " + str(e))
+
+                        try:
+                            if pg_tx_queryset:
+                                appointment_obj = order_obj.process_order()
+                        except Exception as e:
+                            logger.error("Error in building appointment - " + str(e))
                 else:
-                    response_data = None
-                    resp_serializer = serializers.TransactionSerializer(data=response)
-                    if resp_serializer.is_valid():
-                        response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-                        if True:
-                        # if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
-                            pg_tx_queryset = None
-                            try:
-                                pg_tx_queryset = PgTransaction.objects.create(**response_data)
-                            except Exception as e:
-                                logger.error("Error in saving PG Transaction Data - " + str(e))
+                    logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
 
-                            try:
-                                appointment_obj = self.block_pay_schedule_transaction(response_data, order_obj)
-                            except Exception as e:
-                                logger.error("Error in building appointment - " + str(e))
-                    else:
-                        logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
 
-                    if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
-                        if appointment_obj:
-                            REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
-                        elif order_obj:
-                            REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
-                                order_obj.action_data.get("lab"), response.get('statusCode'))
-                    elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
-                        if appointment_obj:
-                            REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
-                        elif order_obj:
-                            REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
-                                                                       order_obj.action_data.get("hospital"),
-                                                                       response.get('statusCode'))
-                    elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
-                        if appointment_obj:
-                            REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
-                        elif order_obj:
-                            REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
-                                                                       order_obj.action_data.get("hospital"),
-                                                                       response.get('statusCode'))
+                if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
+                    if appointment_obj:
+                        REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
+                    elif order_obj:
+                        REDIRECT_URL = LAB_FAILURE_REDIRECT_URL % (
+                            order_obj.action_data.get("lab"), response.get('statusCode'))
+                elif order_obj.product_id == account_models.Order.DOCTOR_PRODUCT_ID:
+                    if appointment_obj:
+                        REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
+                    elif order_obj:
+                        REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
+                                                                   order_obj.action_data.get("hospital"),
+                                                                   response.get('statusCode'))
             else:
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
@@ -987,6 +993,25 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                                                    response.get('statusCode'))
         except Exception as e:
             logger.error("Error - " + str(e))
+
+        try:
+            # log redirects
+            log_data = { "url" : REDIRECT_URL }
+            if order_obj:
+                log_data["product_id"] = order_obj.product_id
+                log_data["order_id"] = order_obj.id
+            if appointment_obj:
+                log_data["appointment_id"] = appointment_obj.id
+            log_data['referer_data'] = { 'HTTP_USER_AGENT' : request.META['HTTP_USER_AGENT'], 'HTTP_HOST' : request.META['HTTP_HOST'] }
+            if request.user:
+                log_data['user'] = request.user.id
+            if hasattr(request, 'agent'):
+                log_data['is_agent'] = True
+            if response:
+                log_data['pg_data'] = response
+            OrderLog.objects.create(**log_data)
+        except Exception as e:
+            logger.error("Error in logging Order - " + str(e))
 
         # return Response({"url": REDIRECT_URL})
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
@@ -1231,12 +1256,17 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
               doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+              doctor__manageable_doctors__write_permission=True) |
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital__isnull=True,
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
               doctor__manageable_doctors__write_permission=True) |
             Q(hospital__manageable_hospitals__doctor__isnull=True,
               hospital__manageable_hospitals__user=user,
               hospital__manageable_hospitals__is_disabled=False,
-              hospital__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT,
+              hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
               hospital__manageable_hospitals__write_permission=True)).
                              values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
                              )
@@ -1418,7 +1448,19 @@ class OnlineLeadViewSet(GenericViewSet):
 
     def create(self, request):
         resp = {}
-        serializer = serializers.OnlineLeadSerializer(data=request.data)
+        data = request.data
+
+        if request.user_agent.is_mobile or request.user_agent.is_tablet:
+            source = request.user_agent.os.family
+        elif request.user_agent.is_pc:
+            source = "WEB %s" % (data.get('source', ''))
+        else:
+            source = "Unknown"
+
+        data['source'] = source
+        if not data.get('city_name'):
+            data['city_name'] = 0
+        serializer = serializers.OnlineLeadSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         data = serializer.save()
         if data.id:
@@ -1448,8 +1490,17 @@ class SendBookingUrlViewSet(GenericViewSet):
     def send_booking_url(self, request, order_id):
         type = request.data.get('type')
         agent_token = AgentToken.objects.create_token(user=request.user, order_id=order_id)
+        order = Order.objects.filter(pk=order_id).first()
+        if not order:
+            return Response({"status": 1})
+        profile_id = order.action_data.get('profile')
+        user_profile = UserProfile.objects.filter(pk=profile_id).first()
+        if not user_profile:
+            return Response({"status": 1})
         booking_url = SmsNotification.send_booking_url(token=agent_token.token, order_id=order_id,
-                                                       phone_number=request.user.phone_number)
+                                                       phone_number=str(user_profile.phone_number))
+        EmailNotification.send_booking_url(token=agent_token.token, order_id=order_id, email=user_profile.email)
+
         return Response({"status": 1})
 
 

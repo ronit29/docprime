@@ -7,21 +7,21 @@ from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
 
-from ondoc.common.models import Cities
+from ondoc.common.models import Cities, MatrixCityMapping
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin
 
 def practicing_since_choices():
-    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
+    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
 
 def hospital_operational_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-100,-1)]
 
 def college_passing_year_choices():
-    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
+    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
 
 def award_year_choices():
-    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-60,-1)]
+    return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
 
 
 def award_year_choices_no_blank():
@@ -69,11 +69,12 @@ class QCPemAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        final_qs = None
+        final_qs = qs
         if request.user.is_superuser or \
                 request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or \
                 request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists() or \
-                request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
+                request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() or \
+                request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
             final_qs = qs
         if final_qs:
             final_qs = final_qs.prefetch_related('created_by', 'assigned_to', 'assigned_to__staffprofile',
@@ -85,41 +86,50 @@ class QCPemAdmin(admin.ModelAdmin):
 
 
 class FormCleanMixin(forms.ModelForm):
-   def clean(self):
-       if not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
-           if self.instance.data_status == 3:
-               raise forms.ValidationError("Cannot modify QC approved Data")
-           if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
-               if self.instance.data_status == 2:
-                   raise forms.ValidationError("Cannot update Data submitted for QC approval")
-               elif self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
-                   raise forms.ValidationError("Cannot modify Data added by other users")
-           if '_submit_for_qc' in self.data:
-               self.validate_qc()
-               if hasattr(self.instance,'doctor_clinics') and self.instance.doctor_clinics is not None:
-                   for h in self.instance.doctor_clinics.all():
-                       if (h.hospital.data_status < 2):
-                           raise forms.ValidationError(
-                               "Cannot submit for QC without submitting associated Hospitals: " + h.hospital.name)
-               if hasattr(self.instance,'network') and self.instance.network is not None:
-                   if self.instance.network.data_status < 2:
-                       class_name = self.instance.network.__class__.__name__
-                       raise forms.ValidationError("Cannot submit for QC without submitting associated " + class_name.rstrip('Form')+ ": " + self.instance.network.name)
-           if '_qc_approve' in self.data:
-               self.validate_qc()
-               if hasattr(self.instance,'doctor_clinics') and self.instance.doctor_clinics is not None:
-                   for h in self.instance.doctor_clinics.all():
-                       if (h.hospital.data_status < 3):
-                           raise forms.ValidationError(
-                                "Cannot approve QC check without approving associated Hospitals: " + h.hospital.name)
-               if hasattr(self.instance,'network') and self.instance.network is not None:
-                   if self.instance.network.data_status < 3:
-                       class_name = self.instance.network.__class__.__name__
-                       raise forms.ValidationError("Cannot approve QC check without approving associated"+ class_name.rstrip('Form') + ": " + self.instance.network.name)
-           if '_mark_in_progress' in self.data:
-               if self.instance.data_status == 3:
-                   raise forms.ValidationError("Cannot reject QC approved data")
-           return super().clean()
+    def clean(self):
+        if not self.request.user.is_superuser and not self.request.user.groups.filter(
+                name=constants['SUPER_QC_GROUP']).exists():
+            if self.instance.data_status == 3:
+                raise forms.ValidationError("Cannot modify QC approved Data")
+            if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
+                if self.instance.data_status == 2:
+                    raise forms.ValidationError("Cannot update Data submitted for QC approval")
+                if not self.request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+                    if self.instance.data_status == 1 and self.instance.created_by and self.instance.created_by != self.request.user:
+                        raise forms.ValidationError("Cannot modify Data added by other users")
+            if '_submit_for_qc' in self.data:
+                self.validate_qc()
+                # if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
+                #     for h in self.instance.doctor_clinics.all():
+                #         if (h.hospital.data_status < 2):
+                #             raise forms.ValidationError(
+                #                 "Cannot submit for QC without submitting associated Hospitals: " + h.hospital.name)
+                if hasattr(self.instance, 'network') and self.instance.network is not None:
+                    if self.instance.network.data_status < 2:
+                        class_name = self.instance.network.__class__.__name__
+                        raise forms.ValidationError(
+                            "Cannot submit for QC without submitting associated " + class_name.rstrip(
+                                'Form') + ": " + self.instance.network.name)
+                if hasattr(self.instance, 'mobiles') and not self.instance.mobiles.filter(is_primary=True).count() == 1:
+                    raise forms.ValidationError("Doctor must have atleast and atmost one primary mobile number.")
+            if '_qc_approve' in self.data:
+                self.validate_qc()
+                # if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
+                #     for h in self.instance.doctor_clinics.all():
+                #         if (h.hospital.data_status < 3):
+                #             raise forms.ValidationError(
+                #                 "Cannot approve QC check without approving associated Hospitals: " + h.hospital.name)
+                if hasattr(self.instance, 'network') and self.instance.network is not None:
+                    if self.instance.network.data_status < 3:
+                        class_name = self.instance.network.__class__.__name__
+                        raise forms.ValidationError(
+                            "Cannot approve QC check without approving associated" + class_name.rstrip(
+                                'Form') + ": " + self.instance.network.name)
+
+            if '_mark_in_progress' in self.data:
+                if self.instance.data_status == 3:
+                    raise forms.ValidationError("Cannot reject QC approved data")
+            return super().clean()
 
 
 class ActionAdmin(admin.ModelAdmin):
@@ -212,4 +222,25 @@ class CitiesAdmin(ImportMixin, admin.ModelAdmin):
     resource_class = CitiesResource
 
 
+class MatrixCityResource(resources.ModelResource):
+    city_id = fields.Field(attribute='city_id', column_name='id')
+    name = fields.Field(attribute='name', column_name='City')
 
+    class Meta:
+        model = MatrixCityMapping
+        import_id_fields = ('id',)
+
+    def before_save_instance(self, instance, using_transactions, dry_run):
+        super().before_save_instance(instance, using_transactions, dry_run)
+
+
+class MatrixCityAdmin(ImportMixin, admin.ModelAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name',)
+    resource_class = MatrixCityResource
+
+
+class GenericAdminForm(forms.ModelForm):
+    class Meta:
+        widgets = {'name': forms.TextInput(attrs={'size': 13}),
+                   'phone_number': forms.NumberInput(attrs={'size': 8})}

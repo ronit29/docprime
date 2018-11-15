@@ -1,30 +1,34 @@
 
 from django.contrib.gis import admin
 
+from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
-                                 SpecializationDepartment, SpecializationField, PracticeSpecialization, Procedure)
+                                 SpecializationDepartment, SpecializationField, PracticeSpecialization,
+                                 VisitReason, CancellationReason, PracticeSpecializationContent)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
-                                     TestParameter)
-from ondoc.lead.models import HospitalLead, DoctorLead
+                                     TestParameter, CommonPackage)
+from ondoc.coupon.models import Coupon
+from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, Order
 from ondoc.notification import models as notifcation_model
-from .common import Cities, CitiesAdmin
-from .lead import HospitalLeadAdmin, DoctorLeadAdmin
+from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory
+from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin
+from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
                      DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
                      SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,
-                     CompetitorInfoImportAdmin, ProcedureAdmin)
+                     CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
-    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin
+    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -37,12 +41,23 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 from ondoc.authentication.models import OtpVerifications, UserProfile
+
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
 from ondoc.insurance.models import Insurer, InsurerFloat, InsurancePlans, InsuranceThreshold, UserInsurance, \
     InsuredMembers, InsuranceTransaction
 from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, UserInsuranceAdmin, InsuredMembersAdmin
 from ondoc.insurance import models as insurance_model
+from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
+from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
+from ondoc.doctor.models import GoogleDetailing
+from .doctor import GoogleDetailingAdmin
+from .seo import SitemapManagerAdmin, SeoSpecializationAdmin, SeoLabNetworkAdmin
+from ondoc.seo.models import SitemapManger
+from ondoc.seo.models import SeoSpecialization
+from ondoc.seo.models import SeoLabNetwork
+from ondoc.elastic.models import DemoElastic
+from .elastic import DemoElasticAdmin
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -54,9 +69,10 @@ admin.site.index_title = 'CRM Administration'
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
 admin.site.register(UserProfile)
+admin.site.register(ReviewCompliments, ReviewComplimentsAdmin)
 
 admin.site.register(LabAppointment, LabAppointmentAdmin) #temp temp temp
-admin.site.register(DoctorClinic, DoctorClinicAdmin)
+#admin.site.register(DoctorClinic, DoctorClinicAdmin)
 
 admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(AboutDoctor, AboutDoctorAdmin)
@@ -78,6 +94,7 @@ admin.site.register(College, CollegeAdmin)
 admin.site.register(HospitalNetwork, HospitalNetworkAdmin)
 admin.site.register(Lab, LabAdmin)
 admin.site.register(CommonTest, CommonTestAdmin)
+admin.site.register(CommonPackage, CommonPackageAdmin)
 admin.site.register(CommonDiagnosticCondition, CommonDiagnosticConditionAdmin)
 admin.site.register(LabNetwork, LabNetworkAdmin)
 
@@ -88,7 +105,9 @@ admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
 admin.site.register(Cities, CitiesAdmin)
+admin.site.register(MatrixCityMapping, MatrixCityAdmin)
 admin.site.register(DoctorLead, DoctorLeadAdmin)
+admin.site.register(SearchLead, SearchLeadAdmin)
 
 admin.site.register(notifcation_model.EmailNotification, EmailNotificationAdmin)
 admin.site.register(notifcation_model.SmsNotification, SmsNotificationAdmin)
@@ -113,3 +132,16 @@ admin.site.register(InsuredMembers, InsuredMembersAdmin)
 admin.site.register(InsuranceTransaction)
 admin.site.register(Order)
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
+admin.site.register(ProcedureCategory, ProcedureCategoryAdmin)
+admin.site.register(RatingsReview, RatingsReviewAdmin)
+admin.site.register(SitemapManger, SitemapManagerAdmin)
+admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
+admin.site.register(Coupon)
+admin.site.register(VisitReason, VisitReasonAdmin)
+admin.site.register(CancellationReason)
+admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
+
+admin.site.register(SeoLabNetwork, SeoLabNetworkAdmin)
+admin.site.register(PracticeSpecializationContent, PracticeSpecializationContentAdmin)
+admin.site.register(CommonProcedureCategory)
+admin.site.register(DemoElastic, DemoElasticAdmin)

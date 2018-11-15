@@ -574,6 +574,25 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             message = json.dumps(message)
             publish_message(message)
 
+    @classmethod
+    def send_booking_url(cls, token, order_id, email):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        html_body = "Your booking url is - {} . Please pay to confirm".format(booking_url)
+        email_subject = "Booking Url"
+        if email:
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
 
 class SmsNotificationOpdMixin:
 
@@ -702,6 +721,20 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             sms_noti = {
                 "phone_number": phone_number,
                 "content": sms_body,
+            }
+            message = {
+                "data": sms_noti,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def send_rating_link(cls, data):
+        if data:
+            sms_noti = {
+                "phone_number": data['phone_number'],
+                "content": data['text'],
             }
             message = {
                 "data": sms_noti,
