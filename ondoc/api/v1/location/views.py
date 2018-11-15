@@ -879,7 +879,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                             and eu.locality_value ilike %s and eu.sitemap_identifier='SPECIALIZATION_CITY' 
                             and eu.is_valid=True order by count desc limit 10'''
                 sql_urls = RawSql(query, [city]).fetch_all()
-                list.append({'title' : 'Doctors in %s'%(city), 'top_specialities_in_top_city_urls':sql_urls})
+                list.append({'title' : 'Doctors in %s'%(city), 'urls':sql_urls})
                 # static_footer_urls.append({'title' : title, 'result' : list})
         return Response(list)
 

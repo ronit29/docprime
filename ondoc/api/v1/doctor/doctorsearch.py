@@ -18,6 +18,7 @@ class DoctorSearchHelper:
 
     def get_filtering_params(self):
         """Helper function that prepare dynamic query for filtering"""
+        params = {}
         hospital_type_mapping = {hospital_type[1]: hospital_type[0] for hospital_type in
                                  models.Hospital.HOSPITAL_TYPE_CHOICES}
 
@@ -31,21 +32,49 @@ class DoctorSearchHelper:
             cs = [str(i) for i in cs]
             specialization_ids.extend(cs)
 
-        if len(specialization_ids)>0:
+        # " gs.id IN({})".format(",".join(specialization_ids))
+
+        counter=1
+        if len(specialization_ids) > 0:
+            sp_str = 'gs.id IN('
+            for id in specialization_ids:
+
+                if not counter == 1:
+                    sp_str += ','
+                sp_str = sp_str + '%('+'specialization'+str(counter)+')s'
+                params['specialization'+str(counter)] = id
+                counter += 1
+
             filtering_params.append(
-                " gs.id IN({})".format(",".join(specialization_ids))
+                sp_str+')'
             )
+            spr_str = ''
+            counter=0
+
+            # for id in specialization_ids:
+            #     if not counter==0:
+            #         spr_str = spr_str + ','
+            #     spr_str = spr_str+"'"+str(id)+"'"
+            #     counter+=1
+            # params['specializations'] = spr_str
+            #params['specializations'] = ",".join(specialization_ids)
+
         if self.query_params.get("sits_at"):
             filtering_params.append(
-                "hospital_type IN({})".format(", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in
-                                                         self.query_params.get("sits_at")]))
+                "hospital_type IN(%(sits_at)s)"
             )
+            params['sits_at'] = ", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in
+                                                         self.query_params.get("sits_at")])
         if self.query_params.get("min_fees") is not None:
             filtering_params.append(
-                "deal_price>={}".format(str(self.query_params.get("min_fees"))))
+                # "deal_price>={}".format(str(self.query_params.get("min_fees")))
+                "deal_price>=(%(min_fees)s)")
+            params['min_fees'] = str(self.query_params.get("min_fees"))
         if self.query_params.get("max_fees") is not None:
             filtering_params.append(
-                "deal_price<={}".format(str(self.query_params.get("max_fees"))))
+                # "deal_price<={}".format(str(self.query_params.get("max_fees"))))
+                "deal_price<=(%(max_fees)s)")
+            params['max_fees'] = str(self.query_params.get("max_fees"))
         if self.query_params.get("is_female"):
             filtering_params.append(
                 "gender='f'"
@@ -54,24 +83,31 @@ class DoctorSearchHelper:
             current_time = datetime.now()
             current_hour = round(float(current_time.hour) + (float(current_time.minute)*1/60), 2) + .75
             filtering_params.append(
-                'dct.day={} and dct.end>={}'.format(str(current_time.weekday()), str(current_hour))
-            )
+                'dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
+            params['current_time'] = str(current_time.weekday())
+            params['current_hour'] = str(current_hour)
+
         if self.query_params.get("doctor_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             filtering_params.append(
-                "d.search_key ilike '%{}%'".format(search_key))
+                "d.search_key ilike '%(%(search_key)s)%'"
+                    )
+            params['search_key'] = search_key
         if self.query_params.get("hospital_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("hospital_name"))
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             filtering_params.append(
-                "h.search_key ilike '%{}%'".format(search_key))
+                "h.search_key ilike '%(%(search_key)s)%'")
 
         if not filtering_params:
             return "1=1"
-        return " and ".join(filtering_params)
+        result = {}
+        result['string'] = " and ".join(filtering_params)
+        result['params'] = params
+        return result
 
     def get_ordering_params(self):
         order_by_field = 'is_gold desc, distance, dc.priority desc'
@@ -101,8 +137,8 @@ class DoctorSearchHelper:
                        "FROM (SELECT Row_number() OVER( partition BY dc.doctor_id " \
                        "ORDER BY dct.deal_price ASC) rank_fees, " \
                        "Row_number() OVER( partition BY dc.doctor_id  ORDER BY " \
-                       "St_distance(St_setsrid(St_point(%s, %s), 4326 ), h.location),dct.deal_price ASC) rank_distance, " \
-                       "St_distance(St_setsrid(St_point(%s, %s), 4326), h.location) distance, d.id as doctor_id, " \
+                       "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location),dct.deal_price ASC) rank_distance, " \
+                       "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, d.id as doctor_id, " \
                        "dc.id as doctor_clinic_id,  " \
                        "dct.id as doctor_clinic_timing_id, " \
                        "dc.hospital_id as hospital_id FROM   doctor d " \
@@ -112,10 +148,10 @@ class DoctorSearchHelper:
                        "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
                        "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
                        "WHERE d.is_live=true and {filtering_params} " \
-                       "and St_dwithin(St_setsrid(St_point(%s, %s), 4326 ), h.location, %s)" \
-                       "and St_dwithin(St_setsrid(St_point(%s, %s), 4326 ), h.location, %s) = false " \
+                       "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s))" \
+                       "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
                         "ORDER  BY {order_by_field} ) x " \
-                        "where {rank_by}".format(filtering_params=filtering_params, order_by_field=order_by_field, rank_by = rank_by)
+                        "where {rank_by}".format(filtering_params=filtering_params.get('string'), order_by_field=order_by_field, rank_by = rank_by)
                        # "ORDER  BY {ordering_field} ) x " \
                        #  "where {rank_field}" % ({'ordering_field': order_by_field, 'rank_field': rank_by})
                        # % (longitude, latitude,
@@ -124,9 +160,14 @@ class DoctorSearchHelper:
                        #               longitude, latitude, max_distance,
                        #               longitude, latitude, min_distance,
                        #               order_by_field, rank_by)
-        data["query"] = query_string
-        data["parameters"] = [longitude,latitude, longitude, latitude,longitude,latitude,max_distance, longitude, latitude, min_distance]
-        return data
+        if filtering_params.get('params'):
+            # filtering_params.get('params')["query"] = query_string
+            filtering_params.get('params')['longitude'] = longitude
+            filtering_params.get('params')['latitude'] = latitude
+            filtering_params.get('params')['min_distance'] = min_distance
+            filtering_params.get('params')['max_distance']= max_distance
+
+        return {'params':filtering_params.get('params'), 'query': query_string}
 
 
     def count_hospitals(self, doctor):

@@ -828,7 +828,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
             doctor_search_result = RawSql(query_string.get('query'),
-                                         query_string.get('parameters')).fetch_all()
+                                         query_string.get('params')).fetch_all()
 
             result_count = len(doctor_search_result)
             # sa
