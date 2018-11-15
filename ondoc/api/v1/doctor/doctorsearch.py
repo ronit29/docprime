@@ -113,7 +113,7 @@ class DoctorSearchHelper:
                        "LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id " \
                        "WHERE d.is_live=true and {filtering_params} " \
                        "and St_dwithin(St_setsrid(St_point(%s, %s), 4326 ), h.location, %s)" \
-                       "and St_dwithin(St_setsrid(St_point(%s, %s), 4326 ), h.location, %s) = false" \
+                       "and St_dwithin(St_setsrid(St_point(%s, %s), 4326 ), h.location, %s) = false " \
                         "ORDER  BY {order_by_field} ) x " \
                         "where {rank_by}".format(filtering_params=filtering_params, order_by_field=order_by_field, rank_by = rank_by)
                        # "ORDER  BY {ordering_field} ) x " \
