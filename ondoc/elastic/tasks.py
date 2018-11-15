@@ -381,7 +381,7 @@ def fetch_and_upload_json(self, data):
             # f.write('['.encode())
             # f.close()
 
-            file = TemporaryUploadedFile(new_file_name, 'byte', 1000, 'utf-8')
+            file = TemporaryUploadedFile(new_file_name, 'byte', 66666, 'utf-8')
             file.write('['.encode())
             batch_size = 10000
             with transaction.atomic():
