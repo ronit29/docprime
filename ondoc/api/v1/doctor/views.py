@@ -42,13 +42,14 @@ import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as rating_models
-
+from ondoc.api.v1.diagnostic import serializers as lab_serializers
 from ondoc.notification import models as notif_models
 User = get_user_model()
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
 from dal import autocomplete
+
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -1273,44 +1274,47 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
     def list_entities(self, request):
         user = request.user
         opd_list = []
-        opd_queryset = (models.DoctorClinic.objects
-                        .select_related('doctor', 'doctor__manageable_doctors')
-                        .filter(doctor__is_live=True, hospital__is_live=True)
-                        .annotate(doctor_name=F('doctor__name')).filter(
-                                      doctor__manageable_doctors__user=user,
-                                      doctor__manageable_doctors__is_disabled=False,
-                                      doctor__manageable_doctors__super_user_permission=True,
-                                      doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR  )
-                        .values('doctor', 'doctor_name').distinct('doctor'))
-        if opd_queryset:
-            for k in opd_queryset:
-                k.update({'entity_type': GenericAdminEntity.DOCTOR})
-                opd_list.append(k)
-        opd_queryset_hos = (models.DoctorClinic.objects
-                            .select_related('hospital', 'hospital__manageable_hospitals')
-                            .filter(doctor__is_live=True, hospital__is_live=True)
-                            .annotate(hospital_name=F('hospital__name')).filter(
-                                      (Q(hospital__is_appointment_manager=True) | Q(hospital__is_billing_enabled=True)),
-                                      hospital__manageable_hospitals__user=user,
-                                      hospital__manageable_hospitals__is_disabled=False,
-                                      hospital__manageable_hospitals__super_user_permission=True,
-                                      hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-                            .values('hospital', 'hospital_name').distinct('hospital')
+        opd_queryset = (models.Doctor.objects
+                        .prefetch_related('manageable_doctors', 'qualifications')
+                        .filter(
+                                      is_live=True,
+                                      manageable_doctors__user=user,
+                                      manageable_doctors__is_disabled=False,
+                                      manageable_doctors__super_user_permission=True,
+                                      manageable_doctors__entity_type=GenericAdminEntity.DOCTOR).distinct('id'))
+        doc_serializer = serializers.DoctorEntitySerializer(opd_queryset, many=True, context={'request': request})
+        doc_data = doc_serializer.data
+        if doc_data:
+            opd_list = [i for i in doc_data]
+        opd_queryset_hos = (models.Hospital.objects
+                            .prefetch_related('manageable_hospitals')
+                            .filter(
+                                      is_live=True,
+                                      is_appointment_manager=True,
+                                      manageable_hospitals__user=user,
+                                      manageable_hospitals__is_disabled=False,
+                                      manageable_hospitals__super_user_permission=True,
+                                      manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+                            .distinct('id')
                             )
-        if opd_queryset_hos:
-            for h in opd_queryset_hos:
-                h.update({'entity_type': GenericAdminEntity.HOSPITAL})
-                opd_list.append(h)
-        lab_queryset = auth_models.GenericLabAdmin.objects \
-                        .filter(user=user, is_disabled=False, super_user_permission=True) \
-                        .annotate(lab_name=F('lab__name')) \
-                        .values('lab', 'lab_name') \
-                        .distinct('lab')
-        if lab_queryset:
-            for l in lab_queryset:
-                l.update({'entity_type': GenericAdminEntity.LAB})
-                opd_list.append(l)
-        return Response(opd_list)
+        hos_list = []
+        hos_serializer = serializers.HospitalEntitySerializer(opd_queryset_hos, many=True, context={'request': request})
+        hos_data = hos_serializer.data
+        if hos_data:
+            hos_list = [i for i in hos_data]
+        result_data = opd_list + hos_list
+        lab_queryset = lab_models.Lab.objects.prefetch_related('manageable_lab_admins').filter(is_live= True,
+                                manageable_lab_admins__user=user,
+                                manageable_lab_admins__is_disabled=False,
+                                manageable_lab_admins__super_user_permission=True).distinct('id')
+
+        lab_list = []
+        laab_serializer = lab_serializers.LabEntitySerializer(lab_queryset, many=True, context={'request': request})
+        lab_data = laab_serializer.data
+        if lab_data:
+            lab_list = [i for i in lab_data]
+        result_data = result_data + lab_list
+        return Response(result_data)
 
     def list_entity_admins(self, request):
         serializer = serializers.EntityListQuerySerializer(data=request.query_params)

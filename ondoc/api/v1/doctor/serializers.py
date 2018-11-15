@@ -997,3 +997,41 @@ class AdminCreateBodySerializer(serializers.Serializer):
 class EntityListQuerySerializer(serializers.Serializer):
     entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
     id = serializers.IntegerField()
+
+
+class HospitalEntitySerializer(HospitalModelSerializer):
+    entity_type = serializers.SerializerMethodField()
+
+    def get_entity_type(self, obj):
+        return GenericAdminEntity.HOSPITAL
+
+    class Meta:
+        model = Hospital
+        fields = ('id', 'name', 'entity_type', 'address')
+
+
+class DoctorEntitySerializer(serializers.ModelSerializer):
+    thumbnail = serializers.SerializerMethodField()
+    general_specialization = DoctorPracticeSpecializationSerializer(read_only=True, many=True, source='doctorpracticespecializations')
+    qualifications = serializers.SerializerMethodField()
+    entity_type = serializers.SerializerMethodField()
+
+    def get_qualifications(self, obj):
+        if obj.qualifications.exists():
+            return obj.qualifications.first().qualification.name
+        return None
+
+    def get_entity_type(self, obj):
+        return GenericAdminEntity.DOCTOR
+
+    def get_thumbnail(self, obj):
+        request = self.context.get('request')
+        thumbnail = obj.get_thumbnail()
+        if thumbnail:
+            return request.build_absolute_uri(thumbnail) if thumbnail else None
+        else:
+            return None
+
+    class Meta:
+        model = Doctor
+        fields = ('id', 'thumbnail', 'name', 'entity_type', 'qualifications', 'general_specialization')
