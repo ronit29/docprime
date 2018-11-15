@@ -48,17 +48,6 @@ class DoctorSearchHelper:
             filtering_params.append(
                 sp_str+')'
             )
-            spr_str = ''
-            counter=0
-
-            # for id in specialization_ids:
-            #     if not counter==0:
-            #         spr_str = spr_str + ','
-            #     spr_str = spr_str+"'"+str(id)+"'"
-            #     counter+=1
-            # params['specializations'] = spr_str
-            #params['specializations'] = ",".join(specialization_ids)
-
         if self.query_params.get("sits_at"):
             filtering_params.append(
                 "hospital_type IN(%(sits_at)s)"
