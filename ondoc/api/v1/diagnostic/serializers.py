@@ -129,8 +129,8 @@ class LabModelSerializer(serializers.ModelSerializer):
         # entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
         #                                    entity_type__iexact='Lab')
 
-        locality = ''
-        sublocality = ''
+        locality = None
+        sublocality = None
         # if entity.exists():
             #entity = entity[0]
         if self.context.get('entity'):
@@ -139,12 +139,12 @@ class LabModelSerializer(serializers.ModelSerializer):
                 locality = entity.additional_info.get('locality_value')
                 sublocality = entity.additional_info.get('sublocality_value')
 
-        if sublocality:
-            title = obj.name + ' - Diagnostic Centre in '+ sublocality + " " + locality + ' |DocPrime'
+        if sublocality and locality:
+            title = obj.name + ' - Diagnostic Centre in '+ sublocality + " " + locality + ' | DocPrime'
         elif locality:
-            title = obj.name + ' - Diagnostic Centre in ' + locality + ' |DocPrime'
+            title = obj.name + ' - Diagnostic Centre in ' + locality + ' | DocPrime'
         else:
-            title = obj.name + ' - Diagnostic Centre |DocPrime'
+            title = obj.name + ' - Diagnostic Centre | DocPrime'
 
         description = obj.name + ': Book test at ' + obj.name + ' online, check fees, packages prices and more at DocPrime. '
         return {'title': title, "description": description}
