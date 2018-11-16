@@ -175,7 +175,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def retrieve(self, request, pk=None):
         user = request.user
         queryset = self.get_pem_queryset(user)
-        queryset = queryset.filter(pk=pk)
+        queryset = queryset.filter(pk=pk).distinct()
         if queryset:
             serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True,
                                                                          context={'request': request})
@@ -185,23 +185,33 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     @transaction.atomic
     def complete(self, request):
+        user = request.user
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-
-        # opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('id'))
         opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('id')).first()
+
         if not opd_appointment:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
+        permission = auth_models.GenericAdmin.objects.filter(Q(is_disabled=False,
+                                                                    user=user,
+                                                                    doctor_id=opd_appointment.doctor.id,
+                                                                    permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
+                                                                                           auth_models.GenericAdmin.ALL])|
+                                                                  Q(user=user,
+                                                                    is_disabled=False,
+                                                                    hospital_id=opd_appointment.hospital.id,
+                                                                    permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
+                                                                                               auth_models.GenericAdmin.ALL]
+                                                                    )
+                                                                  ).first()
 
-        permission_queryset = (auth_models.GenericAdmin.objects.filter(doctor=opd_appointment.doctor.id).
-                               filter(hospital=opd_appointment.hospital_id))
-        if permission_queryset:
-            perm_data = permission_queryset.first()
-            if request.user.user_type == User.DOCTOR and perm_data.write_permission:
-                otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
-                otp_valid_serializer.is_valid(raise_exception=True)
-                opd_appointment.action_completed()
+        if not permission:
+            return Response({"message": "UnAuthorized"}, status.HTTP_403_FORBIDDEN)
+        if request.user.user_type == User.DOCTOR:
+            otp_valid_serializer = serializers.OTPConfirmationSerializer(data=request.data)
+            otp_valid_serializer.is_valid(raise_exception=True)
+            opd_appointment.action_completed()
         opd_appointment_serializer = serializers.DoctorAppointmentRetrieveSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
@@ -261,7 +271,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return Response(data=resp)
 
     def update(self, request, pk=None):
-        opd_appointment = get_object_or_404(models.OpdAppointment, pk=pk)
+        user = request.user
+        queryset = self.get_pem_queryset(user)
+        opd_appointment = get_object_or_404(queryset, pk=pk)
         serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)

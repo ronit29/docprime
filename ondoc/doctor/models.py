@@ -1096,12 +1096,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         current_datetime = timezone.now()
         today = datetime.date.today()
         if user_type == auth_model.User.DOCTOR and self.time_slot_start.date() >= today:
-            # perm_queryset = auth_model.GenericAdmin.objects.filter(is_disabled=False,
-            #                                                        hospital=self.hospital,
-            #                                                        user=request.user)
-            # if perm_queryset.first():
-            # doc_permission = perm_queryset.first()
-            # if doc_permission.write_permission or doc_permission.super_user_permission:
             if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
                 allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
             elif self.status == self.ACCEPTED:
