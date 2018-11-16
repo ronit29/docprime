@@ -15,7 +15,6 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from django.db import transaction
 from . import serializers
-import sys
 from django.conf import settings
 import requests, re, json
 
@@ -71,9 +70,9 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
 
         # sort coupons on discount granted
-        if applicable_coupons:
+        if applicable_coupons and input_data.get("deal_price"):
             def compare_coupon(coupon):
-                discount = obj.get_discount(None, sys.maxsize, coupon["coupon"])
+                discount = obj.get_discount(None, input_data.get("deal_price"), coupon["coupon"])
                 return discount
             applicable_coupons = sorted(applicable_coupons, key=compare_coupon, reverse=True)
 

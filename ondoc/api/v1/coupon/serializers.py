@@ -14,7 +14,7 @@ User = get_user_model()
 
 class ProductIDSerializer(serializers.Serializer):
     product_id = serializers.ChoiceField(required=False, choices=Order.PRODUCT_IDS)
-
+    deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
 
 class CouponListSerializer(serializers.Serializer):
 
