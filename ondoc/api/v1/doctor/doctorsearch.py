@@ -244,9 +244,8 @@ class DoctorSearchHelper:
                 # "discounted_fees": filtered_fees, **********deal_price
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
-                "experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
-                "qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(),
-                                                                            many=True).data,
+                #"experiences": serializers.DoctorExperienceSerializer(doctor.experiences.all(), many=True).data,
+                #"qualifications": serializers.DoctorQualificationSerializer(doctor.qualifications.all(), many=True).data,
                 "general_specialization": serializers.DoctorPracticeSpecializationSerializer(
                     doctor.doctorpracticespecializations.all(),
                     many=True).data,
@@ -254,8 +253,7 @@ class DoctorSearchHelper:
                 "name": doctor.name,
                 "display_name": doctor.get_display_name(),
                 "gender": doctor.gender,
-                "images": serializers.DoctorImageSerializer(doctor.images.all(), many=True,
-                                                            context={"request": request}).data,
+                #"images": serializers.DoctorImageSerializer(doctor.images.all(), many=True, context={"request": request}).data,
                 "hospitals": hospitals,
                 "thumbnail": (
                     request.build_absolute_uri(thumbnail) if thumbnail else None),
