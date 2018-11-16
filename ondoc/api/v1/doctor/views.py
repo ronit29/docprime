@@ -573,7 +573,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
-                                    'doctor_clinics__doctorclinicprocedure_set',
+                                    'doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
                                     'qualifications__college',
@@ -985,7 +985,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctorpracticespecializations", "doctorpracticespecializations__specialization",
                                                 "experiences", "images", "qualifications",
                                                 "qualifications__qualification", "qualifications__specialization",
-                                                "qualifications__college", "doctor_clinics__doctorclinicprocedure_set").order_by(preserved)
+                                                "qualifications__college",
+                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping").order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request)
 
