@@ -673,7 +673,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 specialization_id = practice_specialization.id
 
         if sublocality and locality and specialization:
-            title = 'View all ' + specialization + 's near ' + sublocality + ' ' + locality
+            title = specialization + 's near ' + sublocality + ' ' + locality
 
         if lat and long and specialization and title:
             return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title}
