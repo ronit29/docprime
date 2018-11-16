@@ -138,9 +138,7 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(LabTest,
-                                                           LabTestType, LabService,
-                                                           TestParameter, ParameterLabTest, LabTestPackage)
+        content_types = ContentType.objects.get_for_models(LabTest, LabTestType, LabService, TestParameter)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -148,6 +146,18 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model)
+                )
+            group.permissions.add(*permissions)
+
 
         content_types = ContentType.objects.get_for_models(
             DoctorClinic, DoctorClinicTiming, GenericAdmin, GenericLabAdmin,
@@ -197,7 +207,7 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(
             Qualification, Specialization, Language, MedicalService, College, LabTest,
-            LabTestType, LabService, TestParameter, ParameterLabTest, LabTestPackage, PracticeSpecialization,
+            LabTestType, LabService, TestParameter, PracticeSpecialization,
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping, Procedure)
 
         for cl, ct in content_types.items():
@@ -206,6 +216,19 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
+
+
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model)
+                )
+            group.permissions.add(*permissions)
+
 
 
         content_types = ContentType.objects.get_for_models(

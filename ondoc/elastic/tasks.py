@@ -41,7 +41,7 @@ def fetch_and_upload_json(self, data):
 
             file = TemporaryUploadedFile(new_file_name, 'byte', 66666, 'utf-8')
             file.write('['.encode())
-            batch_size = 10000
+            batch_size = 50000
             with transaction.atomic():
 
                 with connection.connection.cursor(name='elasticdata', cursor_factory=psycopg2.extras.RealDictCursor) as cursor:

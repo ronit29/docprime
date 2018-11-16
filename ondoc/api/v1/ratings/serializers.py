@@ -121,14 +121,15 @@ class RatingsModelSerializer(serializers.ModelSerializer):
     def get_user_name(self, obj):
         name = app = None
         app_obj = self.context.get('app')
-        for ap in app_obj:
-            if obj.appointment_id == ap.id:
-                app = ap
-                break
-        if app:
-            profile = app.profile
-            if profile:
-                name = profile.name
+        if app_obj:
+            for ap in app_obj:
+                if obj.appointment_id == ap.id:
+                    app = ap
+                    break
+            if app:
+                profile = app.profile
+                if profile:
+                    name = profile.name
         return name
 
     def get_date(self, obj):

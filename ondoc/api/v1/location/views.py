@@ -157,7 +157,6 @@ class LabLocalityCityFooter(Footer):
 
            return self.get_urls(query, [self.locality_id])
 
-    @property
     def top_labs_in_localities(self):
         result = []
 
@@ -871,15 +870,22 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
     def top_specialities_in_top_cities(self,request):
         cities = self.top_cities(EntityUrls.SitemapIdentifier.DOCTORS_CITY)
         list = []
-        for city in cities:
-            if city:
+        resp = {}
 
-                query = ''' select url, concat(eu.specialization,' in ', eu.locality_value) title 
-                            from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
-                            and eu.locality_value ilike %s and eu.sitemap_identifier='SPECIALIZATION_CITY' 
-                            and eu.is_valid=True order by count desc limit 10'''
-                sql_urls = RawSql(query, [city]).fetch_all()
-                list.append({'title' : 'Doctors in %s'%(city), 'urls':sql_urls})
-                # static_footer_urls.append({'title' : title, 'result' : list})
-        return Response(list)
+        query = ''' select city, eu.url, concat(eu.specialization,' in ', city) title from 
+                    (
+                    (select city , rank as city_rank from seo_cities order by rank limit 10) sc
+                    inner join 
+                    (select specialization_id,rank as specialization_rank from seo_specialization order by rank nulls last limit 10) ss on true
+                    )x 
+                    inner join 
+                    entity_urls eu on eu.is_valid=true and eu.sitemap_identifier='SPECIALIZATION_CITY' and x.city ilike eu.locality_value 
+                    and eu.specialization_id=x.specialization_id order by city_rank nulls last ,city, specialization_rank nulls last, x.specialization_id'''
+        result = RawSql(query, []).fetch_all()
+        for data in result:
+            if not resp.get(data.get('city')):
+                title = 'Doctors in ' + data.get('city')
+                resp[data.get('city')] = {'title': title, 'urls': []}
+            resp[data.get('city')]['urls'].append({'url': data.get('url'),'title': data.get('title')})
 
+        return Response(resp.values())
