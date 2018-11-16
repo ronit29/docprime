@@ -640,6 +640,45 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     breadcrumb = serializers.SerializerMethodField()
     unrated_appointment = serializers.SerializerMethodField()
     is_gold = serializers.SerializerMethodField()
+    search_data = serializers.SerializerMethodField()
+
+    def get_search_data(self, obj):
+        data = {}
+        lat = None
+        long = None
+        specialization = None
+        specialization_id = None
+        title = None
+        locality = None
+        sublocality = None
+        clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
+
+        if clinics:
+            hospital = clinics[0]
+            if hospital.hospital and hospital.hospital.location:
+                lat = hospital.hospital.location.y
+                long = hospital.hospital.location.x
+                hosp_entity_relation = hospital.hospital.entity.all().prefetch_related('location')
+                for entity_relation in hosp_entity_relation:
+                    entity_address = entity_relation.location
+                    if entity_address.type_blueprint == 'LOCALITY':
+                        locality = entity_address.alternative_value
+                    if entity_address.type_blueprint == 'SUBLOCALITY':
+                        sublocality = entity_address.alternative_value
+
+        if obj.doctorpracticespecializations.exists():
+            practice_specialization = obj.doctorpracticespecializations.first().specialization
+            if practice_specialization:
+                specialization = practice_specialization.name
+                specialization_id = practice_specialization.id
+
+        if sublocality and locality and specialization:
+            title = 'View all ' + specialization + 's near ' + sublocality + ' ' + locality
+
+        if lat and long and specialization and title:
+            return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title}
+        return None
+
 
     def get_display_rating_widget(self, obj):
         if obj.rating.count() > 10:
@@ -650,8 +689,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return obj.is_gold and obj.enabled_for_online_booking
 
     def get_rating(self, obj):
+        app = OpdAppointment.objects.select_related('profile').all()
+
         queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
-        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True)
+        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app':app})
         return reviews.data[:5]
 
     def get_unrated_appointment(self, obj):
@@ -823,7 +864,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
                   'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
-                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold')
+                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold', 'search_data')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):

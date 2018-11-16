@@ -134,15 +134,17 @@ class ServicesViewSet(viewsets.GenericViewSet):
 
 
 class SmsServiceViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication, )
+    #authentication_classes = (JWTAuthentication, )
 
     def send_sms(self, request):
         serializer = serializers.SMSServiceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         text = serializer.validated_data.get('text')
-        phone_number = [request.user.phone_number] if request.user else []
-        phone_number = list(set(phone_number))
-        send_sms(text, phone_number)
+        phone_number = serializer.validated_data.get('phone_number')
+
+        #phone_number = [request.user.phone_number] if request.user else []
+        #phone_number = list(set(phone_number))
+        send_sms(text, [phone_number])
         return Response({"status": "success"})
 
 

@@ -194,7 +194,7 @@ class EntityUrls(TimeStampedModel):
         from ondoc.api.v1.utils import RawSql
         query = '''select nextval('entity_url_version_seq') as inc;'''
 
-        seq = RawSql(query).fetch_all()
+        seq = RawSql(query, []).fetch_all()
         if seq:
             sequence = seq[0]['inc'] if seq[0]['inc'] else 0
         else:
@@ -290,8 +290,8 @@ class EntityUrls(TimeStampedModel):
             ,count(*) count from entity_address ea
             inner join hospital h on h.is_live=true
             and (
-            (type_blueprint='LOCALITY' and st_distance(ea.centroid,h.location)<15000) or
-            (type_blueprint='SUBLOCALITY' and st_distance(ea.centroid,h.location)<5000)
+            (type_blueprint='LOCALITY' and ST_DWithin(ea.centroid,h.location,15000)) or
+            (type_blueprint='SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))
             )
             inner join doctor_clinic dc on dc.hospital_id = h.id
             inner join doctor d on dc.doctor_id = d.id and d.is_live=true
@@ -385,8 +385,8 @@ class EntityUrls(TimeStampedModel):
             ,count(*) count from entity_address ea
             inner join hospital h on h.is_live=true
             and (
-            (type_blueprint='LOCALITY' and st_distance(ea.centroid,h.location)<15000) or
-            (type_blueprint='SUBLOCALITY' and st_distance(ea.centroid,h.location)<5000)
+            (type_blueprint='LOCALITY' and ST_DWithin(ea.centroid,h.location,15000)) or
+            (type_blueprint='SUBLOCALITY' and ST_DWithin(ea.centroid,h.location,5000))
             )
             inner join doctor_clinic dc on dc.hospital_id = h.id
             inner join doctor d on dc.doctor_id = d.id and d.is_live=true
@@ -473,7 +473,7 @@ class EntityUrls(TimeStampedModel):
         from ondoc.api.v1.utils import RawSql
         query = '''select nextval('entity_url_version_seq') as inc;'''
 
-        seq = RawSql(query).fetch_all()
+        seq = RawSql(query,[]).fetch_all()
         if seq:
             sequence = seq[0]['inc'] if seq[0]['inc'] else 0
         else:
@@ -565,8 +565,8 @@ class EntityUrls(TimeStampedModel):
                        ,count(*) count from entity_address ea
                        inner join lab l on l.is_live=true 
                        and (
-                       (type_blueprint='LOCALITY' and st_distance(ea.centroid,l.location)<15000) or
-                       (type_blueprint='SUBLOCALITY' and st_distance(ea.centroid,l.location)<5000)
+                       (type_blueprint='LOCALITY' and ST_DWithin(ea.centroid,l.location,15000)) or
+                       (type_blueprint='SUBLOCALITY' and ST_DWithin(ea.centroid,l.location,5000))
                        )
                        where type_blueprint in ('LOCALITY','SUBLOCALITY')
                        group by ea.id)x where count>=3)y
@@ -920,6 +920,11 @@ class LabPageUrl(object):
         self.locality = None
         self.sequence = sequence
 
+        self.sublocality = None
+        self.sublocality_id = None
+        self.sublocality_longitude = None
+        self.sublocality_latitude = None
+
     def initialize(self):
         if self.lab:
             sublocality = self.lab.entity.filter(type="SUBLOCALITY", valid=True).first()
@@ -1045,7 +1050,7 @@ class DoctorPageURL(object):
         url = None
 
         if self.hospital and self.locality and self.specializations and len(self.specializations)>0:
-            print('inside')
+
             specialization_name = [specialization.name for specialization in self.specializations]
 
             url = "dr-%s-%s" %(self.doctor.name, "-".join(specialization_name))
