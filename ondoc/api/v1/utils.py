@@ -452,6 +452,9 @@ def doctor_query_parameters(entity_params, req_params):
             params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
     if entity_params.get("specialization_id"):
         params_dict["specialization_ids"] = str(entity_params["specialization_id"])
+    else:
+        params_dict["specialization_ids"] = ''
+
     return params_dict
 
 
