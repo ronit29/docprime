@@ -10,6 +10,8 @@ class DemoElastic(TimeStampedModel):
     file = models.FileField(upload_to='demoelastic', validators=[FileExtensionValidator(allowed_extensions=['json'])],
                             null=True, blank=True, default='')
     query = models.TextField(null=True, blank=False)
+    mongo_database = models.CharField(max_length=100, null=True, blank=False)
+    mongo_collection = models.CharField(max_length=100, null=True, blank=False)
 
     def save(self, *args, **kwargs):
         to_be_uploaded = self.id is None
