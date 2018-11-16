@@ -961,13 +961,25 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
+    procedures = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail')
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures')
 
+    def get_procedures(self, obj):
+        if obj and obj.doctor and obj.hospital:
+            doctor = obj.doctor
+            doctor_clinic = doctor.doctor_clinics.filter(hospital=obj.hospital).first()
+            if doctor_clinic:
+                data = DoctorClinicProcedure.objects.filter(doctor_clinic=doctor_clinic,
+                                                            procedure_id__in=obj.procedures.all().values_list('id'))
+                if data:
+                    serializer = DoctorClinicProcedureSerializer(data, many=True)
+                    return serializer.data
+        return []
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()
