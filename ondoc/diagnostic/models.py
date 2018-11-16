@@ -607,8 +607,8 @@ class TestParameter(TimeStampedModel):
 
 
 class ParameterLabTest(TimeStampedModel):
-    parameter = models.ForeignKey(TestParameter, on_delete=models.DO_NOTHING, related_name='test_parameters')
-    lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, related_name='labtests')
+    parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, related_name='test_parameters')
+    lab_test = models.ForeignKey('LabTest', on_delete=models.CASCADE, related_name='labtests')
 
     class Meta:
         db_table = 'parameter_lab_test'
