@@ -876,7 +876,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                     (
                     (select city , rank as city_rank from seo_cities order by rank limit 10) sc
                     inner join 
-                    (select specialization_id,rank as specialization_rank from seo_specialization order by rank nulls last limit 10) ss on true
+                    (select specialization_id,rank as specialization_rank from seo_specialization order by rank nulls last limit 5) ss on true
                     )x 
                     inner join 
                     entity_urls eu on eu.is_valid=true and eu.sitemap_identifier='SPECIALIZATION_CITY' and x.city ilike eu.locality_value 
