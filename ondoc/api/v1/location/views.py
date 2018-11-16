@@ -157,7 +157,6 @@ class LabLocalityCityFooter(Footer):
 
            return self.get_urls(query, [self.locality_id])
 
-    @property
     def top_labs_in_localities(self):
         result = []
 
