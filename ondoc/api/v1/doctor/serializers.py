@@ -673,12 +673,11 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 specialization_id = practice_specialization.id
 
         if sublocality and locality and specialization:
-            title = 'View all ' + specialization + 's near ' + sublocality + ' ' + locality
+            title = specialization + 's near ' + sublocality + ' ' + locality
 
         if lat and long and specialization and title:
             return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title}
         return None
-
 
     def get_display_rating_widget(self, obj):
         if obj.rating.count() > 10:
@@ -721,29 +720,15 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         specializations = [doctor_specialization.specialization for doctor_specialization in obj.doctorpracticespecializations.all()]
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
-        entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
-                                           is_valid=True)
-        sublocality = ''
-        locality = ''
-        if entity.exists():
-
-            entity = entity.first()
+        # entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
+        #                                    is_valid=True)
+        sublocality = None
+        locality = None
+        if self.context.get('entity'):
+            entity = self.context.get('entity')
             if entity.additional_info:
                 locality = entity.additional_info.get('locality_value')
                 sublocality = entity.additional_info.get('sublocality_value')
-                # if sublocality:
-                #     locality = " " + locality
-            # location_id = entity.first().additional_info.get('location_id')
-            # type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
-            # if type.exists():
-            #        if type.first().get('type') == 'LOCALITY':
-            #            locality = type.first().get('value')
-            #
-            # if type.exists():
-            #     if type.first().get('type') == 'SUBLOCALITY':
-            #         sublocality = type.first().get('value')
-            #         parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-            #         locality = ' ' + parent.first().get('value')
 
         title = "Dr. " + obj.name
         description = "Dr. " + obj.name + ': ' + "Dr. " + obj.name
@@ -755,7 +740,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if len(doc_spec_list) >= 1:
             title +=  ' - '+', '.join(doc_spec_list)
             description += ' is ' + ', '.join(doc_spec_list)
-        if sublocality:
+        if sublocality and locality:
             title += ' in ' + sublocality + " " + locality + ' - Consult Online'
             description += ' in ' + sublocality + " " + locality
         elif locality:
@@ -842,11 +827,12 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         if self.parent:
             return None
-        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Doctor')
+        # entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+        #                                    entity_type__iexact='Doctor')
         breadcrums = None
-        if entity.exists():
-            breadcrums = entity.first().additional_info.get('breadcrums')
+        if self.context.get('entity'):
+            entity = self.context.get('entity')
+            breadcrums = entity.additional_info.get('breadcrums')
             if breadcrums:
                 return breadcrums
         return breadcrums
