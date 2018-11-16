@@ -254,7 +254,6 @@ def opdappointment_transform(app_data):
         app_data["procedures"] = list([procedure.id for procedure in app_data["procedures"]])
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
-    # TODO: SHASHANK_SINGH see what to do with procedures
     return app_data
 
 

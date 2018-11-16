@@ -1,6 +1,7 @@
 from django.contrib.gis.geos import Point
 from django.db.models import F
 
+from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings
@@ -321,12 +322,17 @@ class DoctorSearchHelper:
 
                 # selected_procedures_data = DoctorClinicProcedure.objects.filter(
                 #     procedure_id__in=selected_procedure_ids,
-                #     doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
-                selected_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(procedure_id__in=selected_procedure_ids)
+                #     doctor_clinic_id=doctor_clinic.id)
+                # selected_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(procedure_id__in=selected_procedure_ids)
+                all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
+                selected_procedures_data = DoctorProfileUserViewSerializer.get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                                     selected_procedure_ids)
                 # other_procedures_data = DoctorClinicProcedure.objects.filter(
                 #     procedure_id__in=other_procedure_ids,
-                #     doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
-                other_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(procedure_id__in=other_procedure_ids)
+                #     doctor_clinic_id=doctor_clinic.id)
+                # other_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(procedure_id__in=other_procedure_ids)
+                other_procedures_data = DoctorProfileUserViewSerializer.get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                                  other_procedure_ids)
                 selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data, context={'is_selected': True, 'category_ids': category_ids if category_ids else None}, many=True)
                 other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data, context={'is_selected': False, 'category_ids': category_ids if category_ids else None}, many=True)
                 selected_procedures_list = list(selected_procedures_serializer.data)

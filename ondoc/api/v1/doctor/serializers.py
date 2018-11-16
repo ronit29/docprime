@@ -827,6 +827,11 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 return breadcrums
         return breadcrums
 
+    @staticmethod
+    def get_included_doctor_clinic_procedure(all_data, filter_ids):
+        return [dcp for dcp in all_data if dcp.procedure.id in filter_ids]
+
+
     def get_procedures(self, obj):
         selected_clinic = self.context.get('hospital_id')
         category_ids = self.context.get('category_ids')
@@ -847,15 +852,19 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
                     # selected_procedures_data = DoctorClinicProcedure.objects.filter(
                     #     procedure_id__in=selected_procedure_ids,
-                    #     doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
-                    selected_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(
-                        procedure_id__in=selected_procedure_ids)
+                    #     doctor_clinic_id=doctor_clinic.id)
+                    # selected_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(
+                    #     procedure_id__in=selected_procedure_ids)
+                    all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
+                    selected_procedures_data = self.get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                                         selected_procedure_ids)
                     # other_procedures_data = DoctorClinicProcedure.objects.filter(
                     #     procedure_id__in=other_procedure_ids,
-                    #     doctor_clinic_id=doctor_clinic.id)  # OPTIMISE_SHASHANK_SINGH
-                    other_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(
-                        procedure_id__in=other_procedure_ids)
-
+                    #     doctor_clinic_id=doctor_clinic.id)
+                    # other_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(
+                    #     procedure_id__in=other_procedure_ids)
+                    other_procedures_data = self.get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                              other_procedure_ids)
                     if selected_clinic and selected_clinic == doctor_clinic.hospital.pk:
 
                         selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
