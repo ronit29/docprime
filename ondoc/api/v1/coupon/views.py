@@ -65,7 +65,21 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                            "desc": coupon.description,
                                            "coupon_count": coupon.count,
                                            "used_count": is_valid_coupon.get("used_count"),
+                                           "coupon": coupon,
                                            "tnc": coupon.tnc})
+
+
+        # sort coupons on discount granted
+        if applicable_coupons and input_data.get("deal_price"):
+            def compare_coupon(coupon):
+                discount = obj.get_discount(None, input_data.get("deal_price"), coupon["coupon"])
+                return discount
+            applicable_coupons = sorted(applicable_coupons, key=compare_coupon, reverse=True)
+
+        def remove_coupon_data(c):
+            c.pop('coupon')
+            return c
+        applicable_coupons = list(map(remove_coupon_data ,applicable_coupons))
 
         return Response(applicable_coupons)
 

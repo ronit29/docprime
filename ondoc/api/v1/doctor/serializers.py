@@ -722,8 +722,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
         # entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
         #                                    is_valid=True)
-        sublocality = ''
-        locality = ''
+        sublocality = None
+        locality = None
         if self.context.get('entity'):
             entity = self.context.get('entity')
             if entity.additional_info:
@@ -740,7 +740,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if len(doc_spec_list) >= 1:
             title +=  ' - '+', '.join(doc_spec_list)
             description += ' is ' + ', '.join(doc_spec_list)
-        if sublocality:
+        if sublocality and locality:
             title += ' in ' + sublocality + " " + locality + ' - Consult Online'
             description += ' in ' + sublocality + " " + locality
         elif locality:

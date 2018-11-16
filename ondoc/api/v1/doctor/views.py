@@ -785,8 +785,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
                                            entity_type__iexact='Doctor').order_by('-sequence')
-        if entity_url_qs.exists():
-            entity = entity_url_qs.first()
+        if len(entity_url_qs) > 0:
+            entity = entity_url_qs[0]
             if not entity.is_valid:
                 valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
                                           entity_type__iexact='Doctor', specialization_id=entity.specialization_id,
@@ -847,9 +847,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
                                                 "doctor_clinics__hospital",
                                                 "doctorpracticespecializations", "doctorpracticespecializations__specialization",
-                                                "experiences", "images", "qualifications",
-                                                "qualifications__qualification", "qualifications__specialization",
-                                                "qualifications__college").order_by(preserved)
+                                                "images").order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request)
 
