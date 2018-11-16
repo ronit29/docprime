@@ -176,7 +176,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                                                                                                          'dob',
                                                                                                          'phone_number')
 
-            resp['insurance'] = {"profile_detail": user_profile[0], "members": insured_members_list, "insurer": insurer[0],
+            resp['insurance'] = {"profile_detail": user_profile[0], "insured_members": insured_members_list, "insurer": insurer[0],
                                  "insurance_plan": insurance_plan[0], "user": request.user.pk}
             return Response(resp)
 
