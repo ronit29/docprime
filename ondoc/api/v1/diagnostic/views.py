@@ -158,19 +158,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         url = url.lower()
         entity = EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by('-is_valid')
-        if entity.exists():
-            entity = entity.first()
+        if len(entity) > 0:
+            entity = entity[0]
             if not entity.is_valid:
-                valid_entity_url_qs = EntityUrls.objects.filter(url_type='PAGEURL', entity_id=entity.entity_id,
-                                                                entity_type__iexact='Lab', is_valid='t')
+                valid_entity_url_qs = EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE, entity_id=entity.entity_id,
+                                                                is_valid='t')
                 if valid_entity_url_qs.exists():
-                    corrected_url = valid_entity_url_qs.first().url
+                    corrected_url = valid_entity_url_qs[0].url
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
                 else:
-                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                    return Response(status=status.HTTP_404_NOT_FOUND)
 
-            entity_id = entity.entity_id
-            response = self.retrieve(request, entity_id)
+            #entity_id = entity.entity_id
+            response = self.retrieve(request, entity.entity_id, entity)
             return response
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -261,7 +261,20 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          "seo": seo, "breadcrumb": breadcrumb})
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, lab_id):
+    def retrieve(self, request, lab_id, entity=None):
+
+        lab_obj = Lab.objects.prefetch_related('rating','lab_documents').filter(id=lab_id, is_live=True).first()
+
+        if not lab_obj:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not entity:
+            entity = EntityUrls.objects.filter(entity_id=lab_id,
+                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by(
+                '-is_valid')
+            if len(entity) > 0:
+                entity = entity[0]
+
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
         queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter')\
                                                             .filter(lab_pricing_group__labs__id=lab_id,
@@ -269,9 +282,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                     lab_pricing_group__labs__is_live=True,
                                                                     enabled=True,
                                                                     test__in=test_ids)
-        lab_obj = Lab.objects.prefetch_related('rating','lab_documents').filter(id=lab_id, is_live=True).first()
-        if not lab_obj:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
@@ -283,26 +294,33 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing = None
         lab_timing_data = list()
         distance_related_charges = None
+        url = None
 
-        if lab_obj:
-            distance_related_charges = 1 if lab_obj.home_collection_charges.all().exists() else 0
-            if lab_obj.always_open:
-                lab_timing = "12:00 AM - 23:45 PM"
-                lab_timing_data = [{
-                    "start": 0.0,
-                    "end": 23.75
-                }]
-            else:
-                timing_queryset = lab_obj.lab_timings.filter(day=day_now)
-                lab_timing, lab_timing_data = self.get_lab_timing(timing_queryset)
+        distance_related_charges = 1 if lab_obj.home_collection_charges.all().exists() else 0
+        if lab_obj.always_open:
+            lab_timing = "12:00 AM - 23:45 PM"
+            lab_timing_data = [{
+                "start": 0.0,
+                "end": 23.75
+            }]
+        else:
+            timing_queryset = lab_obj.lab_timings.filter(day=day_now)
+            lab_timing, lab_timing_data = self.get_lab_timing(timing_queryset)
 
-            lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
-            lab_serializable_data = lab_serializer.data
+        # entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
+        #                                    entity_type__iexact='Lab')
+        # if entity.exists():
+        #     entity = entity.first()
 
-            entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
-                                               entity_type__iexact='Lab').values('url')
-            if entity.exists():
-                lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+        lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request, "entity": entity})
+        lab_serializable_data = lab_serializer.data
+        if entity:
+            lab_serializable_data['url'] = entity.url
+
+        # entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
+        #                                    entity_type__iexact='Lab').values('url')
+        # if entity.exists():
+        #     lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
         temp_data['distance_related_charges'] = distance_related_charges
