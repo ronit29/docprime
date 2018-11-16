@@ -495,16 +495,16 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     corrected_url = valid_entity_url_qs.first().url
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
                 else:
-                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                    return Response(status=status.HTTP_404_NOT_FOUND)
 
             entity_id = entity.entity_id
-            response = self.retrieve(request, entity_id)
+            response = self.retrieve(request, entity_id, entity)
             return response
 
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, pk):
+    def retrieve(self, request, pk, entity=None):
         response_data = []
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
@@ -520,14 +520,19 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         # if not doctor or not is_valid_testing_data(request.user, doctor):
         #     return Response(status=status.HTTP_400_BAD_REQUEST)
         if doctor:
+            if not entity:
+                entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
+                if len(entity) > 0:
+                    entity = entity[0]
             serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
-                                                                     context={"request": request})
-
-            entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
-                                                entity_type__iexact='Doctor').values('url')
+                                                                     context={"request": request, "entity":entity})
+            #
+            # entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
+            #                                     entity_type__iexact='Doctor').values('url')
             response_data = self.prepare_response(serializer.data)
 
-            response_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+            if entity:
+                response_data['url'] = entity.url
         return Response(response_data)
 
 
@@ -827,7 +832,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             order_by_field, rank_by = doctor_search_helper.get_ordering_params()
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
-            doctor_search_result = RawSql(query_string).fetch_all()
+            doctor_search_result = RawSql(query_string.get('query'),
+                                         query_string.get('params')).fetch_all()
+
             result_count = len(doctor_search_result)
             # sa
             # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,

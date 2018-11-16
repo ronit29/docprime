@@ -142,12 +142,14 @@ def clinic_convert_timings(timings, is_day_human_readable=True):
     return final_dict
 
 class RawSql:
-    def __init__(self, query):
+    def __init__(self, query, parameters):
         self.query = query
+        self.parameters = parameters
+
 
     def fetch_all(self):
         with connection.cursor() as cursor:
-            cursor.execute(self.query)
+            cursor.execute(self.query, self.parameters)
             columns = [col[0] for col in cursor.description]
             result = [
                 dict(zip(columns, row))

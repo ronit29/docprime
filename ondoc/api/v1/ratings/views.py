@@ -68,13 +68,11 @@ class RatingsViewSet(viewsets.GenericViewSet):
 
                 if valid_data.get('compliment'):
                     rating_review.compliment.add(*valid_data.get('compliment'))
-
-                serialized = serializers.RatingsModelSerializer(rating_review, context={'request':request})
             except Exception as e:
                 resp['error'] = e
         else:
             return Response({'error': 'Object Not Found'}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(serialized.data)
+        return Response({'status': 'success', 'id': rating_review.id if rating_review else None})
 
     def list(self, request):
         serializer = serializers.RatingListBodySerializerdata(data=request.query_params)

@@ -9,7 +9,13 @@ from ondoc.api.v1.utils import RawSql
 from io import StringIO, BytesIO
 from ondoc.elastic import models as elastic_models
 logger = logging.getLogger(__name__)
-
+from django.core.files.uploadedfile import TemporaryUploadedFile
+from django.template.defaultfilters import slugify
+from django.core.files.storage import default_storage
+import os
+from django.db import connection, transaction
+import psycopg2
+from decimal import Decimal
 
 @task(bind=True, max_retries=2)
 def fetch_and_upload_json(self, data):
@@ -144,7 +150,7 @@ def fetch_and_upload_json(self, data):
                     replace(replace(replace(h."name",'"',''),'[',''),']',''),
                     'city', h.city,
                     'sublocality',
-                    replace(replace(replace(h.sublocality,'"',''),'[',''),']',''),    
+                    replace(replace(replace(h.sublocality,'"',''),'[',''),']',''),
                     'location',concat_ws(',',ST_Y(location::geometry),ST_X(location::geometry)),
                     'state', h.state)
                     ))) as doc_calender
@@ -208,7 +214,7 @@ def fetch_and_upload_json(self, data):
                     ci.unique_identifier = dp.unique_identifier)
                     f on f.doctor_id = c.id
                 ) y
-            
+
             ) a
             union
             (
@@ -362,27 +368,65 @@ def fetch_and_upload_json(self, data):
                     on b.l_id = c.lab_id) x
                     on x.lab_id = a.la_id
             )'''
-            results = RawSql(query).fetch_all()
-            response_list = list()
-            for result in results:
-                dic = dict()
-                for k, v in result.items():
-                    try:
-                        json.dumps(v)
-                    except TypeError:
-                        v = str(v)
-                    dic[k] = v
 
-                response_list.append(dic)
+            def default(obj):
+                if isinstance(obj, Decimal):
+                    return str(obj)
+                raise TypeError("Object of type '%s' is not JSON serializable" % type(obj).__name__)
 
-            name = '%s.json' % (str(obj.created_at))
-            string_io_obj = BytesIO()
-            string_io_obj.write(json.dumps(response_list).encode())
-            string_io_obj.seek(0)
-            file_obj = InMemoryUploadedFile(string_io_obj, None, name, 'text/json',
-                                            string_io_obj.tell(), None)
+            new_file_name = str(slugify('%s' % str(obj.created_at)))
+            new_file_name = 'demoelastic/%s.json' % new_file_name
 
-            obj.file = file_obj
+            # f = default_storage.open(new_file_name, 'wb')
+            # f.write('['.encode())
+            # f.close()
+
+            file = TemporaryUploadedFile(new_file_name, 'byte', 66666, 'utf-8')
+            file.write('['.encode())
+            batch_size = 50000
+            with transaction.atomic():
+
+                with connection.connection.cursor(name='elasticdata', cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                    cursor.itersize = batch_size
+                    cursor.execute(query)
+                    counter = 0
+                    response_list = list()
+                    for row in cursor:
+                        response_list.append(row)
+                        if len(response_list)>=batch_size:
+                            # file = default_storage.open(new_file_name, 'ab')
+                            content = json.dumps(response_list, default=default).encode()
+                            if not counter == 0:
+                                file.write(','.encode())
+
+                            file.write(content[1:len(content)-1])
+                            # file.close()
+
+                            response_list = list()
+                            counter+=1
+                            #print(str(counter))
+
+                    # write all remaining records
+                    if len(response_list)>0:
+                            content = json.dumps(response_list, default=default).encode()
+                            # file = default_storage.open(new_file_name, 'ab')
+                            if not counter == 0:
+                                file.write(','.encode())
+
+                            file.write(content[1:len(content)-1])
+                            # file.close()
+
+
+            # file = default_storage.open(new_file_name, 'ab')
+            file.write(']'.encode())
+
+            file.seek(0)
+            file.flush()
+            obj.file = file
             obj.save()
+            print(file.temporary_file_path())
+
+            file.close()
+
     except Exception as e:
         logger.error("Error in Celery. Failed creating json and uploading S3 - " + str(e))
