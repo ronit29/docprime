@@ -1256,8 +1256,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                       hospital__manageable_hospitals__is_disabled=False,
                       hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
             )
-            ).
-                             values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
+            ).values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
                              )
         return Response(doc_hosp_queryset)
 

@@ -1354,7 +1354,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                     )
                                     )\
                 .annotate(hospital_id=F('doctor__doctor_clinics__hospital__id'))\
-                .values('phone_number', 'name', 'is_disabled', 'permission_type', 'hospital_id', 'updated_at')
+                .values('phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_id', 'updated_at')
             for x in query:
                 if temp.get(x['phone_number']):
                     temp[x['phone_number']]['hospital_id'].append(x['hospital_id'])
@@ -1372,7 +1372,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 
                                        )\
                 .annotate(doctor_id=F('hospital__hospital_doctors__doctor__id')) \
-                .values('phone_number', 'name', 'is_disabled', 'permission_type', 'doctor_id', 'updated_at')
+                .values('phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'doctor_id', 'updated_at')
             for x in response:
                 if temp.get(x['phone_number']):
                     temp[x['phone_number']]['doctor_id'].append(x['doctor_id'])
@@ -1384,7 +1384,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             response = auth_models.GenericLabAdmin.objects\
                 .exclude(user=request.user)\
                 .filter(lab_id=valid_data.get('id'))\
-                .values('phone_number', 'name', 'updated_at', 'is_disabled', 'permission_type')
+                .values('phone_number', 'name', 'updated_at', 'is_disabled', 'super_user_permission', 'permission_type')
         if response:
             return Response(response)
         return Response([])
