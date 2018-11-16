@@ -587,7 +587,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             if category_ids and not procedure_ids:
                 # all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
                 #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-                #                                                                                     flat=True)  # OPTIMISE_SHASHANK_SINGH
+                #                                                                                     flat=True)
                 all_clinics_of_doctor = doctor.doctor_clinics.all()
                 all_procedures_under_doctor = []
                 for doctor_clinic in all_clinics_of_doctor:
@@ -600,7 +600,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             elif category_ids and procedure_ids:
                 # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
                 #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-                #                                                      flat=True)  # OPTIMISE_SHASHANK_SINGH
+                #                                                      flat=True)
                 all_clinics_of_doctor = doctor.doctor_clinics.all()
                 all_procedures_under_doctor = []
                 for doctor_clinic in all_clinics_of_doctor:
@@ -613,10 +613,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             elif procedure_ids and not category_ids:
                 selected_procedure_ids = procedure_ids
                 # all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
-                #     procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)  # OPTIMISE_SHASHANK_SINGH
+                #     procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)
                 # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
                 #     parent_category_id__in=all_parent_procedures_category_ids).values_list('procedure_id',
-                #                                                                            flat=True)  # OPTIMISE_SHASHANK_SINGH
+                #                                                                            flat=True)
                 all_clinics_of_doctor = doctor.doctor_clinics.all()
                 all_procedures_under_doctor = []
                 for doctor_clinic in all_clinics_of_doctor:
