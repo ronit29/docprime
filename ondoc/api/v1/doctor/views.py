@@ -231,6 +231,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
 
         extras_details = []
+
         if not procedures:
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
