@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from django.db import transaction
 from . import serializers
+import sys
 from django.conf import settings
 import requests, re, json
 
@@ -65,7 +66,21 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                            "desc": coupon.description,
                                            "coupon_count": coupon.count,
                                            "used_count": is_valid_coupon.get("used_count"),
+                                           "coupon": coupon,
                                            "tnc": coupon.tnc})
+
+
+        # sort coupons on discount granted
+        if applicable_coupons:
+            def compare_coupon(coupon):
+                discount = obj.get_discount(None, sys.maxsize, coupon["coupon"])
+                return discount
+            applicable_coupons = sorted(applicable_coupons, key=compare_coupon, reverse=True)
+
+        def remove_coupon_data(c):
+            c.pop('coupon')
+            return c
+        applicable_coupons = list(map(remove_coupon_data ,applicable_coupons))
 
         return Response(applicable_coupons)
 

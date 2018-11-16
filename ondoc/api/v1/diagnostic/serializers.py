@@ -126,29 +126,19 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_seo(self, obj):
         if self.parent:
             return None
-        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Lab')
+        # entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+        #                                    entity_type__iexact='Lab')
+
         locality = ''
         sublocality = ''
-        if entity.exists():
-            # location_id = entity.first().additional_info.get('location_id')
-            # type = EntityAddress.objects.filter(id=location_id).values('type', 'value', 'parent')
-            entity = entity[0]
+        # if entity.exists():
+            #entity = entity[0]
+        if self.context.get('entity'):
+            entity = self.context.get('entity')
             if entity.additional_info:
                 locality = entity.additional_info.get('locality_value')
                 sublocality = entity.additional_info.get('sublocality_value')
-                # if sublocality:
-                #        locality =  " " + locality
-            # if type.exists():
-            #     if type.first().get('type') == 'LOCALITY':
-            #         locality = type.first().get('value')
 
-            # if type.exists():
-            #     if type.first().get('type') == 'SUBLOCALITY':
-            #         sublocality = type.first().get('value')
-            #         parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-            #         if sublocality:
-            #             locality = ' ' + parent.first().get('value')
         if sublocality:
             title = obj.name + ' - Diagnostic Centre in '+ sublocality + " " + locality + ' |DocPrime'
         elif locality:
@@ -163,11 +153,13 @@ class LabModelSerializer(serializers.ModelSerializer):
 
         if self.parent:
             return None
-        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Lab')
+        # entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+        #                                    entity_type__iexact='Lab')
         breadcrums = None
-        if entity.exists():
-            breadcrums = entity[0].additional_info.get('breadcrums')
+        if self.context.get('entity'):
+            entity = self.context.get('entity')
+        # if entity.exists():
+            breadcrums = entity.additional_info.get('breadcrums')
             if breadcrums:
                 return breadcrums
         return breadcrums
