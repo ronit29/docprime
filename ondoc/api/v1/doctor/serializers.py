@@ -655,7 +655,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         if clinics:
             hospital = clinics[0]
-            if hospital.hospital:
+            if hospital.hospital and hospital.hospital.location:
                 lat = hospital.hospital.location.y
                 long = hospital.hospital.location.x
                 hosp_entity_relation = hospital.hospital.entity.all().prefetch_related('location')
@@ -672,7 +672,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 specialization = practice_specialization.name
                 specialization_id = practice_specialization.id
 
-        if sublocality or locality or specialization:
+        if sublocality and locality and specialization:
             title = 'View all ' + specialization + 's near ' + sublocality + ' ' + locality
 
         if lat and long and specialization and title:
@@ -689,8 +689,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return obj.is_gold and obj.enabled_for_online_booking
 
     def get_rating(self, obj):
+        app = OpdAppointment.objects.select_related('profile').all()
+
         queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
-        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True)
+        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app':app})
         return reviews.data[:5]
 
     def get_unrated_appointment(self, obj):
