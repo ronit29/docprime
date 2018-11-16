@@ -71,7 +71,6 @@ def fetch_and_upload_json(self, data):
                             # file.close()
 
                             response_list = list()
-                            result = list()
                             counter+=1
                             #print(str(counter))
 
