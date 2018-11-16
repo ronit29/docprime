@@ -527,10 +527,13 @@ class CouponsMixin(object):
         else:
             return {"is_valid": False, "used_count": None}
 
-    def get_discount(self, coupon_code, price):
+    def get_discount(self, coupon_code, price, coupon_object=None):
         from ondoc.coupon.models import Coupon
 
-        data = Coupon.objects.filter(code__exact=coupon_code).first()
+        if coupon_object:
+            data = coupon_object
+        else:
+            data = Coupon.objects.filter(code__exact=coupon_code).first()
         discount = 0
 
         if data:
