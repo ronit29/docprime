@@ -1283,13 +1283,13 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         return Response({'success': 'Created Successfully'})
 
     def assoc_doctors(self, request, pk=None):
-        hospital = get_object_or_404(Hospital, pk=pk)
+        hospital = get_object_or_404(Hospital.objects.prefetch_related('assoc_doctors'), pk=pk)
         queryset = hospital.assoc_doctors
         return Response(queryset.extra(select={'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END'}).values('name', 'id', 'assigned'))
 
     def assoc_hosp(self, request, pk=None):
-        doctor = get_object_or_404(Doctor, pk=pk)
-        queryset = doctor.prefetch_related('hospitals').hospitals.filter(is_appointment_manager=False)
+        doctor = get_object_or_404(Doctor.objects.prefetch_related('hospitals'), pk=pk)
+        queryset = doctor.hospitals.filter(is_appointment_manager=False)
         return Response(queryset.values('name', 'id'))
 
 
