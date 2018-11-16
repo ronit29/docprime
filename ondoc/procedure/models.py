@@ -33,19 +33,42 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
     class Meta:
         db_table = "procedure"
 
+    @staticmethod
+    def get_first_parent(all_mappings=[], parent_category_ids=None, is_primary=False):
+        if parent_category_ids:
+            if is_primary:
+                for mapping in all_mappings:
+                    if mapping.is_primary and mapping.procedure.pk in parent_category_ids:
+                        return mapping
+            else:
+                all_mappings = sorted(all_mappings, key=lambda x: x.procedure.id)
+                for mapping in all_mappings:
+                    if mapping.procedure.pk in parent_category_ids:
+                        return mapping
+        else:
+            if is_primary:
+                for mapping in all_mappings:
+                    if mapping.is_primary:
+                        return mapping
+        return None
+
     def get_primary_parent_category(self, parent_category_ids=None):
         parent = None
-        first_parent = None
+        first_parent_mapping = None
         if parent_category_ids:
-            first_parent = self.parent_categories_mapping.filter(parent_category_id__in=parent_category_ids,
-                                                                 is_primary=True).first()  # OPTIMIZE_SHASHANK_SINGH
-            if not first_parent:
-                first_parent = self.parent_categories_mapping.filter(
-                    parent_category_id__in=parent_category_ids).order_by('pk').first()  # OPTIMIZE_SHASHANK_SINGH
-        if not first_parent:
-            first_parent = self.parent_categories_mapping.filter(is_primary=True).first()  # OPTIMIZE_SHASHANK_SINGH
-        if first_parent:
-            parent = first_parent.parent_category
+            first_parent_mapping = self.get_first_parent(list(self.parent_categories_mapping.all()), parent_category_ids, True)
+            # first_parent_mapping = self.parent_categories_mapping.filter(parent_category_id__in=parent_category_ids,
+            #                                                      is_primary=True).first()
+            if not first_parent_mapping:
+                # first_parent_mapping = self.parent_categories_mapping.filter(
+                #     parent_category_id__in=parent_category_ids).order_by('procedure_id').first()
+                first_parent_mapping = self.get_first_parent(list(self.parent_categories_mapping.all()), parent_category_ids)
+        if not first_parent_mapping:
+            # first_parent_mapping = self.parent_categories_mapping.filter(is_primary=True).first()
+            first_parent_mapping = self.get_first_parent(list(self.parent_categories_mapping.all()),
+                                                         is_primary=True)
+        if first_parent_mapping:
+            parent = first_parent_mapping.parent_category
         return parent
 
 
