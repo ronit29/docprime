@@ -64,13 +64,169 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             insured_member.save()
         return Response({"message": "User Profile Updated Successfully"}, status.HTTP_200_OK)
 
-    def summary(self, request):
+    # def summary(self, request):
+    #     serializer = serializers.InsuredMemberSerializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     valid_data = serializer.validated_data
+    #
+    #     members = valid_data.get("members")
+    #     resp = {}
+    #
+    #     if valid_data:
+    #         user = request.user
+    #         logged_in_user_id = None
+    #         pre_insured_members = {}
+    #         insured_members_list = []
+    #         for member in members:
+    #             profile = {}
+    #             name = member['first_name'] + " " + member['last_name']
+    #             dob = member['dob']
+    #             # Calculate day difference between dob and current date
+    #             current_date = datetime.datetime.now().date()
+    #             days_diff = current_date - dob
+    #             days_diff = days_diff.days
+    #             years_diff = days_diff / 365
+    #             years_diff = int(years_diff)
+    #             if valid_data.get('insurance_plan'):
+    #                 # Age Validation for parent and child
+    #                 insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
+    #                                                                     valid_data.get('insurance_plan').id,
+    #                                                                     insurer_id=valid_data.get('insurer')).first()
+    #                 adult_max_age = insurance_threshold.max_age
+    #                 adult_min_age = insurance_threshold.min_age
+    #                 child_min_age = insurance_threshold.child_min_age
+    #                 # Age validation for parent in years
+    #                 if member['member_type'] == "adult":
+    #                     if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
+    #                         pre_insured_members['dob'] = member['dob']
+    #                     elif adult_max_age <= years_diff:
+    #                         return Response({"message": "Adult Age would be less than " + str(adult_max_age) + " years"},
+    #                                         status.HTTP_404_NOT_FOUND)
+    #                     elif adult_min_age >= years_diff:
+    #                         return Response({"message": "Adult Age would be more than " + str(adult_min_age) + " years"},
+    #                                         status.HTTP_404_NOT_FOUND)
+    #                 # Age validation for child in days
+    #                 if member['member_type'] == "child":
+    #                     if child_min_age <= days_diff:
+    #                         pre_insured_members['dob'] = member['dob']
+    #                     else:
+    #                         return Response({"message": "Child Age would be more than " + str(child_min_age) + " days"},
+    #                                         status.HTTP_404_NOT_FOUND)
+    #
+    #             # User Profile creation or updation
+    #             if member['profile'] or UserProfile.objects.filter(name=name, user=request.user).exists():
+    #                 # Check whether Profile exist with same name
+    #                 existing_profile = UserProfile.objects.filter(name=name, user=request.user).first()
+    #                 if member['profile']:
+    #                     profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
+    #                                                                                      'gender', 'user_id', 'dob',
+    #                                                                                      'phone_number').first()
+    #                 else:
+    #                     if existing_profile:
+    #                         profile = UserProfile.objects.filter(id=existing_profile.id).values('id', 'name', 'email',
+    #                                                                                              'gender', 'user_id',
+    #                                                                                              'dob',
+    #                                                                                              'phone_number').first()
+    #
+    #                 if profile:
+    #                     if profile.get('user_id') == request.user.pk:
+    #                         member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
+    #                                                         dob=member['dob'])
+    #
+    #                         if member['relation'].lower() == 'self'.lower():
+    #                             if member['profile']:
+    #                                 logged_in_user_id = member['profile'].id
+    #                             else:
+    #                                 logged_in_user_id = existing_profile.id
+    #                     else:
+    #                         return Response({"message": "User is not valid"},
+    #                                         status.HTTP_404_NOT_FOUND)
+    #
+    #             # Create Profile if not exist with name or not exist in profile id from request
+    #             else:
+    #                 member_profile = UserProfile.objects.create(name=name,
+    #                                                             email=member['email'], gender=member['gender'],
+    #                                                             user_id=request.user.pk, dob=member['dob'],
+    #                                                             is_default_user=False, is_otp_verified=False,
+    #                                                             phone_number=request.user.phone_number)
+    #                 profile = {'id': member_profile.id, 'name': member_profile.name, 'email': member_profile.email,
+    #                            'gender': member_profile.gender, 'user_id': member_profile.user_id,
+    #                            'dob': member_profile.dob, 'phone_number': member_profile.phone_number}
+    #
+    #                 if member['relation'].lower() == 'self'.lower():
+    #                     logged_in_user_id = member_profile.id
+    #
+    #             pre_insured_members['first_name'] = member['first_name']
+    #             pre_insured_members['last_name'] = member['last_name']
+    #
+    #             pre_insured_members['address'] = member['address']
+    #             pre_insured_members['pincode'] = member['pincode']
+    #             pre_insured_members['email'] = member['email']
+    #             pre_insured_members['relation'] = member['relation']
+    #             pre_insured_members['member_profile'] = profile
+    #
+    #             insured_members_list.append(pre_insured_members.copy())
+    #
+    #         insurer = Insurer.objects.filter(id=valid_data.get('insurer').id).values()
+    #         insurance_plan = InsurancePlans.objects.filter(id=valid_data.get('insurance_plan').id).values()
+    #         user_profile = UserProfile.objects.filter(id=logged_in_user_id, user_id=request.user.pk).values('id','name',
+    #                                                                                                      'email',
+    #                                                                                                      'gender',
+    #                                                                                                      'user_id',
+    #                                                                                                      'dob',
+    #                                                                                                      'phone_number')
+    #
+    #         resp['insurance'] = {"profile_detail": user_profile[0], "insured_members": insured_members_list, "insurer": insurer[0],
+    #                              "insurance_plan": insurance_plan[0], "user": request.user.pk}
+    #         return Response(resp)
+
+
+class InsuranceOrderViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def age_validate(member, insurance_threshold):
+        dob = None
+        # Calculate day difference between dob and current date
+        current_date = datetime.datetime.now().date()
+        days_diff = current_date - member['dob']
+        days_diff = days_diff.days
+        years_diff = days_diff / 365
+        years_diff = int(years_diff)
+        adult_max_age = insurance_threshold.max_age
+        adult_min_age = insurance_threshold.min_age
+        child_min_age = insurance_threshold.child_min_age
+        # Age validation for parent in years
+        if member['member_type'] == "adult":
+            if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
+                dob = member['dob']
+            elif adult_max_age <= years_diff:
+                return Response(
+                    {"message": "Adult Age would be less than " + str(adult_max_age) + " years"},
+                    status.HTTP_404_NOT_FOUND)
+            elif adult_min_age >= years_diff:
+                return Response(
+                    {"message": "Adult Age would be more than " + str(adult_min_age) + " years"},
+                    status.HTTP_404_NOT_FOUND)
+        # Age validation for child in days
+        if member['member_type'] == "child":
+            if child_min_age <= days_diff:
+                dob = member['dob']
+            else:
+                return Response({"message": "Child Age would be more than " + str(child_min_age) + " days"},
+                                status.HTTP_404_NOT_FOUND)
+        return dob
+
+    @transaction.atomic
+    def create_order(self, request):
+        user = request.user
         serializer = serializers.InsuredMemberSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
 
         members = valid_data.get("members")
         resp = {}
+        insurance_data = {}
 
         if valid_data:
             user = request.user
@@ -80,38 +236,13 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
             for member in members:
                 profile = {}
                 name = member['first_name'] + " " + member['last_name']
-                dob = member['dob']
-                # Calculate day difference between dob and current date
-                current_date = datetime.datetime.now().date()
-                days_diff = current_date - dob
-                days_diff = days_diff.days
-                years_diff = days_diff / 365
-                years_diff = int(years_diff)
                 if valid_data.get('insurance_plan'):
                     # Age Validation for parent and child
                     insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
-                                                                        valid_data.get('insurance_plan').id,
-                                                                        insurer_id=valid_data.get('insurer')).first()
-                    adult_max_age = insurance_threshold.max_age
-                    adult_min_age = insurance_threshold.min_age
-                    child_min_age = insurance_threshold.child_min_age
-                    # Age validation for parent in years
-                    if member['member_type'] == "adult":
-                        if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
-                            pre_insured_members['dob'] = member['dob']
-                        elif adult_max_age <= years_diff:
-                            return Response({"message": "Adult Age would be less than " + str(adult_max_age) + " years"},
-                                            status.HTTP_404_NOT_FOUND)
-                        elif adult_min_age >= years_diff:
-                            return Response({"message": "Adult Age would be more than " + str(adult_min_age) + " years"},
-                                            status.HTTP_404_NOT_FOUND)
-                    # Age validation for child in days
-                    if member['member_type'] == "child":
-                        if child_min_age <= days_diff:
-                            pre_insured_members['dob'] = member['dob']
-                        else:
-                            return Response({"message": "Child Age would be more than " + str(child_min_age) + " days"},
-                                            status.HTTP_404_NOT_FOUND)
+                                                                            valid_data.get('insurance_plan').id,
+                                                                            insurer_id=valid_data.get(
+                                                                                'insurer')).first()
+                    pre_insured_members['dob'] = self.age_validate(member, insurance_threshold)
 
                 # User Profile creation or updation
                 if member['profile'] or UserProfile.objects.filter(name=name, user=request.user).exists():
@@ -119,14 +250,14 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                     existing_profile = UserProfile.objects.filter(name=name, user=request.user).first()
                     if member['profile']:
                         profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
-                                                                                         'gender', 'user_id', 'dob',
-                                                                                         'phone_number').first()
+                                                                                             'gender', 'user_id', 'dob',
+                                                                                             'phone_number').first()
                     else:
                         if existing_profile:
                             profile = UserProfile.objects.filter(id=existing_profile.id).values('id', 'name', 'email',
-                                                                                                 'gender', 'user_id',
-                                                                                                 'dob',
-                                                                                                 'phone_number').first()
+                                                                                                'gender', 'user_id',
+                                                                                                'dob',
+                                                                                                'phone_number').first()
 
                     if profile:
                         if profile.get('user_id') == request.user.pk:
@@ -169,43 +300,32 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
 
             insurer = Insurer.objects.filter(id=valid_data.get('insurer').id).values()
             insurance_plan = InsurancePlans.objects.filter(id=valid_data.get('insurance_plan').id).values()
-            user_profile = UserProfile.objects.filter(id=logged_in_user_id, user_id=request.user.pk).values('id','name',
-                                                                                                         'email',
-                                                                                                         'gender',
-                                                                                                         'user_id',
-                                                                                                         'dob',
-                                                                                                         'phone_number')
+            user_profile = UserProfile.objects.filter(id=logged_in_user_id, user_id=request.user.pk).values('id',
+                                                                                                            'name',
+                                                                                                            'email',
+                                                                                                            'gender',
+                                                                                                            'user_id',
+                                                                                                            'dob',
+                                                                                                            'phone_number')
 
-            resp['insurance'] = {"profile_detail": user_profile[0], "insured_members": insured_members_list, "insurer": insurer[0],
-                                 "insurance_plan": insurance_plan[0], "user": request.user.pk}
-            return Response(resp)
+            insurance_data['insurance'] = {"profile_detail": user_profile[0], "insured_members": insured_members_list,
+                                           "insurer": insurer[0], "insurance_plan": insurance_plan[0],
+                                           "user": request.user.pk}
 
-
-class InsuranceOrderViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
-
-    @transaction.atomic
-    def create_order(self, request):
-        user = request.user
-        insurance_data = request.data.get('insurance')
         insurance_plan = insurance_data.get('insurance_plan')
         transaction_date = datetime.datetime.now().strftime('%Y-%m-%d')
-        # transaction_date = json.dumps(repr(transaction_date))
         if insurance_plan:
             amount = insurance_plan.get('amount')
-        insurance_transaction = {'insurer': insurance_data.get('insurer').get('id'),
-                                 'insurance_plan': insurance_data.get('insurance_plan').get('id'),
+        insurance_transaction = {'insurer': insurer[0],
+                                 'insurance_plan': insurance_plan[0],
                                  'transaction_date': transaction_date, 'status_type': InsuranceTransaction.CREATED,
-                                 'amount': amount, 'user': insurance_data.get('user'),
-                                 'insured_members': insurance_data.get('members')}
-        user_insurance = {'insurer': insurance_data.get('insurer').get('id'),
-                          'insurance_plan': insurance_data.get('insurance_plan').get('id'),
-                          'user': insurance_data.get('user'), 'insured_members': insurance_data.get('members')}
-        insurance_data['insurance_transaction'] = insurance_transaction
-        insurance_data['user_insurance'] = user_insurance
-        resp = {}
-
+                                 'amount': amount, 'user': request.user.pk,
+                                 'insured_members': insured_members_list}
+        user_insurance = {'insurer': insurer[0],
+                          'insurance_plan': insurance_plan[0],
+                          'user': request.user.pk, 'insured_members': insured_members_list}
+        resp['insurance_transaction'] = insurance_transaction
+        resp['user_insurance'] = user_insurance
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
