@@ -85,11 +85,14 @@ class Order(TimeStampedModel):
     def process_order(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.insurance.models import InsuranceTransaction
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
+        from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
 
         # Initial validations for appointment data
         appointment_data = self.action_data
+        insurance_data = self.action_data
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:
@@ -108,6 +111,10 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
+        elif self.product_id == self.INSURANCE_PRODUCT_ID:
+            serializer = InsuranceTransactionSerializer(data=appointment_data.get('insurance_transaction'))
+            serializer.is_valid(raise_exception=True)
+            insurance_data = serializer.validated_data
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
@@ -151,6 +158,10 @@ class Order(TimeStampedModel):
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
+        elif self.action == Order.INSURANCE_CREATE:
+            insurance_data = appointment_data
+            if consumer_account.balance >= insurance_data['amount']:
+                appointment_obj = InsuranceTransaction.create_insurance_transaction(insurance_data)
         if order_dict:
             self.update_order(order_dict)
         # If payment is required and appointment is created successfully, debit consumer's account

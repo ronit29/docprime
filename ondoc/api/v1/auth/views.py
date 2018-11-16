@@ -38,7 +38,7 @@ from ondoc.api.v1.doctor.views import DoctorAppointmentsViewSet
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
-from ondoc.api.v1.insurance.serializers import (InsuranceTransactionModelSerializer)
+from ondoc.api.v1.insurance.serializers import (InsuranceTransactionSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
@@ -951,8 +951,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 resp_serializer = serializers.TransactionSerializer(data=response)
                 if resp_serializer.is_valid():
                     response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-                    if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
-                        pg_tx_queryset = None
+                    # if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                    #     pg_tx_queryset = None
+                    if True:
                         try:
                             pg_tx_queryset = PgTransaction.objects.create(**response_data)
                         except Exception as e:
@@ -965,7 +966,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             logger.error("Error in building appointment - " + str(e))
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
-
 
                 if order_obj.product_id == account_models.Order.LAB_PRODUCT_ID:
                     if appointment_obj:
@@ -1073,7 +1073,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 transaction_dict["amount"] = order_obj.amount
                 transaction_dict["status_type"] = InsuranceTransaction.CREATED
                 # transaction_dict["insured_members"] = insurance_data.get('members')
-                serializer = InsuranceTransactionModelSerializer(data=transaction_dict)
+                serializer = InsuranceTransactionSerializer(data=transaction_dict)
                 serializer.is_valid()
                 valid_data = serializer.validated_data
 

@@ -1,7 +1,11 @@
+
 from rest_framework import viewsets
+
+from ondoc.api.v1.utils import payment_details
 from . import serializers
 from rest_framework.response import Response
 from ondoc.account import models as account_models
+from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance,
                                     InsuranceTransaction)
 from ondoc.authentication.models import UserProfile
@@ -10,6 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, permissions
 from django.db.models import F
 import datetime
+from django.db import transaction
 from ondoc.authentication.models import User
 
 
@@ -171,24 +176,78 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
                                                                                                          'dob',
                                                                                                          'phone_number')
 
-            resp['insurance'] = {"profile": user_profile[0], "members": insured_members_list, "insurer": insurer[0],
+            resp['insurance'] = {"profile_detail": user_profile[0], "members": insured_members_list, "insurer": insurer[0],
                                  "insurance_plan": insurance_plan[0], "user": request.user.pk}
             return Response(resp)
 
-    def create(self, request):
+
+class InsuranceOrderViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    @transaction.atomic
+    def create_order(self, request):
+        user = request.user
         insurance_data = request.data.get('insurance')
         insurance_plan = insurance_data.get('insurance_plan')
+        transaction_date = datetime.datetime.now().strftime('%Y-%m-%d')
+        # transaction_date = json.dumps(repr(transaction_date))
         if insurance_plan:
             amount = insurance_plan.get('amount')
+        insurance_transaction = {'insurer': insurance_data.get('insurer').get('id'),
+                                 'insurance_plan': insurance_data.get('insurance_plan').get('id'),
+                                 'transaction_date': transaction_date, 'status_type': InsuranceTransaction.CREATED,
+                                 'amount': amount, 'user': insurance_data.get('user'),
+                                 'insured_members': insurance_data.get('members')}
+        user_insurance = {'insurer': insurance_data.get('insurer').get('id'),
+                          'insurance_plan': insurance_data.get('insurance_plan').get('id'),
+                          'user': insurance_data.get('user'), 'insured_members': insurance_data.get('members')}
+        insurance_data['insurance_transaction'] = insurance_transaction
+        insurance_data['user_insurance'] = user_insurance
         resp = {}
-        order = account_models.Order.objects.create(
-            product_id=account_models.Order.INSURANCE_PRODUCT_ID,
-            action=account_models.Order.INSURANCE_CREATE,
-            action_data=insurance_data,
-            amount=amount,
-            reference_id=1,
-            payment_status=account_models.Order.PAYMENT_PENDING
-        )
+
+        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+        balance = consumer_account.balance
+
+        resp['is_agent'] = False
+        if hasattr(request, 'agent') and request.agent:
+            resp['is_agent'] = True
+
+        if (request.data.get('payment_type') == doctor_models.OpdAppointment.PREPAID and
+                    balance < amount or resp['is_agent']):
+
+            payable_amount = amount - balance
+
+            order = account_models.Order.objects.create(
+                product_id=account_models.Order.INSURANCE_PRODUCT_ID,
+                action=account_models.Order.INSURANCE_CREATE,
+                action_data=insurance_data,
+                amount=payable_amount,
+                wallet_amount=balance,
+                payment_status=account_models.Order.PAYMENT_PENDING
+            )
+            resp["status"] = 1
+            resp['data'], resp["payment_required"] = payment_details(request, order)
+        else:
+            wallet_amount = 0
+            if request.data.get('payment_type') == doctor_models.OpdAppointment.PREPAID:
+                wallet_amount = amount
+
+            order = account_models.Order.objects.create(
+                product_id=account_models.Order.INSURANCE_PRODUCT_ID,
+                action=account_models.Order.INSURANCE_CREATE,
+                action_data=insurance_data,
+                amount=0,
+                wallet_amount=wallet_amount,
+                payment_status=account_models.Order.PAYMENT_PENDING
+            )
+
+            insurance_object = order.process_order()
+            resp["status"] = 1
+            resp["payment_required"] = False
+            resp["data"] = {'id': insurance_object}
+
         return Response(resp)
 
 

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from rest_framework import serializers
-from ondoc.api.v1.insurance.serializers import InsuranceTransactionModelSerializer, InsuredTransactionIdsSerializer
+from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer, InsuredTransactionIdsSerializer
 
 
 class InsurerAdmin(admin.ModelAdmin):

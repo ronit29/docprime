@@ -85,14 +85,14 @@ class InsuredMemberSerializer(serializers.Serializer):
     insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
 
 
-class InsuranceTransactionModelSerializer(serializers.Serializer):
+class InsuranceTransactionSerializer(serializers.Serializer):
 
     insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
     insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
     amount = serializers.IntegerField()
-    status_type = serializers.CharField(max_length=50)
+    status_type = serializers.ChoiceField(choices=InsuranceTransaction.STATUS_CHOICES)
     insured_members = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all))
     transaction_date = serializers.DateTimeField()
 

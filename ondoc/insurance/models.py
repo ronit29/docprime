@@ -179,6 +179,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
 
     @classmethod
     def create_insurance_transaction(self, data, insured_members, order):
+
         insurer = Insurer.objects.get(id=data.get('insurer').id)
         insurance_plan = InsurancePlans.objects.get(id=data.get('insurance_plan').id)
         insurance_transaction_obj = InsuranceTransaction.objects.create(insurer=insurer,
