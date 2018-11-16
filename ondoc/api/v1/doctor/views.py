@@ -84,26 +84,49 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     def get_queryset(self):
 
-        user = self.request.user
-        if user.user_type == User.DOCTOR:
-            return models.OpdAppointment.objects.filter(doctor=user.doctor, doctor__is_live=True, hospital__is_live=True)
-        elif user.user_type == User.CONSUMER:
-            return models.OpdAppointment.objects.filter(user=user, doctor__is_live=True, hospital__is_live=True)
+        return None
+
+    def get_pem_queryset(self, user):
+        queryset = models.OpdAppointment.objects \
+            .select_related('doctor', 'hospital', 'profile') \
+            .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
+                              'doctor__qualifications', 'doctor__doctorpracticespecializations') \
+            .filter(hospital__is_live=True, doctor__is_live=True) \
+            .filter(
+            Q(
+                Q(doctor__manageable_doctors__user=user,
+                  doctor__manageable_doctors__hospital=F('hospital'),
+                  doctor__manageable_doctors__is_disabled=False,
+                  doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
+                                                                   auth_models.GenericAdmin.ALL]) |
+                Q(doctor__manageable_doctors__user=user,
+                  doctor__manageable_doctors__hospital__isnull=True,
+                  doctor__manageable_doctors__is_disabled=False,
+                  doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
+                                                                   auth_models.GenericAdmin.ALL]) |
+                Q(hospital__manageable_hospitals__doctor__isnull=True,
+                  hospital__manageable_hospitals__user=user,
+                  hospital__manageable_hospitals__is_disabled=False,
+                  hospital__manageable_hospitals__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
+                                                                       auth_models.GenericAdmin.ALL])
+            ) |
+            Q(
+                Q(doctor__manageable_doctors__user=user,
+                  doctor__manageable_doctors__super_user_permission=True,
+                  doctor__manageable_doctors__is_disabled=False,
+                  doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR, ) |
+                Q(hospital__manageable_hospitals__user=user,
+                  hospital__manageable_hospitals__super_user_permission=True,
+                  hospital__manageable_hospitals__is_disabled=False,
+                  hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+            ))
+        return queryset
 
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        queryset = models.OpdAppointment.objects.filter(hospital__is_live=True, doctor__is_live=True).filter(
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital=F('hospital'),
-              doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL]) |
-            Q(hospital__manageable_hospitals__doctor__isnull=True,
-              hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__is_disabled=False,
-              hospital__manageable_hospitals__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                               auth_models.GenericAdmin.ALL])
-            ).distinct()
+        queryset = self.get_pem_queryset(user)
+        queryset = queryset.distinct()
         if not queryset:
             return Response([])
         serializer = serializers.AppointmentFilterSerializer(data=request.query_params)
@@ -125,7 +148,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             queryset = queryset.filter(doctor=doctor)
 
         if range == 'previous':
-            queryset = queryset.filter(status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).order_by('-time_slot_start')
+            queryset = queryset.filter(
+                status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).order_by(
+                '-time_slot_start')
         elif range == 'upcoming':
             today = datetime.date.today()
             queryset = queryset.filter(
@@ -133,9 +158,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                             models.OpdAppointment.RESCHEDULED_DOCTOR, models.OpdAppointment.ACCEPTED],
                 time_slot_start__date__gte=today).order_by('time_slot_start')
         elif range == 'pending':
-            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status__in = [models.OpdAppointment.BOOKED,
-                                                                                         models.OpdAppointment.RESCHEDULED_PATIENT
-                                                                                         ]).order_by('time_slot_start')
+            queryset = queryset.filter(time_slot_start__gt=timezone.now(), status__in=[models.OpdAppointment.BOOKED,
+                                                                                       models.OpdAppointment.RESCHEDULED_PATIENT
+                                                                                       ]).order_by('time_slot_start')
         else:
             queryset = queryset.order_by('-time_slot_start')
 
@@ -149,16 +174,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     @transaction.non_atomic_requests
     def retrieve(self, request, pk=None):
         user = request.user
-        queryset = models.OpdAppointment.objects.filter(hospital__is_live=True, doctor__is_live=True).filter(
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital=F('hospital'),
-              doctor__manageable_doctors__is_disabled=False) |
-            Q(hospital__manageable_hospitals__doctor__isnull=True,
-              hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__is_disabled=False),
-            Q(pk=pk)).distinct()
+        queryset = self.get_pem_queryset(user)
+        queryset = queryset.filter(pk=pk)
         if queryset:
-            serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request':request})
+            serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True,
+                                                                         context={'request': request})
             return Response(serializer.data)
         else:
             return Response([])
