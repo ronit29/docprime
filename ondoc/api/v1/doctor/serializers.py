@@ -94,14 +94,14 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
                   'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name')
 
     def get_patient_image(self, obj):
-        if obj.profile.profile_image:
+        if obj.profile and obj.profile.profile_image:
             return obj.profile.profile_image.url
         else:
             return ""
 
     def get_patient_thumbnail(self, obj):
         request = self.context.get('request')
-        if obj.profile.profile_image:
+        if obj.profile and obj.profile.profile_image:
             photo_url = obj.profile.profile_image.url
             return request.build_absolute_uri(photo_url)
         else:

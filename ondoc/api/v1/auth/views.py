@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
 from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from dal import autocomplete
 from rest_framework import mixins, viewsets, status
 from ondoc.api.v1.auth import serializers
@@ -16,7 +16,6 @@ from django.db import transaction, IntegrityError
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When
-from django.forms.models import model_to_dict
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
@@ -33,24 +32,19 @@ from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, Appointme
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
                                              OpdAppModelSerializer)
-from ondoc.api.v1.doctor.views import DoctorAppointmentsViewSet
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
-from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from ondoc.authentication.backends import JWTAuthentication
-from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, \
-    ErrorCodeMapping, IsNotAgent
-from ondoc.api.v1.auth .serializers import OnlineLeadSerializer
-import decimal
+from ondoc.api.v1.utils import (IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform,
+                                ErrorCodeMapping, IsNotAgent, GenericAdminEntity)
 from django.conf import settings
 from collections import defaultdict
 import copy
 import logging
-import jwt
 
 from ondoc.web.models import ContactUs
 
@@ -1230,23 +1224,39 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (DoctorClinic.objects.filter(doctor__is_live=True, hospital__is_live=True).annotate(
+        doc_hosp_queryset = (DoctorClinic.objects
+                             .select_related('doctor', 'hospital')
+                             .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
+                             .filter(doctor__is_live=True, hospital__is_live=True).annotate(
             hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital=F('hospital'),
-              doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-              doctor__manageable_doctors__write_permission=True) |
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital__isnull=True,
-              doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-              doctor__manageable_doctors__write_permission=True) |
-            Q(hospital__manageable_hospitals__doctor__isnull=True,
-              hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__is_disabled=False,
-              hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-              hospital__manageable_hospitals__write_permission=True)).
+            Q(
+                Q(doctor__manageable_doctors__user=user,
+                  doctor__manageable_doctors__hospital=F('hospital'),
+                  doctor__manageable_doctors__is_disabled=False,
+                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                  doctor__manageable_doctors__write_permission=True) |
+                Q(doctor__manageable_doctors__user=user,
+                  doctor__manageable_doctors__hospital__isnull=True,
+                  doctor__manageable_doctors__is_disabled=False,
+                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                  doctor__manageable_doctors__write_permission=True) |
+                Q(hospital__manageable_hospitals__doctor__isnull=True,
+                  hospital__manageable_hospitals__user=user,
+                  hospital__manageable_hospitals__is_disabled=False,
+                  hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                  hospital__manageable_hospitals__write_permission=True)
+            )|
+                Q(
+                    Q(doctor__manageable_doctors__user=user,
+                     doctor__manageable_doctors__super_user_permission=True,
+                     doctor__manageable_doctors__is_disabled=False,
+                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
+                    Q(hospital__manageable_hospitals__user=user,
+                      hospital__manageable_hospitals__super_user_permission=True,
+                      hospital__manageable_hospitals__is_disabled=False,
+                      hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+            )
+            ).
                              values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
                              )
         return Response(doc_hosp_queryset)
