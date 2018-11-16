@@ -188,6 +188,18 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         opd_appointment_serializer = serializers.DoctorAppointmentRetrieveSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
+    @staticmethod
+    def get_procedure_prices(procedures, doctor, selected_hospital):
+        doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
+        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
+            'procedure_id')
+        total_deal_price, total_agreed_price, total_mrp = 0, 0, 0
+        for doctor_clinic_procedure in doctor_clinic_procedures:
+            total_agreed_price += doctor_clinic_procedure.agreed_price
+            total_deal_price += doctor_clinic_procedure.deal_price
+            total_mrp += doctor_clinic_procedure.mrp
+        return total_deal_price, total_agreed_price, total_mrp  # SHASHANK_SINGH what happens with agreed_price
+
     @transaction.atomic
     def create(self, request):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
@@ -230,11 +242,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             deal_price = doctor_clinic_timing.deal_price
             mrp = doctor_clinic_timing.mrp
         else:
-            # TODO: SHASHANK_SINGH
-            total_deal_price, total_effective_price, total_mrp = 0, 0, 0
-            # total_deal_price, total_effective_price, total_mrp = get_procedure_prices(procedure_categories, procedures, hospital_id)
+            total_deal_price, total_agreed_price, total_mrp = self.get_procedure_prices(procedures, doctor, selected_hospital)
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-                effective_price = total_effective_price
+                effective_price = total_deal_price
             elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
                 if coupon_discount >= total_deal_price:
                     effective_price = 0

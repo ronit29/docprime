@@ -308,7 +308,7 @@ class DoctorSearchHelper:
                         "mrp": data.mrp
                     }
             # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
-
+            selected_procedures_data = None
             if not doctor_clinic:
                 hospitals = []
             else:
@@ -327,6 +327,10 @@ class DoctorSearchHelper:
                 all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
                 selected_procedures_data = DoctorProfileUserViewSerializer.get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                                      selected_procedure_ids)
+                if selected_procedures_data:
+                    min_price["deal_price"] = sum([dcp.deal_price for dcp in selected_procedures_data])
+                    min_price["mrp"] = sum([dcp.mrp for dcp in selected_procedures_data])
+
                 # other_procedures_data = DoctorClinicProcedure.objects.filter(
                 #     procedure_id__in=other_procedure_ids,
                 #     doctor_clinic_id=doctor_clinic.id)
@@ -384,12 +388,12 @@ class DoctorSearchHelper:
                 "is_license_verified" : doctor.is_license_verified,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
-                "deal_price": filtered_deal_price,
-                "mrp": filtered_mrp,
+                "deal_price": filtered_deal_price if not selected_procedures_data else min_price["deal_price"],  # SHASHANK_SINGH not sure
+                "mrp": filtered_mrp if not selected_procedures_data else min_price["mrp"],  # SHASHANK_SINGH not sure
                 "is_live": doctor.is_live,
                 "is_gold": is_gold,
                 # "fees": filtered_fees,*********show mrp here
-                "discounted_fees": filtered_deal_price,
+                "discounted_fees": filtered_deal_price if not selected_procedures_data else min_price["deal_price"],  # SHASHANK_SINGH not sure
                 # "discounted_fees": filtered_fees, **********deal_price
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
