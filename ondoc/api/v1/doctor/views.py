@@ -983,7 +983,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "title": title,
                 "description": description,
                 "location": location,
-                "image": static('web/images/dclogo_placeholder.png'),
+                "image": static('web/images/dclogo-placeholder.png'),
                 'schema': {
                     "@context": "http://schema.org",
                     "@type": "MedicalBusiness",
