@@ -384,8 +384,10 @@ class LabCityFilter(SimpleListFilter):
     parameter_name = 'city'
 
     def lookups(self, request, model_admin):
-        cities = set([(c['city'].upper(), c['city'].upper()) if (c.get('city')) else ('', '') for c in
-                      Lab.objects.values('city')])
+        cities = Lab.objects.distinct('city').values_list('city','city')
+
+        # cities = set([(c['city'].upper(), c['city'].upper()) if (c.get('city')) else ('', '') for c in
+        #               Lab.objects.values('city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -505,13 +507,13 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         js = ('js/admin/ondoc.js',)
 
     def get_queryset(self, request):
-        return Lab.objects.all().prefetch_related('lab_documents')
+        return super().get_queryset(request).prefetch_related('lab_documents')
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
-        if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
+        if (not request.user.is_member_of(constants['QC_GROUP_NAME'])) and (not request.user.is_superuser):
             read_only_fields += ['lab_pricing_group']
-        if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
+        if (not request.user.is_member_of(constants['SUPER_QC_GROUP'])) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         return read_only_fields
 
@@ -656,7 +658,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
         form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
-        if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+        if not request.user.is_superuser and not request.user.is_member_of(constants['QC_GROUP_NAME']):
             form.base_fields['assigned_to'].disabled = True
         return form
 

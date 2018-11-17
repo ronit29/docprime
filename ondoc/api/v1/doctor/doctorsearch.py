@@ -160,7 +160,7 @@ class DoctorSearchHelper:
                        "dc.id as doctor_clinic_id,  " \
                        "dct.id as doctor_clinic_timing_id, " \
                        "dc.hospital_id as hospital_id FROM   doctor d " \
-                       "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
+                       "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true " \
                        "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
                        "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                        "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \

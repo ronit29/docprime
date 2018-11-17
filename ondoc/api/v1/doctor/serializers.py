@@ -325,7 +325,10 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     discounted_fees = serializers.IntegerField(read_only=True, allow_null=True, source='deal_price')
     lat = serializers.SerializerMethodField(read_only=True)
     long = serializers.SerializerMethodField(read_only=True)
-
+    enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
+    
+    def get_enabled_for_online_booking(self, obj):
+        return obj.doctor_clinic.enabled_for_online_booking
     def get_lat(self, obj):
         if obj.doctor_clinic.hospital.location:
             return obj.doctor_clinic.hospital.location.y
@@ -354,7 +357,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
-                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id', )
+                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking')
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -625,7 +628,7 @@ class DoctorListSerializer(serializers.Serializer):
 
 
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
-    emails = None
+    #emails = None
     experience_years = serializers.IntegerField(allow_null=True)
     is_license_verified = serializers.BooleanField(read_only=True)
     # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
@@ -843,6 +846,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
     def get_hospitals(self, obj):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
+                                                 doctor_clinic__enabled=True,
                                                  doctor_clinic__hospital__is_live=True).select_related(
             "doctor_clinic__doctor", "doctor_clinic__hospital")
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
@@ -852,7 +856,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
-                  'hospital_count', 'hospitals', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
+                  'hospital_count', 'hospitals', 'id', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
                   'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold', 'search_data')
 

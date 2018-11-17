@@ -303,7 +303,7 @@ class LabCertification(TimeStampedModel):
     name = models.CharField(max_length=200)
 
     def __str__(self):
-        return self.lab.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "lab_certification"
@@ -314,7 +314,7 @@ class LabAccreditation(TimeStampedModel):
     name = models.CharField(max_length=200)
 
     def __str__(self):
-        return self.lab.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "lab_accreditation"
@@ -347,7 +347,7 @@ class LabManager(TimeStampedModel):
         choices=CONTACT_TYPE_CHOICES)
 
     def __str__(self):
-        return self.lab.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "lab_manager"
@@ -1207,8 +1207,8 @@ class LabDoctorAvailability(TimeStampedModel):
     is_female_available = models.BooleanField(verbose_name='Female', default=False)
     slot = models.CharField(blank=False, max_length=2, choices=SLOT_CHOICES)
 
-    def __str__(self):
-        return self.lab.name
+    # def __str__(self):
+    #     return self.lab.name
 
     class Meta:
         db_table = "lab_doctor_availability"

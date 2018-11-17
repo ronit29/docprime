@@ -519,20 +519,19 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
         #     return Response(status=status.HTTP_400_BAD_REQUEST)
-        if doctor:
-            if not entity:
-                entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
-                if len(entity) > 0:
-                    entity = entity[0]
-            serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
-                                                                     context={"request": request, "entity":entity})
-            #
-            # entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
-            #                                     entity_type__iexact='Doctor').values('url')
-            response_data = self.prepare_response(serializer.data)
+        if not doctor or (not doctor.is_live and not doctor.is_internal):
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
-            if entity:
-                response_data['url'] = entity.url
+        if not entity:
+            entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
+            if len(entity) > 0:
+                entity = entity[0]
+        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+                                                                     context={"request": request, "entity":entity})
+        response_data = self.prepare_response(serializer.data)
+
+        if entity:
+            response_data['url'] = entity.url
         return Response(response_data)
 
 
