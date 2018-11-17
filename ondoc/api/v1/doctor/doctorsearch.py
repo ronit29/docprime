@@ -6,6 +6,7 @@ from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor
 from datetime import datetime
 import re
+from django.contrib.staticfiles.templatetags.staticfiles import static
 
 from ondoc.location.models import EntityAddress
 
@@ -291,7 +292,7 @@ class DoctorSearchHelper:
 
                 "schema": {
                     "name": doctor.get_display_name(),
-                    "image": doctor.get_thumbnail() if doctor.get_thumbnail() else '',
+                    "image": doctor.get_thumbnail() if doctor.get_thumbnail() else static('web/images/doc_placeholder.png'),
                     "@context": 'http://schema.org',
                     "@type": 'MedicalBusiness',
                     "address": {

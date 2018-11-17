@@ -26,8 +26,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
-from django.db.models import Q, Value
-from django.db.models import Case, When
+from django.db.models import Q, Value, Case, When
 from operator import itemgetter
 from itertools import groupby
 from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_parameters
@@ -49,6 +48,7 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
 from dal import autocomplete
+from django.contrib.staticfiles.templatetags.staticfiles import static
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -983,6 +983,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "title": title,
                 "description": description,
                 "location": location,
+                "image": static('web/images/dclogo_placeholder.png'),
                 'schema': {
                     "@context": "http://schema.org",
                     "@type": "MedicalBusiness",

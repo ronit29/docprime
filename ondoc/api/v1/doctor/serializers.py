@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
-from django.db.models import Q
+from django.db.models import Q, Avg, Count, Max
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
@@ -9,8 +9,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
 from ondoc.authentication.models import UserProfile
-from django.db.models import Avg
-from django.db.models import Q
+
 from ondoc.coupon.models import Coupon
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -21,6 +20,7 @@ from django.contrib.auth import get_user_model
 import math
 import datetime
 import pytz
+from django.contrib.staticfiles.templatetags.staticfiles import static
 import json
 import logging
 from dateutil import tz
@@ -666,11 +666,15 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                     if entity_address.type_blueprint == 'SUBLOCALITY':
                         sublocality = entity_address.alternative_value
 
-        if obj.doctorpracticespecializations.exists():
-            practice_specialization = obj.doctorpracticespecializations.first().specialization
-            if practice_specialization:
-                specialization = practice_specialization.name
-                specialization_id = practice_specialization.id
+
+        if len(obj.doctorpracticespecializations.all())>0:
+            dsp = [specialization.specialization for specialization in obj.doctorpracticespecializations.all()]
+            top_specialization = DoctorPracticeSpecialization.objects.filter(specialization__in=dsp).values('specialization')\
+                .annotate(doctor_count=Count('doctor'),name=Max('specialization__name')).order_by('-doctor_count').first()
+
+            if top_specialization:
+                specialization = top_specialization.get('name')
+                specialization_id = top_specialization.get('specialization')
 
         if sublocality and locality and specialization:
             title = specialization + 's near ' + sublocality + ' ' + locality
@@ -794,7 +798,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         schema = {
             'name': self.instance.get_display_name(),
-            'image': self.instance.get_thumbnail() if self.instance.get_thumbnail() else '',
+            'image': self.instance.get_thumbnail() if self.instance.get_thumbnail() else static('web/images/doc_placeholder.png'),
             '@context': 'http://schema.org',
             '@type': 'MedicalBusiness',
             'address': {
