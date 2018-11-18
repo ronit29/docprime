@@ -231,12 +231,12 @@ class DoctorSearchHelper:
 
     def get_doctor_fees(self, doctor_clinic, doctor_availability_mapping):
         if not doctor_clinic:
-            return 0, 0
+            return
         for doctor_clinic_timing in doctor_clinic.availability.all():
             if doctor_clinic_timing.id == doctor_availability_mapping[doctor_clinic.doctor.id]:
                 return doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
                 # return doctor_hospital.deal_price
-        return 0, 0
+        return None
 
     def prepare_search_response(self, doctor_data, doctor_search_result, request):
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}

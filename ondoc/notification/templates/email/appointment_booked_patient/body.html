@@ -62,25 +62,10 @@
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
                         Hi,<br/>We have received an appointment request for {{patient_name|capfirst}} with Dr.
                         {{doctor_name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}}
-                        {{instance.time_slot_start|date:"h:i a"}}.
+                        {{instance.time_slot_start|date:"h:i A"}}.
                         <br/>Please find below the details of the appointment
                     </td>
                 </tr>
-                <!--<tr>-->
-                <!--<td style="color: #000000; font-size: 14px;">-->
-                <!--Dear-->
-                <!--</td>-->
-                <!--</tr>-->
-                <!--<tr>-->
-                <!--<td style="color: #757575; font-size: 16px; font-weight: 500;">-->
-                <!--<span style="color: #000000; font-weight: 600;">{{patient_name|capfirst}},</span>-->
-                <!--</td>-->
-                <!--</tr>-->
-                <!--<tr>-->
-                <!--<td style="color: #000000; font-size: 16px; font-weight: 500; padding-top: 16px;">-->
-                <!--Appointment with <span style="font-weight: 600;" > {{doctor_name|capfirst}}</span>-->
-                <!--</td>-->
-                <!--</tr>-->
                 <tr>
                     <td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
                         Booking ID
@@ -128,7 +113,7 @@
                 </tr>
                 <tr>
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
-                        {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i a"}}
+                        {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
                     </td>
                 </tr>
                 {% if procedures %}
@@ -214,21 +199,6 @@
                         You will receive a confirmation email and sms once the booking is confirmed by the doctor.
                     </td>
                 </tr>
-                <!--<tr>-->
-                <!--<td style="color: #4a4a4a; font-size: 14px; font-weight: 500; padding-top: 30px;">-->
-                <!--Kindly accept the same to confirm in your docprime account.-->
-                <!--</td>-->
-                <!--</tr>-->
-                <!--<tr>-->
-                <!--<td align="center" style="text-align: center; padding-top: 30px;">-->
-                <!--<a href="javascript:;" target="_blank" style="font-size: 16px; color: #ffffff; text-decoration: none; border-radius: 5px; background-color: #f78631; border-top: 10px solid #f78631; border-bottom: 10px solid #f78631; border-right: 16px solid #f78631; border-left: 16px solid #f78631;">Accept Appointment</a>-->
-                <!--</td>-->
-                <!--</tr>-->
-                <!--<tr>-->
-                <!--<td align="center" style="text-align: center; font-size: 10px; font-style: italic; color: #4a4a4a; padding-top: 12px; font-weight: 500;">-->
-                <!--(to reschedule, kindly login to your docprime app)-->
-                <!--</td>-->
-                <!--</tr>-->
                 </tbody>
             </table>
         </td>
