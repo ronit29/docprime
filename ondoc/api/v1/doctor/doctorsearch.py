@@ -9,7 +9,9 @@ from ondoc.api.v1.doctor import serializers
 from django.core import serializers as core_serializer
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor
-from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping
+from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
+    get_selected_and_other_categories, get_included_doctor_clinic_procedure, \
+    get_procedure_categories_with_selected_procedure
 from datetime import datetime
 import re
 import json
@@ -229,12 +231,12 @@ class DoctorSearchHelper:
 
     def get_doctor_fees(self, doctor_clinic, doctor_availability_mapping):
         if not doctor_clinic:
-            return
+            return 0, 0
         for doctor_clinic_timing in doctor_clinic.availability.all():
             if doctor_clinic_timing.id == doctor_availability_mapping[doctor_clinic.doctor.id]:
                 return doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
                 # return doctor_hospital.deal_price
-        return None
+        return 0, 0
 
     def prepare_search_response(self, doctor_data, doctor_search_result, request):
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
@@ -245,57 +247,13 @@ class DoctorSearchHelper:
         category_ids = [int(x) for x in category_ids]
         procedure_ids = [int(x) for x in procedure_ids]
         response = []
-        selected_procedure_ids = []
-        other_procedure_ids = []
-        if category_ids and not procedure_ids:
-            all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-                parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-                                                                                                flat=True)
-            all_procedures_under_category = set(all_procedures_under_category)
-            selected_procedure_ids = ProcedureCategory.objects.filter(
-                pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True)
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
-        elif category_ids and procedure_ids:
-            all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-                parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-                                                                 flat=True)
-            all_procedures_under_category = set(all_procedures_under_category)
-            selected_procedure_ids = procedure_ids
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
-        elif procedure_ids and not category_ids:
-            selected_procedure_ids = procedure_ids
-            all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
-                procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)
-            all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-                parent_category_id__in=all_parent_procedures_category_ids).values_list('procedure_id',
-                                                                                       flat=True)
-            all_procedures_under_category = set(all_procedures_under_category)
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
-
-
-        # boiler_code_for_categories =
-
+        selected_procedure_ids, other_procedure_ids = get_selected_and_other_categories(category_ids, procedure_ids)
         for doctor in doctor_data:
 
             is_gold = doctor.enabled_for_online_booking and doctor.is_gold
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
-            # if doctor_clinic_procedure:
-            #     procedure_dict = dict()
-            #     procedure_list = []
-            #     for procedure in doctor_clinic_procedure:
-            #         procedure_dict = {"clinic_procedure_id": procedure['id'], "mrp": procedure['mrp'], "agreed_price":
-            #                             procedure['agreed_price'], "deal_price": procedure['deal_price'],
-            #                             "doctor_clinic_id": procedure['doctor_clinic_id'], "procedure_id":
-            #                             procedure['procedure_id'], "procedure_name": procedure['procedure__name'],
-            #                             "procedure_details": procedure['procedure__details'], "duration":
-            #                             procedure['procedure__duration']}
-            #         procedure_list.append(procedure_dict)
-            # serializer = serializers.DoctorHospitalSerializer(doctor_clinics, many=True, context={"request": request})
             filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
             min_deal_price = None
@@ -312,53 +270,26 @@ class DoctorSearchHelper:
             if not doctor_clinic:
                 hospitals = []
             else:
-                # result_for_a_hospital = defaultdict(list)
-                # all_procedures_in_hospital = doctor_clinic.doctorclinicprocedure_set.all()
-                # for doctorclinicprocedure in all_procedures_in_hospital:
-                #     primary_parent = doctorclinicprocedure.procedure.get_primary_parent_category()
-                #     if primary_parent:
-                #         if primary_parent.pk in category_ids:
-                #             result_for_a_hospital[primary_parent.pk].append(doctorclinicprocedure.procedure.pk)
-
-                # selected_procedures_data = DoctorClinicProcedure.objects.filter(
-                #     procedure_id__in=selected_procedure_ids,
-                #     doctor_clinic_id=doctor_clinic.id)
-                # selected_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(procedure_id__in=selected_procedure_ids)
                 all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
-                selected_procedures_data = DoctorProfileUserViewSerializer.get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
-                                                                                     selected_procedure_ids)
+                selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                                selected_procedure_ids)
                 if selected_procedures_data:
-                    min_price["deal_price"] = sum([dcp.deal_price for dcp in selected_procedures_data])
-                    min_price["mrp"] = sum([dcp.mrp for dcp in selected_procedures_data])
-
-                # other_procedures_data = DoctorClinicProcedure.objects.filter(
-                #     procedure_id__in=other_procedure_ids,
-                #     doctor_clinic_id=doctor_clinic.id)
-                # other_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(procedure_id__in=other_procedure_ids)
-                other_procedures_data = DoctorProfileUserViewSerializer.get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
-                                                                                  other_procedure_ids)
-                selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data, context={'is_selected': True, 'category_ids': category_ids if category_ids else None}, many=True)
-                other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data, context={'is_selected': False, 'category_ids': category_ids if category_ids else None}, many=True)
+                    min_price["deal_price"] = sum([dcp.deal_price for dcp in selected_procedures_data]) + min_price["deal_price"]
+                    min_price["mrp"] = sum([dcp.mrp for dcp in selected_procedures_data]) + min_price["mrp"]
+                other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                             other_procedure_ids)
+                selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
+                                                                                 context={'is_selected': True,
+                                                                                          'category_ids': category_ids},
+                                                                                 many=True)
+                other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data,
+                                                                              context={'is_selected': False,
+                                                                                       'category_ids': category_ids},
+                                                                              many=True)
                 selected_procedures_list = list(selected_procedures_serializer.data)
                 other_procedures_list = list(other_procedures_serializer.data)
-                # result_for_a_hospital_data = [(procedure.pop('procedure_category_id'),
-                #                                procedure.pop('procedure_category_name'))
-                final_result_procedures = OrderedDict()
-                procedures = selected_procedures_list + other_procedures_list
-                for procedure in procedures:
-                    temp_category_id = procedure.pop('procedure_category_id')
-                    temp_category_name = procedure.pop('procedure_category_name')
-                    if temp_category_id in final_result_procedures:
-                        final_result_procedures[temp_category_id]['procedures'].append(procedure)
-                    else:
-                        final_result_procedures[temp_category_id] = OrderedDict()
-                        final_result_procedures[temp_category_id]['name'] = temp_category_name
-                        final_result_procedures[temp_category_id]['procedures'] = [procedure]
-
-                final_result = []
-                for key, value in final_result_procedures.items():
-                    value['procedure_category_id'] = key
-                    final_result.append(value)
+                final_result = get_procedure_categories_with_selected_procedure(selected_procedures_list,
+                                                                                other_procedures_list)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
                 hospitals = [{
                     "hospital_name": doctor_clinic.hospital.name,

@@ -11,7 +11,8 @@ from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
-from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping
+from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
+    get_selected_and_other_categories
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
@@ -581,8 +582,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         category_ids = validated_data.get('procedure_category_ids')
         procedure_ids = validated_data.get('procedure_ids')
         selected_hospital = validated_data.get('hospital_id')
-        selected_procedure_ids = []
-        other_procedure_ids = []
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
@@ -597,57 +596,15 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     )
                   .filter(pk=pk).first())
         if selected_hospital:
-            if category_ids and not procedure_ids:
-                # all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-                #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-                #                                                                                     flat=True)
-                all_clinics_of_doctor = doctor.doctor_clinics.all()
-                all_procedures_under_doctor = []
-                for doctor_clinic in all_clinics_of_doctor:
-                    all_procedures_under_doctor.extend(doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
-                all_procedures_under_doctor = set(all_procedures_under_doctor)
-                selected_procedure_ids = ProcedureCategory.objects.filter(
-                    pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True)
-                selected_procedure_ids = set(selected_procedure_ids)
-                other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
-            elif category_ids and procedure_ids:
-                # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
-                #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-                #                                                      flat=True)
-                all_clinics_of_doctor = doctor.doctor_clinics.all()
-                all_procedures_under_doctor = []
-                for doctor_clinic in all_clinics_of_doctor:
-                    all_procedures_under_doctor.extend(
-                        doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
-                all_procedures_under_doctor = set(all_procedures_under_doctor)
-                selected_procedure_ids = procedure_ids
-                selected_procedure_ids = set(selected_procedure_ids)
-                other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
-            elif procedure_ids and not category_ids:
-                selected_procedure_ids = procedure_ids
-                # all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
-                #     procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)
-                # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
-                #     parent_category_id__in=all_parent_procedures_category_ids).values_list('procedure_id',
-                #                                                                            flat=True)
-                all_clinics_of_doctor = doctor.doctor_clinics.all()
-                all_procedures_under_doctor = []
-                for doctor_clinic in all_clinics_of_doctor:
-                    all_procedures_under_doctor.extend(
-                        doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
-                all_procedures_under_doctor = set(all_procedures_under_doctor)
-                selected_procedure_ids = set(selected_procedure_ids)
-                other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
-
-
-            # if not doctor or not is_valid_testing_data(request.user, doctor):
-            #     return Response(status=status.HTTP_400_BAD_REQUEST)
+            selected_procedure_ids, other_procedure_ids = get_selected_and_other_categories(category_ids, procedure_ids,
+                                                                                            doctor, all=True)
             if doctor:
                 serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                          context={"request": request
                                                                              ,
                                                                                   "selected_procedure_ids": selected_procedure_ids
-                                                                             , "other_procedure_ids": other_procedure_ids
+                                                                             ,
+                                                                                  "other_procedure_ids": other_procedure_ids
                                                                              , "category_ids": category_ids
                                                                              , "hospital_id": selected_hospital
                                                                                   })

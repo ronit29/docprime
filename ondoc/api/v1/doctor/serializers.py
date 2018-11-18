@@ -29,7 +29,8 @@ from dateutil import tz
 from django.conf import settings
 
 from ondoc.location.models import EntityUrls, EntityAddress
-from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory
+from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
+    get_included_doctor_clinic_procedure, get_procedure_categories_with_selected_procedure
 
 logger = logging.getLogger(__name__)
 
@@ -826,11 +827,6 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 return breadcrums
         return breadcrums
 
-    @staticmethod
-    def get_included_doctor_clinic_procedure(all_data, filter_ids):
-        return [dcp for dcp in all_data if dcp.procedure.id in filter_ids]
-
-
     def get_procedures(self, obj):
         selected_clinic = self.context.get('hospital_id')
         category_ids = self.context.get('category_ids')
@@ -841,29 +837,11 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 data = obj.doctor_clinics.all()
                 result_for_a_doctor = OrderedDict()
                 for doctor_clinic in data:
-                    # result_for_a_hospital = defaultdict(list)
-                    # all_procedures_in_hospital = doctor_clinic.doctorclinicprocedure_set.all()
-                    # for doctorclinicprocedure in all_procedures_in_hospital:
-                    #     primary_parent = doctorclinicprocedure.procedure.get_primary_parent_category()
-                    #     if primary_parent:
-                    #         if primary_parent.pk in category_ids:
-                    #             result_for_a_hospital[primary_parent.pk].append(doctorclinicprocedure.procedure.pk)
-
-                    # selected_procedures_data = DoctorClinicProcedure.objects.filter(
-                    #     procedure_id__in=selected_procedure_ids,
-                    #     doctor_clinic_id=doctor_clinic.id)
-                    # selected_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(
-                    #     procedure_id__in=selected_procedure_ids)
                     all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
-                    selected_procedures_data = self.get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
-                                                                                         selected_procedure_ids)
-                    # other_procedures_data = DoctorClinicProcedure.objects.filter(
-                    #     procedure_id__in=other_procedure_ids,
-                    #     doctor_clinic_id=doctor_clinic.id)
-                    # other_procedures_data = doctor_clinic.doctorclinicprocedure_set.filter(
-                    #     procedure_id__in=other_procedure_ids)
-                    other_procedures_data = self.get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
-                                                              other_procedure_ids)
+                    selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                                    selected_procedure_ids)
+                    other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                                 other_procedure_ids)
 
                     selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
                                                                                      context={'is_selected': True,
@@ -875,25 +853,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                                                                                   many=True)
                     selected_procedures_list = list(selected_procedures_serializer.data)
                     other_procedures_list = list(other_procedures_serializer.data)
-                    # result_for_a_hospital_data = [(procedure.pop('procedure_category_id'),
-                    #                                procedure.pop('procedure_category_name'))
-                    final_result_procedures = OrderedDict()
-                    procedures = selected_procedures_list + other_procedures_list
-                    for procedure in procedures:
-                        temp_category_id = procedure.pop('procedure_category_id')
-                        temp_category_name = procedure.pop('procedure_category_name')
-                        if temp_category_id in final_result_procedures:
-                            final_result_procedures[temp_category_id]['procedures'].append(procedure)
-                        else:
-                            final_result_procedures[temp_category_id] = OrderedDict()
-                            final_result_procedures[temp_category_id]['name'] = temp_category_name
-                            final_result_procedures[temp_category_id]['procedures'] = [procedure]
-
-                    final_result = []
-                    for key, value in final_result_procedures.items():
-                        value['procedure_category_id'] = key
-                        final_result.append(value)
-
+                    final_result = get_procedure_categories_with_selected_procedure(selected_procedures_list,
+                                                                                    other_procedures_list)
                     result_for_a_doctor[doctor_clinic.hospital.pk] = final_result
                 if selected_clinic and result_for_a_doctor.get(selected_clinic, None):
                     result_for_a_doctor.move_to_end(selected_clinic, last=False)
