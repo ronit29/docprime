@@ -1125,10 +1125,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
         coupon_list = appointment_data.pop("coupon", None)
-        procedure_ids = appointment_data.pop('procedures', [])
+        procedure_details = appointment_data.pop('procedures', [])
         appointment_data.pop("extra_details", None)
         app_obj = cls.objects.create(**appointment_data)
-        app_obj.procedures.add(*procedure_ids)
+        if procedure_details:
+            procedure_to_be_added = []
+            for procedure in procedure_details:
+                procedure['opd_appointment_id'] = app_obj.id
+                procedure.pop('procedure_name')
+                procedure_to_be_added.append(OpdAppointmentProcedureMapping(**procedure))
+            OpdAppointmentProcedureMapping.objects.bulk_create(procedure_to_be_added)
         if coupon_list:
             app_obj.coupon.add(*coupon_list)
         return app_obj
@@ -1376,9 +1382,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
     procedure = models.ForeignKey('procedure.Procedure', on_delete=models.CASCADE, related_name='opd_appointment_mappings')
-    mrp = models.IntegerField(null=True, blank=True)
-    agreed_price = models.IntegerField(null=True, blank=True)
-    deal_price = models.IntegerField(null=True, blank=True)
+    mrp = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    deal_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def __str__(self):
+        return '{}>{}'.format(self.opd_appointment, self.procedure)
 
     class Meta:
         db_table = 'opd_appointment_procedure_mapping'

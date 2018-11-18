@@ -1242,34 +1242,43 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
             return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
-                    'contact_details', 'profile', 'profile_detail', 'user', 'booked_by',
+                    'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'procedures')
+                    'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
                     'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_id', 'user_number', 'booked_by',
+                    'default_profile_number', 'user_id', 'user_number', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
                     'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                    'start_date', 'start_time', 'procedures')
+                    'start_date', 'start_time')
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc'
+            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details'
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details')
         else:
             return ()
+
+    def procedures_details(self, obj):
+        procedure_mappings = obj.procedure_mappings.all()
+        if procedure_mappings:
+            result = []
+            for mapping in procedure_mappings:
+                result.append('{}, mrp was {}, booking price was {}'.format(mapping.procedure, mapping.mrp, mapping.deal_price))
+            return ",\n".join(result)
+        return None
 
     def kyc(self, obj):
         count = 0
