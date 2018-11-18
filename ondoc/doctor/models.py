@@ -44,6 +44,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+# from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 
@@ -1087,7 +1088,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
-    procedures = models.ManyToManyField('procedure.Procedure', null=True, blank=True)
+    procedures = models.ManyToManyField('procedure.Procedure', through='OpdAppointmentProcedureMapping',
+                                        through_fields=('opd_appointment', 'procedure'), null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1369,6 +1371,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
     class Meta:
         db_table = "opd_appointment"
+
+
+class OpdAppointmentProcedureMapping(models.Model):
+    opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
+    procedure = models.ForeignKey('procedure.Procedure', on_delete=models.CASCADE, related_name='opd_appointment_mappings')
+    mrp = models.IntegerField(null=True, blank=True)
+    agreed_price = models.IntegerField(null=True, blank=True)
+    deal_price = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'opd_appointment_procedure_mapping'
 
 
 class DoctorLeave(auth_model.TimeStampedModel):

@@ -256,12 +256,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
             doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
             doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by('procedure_id')
+            # to_be_created = [] SHASHANK_SINGH create mappings
             for doctor_clinic_procedure in doctor_clinic_procedures:
                 temp_extra = {'procedure_id': doctor_clinic_procedure.procedure.id,
                               'procedure_name': doctor_clinic_procedure.procedure.name,
                               'deal_price': doctor_clinic_procedure.deal_price,
                               'agreed_price': doctor_clinic_procedure.agreed_price,
                               'mrp': doctor_clinic_procedure.mrp}
+                # OpdAppointmentProcedureMapping(**temp_extra)
                 extras_details.append(temp_extra)
 
         opd_data = {

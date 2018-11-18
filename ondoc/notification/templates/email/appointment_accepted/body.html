@@ -64,7 +64,7 @@
 							</tr>
 							<tr>
 								<td style="color: #000000; font-size: 12px; font-weight: 500; padding-top: 4px;">
-									Share this code with doctor at the time of your appoinment
+									Share this code with doctor at the time of your appointment
 								</td>
 							</tr>
 						</tbody>
@@ -139,7 +139,7 @@
 			</tr>
 			<tr>
 				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 20px; border-bottom: 1px solid #d3d3d3;">
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 20px;">
 						<tbody>
 							<tr>
 								<td style="color: #000000; font-weight: 600; font-size: 16px;">
@@ -155,9 +155,31 @@
 					</table>
 				</td>
 			</tr>
+            {% if procedures %}
 			<tr>
 				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 20px;">
+						<tbody>
+                            <tr>
+								<td style="color: #000000; font-weight: 600; font-size: 16px;">
+									Treatment(s)
+								</td>
+							</tr>
+                            {% for procedure in procedures %}
+                                <tr>
+                                    <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
+                                        {{procedure|capfirst}}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+						</tbody>
+					</table>
+				</td>
+			</tr>
+            {% endif %}
+			<tr>
+				<td>
+					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px; border-top: 1px solid #d3d3d3;">
 						<tbody>
 							<tr>
 								<td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;">
