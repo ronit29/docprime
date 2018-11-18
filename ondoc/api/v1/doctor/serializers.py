@@ -864,17 +864,11 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                     #     procedure_id__in=other_procedure_ids)
                     other_procedures_data = self.get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                               other_procedure_ids)
-                    if selected_clinic and selected_clinic == doctor_clinic.hospital.pk:
 
-                        selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
-                                                                                         context={'is_selected': True,
-                                                                                                  'category_ids': category_ids if category_ids else None},
-                                                                                         many=True)
-                    else:
-                        selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
-                                                                                         context={'is_selected': False,
-                                                                                                  'category_ids': category_ids if category_ids else None},
-                                                                                         many=True)
+                    selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
+                                                                                     context={'is_selected': True,
+                                                                                              'category_ids': category_ids if category_ids else None},
+                                                                                     many=True)
                     other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data,
                                                                                   context={'is_selected': False,
                                                                                            'category_ids': category_ids if category_ids else None},
