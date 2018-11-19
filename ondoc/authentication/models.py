@@ -608,13 +608,13 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
                                     related_name='manageable_lab_network_admins')
     lab = models.ForeignKey("diagnostic.Lab", null=True, blank=True, on_delete=models.CASCADE,
                             related_name='manageable_lab_admins')
-    permission_type = models.PositiveSmallIntegerField(max_length=20, choices=type_choices, default=APPOINTMENT)
+    permission_type = models.PositiveSmallIntegerField(choices=type_choices, default=APPOINTMENT)
     is_disabled = models.BooleanField(default=False)
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
     name = models.CharField(max_length=24, blank=True, null=True)
-    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=CRM)
+    source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
 
     class Meta:
         db_table = 'generic_lab_admin'
@@ -714,15 +714,15 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                                  related_name='manageable_hospitals')
     doctor = models.ForeignKey("doctor.Doctor", null=True, blank=True, on_delete=models.CASCADE,
                                related_name='manageable_doctors')
-    permission_type = models.PositiveSmallIntegerField(max_length=20, choices=type_choices, default=APPOINTMENT)
+    permission_type = models.PositiveSmallIntegerField(choices=type_choices, default=APPOINTMENT)
     is_doc_admin = models.BooleanField(default=False)
     is_disabled = models.BooleanField(default=False)
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
     name = models.CharField(max_length=24, blank=True, null=True)
-    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=CRM)
-    entity_type = models.PositiveSmallIntegerField(max_length=20, choices=entity_choices, default=OTHER)
+    source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
+    entity_type = models.PositiveSmallIntegerField(choices=entity_choices, default=OTHER)
 
 
     class Meta:
@@ -965,7 +965,7 @@ class BillingAccount(models.Model):
     )
     pan_copy = models.ImageField('Pan Card Image',upload_to='billing/documents', null=True, blank=True)
     account_copy = models.ImageField('Account/Cheque Image',upload_to='billing/documents', null=True, blank=True)
-    type = models.PositiveIntegerField(max_length=1, choices=TYPE_CHOICES, null=True)
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES, null=True)
     enabled = models.BooleanField(default=False)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)

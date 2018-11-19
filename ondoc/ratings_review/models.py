@@ -17,7 +17,7 @@ class ReviewCompliments(auth_model.TimeStampedModel):
     TYPE_CHOICES = [(LAB, 'Lab'), (DOCTOR, 'Opd')]
     message = models.CharField(max_length=128, default=None)
     type = models.PositiveSmallIntegerField(choices=TYPE_CHOICES, blank=True, null=True)
-    rating_level = models.PositiveSmallIntegerField(max_length=5, default=None)
+    rating_level = models.PositiveSmallIntegerField(default=None)
     icon = models.ImageField(upload_to='rating_compliments/icons', null=True, blank=True, default='')
 
     class Meta:
