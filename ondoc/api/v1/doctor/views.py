@@ -689,17 +689,39 @@ class PrescriptionFileViewset(OndocViewSet):
         request = self.request
         if request.user.user_type == User.DOCTOR:
             user = request.user
-            return (models.PrescriptionFile.objects.filter(
-                Q(prescription__appointment__doctor__manageable_doctors__user=user,
-                  prescription__appointment__doctor__manageable_doctors__hospital=F(
-                      'prescription__appointment__hospital'),
-                  prescription__appointment__doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
-                  prescription__appointment__doctor__manageable_doctors__is_disabled=False) |
-                Q(prescription__appointment__hospital__manageable_hospitals__user=user,
-                  prescription__appointment__hospital__manageable_hospitals__doctor__isnull=True,
-                  prescription__appointment__hospital__manageable_hospitals__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
-                  prescription__appointment__hospital__manageable_hospitals__is_disabled=False)).
-                    distinct())
+            return (models.PrescriptionFile.objects
+                    .select_related('prescription', 'prescription__appointment', 'prescription__appointment__doctor')
+                    .prefetch_related('prescription__appointment__doctor__manageable_doctors',
+                                      'prescription__appointment__hospital__manageable_hospitals')
+                    .filter(
+                        Q(Q(prescription__appointment__doctor__manageable_doctors__user=user,
+                          prescription__appointment__doctor__manageable_doctors__hospital=F(
+                              'prescription__appointment__hospital'),
+                          prescription__appointment__doctor__manageable_doctors__permission_type__in=[
+                              auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
+                          prescription__appointment__doctor__manageable_doctors__is_disabled=False) |
+                        Q(prescription__appointment__doctor__manageable_doctors__user=user,
+                          prescription__appointment__doctor__manageable_doctors__hospital__isnull=True,
+                          prescription__appointment__doctor__manageable_doctors__permission_type__in=[
+                              auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
+                          prescription__appointment__doctor__manageable_doctors__is_disabled=False) |
+                        Q(prescription__appointment__hospital__manageable_hospitals__user=user,
+                          prescription__appointment__hospital__manageable_hospitals__doctor__isnull=True,
+                          prescription__appointment__hospital__manageable_hospitals__permission_type__in=[
+                              auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
+                          prescription__appointment__hospital__manageable_hospitals__is_disabled=False)) |
+                        Q(
+                            Q(prescription__appointment__doctor__manageable_doctors__user=user,
+                              prescription__appointment__doctor__manageable_doctors__super_user_permission=True,
+                              prescription__appointment__doctor__manageable_doctors__is_disabled=False,
+                              prescription__appointment__doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR, ) |
+                            Q(prescription__appointment__hospital__manageable_hospitals__user=user,
+                              prescription__appointment__hospital__manageable_hospitals__super_user_permission=True,
+                              prescription__appointment__hospital__manageable_hospitals__is_disabled=False,
+                              prescription__appointment__hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+                        )
+                    )
+                    .distinct())
             # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
         elif request.user.user_type == User.CONSUMER:
             return models.PrescriptionFile.objects.filter(prescription__appointment__user=request.user)
