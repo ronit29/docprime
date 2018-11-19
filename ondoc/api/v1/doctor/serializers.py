@@ -925,7 +925,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_procedures(self, obj):
         if obj:
-            return OpdAppointmentProcedureMappingSerializer(obj.procedure_mappings.all(), many=True).data
+            return OpdAppointmentProcedureMappingSerializer(obj.procedure_mappings.all().select_related('procedure'), many=True).data
         return []
 
 
