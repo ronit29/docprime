@@ -241,7 +241,7 @@ def get_selected_and_other_categories(category_ids, procedure_ids, doctor=None, 
 def get_included_doctor_clinic_procedure(all_data, filter_ids):
         return [dcp for dcp in all_data if dcp.procedure.id in filter_ids]
 
-def get_procedure_categories_with_selected_procedure(selected_procedures, other_procedures):
+def get_procedure_categories_with_procedures(selected_procedures, other_procedures):
     temp_result = OrderedDict()
     all_procedures = selected_procedures + other_procedures
     for procedure in all_procedures:

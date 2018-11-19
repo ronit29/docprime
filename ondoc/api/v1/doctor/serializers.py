@@ -30,7 +30,7 @@ from django.conf import settings
 
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
-    get_included_doctor_clinic_procedure, get_procedure_categories_with_selected_procedure
+    get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures
 
 logger = logging.getLogger(__name__)
 
@@ -853,8 +853,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                                                                                   many=True)
                     selected_procedures_list = list(selected_procedures_serializer.data)
                     other_procedures_list = list(other_procedures_serializer.data)
-                    final_result = get_procedure_categories_with_selected_procedure(selected_procedures_list,
-                                                                                    other_procedures_list)
+                    final_result = get_procedure_categories_with_procedures(selected_procedures_list,
+                                                                            other_procedures_list)
                     result_for_a_doctor[doctor_clinic.hospital.pk] = final_result
                 if selected_clinic and result_for_a_doctor.get(selected_clinic, None):
                     result_for_a_doctor.move_to_end(selected_clinic, last=False)

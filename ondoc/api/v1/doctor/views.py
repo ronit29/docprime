@@ -543,7 +543,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("end", None)
             hospital.pop("day",  None)
             hospital.pop("discounted_fees", None)
-            hospital['procedure_categories'] = procedures.get(key) if procedures else None
+            hospital['procedure_categories'] = procedures.get(key) if procedures else []
             if key == selected_hospital:
                 availability.insert(0, hospital)
             else:

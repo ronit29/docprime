@@ -11,7 +11,7 @@ from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_categories, get_included_doctor_clinic_procedure, \
-    get_procedure_categories_with_selected_procedure
+    get_procedure_categories_with_procedures
 from datetime import datetime
 import re
 import json
@@ -288,8 +288,8 @@ class DoctorSearchHelper:
                                                                               many=True)
                 selected_procedures_list = list(selected_procedures_serializer.data)
                 other_procedures_list = list(other_procedures_serializer.data)
-                final_result = get_procedure_categories_with_selected_procedure(selected_procedures_list,
-                                                                                other_procedures_list)
+                final_result = get_procedure_categories_with_procedures(selected_procedures_list,
+                                                                        other_procedures_list)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
                 hospitals = [{
                     "hospital_name": doctor_clinic.hospital.name,
