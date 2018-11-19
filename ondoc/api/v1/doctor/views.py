@@ -1450,7 +1450,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 delete_queryset = delete_queryset.filter(hospital_id__in=valid_data.get('remove_list'))
             else:
                 delete_queryset = delete_queryset.filter(hospital_id=None)
-            if delete_queryset:
+            if len(delete_queryset) > 0:
                 delete_queryset.delete()
             doct = Doctor.objects.get(id=valid_data['id'])
             user_queryset = User.objects.filter(user_type=User.DOCTOR, phone_number=valid_data['phone_number']).first()
@@ -1500,7 +1500,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 delete_queryset = delete_queryset.filter(doctor_id__in=valid_data.get('remove_list'))
             else:
                 delete_queryset = delete_queryset.filter(doctor_id=None)
-            if delete_queryset:
+            if len(delete_queryset):
                 delete_queryset.delete()
             hosp = Hospital.objects.get(id=valid_data['id'])
             user_queryset = User.objects.filter(user_type=User.DOCTOR,
