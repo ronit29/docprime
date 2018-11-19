@@ -190,7 +190,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return Response(opd_appointment_serializer.data)
 
     @staticmethod
-    def get_procedure_prices(procedures, doctor, selected_hospital):
+    def get_procedure_prices(procedures, doctor, selected_hospital, dct):
         doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
         doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
             'procedure_id')
@@ -199,7 +199,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             total_agreed_price += doctor_clinic_procedure.agreed_price
             total_deal_price += doctor_clinic_procedure.deal_price
             total_mrp += doctor_clinic_procedure.mrp
-        return total_deal_price, total_agreed_price, total_mrp  # SHASHANK_SINGH what happens with agreed_price
+        return total_deal_price + dct.deal_price, total_agreed_price, total_mrp + dct.mrp  # SHASHANK_SINGH what happens with agreed_price
 
     @transaction.atomic
     def create(self, request):
@@ -244,7 +244,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             deal_price = doctor_clinic_timing.deal_price
             mrp = doctor_clinic_timing.mrp
         else:
-            total_deal_price, total_agreed_price, total_mrp = self.get_procedure_prices(procedures, doctor, selected_hospital)
+            total_deal_price, total_agreed_price, total_mrp = self.get_procedure_prices(procedures, doctor,
+                                                                                        selected_hospital,
+                                                                                        doctor_clinic_timing)
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
                 effective_price = total_deal_price
             elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:

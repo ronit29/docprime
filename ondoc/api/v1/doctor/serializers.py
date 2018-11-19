@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q
 from collections import defaultdict, OrderedDict
-from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
+from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
@@ -924,16 +924,10 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures')
 
     def get_procedures(self, obj):
-        if obj and obj.doctor and obj.hospital:
-            doctor = obj.doctor
-            doctor_clinic = doctor.doctor_clinics.filter(hospital=obj.hospital).first()
-            if doctor_clinic:
-                data = DoctorClinicProcedure.objects.filter(doctor_clinic=doctor_clinic,
-                                                            procedure_id__in=obj.procedures.all().values_list('id'))
-                if data:
-                    serializer = DoctorClinicProcedureSerializer(data, many=True)
-                    return serializer.data
+        if obj:
+            return OpdAppointmentProcedureMappingSerializer(obj.procedure_mappings.all(), many=True).data
         return []
+
 
 class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     profile = UserProfileSerializer()

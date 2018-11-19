@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+from ondoc.doctor.models import OpdAppointmentProcedureMapping
 from ondoc.procedure.models import Procedure, DoctorClinicProcedure, ProcedureToCategoryMapping, CommonProcedureCategory
 
 
@@ -24,6 +26,25 @@ class ProcedureInSerializer(serializers.ModelSerializer):
         if parent:
             name += ' in {}'.format(parent.name)
         return name
+
+
+class OpdAppointmentProcedureSerializer(serializers.ModelSerializer):
+
+
+    class Meta:
+        model = DoctorClinicProcedure
+        fields = ('hospital_id', 'procedure', 'mrp', 'agreed_price', 'deal_price',
+                  'procedure_category_id', 'procedure_category_name', 'is_selected')
+
+
+class OpdAppointmentProcedureMappingSerializer(serializers.ModelSerializer):
+    name = serializers.ReadOnlyField(source='procedure.name')
+
+    class Meta:
+        model = OpdAppointmentProcedureMapping
+        fields = ('name', 'mrp', 'agreed_price', 'deal_price')
+
+        # 'procedure' , 'mrp', 'agreed_price', 'deal_price'
 
 
 class DoctorClinicProcedureSerializer(serializers.ModelSerializer):
