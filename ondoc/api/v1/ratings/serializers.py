@@ -81,7 +81,7 @@ class RatingsGraphSerializer(serializers.Serializer):
         return response
 
     def get_rating_count(self, obj):
-        count = len(obj) if len(obj) > 0 else 0
+        count = obj.count()
         return count
 
     def get_review_count(self, obj):
@@ -94,7 +94,7 @@ class RatingsGraphSerializer(serializers.Serializer):
                  3: {'count': 0, 'percent': 0},
                  4: {'count': 0, 'percent': 0},
                  5: {'count': 0, 'percent': 0}}
-        total = len(obj) if len(obj) > 0 else 0
+        total = obj.count()
         if total:
             for rate in obj.all():
                 star_data[rate.ratings]['count'] += 1
