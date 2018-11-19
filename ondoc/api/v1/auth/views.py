@@ -575,31 +575,40 @@ class UserAppointmentsViewSet(OndocViewSet):
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
                         coupon_discount = opd_appointment.discount
-                        if not opd_appointment.procedures.count():
-                            if coupon_discount > doctor_hospital.deal_price:
-                                new_effective_price = 0
-                            else:
-                                new_effective_price = doctor_hospital.deal_price - coupon_discount
+                        if coupon_discount > doctor_hospital.deal_price:
+                            new_effective_price = 0  # SHASHANK_SINGH Ask Arun Sir?
+                        else:
+                            new_effective_price = doctor_hospital.deal_price - coupon_discount
 
-                            new_appointment = {
-                                "id": opd_appointment.id,
-                                "doctor": opd_appointment.doctor,
-                                "hospital": opd_appointment.hospital,
-                                "profile": opd_appointment.profile,
-                                "profile_detail": opd_appointment.profile_detail,
-                                "user": opd_appointment.user,
+                        if opd_appointment.procedures.count():
+                            new_fees = opd_appointment.fees
+                            new_deal_price = opd_appointment.deal_price
+                            new_mrp = opd_appointment.mrp
+                            new_effective_price = opd_appointment.effective_price
+                        else:
+                            new_fees = doctor_hospital.fees
+                            new_deal_price = doctor_hospital.deal_price
+                            new_mrp = doctor_hospital.mrp
 
-                                "booked_by": opd_appointment.booked_by,
-                                "fees": doctor_hospital.fees,
-                                "deal_price": doctor_hospital.deal_price,
-                                "effective_price": new_effective_price,
-                                "mrp": doctor_hospital.mrp,
-                                "time_slot_start": time_slot_start,
-                                "payment_type": opd_appointment.payment_type,
-                                "discount": coupon_discount
-                            }
-                            resp = self.extract_payment_details(request, opd_appointment, new_appointment,
-                                                                account_models.Order.DOCTOR_PRODUCT_ID)
+                        new_appointment = {
+                            "id": opd_appointment.id,
+                            "doctor": opd_appointment.doctor,
+                            "hospital": opd_appointment.hospital,
+                            "profile": opd_appointment.profile,
+                            "profile_detail": opd_appointment.profile_detail,
+                            "user": opd_appointment.user,
+
+                            "booked_by": opd_appointment.booked_by,
+                            "fees": new_fees,
+                            "deal_price": new_deal_price,
+                            "effective_price": new_effective_price,
+                            "mrp": new_mrp,
+                            "time_slot_start": time_slot_start,
+                            "payment_type": opd_appointment.payment_type,
+                            "discount": coupon_discount
+                        }
+                        resp = self.extract_payment_details(request, opd_appointment, new_appointment,
+                                                            account_models.Order.DOCTOR_PRODUCT_ID)
                     else:
                         resp = {
                             "status": 0,
@@ -617,7 +626,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         resp = dict()
         user = request.user
 
-        if appointment_details.payment_type == OpdAppointment.PREPAID:
+        if appointment_details.payment_type == OpdAppointment.PREPAID and not appointment_details.procedures.count():
             remaining_amount = 0
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
             consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)

@@ -1,163 +1,236 @@
 {% load static %}
 {% load invoice_tags %}
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-	<title>New Appointment</title>
-	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
+    <title>New Appointment</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
 </head>
 <body style="margin: 0; padding: 0; width: 100%; font-family: 'Quicksand', sans-serif;">
-	<table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; margin: auto;">
-		<tbody>
-			<tr>
-				<td>
-					<table bgcolor="#ececec" style="padding: 0 15px 40px; background-color: #ececec; width: 100%;">
-						<tbody>
-							<tr>
-								<td>
-									<table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px;">
-										<tbody>
-											<tr>
-												<td>
-													<img src="{{'notification/images/appointment.png'|get_absolute_url}}">
-												</td>
-												<td style="text-align: right;">
-													<img src="{{'notification/images/logo.png'|get_absolute_url}}">
-												</td>
-											</tr>
-										</tbody>
-									</table>
-								</td>
-							</tr>
-							<tr>
-								<td>
-									<table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 16px;">
-										<tbody>
-											<tr>
-												<td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
-													New Appoinment
-												</td>
-											</tr>
-											<tr>
-												<td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
-													{{instance.updated_at|date:'M d, Y'}}
-												</td>
-											</tr>
-										</tbody>
-									</table>
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 30px; border-bottom: 1px solid #d3d3d3;">
-						<tbody>
-							<tr>
-								<td style="color: #000000; font-size: 14px;">
-									Dear
-								</td>
-							</tr>
-							<tr>
-								<td style="color: #757575; font-size: 16px; font-weight: 500;">
-									<span style="color: #000000; font-weight: 600;">Dr {{doctor_name|capfirst}},</span>
-								</td>
-							</tr>
-							<tr>
-								<td style="color: #000000; font-size: 16px; font-weight: 500; padding-top: 16px;">
-									Appointment with <span style="font-weight: 600;" > {{patient_name|capfirst}}</span>
-								</td>
-							</tr>
-							<tr>
-								<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 8px;">
-									Date and Time
-								</td>
-							</tr>
-							<tr>
-								<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
-									{{instance.time_slot_start|date:"D jS F Y"}}
-								</td>
-							</tr>
-							<tr>
-								<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 4px; padding-left: 8px;">
-									{{instance.time_slot_start|date:"h:i a"}}
-								</td>
-							</tr>
-							<tr>
-								<td style="color: #f78631; font-size: 14px; font-weight: 500; padding-top: 16px;">
-									Clinic
-								</td>
-							</tr>
-							<tr>
-								<td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top: 8px; padding-left: 8px;">
-									{{instance.hospital.name|capfirst}}
-								</td>
-							</tr>
-							<tr>
-								<td style="color: #4a4a4a; font-size: 14px; font-weight: 500; padding-top: 30px;">
-									Kindly accept the same to confirm in your docprime account.
-								</td>
-							</tr>
-							<!--<tr>-->
-								<!--<td align="center" style="text-align: center; padding-top: 30px;">-->
-									<!--<a href="javascript:;" target="_blank" style="font-size: 16px; color: #ffffff; text-decoration: none; border-radius: 5px; background-color: #f78631; border-top: 10px solid #f78631; border-bottom: 10px solid #f78631; border-right: 16px solid #f78631; border-left: 16px solid #f78631;">Accept Appointment</a>-->
-								<!--</td>-->
-							<!--</tr>-->
-							<!--<tr>-->
-								<!--<td align="center" style="text-align: center; font-size: 10px; font-style: italic; color: #4a4a4a; padding-top: 12px; font-weight: 500;">-->
-									<!--(to reschedule, kindly login to your docprime app)-->
-								<!--</td>-->
-							<!--</tr>-->
-						</tbody>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">
-						<tbody>
-							<tr>
-								<td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;">
-									This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to networkhelp@docprime.com
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; background-color: #f78631;">
-						<tbody>
-							<tr>
-								<td style="font-size: 14px; color: #fafafa; width: 55%">
-									All Rights Reserved
-								</td>
-								<td style="width: 9%; text-align: right;">
-									<a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="{{'notification/images/youtube-email.png'|get_absolute_url}}"></a>
-								</td>
-								<td style="width: 9%; text-align: right;">
-									<a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img src="{{'notification/images/instagram-email.png'|get_absolute_url}}"></a>
-								</td>
-								<td style="width: 9%; text-align: right;">
-									<a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img src="{{'notification/images/facebook-email.png'|get_absolute_url}}"></a>
-								</td>
-								<td style="width: 9%; text-align: right;">
-									<a href="https://twitter.com/DocPrimeindia" target="_blank"><img src="{{'notification/images/twitter-email.png'|get_absolute_url}}"></a>
-								</td>
-								<td style="width: 9%; text-align: right;">
-									<a href="https://www.linkedin.com/company/docprime/" target="_blank"><img src="{{'notification/images/linkedin-email.png'|get_absolute_url}}"></a>
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
-		</tbody>
-	</table>
+<table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; margin: auto;">
+    <tbody>
+    <tr>
+        <td>
+            <table bgcolor="#ececec" style="padding: 0 15px 40px; background-color: #ececec; width: 100%;">
+                <tbody>
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px;">
+                            <tbody>
+                            <tr>
+                                <td>
+                                    <img src="{{'notification/images/appointment.png'|get_absolute_url}}">
+                                </td>
+                                <td style="text-align: right;">
+                                    <img src="{{'notification/images/logo.png'|get_absolute_url}}">
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 16px;">
+                            <tbody>
+                            <tr>
+                                <td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
+                                    New Appoinment
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
+                                    {{instance.updated_at|date:'M d, Y'}}
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <table cellpadding="0" cellspacing="0"
+                   style="width: 100%; padding: 20px 15px 30px;">
+                <tbody>
+                <tr>
+                    <td style="color: #000000; font-size: 14px;">
+                        Hi<br/>We have received an appointment for {{patient_name|capfirst}} at
+                        {{instance.hospital.name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at
+                        {{instance.time_slot_start|date:"h:i A"}}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="color: #000000; font-size: 14px; padding-top: 10px;">
+                        Please confirm the booking at the earliest by accepting the booking using docprime provider app
+                        or by replying to this email.<br/>The booking details are mentioned below.
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table>
+                            <tbody>
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Booking ID
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.id}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Patient
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{patient_name|capfirst}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Doctor
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{doctor_name|capfirst}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Clinic
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.hospital.name|capfirst}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Date and Time
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.time_slot_start|date:"D jS F Y"}} ||
+                                    {{instance.time_slot_start|date:"h:i A"}}
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% if procedures %}
+                <tr>
+                    <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;padding-bottom:2px">
+                        Treatment(s) Booked
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width:100%">
+                            <tbody>
+                            <tr>
+                                <th style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid #d3d3d3">
+                                    Name
+                                </th>
+                            </tr>
+                            {% for procedure in procedures %}
+
+                            <tr>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px;border:1px solid #d3d3d3">
+                                    {{procedure.name|capfirst}}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td style="color: #000000; font-size: 14px;">
+            <pre>
+Process to complete the appointment & billing:
+1. In case you have the Docprime provider App installed:
+<ul>
+         <li>       Once the customer comes to avail services at your premises, obtain the 4
+digit Unique Identification Code (OTP) from the customer</li>
+<li>Open the appointment of the customer on the Docprime provider application
+    and enter the Unique Identification Code (OTP) in the FIELD</li>
+    </ul>
+2. In case you don't have the Docprime provider App installed:
+                <ul>
+<li>In case you are unable to open the App, please obtain the 4-digit Unique Identification Code and Booking ID from the
+customer & enter it in the below mentioned link:
+
+Confirmation page - https://provider.docprime.com/opd/otp
+</li>
+                </ul>
+Thanks
+Team docprime
+
+            </pre>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">
+                <tbody>
+                <tr>
+                    <td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;  border-top: 1px solid #d3d3d3;">
+                        This is a system-generated e-mail. Please do not reply to this e-mail. For any support
+                        please write to customercare@docprime.com.
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; background-color: #f78631;">
+                <tbody>
+                <tr>
+                    <td style="font-size: 14px; color: #fafafa; width: 55%">
+                        All Rights Reserved
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img
+                                src="{{'notification/images/youtube-email.png'|get_absolute_url}}">
+                        </a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img
+                                src="{{'notification/images/instagram-email.png'|get_absolute_url}}">
+                        </a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img
+                                src="{{'notification/images/facebook-email.png'|get_absolute_url}}">
+                        </a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://twitter.com/DocPrimeindia" target="_blank"><img
+                                src="{{'notification/images/twitter-email.png'|get_absolute_url}}">
+                        </a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.linkedin.com/company/docprime/" target="_blank"><img
+                                src="{{'notification/images/linkedin-email.png'|get_absolute_url}}">
+                        </a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    </tbody>
+</table>
 </body>
 </html>

@@ -250,8 +250,6 @@ def opdappointment_transform(app_data):
     app_data["profile"] = app_data["profile"].id
     app_data["user"] = app_data["user"].id
     app_data["booked_by"] = app_data["booked_by"].id
-    if app_data.get("extras_details"):
-        app_data["procedures"] = app_data["extras_details"]
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
     return app_data
