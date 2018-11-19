@@ -82,11 +82,17 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
             return
         appnt_manager_flag = self.instance.is_appointment_manager
         if self.cleaned_data:
+            validate_unique = []
             phone_number = False
             for data in self.cleaned_data:
                 if data.get('phone_number') and data.get('permission_type') == GenericAdmin.APPOINTMENT:
                     phone_number = True
-                    break
+                    # break
+                row = (data.get('phone_number'), data.get('doctor'))
+                if row in validate_unique:
+                    raise forms.ValidationError("Duplicate Permission with this %s exists." % (data.get('phone_number')))
+                else:
+                    validate_unique.append(row)
             if phone_number:
                 if not appnt_manager_flag:
                     if not(len(self.deleted_forms) == len(self.cleaned_data)):
@@ -114,7 +120,7 @@ class GenericAdminInline(admin.TabularInline):
     formset = GenericAdminFormSet
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    fields = ['phone_number', 'name', 'doctor', 'permission_type', 'super_user_permission', 'read_permission',
+    fields = ['phone_number', 'name', 'doctor', 'permission_type', 'super_user_permission',
               'write_permission', 'user', 'entity_type']
 
     def get_queryset(self, request):

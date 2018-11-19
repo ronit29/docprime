@@ -603,6 +603,16 @@ class DoctorPracticeSpecializationInline(ReadOnlyInline):
 class GenericAdminFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
+        if self.cleaned_data:
+            validate_unique = []
+            for data in self.cleaned_data:
+                row = (data.get('phone_number'), data.get('hospital'))
+                if row in validate_unique:
+                    raise forms.ValidationError("Duplicate Permission with this phone number exists.")
+                else:
+                    validate_unique.append(row)
 
 
 class GenericAdminInline(nested_admin.NestedTabularInline):
@@ -611,7 +621,7 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
     formset = GenericAdminFormSet
     form = GenericAdminForm
     show_change_link = False
-    exclude = ('hospital_network', 'source_type', 'is_doc_admin')
+    exclude = ('hospital_network', 'source_type', 'is_doc_admin', 'read_permission')
     verbose_name_plural = "Admins"
 
     # def has_delete_permission(self, request, obj=None):
