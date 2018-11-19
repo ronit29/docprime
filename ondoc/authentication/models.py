@@ -16,6 +16,7 @@ import hashlib
 import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.utils.functional import cached_property
 
 
 class Image(models.Model):
@@ -250,6 +251,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         #     return self.staffprofile.name
         # return str(self.phone_number)
 
+    @cached_property
+    def my_groups(self):
+        return self.groups.all()
+
+    def is_member_of(self, group_name):
+        for group in self.my_groups:
+            if group.name == group_name:
+                return True
+
+        return False
 
     def get_unrated_opd_appointment(self):
         from ondoc.doctor import models as doc_models

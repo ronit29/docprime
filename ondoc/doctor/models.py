@@ -419,12 +419,11 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
                 self.is_live = False
 
-        if self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED:
-            self.enabled_for_online_booking = True
+        if self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled_for_online_booking:
             if not self.enabled_for_online_booking_at:
                 self.enabled_for_online_booking_at = timezone.now()
 
-        else:
+        if not self.onboarding_status == self.ONBOARDED:
             self.enabled_for_online_booking = False
 
     def save(self, *args, **kwargs):
@@ -480,10 +479,11 @@ class DoctorQualification(auth_model.TimeStampedModel):
     college = models.ForeignKey(College, on_delete=models.CASCADE, blank=True, null=True);
     passing_year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
 
-    def __str__(self):
-        if self.specialization_id:
-            return self.qualification.name + " (" + self.specialization.name + ")"
-        return self.qualification.name
+    # def __str__(self):
+    #     return ''
+    #     if self.specialization_id:
+    #         return self.qualification.name + " (" + self.specialization.name + ")"
+    #     return self.qualification.name
 
     class Meta:
         db_table = "doctor_qualification"
@@ -506,8 +506,8 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorspecializations", on_delete=models.CASCADE)
     specialization = models.ForeignKey(GeneralSpecialization, on_delete=models.CASCADE, blank=False, null=False)
 
-    def __str__(self):
-       return self.doctor.name + " (" + self.specialization.name + ")"
+    # def __str__(self):
+    #    return self.doctor.name + " (" + self.specialization.name + ")"
 
     class Meta:
         db_table = "doctor_specialization"
@@ -520,13 +520,14 @@ class DoctorClinic(auth_model.TimeStampedModel):
     followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
     followup_charges = models.PositiveSmallIntegerField(blank=True, null=True)
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=False)
+    enabled = models.BooleanField(verbose_name='Enabled', default=True)
     priority = models.PositiveSmallIntegerField(blank=True, null=True, default=0)
     class Meta:
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
 
-    def __str__(self):
-        return '{}-{}'.format(self.doctor, self.hospital)
+    # def __str__(self):
+    #     return '{}-{}'.format(self.doctor, self.hospital)
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
@@ -617,8 +618,8 @@ class DoctorHospital(auth_model.TimeStampedModel):
     followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
-    def __str__(self):
-        return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
+    # def __str__(self):
+    #     return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
 
     def discounted_fees(self):
         return self.fees
@@ -800,8 +801,8 @@ class DoctorLanguage(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="languages", on_delete=models.CASCADE)
     language = models.ForeignKey(Language, on_delete=models.CASCADE)
 
-    def __str__(self):
-        return self.doctor.name + " (" + self.language.name + ")"
+    # def __str__(self):
+    #     return self.doctor.name + " (" + self.language.name + ")"
 
     class Meta:
         db_table = "doctor_language"
@@ -814,7 +815,7 @@ class DoctorAward(auth_model.TimeStampedModel):
     year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
 
     def __str__(self):
-        return self.doctor.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "doctor_awards"
@@ -824,8 +825,8 @@ class DoctorAssociation(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="associations", on_delete=models.CASCADE)
     name = models.CharField(max_length=2000)
 
-    def __str__(self):
-        return self.doctor.name + " (" + self.name + ")"
+    # def __str__(self):
+    #     return self.doctor.name + " (" + self.name + ")"
 
     class Meta:
         db_table = "doctor_association"
@@ -896,7 +897,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     spoc_details = GenericRelation(auth_model.SPOCDetails)
 
     def __str__(self):
-        return self.name + " (" + self.city + ")"
+        return self.name
 
     class Meta:
         db_table = "hospital_network"
@@ -927,7 +928,7 @@ class HospitalNetworkCertification(auth_model.TimeStampedModel):
     name = models.CharField(max_length=200)
 
     def __str__(self):
-        return self.network.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "hospital_network_certification"
@@ -1599,8 +1600,8 @@ class DoctorPracticeSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorpracticespecializations", on_delete=models.CASCADE)
     specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False)
 
-    def __str__(self):
-        return "{}-{}".format(self.doctor.name, self.specialization.name)
+    # def __str__(self):
+    #     return "{}-{}".format(self.doctor.name, self.specialization.name)
 
     class Meta:
         db_table = "doctor_practice_specialization"

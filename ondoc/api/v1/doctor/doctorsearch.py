@@ -6,6 +6,7 @@ from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor
 from datetime import datetime
 import re
+from django.contrib.staticfiles.templatetags.staticfiles import static
 
 from ondoc.location.models import EntityAddress
 
@@ -27,6 +28,25 @@ class DoctorSearchHelper:
 
         specialization_ids = self.query_params.get("specialization_ids",[])
         condition_ids = self.query_params.get("condition_ids", [])
+        # longitude = self.query_params.get("longitude", 0)
+        # latitude = self.query_params.get("latitude", 0)
+        # sits_at = self.query_params.get("sits_at", [])
+        # sort_on = self.query_params.get("sort_on", None)
+        # min_fees = self.query_params.get("min_fees", 0)
+        # max_fees = self.query_params.get("max_fees", 1500)
+        # is_female = self.query_params.get("is_female", None)
+        # is_available = self.query_params.get("is_available", None)
+        # #search_id = self.query_params.get("search_id", None)
+        # doctor_name = self.query_params.get("doctor_name", None)
+        # hospital_name = self.query_params.get("hospital_name", None)
+        # max_distance = self.query_params.get("max_distance", 15)
+        # min_distance = self.query_params.get("min_distance", 0)
+        #
+        # if self.query_params.get('longitude'):
+        #     params['longitude'] = longitude
+        # if self.query_params.get('latitude'):
+        #     params['latitude'] = latitude
+
         if len(condition_ids)>0:
             cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
             cs = [str(i) for i in cs]
@@ -100,8 +120,14 @@ class DoctorSearchHelper:
         return result
 
     def get_ordering_params(self):
+        # if self.query_params.get('url'):
+        #     order_by_field =
         order_by_field = 'is_gold desc, distance, dc.priority desc'
         rank_by = "rank_distance=1"
+
+        if self.query_params.get('url') and not self.query_params.get('sort_on'):
+            return 'distance, dc.priority desc', rank_by
+
         if self.query_params.get('sort_on'):
             if self.query_params.get('sort_on') == 'experience':
                 order_by_field = 'practicing_since ASC, dc.priority desc'
@@ -109,6 +135,8 @@ class DoctorSearchHelper:
                 order_by_field = "deal_price ASC, dc.priority desc"
                 rank_by = "rank_fees=1"
         order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC', order_by_field)
+
+
         # order_by_field = "{}, {} ".format('d.is_live DESC', order_by_field)
         return order_by_field, rank_by
 
@@ -132,7 +160,7 @@ class DoctorSearchHelper:
                        "dc.id as doctor_clinic_id,  " \
                        "dct.id as doctor_clinic_timing_id, " \
                        "dc.hospital_id as hospital_id FROM   doctor d " \
-                       "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id " \
+                       "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true " \
                        "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
                        "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                        "LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
@@ -151,11 +179,15 @@ class DoctorSearchHelper:
                        #               longitude, latitude, min_distance,
                        #               order_by_field, rank_by)
         if filtering_params.get('params'):
-            # filtering_params.get('params')["query"] = query_string
             filtering_params.get('params')['longitude'] = longitude
             filtering_params.get('params')['latitude'] = latitude
             filtering_params.get('params')['min_distance'] = min_distance
-            filtering_params.get('params')['max_distance']= max_distance
+            filtering_params.get('params')['max_distance'] = max_distance
+        else:
+             filtering_params['params']['longitude'] = longitude
+             filtering_params['params']['latitude'] = latitude
+             filtering_params['params']['min_distance'] = min_distance
+             filtering_params['params']['max_distance'] = max_distance
 
         return {'params':filtering_params.get('params'), 'query': query_string}
 
@@ -260,7 +292,7 @@ class DoctorSearchHelper:
 
                 "schema": {
                     "name": doctor.get_display_name(),
-                    "image": doctor.get_thumbnail() if doctor.get_thumbnail() else '',
+                    "image": doctor.get_thumbnail() if doctor.get_thumbnail() else static('web/images/doc_placeholder.png'),
                     "@context": 'http://schema.org',
                     "@type": 'MedicalBusiness',
                     "address": {

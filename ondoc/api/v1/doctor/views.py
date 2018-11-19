@@ -26,8 +26,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
-from django.db.models import Q, Value
-from django.db.models import Case, When
+from django.db.models import Q, Value, Case, When
 from operator import itemgetter
 from itertools import groupby
 from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_parameters
@@ -49,6 +48,7 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
 from dal import autocomplete
+from django.contrib.staticfiles.templatetags.staticfiles import static
 
 
 class CreateAppointmentPermission(permissions.BasePermission):
@@ -552,20 +552,19 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
         #     return Response(status=status.HTTP_400_BAD_REQUEST)
-        if doctor:
-            if not entity:
-                entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
-                if len(entity) > 0:
-                    entity = entity[0]
-            serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
-                                                                     context={"request": request, "entity":entity})
-            #
-            # entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
-            #                                     entity_type__iexact='Doctor').values('url')
-            response_data = self.prepare_response(serializer.data)
+        if not doctor or (not doctor.is_live and not doctor.is_internal):
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
-            if entity:
-                response_data['url'] = entity.url
+        if not entity:
+            entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
+            if len(entity) > 0:
+                entity = entity[0]
+        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+                                                                     context={"request": request, "entity":entity})
+        response_data = self.prepare_response(serializer.data)
+
+        if entity:
+            response_data['url'] = entity.url
         return Response(response_data)
 
 
@@ -1038,6 +1037,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "title": title,
                 "description": description,
                 "location": location,
+                "image": static('web/images/dclogo-placeholder.png'),
                 'schema': {
                     "@context": "http://schema.org",
                     "@type": "MedicalBusiness",

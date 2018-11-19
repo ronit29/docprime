@@ -70,14 +70,14 @@ class QCPemAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         final_qs = qs
-        if request.user.is_superuser or \
-                request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or \
-                request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists() or \
-                request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() or \
-                request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-            final_qs = qs
-        if final_qs:
-            final_qs = final_qs.prefetch_related('created_by', 'assigned_to', 'assigned_to__staffprofile',
+        # if request.user.is_superuser or \
+        #         request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or \
+        #         request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists() or \
+        #         request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() or \
+        #         request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        #     final_qs = qs
+        # if final_qs:
+        final_qs = final_qs.prefetch_related('created_by', 'assigned_to', 'assigned_to__staffprofile',
                                                  'created_by__staffprofile')
         return final_qs
 
