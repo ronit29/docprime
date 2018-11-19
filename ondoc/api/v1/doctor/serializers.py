@@ -1056,3 +1056,7 @@ class DoctorEntitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Doctor
         fields = ('id', 'thumbnail', 'name', 'entity_type', 'qualifications')
+
+
+class AdminUpdateBodySerializer(AdminCreateBodySerializer):
+    remove_list = serializers.ListField()
