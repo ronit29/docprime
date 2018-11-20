@@ -274,8 +274,8 @@ class DoctorSearchHelper:
                 selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                                 selected_procedure_ids)
                 if selected_procedures_data:
-                    min_price["deal_price"] = sum([dcp.deal_price for dcp in selected_procedures_data]) + min_price["deal_price"]
-                    min_price["mrp"] = sum([dcp.mrp for dcp in selected_procedures_data]) + min_price["mrp"]
+                    min_price["deal_price"] = sum([dcp.deal_price for dcp in selected_procedures_data])
+                    min_price["mrp"] = sum([dcp.mrp for dcp in selected_procedures_data])
                 other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                              other_procedure_ids)
                 selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
