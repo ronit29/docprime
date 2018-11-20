@@ -89,6 +89,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         # sort coupons on discount granted
         if applicable_coupons and input_data.get("deal_price"):
             def compare_coupon(coupon):
+                obj = CouponsMixin()
                 discount = obj.get_discount(coupon["coupon"], input_data.get("deal_price"))
                 return discount
             applicable_coupons = sorted(applicable_coupons, key=compare_coupon, reverse=True)
