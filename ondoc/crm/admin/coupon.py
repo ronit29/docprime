@@ -49,7 +49,7 @@ class CouponForm(forms.ModelForm):
 class CouponAdmin(admin.ModelAdmin):
 
     list_display = (
-        'code', 'is_user_specific', 'type', 'count')
+        'code', 'is_user_specific', 'type', 'count', 'created_at', 'updated_at')
 
     autocomplete_fields = ['lab_network']
 

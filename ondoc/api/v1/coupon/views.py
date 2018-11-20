@@ -53,21 +53,21 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 .annotate(opd_used_count=Count('opd_appointment_coupon', filter=(Q(opd_appointment_coupon__user=user) & ~Q(opd_appointment_coupon__status__in=[OpdAppointment.CANCELLED]))),
                           lab_used_count=Count('lab_appointment_coupon', filter=(Q(lab_appointment_coupon__user=user) & ~Q(lab_appointment_coupon__status__in=[LabAppointment.CANCELLED]))))\
                 .filter(coupon_qs).prefetch_related('lab_appointment_coupon', 'opd_appointment_coupon')
-
-            # add on case when query_params(lab and test) are also available
-            if product_id and product_id == Order.LAB_PRODUCT_ID and lab:   # for lab case only when lab param is available
-                lab_qs = Q(lab=lab)     # qs to give only coupons for that lab
-                if test_ids:
-                    # qs intersects cases - 1) lab is available, 2) (test_ids_lies in (available test for given lab in coupons_data)) OR (test is null for given lab)
-                    lab_qs = lab_qs & (Q(test__in=test_ids, lab=lab) | Q(test__isnull=True, lab=lab))
-
-                # qs adds on cases when 1) lab_network is available for given lab in coupons_data and is equal to incoming lab's network
-                #                       2) (lab_network is available coupons_data and is equal to incoming lab's network) AND (lab is null in coupons_data)
-                #                       3) lab and lab_network in coupons_data is null
-                lab_qs = lab_qs | Q(lab_network=lab.network, lab=lab) | Q(lab_network=lab.network, lab__isnull=True) | Q(lab__isnull=True, lab_network__isnull=True)
-                coupons_data = coupons_data.filter(lab_qs)
         else:
             coupons_data = Coupon.objects.filter(coupon_qs)
+
+            # add on case when query_params(lab and test) are also available
+        if product_id and product_id == Order.LAB_PRODUCT_ID and lab:   # for lab case only when lab param is available
+            lab_qs = Q(lab=lab)     # qs to give only coupons for that lab
+            if test_ids:
+                # qs intersects cases - 1) lab is available, 2) (test_ids_lies in (available test for given lab in coupons_data)) OR (test is null for given lab)
+                lab_qs = lab_qs & (Q(test__in=test_ids, lab=lab) | Q(test__isnull=True, lab=lab)) | (Q(lab_network=lab.network, lab__isnull=True, test__in=test_ids))
+
+            # qs adds on cases when 1) lab_network is available for given lab in coupons_data and is equal to incoming lab's network
+            #                       2) (lab_network is available coupons_data and is equal to incoming lab's network) AND (lab is null in coupons_data)
+            #                       3) lab and lab_network in coupons_data is null
+            lab_qs = lab_qs | Q(lab_network=lab.network, lab=lab) | Q(lab_network=lab.network, lab__isnull=True, test__isnull=True) | Q(lab__isnull=True, lab_network__isnull=True)
+            coupons_data = coupons_data.filter(lab_qs)
 
         applicable_coupons = []
         for coupon in coupons_data:
@@ -83,6 +83,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                            "coupon_count": coupon.count,
                                            "used_count": used_count,
                                            "coupon": coupon,
+                                           "heading": coupon.heading,
                                            "tnc": coupon.tnc})
 
 
