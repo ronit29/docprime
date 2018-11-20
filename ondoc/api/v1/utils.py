@@ -3,7 +3,7 @@ from rest_framework import permissions
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import F, Func
 from django.utils import timezone
 import math
@@ -24,6 +24,7 @@ from dateutil.parser import parse
 from dateutil import tz
 from decimal import Decimal
 from collections import OrderedDict
+import datetime
 from django.utils.dateparse import parse_datetime
 User = get_user_model()
 
@@ -141,12 +142,14 @@ def clinic_convert_timings(timings, is_day_human_readable=True):
     return final_dict
 
 class RawSql:
-    def __init__(self, query):
+    def __init__(self, query, parameters):
         self.query = query
+        self.parameters = parameters
+
 
     def fetch_all(self):
         with connection.cursor() as cursor:
-            cursor.execute(self.query)
+            cursor.execute(self.query, self.parameters)
             columns = [col[0] for col in cursor.description]
             result = [
                 dict(zip(columns, row))
@@ -449,6 +452,9 @@ def doctor_query_parameters(entity_params, req_params):
             params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
     if entity_params.get("specialization_id"):
         params_dict["specialization_ids"] = str(entity_params["specialization_id"])
+    else:
+        params_dict["specialization_ids"] = ''
+
     return params_dict
 
 
@@ -690,3 +696,68 @@ class TimeSlotExtraction(object):
         format_data['title'] = day_time
         format_data['timing'] = data_list
         return format_data
+
+    def initial_start_times(self, is_thyrocare, is_home_pickup, time_slots):
+        today_min = None
+        tomorrow_min = None
+        today_max = None
+
+        now = datetime.datetime.now()
+        curr_time = now.hour
+        curr_minute = round(round(float(now.minute) / 60, 2) * 2) / 2
+        curr_time += curr_minute
+        is_sunday = now.weekday() == 6
+
+        # TODO: put time gaps in config
+        if is_home_pickup:
+            if is_thyrocare:
+                today_min = 24
+                if curr_time >= 17:
+                    tomorrow_min = 24
+            else:
+                if is_sunday:
+                    today_min = 24
+                else:
+                    if curr_time < 13:
+                        today_min = curr_time + 4
+                    elif curr_time >= 13:
+                        today_min = 24
+                if curr_time >= 17:
+                    tomorrow_min = 12
+        else:
+            if not is_thyrocare:
+                # add 2 hours gap,
+                today_min = curr_time + 2
+
+                # block lab for 2 hours, before last found time slot
+                if time_slots and time_slots[now.weekday()]:
+                    max_val = 0
+                    for s in time_slots[now.weekday()]:
+                        if s["timing"]:
+                            for t in s["timing"]:
+                                max_val = max(t["value"], max_val)
+                    if max_val >= 2:
+                        today_max = max_val - 2
+
+        return today_min, tomorrow_min, today_max
+
+
+def consumers_balance_refund():
+    from ondoc.account.models import ConsumerAccount, ConsumerRefund
+    refund_time = timezone.now() - timezone.timedelta(hours=settings.REFUND_INACTIVE_TIME)
+    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time)
+    for account in consumer_accounts:
+        with transaction.atomic():
+            consumer_account = ConsumerAccount.objects.select_for_update().filter(pk=account.id).first()
+            if consumer_account:
+                if consumer_account.balance > 0:
+                    print("consumer account balance " + str(consumer_account.balance))
+                    ctx_obj = consumer_account.debit_refund()
+                    ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+
+
+class GenericAdminEntity():
+    DOCTOR = 1
+    HOSPITAL = 2
+    LAB = 3
+    EntityChoices = [(DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'), (LAB, 'Lab')]

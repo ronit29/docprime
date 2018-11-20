@@ -3,7 +3,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
-from ondoc.doctor.models import Hospital, SearchKey
+from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
 from ondoc.coupon.models import Coupon
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
@@ -256,10 +256,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
     def save(self, *args, **kwargs):
         self.clean()
-        build_url = True
-        if self.is_live and self.location and self.id:
-            if Lab.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
-                build_url = False
 
         edit_instance = None
         if self.id is not None:
@@ -268,11 +264,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
 
         self.update_live_status()
         super(Lab, self).save(*args, **kwargs)
-
-        if self.is_live and self.location and build_url:
-            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
-            if ea:
-                location_models.EntityUrls.create_page_url(self)
 
         if edit_instance is not None:
             id = self.id
@@ -312,7 +303,7 @@ class LabCertification(TimeStampedModel):
     name = models.CharField(max_length=200)
 
     def __str__(self):
-        return self.lab.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "lab_certification"
@@ -323,7 +314,7 @@ class LabAccreditation(TimeStampedModel):
     name = models.CharField(max_length=200)
 
     def __str__(self):
-        return self.lab.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "lab_accreditation"
@@ -356,7 +347,7 @@ class LabManager(TimeStampedModel):
         choices=CONTACT_TYPE_CHOICES)
 
     def __str__(self):
-        return self.lab.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "lab_manager"
@@ -381,7 +372,12 @@ class LabBookingClosingManager(models.Manager):
         lab_timing_queryset = LabTiming.timing_manager.filter(**kwargs)
 
         if not lab_timing_queryset or (is_home_pickup and not lab_timing_queryset[0].lab.is_home_collection_enabled):
-            return []
+            return {
+                "time_slots": [],
+                "today_min": None,
+                "tomorrow_min": None,
+                "today_max": None
+            }
 
         else:
             obj = TimeSlotExtraction()
@@ -389,23 +385,39 @@ class LabBookingClosingManager(models.Manager):
 
             if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
                 for day in range(0, 7):
-                    obj.form_time_slots(day, 0.0, 23.75-threshold, None, True)
+                    obj.form_time_slots(day, 0.0, 23.75, None, True)
 
             else:
-                daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
-                day, end = daywise_data_array[0].day, daywise_data_array[0].end
-                end = end - threshold
-                for data in daywise_data_array:
-                    if data.day != day:
-                        day = data.day
-                        end = data.end - threshold
-                    if not end <= data.start <= data.end:
-                        if data.start <= end <= data.end:
-                            data.end = end
-                        obj.form_time_slots(data.day, data.start, data.end, None, True)
+                for data in lab_timing_queryset:
+                    obj.form_time_slots(data.day, data.start, data.end, None, True)
+                # daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
+                # day, end = daywise_data_array[0].day, daywise_data_array[0].end
+                # end = end - threshold
+                # for data in daywise_data_array:
+                #     if data.day != day:
+                #         day = data.day
+                #         end = data.end - threshold
+                #     if not end <= data.start <= data.end:
+                #         if data.start <= end <= data.end:
+                #             data.end = end
+                #         obj.form_time_slots(data.day, data.start, data.end, None, True)
 
             resp_list = obj.get_timing_list()
-            return resp_list
+            is_thyrocare = False
+            lab_id = kwargs.get("lab__id", None)
+            if lab_id and settings.THYROCARE_NETWORK_ID:
+                if Lab.objects.filter(id=lab_id, network_id=settings.THYROCARE_NETWORK_ID).exists():
+                    is_thyrocare = True
+
+            today_min, tomorrow_min, today_max = obj.initial_start_times(is_thyrocare=is_thyrocare, is_home_pickup=is_home_pickup, time_slots=resp_list)
+            res_data = {
+                "time_slots": resp_list,
+                "today_min": today_min,
+                "tomorrow_min": tomorrow_min,
+                "today_max": today_max
+            }
+
+            return res_data
 
 
 class LabTiming(TimeStampedModel):
@@ -595,8 +607,8 @@ class TestParameter(TimeStampedModel):
 
 
 class ParameterLabTest(TimeStampedModel):
-    parameter = models.ForeignKey(TestParameter, on_delete=models.DO_NOTHING, related_name='test_parameters')
-    lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, related_name='labtests')
+    parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, related_name='test_parameters')
+    lab_test = models.ForeignKey('LabTest', on_delete=models.CASCADE, related_name='labtests')
 
     class Meta:
         db_table = 'parameter_lab_test'
@@ -797,6 +809,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="lab_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
+    cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -853,7 +867,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=account_model.Order.LAB_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
-
+        if self.status == self.COMPLETED and not self.is_rated:
+            notification_tasks.send_opd_rating_message.apply_async(kwargs={'appointment_id': self.id, 'type': 'lab'}, countdown=int(settings.RATING_SMS_NOTIF))
         # Do not delete below commented code
         # try:
         #     prev_app_dict = {'id': self.id,
@@ -1192,8 +1207,8 @@ class LabDoctorAvailability(TimeStampedModel):
     is_female_available = models.BooleanField(verbose_name='Female', default=False)
     slot = models.CharField(blank=False, max_length=2, choices=SLOT_CHOICES)
 
-    def __str__(self):
-        return self.lab.name
+    # def __str__(self):
+    #     return self.lab.name
 
     class Meta:
         db_table = "lab_doctor_availability"

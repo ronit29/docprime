@@ -210,12 +210,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         super(Hospital, self).save(*args, **kwargs)
 
-        if self.is_appointment_manager:
-            auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
-                .update(is_disabled=True)
-        else:
-            auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
-                .update(is_disabled=False)
+        # if self.is_appointment_manager:
+        #     auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+        #         .update(is_disabled=True)
+        # else:
+        #     auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+        #         .update(is_disabled=False)
 
         if build_url and self.location and self.is_live:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
@@ -355,7 +355,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     batch = models.CharField(max_length=20, blank=True)
     enabled_for_online_booking = models.BooleanField(default=False)
     enabled_for_online_booking_at = models.DateTimeField(null=True, blank=True)
-
+    is_gold = models.BooleanField(verbose_name='Is Gold', default=False)
 
     def __str__(self):
         return self.name
@@ -419,20 +419,16 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
             if self.is_live and (self.onboarding_status != self.ONBOARDED or self.data_status != self.QC_APPROVED or self.enabled == False):
                 self.is_live = False
 
-        if self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED:
-            self.enabled_for_online_booking = True
+        if self.onboarding_status == self.ONBOARDED and self.data_status == self.QC_APPROVED and self.enabled_for_online_booking:
             if not self.enabled_for_online_booking_at:
                 self.enabled_for_online_booking_at = timezone.now()
 
-        else:
+        if not self.onboarding_status == self.ONBOARDED:
             self.enabled_for_online_booking = False
 
     def save(self, *args, **kwargs):
         self.update_live_status()
         super(Doctor, self).save(*args, **kwargs)
-        if self.is_live:
-            location_models.EntityUrls.create_page_url(self)
-
 
     class Meta:
         db_table = "doctor"
@@ -483,10 +479,11 @@ class DoctorQualification(auth_model.TimeStampedModel):
     college = models.ForeignKey(College, on_delete=models.CASCADE, blank=True, null=True);
     passing_year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
 
-    def __str__(self):
-        if self.specialization_id:
-            return self.qualification.name + " (" + self.specialization.name + ")"
-        return self.qualification.name
+    # def __str__(self):
+    #     return ''
+    #     if self.specialization_id:
+    #         return self.qualification.name + " (" + self.specialization.name + ")"
+    #     return self.qualification.name
 
     class Meta:
         db_table = "doctor_qualification"
@@ -509,8 +506,8 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorspecializations", on_delete=models.CASCADE)
     specialization = models.ForeignKey(GeneralSpecialization, on_delete=models.CASCADE, blank=False, null=False)
 
-    def __str__(self):
-       return self.doctor.name + " (" + self.specialization.name + ")"
+    # def __str__(self):
+    #    return self.doctor.name + " (" + self.specialization.name + ")"
 
     class Meta:
         db_table = "doctor_specialization"
@@ -519,16 +516,18 @@ class DoctorSpecialization(auth_model.TimeStampedModel):
 
 class DoctorClinic(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='doctor_clinics')
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_doctors')
     followup_duration = models.PositiveSmallIntegerField(blank=True, null=True)
     followup_charges = models.PositiveSmallIntegerField(blank=True, null=True)
-
+    enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=False)
+    enabled = models.BooleanField(verbose_name='Enabled', default=True)
+    priority = models.PositiveSmallIntegerField(blank=True, null=True, default=0)
     class Meta:
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
 
-    def __str__(self):
-        return '{}-{}'.format(self.doctor, self.hospital)
+    # def __str__(self):
+    #     return '{}-{}'.format(self.doctor, self.hospital)
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
@@ -619,8 +618,8 @@ class DoctorHospital(auth_model.TimeStampedModel):
     followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
-    def __str__(self):
-        return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
+    # def __str__(self):
+    #     return self.doctor.name + " " + self.hospital.name + " ," + str(self.start)+ " " + str(self.end) + " " + str(self.day)
 
     def discounted_fees(self):
         return self.fees
@@ -802,8 +801,8 @@ class DoctorLanguage(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="languages", on_delete=models.CASCADE)
     language = models.ForeignKey(Language, on_delete=models.CASCADE)
 
-    def __str__(self):
-        return self.doctor.name + " (" + self.language.name + ")"
+    # def __str__(self):
+    #     return self.doctor.name + " (" + self.language.name + ")"
 
     class Meta:
         db_table = "doctor_language"
@@ -816,7 +815,7 @@ class DoctorAward(auth_model.TimeStampedModel):
     year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
 
     def __str__(self):
-        return self.doctor.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "doctor_awards"
@@ -826,8 +825,8 @@ class DoctorAssociation(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="associations", on_delete=models.CASCADE)
     name = models.CharField(max_length=2000)
 
-    def __str__(self):
-        return self.doctor.name + " (" + self.name + ")"
+    # def __str__(self):
+    #     return self.doctor.name + " (" + self.name + ")"
 
     class Meta:
         db_table = "doctor_association"
@@ -860,6 +859,7 @@ class DoctorMobile(auth_model.TimeStampedModel):
     number = models.BigIntegerField(blank=True, null=True)
     is_primary = models.BooleanField(verbose_name='Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name='Phone Number Verified?', default=False)
+    source = models.CharField(max_length=2000, blank=True)
 
     class Meta:
         db_table = "doctor_mobile"
@@ -897,7 +897,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     spoc_details = GenericRelation(auth_model.SPOCDetails)
 
     def __str__(self):
-        return self.name + " (" + self.city + ")"
+        return self.name
 
     class Meta:
         db_table = "hospital_network"
@@ -928,7 +928,7 @@ class HospitalNetworkCertification(auth_model.TimeStampedModel):
     name = models.CharField(max_length=200)
 
     def __str__(self):
-        return self.network.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "hospital_network_certification"
@@ -994,7 +994,6 @@ class HospitalNetworkEmail(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "hospital_network_email"
-
 
 
 class DoctorOnboardingToken(auth_model.TimeStampedModel):
@@ -1087,10 +1086,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="opd_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
+    cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
-
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -1235,6 +1235,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=Order.DOCTOR_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+        if self.status == self.COMPLETED and not self.is_rated:
+            notification_tasks.send_opd_rating_message.apply_async(kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
@@ -1583,6 +1585,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     specialization_field = models.ForeignKey(SpecializationField, on_delete=models.DO_NOTHING)
     general_specialization_ids = ArrayField(models.IntegerField(blank=True, null=True), size=100,
                                             null=True, blank=True)
+    synonyms = models.CharField(max_length=4000, null=True, blank=True)
 
     class Meta:
         db_table = 'practice_specialization'
@@ -1591,12 +1594,20 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
         return "{}".format(self.name)
 
 
+class PracticeSpecializationContent(auth_model.TimeStampedModel):
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+    content = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'practice_specialization_content'
+
+
 class DoctorPracticeSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorpracticespecializations", on_delete=models.CASCADE)
     specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, blank=False, null=False)
 
-    def __str__(self):
-        return "{}-{}".format(self.doctor.name, self.specialization.name)
+    # def __str__(self):
+    #     return "{}-{}".format(self.doctor.name, self.specialization.name)
 
     class Meta:
         db_table = "doctor_practice_specialization"
@@ -1653,7 +1664,7 @@ class SourceIdentifier(auth_model.TimeStampedModel):
 class GoogleDetailing(auth_model.TimeStampedModel):
 
     identifier = models.CharField(max_length=255, null=True, blank=False)
-    name = models.CharField(max_length=64, null=True, blank=False)
+    name = models.CharField(max_length=500, null=True, blank=False)
     clinic_hospital_name = models.CharField(max_length=128, null=True, blank=False)
     address = models.TextField(null=True, blank=False)
     doctor_clinic_address = models.TextField(null=True, blank=False)
@@ -1679,3 +1690,59 @@ class GoogleDetailing(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'google_api_details'
+
+class DoctorPopularity(models.Model):
+    KEY = 1
+    NON_KEY = 2
+    POPULARITY_CHOICES = ((KEY, 'Key'), (NON_KEY, 'Non-Key'))
+    unique_identifier = models.CharField(max_length=500)
+    popularity = models.PositiveSmallIntegerField(choices=POPULARITY_CHOICES)
+    popularity_score = models.DecimalField(max_digits=3, decimal_places=1, validators=[MaxValueValidator(10.0)])
+    rating_percent = models.PositiveSmallIntegerField(validators=[MaxValueValidator(100)])
+    votes_count = models.PositiveIntegerField()
+    reviews_count = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = "doctor_popularity"
+        unique_together = ('unique_identifier',)
+
+    def __str__(self):
+        return self.unique_identifier
+
+
+class VisitReason(auth_model.TimeStampedModel, SearchKey):
+    name = models.TextField()
+    practice_specializations = models.ManyToManyField(PracticeSpecialization, through='VisitReasonMapping',
+                                                      through_fields=('visit_reason', 'practice_specialization'),
+                                                      related_name='visiting_reasons')
+
+    class Meta:
+        db_table = "visit_reason"
+        unique_together = (('name',),)
+
+    def __str__(self):
+        return '{}'.format(self.name)
+
+
+class VisitReasonMapping(models.Model):
+    visit_reason = models.ForeignKey(VisitReason, on_delete=models.CASCADE, related_name='related_practice_specializations')
+    practice_specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, related_name='related_visit_reasons')
+    is_primary = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "visit_reason_mapping"
+        unique_together = (('visit_reason', 'practice_specialization'),)
+
+    def __str__(self):
+        return '{}({})'.format(self.visit_reason.name, self.practice_specialization.name)
+
+
+class CancellationReason(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200)
+
+    class Meta:
+        db_table = 'cancellation_reason'
+        unique_together = (('name',),)
+
+    def __str__(self):
+        return self.name

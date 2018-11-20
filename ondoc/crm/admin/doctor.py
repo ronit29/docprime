@@ -19,6 +19,8 @@ import pytz
 import datetime
 from django.db import transaction
 import logging
+from dal import autocomplete
+
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure,
-                                 GoogleDetailing)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -56,7 +58,7 @@ class AutoComplete:
 
 class ReadOnlyInline(nested_admin.NestedTabularInline):
     def get_readonly_fields(self, request, obj=None):
-        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             all_fields = [f for f in self.model._meta.get_fields()
                           if f.concrete and (
                                   not f.is_relation
@@ -133,16 +135,16 @@ class DoctorClinicFormSet(forms.BaseInlineFormSet):
         super().clean()
         if any(self.errors):
             return
-        hospital = 0
-        count = 0
-        for value in self.cleaned_data:
-            count += 1
-            if value.get('hospital'):
-                hospital += 1
-
-        if count > 0:
-            if not hospital:
-                raise forms.ValidationError("Atleast one Hospital is required")
+        # hospital = 0
+        # count = 0
+        # for value in self.cleaned_data:
+        #     count += 1
+        #     if value.get('hospital'):
+        #         hospital += 1
+        #
+        # if count > 0:
+        #     if not hospital:
+        #         raise forms.ValidationError("Atleast one Hospital is required")
 
 
 class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
@@ -181,12 +183,25 @@ class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     readonly_fields = ['deal_price']
 
 
-class DoctorClinicInline(ReadOnlyInline):
+class DoctorClinicInlineForm(forms.ModelForm):
+    hospital = forms.ModelChoiceField(
+        queryset=Hospital.objects.all(),
+        widget=autocomplete.ModelSelect2(url='hospital-autocomplete')
+    )
+
+    class Meta:
+        model = DoctorClinic
+        fields = ('__all__')
+
+
+class DoctorClinicInline(nested_admin.NestedTabularInline):
     model = DoctorClinic
+    form = DoctorClinicInlineForm
     extra = 0
     can_delete = True
+    formset = DoctorClinicFormSet
     show_change_link = False
-    autocomplete_fields = ['hospital']
+    # autocomplete_fields = ['hospital']
     inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline]
 
     def get_queryset(self, request):
@@ -511,9 +526,10 @@ class DoctorForm(FormCleanMixin):
     # onboarding_status = forms.ChoiceField(disabled=True, required=False, choices=Doctor.ONBOARDING_STATUS)
 
     def validate_qc(self):
-        qc_required = {'name': 'req', 'gender': 'req', 'practicing_since': 'req',
+        qc_required = {'name': 'req', 'gender': 'req',
+                       # 'practicing_since': 'req',
                        'emails': 'count',
-                       'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
+                       'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
@@ -551,9 +567,10 @@ class CityFilter(SimpleListFilter):
     parameter_name = 'hospitals__city'
 
     def lookups(self, request, model_admin):
-        cities = set(
-            [(c['hospitals__city'].upper(), c['hospitals__city'].upper()) if (c.get('hospitals__city')) else ('', '')
-             for c in Doctor.objects.all().values('hospitals__city')])
+        cities = Hospital.objects.distinct('city').values_list('city','city')
+        # cities = set(
+        #     [(c['hospitals__city'].upper(), c['hospitals__city'].upper()) if (c.get('hospitals__city')) else ('', '')
+        #      for c in Doctor.objects.all().values('hospitals__city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -592,45 +609,50 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
 class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
-    formset = GenericAdminFormSet
-    # can_delete = True
+    # formset = GenericAdminFormSet
+    form = GenericAdminForm
     show_change_link = False
-    exclude = ('hospital_network', 'super_user_permission')
+    exclude = ('hospital_network', 'source_type')
     verbose_name_plural = "Admins"
 
-    def has_delete_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
-        else:
-            return False
-
-    def has_add_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
-        else:
-            return False
+    # def has_delete_permission(self, request, obj=None):
+    #     if request.user.is_superuser:
+    #         return True
+    #     else:
+    #         return False
+    #
+    # def has_add_permission(self, request, obj=None):
+    #     if request.user.is_superuser:
+    #         return True
+    #     else:
+    #         return False
 
     def get_readonly_fields(self, request, obj=None):
-        if not request.user.is_superuser:
-            return ['phone_number', 'is_disabled', 'write_permission', 'read_permission', 'hospital',  'permission_type',
-                    'user', 'is_doc_admin']
-        else:
-            return ['user']
+        # if not request.user.is_superuser:
+        #     return ['phone_number', 'is_disabled', 'write_permission', 'read_permission', 'hospital',  'permission_type',
+        #             'user', 'is_doc_admin']
+        # else:
+        return ['user']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
 
-    def get_formset(self, request, obj=None, **kwargs):
-        formset = super().get_formset(request, obj=obj, **kwargs)
-        if request.user.is_superuser:
-            if not request.POST:
-                if obj is not None:
-                    try:
-                        formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
-                            assoc_doctors=obj).distinct()
-                    except MultipleObjectsReturned:
-                        pass
-        return formset
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "hospital":
+            doctor_id = request.resolver_match.kwargs.get('object_id')
+            kwargs["queryset"] = Hospital.objects.filter(assoc_doctors=doctor_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    # def get_formset(self, request, obj=None, **kwargs):
+    #     formset = super().get_formset(request, obj=obj, **kwargs)
+    #     if not request.POST:
+    #         if obj is not None:
+    #             try:
+    #                 formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
+    #                     assoc_doctors=obj).distinct()
+    #             except MultipleObjectsReturned:
+    #                 pass
+    #     return formset
 
 
 
@@ -785,9 +807,6 @@ class CompetitorInfoFormSet(forms.BaseInlineFormSet):
         #         prev_compe_infos[req_set] = True
 
 
-
-
-
 class CompetitorInfoForm(forms.ModelForm):
     hospital_name = forms.CharField(required=True)
     fee = forms.CharField(required=True)
@@ -849,10 +868,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         CompetitorMonthlyVisitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
-        #ProcedureInline,
         DoctorPracticeSpecializationInline,
         DoctorQualificationInline,
-        # DoctorHospitalInline,
         DoctorClinicInline,
         DoctorLanguageInline,
         DoctorAwardInline,
@@ -880,7 +897,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             qs = qs.filter(source='pr')
             if request.path.endswith('doctor/'):
                 qs = Doctor.objects.none()
@@ -891,19 +908,19 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         exclude = ['source', 'user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
                'onboarded_at', 'qc_approved_at','enabled_for_online_booking_at']
 
-        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-            exclude += ['source','batch','lead_url','registered','created_by','about','raw_about',
-            'additional_details','is_insurance_enabled','is_insurance_enabled','is_online_consultation_enabled',
-            'online_consultation_fees', 'is_retail_enabled', 'is_internal', 'is_test_doctor','doctor_signature',
-            'is_enabled','matrix_reference_id','doctor_signature']
+        if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
+            exclude += ['source', 'batch', 'lead_url', 'registered', 'created_by', 'about', 'raw_about',
+            'additional_details', 'is_insurance_enabled', 'is_insurance_enabled', 'is_online_consultation_enabled',
+            'online_consultation_fees', 'is_retail_enabled', 'is_internal', 'is_test_doctor', 'doctor_signature',
+            'is_enabled', 'matrix_reference_id', 'doctor_signature','enabled_for_online_booking']
 
         return exclude
 
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['source', 'lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'enabled_for_online_booking', 'onboarding_url', 'get_onboard_link']
-        if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
+        read_only_fields = ['is_gold','source', 'lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'onboarding_url', 'get_onboard_link']
+        if not request.user.is_member_of(constants['SUPER_QC_GROUP']) and not request.user.is_superuser:
             read_only_fields += ['onboarding_status']
-        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             read_only_fields += ['name', 'gender', 'practicing_since',  'license', 'additional_details',
                                  'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
                                  'online_consultation_fees', 'live_at', 'is_internal',
@@ -990,56 +1007,64 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         return ""
 
     def get_form(self, request, obj=None, **kwargs):
-        if not request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             kwargs['form'] = DoctorForm
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
-        if (not request.user.is_superuser) and (
-                (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists())):
+        if not request.user.is_superuser and\
+            (not request.user.is_member_of(constants['QC_GROUP_NAME']) and not request.user.is_member_of(constants['SUPER_QC_GROUP']) ):
             form.base_fields['assigned_to'].disabled = True
         return form
 
-    # def save_formset(self, request, form, formset, change):
-    #     for form in formset.forms:
-    #         if hasattr(form.instance, 'created_by'):
-    #             form.instance.created_by = request.user
-    #     try:
-    #         formset.save()
-    #     except Exception as e:
-    #         logger.error(e)
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
 
-    def save_related(self, request, form, formsets, change):
-        super(type(self), self).save_related(request, form, formsets, change)
-        # now you have all objects in the database
-        doctor = form.instance
-        doc_hosp_form_change = False
-        gen_admin_form_change = False
-        doc_hosp_new_len = doc_hosp_del_len = gen_admin_new_len = gen_admin_del_len = 0
-        for formset in formsets:
-            if isinstance(formset, DoctorClinicFormSet):
-                for form in formset.forms:
-                    if 'hospital' in form.changed_data:
-                        doc_hosp_form_change = True
-                        break
-                doc_hosp_new_len = len(formset.new_objects)
-                doc_hosp_del_len = len(formset.deleted_objects)
-            if isinstance(formset, GenericAdminFormSet):
-                for form in formset.forms:
-                    if form.has_changed():
-                        gen_admin_form_change = True
-                        break
-                gen_admin_new_len = len(formset.new_objects)
-                gen_admin_del_len = len(formset.deleted_objects)
+        for obj in formset.deleted_objects:
+            obj.delete()
 
-        if doctor is not None:
-            if ((doc_hosp_form_change or doc_hosp_new_len > 0 or doc_hosp_del_len > 0) or
-                    (gen_admin_form_change or gen_admin_new_len > 0 or gen_admin_del_len > 0)):
-                GenericAdmin.create_admin_permissions(doctor)
-                GenericAdmin.create_admin_billing_permissions(doctor)
+        for instance in instances:
+            if isinstance(instance, GenericAdmin):
+                if (not instance.created_by):
+                    instance.created_by = request.user
+                if (not instance.id):
+                    instance.source_type = GenericAdmin.CRM
+                    instance.entity_type = GenericAdmin.DOCTOR
+            instance.save()
+        formset.save_m2m()
+
+
+    # def save_related(self, request, form, formsets, change):
+    #     super(type(self), self).save_related(request, form, formsets, change)
+    #     # now you have all objects in the database
+    #     doctor = form.instance
+    #     doc_hosp_form_change = False
+    #     gen_admin_form_change = False
+    #     doc_hosp_new_len = doc_hosp_del_len = gen_admin_new_len = gen_admin_del_len = 0
+    #     for formset in formsets:
+    #         if isinstance(formset, DoctorClinicFormSet):
+    #             for form in formset.forms:
+    #                 if 'hospital' in form.changed_data:
+    #                     doc_hosp_form_change = True
+    #                     break
+    #             doc_hosp_new_len = len(formset.new_objects)
+    #             doc_hosp_del_len = len(formset.deleted_objects)
+    #         if isinstance(formset, GenericAdminFormSet):
+    #             for form in formset.forms:
+    #                 if form.has_changed():
+    #                     gen_admin_form_change = True
+    #                     break
+    #             gen_admin_new_len = len(formset.new_objects)
+    #             gen_admin_del_len = len(formset.deleted_objects)
+    #
+    #     if doctor is not None:
+    #         if ((doc_hosp_form_change or doc_hosp_new_len > 0 or doc_hosp_del_len > 0) or
+    #                 (gen_admin_form_change or gen_admin_new_len > 0 or gen_admin_del_len > 0)):
+    #             GenericAdmin.create_admin_permissions(doctor)
+    #             GenericAdmin.create_admin_billing_permissions(doctor)
 
     def save_model(self, request, obj, form, change):
-        if not request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):        
             if not obj.created_by:
                 obj.created_by = request.user
             if not obj.assigned_to:
@@ -1136,6 +1161,21 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
         if self.instance.status in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED] and len(cleaned_data):
             raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
 
+        if not cleaned_data.get('status') is OpdAppointment.CANCELLED and (cleaned_data.get(
+                'cancellation_reason') or cleaned_data.get('cancellation_comments')):
+            raise forms.ValidationError(
+                "Reason/Comment for cancellation can only be entered on cancelled appointment")
+
+        if cleaned_data.get('status') is OpdAppointment.CANCELLED and not cleaned_data.get('cancellation_reason'):
+            raise forms.ValidationError("Reason for Cancelled appointment should be set.")
+
+        if cleaned_data.get('status') is OpdAppointment.CANCELLED and cleaned_data.get(
+                'cancellation_reason') and 'others' in cleaned_data.get(
+                'cancellation_reason').name.lower() and not cleaned_data.get('cancellation_comments'):
+            raise forms.ValidationError(
+                "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
+
+
         if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                  doctor_clinic__hospital=hospital,
                                                  day=time_slot_start.weekday(),
@@ -1208,6 +1248,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
                     'contact_details', 'profile', 'profile_detail', 'user', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
+                    'cancellation_reason', 'cancellation_comments',
                     'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
@@ -1216,7 +1257,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'cancel_type', 'start_date', 'start_time')
+                    'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time')
         else:
             return ()
 
@@ -1522,6 +1563,12 @@ class SpecializationFieldResource(resources.ModelResource):
         fields = ('id', 'name')
 
 
+class PracticeSpecializationSynonymResource(resources.ModelResource):
+    class Meta:
+        model = PracticeSpecialization
+        fields = ('id', 'synonyms')
+
+
 class PracticeSpecializationResource(resources.ModelResource):
     name = Field(attribute='name', column_name='modified_name')
     field_medicine = Field(column_name='field_medicine')
@@ -1601,7 +1648,7 @@ class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin)
     list_display = ('name', )
     date_hierarchy = 'created_at'
     inlines = [PracticeSpecializationDepartmentMappingInline, ]
-    resource_class = PracticeSpecializationResource
+    resource_class = PracticeSpecializationSynonymResource
     search_fields = ['name', ]
 
 
@@ -1631,3 +1678,29 @@ class GoogleDetailingAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', 'clinic_hospital_name')
     resource_class = GoogleDetailingResource
+
+
+class VisitReasonPracticeSpecializationInline(admin.TabularInline):
+    model = VisitReasonMapping
+    fk_name = 'visit_reason'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    verbose_name = 'Related practice specialization'
+    verbose_name_plural = 'Related practice specializations'
+
+
+class VisitReasonAdmin(admin.ModelAdmin):
+    fields = ['name']
+    inlines = [VisitReasonPracticeSpecializationInline]
+
+    class Meta:
+        model = VisitReason
+
+
+class PracticeSpecializationContentAdmin(admin.ModelAdmin):
+    model = PracticeSpecializationContent
+    list_display = ('specialization',)
+    display = ('specialization', 'content', )
+    autocomplete_fields = ('specialization', )
+

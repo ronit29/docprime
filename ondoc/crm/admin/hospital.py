@@ -11,6 +11,7 @@ from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
 from ondoc.authentication.models import GenericAdmin, User, QCModel
 from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
+from django import forms
 
 
 class HospitalImageInline(admin.TabularInline):
@@ -76,32 +77,32 @@ class HospitalSpecialityInline(admin.TabularInline):
 #     show_change_link = False
 class GenericAdminFormSet(forms.BaseInlineFormSet):
     def clean(self):
-        # appnt_manager_flag = self.instance.is_appointment_manager
-        # if self.cleaned_data:
-        #     phone_number = False
-        #     for data in self.cleaned_data:
-        #         if data.get('phone_number') and data.get('permission_type') == GenericAdmin.APPOINTMENT:
-        #             phone_number = True
-        #             break
-        #     if phone_number:
-        #         if not appnt_manager_flag:
-        #             if not(len(self.deleted_forms) == len(self.cleaned_data)):
-        #                 raise forms.ValidationError(
-        #                     "'Enabled for Managing Appointment' should be set if a Admin is Entered.")
-        #     else:
-        #         if appnt_manager_flag:
-        #             raise forms.ValidationError(
-        #                 "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
-        #     pass
-        # else:
-        #     if appnt_manager_flag:
-        #         raise forms.ValidationError("An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
-        #     pass
-        # if len(self.deleted_forms) == len(self.cleaned_data):
-        #     if appnt_manager_flag:
-        #         raise forms.ValidationError(
-        #             "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
-        pass
+        super().clean()
+        if any(self.errors):
+            return
+        appnt_manager_flag = self.instance.is_appointment_manager
+        if self.cleaned_data:
+            phone_number = False
+            for data in self.cleaned_data:
+                if data.get('phone_number') and data.get('permission_type') == GenericAdmin.APPOINTMENT:
+                    phone_number = True
+                    break
+            if phone_number:
+                if not appnt_manager_flag:
+                    if not(len(self.deleted_forms) == len(self.cleaned_data)):
+                        raise forms.ValidationError("Enabled for Managing Appointment should be set if a Admin is Entered.")
+            else:
+                if appnt_manager_flag:
+                    raise forms.ValidationError(
+                        "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
+        else:
+            if appnt_manager_flag:
+                raise forms.ValidationError("An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
+            pass
+        if len(self.deleted_forms) == len(self.cleaned_data):
+            if appnt_manager_flag:
+                raise forms.ValidationError(
+                    "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
 
 
 class GenericAdminInline(admin.TabularInline):
@@ -109,16 +110,35 @@ class GenericAdminInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+    form = GenericAdminForm
     formset = GenericAdminFormSet
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    fields = ['phone_number', 'permission_type', 'read_permission', 'write_permission', 'user']
+    fields = ['phone_number', 'name', 'doctor', 'permission_type', 'super_user_permission', 'read_permission',
+              'write_permission', 'user', 'entity_type']
 
     def get_queryset(self, request):
-        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital').filter(doctor=None)
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "doctor":
+            hospital_id = request.resolver_match.kwargs.get('object_id')
+            kwargs["queryset"] = Doctor.objects.filter(hospitals=hospital_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    # def get_formset(self, request, obj=None, **kwargs):
+    #     from django.core.exceptions import MultipleObjectsReturned
+    #     formset = super().get_formset(request, obj=obj, **kwargs)
+    #     if not request.POST and obj is not None:
+    #         formset.form.base_fields['doctor'].queryset = Doctor.objects.filter(
+    #                     hospitals=obj).distinct()
+    #
+    #
+    #     return formset
 
 
 class HospitalForm(FormCleanMixin):
+
     operational_since = forms.ChoiceField(required=False, choices=hospital_operational_since_choices)
 
     def clean_location(self):
@@ -170,10 +190,11 @@ class HospCityFilter(SimpleListFilter):
         if self.value():
             return queryset.filter(city__iexact=self.value()).distinct()
 
+
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', HospCityFilter, CreatedByFilter)
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', )
-    exclude = ('search_key', 'live_at', 'qc_approved_at' )
+    exclude = ('search_key', 'live_at', 'qc_approved_at')
 
     def associated_doctors(self, instance):
         if instance.id:
@@ -184,13 +205,6 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             return mark_safe(html)
         else:
             return ''
-
-    def save_related(self, request, form, formsets, change):
-        super(type(self), self).save_related(request, form, formsets, change)
-        hospital_changed_list = form.changed_data
-        hospital = form.instance
-        if 'is_billing_enabled' in hospital_changed_list or 'is_appointment_manager' in hospital_changed_list:
-            GenericAdmin.create_hospital_spoc_admin(hospital)
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
@@ -207,6 +221,22 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         if '_mark_in_progress' in request.POST:
             obj.data_status = 1
         super().save_model(request, obj, form, change)
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+
+        for obj in formset.deleted_objects:
+            obj.delete()
+
+        for instance in instances:
+            if isinstance(instance, GenericAdmin):
+                if (not instance.created_by):
+                    instance.created_by = request.user
+                if (not instance.id):
+                    instance.entity_type = GenericAdmin.HOSPITAL
+                    instance.source_type = GenericAdmin.CRM
+            instance.save()
+        formset.save_m2m()
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -228,7 +258,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     def doctor_count(self, instance):
         if instance.id:
-            count  = len(set(instance.assoc_doctors.values_list('id', flat=True)))
+            count = instance.assoc_doctors.count()
+            #count  = len(set(instance.assoc_doctors.values_list('id', flat=True)))
             #count = DoctorHospital.objects.filter(hospital_id=instance.id).count()
             return count
 
@@ -254,4 +285,4 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
-    extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&callback=initGoogleMap']
+    extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyA-5gVhdnhNBInTuxBxMJnGuErjQP40nNc&callback=initGoogleMap']

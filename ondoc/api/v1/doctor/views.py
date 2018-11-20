@@ -1,14 +1,16 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
+from ondoc.doctor.models import Hospital
 from ondoc.notification.models import EmailNotification
+from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
-from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction
+from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min
@@ -24,8 +26,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
-from django.db.models import Q, Value
-from django.db.models import Case, When
+from django.db.models import Q, Value, Case, When
 from operator import itemgetter
 from itertools import groupby
 from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_parameters
@@ -35,6 +36,7 @@ from django.db.models import F
 from django.db.models.functions import StrIndex
 import datetime
 import copy
+import re
 import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
@@ -44,7 +46,9 @@ from ondoc.notification import models as notif_models
 User = get_user_model()
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.throttling import AnonRateThrottle
-
+from ondoc.matrix.tasks import push_order_to_matrix
+from dal import autocomplete
+from django.contrib.staticfiles.templatetags.staticfiles import static
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -91,10 +95,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         queryset = models.OpdAppointment.objects.filter(hospital__is_live=True, doctor__is_live=True).filter(
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
-              doctor__manageable_doctors__is_disabled=False) |
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL]) |
             Q(hospital__manageable_hospitals__doctor__isnull=True,
               hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__is_disabled=False)
+              hospital__manageable_hospitals__is_disabled=False,
+              hospital__manageable_hospitals__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
+                                                               auth_models.GenericAdmin.ALL])
             ).distinct()
         if not queryset:
             return Response([])
@@ -310,6 +317,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
                                                          order.product_id,
                                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
+                push_order_to_matrix.apply_async(({'order_id': order.id, 'created_at':int(order.created_at.timestamp()),
+                                                   'timeslot':int(appointment_details['time_slot_start'].timestamp())}, ), countdown=5)
+
             except:
                 pass
         else:
@@ -419,18 +429,32 @@ class DoctorProfileView(viewsets.GenericViewSet):
         LAB_ONLY = 2
         OPD_AND_LAB = 3
 
-        if auth_models.GenericAdmin.objects.filter(user=user,
-                                                   is_disabled=False).exists() and auth_models.GenericLabAdmin.objects.filter(
-                user=user, is_disabled=False).exists():
+        generic_admin = auth_models.GenericAdmin.objects.filter(user=user,
+                                                is_disabled=False)
+        generic_lab_admin = auth_models.GenericLabAdmin.objects.filter(user=user,
+                                                                is_disabled=False)
+
+        if generic_admin.exists() and generic_lab_admin.exists():
             resp_data["access_type"] = OPD_AND_LAB
-        elif auth_models.GenericAdmin.objects.filter(user=user, is_disabled=False).exists():
+        elif generic_admin.exists():
             resp_data["access_type"] = OPD_ONLY
-        elif auth_models.GenericLabAdmin.objects.filter(user=user, is_disabled=False).exists():
+        elif generic_lab_admin.exists():
             resp_data["access_type"] = LAB_ONLY
         # Check access_type END
 
         resp_data["count"] = queryset
         resp_data['lab_appointment_count'] = lab_appointment_count
+
+        generic_super_user_admin=generic_admin.filter(super_user_permission=True)
+        if generic_super_user_admin.exists():
+            resp_data['is_super_user'] = True
+
+        generic_super_user_lab_admin=generic_lab_admin.filter(super_user_permission=True)
+        if generic_super_user_lab_admin.exists():
+            resp_data['is_super_user_lab'] = True
+
+
+
         return Response(resp_data)
 
 
@@ -462,48 +486,53 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
-        entity = location_models.EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Doctor')
+        entity = location_models.EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).order_by('-is_valid')
         if entity.exists():
             entity = entity.first()
             if not entity.is_valid:
-                valid_entity_url_qs = location_models.EntityUrls.objects.filter(url_type='PAGEURL',
-                                                                           entity_id=entity.entity_id,
-                                                                           entity_type__iexact='Doctor', is_valid='t')
+                valid_entity_url_qs = location_models.EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
+                                                                           entity_id=entity.entity_id, is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs.first().url
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
                 else:
-                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                    return Response(status=status.HTTP_404_NOT_FOUND)
 
             entity_id = entity.entity_id
-            response = self.retrieve(request, entity_id)
+            response = self.retrieve(request, entity_id, entity)
             return response
 
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, pk):
+    def retrieve(self, request, pk, entity=None):
         response_data = []
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
+                                    'qualifications__college',
                                     'doctorpracticespecializations__specialization',
+                                    'images',
                                     'rating'
                                     )
                   .filter(pk=pk).first())
         # if not doctor or not is_valid_testing_data(request.user, doctor):
         #     return Response(status=status.HTTP_400_BAD_REQUEST)
-        if doctor:
-            serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
-                                                                     context={"request": request})
+        if not doctor or (not doctor.is_live and not doctor.is_internal):
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
-            entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
-                                                entity_type__iexact='Doctor').values('url')
-            response_data = self.prepare_response(serializer.data)
+        if not entity:
+            entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
+            if len(entity) > 0:
+                entity = entity[0]
+        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+                                                                     context={"request": request, "entity":entity})
+        response_data = self.prepare_response(serializer.data)
 
-            response_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+        if entity:
+            response_data['url'] = entity.url
         return Response(response_data)
 
 
@@ -631,11 +660,11 @@ class PrescriptionFileViewset(OndocViewSet):
                 Q(prescription__appointment__doctor__manageable_doctors__user=user,
                   prescription__appointment__doctor__manageable_doctors__hospital=F(
                       'prescription__appointment__hospital'),
-                  prescription__appointment__doctor__manageable_doctors__permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                  prescription__appointment__doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
                   prescription__appointment__doctor__manageable_doctors__is_disabled=False) |
                 Q(prescription__appointment__hospital__manageable_hospitals__user=user,
                   prescription__appointment__hospital__manageable_hospitals__doctor__isnull=True,
-                  prescription__appointment__hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                  prescription__appointment__hospital__manageable_hospitals__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
                   prescription__appointment__hospital__manageable_hospitals__is_disabled=False)).
                     distinct())
             # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
@@ -700,7 +729,7 @@ class PrescriptionFileViewset(OndocViewSet):
 
     def prescription_permission(self, user, appointment):
         return auth_models.GenericAdmin.objects.filter(user=user, hospital=appointment.hospital,
-                                                permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                                                permission_type__in=[auth_models.GenericAdmin.APPOINTMENT, auth_models.GenericAdmin.ALL],
                                                 write_permission=True).exists()
 
 
@@ -752,12 +781,28 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
-                                           entity_type__iexact='Doctor').order_by('-updated_at')
-        if entity.exists():
-            extras = entity.first().additional_info
+        url = url.lower()
+
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                           entity_type__iexact='Doctor').order_by('-sequence')
+        if len(entity_url_qs) > 0:
+            entity = entity_url_qs[0]
+            if not entity.is_valid:
+                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
+                                          entity_type__iexact='Doctor', specialization_id=entity.specialization_id,
+                                          locality_id=entity.locality_id, sublocality_id=entity.sublocality_id,
+                                          sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+
+                if valid_qs.exists():
+                    corrected_url = valid_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            extras = entity.additional_info
             if extras:
                 kwargs['extras'] = extras
+                kwargs['specialization_id'] = entity.specialization_id
                 kwargs['url'] = url
                 kwargs['parameters'] = doctor_query_parameters(extras, request.query_params)
                 response = self.list(request, **kwargs)
@@ -778,29 +823,33 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         if kwargs.get('url'):
             validated_data['url'] = kwargs['url']
 
+        specialization_id = kwargs.get('specialization_id', None)
+        specialization_dynamic_content = ''
+
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
             filtering_params = doctor_search_helper.get_filtering_params()
             order_by_field, rank_by = doctor_search_helper.get_ordering_params()
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
-            doctor_search_result = RawSql(query_string).fetch_all()
+            doctor_search_result = RawSql(query_string.get('query'),
+                                         query_string.get('params')).fetch_all()
+
             result_count = len(doctor_search_result)
-            saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
-                                                                           result_count=result_count)
+            # sa
+            # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
+            #                                                                result_count=result_count)
         else:
             saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
-        doctor_ids = paginate_queryset([data.get("doctor_id") for data in saved_search_result.results], request)
+        doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
         preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
         doctor_data = models.Doctor.objects.filter(
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
                                                 "doctor_clinics__hospital",
                                                 "doctorpracticespecializations", "doctorpracticespecializations__specialization",
-                                                "experiences", "images", "qualifications",
-                                                "qualifications__qualification", "qualifications__specialization",
-                                                "qualifications__college").order_by(preserved)
+                                                "images").order_by(preserved)
 
-        response = doctor_search_helper.prepare_search_response(doctor_data, saved_search_result.results, request)
+        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 
@@ -860,6 +909,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if specializations:
                 title = specializations
                 description = specializations
+
             else:
                 title = 'Doctors'
                 description = 'Doctors'
@@ -888,7 +938,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if not sublocality:
                     title += '- Book Best ' + specializations +' Online'
                 else:
-                    title += '| Book & Get Best Deal'
+                    title += ' | Book & Get Best Deal'
 
             else:
                  title += ' | Book Doctors Online & Get Best Deal'
@@ -916,22 +966,69 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     else:
                         location = locality
 
-                seo = {
-                    "title": title,
-                    "description": description,
-                    "location" : location
+            if validated_data.get('extras', {}).get('location_json', {}).get('sublocality_latitude', None):
+                latitude = validated_data.get('extras').get('location_json').get('sublocality_latitude')
+                longitude = validated_data.get('extras').get('location_json').get('sublocality_longitude')
+            else:
+                latitude = validated_data.get('extras', {}).get('location_json', {}).get('locality_latitude', None)
+                longitude = validated_data.get('extras', {}).get('location_json', {}).get('locality_longitude', None)
+
+            # seo = {
+            #     "title": title,
+            #     "description": description,
+            #     "location" : location
+            #     }
+
+            seo = {
+                "title": title,
+                "description": description,
+                "location": location,
+                "image": static('web/images/dclogo-placeholder.png'),
+                'schema': {
+                    "@context": "http://schema.org",
+                    "@type": "MedicalBusiness",
+                    "name": "%s in %s" % (specializations if specializations else 'Doctors', location),
+                    "address": {
+                        "@type": "PostalAddress",
+                        "addressLocality": location,
+                        "addressRegion": locality,
+                    },
+                    "location": {
+                        "@type": "Place",
+                        "geo": {
+                            "@type": "GeoCircle",
+                            "geoMidpoint": {
+                                "@type": "GeoCoordinates",
+                                "latitude": latitude,
+                                "longitude": longitude
+                            }
+                        }
+                    },
+                    "priceRange": "0"
                 }
+            }
+
+            if specialization_id:
+                specialization_content = models.PracticeSpecializationContent.objects.filter(specialization__id=specialization_id).first()
+                if specialization_content:
+                    content = str(specialization_content.content)
+                    content = content.replace('<location>', location)
+                    regex = re.compile(r'[\n\r\t]')
+                    content = regex.sub(" ", content)
+                    specialization_dynamic_content = content
 
         for resp in response:
             if id_url_dict.get(resp['id']):
                 resp['url'] = id_url_dict[resp['id']]
+                resp['schema']['url'] = id_url_dict[resp['id']]
             else:
                 resp['url'] = None
+                resp['schema']['url'] = None
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'));
         conditions = list(models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids',[])).values('id','name'));
-        return Response({"result": response, "count": saved_search_result.result_count,
-                         "search_id": saved_search_result.id,'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb})
+        return Response({"result": response, "count": result_count,
+                         'specializations': specializations,'conditions':conditions, "seo": seo, "breadcrumb":breadcrumb, 'search_content': specialization_dynamic_content})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
@@ -1049,39 +1146,115 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
                 val = ' '.join(map(str, value))
             else:
                 val = value
-            message += str(key) + "  -  " + str(val) + "\n"
+            message += str(key) + "  -  " + str(val) + "<br>"
         if user.doctor:
             managers_list = []
             for managers in user.doctor.manageable_doctors.all():
                 info = {}
-                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "\n"
-                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "\n"
-                info['user_id'] = (str(managers.user_id) ) if managers.user else "\n"
-                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "\n"
-                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "\n"
+                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "<br>"
+                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "<br>"
+                info['user_id'] = (str(managers.user_id) ) if managers.user else "<br>"
+                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "<br>"
+                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "<br>"
                 managers_list.append(info)
-            managers_string = "\n".join(str(x) for x in managers_list)
+            managers_string = "<br>".join(str(x) for x in managers_list)
         if managers_string:
-            message = message + "\n\nUser's Managers \n"+ managers_string
+            message = message + "<br><br> User's Managers <br>"+ managers_string
 
         manages_list = []
         for manages in user.manages.all():
             info = {}
-            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "\n"
-            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "\n"
-            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "\n"
-            info['user_id'] = (str(user.id)) if user else "\n"
-            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "\n"
+            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "<br>"
+            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "<br>"
+            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "<br>"
+            info['user_id'] = (str(user.id)) if user else "<br>"
+            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "<br>"
             manages_list.append(info)
-        manages_string = "\n".join(str(x) for x in manages_list)
+        manages_string = "<br>".join(str(x) for x in manages_list)
         if manages_string:
-            message = message + "\n\n User Manages \n"+ manages_string
+            message = message + "<br><br> User Manages <br>"+ manages_string
         try:
-            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com"]
+            emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com", "harpreet@docprime.com"]
             for x in emails:
-                notif_models.EmailNotification.publish_ops_email(str(x), message, 'Feedback Mail')
+                notif_models.EmailNotification.publish_ops_email(str(x), mark_safe(message), 'Feedback Mail')
             resp['status'] = "success"
         except:
             resp['status'] = "error"
         return Response(resp)
 
+
+class HospitalAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Hospital.objects.all()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q).order_by('name')
+        return qs
+
+
+class CreateAdminViewSet(viewsets.GenericViewSet):
+
+    def create(self, request):
+        serializer = serializers.AdminCreateBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+
+    def list_entities(self, request):
+        user = request.user
+        opd_list = []
+        opd_queryset = (models.DoctorClinic.objects.prefetch_related('doctor__manageable_doctors')
+                        .filter(doctor__is_live=True, hospital__is_live=True)
+                        .annotate(doctor_name=F('doctor__name')).filter(
+                                      doctor__manageable_doctors__user=user,
+                                      doctor__manageable_doctors__is_disabled=False,
+                                      doctor__manageable_doctors__super_user_permission=True)
+                        .values('doctor', 'doctor_name').distinct('doctor'))
+        if opd_queryset:
+            for k in opd_queryset.all():
+                k.update({'entity_type': GenericAdminEntity.DOCTOR})
+                opd_list.append(k)
+        opd_queryset_hos = (models.DoctorClinic.objects.prefetch_related('hospital__manageable_hospitals')
+                            .filter(doctor__is_live=True, hospital__is_live=True)
+                            .annotate(hospital_name=F('hospital__name')).filter(
+                                      (Q(hospital__is_appointment_manager=True) | Q(hospital__is_billing_enabled=True)),
+                                      hospital__manageable_hospitals__user=user,
+                                      hospital__manageable_hospitals__is_disabled=False,
+                                      hospital__manageable_hospitals__super_user_permission=True)
+                            .values('hospital', 'hospital_name').distinct('hospital')
+                            )
+        if opd_queryset_hos:
+            for h in opd_queryset_hos.all():
+                h.update({'entity_type': GenericAdminEntity.HOSPITAL})
+                opd_list.append(h)
+        lab_queryset = auth_models.GenericLabAdmin.objects \
+                        .filter(user=request.user, is_disabled=False, super_user_permission=True) \
+                        .annotate(lab_name=F('lab__name')) \
+                        .values('lab', 'lab_name') \
+                        .distinct('lab')
+        if lab_queryset:
+            for l in lab_queryset.all():
+                l.update({'entity_type': GenericAdminEntity.LAB})
+                opd_list.append(l)
+        return Response(opd_list)
+
+    def list_entity_admins(self, request):
+        serializer = serializers.EntityListQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        queryset = auth_models.GenericAdmin.objects.exclude(user=request.user)
+        if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
+            query = queryset.filter(doctor_id=valid_data.get('id'))\
+                .annotate(hospital_name=F('hospital__name'))\
+                .values('phone_number', 'name', 'super_user_permission', 'is_disabled', 'permission_type', 'hospital', 'hospital_name')
+        elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
+            query = queryset.filter(hospital_id=valid_data.get('id'))\
+                .annotate(doctor_name=F('doctor__name')) \
+                .values('phone_number', 'name', 'super_user_permission', 'is_disabled', 'permission_type', 'doctor', 'doctor_name')
+        elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
+            query = auth_models.GenericLabAdmin.objects\
+                .exclude(user=request.user)\
+                .filter(lab_id=valid_data.get('id'))\
+                .values('phone_number', 'name', 'super_user_permission', 'is_disabled', 'permission_type')
+        if query:
+            return Response(query)
+        return Response([])

@@ -27,7 +27,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
 from django.db import transaction
-from django.db.models import Count, Sum, Max, When, Case, F, Q
+from django.db.models import Count, Sum, Max, When, Case, F, Q, Value, DecimalField, IntegerField
 from django.http import Http404
 from django.conf import settings
 import hashlib
@@ -44,6 +44,7 @@ import copy
 import re
 import datetime
 from django.contrib.auth import get_user_model
+from ondoc.matrix.tasks import push_order_to_matrix
 User = get_user_model()
 
 
@@ -122,10 +123,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL, is_valid='t',
-                                           entity_type__iexact='Lab').order_by('-updated_at')
-        if entity.exists():
-            extras = entity.first().additional_info
+        entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                  entity_type__iexact='Lab').order_by('-sequence')
+        if entity_url_qs.exists():
+            entity = entity_url_qs.first()
+            if not entity.is_valid:
+                valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
+                                                     entity_type__iexact='Lab', locality_id=entity.locality_id,
+                                                     sublocality_id=entity.sublocality_id,
+                                                     sitemap_identifier=entity.sitemap_identifier).order_by('-sequence')
+
+                if valid_qs.exists():
+                    corrected_url = valid_qs.first().url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            extras = entity.additional_info
             if extras.get('location_json'):
                 kwargs['location_json'] = extras.get('location_json')
                 kwargs['url'] = url
@@ -143,22 +157,20 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
-        entity = EntityUrls.objects.filter(url=url, url_type='PAGEURL', entity_type__iexact='Lab')
-        if entity.exists():
-            entity = entity.first()
+        entity = EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by('-is_valid')
+        if len(entity) > 0:
+            entity = entity[0]
             if not entity.is_valid:
-                valid_entity_url_qs = EntityUrls.objects.filter(url_type='PAGEURL',
-                                                                                entity_id=entity.entity_id,
-                                                                                entity_type__iexact='Lab',
-                                                                                is_valid='t')
+                valid_entity_url_qs = EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE, entity_id=entity.entity_id,
+                                                                is_valid='t')
                 if valid_entity_url_qs.exists():
-                    corrected_url = valid_entity_url_qs.first().url
+                    corrected_url = valid_entity_url_qs[0].url
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
                 else:
-                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                    return Response(status=status.HTTP_404_NOT_FOUND)
 
-            entity_id = entity.entity_id
-            response = self.retrieve(request, entity_id)
+            #entity_id = entity.entity_id
+            response = self.retrieve(request, entity.entity_id, entity)
             return response
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -249,13 +261,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          "seo": seo, "breadcrumb": breadcrumb})
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, lab_id):
+    def retrieve(self, request, lab_id, entity=None):
+
+        lab_obj = Lab.objects.prefetch_related('rating','lab_documents').filter(id=lab_id, is_live=True).first()
+
+        if not lab_obj:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not entity:
+            entity = EntityUrls.objects.filter(entity_id=lab_id,
+                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by(
+                '-is_valid')
+            if len(entity) > 0:
+                entity = entity[0]
+
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
-        queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter').filter(lab_pricing_group__labs__id=lab_id,
+        queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter')\
+                                                            .filter(lab_pricing_group__labs__id=lab_id,
                                                                     lab_pricing_group__labs__is_test_lab=False,
                                                                     lab_pricing_group__labs__is_live=True,
+                                                                    enabled=True,
                                                                     test__in=test_ids)
-        lab_obj = Lab.objects.prefetch_related('rating').filter(id=lab_id, is_live=True).first()
+
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
@@ -266,26 +293,36 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_serializable_data = list()
         lab_timing = None
         lab_timing_data = list()
-        if lab_obj:
-            if lab_obj.always_open:
-                lab_timing = "12:00 AM - 23:45 PM"
-                lab_timing_data = [{
-                    "start": 0.0,
-                    "end": 23.75
-                }]
-            else:
-                timing_queryset = lab_obj.lab_timings.filter(day=day_now)
-                lab_timing, lab_timing_data = self.get_lab_timing(timing_queryset)
+        distance_related_charges = None
 
-            lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request})
-            lab_serializable_data = lab_serializer.data
+        distance_related_charges = 1 if lab_obj.home_collection_charges.all().exists() else 0
+        if lab_obj.always_open:
+            lab_timing = "12:00 AM - 23:45 PM"
+            lab_timing_data = [{
+                "start": 0.0,
+                "end": 23.75
+            }]
+        else:
+            timing_queryset = lab_obj.lab_timings.filter(day=day_now)
+            lab_timing, lab_timing_data = self.get_lab_timing(timing_queryset)
 
-            entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
-                                               entity_type__iexact='Lab').values('url')
-            if entity.exists():
-                lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+        # entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
+        #                                    entity_type__iexact='Lab')
+        # if entity.exists():
+        #     entity = entity.first()
+
+        lab_serializer = diagnostic_serializer.LabModelSerializer(lab_obj, context={"request": request, "entity": entity})
+        lab_serializable_data = lab_serializer.data
+        if entity:
+            lab_serializable_data['url'] = entity.url
+
+        # entity = EntityUrls.objects.filter(entity_id=lab_id, url_type='PAGEURL', is_valid='t',
+        #                                    entity_type__iexact='Lab').values('url')
+        # if entity.exists():
+        #     lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
+        temp_data['distance_related_charges'] = distance_related_charges
         temp_data['tests'] = test_serializer.data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
@@ -381,20 +418,42 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if ids:
             queryset = queryset.filter(lab_pricing_group__available_lab_tests__test_id__in=ids,
-                lab_pricing_group__available_lab_tests__enabled=True)
+                                       lab_pricing_group__available_lab_tests__enabled=True)
 
         if ids:
-            deal_price_calculation = Case(When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
-                                               then=F('lab_pricing_group__available_lab_tests__computed_deal_price')),
-                                          When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=False,
-                                               then=F('lab_pricing_group__available_lab_tests__custom_deal_price')))
+            if LabTest.objects.filter(id__in=ids, home_collection_possible=True).count() == len(ids):
+                home_pickup_calculation = Case(
+                    When(is_home_collection_enabled=True,
+                         then=F('home_pickup_charges')),
+                    When(is_home_collection_enabled=False,
+                         then=Value(0)),
+                    output_field=DecimalField())
+                # distance_related_charges = Case(
+                #     When(is_home_collection_enabled=False, then=Value(0)),
+                #     When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=True),
+                #          then=Value(0)),
+                #     When(Q(is_home_collection_enabled=True, home_collection_charges__isnull=False),
+                #          then=Value(1)),
+                #     output_field=IntegerField())
+            else:
+                home_pickup_calculation = Value(0, DecimalField())
+                # distance_related_charges = Value(0, IntegerField())
+
+            deal_price_calculation = Case(
+                When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=True,
+                     then=F('lab_pricing_group__available_lab_tests__computed_deal_price')),
+                When(lab_pricing_group__available_lab_tests__custom_deal_price__isnull=False,
+                     then=F('lab_pricing_group__available_lab_tests__custom_deal_price')))
 
             queryset = (
                 queryset.values('id').annotate(price=Sum(deal_price_calculation),
                                                mrp=Sum(F('lab_pricing_group__available_lab_tests__mrp')),
                                                count=Count('id'),
                                                distance=Max(Distance('location', pnt)),
-                                               name=Max('name')).filter(count__gte=len(ids)))
+                                               name=Max('name'),
+                                               pickup_charges=Max(home_pickup_calculation),
+                                               order_priority=Max('order_priority')).filter(count__gte=len(ids)))
+
             if min_price is not None:
                 queryset = queryset.filter(price__gte=min_price)
 
@@ -417,7 +476,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
-                queryset = queryset.order_by("-order_priority", "price", "distance")
+                queryset = queryset.order_by("-order_priority", F("price")+F("pickup_charges"), "distance")
             elif order_by == 'distance':
                 queryset = queryset.order_by("-order_priority", "distance")
             elif order_by == 'name':
@@ -431,7 +490,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def form_lab_whole_data(self, queryset):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.prefetch_related('lab_documents', 'lab_image', 'lab_timings').filter(id__in=ids)
+        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges').filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
 
@@ -479,6 +538,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         next_lab_timing_dict[day] = next_lab_timing
                         next_lab_timing_data_dict[day] = next_lab_timing_data
                         break
+
+            if row["lab"].home_collection_charges.exists():
+                row["distance_related_charges"] = 1
+            else:
+                row["distance_related_charges"] = 0
 
             row["lab_timing"] = lab_timing
             row["lab_timing_data"] = lab_timing_data
@@ -750,6 +814,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 EmailNotification.ops_notification_alert(ops_email_data, settings.OPS_EMAIL_ID,
                                                          order.product_id,
                                                          EmailNotification.OPS_PAYMENT_NOTIFICATION)
+
+                push_order_to_matrix.apply_async(({'order_id': order.id, 'created_at':int(order.created_at.timestamp()),
+                                                   'timeslot':int(appointment_details['time_slot_start'].timestamp())}, ), countdown=5)
             except:
                 pass
         else:
@@ -817,9 +884,17 @@ class LabTimingListView(mixins.ListModelMixin,
         for_home_pickup = True if int(params.get('pickup', 0)) else False
         lab = params.get('lab')
 
-        resp_list = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
+        resp_data = LabTiming.timing_manager.lab_booking_slots(lab__id=lab, lab__is_live=True, for_home_pickup=for_home_pickup)
 
-        return Response(resp_list)
+        # for agent do not set any time limitations
+        if hasattr(request, "agent") and request.agent:
+            resp_data = {
+                "time_slots" : resp_data["time_slots"],
+                "today_min": None,
+                "tomorrow_min": None,
+                "today_max": None
+            }
+        return Response(resp_data)
 
 
 class AvailableTestViewSet(mixins.RetrieveModelMixin,

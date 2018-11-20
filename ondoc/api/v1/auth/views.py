@@ -24,7 +24,7 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
                                          AgentToken)
 from ondoc.notification.models import SmsNotification, EmailNotification
-from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund
+from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -79,6 +79,7 @@ class LoginOTP(GenericViewSet):
         data = serializer.validated_data
         phone_number = data['phone_number']
         req_type = request.query_params.get('type')
+        retry_send = request.query_params.get('retry', False)
 
         if req_type == 'doctor':
             doctor_queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter( Q(phone_number=phone_number, is_disabled=False),
@@ -99,14 +100,14 @@ class LoginOTP(GenericViewSet):
 
             if lab_queryset.exists() or doctor_queryset.exists():
                 response['exists'] = 1
-                send_otp("OTP for login is {}", phone_number)
+                send_otp("OTP for login is {}", phone_number, retry_send)
 
             # if queryset.exists():
             #     response['exists'] = 1
             #     send_otp("OTP for DocPrime login is {}", phone_number)
 
         else:
-            send_otp("OTP for login is {}", phone_number)
+            send_otp("OTP for login is {}", phone_number, retry_send)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists'] = 1
 
@@ -989,6 +990,25 @@ class TransactionViewSet(viewsets.GenericViewSet):
         except Exception as e:
             logger.error("Error - " + str(e))
 
+        try:
+            # log redirects
+            log_data = { "url" : REDIRECT_URL }
+            if order_obj:
+                log_data["product_id"] = order_obj.product_id
+                log_data["order_id"] = order_obj.id
+            if appointment_obj:
+                log_data["appointment_id"] = appointment_obj.id
+            log_data['referer_data'] = { 'HTTP_USER_AGENT' : request.META['HTTP_USER_AGENT'], 'HTTP_HOST' : request.META['HTTP_HOST'] }
+            if request.user:
+                log_data['user'] = request.user.id
+            if hasattr(request, 'agent'):
+                log_data['is_agent'] = True
+            if response:
+                log_data['pg_data'] = response
+            OrderLog.objects.create(**log_data)
+        except Exception as e:
+            logger.error("Error in logging Order - " + str(e))
+
         # return Response({"url": REDIRECT_URL})
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 
@@ -1215,12 +1235,17 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
               doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__permission_type=GenericAdmin.APPOINTMENT,
+              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+              doctor__manageable_doctors__write_permission=True) |
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital__isnull=True,
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
               doctor__manageable_doctors__write_permission=True) |
             Q(hospital__manageable_hospitals__doctor__isnull=True,
               hospital__manageable_hospitals__user=user,
               hospital__manageable_hospitals__is_disabled=False,
-              hospital__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT,
+              hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
               hospital__manageable_hospitals__write_permission=True)).
                              values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
                              )

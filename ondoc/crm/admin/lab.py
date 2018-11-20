@@ -263,7 +263,7 @@ class GenericLabAdminInline(admin.TabularInline):
     show_change_link = False
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    fields = ['user', 'phone_number', 'lab', 'permission_type', 'is_disabled', 'read_permission', 'write_permission']
+    fields = ['user', 'phone_number', 'lab', 'permission_type', 'super_user_permission', 'is_disabled', 'read_permission', 'write_permission']
 
 
 class LabDocumentFormSet(forms.BaseInlineFormSet):
@@ -384,8 +384,10 @@ class LabCityFilter(SimpleListFilter):
     parameter_name = 'city'
 
     def lookups(self, request, model_admin):
-        cities = set([(c['city'].upper(), c['city'].upper()) if (c.get('city')) else ('', '') for c in
-                      Lab.objects.values('city')])
+        cities = Lab.objects.distinct('city').values_list('city','city')
+
+        # cities = set([(c['city'].upper(), c['city'].upper()) if (c.get('city')) else ('', '') for c in
+        #               Lab.objects.values('city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -505,13 +507,13 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         js = ('js/admin/ondoc.js',)
 
     def get_queryset(self, request):
-        return Lab.objects.all().prefetch_related('lab_documents')
+        return super().get_queryset(request).prefetch_related('lab_documents')
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
-        if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
+        if (not request.user.is_member_of(constants['QC_GROUP_NAME'])) and (not request.user.is_superuser):
             read_only_fields += ['lab_pricing_group']
-        if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
+        if (not request.user.is_member_of(constants['SUPER_QC_GROUP'])) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         return read_only_fields
 
@@ -616,23 +618,39 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
 
         super().save_model(request, obj, form, change)
 
-    def save_related(self, request, form, formsets, change):
-        super(type(self), self).save_related(request, form, formsets, change)
-        lab = form.instance
-        lab_mgr_form_change = False
-        lab_mgr_new_len = lab_mgr_del_len = 0
-        for formset in formsets:
-            if isinstance(formset, LabManagerFormSet):
-                for form in formset.forms:
-                    if 'contact_type' in form.changed_data or 'number' in form.changed_data:
-                        lab_mgr_form_change = True
-                        break
-                lab_mgr_new_len = len(formset.new_objects)
-                lab_mgr_del_len = len(formset.deleted_objects)
 
-        if lab is not None:
-            if (lab_mgr_form_change or lab_mgr_new_len > 0 or lab_mgr_del_len > 0):
-                GenericLabAdmin.create_admin_permissions(lab)
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+
+        for obj in formset.deleted_objects:
+            obj.delete()
+
+        for instance in instances:
+            if isinstance(instance, GenericLabAdmin):
+                if (not instance.created_by):
+                    instance.created_by = request.user
+                if (not instance.id):
+                    instance.source_type = GenericAdmin.CRM
+            instance.save()
+        formset.save_m2m()
+
+    # def save_related(self, request, form, formsets, change):
+    #     super(type(self), self).save_related(request, form, formsets, change)
+    #     lab = form.instance
+    #     lab_mgr_form_change = False
+    #     lab_mgr_new_len = lab_mgr_del_len = 0
+    #     for formset in formsets:
+    #         if isinstance(formset, LabManagerFormSet):
+    #             for form in formset.forms:
+    #                 if 'contact_type' in form.changed_data or 'number' in form.changed_data:
+    #                     lab_mgr_form_change = True
+    #                     break
+    #             lab_mgr_new_len = len(formset.new_objects)
+    #             lab_mgr_del_len = len(formset.deleted_objects)
+    #
+    #     if lab is not None:
+    #         if (lab_mgr_form_change or lab_mgr_new_len > 0 or lab_mgr_del_len > 0):
+    #             GenericLabAdmin.create_admin_permissions(lab)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(LabAdmin, self).get_form(request, obj=obj, **kwargs)
@@ -640,7 +658,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
         form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
-        if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+        if not request.user.is_superuser and not request.user.is_member_of(constants['QC_GROUP_NAME']):
             form.base_fields['assigned_to'].disabled = True
         return form
 
@@ -679,6 +697,21 @@ class LabAppointmentForm(forms.ModelForm):
 
         if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
             raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+
+        if not cleaned_data.get('status') is LabAppointment.CANCELLED and (cleaned_data.get(
+                'cancellation_reason') or cleaned_data.get('cancellation_comments')):
+            raise forms.ValidationError(
+                "Reason/Comment for cancellation can only be entered on cancelled appointment")
+
+        if cleaned_data.get('status') is LabAppointment.CANCELLED and not cleaned_data.get('cancellation_reason'):
+            raise forms.ValidationError("Reason for Cancelled appointment should be set.")
+
+        if cleaned_data.get('status') is LabAppointment.CANCELLED and cleaned_data.get(
+                'cancellation_reason') and 'others' in cleaned_data.get(
+                'cancellation_reason').name.lower() and not cleaned_data.get('cancellation_comments'):
+            raise forms.ValidationError(
+                "If Reason for Cancelled appointment is others it should be mentioned in cancellation comment.")
+
 
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
@@ -745,7 +778,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         if request.user.is_superuser:
             return ('booking_id', 'order_id', 'lab', 'lab_id', 'lab_test', 'lab_contact_details', 'profile', 'user',
-                    'profile_detail', 'status', 'cancel_type', 'price', 'agreed_price',
+                    'profile_detail', 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
+                    'price', 'agreed_price',
                     'deal_price', 'effective_price', 'start_date', 'start_time', 'otp', 'payment_status',
                     'payment_type', 'insurance', 'is_home_pickup', 'address', 'outstanding')
         elif request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists():
@@ -753,7 +787,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
                     'used_profile_name', 'used_profile_number',
                     'default_profile_name', 'default_profile_number', 'user_id', 'user_number', 'price', 'agreed_price',
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
-                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type','start_date', 'start_time')
+                    'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
+                    'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time')
         else:
             return ()
 

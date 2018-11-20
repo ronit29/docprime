@@ -5,7 +5,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
                                  MedicalCondition, AboutDoctor, HealthTip, CommonMedicalCondition, CommonSpecialization,
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
-                                 SpecializationDepartment, SpecializationField, PracticeSpecialization, Procedure)
+                                 SpecializationDepartment, SpecializationField, PracticeSpecialization, Procedure,
+                                 VisitReason, CancellationReason, PracticeSpecializationContent)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage)
@@ -13,13 +14,13 @@ from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
-from .common import Cities, CitiesAdmin
+from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
                      DoctorMappingAdmin, DoctorImageAdmin, DoctorOpdAppointmentAdmin, CommonSpecializationAdmin,
                      SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,
-                     CompetitorInfoImportAdmin, ProcedureAdmin)
+                     CompetitorInfoImportAdmin, ProcedureAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
@@ -46,8 +47,12 @@ from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
 from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin
 from ondoc.doctor.models import GoogleDetailing
 from .doctor import GoogleDetailingAdmin
-from .seo import SitemapManagerAdmin
+from .seo import SitemapManagerAdmin, SeoSpecializationAdmin, SeoLabNetworkAdmin
 from ondoc.seo.models import SitemapManger
+from ondoc.seo.models import SeoSpecialization
+from ondoc.seo.models import SeoLabNetwork
+from ondoc.elastic.models import DemoElastic
+from .elastic import DemoElasticAdmin
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -95,6 +100,7 @@ admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
 admin.site.register(Cities, CitiesAdmin)
+admin.site.register(MatrixCityMapping, MatrixCityAdmin)
 admin.site.register(DoctorLead, DoctorLeadAdmin)
 admin.site.register(SearchLead, SearchLeadAdmin)
 
@@ -117,5 +123,13 @@ admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
 admin.site.register(RatingsReview, RatingsReviewAdmin)
 admin.site.register(SitemapManger, SitemapManagerAdmin)
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
-admin.site.register(Coupon, CouponAdmin)
+admin.site.register(Coupon)
 admin.site.register(UserSpecificCoupon)
+admin.site.register(VisitReason, VisitReasonAdmin)
+admin.site.register(CancellationReason)
+admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
+
+admin.site.register(SeoLabNetwork, SeoLabNetworkAdmin)
+admin.site.register(PracticeSpecializationContent, PracticeSpecializationContentAdmin)
+admin.site.register(DemoElastic, DemoElasticAdmin)
+

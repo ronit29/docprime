@@ -12,7 +12,7 @@ TEMPLATES[0]['OPTIONS']['debug'] = DEBUG
 # SECURE_SSL_REDIRECT=True
 # SESSION_COOKIE_SECURE=True
 # SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
+INSTALLED_APPS += ('django_extensions',)
 INSTALLED_APPS += ('debug_toolbar',)
 MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
 
@@ -51,12 +51,7 @@ EMAIL_BACKEND = 'ondoc.sendemail.backends.backend.ConsoleEmailBackend'
 #         },
 #     },
 # }
-INSTALLED_APPS += ('django_extensions',)
-INSTALLED_APPS += ('rest_framework_swagger',)
 
-SWAGGER_SETTINGS = {
-    'USE_SESSION_AUTH': True,
-}
 
 
 # RABBITMQ_CONNECTION_SETTINGS = {
@@ -126,5 +121,7 @@ REST_FRAMEWORK = {
     ),
     'EXCEPTION_HANDLER': 'ondoc.api.v1.utils.custom_exception_handler',
 
-
 }
+
+RATING_SMS_NOTIF=env('RATING_SMS_NOTIF_QA', default=60)
+THYROCARE_NETWORK_ID = 1

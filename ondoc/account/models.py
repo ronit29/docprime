@@ -46,6 +46,7 @@ class Order(TimeStampedModel):
     payment_status = models.PositiveSmallIntegerField(choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     error_status = models.CharField(max_length=250, verbose_name="Error", blank=True, null=True)
     is_viewable = models.BooleanField(verbose_name='Is Viewable', default=True)
+    matrix_lead_id = models.PositiveIntegerField(null=True)
 
     def __str__(self):
         return "{}".format(self.id)
@@ -555,8 +556,8 @@ class ConsumerRefund(TimeStampedModel):
                 "auth": token
             }
             response = requests.get(url=url, params={"refId": ref_id}, headers=headers)
-            print(response.url)
-            print(response.status_code)
+            #print(response.url)
+            #print(response.status_code)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 temp_data = resp_data.get("data")
@@ -577,7 +578,8 @@ class ConsumerRefund(TimeStampedModel):
                             obj.save()
                             print("status updated for - " + str(obj.id))
                 else:
-                    logger.error("Invalid ok status or code mismatch - " + str(response.content))
+                    pass
+                    #logger.error("Invalid ok status or code mismatch - " + str(response.content))
 
     @classmethod
     def update_refund_status(cls):
@@ -591,3 +593,21 @@ class Invoice(TimeStampedModel):
     reference_id = models.PositiveIntegerField()
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
     file = models.FileField(upload_to='invoices', null=True, blank=True)
+
+
+
+class OrderLog(TimeStampedModel):
+    product_id = models.CharField(max_length=10, blank=True, null=True)
+    referer_data = JSONField(blank=True, null=True)
+    url = models.CharField(max_length=250, blank=True, null=True)
+    order_id = models.CharField(max_length=20, blank=True, null=True)
+    appointment_id = models.CharField(max_length=20, blank=True, null=True)
+    user = models.CharField(max_length=20, blank=True, null=True)
+    is_agent = models.BooleanField(default=False)
+    pg_data = JSONField(blank=True, null=True)
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+    class Meta:
+        db_table = "order_log"

@@ -15,6 +15,7 @@ class EmailServiceSerializer(serializers.Serializer):
 
 class SMSServiceSerializer(serializers.Serializer):
     text = serializers.CharField(max_length=500)
+    phone_number = serializers.IntegerField()
 
 
 class XlsSerializer(serializers.Serializer):

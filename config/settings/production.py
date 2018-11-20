@@ -149,3 +149,7 @@ CACHES = {
 CLOUDFRONT_DOMAIN = "cdn.docprime.com"
 #CLOUDFRONT_ID = "your cloud front id"
 AWS_S3_CUSTOM_DOMAIN = "cdn.docprime.com" # to make sure the url that the files are served from this domain
+
+RATING_SMS_NOTIF=env('RATING_SMS_NOTIF_PRD', default=86400)
+THYROCARE_NETWORK_ID = 43
+

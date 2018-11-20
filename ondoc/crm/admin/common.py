@@ -7,7 +7,7 @@ from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
 
-from ondoc.common.models import Cities
+from ondoc.common.models import Cities, MatrixCityMapping
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin
 
@@ -70,14 +70,14 @@ class QCPemAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         final_qs = qs
-        if request.user.is_superuser or \
-                request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or \
-                request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists() or \
-                request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() or \
-                request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-            final_qs = qs
-        if final_qs:
-            final_qs = final_qs.prefetch_related('created_by', 'assigned_to', 'assigned_to__staffprofile',
+        # if request.user.is_superuser or \
+        #         request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() or \
+        #         request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists() or \
+        #         request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() or \
+        #         request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        #     final_qs = qs
+        # if final_qs:
+        final_qs = final_qs.prefetch_related('created_by', 'assigned_to', 'assigned_to__staffprofile',
                                                  'created_by__staffprofile')
         return final_qs
 
@@ -222,4 +222,25 @@ class CitiesAdmin(ImportMixin, admin.ModelAdmin):
     resource_class = CitiesResource
 
 
+class MatrixCityResource(resources.ModelResource):
+    city_id = fields.Field(attribute='city_id', column_name='id')
+    name = fields.Field(attribute='name', column_name='City')
 
+    class Meta:
+        model = MatrixCityMapping
+        import_id_fields = ('id',)
+
+    def before_save_instance(self, instance, using_transactions, dry_run):
+        super().before_save_instance(instance, using_transactions, dry_run)
+
+
+class MatrixCityAdmin(ImportMixin, admin.ModelAdmin):
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    list_display = ('name',)
+    resource_class = MatrixCityResource
+
+
+class GenericAdminForm(forms.ModelForm):
+    class Meta:
+        widgets = {'name': forms.TextInput(attrs={'size': 13}),
+                   'phone_number': forms.NumberInput(attrs={'size': 8})}

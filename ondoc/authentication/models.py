@@ -16,6 +16,7 @@ import hashlib
 import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.utils.functional import cached_property
 
 
 class Image(models.Model):
@@ -187,6 +188,9 @@ class CustomUserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
     use_in_migrations = True
 
+    def get_queryset(self):
+        return super().get_queryset().prefetch_related('staffprofile')
+
     def _create_user(self, email, password, **extra_fields):
         """Create and save a User with the given email and password."""
         if not email:
@@ -237,10 +241,26 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        if self.user_type==1 and hasattr(self, 'staffprofile'):
-            return self.staffprofile.name
-        return str(self.phone_number)
+        name = self.phone_number
+        try:
+            name = self.staffprofile.name
+        except:
+            pass
+        return name
+        # if self.user_type==1 and hasattr(self, 'staffprofile'):
+        #     return self.staffprofile.name
+        # return str(self.phone_number)
 
+    @cached_property
+    def my_groups(self):
+        return self.groups.all()
+
+    def is_member_of(self, group_name):
+        for group in self.my_groups:
+            if group.name == group_name:
+                return True
+
+        return False
 
     def get_unrated_opd_appointment(self):
         from ondoc.doctor import models as doc_models
@@ -573,13 +593,16 @@ class LabUserPermission(TimeStampedModel):
         # TODO PM - Logic to get admin for a particular User
 
 
-class GenericLabAdmin(TimeStampedModel):
+class GenericLabAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLING = 2
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    ALL = 3
+    CRM = 1
+    APP = 2
+    source_choices = ((CRM, 'CRM'), (APP, 'App'),)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages_lab', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    type_choices = ((APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
+    type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
     lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True,
                                     on_delete=models.CASCADE,
                                     related_name='manageable_lab_network_admins')
@@ -590,6 +613,8 @@ class GenericLabAdmin(TimeStampedModel):
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
+    name = models.CharField(max_length=24, blank=True, null=True)
+    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=CRM)
 
     class Meta:
         db_table = 'generic_lab_admin'
@@ -668,13 +693,20 @@ class GenericLabAdmin(TimeStampedModel):
                                )
 
 
-class GenericAdmin(TimeStampedModel):
+class GenericAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLINNG = 2
-
+    ALL = 3
+    DOCTOR = 1
+    HOSPITAL =2
+    OTHER = 3
+    CRM = 1
+    APP = 2
+    entity_choices = ((OTHER, 'Other'), (DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'),)
+    source_choices = ((CRM, 'CRM'), (APP, 'App'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
+    type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
     hospital_network = models.ForeignKey("doctor.HospitalNetwork", null=True, blank=True,
                                          on_delete=models.CASCADE,
                                          related_name='manageable_hospital_networks')
@@ -688,6 +720,10 @@ class GenericAdmin(TimeStampedModel):
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
+    name = models.CharField(max_length=24, blank=True, null=True)
+    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=CRM)
+    entity_type = models.PositiveSmallIntegerField(max_length=20, choices=entity_choices, default=OTHER)
+
 
     class Meta:
         db_table = 'generic_admin'
@@ -697,8 +733,10 @@ class GenericAdmin(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.clean()
-        if self.permission_type == self.BILLINNG and self.doctor is not None:
-            self.hospital = None
+        # if not self.created_by:
+        #     self.created_by = self.request.user
+        # if self.permission_type == self.BILLINNG and self.doctor is not None:
+        #     self.hospital = None
         super(GenericAdmin, self).save(*args, **kwargs)
         GenericAdmin.update_user_admin(self.phone_number)
 
@@ -943,7 +981,7 @@ class BillingAccount(models.Model):
         from ondoc.api.v1.utils import RawSql
         merchant_id = None
         query = '''select nextval('merchant_id_seq') as inc'''
-        seq = RawSql(query).fetch_all()
+        seq = RawSql(query,[]).fetch_all()
         if seq:
             merchant_id = seq[0]['inc'] if seq[0]['inc'] else None
         return merchant_id
@@ -1016,7 +1054,7 @@ class SPOCDetails(TimeStampedModel):
     CONTACT_TYPE_CHOICES = [(OTHER, "Other"), (SPOC, "Single Point of Contact"), (MANAGER, "Manager"), (OWNER, "Owner")]
     contact_type = models.PositiveSmallIntegerField(
         choices=CONTACT_TYPE_CHOICES)
-
+    source = models.CharField(max_length=2000, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
@@ -1105,7 +1143,7 @@ class SPOCDetails(TimeStampedModel):
     def get_hospital_admin_objs(self):
         perm_dict = self.get_spoc_permissions()
         hospital = self.content_object
-        user_obj = User.objects.filter(phone_number=self.number).first()
+        user_obj = User.objects.filter(phone_number=self.number, user_type=User.DOCTOR).first()
         if not user_obj:
             user_obj = None
         admin_objs = list()
@@ -1175,45 +1213,45 @@ class SPOCDetails(TimeStampedModel):
             "bill_read_permission": bill_read_permission
         }
 
-    def save(self, *args, **kwargs):
-        from ondoc.doctor.models import Hospital, HospitalNetwork
-        from ondoc.diagnostic.models import LabNetwork
-        prev_instance = SPOCDetails.objects.filter(pk=self.id).first()
-        if prev_instance:
-            admin_to_be_deleted = None
-            if isinstance(self.content_object, Hospital):
-                admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=prev_instance.number, hospital=self.content_object)
-            elif isinstance(self.content_object, HospitalNetwork):
-                admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=prev_instance.number, hospital_network=self.content_object)
-            elif isinstance(self.content_object, LabNetwork):
-                admin_to_be_deleted = GenericLabAdmin.objects.filter(phone_number=prev_instance.number, lab_network=self.content_object)
-            if admin_to_be_deleted:
-                admin_to_be_deleted.delete()
-        saved_obj = super(SPOCDetails, self).save(*args, **kwargs)
-        admin_objs = self.get_admin_objs()
-        if admin_objs:
-            if isinstance(self.content_object, Hospital) or isinstance(self.content_object, HospitalNetwork):
-                GenericAdmin.objects.bulk_create(admin_objs)
-            elif isinstance(self.content_object, LabNetwork):
-                GenericLabAdmin.objects.bulk_create(admin_objs)
-        return saved_obj
+    # def save(self, *args, **kwargs):
+    #     from ondoc.doctor.models import Hospital, HospitalNetwork
+    #     from ondoc.diagnostic.models import LabNetwork
+    #     prev_instance = SPOCDetails.objects.filter(pk=self.id).first()
+    #     if prev_instance:
+    #         admin_to_be_deleted = None
+    #         if isinstance(self.content_object, Hospital):
+    #             admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=prev_instance.number, hospital=self.content_object)
+    #         elif isinstance(self.content_object, HospitalNetwork):
+    #             admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=prev_instance.number, hospital_network=self.content_object)
+    #         elif isinstance(self.content_object, LabNetwork):
+    #             admin_to_be_deleted = GenericLabAdmin.objects.filter(phone_number=prev_instance.number, lab_network=self.content_object)
+    #         if admin_to_be_deleted:
+    #             admin_to_be_deleted.delete()
+    #     saved_obj = super(SPOCDetails, self).save(*args, **kwargs)
+    #     admin_objs = self.get_admin_objs()
+    #     if admin_objs:
+    #         if isinstance(self.content_object, Hospital) or isinstance(self.content_object, HospitalNetwork):
+    #             GenericAdmin.objects.bulk_create(admin_objs)
+    #         elif isinstance(self.content_object, LabNetwork):
+    #             GenericLabAdmin.objects.bulk_create(admin_objs)
+    #     return saved_obj
 
-    def delete(self, *args, **kwargs):
-        from ondoc.doctor.models import Hospital, HospitalNetwork
-        from ondoc.diagnostic.models import LabNetwork
-        admin_to_be_deleted = None
-        if isinstance(self.content_object, Hospital):
-            admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=self.number,
-                                                              hospital=self.content_object)
-        elif isinstance(self.content_object, HospitalNetwork):
-            admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=self.number,
-                                                              hospital_network=self.content_object)
-        elif isinstance(self.content_object, LabNetwork):
-            admin_to_be_deleted = GenericLabAdmin.objects.filter(phone_number=self.number,
-                                                                 lab_network=self.content_object)
-        if admin_to_be_deleted:
-            admin_to_be_deleted.delete()
-        return super(SPOCDetails, self).delete(*args, **kwargs)
+    # def delete(self, *args, **kwargs):
+    #     from ondoc.doctor.models import Hospital, HospitalNetwork
+    #     from ondoc.diagnostic.models import LabNetwork
+    #     admin_to_be_deleted = None
+    #     if isinstance(self.content_object, Hospital):
+    #         admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=self.number,
+    #                                                           hospital=self.content_object)
+    #     elif isinstance(self.content_object, HospitalNetwork):
+    #         admin_to_be_deleted = GenericAdmin.objects.filter(phone_number=self.number,
+    #                                                           hospital_network=self.content_object)
+    #     elif isinstance(self.content_object, LabNetwork):
+    #         admin_to_be_deleted = GenericLabAdmin.objects.filter(phone_number=self.number,
+    #                                                              lab_network=self.content_object)
+    #     if admin_to_be_deleted:
+    #         admin_to_be_deleted.delete()
+    #     return super(SPOCDetails, self).delete(*args, **kwargs)
 
     def __str__(self):
         return self.name
