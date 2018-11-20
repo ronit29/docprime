@@ -319,12 +319,12 @@ class DoctorSearchHelper:
                 "is_license_verified" : doctor.is_license_verified,
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
-                "deal_price": filtered_deal_price if not selected_procedures_data else min_price["deal_price"],  # SHASHANK_SINGH not sure
-                "mrp": filtered_mrp if not selected_procedures_data else min_price["mrp"],  # SHASHANK_SINGH not sure
+                "deal_price": filtered_deal_price,
+                "mrp": filtered_mrp,
                 "is_live": doctor.is_live,
                 "is_gold": is_gold,
                 # "fees": filtered_fees,*********show mrp here
-                "discounted_fees": filtered_deal_price if not selected_procedures_data else min_price["deal_price"],  # SHASHANK_SINGH not sure
+                "discounted_fees": filtered_deal_price,
                 # "discounted_fees": filtered_fees, **********deal_price
                 "practicing_since": doctor.practicing_since,
                 "experience_years": doctor.experience_years(),
