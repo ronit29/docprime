@@ -576,7 +576,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                         old_effective_price = opd_appointment.effective_price
                         coupon_discount = opd_appointment.discount
                         if coupon_discount > doctor_hospital.deal_price:
-                            new_effective_price = 0  # SHASHANK_SINGH Ask Arun Sir?
+                            new_effective_price = 0
                         else:
                             new_effective_price = doctor_hospital.deal_price - coupon_discount
 
