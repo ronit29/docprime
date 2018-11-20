@@ -9,10 +9,10 @@ class Coupon(auth_model.TimeStampedModel):
     TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"),)
     code = models.CharField(max_length=50)
     min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    percentage_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, validators=[MaxValueValidator(100), MinValueValidator(0)])  # range - 1 to 100
+    percentage_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, validators=[MaxValueValidator(100), MinValueValidator(0)])
     max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     flat_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    validity = models.PositiveIntegerField(blank=True, null=True)
+    validity = models.PositiveIntegerField(blank=False, null=False)
     type = models.IntegerField(choices=TYPE_CHOICES)
     count = models.PositiveIntegerField()
     description = models.CharField(max_length=500, default="")

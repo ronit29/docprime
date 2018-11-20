@@ -24,8 +24,12 @@ class TestAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         if not self.request.user.is_authenticated:
             return LabTest.objects.none()
+        lab_network = self.forwarded.get('lab_network', None)
         lab = self.forwarded.get('lab', None)
-        queryset = LabTest.objects.filter(availablelabs__lab_pricing_group__labs__id=lab)
+        if lab_network and lab:
+            queryset = LabTest.objects.filter(availablelabs__lab_pricing_group__labs__id=lab)
+        elif lab_network and not lab:
+            queryset = LabTest.objects.filter(availablelabs__lab_pricing_group__labs__id__in=Lab.objects.filter(network=lab_network))
         if self.q:
             queryset = queryset.filter(name__istartswith=self.q)
         return queryset
@@ -38,7 +42,7 @@ class CouponForm(forms.ModelForm):
         fields = ('__all__')
         widgets = {
             'lab': autocomplete.ModelSelect2(url='lab-autocomplete', forward=['lab_network']),
-            'test': autocomplete.ModelSelect2Multiple(url='test-autocomplete', forward=['lab'])
+            'test': autocomplete.ModelSelect2Multiple(url='test-autocomplete', forward=['lab', 'lab_network'])
         }
 
 

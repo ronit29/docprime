@@ -516,22 +516,29 @@ class CouponsMixin(object):
         coupon_obj = kwargs.get("coupon_obj")
 
         is_valid = False
+
         if coupon_obj:
+
             if kwargs.get("product_id") == Order.LAB_PRODUCT_ID:
                 if kwargs.get("lab"):
                     lab = Lab.objects.filter(pk=kwargs.get("lab").id)
                     if lab:
-                        if kwargs.get("test"):
-                            test = kwargs.get("test", [])
-                            lab = lab.filter(lab_pricing_group__available_lab_tests__test__in=test)
-                            if lab.count() == len(test):
-                                lab = lab.first()
-                                if (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network) or \
-                                        (coupon_obj.lab is not None and not coupon_obj.test.all() and coupon_obj.lab==lab) or \
-                                        (coupon_obj.lab is not None and coupon_obj.test.all() and set(test)<=set(coupon_obj.test.all())  and coupon_obj.lab == lab):
-                                    is_valid = True
+                        # if kwargs.get("test"):
+                        test = kwargs.get("test", [])
+                        lab = lab.filter(lab_pricing_group__available_lab_tests__test__in=test)
+                        if lab.count() == len(test):
+                            lab = lab.first()
+                            if (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and not coupon_obj.test.exists()) or \
+                                (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or \
+                                (coupon_obj.lab is not None and not coupon_obj.test.exists() and coupon_obj.lab==lab) or \
+                                (coupon_obj.lab is not None and coupon_obj.test.exists() and coupon_obj.lab==lab and set(test) & set(coupon_obj.test.all())):
+                                # (coupon_obj.lab is not None and coupon_obj.test.all() and coupon_obj.lab == lab and set(test)<=set(coupon_obj.test.all())):
+                                is_valid = True
+
             elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
-                pass
+                if kwargs.get("doctor"):
+                    pass
+
         return is_valid
 
 
@@ -557,6 +564,34 @@ class CouponsMixin(object):
             return discount
         else:
             return 0
+
+    def get_applicable_tests_with_total_price(self, **kwargs):
+        from django.db.models import Sum
+
+        coupon_obj = kwargs.get("coupon_obj")
+        lab_test_queryset = kwargs.get("lab_test_queryset")
+
+        if coupon_obj.lab:
+
+            if coupon_obj.test.exists():
+                test_ids = lab_test_queryset.values_list("test_id")
+
+                applicable_tests = set(test_ids) & set(coupon_obj.test.all().values_list("id"))
+
+                filtered_tests = lab_test_queryset.filter(test_id__in=applicable_tests)
+            elif not (coupon_obj.test.exists()):
+                filtered_tests = lab_test_queryset
+
+        elif not (coupon_obj.lab_network or coupon_obj.lab or coupon_obj.test.exists()) or coupon_obj.lab_network:
+            filtered_tests = lab_test_queryset
+
+        if filtered_tests.values("custom_deal_price").exists():
+            total_price = filtered_tests.values("custom_deal_price").aggregate(Sum('custom_deal_price')).get("custom_deal_price__sum")
+        else:
+            total_price = filtered_tests.values("computed_deal_price").aggregate(Sum('computed_deal_price')).get("computed_deal_price__sum")
+
+        return {"applicable_tests": filtered_tests, "total_price": total_price}
+
 
 
 class TimeSlotExtraction(object):
