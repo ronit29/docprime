@@ -16,6 +16,7 @@ class Coupon(auth_model.TimeStampedModel):
     type = models.IntegerField(choices=TYPE_CHOICES)
     count = models.PositiveIntegerField()
     description = models.CharField(max_length=500, default="")
+    heading = models.CharField(max_length=500, default="")
     tnc = models.CharField(max_length=2000, default="")
     lab_network = models.ForeignKey("diagnostic.LabNetwork", on_delete=models.CASCADE, blank=True, null=True)
     lab = models.ForeignKey("diagnostic.Lab", on_delete=models.CASCADE, blank=True, null=True)
