@@ -579,9 +579,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         response_data = []
-        category_ids = validated_data.get('procedure_category_ids')
-        procedure_ids = validated_data.get('procedure_ids')
-        selected_hospital = validated_data.get('hospital_id')
+        category_ids = validated_data.get('procedure_category_ids', None)
+        procedure_ids = validated_data.get('procedure_ids', None)
+        selected_hospital = validated_data.get('hospital_id', None)
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
@@ -595,24 +595,23 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'rating',
                                     )
                   .filter(pk=pk).first())
-        if selected_hospital:
-            selected_procedure_ids, other_procedure_ids = get_selected_and_other_categories(category_ids, procedure_ids,
-                                                                                            doctor, all=True)
-            if doctor:
-                serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
-                                                                         context={"request": request
-                                                                             ,
-                                                                                  "selected_procedure_ids": selected_procedure_ids
-                                                                             ,
-                                                                                  "other_procedure_ids": other_procedure_ids
-                                                                             , "category_ids": category_ids
-                                                                             , "hospital_id": selected_hospital
-                                                                                  })
+        selected_procedure_ids, other_procedure_ids = get_selected_and_other_categories(category_ids, procedure_ids,
+                                                                                        doctor, all=True)
+        if doctor:
+            serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+                                                                     context={"request": request
+                                                                         ,
+                                                                              "selected_procedure_ids": selected_procedure_ids
+                                                                         ,
+                                                                              "other_procedure_ids": other_procedure_ids
+                                                                         , "category_ids": category_ids
+                                                                         , "hospital_id": selected_hospital
+                                                                              })
 
-        else:
-            if doctor:
-                serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
-                                                                         context={"request": request})
+        # else:
+        #     if doctor:
+        #         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+        #                                                                  context={"request": request})
         if doctor:
             entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
                                                entity_type__iexact='Doctor').values('url')

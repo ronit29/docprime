@@ -832,34 +832,31 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         category_ids = self.context.get('category_ids')
         selected_procedure_ids = self.context.get('selected_procedure_ids')
         other_procedure_ids = self.context.get('other_procedure_ids')
-        if selected_clinic:
-            if obj and selected_clinic or category_ids or selected_procedure_ids or other_procedure_ids:
-                data = obj.doctor_clinics.all()
-                result_for_a_doctor = OrderedDict()
-                for doctor_clinic in data:
-                    all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
-                    selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
-                                                                                    selected_procedure_ids)
-                    other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
-                                                                                 other_procedure_ids)
+        data = obj.doctor_clinics.all()
+        result_for_a_doctor = OrderedDict()
+        for doctor_clinic in data:
+            all_doctor_clinic_procedures = list(doctor_clinic.doctorclinicprocedure_set.all())
+            selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                            selected_procedure_ids)
+            other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
+                                                                         other_procedure_ids)
 
-                    selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
-                                                                                     context={'is_selected': True,
-                                                                                              'category_ids': category_ids if category_ids else None},
-                                                                                     many=True)
-                    other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data,
-                                                                                  context={'is_selected': False,
-                                                                                           'category_ids': category_ids if category_ids else None},
-                                                                                  many=True)
-                    selected_procedures_list = list(selected_procedures_serializer.data)
-                    other_procedures_list = list(other_procedures_serializer.data)
-                    final_result = get_procedure_categories_with_procedures(selected_procedures_list,
-                                                                            other_procedures_list)
-                    result_for_a_doctor[doctor_clinic.hospital.pk] = final_result
-                if selected_clinic and result_for_a_doctor.get(selected_clinic, None):
-                    result_for_a_doctor.move_to_end(selected_clinic, last=False)
-                return result_for_a_doctor
-        return None
+            selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
+                                                                             context={'is_selected': True,
+                                                                                      'category_ids': category_ids if category_ids else None},
+                                                                             many=True)
+            other_procedures_serializer = DoctorClinicProcedureSerializer(other_procedures_data,
+                                                                          context={'is_selected': False,
+                                                                                   'category_ids': category_ids if category_ids else None},
+                                                                          many=True)
+            selected_procedures_list = list(selected_procedures_serializer.data)
+            other_procedures_list = list(other_procedures_serializer.data)
+            final_result = get_procedure_categories_with_procedures(selected_procedures_list,
+                                                                    other_procedures_list)
+            result_for_a_doctor[doctor_clinic.hospital.pk] = final_result
+        if selected_clinic and result_for_a_doctor.get(selected_clinic, None):
+            result_for_a_doctor.move_to_end(selected_clinic, last=False)
+        return result_for_a_doctor
 
     def get_hospitals(self, obj):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,

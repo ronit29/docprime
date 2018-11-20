@@ -234,6 +234,16 @@ def get_selected_and_other_categories(category_ids, procedure_ids, doctor=None, 
             all_procedures_under_doctor = set(all_procedures_under_doctor)
             selected_procedure_ids = set(selected_procedure_ids)
             other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+        else:
+            all_clinics_of_doctor = doctor.doctor_clinics.all()
+            all_procedures_under_doctor = []
+            for doctor_clinic in all_clinics_of_doctor:
+                all_procedures_under_doctor.extend(
+                    doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
+            all_procedures_under_doctor = set(all_procedures_under_doctor)
+            selected_procedure_ids = []
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
 
     return selected_procedure_ids, other_procedure_ids
 
