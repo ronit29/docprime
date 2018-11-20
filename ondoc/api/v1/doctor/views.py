@@ -199,7 +199,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             total_agreed_price += doctor_clinic_procedure.agreed_price
             total_deal_price += doctor_clinic_procedure.deal_price
             total_mrp += doctor_clinic_procedure.mrp
-        return total_deal_price + dct.deal_price, total_agreed_price, total_mrp + dct.mrp  # SHASHANK_SINGH what happens with agreed_price
+        return total_deal_price + dct.deal_price, total_agreed_price + dct.fees, total_mrp + dct.mrp
 
     @transaction.atomic
     def create(self, request):
@@ -232,7 +232,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
 
         extra_details = []
-
+        effective_price = 0
         if not procedures:
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
@@ -243,6 +243,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     effective_price = doctor_clinic_timing.deal_price - coupon_discount
             deal_price = doctor_clinic_timing.deal_price
             mrp = doctor_clinic_timing.mrp
+            fees = doctor_clinic_timing.fees
         else:
             total_deal_price, total_agreed_price, total_mrp = self.get_procedure_prices(procedures, doctor,
                                                                                         selected_hospital,
@@ -256,6 +257,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     effective_price = total_deal_price - coupon_discount
             deal_price = total_deal_price
             mrp = total_mrp
+            fees = total_agreed_price
 
             doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
             doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by('procedure_id')
@@ -274,7 +276,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "profile_detail": profile_detail,
             "user": request.user,
             "booked_by": request.user,
-            "fees": doctor_clinic_timing.fees,
+            "fees": fees,
             "deal_price": deal_price,
             "effective_price": effective_price,
             "mrp": mrp,
