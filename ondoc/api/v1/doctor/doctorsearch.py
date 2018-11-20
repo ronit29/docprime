@@ -248,6 +248,7 @@ class DoctorSearchHelper:
         procedure_ids = [int(x) for x in procedure_ids]
         response = []
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_categories(category_ids, procedure_ids)
+        total_deal_price, total_mrp = 0, 0
         for doctor in doctor_data:
 
             is_gold = doctor.enabled_for_online_booking and doctor.is_gold
@@ -255,6 +256,8 @@ class DoctorSearchHelper:
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
             filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
+            total_deal_price += filtered_deal_price
+            total_mrp += filtered_mrp
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
             min_deal_price = None
             min_price = dict()
@@ -264,9 +267,8 @@ class DoctorSearchHelper:
                     min_price = {
                         "deal_price": data.deal_price,
                         "mrp": data.mrp
-                    }
+                    }  # SHASHANK_SINGH why?
             # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
-            selected_procedures_data = None
             if not doctor_clinic:
                 hospitals = []
             else:
@@ -274,8 +276,8 @@ class DoctorSearchHelper:
                 selected_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                                 selected_procedure_ids)
                 if selected_procedures_data:
-                    min_price["deal_price"] = sum([dcp.deal_price for dcp in selected_procedures_data])
-                    min_price["mrp"] = sum([dcp.mrp for dcp in selected_procedures_data])
+                    total_deal_price += sum([dcp.deal_price for dcp in selected_procedures_data])
+                    total_mrp += sum([dcp.mrp for dcp in selected_procedures_data])
                 other_procedures_data = get_included_doctor_clinic_procedure(all_doctor_clinic_procedures,
                                                                              other_procedure_ids)
                 selected_procedures_serializer = DoctorClinicProcedureSerializer(selected_procedures_data,
@@ -321,6 +323,8 @@ class DoctorSearchHelper:
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,
                 "mrp": filtered_mrp,
+                "total_deal_price": total_deal_price,
+                "total_mrp": total_mrp,
                 "is_live": doctor.is_live,
                 "is_gold": is_gold,
                 # "fees": filtered_fees,*********show mrp here
