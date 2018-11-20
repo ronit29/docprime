@@ -21,8 +21,8 @@ def get_doctor_detail_from_google(place_sheet_obj, cache):
             response = cache.get(key)
 
             if not response:
-                response = requests.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery',
-                                        params={'key': api_key, 'input': request_parameter})
+                response = requests.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery&input=' + request_parameter,
+                                        params={'key': api_key})
                 cache[key] = response
             if response.status_code != status.HTTP_200_OK or not response.ok:
                 print("[ERROR] Google API for fetching doctor_clinic_address place id.")
@@ -47,8 +47,8 @@ def get_doctor_detail_from_google(place_sheet_obj, cache):
                     response = cache.get(place_id)
 
                     if not response:
-                        response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
-                                                params={'key': api_key, 'place_id': place_id})
+                        response = requests.get('https://maps.googleapis.com/maps/api/place/details/json?place_id=' + place_id,
+                                                params={'key': api_key})
                         cache[place_id] = response
                     if response.status_code != status.HTTP_200_OK or not response.ok:
                         print("[ERROR] Google API for fetching detail on basis of place_id")
@@ -97,11 +97,10 @@ def get_clinic_detail_from_google(place_sheet_obj, cache):
             request_parameter = place_sheet_obj.clinic_address
             key = hashlib.md5(request_parameter.encode('utf-8')).hexdigest()
             response = cache.get(key)
-
             if not response:
                 response = requests.get(
-                    'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery',
-                    params={'key': api_key, 'input': request_parameter})
+                    'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery&input=' + request_parameter,
+                    params={'key':api_key})
                 cache[key] = response
 
             if response.status_code != status.HTTP_200_OK or not response.ok:
@@ -128,8 +127,8 @@ def get_clinic_detail_from_google(place_sheet_obj, cache):
                     response = cache.get(place_id)
 
                     if not response:
-                        response = requests.get('https://maps.googleapis.com/maps/api/place/details/json',
-                                                params={'key': api_key, 'place_id': place_id})
+                        response = requests.get('https://maps.googleapis.com/maps/api/place/details/json?place_id=' + place_id,
+                                                params={'key': api_key})
                         cache[place_id] = response
 
                     if response.status_code != status.HTTP_200_OK or not response.ok:
