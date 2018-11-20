@@ -1,1 +1,13 @@
-Appointment Confirmed for {{patient_name|capfirst}} requested with Dr. {{doctor_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.
+The appointment request for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} has been confirmed.
+Unique Confirmation Code : {{instance.otp}}
+Please share this code with doctor at the time of appointment.
+The booking details are as below :
+Booking ID : {{instance.id}}
+Patient Name : {{patient_name|capfirst}}
+Doctor Name : {{doctor_name|capfirst}}
+Clinic : {{instance.hospital.name|capfirst}}
+Address : {% if instance.hospital.building %}{{instance.hospital.building}}, {% endif %}{% if instance.hospital.sublocality %}{{instance.hospital.sublocality}}, {% endif %}{% if instance.hospital.locality %}{{instance.hospital.locality}}, {% endif %}{% if instance.hospital.city %}{{instance.hospital.city}}, {% endif %}{% if instance.hospital.state %}{{instance.hospital.state}}, {% endif %}{% if instance.hospital.pin_code %}{{instance.hospital.pin_code}} {% endif %}
+Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+Helpline Toll Free Number : 1800-123-9419
+
+Thanks for choosing docprime.com

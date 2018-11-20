@@ -66,13 +66,13 @@
                 <tr>
                     {% if instance.cancellation_type == 3 %}
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
-                        Your appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} on
+                        The appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} on
                         {{instance.time_slot_start|date:"d/m/y"}} at {{instance.time_slot_start|date:"h:i a"}} has been
                         cancelled due to unforeseeable circumstances.
                     </td>
                     {% else %}
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
-                        As requested your appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} on
+                        As requested the appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} on
                         {{instance.time_slot_start|date:"d/m/y"}} at {{instance.time_slot_start|date:"h:i a"}} has been
                         cancelled.
                     </td>

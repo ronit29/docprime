@@ -1,1 +1,3 @@
-Your appointment with {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} has been cancelled.
+Your appointment with {{patient_name|capfirst}} on {{instance.time_slot_start|date:"h:i a"}} at {{instance.time_slot_start|date:"d/m/y"}} at {{instance.hospital.name|capfirst}} has been cancelled.
+Apologies for the inconvenience caused.
+Team docprime
