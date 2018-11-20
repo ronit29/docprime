@@ -82,6 +82,10 @@ class NotificationAction:
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
+            procedure_mappings = instance.procedure_mappings.select_related("procedure").all()
+            procedures = [{"name": mapping.procedure.name, "mrp": mapping.mrp, "deal_price": mapping.deal_price,
+                           "discount": mapping.mrp - mapping.deal_price} for mapping in procedure_mappings]
+            coupon_discount = instance.deal_price - instance.effective_price
             context = {
                 "doctor_name": doctor_name,
                 "patient_name": patient_name,
@@ -92,6 +96,8 @@ class NotificationAction:
                     patient_name, doctor_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y"), doctor_name
                 ),
+                "procedures": procedures,
+                "coupon_discount": coupon_discount,
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -157,10 +163,10 @@ class NotificationAction:
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
                 "instance": instance,
-                # "title": "New Appointment",
-                # "body": "New Appointment for {} at {}, {} with Dr. {}. You will receive a confirmation as soon as it is accepted by the doctor.".format(
-                #     patient_name, time_slot_start.strftime("%I:%M %P"),
-                #     time_slot_start.strftime("%d/%m/%y"), doctor_name),
+                "title": "New Appointment",
+                "body": "New Appointment for {} at {}, {} with Dr. {}. You will receive a confirmation as soon as it is accepted by the doctor.".format(
+                    patient_name, time_slot_start.strftime("%I:%M %P"),
+                    time_slot_start.strftime("%d/%m/%y"), doctor_name),
                 "procedures": procedures,
                 "coupon_discount": coupon_discount,
                 "url": "/opd/appointment/{}".format(instance.id),
@@ -172,6 +178,8 @@ class NotificationAction:
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
+            procedure_mappings = instance.procedure_mappings.select_related("procedure").all()
+            procedures = [{"name": mapping.procedure.name} for mapping in procedure_mappings]
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
@@ -180,6 +188,7 @@ class NotificationAction:
                 "body": "New appointment for {} at {}, {}. Please confirm.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")),
+                "procedures": procedures,
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
