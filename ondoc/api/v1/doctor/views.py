@@ -1349,9 +1349,17 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         return Response({'success': 'Created Successfully'})
 
     def assoc_doctors(self, request, pk=None):
-        hospital = get_object_or_404(Hospital.objects.prefetch_related('assoc_doctors'), pk=pk)
-        queryset = hospital.assoc_doctors
-        return Response(queryset.extra(select={'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END'}).values('name', 'id', 'assigned'))
+        resp = None
+        hospital = Hospital.objects.prefetch_related('assoc_doctors').filter(id=pk)
+        if not hospital.exists():
+            return Response({'error': "Hospital Not Found"}, status=status.HTTP_404_NOT_FOUND)
+
+        queryset = hospital.first().assoc_doctors.annotate(phone_number=F('doctor_number__phone_number'))
+
+
+        resp = queryset.extra(select={'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END'})\
+            .values('name', 'id', 'assigned', 'phone_number')
+        return Response(resp)
 
     def assoc_hosp(self, request, pk=None):
         doctor = get_object_or_404(Doctor.objects.prefetch_related('hospitals'), pk=pk)
@@ -1420,7 +1428,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                     )
                                     )\
                 .annotate(hospital_id=F('doctor__doctor_clinics__hospital__id'))\
-                .values('phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_id', 'updated_at')
+                .values('id', 'phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_id', 'updated_at')
             for x in query:
                 if temp.get(x['phone_number']):
                     temp[x['phone_number']]['hospital_id'].append(x['hospital_id'])
@@ -1437,15 +1445,41 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                        )
 
                                        )\
-                .annotate(doctor_id=F('hospital__hospital_doctors__doctor__id')) \
-                .values('phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'doctor_id', 'updated_at')
+                .annotate(doctor_ids=F('hospital__hospital_doctors__doctor__id'), hospital_name=F('hospital__name')) \
+                .values('phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'doctor_ids',
+                        'hospital_id', 'hospital_name', 'updated_at')
+
+            hos_queryset = Hospital.objects.prefetch_related('assoc_doctors').filter(id=valid_data.get('id'))
+            if hos_queryset.exists():
+                hos_obj = hos_queryset.first()
+                hos_name = hos_obj.name
+                assoc_docs = hos_obj.assoc_doctors.extra(select={
+                    'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END',
+                    'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id'}) \
+                    .values('name', 'id', 'assigned', 'phone_number')
+
             for x in response:
                 if temp.get(x['phone_number']):
-                    temp[x['phone_number']]['doctor_id'].append(x['doctor_id'])
+                    temp[x['phone_number']]['doctor_ids'].append(x['doctor_ids'])
                 else:
-                    x['doctor_id'] = [x['doctor_id']]
+                    for doc in assoc_docs:
+                        if doc.get('phone_number') and doc.get('phone_number') == x['phone_number']:
+                            x['is_doctor'] = True
+                            x['name'] = doc.get('name')
+                            x['id'] = doc.get('id')
+                            x['assigned'] = doc.get('assigned')
+                            break
+                    if not x.get('is_doctor'):
+                        x['is_doctor'] = False
+                    x['doctor_ids'] = [x['doctor_ids']]
                     temp[x['phone_number']] = x
-            response = list(temp.values())
+            admin_final_list = list(temp.values())
+            for a_d in assoc_docs:
+                if not a_d.get('phone_number'):
+                    a_d['is_doctor'] = True
+                    a_d['hospital_name'] = hos_name
+                    admin_final_list.append(a_d)
+            response = admin_final_list
         elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
             response = auth_models.GenericLabAdmin.objects\
                 .exclude(user=request.user)\

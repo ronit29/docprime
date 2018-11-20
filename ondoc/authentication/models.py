@@ -1266,10 +1266,12 @@ class SPOCDetails(TimeStampedModel):
 class DoctorNumber(TimeStampedModel):
     phone_number = models.CharField(max_length=10)
     doctor = models.ForeignKey("doctor.Doctor", on_delete=models.CASCADE, related_name='doctor_number')
+    hospital = models.ForeignKey("doctor.Hospital", on_delete=models.CASCADE, related_name='hospital_doctor_number', null=True)
+
 
     class Meta:
         db_table = 'doctor_number'
-        # unique_together = (("phone_number", "doctor"), )
+        unique_together = (("phone_number", "doctor", "hospital"), )
 
     def __str__(self):
         return '{}-{}'.format(self.phone_number, self.doctor)
