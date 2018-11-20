@@ -231,7 +231,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             for coupon in data.get("coupon_code"):
                 coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
 
-        extras_details = []
+        extra_details = []
 
         if not procedures:
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
@@ -265,7 +265,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                               'deal_price': doctor_clinic_procedure.deal_price,
                               'agreed_price': doctor_clinic_procedure.agreed_price,
                               'mrp': doctor_clinic_procedure.mrp}
-                extras_details.append(temp_extra)
+                extra_details.append(temp_extra)
 
         opd_data = {
             "doctor": data.get("doctor"),
@@ -278,8 +278,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "deal_price": deal_price,
             "effective_price": effective_price,
             "mrp": mrp,
-            "procedures": procedures,
-            "extras_details": extras_details,
+            "extra_details": extra_details,
             "time_slot_start": time_slot_start,
             "payment_type": data.get("payment_type"),
             "coupon": coupon_list,

@@ -144,7 +144,7 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     payment_type = serializers.IntegerField()
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    procedures = serializers.JSONField(required=False)
+    extra_details = serializers.JSONField(required=False)
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
     appointment = OpdAppointmentSerializer()

@@ -1125,8 +1125,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
         coupon_list = appointment_data.pop("coupon", None)
-        procedure_details = appointment_data.pop('procedures', [])
-        appointment_data.pop("extra_details", None)
+        procedure_details = appointment_data.pop('extra_details', [])
         app_obj = cls.objects.create(**appointment_data)
         if procedure_details:
             procedure_to_be_added = []
