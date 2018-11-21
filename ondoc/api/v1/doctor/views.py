@@ -32,7 +32,7 @@ from itertools import groupby
 from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_parameters
 from django.contrib.auth import get_user_model
 from django.conf import settings
-from django.db.models import F
+from django.db.models import F, Count
 from django.db.models.functions import StrIndex
 import datetime
 import copy
