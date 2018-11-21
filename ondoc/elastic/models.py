@@ -15,11 +15,9 @@ class DemoElastic(TimeStampedModel):
     mongo_connection_string = models.CharField(max_length=200, default='', null=False, blank=False)
 
     def save(self, *args, **kwargs):
-        to_be_uploaded = self.id is None
         super(DemoElastic, self).save(*args, **kwargs)
 
-        if to_be_uploaded:
-            fetch_and_upload_json.apply_async(({'id': self.id}, ), countdown=5)
+        fetch_and_upload_json.apply_async(({'id': self.id}, ), countdown=5)
 
     class Meta:
         db_table = "demo_elastic"
