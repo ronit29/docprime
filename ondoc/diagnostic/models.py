@@ -617,6 +617,12 @@ class ParameterLabTest(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.parameter.name)
 
+class FrequentlyAddedTogetherTests(TimeStampedModel):
+    original_test = models.ForeignKey('diagnostic.LabTest', related_name='base_test' ,null =True, blank =False, on_delete=models.CASCADE)
+    booked_together_test = models.ForeignKey('diagnostic.LabTest', related_name='booked_together' ,null=True, blank=False, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "related_tests"
 
 class LabTest(TimeStampedModel, SearchKey):
     RADIOLOGY = 1
@@ -643,16 +649,22 @@ class LabTest(TimeStampedModel, SearchKey):
     excel_id = models.CharField(max_length=100, blank=True)
     sample_type = models.CharField(max_length=500, blank=True)
     home_collection_possible = models.BooleanField(default=False, verbose_name= 'Can sample be home collected for this test?')
-    test = models.ManyToManyField('self', through='LabTestPackage', symmetrical=False,
+    test = models.ManyToManyField('self', through='LabTestPackage', symmetrical=False, related_name= 'package_test',
                                   through_fields=('package', 'lab_test'))  # self reference
     parameter = models.ManyToManyField(
         'TestParameter', through=ParameterLabTest,
         through_fields=('lab_test', 'parameter')
     )
+    frequently_booked_together = models.ManyToManyField('self', symmetrical=False, through=FrequentlyAddedTogetherTests,
+                                                        related_name= 'frequent_test',
+                                                        through_fields=('original_test','booked_together_test'))
     approximate_duration = models.CharField(max_length=50, default='15 mins', verbose_name='What is the approximate duration for the test?')
     report_schedule = models.CharField(max_length=150, default='After 2 days of test.', verbose_name='What is the report schedule for the test?')
     enable_for_ppc = models.BooleanField(default=False)
     enable_for_retail = models.BooleanField(default=False)
+    about_test = models.TextField(blank=True, verbose_name='About the test')
+    why_get_tested = models.TextField(blank=True, verbose_name='Why get tested?')
+    preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -665,6 +677,23 @@ class LabTest(TimeStampedModel, SearchKey):
 
     class Meta:
         db_table = "lab_test"
+
+#
+#
+# class FrequentlyAddedTogetherTests(TimeStampedModel):
+#     test = models.ForeignKey(LabTest, related_name='base_test' ,null =True, blank =False, on_delete=models.CASCADE)
+#     booked_together_test = models.ForeignKey(LabTest, related_name='booked_together' ,null=True, blank=False, on_delete=models.CASCADE)
+#
+#     class Meta:
+#         db_table = "related_tests"
+
+class QuestionAnswer(TimeStampedModel):
+    question = models.TextField(null=False, verbose_name='Question')
+    answer = models.TextField(null=True, verbose_name='Answer')
+    lab_test = models.ForeignKey(LabTest, related_name='faq', null=True, blank=False, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "question_answer"
 
 
 class LabTestPackage(TimeStampedModel):

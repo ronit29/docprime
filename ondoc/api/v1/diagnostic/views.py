@@ -3,7 +3,8 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonDiagnosticCondition, CommonTest, CommonPackage)
+                                     CommonDiagnosticCondition, CommonTest, CommonPackage, QuestionAnswer,
+                                     FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.notification.models import EmailNotification
@@ -1041,4 +1042,58 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
             #                                                                                             'request': request})
             resp = {'success':'LabAppointment Updated Successfully!'}
         return Response(resp)
+
+class TestDetailsViewset(viewsets.GenericViewSet):
+
+    def retrieve(self, request, test_id):
+        params = request.query_params
+        queryset = LabTest.objects.filter(id=test_id)
+        query = ParameterLabTest.objects.filter(lab_test_id=test_id)
+        if not queryset:
+            return Response([])
+        result = {}
+        if len(queryset) > 0:
+            queryset = queryset[0]
+            result['about_test'] = queryset.about_test
+            result['why_get_tested'] = [item.strip('\r') for item in queryset.why_get_tested.split('\n')]
+            # result['test_may_include'] =
+            result['preparations'] = queryset.preparations
+
+        if not query:
+            return Response(result)
+        if len(query) > 0:
+            info=[]
+            for data in query:
+                if data.parameter.name:
+
+                    name = data.parameter.name
+                    info.append(name)
+            result['test_may_include'] = info
+
+
+        queryset1 = QuestionAnswer.objects.filter(lab_test_id=test_id).values('question','answer')
+        if not queryset1:
+            return Response(result)
+        if len(queryset1) > 0:
+            result['faqs']= queryset1
+
+        queryset2 = FrequentlyAddedTogetherTests.objects.filter(original_test_id=test_id)
+        booked_together=[]
+        if not queryset2:
+            return Response(result)
+        if len(queryset2) > 0:
+            for data in queryset2:
+                 if data.booked_together_test.name:
+
+                    name = data.booked_together_test.name
+                    id = data.booked_together_test.id
+                    booked_together.append({'id':id, 'lab_test': name})
+
+
+            result['frequently_booked_together'] = booked_together
+
+        return Response(result)
+
+
+
 
