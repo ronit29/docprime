@@ -1337,15 +1337,15 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 if user_queryset:
                     user = user_queryset
                 auth_models.GenericAdmin.objects.create(user=user, doctor=None,
-                                                                       phone_number=valid_data['phone_number'],
-                                                                       hospital=hosp,
-                                                                       permission_type=pem_type,
-                                                                       is_disabled=False,
-                                                                       super_user_permission=False,
-                                                                       write_permission=True,
-                                                                       created_by=request.user,
-                                                                       source_type=auth_models.GenericAdmin.APP,
-                                                                       entity_type=GenericAdminEntity.HOSPITAL)
+                                                                   phone_number=valid_data['phone_number'],
+                                                                   hospital=hosp,
+                                                                   permission_type=pem_type,
+                                                                   is_disabled=False,
+                                                                   super_user_permission=False,
+                                                                   write_permission=True,
+                                                                   created_by=request.user,
+                                                                   source_type=auth_models.GenericAdmin.APP,
+                                                                   entity_type=GenericAdminEntity.HOSPITAL)
         return Response({'success': 'Created Successfully'})
 
     def assoc_doctors(self, request, pk=None):
@@ -1358,7 +1358,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 
 
         resp = queryset.extra(select={'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END'})\
-            .values('name', 'id', 'assigned', 'phone_number')
+                       .values('name', 'id', 'assigned', 'phone_number')
         return Response(resp)
 
     def assoc_hosp(self, request, pk=None):
@@ -1420,32 +1420,32 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital').prefetch_related('doctor__doctor_clinic').exclude(user=request.user)
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
-            query = queryset.filter(Q(doctor_id=valid_data.get('id')),
-                                    Q(entity_type=GenericAdminEntity.DOCTOR),
-                                    (
-                                        Q(hospital__isnull=True)|
-                                        Q(hospital__isnull=False, doctor__doctor_clinics__hospital=F('hospital'))
-                                    )
-                                    )\
-                .annotate(hospital_id=F('doctor__doctor_clinics__hospital__id'))\
-                .values('id', 'phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_id', 'updated_at')
+            query = queryset.filter(doctor_id=valid_data.get('id'),
+                                    entity_type=GenericAdminEntity.DOCTOR
+                                    # (
+                                    #     Q(hospital__isnull=True)|
+                                    #     Q(hospital__isnull=False, doctor__doctor_clinics__hospital=F('hospital'))
+                                    # )
+                                    ) \
+                            .annotate(hospital_ids=F('hospital__id'))\
+                            .values('id', 'phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_ids', 'updated_at')
             for x in query:
                 if temp.get(x['phone_number']):
                     temp[x['phone_number']]['hospital_id'].append(x['hospital_id'])
                 else:
-                    x['hospital_id'] = [x['hospital_id']]
+                    x['hospital_ids'] = [x['hospital_ids']] if x['hospital_ids'] else []
                     temp[x['phone_number']] = x
             response = list(temp.values())
 
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
-            response = queryset.filter(Q(hospital_id=valid_data.get('id'), entity_type=GenericAdminEntity.HOSPITAL),
-                                       (
-                                            Q(doctor__isnull=True) |
-                                            Q(doctor__isnull=False, hospital__hospital_doctors__doctor=F('doctor'))
-                                       )
+            response = queryset.filter(hospital_id=valid_data.get('id'), entity_type=GenericAdminEntity.HOSPITAL
+                                       # (
+                                       #      Q(doctor__isnull=True) |
+                                       #      Q(doctor__isnull=False, hospital__hospital_doctors__doctor=F('doctor'))
+                                       # )
 
                                        )\
-                .annotate(doctor_ids=F('hospital__hospital_doctors__doctor__id'), hospital_name=F('hospital__name')) \
+                .annotate(doctor_ids=F('doctor__id'), hospital_name=F('hospital__name')) \
                 .values('phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'doctor_ids',
                         'hospital_id', 'hospital_name', 'updated_at')
 
@@ -1471,7 +1471,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                             break
                     if not x.get('is_doctor'):
                         x['is_doctor'] = False
-                    x['doctor_ids'] = [x['doctor_ids']]
+                    x['doctor_ids'] = [x['doctor_ids']] if x['doctor_ids'] else []
                     temp[x['phone_number']] = x
             admin_final_list = list(temp.values())
             for a_d in assoc_docs:
