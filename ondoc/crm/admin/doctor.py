@@ -614,6 +614,11 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
                     raise forms.ValidationError("Duplicate Permission with this phone number exists.")
                 else:
                     validate_unique.append(row)
+            numbers = list(zip(*validate_unique))[0]
+            for row in validate_unique:
+                if row[1] is None and numbers.count(row[0]) > 1:
+                    raise forms.ValidationError(
+                        "Permissions for all Hospitals already allocated for %s." % (row[0]))
 
 
 class GenericAdminInline(nested_admin.NestedTabularInline):

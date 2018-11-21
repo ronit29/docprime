@@ -109,6 +109,11 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
             if appnt_manager_flag:
                 raise forms.ValidationError(
                     "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
+        numbers = list(zip(*validate_unique))[0]
+        for row in validate_unique:
+            if row[1] is None and numbers.count(row[0]) > 1:
+                raise forms.ValidationError(
+                    "Permissions for all doctors already allocated for %s." % (row[0]))
 
 
 class GenericAdminInline(admin.TabularInline):
