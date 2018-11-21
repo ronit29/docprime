@@ -63,7 +63,7 @@ class DoctorSearchHelper:
             filtering_params.append(
                 "hospital_type IN(%(sits_at)s)"
             )
-            params['sits_at'] = ", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in
+            params['sits_at'] = ", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in self.query_params.get("sits_at")])
 
         procedure_ids = self.query_params.get("procedure_ids", [])  # NEW_LOGIC
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
@@ -83,7 +83,6 @@ class DoctorSearchHelper:
             filtering_params.append(
                 " dcp.procedure_id IN({})".format(",".join(procedure_mapped_ids)))
 
-                                                         self.query_params.get("sits_at")])
         if len(procedure_ids) == 0 and self.query_params.get("min_fees") is not None:
             filtering_params.append(
                 # "deal_price>={}".format(str(self.query_params.get("min_fees")))
@@ -137,7 +136,6 @@ class DoctorSearchHelper:
         if self.query_params.get('url') and not self.query_params.get('sort_on'):
             return 'distance, dc.priority desc', rank_by
 
-
         if self.query_params.get("procedure_ids", []) or self.query_params.get("procedure_category_ids", []):  # NEW_LOGIC
             order_by_field = 'count_per_clinic desc, distance, sum_per_clinic'  # NEW_LOGIC
             rank_by = "rank_procedure=1"
@@ -150,12 +148,12 @@ class DoctorSearchHelper:
             order_by_field = "{} ".format(order_by_field)
         else:
             if self.query_params.get('sort_on'):
-            if self.query_params.get('sort_on') == 'experience':
-                order_by_field = 'practicing_since ASC, dc.priority desc'
-            if self.query_params.get('sort_on') == 'fees':
-                order_by_field = "deal_price ASC, dc.priority desc"
-                rank_by = "rank_fees=1"
-        order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC', order_by_field)
+                if self.query_params.get('sort_on') == 'experience':
+                    order_by_field = 'practicing_since ASC, dc.priority desc'
+                if self.query_params.get('sort_on') == 'fees':
+                    order_by_field = "deal_price ASC, dc.priority desc"
+                    rank_by = "rank_fees=1"
+            order_by_field = "{}, {} ".format('d.is_live DESC, d.enabled_for_online_booking DESC, d.is_license_verified DESC', order_by_field)
 
         return order_by_field, rank_by
 
