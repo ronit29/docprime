@@ -82,7 +82,6 @@ class InsuredMemberSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=MemberListSerializer())
     insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
     insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
-    insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
 
 
 class InsuranceTransactionSerializer(serializers.Serializer):
