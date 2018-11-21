@@ -1271,6 +1271,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     if user_queryset:
                         user = user_queryset
                     ad = auth_models.GenericAdmin.create_permission_object(user=user, doctor=doct,
+                                                                      name=valid_data.get('name', None),
                                                                       phone_number=valid_data['phone_number'],
                                                                       hospital=hos,
                                                                       permission_type=pem_type,
@@ -1291,6 +1292,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     user = user_queryset
                 try:
                     auth_models.GenericAdmin.objects.create(user=user, doctor=doct,
+                                                                       name=valid_data.get('name', None),
                                                                        phone_number=valid_data['phone_number'],
                                                                        hospital=None,
                                                                        permission_type=pem_type,
@@ -1307,7 +1309,9 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             hosp = Hospital.objects.get(id=valid_data['id'])
             user_queryset = User.objects.filter(user_type=User.DOCTOR,
                                                 phone_number=valid_data['phone_number']).first()
-            if valid_data['type'] == User.DOCTOR:
+            doc_name = None
+            if valid_data['type'] == User.DOCTOR  and valid_data.get('doc_profile'):
+                doc_name = valid_data['doc_profile'].name
                 try:
                     auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('number'), doctor=valid_data.get('profile'))
                 except Exception as e:
@@ -1319,6 +1323,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     if user_queryset:
                         user = user_queryset
                     ad = auth_models.GenericAdmin.create_permission_object(user=user, doctor=doc,
+                                                                      name=doc_name,
                                                                       phone_number=valid_data['phone_number'], hospital=hosp,
                                                                       permission_type=pem_type,
                                                                       is_disabled=False,
@@ -1337,6 +1342,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 if user_queryset:
                     user = user_queryset
                 auth_models.GenericAdmin.objects.create(user=user, doctor=None,
+                                                                   name=doc_name,
                                                                    phone_number=valid_data['phone_number'],
                                                                    hospital=hosp,
                                                                    permission_type=pem_type,

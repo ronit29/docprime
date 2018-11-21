@@ -1024,9 +1024,9 @@ class AdminCreateBodySerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs['type'] == User.DOCTOR and not attrs['doc_profile']:
             raise serializers.ValidationError("DocProfile is Required.")
-        if attrs['entity_type'] == GenericAdminEntity.DOCTOR and not attrs['assoc_hosp']:
+        if attrs['entity_type'] == GenericAdminEntity.DOCTOR and 'assoc_hosp'not in attrs:
             raise serializers.ValidationError("Associated Hospitals  are Required.")
-        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and not attrs['assoc_doc']:
+        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and 'assoc_doc' not in attrs:
             raise serializers.ValidationError("Associated Doctors are Required.")
         return attrs
         # if DoctorNumber.objects.filter(doctor=attrs['doc_profile'], phone_number=attrs['phone_number']).exists():
