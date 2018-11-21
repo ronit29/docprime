@@ -1372,7 +1372,6 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         queryset = doctor.hospitals.filter(is_appointment_manager=False)
         return Response(queryset.values('name', 'id'))
 
-
     def list_entities(self, request):
         user = request.user
         opd_list = []
@@ -1433,13 +1432,16 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                     #     Q(hospital__isnull=False, doctor__doctor_clinics__hospital=F('hospital'))
                                     # )
                                     ) \
-                            .annotate(hospital_ids=F('hospital__id'))\
-                            .values('id', 'phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_ids', 'updated_at')
+                            .annotate(hospital_ids=F('hospital__id'), hospital_ids_count=Count('hospital__hospital_doctors__doctor'))\
+                            .values('id', 'phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'hospital_ids',
+                                    'hospital_ids_count', 'updated_at')
             for x in query:
                 if temp.get(x['phone_number']):
                     temp[x['phone_number']]['hospital_id'].append(x['hospital_id'])
                 else:
                     x['hospital_ids'] = [x['hospital_ids']] if x['hospital_ids'] else []
+                    if len(x['hospital_ids']) > 0:
+                        x['hospital_ids_count'] = len(x['hospital_ids'])
                     temp[x['phone_number']] = x
             response = list(temp.values())
 
@@ -1450,10 +1452,10 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                        #      Q(doctor__isnull=False, hospital__hospital_doctors__doctor=F('doctor'))
                                        # )
 
-                                       )\
-                .annotate(doctor_ids=F('doctor__id'), hospital_name=F('hospital__name')) \
+                                       ) \
+                .annotate(doctor_ids=F('doctor__id'), hospital_name=F('hospital__name'), doctor_ids_count=Count('hospital__hospital_doctors__doctor')) \
                 .values('phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'doctor_ids',
-                        'hospital_id', 'hospital_name', 'updated_at')
+                        'doctor_ids_count' ,'hospital_id', 'hospital_name', 'updated_at')
 
             hos_queryset = Hospital.objects.prefetch_related('assoc_doctors').filter(id=valid_data.get('id'))
             if hos_queryset.exists():
@@ -1478,6 +1480,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     if not x.get('is_doctor'):
                         x['is_doctor'] = False
                     x['doctor_ids'] = [x['doctor_ids']] if x['doctor_ids'] else []
+                    if len(x['doctor_ids']) > 0:
+                        x['doctor_ids_count'] = len(x['doctor_ids'])
                     temp[x['phone_number']] = x
             admin_final_list = list(temp.values())
             for a_d in assoc_docs:
