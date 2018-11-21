@@ -1257,3 +1257,20 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         if query:
             return Response(query)
         return Response([])
+
+class HospitalNetworkListViewset(viewsets.GenericViewSet):
+    def list(self, request, hospital_network_id):
+        parameters = request.query_params
+        queryset = Hospital.objects.filter(network_id=hospital_network_id)
+        resp = {}
+        info = []
+        if not queryset:
+            return Response(resp)
+        if len(queryset) > 0:
+            for data in queryset:
+                name = data.name
+                id = data.id
+            info.append({'Hospital_id': id, 'Hospital_name': name})
+            resp['Hospital-list'] = info
+        return Response(resp)
+
