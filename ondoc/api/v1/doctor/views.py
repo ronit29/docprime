@@ -1262,15 +1262,21 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
     def list(self, request, hospital_network_id):
         parameters = request.query_params
         queryset = Hospital.objects.filter(network_id=hospital_network_id)
-        resp = {}
+        resp1 = {}
         info = []
         if not queryset:
-            return Response(resp)
+            return Response({})
         if len(queryset) > 0:
+            resp = {}
             for data in queryset:
-                name = data.name
-                id = data.id
-            info.append({'Hospital_id': id, 'Hospital_name': name})
-            resp['Hospital-list'] = info
-        return Response(resp)
+                resp['hospital-id'] = data.id
+                resp['city'] = data.city
+                resp['state'] = data.state
+                resp['country'] = data.country
+                resp['name'] = data.name
+                network_name = data.network.name
+                info.append({'title': resp})
+            # info1 = {'name' : data.name, 'List': new_list}
+                resp1 = {'hospital-Network': network_name, 'hospital-list': info}
+        return Response(resp1)
 
