@@ -83,9 +83,9 @@ class NotificationAction:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             procedure_mappings = instance.procedure_mappings.select_related("procedure").all()
-            procedures = [{"name": mapping.procedure.name, "mrp": mapping.mrp, "deal_price": mapping.deal_price,
-                           "discount": mapping.mrp - mapping.deal_price} for mapping in procedure_mappings]
-            coupon_discount = instance.deal_price - instance.effective_price
+            procedures = [{"name": mapping.procedure.name, "mrp": str(mapping.mrp), "deal_price": str(mapping.deal_price),
+                           "discount": str(mapping.mrp - mapping.deal_price)} for mapping in procedure_mappings]
+            coupon_discount = str(instance.deal_price - instance.effective_price)
             context = {
                 "doctor_name": doctor_name,
                 "patient_name": patient_name,
@@ -156,9 +156,10 @@ class NotificationAction:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             procedure_mappings = instance.procedure_mappings.select_related("procedure").all()
-            procedures = [{"name": mapping.procedure.name, "mrp": mapping.mrp, "deal_price": mapping.deal_price,
-                           "discount": mapping.mrp - mapping.deal_price} for mapping in procedure_mappings]
-            coupon_discount = instance.deal_price - instance.effective_price
+            procedures = [
+                {"name": mapping.procedure.name, "mrp": str(mapping.mrp), "deal_price": str(mapping.deal_price),
+                 "discount": str(mapping.mrp - mapping.deal_price)} for mapping in procedure_mappings]
+            coupon_discount = str(instance.deal_price - instance.effective_price)
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,

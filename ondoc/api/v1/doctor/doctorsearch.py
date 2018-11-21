@@ -10,7 +10,7 @@ from django.core import serializers as core_serializer
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
-    get_selected_and_other_categories, get_included_doctor_clinic_procedure, \
+    get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
 from datetime import datetime
 import re
@@ -247,7 +247,7 @@ class DoctorSearchHelper:
         category_ids = [int(x) for x in category_ids]
         procedure_ids = [int(x) for x in procedure_ids]
         response = []
-        selected_procedure_ids, other_procedure_ids = get_selected_and_other_categories(category_ids, procedure_ids)
+        selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         total_deal_price, total_mrp = 0, 0
         for doctor in doctor_data:
 

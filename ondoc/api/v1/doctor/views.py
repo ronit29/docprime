@@ -12,7 +12,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
-    get_selected_and_other_categories
+    get_selected_and_other_procedures
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
@@ -596,7 +596,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'rating',
                                     )
                   .filter(pk=pk).first())
-        selected_procedure_ids, other_procedure_ids = get_selected_and_other_categories(category_ids, procedure_ids,
+        selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids,
                                                                                         doctor, all=True)
         if doctor:
             serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,

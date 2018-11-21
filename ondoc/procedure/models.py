@@ -171,7 +171,7 @@ class CommonProcedureCategory(auth_model.TimeStampedModel):
         db_table = "common_procedure_category"
 
 
-def get_selected_and_other_categories(category_ids, procedure_ids, doctor=None, all=False):
+def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, all=False):
     selected_procedure_ids = []
     other_procedure_ids = []
     if not all:
