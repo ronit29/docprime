@@ -142,12 +142,14 @@ def clinic_convert_timings(timings, is_day_human_readable=True):
     return final_dict
 
 class RawSql:
-    def __init__(self, query):
+    def __init__(self, query, parameters):
         self.query = query
+        self.parameters = parameters
+
 
     def fetch_all(self):
         with connection.cursor() as cursor:
-            cursor.execute(self.query)
+            cursor.execute(self.query, self.parameters)
             columns = [col[0] for col in cursor.description]
             result = [
                 dict(zip(columns, row))
@@ -451,6 +453,9 @@ def doctor_query_parameters(entity_params, req_params):
             params_dict["longitude"] = entity_params["location_json"]["locality_longitude"]
     if entity_params.get("specialization_id"):
         params_dict["specialization_ids"] = str(entity_params["specialization_id"])
+    else:
+        params_dict["specialization_ids"] = ''
+
     return params_dict
 
 
@@ -528,10 +533,13 @@ class CouponsMixin(object):
         else:
             return {"is_valid": False, "used_count": None}
 
-    def get_discount(self, coupon_code, price):
+    def get_discount(self, coupon_code, price, coupon_object=None):
         from ondoc.coupon.models import Coupon
 
-        data = Coupon.objects.filter(code__exact=coupon_code).first()
+        if coupon_object:
+            data = coupon_object
+        else:
+            data = Coupon.objects.filter(code__exact=coupon_code).first()
         discount = 0
 
         if data:

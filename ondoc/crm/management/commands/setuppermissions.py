@@ -17,7 +17,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  DoctorMapping, OpdAppointment, CommonMedicalCondition, CommonSpecialization,
                                  MedicalCondition, PracticeSpecialization, SpecializationDepartment, SpecializationField,
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
-                                 SpecializationDepartmentMapping)
+                                 SpecializationDepartmentMapping, DoctorClinicProcedure, Procedure)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -71,7 +71,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
-            SPOCDetails)
+            DoctorClinicProcedure, SPOCDetails)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -128,7 +128,7 @@ class Command(BaseCommand):
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
-                                                           SpecializationDepartmentMapping
+                                                           SpecializationDepartmentMapping,Procedure
                                                            )
 
         for cl, ct in content_types.items():
@@ -138,9 +138,7 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(LabTest,
-                                                           LabTestType, LabService,
-                                                           TestParameter, ParameterLabTest, LabTestPackage)
+        content_types = ContentType.objects.get_for_models(LabTest, LabTestType, LabService, TestParameter)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -148,6 +146,18 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model)
+                )
+            group.permissions.add(*permissions)
+
 
         content_types = ContentType.objects.get_for_models(
             DoctorClinic, DoctorClinicTiming, GenericAdmin, GenericLabAdmin,
@@ -158,7 +168,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, SPOCDetails)
+            CompetitorMonthlyVisit, DoctorClinicProcedure, SPOCDetails)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -197,8 +207,8 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(
             Qualification, Specialization, Language, MedicalService, College, LabTest,
-            LabTestType, LabService, TestParameter, ParameterLabTest, LabTestPackage, PracticeSpecialization,
-            SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping)
+            LabTestType, LabService, TestParameter, PracticeSpecialization,
+            SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping, Procedure)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -206,6 +216,19 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
+
+
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model)
+                )
+            group.permissions.add(*permissions)
+
 
 
         content_types = ContentType.objects.get_for_models(
@@ -217,7 +240,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, SPOCDetails, GenericAdmin, GenericLabAdmin)
+            CompetitorMonthlyVisit, DoctorClinicProcedure, SPOCDetails, GenericAdmin, GenericLabAdmin)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -385,6 +408,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(AboutDoctor, DoctorPracticeSpecialization, DoctorQualification,
                                                            DoctorClinicTiming, DoctorClinic, DoctorLanguage,
                                                            DoctorAward, DoctorAssociation, DoctorExperience,
+                                                           DoctorClinicProcedure,
                                                            for_concrete_models=False)
 
         for cl, ct in content_types.items():

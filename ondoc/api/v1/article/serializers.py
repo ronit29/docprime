@@ -27,17 +27,38 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     icon = serializers.SerializerMethodField()
     seo = serializers.SerializerMethodField()
     category = serializers.SerializerMethodField()
-    linked_urls = serializers.SerializerMethodField()
-    linked_articles = serializers.SerializerMethodField()
+    # linked_urls = serializers.SerializerMethodField()
+    # linked_articles = serializers.SerializerMethodField()
     published_date = serializers.SerializerMethodField()
+    linked = serializers.SerializerMethodField()
 
-    def get_linked_urls(self, obj):
-        serializer = LinkedUrlSerializer(obj.articlelinkedurl_set.all(), many=True)
-        return serializer.data
+    def get_linked(self, obj):
+        resp = {}
+        for la in obj.related_articles.all():
+            if la.content_box:
+                if not resp.get(la.content_box.pk):
+                    resp[la.content_box.pk] = {'content_box_title': la.content_box.title, 'urls': []}
+                resp[la.content_box.pk]['urls'].append({'title': la.title, 'url': la.linked_article.url})
 
-    def get_linked_articles(self, obj):
-        serializer = LinkedArticleSerializer(obj.related_articles.all(), many=True)
-        return serializer.data
+        for lu in obj.articlelinkedurl_set.all():
+            if lu.content_box:
+                if not resp.get(lu.content_box.pk):
+                    resp[lu.content_box.pk] = {'content_box_title': lu.content_box.title, 'urls': []}
+                resp[lu.content_box.pk]['urls'].append({'title': lu.title, 'url': lu.url})
+
+
+        final_result = []
+        for key, value in resp.items():
+            final_result.append(value)
+        return final_result
+
+    # def get_linked_urls(self, obj):
+    #     serializer = LinkedUrlSerializer(obj.articlelinkedurl_set.all(), many=True)
+    #     return serializer.data
+    #
+    # def get_linked_articles(self, obj):
+    #     serializer = LinkedArticleSerializer(obj.related_articles.all(), many=True)
+    #     return serializer.data
 
     def get_icon(self, obj):
         request = self.context.get('request')
@@ -58,7 +79,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Article
         fields = ('title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
-                  'linked_urls', 'linked_articles', 'author_name', 'published_date')
+                  'linked', 'author_name', 'published_date')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):

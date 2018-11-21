@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
-from django.db.models import Q
+from django.db.models import Q, Avg, Count, Max
 from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
@@ -11,8 +11,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
 from ondoc.authentication.models import UserProfile
-from django.db.models import Avg
-from django.db.models import Q
+
 from ondoc.coupon.models import Coupon
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -23,6 +22,7 @@ from django.contrib.auth import get_user_model
 import math
 import datetime
 import pytz
+from django.contrib.staticfiles.templatetags.staticfiles import static
 import json
 import logging
 from dateutil import tz
@@ -142,7 +142,7 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     time_slot_start = serializers.DateTimeField()
     payment_type = serializers.IntegerField()
-    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
 
@@ -339,7 +339,10 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     discounted_fees = serializers.IntegerField(read_only=True, allow_null=True, source='deal_price')
     lat = serializers.SerializerMethodField(read_only=True)
     long = serializers.SerializerMethodField(read_only=True)
-
+    enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
+    
+    def get_enabled_for_online_booking(self, obj):
+        return obj.doctor_clinic.enabled_for_online_booking
     def get_lat(self, obj):
         if obj.doctor_clinic.hospital.location:
             return obj.doctor_clinic.hospital.location.y
@@ -368,7 +371,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
-                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id', )
+                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking')
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -641,7 +644,7 @@ class DoctorListSerializer(serializers.Serializer):
 
 
 class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
-    emails = None
+    #emails = None
     experience_years = serializers.IntegerField(allow_null=True)
     is_license_verified = serializers.BooleanField(read_only=True)
     # hospitals = DoctorHospitalSerializer(read_only=True, many=True, source='get_hospitals')
@@ -657,6 +660,48 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     breadcrumb = serializers.SerializerMethodField()
     unrated_appointment = serializers.SerializerMethodField()
     is_gold = serializers.SerializerMethodField()
+    search_data = serializers.SerializerMethodField()
+
+    def get_search_data(self, obj):
+        data = {}
+        lat = None
+        long = None
+        specialization = None
+        specialization_id = None
+        title = None
+        locality = None
+        sublocality = None
+        clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
+
+        if clinics:
+            hospital = clinics[0]
+            if hospital.hospital and hospital.hospital.location:
+                lat = hospital.hospital.location.y
+                long = hospital.hospital.location.x
+                hosp_entity_relation = hospital.hospital.entity.all().prefetch_related('location')
+                for entity_relation in hosp_entity_relation:
+                    entity_address = entity_relation.location
+                    if entity_address.type_blueprint == 'LOCALITY':
+                        locality = entity_address.alternative_value
+                    if entity_address.type_blueprint == 'SUBLOCALITY':
+                        sublocality = entity_address.alternative_value
+
+
+        if len(obj.doctorpracticespecializations.all())>0:
+            dsp = [specialization.specialization for specialization in obj.doctorpracticespecializations.all()]
+            top_specialization = DoctorPracticeSpecialization.objects.filter(specialization__in=dsp).values('specialization')\
+                .annotate(doctor_count=Count('doctor'),name=Max('specialization__name')).order_by('-doctor_count').first()
+
+            if top_specialization:
+                specialization = top_specialization.get('name')
+                specialization_id = top_specialization.get('specialization')
+
+        if sublocality and locality and specialization:
+            title = specialization + 's near ' + sublocality + ' ' + locality
+
+        if lat and long and specialization and title:
+            return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title}
+        return None
 
     def get_display_rating_widget(self, obj):
         if obj.rating.count() > 10:
@@ -667,8 +712,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return obj.is_gold and obj.enabled_for_online_booking
 
     def get_rating(self, obj):
-        queryset = obj.rating.exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
-        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True)
+        app = OpdAppointment.objects.select_related('profile').all()
+
+        queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app':app})
         return reviews.data[:5]
 
     def get_unrated_appointment(self, obj):
@@ -697,29 +744,15 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         specializations = [doctor_specialization.specialization for doctor_specialization in obj.doctorpracticespecializations.all()]
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
-        entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
-                                           is_valid=True)
-        sublocality = ''
-        locality = ''
-        if entity.exists():
-
-            entity = entity.first()
+        # entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
+        #                                    is_valid=True)
+        sublocality = None
+        locality = None
+        if self.context.get('entity'):
+            entity = self.context.get('entity')
             if entity.additional_info:
                 locality = entity.additional_info.get('locality_value')
                 sublocality = entity.additional_info.get('sublocality_value')
-                # if sublocality:
-                #     locality = " " + locality
-            # location_id = entity.first().additional_info.get('location_id')
-            # type = EntityAddress.objects.filter(id=location_id).values('type','value', 'parent')
-            # if type.exists():
-            #        if type.first().get('type') == 'LOCALITY':
-            #            locality = type.first().get('value')
-            #
-            # if type.exists():
-            #     if type.first().get('type') == 'SUBLOCALITY':
-            #         sublocality = type.first().get('value')
-            #         parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-            #         locality = ' ' + parent.first().get('value')
 
         title = "Dr. " + obj.name
         description = "Dr. " + obj.name + ': ' + "Dr. " + obj.name
@@ -731,7 +764,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if len(doc_spec_list) >= 1:
             title +=  ' - '+', '.join(doc_spec_list)
             description += ' is ' + ', '.join(doc_spec_list)
-        if sublocality:
+        if sublocality and locality:
             title += ' in ' + sublocality + " " + locality + ' - Consult Online'
             description += ' in ' + sublocality + " " + locality
         elif locality:
@@ -785,7 +818,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         schema = {
             'name': self.instance.get_display_name(),
-            'image': self.instance.get_thumbnail() if self.instance.get_thumbnail() else '',
+            'image': self.instance.get_thumbnail() if self.instance.get_thumbnail() else static('web/images/doc_placeholder.png'),
             '@context': 'http://schema.org',
             '@type': 'MedicalBusiness',
             'address': {
@@ -818,11 +851,12 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         if self.parent:
             return None
-        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Doctor')
+        # entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+        #                                    entity_type__iexact='Doctor')
         breadcrums = None
-        if entity.exists():
-            breadcrums = entity.first().additional_info.get('breadcrums')
+        if self.context.get('entity'):
+            entity = self.context.get('entity')
+            breadcrums = entity.additional_info.get('breadcrums')
             if breadcrums:
                 return breadcrums
         return breadcrums
@@ -860,6 +894,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
     def get_hospitals(self, obj):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
+                                                 doctor_clinic__enabled=True,
                                                  doctor_clinic__hospital__is_live=True).select_related(
             "doctor_clinic__doctor", "doctor_clinic__hospital")
         return DoctorHospitalSerializer(data, context=self.context, many=True).data
@@ -869,9 +904,9 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
         fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
-                  'hospital_count', 'hospitals', 'procedures', 'id', 'images', 'languages', 'name', 'practicing_since', 'qualifications',
+                  'hospital_count', 'hospitals', 'procedures', 'id', 'languages', 'name', 'practicing_since', 'qualifications',
                   'general_specialization', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
-                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold')
+                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold', 'search_data')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):

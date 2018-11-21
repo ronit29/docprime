@@ -31,8 +31,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
-from django.db.models import Q, Value
-from django.db.models import Case, When
+from django.db.models import Q, Value, Case, When
 from operator import itemgetter
 from itertools import groupby
 from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_parameters
@@ -54,6 +53,7 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
 from dal import autocomplete
+from django.contrib.staticfiles.templatetags.staticfiles import static
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -552,9 +552,10 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
-        url = request.query_params.get('url', None)
+        url = request.GET.get('url')
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
         url = url.lower()
         entity = location_models.EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).order_by('-is_valid')
         if entity.exists():
@@ -566,16 +567,16 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     corrected_url = valid_entity_url_qs.first().url
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
                 else:
-                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                    return Response(status=status.HTTP_404_NOT_FOUND)
 
             entity_id = entity.entity_id
-            response = self.retrieve(request, entity_id)
+            response = self.retrieve(request, entity_id, entity)
             return response
 
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, pk):
+    def retrieve(self, request, pk, entity=None):
         serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -590,16 +591,24 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                     'qualifications__qualification',
                                     'qualifications__specialization',
                                     'qualifications__college',
-                                    'doctorpractices'
-                                    'pecializations__specialization',
+                                    'doctorpracticespecializations__specialization',
                                     'images',
-                                    'rating',
+                                    'rating'
                                     )
                   .filter(pk=pk).first())
+        # if not doctor or not is_valid_testing_data(request.user, doctor):
+        #     return Response(status=status.HTTP_400_BAD_REQUEST)
+        if not doctor or (not doctor.is_live and not doctor.is_internal):
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not entity:
+            entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
+            if len(entity) > 0:
+                entity = entity[0]
+
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids,
                                                                                         doctor, all=True)
-        if doctor:
-            serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                      context={"request": request
                                                                          ,
                                                                               "selected_procedure_ids": selected_procedure_ids
@@ -607,18 +616,13 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                                                               "other_procedure_ids": other_procedure_ids
                                                                          , "category_ids": category_ids
                                                                          , "hospital_id": selected_hospital
+                                                                         , "entity":entity 
                                                                               })
 
-        # else:
-        #     if doctor:
-        #         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
-        #                                                                  context={"request": request})
-        if doctor:
-            entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
-                                               entity_type__iexact='Doctor').values('url')
-            response_data = self.prepare_response(serializer.data, selected_hospital)
+        response_data = self.prepare_response(serializer.data, selected_hospital)
 
-            response_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+        if entity:
+            response_data['url'] = entity.url
         return Response(response_data)
 
 
@@ -893,8 +897,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
                                            entity_type__iexact='Doctor').order_by('-sequence')
-        if entity_url_qs.exists():
-            entity = entity_url_qs.first()
+        if len(entity_url_qs) > 0:
+            entity = entity_url_qs[0]
             if not entity.is_valid:
                 valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
                                           entity_type__iexact='Doctor', specialization_id=entity.specialization_id,
@@ -940,7 +944,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             order_by_field, rank_by = doctor_search_helper.get_ordering_params()
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
-            doctor_search_result = RawSql(query_string).fetch_all()
+            doctor_search_result = RawSql(query_string.get('query'),
+                                         query_string.get('params')).fetch_all()
+
             result_count = len(doctor_search_result)
             # sa
             # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
@@ -953,9 +959,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
                                                 "doctor_clinics__hospital",
                                                 "doctorpracticespecializations", "doctorpracticespecializations__specialization",
-                                                "experiences", "images", "qualifications",
-                                                "qualifications__qualification", "qualifications__specialization",
-                                                "qualifications__college",
+                                                "images",
                                                 "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping").order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request)
@@ -1092,6 +1096,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "title": title,
                 "description": description,
                 "location": location,
+                "image": static('web/images/dclogo-placeholder.png'),
                 'schema': {
                     "@context": "http://schema.org",
                     "@type": "MedicalBusiness",
