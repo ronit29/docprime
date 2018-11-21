@@ -1500,6 +1500,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             pem_type = auth_models.GenericAdmin.BILLINNG
 
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
+
             delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=valid_data.get('phone_number'),
                                                                       entity_type=GenericAdminEntity.DOCTOR)
             if valid_data.get('remove_list'):
@@ -1517,6 +1518,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     if user_queryset:
                         user = user_queryset
                     ad = auth_models.GenericAdmin.create_permission_object(user=user, doctor=doct,
+                                                                      name=valid_data.get('name', None),
                                                                       phone_number=valid_data['phone_number'],
                                                                       hospital=hos,
                                                                       permission_type=pem_type,
@@ -1537,19 +1539,31 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     user = user_queryset
                 try:
                     auth_models.GenericAdmin.objects.create(user=user, doctor=doct,
-                                                                       phone_number=valid_data['phone_number'],
-                                                                       hospital=None,
-                                                                       permission_type=pem_type,
-                                                                       is_disabled=False,
-                                                                       super_user_permission=False,
-                                                                       write_permission=True,
-                                                                       is_doc_admin=False,
-                                                                       created_by=request.user,
-                                                                       source_type=auth_models.GenericAdmin.APP,
-                                                                       entity_type=GenericAdminEntity.DOCTOR)
+                                                            name=valid_data.get('name', None),
+                                                            phone_number=valid_data['phone_number'],
+                                                            hospital=None,
+                                                            permission_type=pem_type,
+                                                            is_disabled=False,
+                                                            super_user_permission=False,
+                                                            write_permission=True,
+                                                            is_doc_admin=False,
+                                                            created_by=request.user,
+                                                            source_type=auth_models.GenericAdmin.APP,
+                                                            entity_type=GenericAdminEntity.DOCTOR)
                 except Exception as e:
                     return Response({'error': 'something went wrong!'})
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
+            hosp = Hospital.objects.get(id=valid_data['id'])
+            doc_name = None
+            if valid_data['type'] == User.DOCTOR and valid_data.get('doc_profile'):
+                doc_name = valid_data['doc_profile'].name
+                dn = auth_models.DoctorNumber.objects.filter(hospital=hosp, doctor=valid_data.get('doc_profile'))
+                try:
+                    if dn.first():
+                        dn.update(phone_number=valid_data.get('phone_number'))
+                except Exception as e:
+                    return Response({'error': 'something went wrong!'})
+
             delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=valid_data.get('phone_number'),
                                                                       entity_type=GenericAdminEntity.HOSPITAL)
             if valid_data.get('remove_list'):
@@ -1558,7 +1572,6 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 delete_queryset = delete_queryset.filter(doctor_id=None)
             if len(delete_queryset):
                 delete_queryset.delete()
-            hosp = Hospital.objects.get(id=valid_data['id'])
             user_queryset = User.objects.filter(user_type=User.DOCTOR,
                                                 phone_number=valid_data['phone_number']).first()
             if valid_data['type'] == User.DOCTOR:
@@ -1573,6 +1586,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     if user_queryset:
                         user = user_queryset
                     ad = auth_models.GenericAdmin.create_permission_object(user=user, doctor=doc,
+                                                                      name=doc_name,
                                                                       phone_number=valid_data['phone_number'], hospital=hosp,
                                                                       permission_type=pem_type,
                                                                       is_disabled=False,
@@ -1591,13 +1605,14 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 if user_queryset:
                     user = user_queryset
                 auth_models.GenericAdmin.objects.create(user=user, doctor=None,
-                                                                       phone_number=valid_data['phone_number'],
-                                                                       hospital=hosp,
-                                                                       permission_type=pem_type,
-                                                                       is_disabled=False,
-                                                                       super_user_permission=False,
-                                                                       write_permission=True,
-                                                                       created_by=request.user,
-                                                                       source_type=auth_models.GenericAdmin.APP,
-                                                                       entity_type=GenericAdminEntity.HOSPITAL)
+                                                                   name=doc_name,
+                                                                   phone_number=valid_data['phone_number'],
+                                                                   hospital=hosp,
+                                                                   permission_type=pem_type,
+                                                                   is_disabled=False,
+                                                                   super_user_permission=False,
+                                                                   write_permission=True,
+                                                                   created_by=request.user,
+                                                                   source_type=auth_models.GenericAdmin.APP,
+                                                                   entity_type=GenericAdminEntity.HOSPITAL)
         return Response({'success': 'Created Successfully'})
