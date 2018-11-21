@@ -45,10 +45,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
         if request.user.is_authenticated:
             user = request.user
-            # this qs adds on all applicable user specific coupon for that user
             coupon_qs = coupon_qs | (Q(is_user_specific=True) & Q(user_specific_coupon__user=user) & Q(type__in=types))
 
-            # this filter gives the count of used coupons in previous appointments
             coupons_data = Coupon.objects\
                 .annotate(opd_used_count=Count('opd_appointment_coupon', filter=(Q(opd_appointment_coupon__user=user) & ~Q(opd_appointment_coupon__status__in=[OpdAppointment.CANCELLED]))),
                           lab_used_count=Count('lab_appointment_coupon', filter=(Q(lab_appointment_coupon__user=user) & ~Q(lab_appointment_coupon__status__in=[LabAppointment.CANCELLED]))))\
@@ -56,17 +54,14 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         else:
             coupons_data = Coupon.objects.filter(coupon_qs)
 
-            # add on case when query_params(lab and test) are also available
-        if product_id and product_id == Order.LAB_PRODUCT_ID and lab:   # for lab case only when lab param is available
-            lab_qs = Q(lab=lab)     # qs to give only coupons for that lab
+        if product_id and product_id == Order.LAB_PRODUCT_ID and lab:
+            lab_qs = Q(lab=lab)
             if test_ids:
-                # qs intersects cases - 1) lab is available, 2) (test_ids_lies in (available test for given lab in coupons_data)) OR (test is null for given lab)
                 lab_qs = lab_qs & (Q(test__in=test_ids, lab=lab) | Q(test__isnull=True, lab=lab)) | (Q(lab_network=lab.network, lab__isnull=True, test__in=test_ids))
 
-            # qs adds on cases when 1) lab_network is available for given lab in coupons_data and is equal to incoming lab's network
-            #                       2) (lab_network is available coupons_data and is equal to incoming lab's network) AND (lab is null in coupons_data)
-            #                       3) lab and lab_network in coupons_data is null
-            lab_qs = lab_qs | Q(lab_network=lab.network, lab=lab) | Q(lab_network=lab.network, lab__isnull=True, test__isnull=True) | Q(lab__isnull=True, lab_network__isnull=True)
+            lab_qs = lab_qs |   Q(lab_network=lab.network, lab=lab) | \
+                                Q(lab_network=lab.network, lab__isnull=True, test__isnull=True) | \
+                                Q(lab__isnull=True, lab_network__isnull=True)
             coupons_data = coupons_data.filter(lab_qs)
 
         applicable_coupons = []
