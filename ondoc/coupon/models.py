@@ -24,6 +24,7 @@ class Coupon(auth_model.TimeStampedModel):
     test = models.ManyToManyField("diagnostic.LabTest", blank=True, null=True)
     show_price = models.BooleanField(default=True)
     is_user_specific = models.BooleanField(default=False)
+    is_corporate = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if self.percentage_discount == 100:

@@ -653,6 +653,7 @@ class LabTest(TimeStampedModel, SearchKey):
     report_schedule = models.CharField(max_length=150, default='After 2 days of test.', verbose_name='What is the report schedule for the test?')
     enable_for_ppc = models.BooleanField(default=False)
     enable_for_retail = models.BooleanField(default=False)
+    is_corporate = models.BooleanField(default=False)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,

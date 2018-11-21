@@ -48,9 +48,10 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             coupon_qs = coupon_qs | (Q(is_user_specific=True) & Q(user_specific_coupon__user=user) & Q(type__in=types))
 
             coupons_data = Coupon.objects\
+                .select_related('lab_network')\
                 .annotate(opd_used_count=Count('opd_appointment_coupon', filter=(Q(opd_appointment_coupon__user=user) & ~Q(opd_appointment_coupon__status__in=[OpdAppointment.CANCELLED]))),
                           lab_used_count=Count('lab_appointment_coupon', filter=(Q(lab_appointment_coupon__user=user) & ~Q(lab_appointment_coupon__status__in=[LabAppointment.CANCELLED]))))\
-                .filter(coupon_qs).prefetch_related('lab_appointment_coupon', 'opd_appointment_coupon')
+                .filter(coupon_qs).prefetch_related('lab_appointment_coupon', 'opd_appointment_coupon', 'test')
         else:
             coupons_data = Coupon.objects.filter(coupon_qs)
 
@@ -79,6 +80,9 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                            "used_count": used_count,
                                            "coupon": coupon,
                                            "heading": coupon.heading,
+                                           "is_corporate" : coupon.is_corporate,
+                                           "tests": [ test.id for test in coupon.test.all() ],
+                                           "network_id": coupon.lab_network.id if coupon.lab_network else None,
                                            "tnc": coupon.tnc})
 
 
