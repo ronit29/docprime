@@ -94,7 +94,7 @@ class NotificationAction:
                     time_slot_start.strftime("%d/%m/%y"), doctor_name
                 ),
                 "procedures": procedures,
-                "coupon_discount": str(instance.discount),
+                "coupon_discount": str(instance.discount) if instance.discount else None,
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -162,7 +162,7 @@ class NotificationAction:
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y"), doctor_name),
                 "procedures": procedures,
-                "coupon_discount": str(instance.discount),
+                "coupon_discount": str(instance.discount) if instance.discount else None,
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
