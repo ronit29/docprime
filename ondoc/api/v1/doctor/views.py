@@ -1260,10 +1260,10 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             pem_type = auth_models.GenericAdmin.ALL
         elif valid_data.get('billing_enabled') and not valid_data.get('appointment_enabled'):
             pem_type = auth_models.GenericAdmin.BILLINNG
+        user_queryset = User.objects.filter(user_type=User.DOCTOR, phone_number=valid_data['phone_number']).first()
 
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
             doct = Doctor.objects.get(id=valid_data['id'])
-            user_queryset = User.objects.filter(user_type=User.DOCTOR, phone_number=valid_data['phone_number']).first()
             if valid_data.get('assoc_hosp'):
                 create_admins = []
                 for hos in valid_data['assoc_hosp']:
@@ -1307,8 +1307,6 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     return Response({'error': 'something went wrong!'})
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
             hosp = Hospital.objects.get(id=valid_data['id'])
-            user_queryset = User.objects.filter(user_type=User.DOCTOR,
-                                                phone_number=valid_data['phone_number']).first()
             name = valid_data.get('name', None)
             if valid_data['type'] == User.DOCTOR  and valid_data.get('doc_profile'):
                 name = valid_data['doc_profile'].name
@@ -1352,6 +1350,21 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                                                    created_by=request.user,
                                                                    source_type=auth_models.GenericAdmin.APP,
                                                                    entity_type=GenericAdminEntity.HOSPITAL)
+        elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
+            lab = lab_models.Lab.objects.get(id=valid_data.get('id'))
+            user = None
+            if user_queryset:
+                user = user_queryset
+            auth_models.GenericAdmin.objects.create(user=user,
+                                                    phone_number=valid_data['phone_number'],
+                                                    lab_network=None,
+                                                    lab=lab,
+                                                    permission_type=pem_type,
+                                                    is_disabled=False,
+                                                    super_user_permission=False,
+                                                    write_permission=True,
+                                                    read_permission=True
+                                                    )
         return Response({'success': 'Created Successfully'})
 
     def assoc_doctors(self, request, pk=None):
@@ -1508,6 +1521,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             pem_type = auth_models.GenericAdmin.ALL
         elif valid_data.get('billing_enabled') and not valid_data.get('appointment_enabled'):
             pem_type = auth_models.GenericAdmin.BILLINNG
+        user_queryset = User.objects.filter(user_type=User.DOCTOR, phone_number=valid_data['phone_number']).first()
 
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
 
@@ -1520,7 +1534,6 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             if len(delete_queryset) > 0:
                 delete_queryset.delete()
             doct = Doctor.objects.get(id=valid_data['id'])
-            user_queryset = User.objects.filter(user_type=User.DOCTOR, phone_number=valid_data['phone_number']).first()
             if valid_data.get('assoc_hosp'):
                 create_admins = []
                 for hos in valid_data['assoc_hosp']:
@@ -1582,8 +1595,6 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 delete_queryset = delete_queryset.filter(doctor_id=None)
             if len(delete_queryset):
                 delete_queryset.delete()
-            user_queryset = User.objects.filter(user_type=User.DOCTOR,
-                                                phone_number=valid_data['phone_number']).first()
             if valid_data['type'] == User.DOCTOR:
                 try:
                     auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('number'), doctor=valid_data.get('profile'))
@@ -1625,4 +1636,12 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                                                    created_by=request.user,
                                                                    source_type=auth_models.GenericAdmin.APP,
                                                                    entity_type=GenericAdminEntity.HOSPITAL)
+        elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
+
+            admin = auth_models.GenericLabAdmin.objects.filter(phone_number=valid_data.get('phone_number'), lab_id=valid_data.get('id'))
+            user = None
+            if user_queryset:
+                user = user_queryset
+            if admin.exists():
+                admin.update(user=user, name=valid_data.get('name'))
         return Response({'success': 'Created Successfully'})

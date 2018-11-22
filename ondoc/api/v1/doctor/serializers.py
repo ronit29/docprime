@@ -8,7 +8,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
                                  CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
-
+from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber
 from django.db.models import Avg
 from django.db.models import Q
@@ -1022,10 +1022,18 @@ class AdminCreateBodySerializer(serializers.Serializer):
                                       required=False)
 
     def validate(self, attrs):
+        if attrs['type'] == User.STAFF and 'name' not in attrs:
+            raise serializers.ValidationError("Name is Required.")
         if attrs['type'] == User.DOCTOR and not attrs['doc_profile']:
             raise serializers.ValidationError("DocProfile is Required.")
         if attrs['entity_type'] == GenericAdminEntity.DOCTOR and 'assoc_hosp'not in attrs:
             raise serializers.ValidationError("Associated Hospitals  are Required.")
+        if attrs['entity_type'] == GenericAdminEntity.DOCTOR and not Doctor.objects.filter(attrs['id']).exists():
+            raise serializers.ValidationError("entity Doctor Not Found.")
+        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and not Hospital.objects.filter(attrs['id']).exists():
+            raise serializers.ValidationError("entity Hospital Not Found.")
+        if attrs['entity_type'] == GenericAdminEntity.LAB and not lab_models.Lab.objects.filter(attrs['id']).exists():
+            raise serializers.ValidationError("entity Lab Not Found.")
         if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and 'assoc_doc' not in attrs:
             raise serializers.ValidationError("Associated Doctors are Required.")
         return attrs
@@ -1071,3 +1079,4 @@ class DoctorEntitySerializer(serializers.ModelSerializer):
 
 class AdminUpdateBodySerializer(AdminCreateBodySerializer):
     remove_list = serializers.ListField()
+    old_phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999, required=False)
