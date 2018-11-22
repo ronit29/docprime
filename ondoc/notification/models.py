@@ -76,6 +76,7 @@ class NotificationAction:
 
     @classmethod
     def trigger(cls, instance, user, notification_type):  # SHASHANK_SINGH all context making
+        from ondoc.doctor.models import OpdAppointment
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = instance.time_slot_start.astimezone(est)
         context = {}
@@ -241,6 +242,7 @@ class NotificationAction:
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
+                "payment_type": dict(OpdAppointment.PAY_CHOICES)[instance.payment_type],
                 "image_url": ""
             }
             if user.user_type == User.CONSUMER:

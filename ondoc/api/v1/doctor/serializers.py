@@ -940,7 +940,8 @@ class OpdAppointmentBillingSerializer(OpdAppointmentSerializer):
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp',
                   'allowed_action', 'effective_price', 'fees', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'payment_type')
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'payment_type',
+                  'mrp')
 
 
 class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
