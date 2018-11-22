@@ -26,7 +26,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges,
-                                     TestParameter, ParameterLabTest)
+                                     TestParameter, ParameterLabTest, LabReport, LabReportFile)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
@@ -36,6 +36,7 @@ from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 import logging
+import nested_admin
 
 logger = logging.getLogger(__name__)
 
@@ -736,11 +737,30 @@ class LabAppointmentForm(forms.ModelForm):
         return cleaned_data
 
 
-class LabAppointmentAdmin(admin.ModelAdmin):
+class LabReportFileInline(nested_admin.NestedTabularInline):
+    model = LabReportFile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class LabReportInline(nested_admin.NestedTabularInline):
+    model = LabReport
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    inlines = [LabReportFileInline]
+
+
+class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
     list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at', 'updated_at')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
+
+    inlines = [
+        LabReportInline
+    ]
 
     def get_profile(self, obj):
         if not obj.profile:
