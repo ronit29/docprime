@@ -54,6 +54,7 @@ from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
 from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
+from django.db.models import Count
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -844,11 +845,13 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
             'search_index').values("id", "name")[:5]
 
-        procedures = Procedure.objects.filter(
+        procedures = Procedure.objects.annotate(no_of_parent_categories=Count('parent_categories_mapping')).filter(
             Q(search_key__icontains=name) |
             Q(search_key__icontains=' ' + name) |
-            Q(search_key__istartswith=name), is_enabled=True).annotate(search_index=StrIndex('search_key', Value(name))
-                                                                       ).order_by('search_index')[:5]
+            Q(search_key__istartswith=name), is_enabled=True, no_of_parent_categories__gt=0).annotate(
+            search_index=StrIndex('search_key', Value(name))
+            ).order_by('search_index')[:5]
+
         serializer = ProcedureInSerializer(procedures, many=True)
         procedures = serializer.data
 
