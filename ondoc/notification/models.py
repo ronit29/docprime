@@ -233,11 +233,13 @@ class NotificationAction:
         elif notification_type == NotificationAction.DOCTOR_INVOICE:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
+            procedures = instance.get_procedures()
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "Invoice Generated",
+                "procedures": procedures,
                 "body": "Invoice for appointment ID-{} has been generated.".format(instance.id),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
