@@ -45,30 +45,29 @@ class DoctorSearchHelper:
 
         # " gs.id IN({})".format(",".join(specialization_ids))
 
-        counter=1
+        counter = 1
         if len(specialization_ids) > 0:
-            sp_str = 'gs.id IN('
+            dcp_str = 'gs.id IN('
             for id in specialization_ids:
-
                 if not counter == 1:
-                    sp_str += ','
-                sp_str = sp_str + '%('+'specialization'+str(counter)+')s'
-                params['specialization'+str(counter)] = id
+                    dcp_str += ','
+                dcp_str = dcp_str + '%(' + 'specialization' + str(counter) + ')s'
+                params['specialization' + str(counter)] = id
                 counter += 1
-
             filtering_params.append(
-                sp_str+')'
+                dcp_str + ')'
             )
+
         if self.query_params.get("sits_at"):
             filtering_params.append(
                 "hospital_type IN(%(sits_at)s)"
             )
-            params['sits_at'] = ", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in self.query_params.get("sits_at")])
+            params['sits_at'] = ", ".join(
+                [str(hospital_type_mapping.get(sits_at)) for sits_at in self.query_params.get("sits_at")])
 
         procedure_ids = self.query_params.get("procedure_ids", [])  # NEW_LOGIC
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
 
-        procedure_mapped_ids = []  # NEW_LOGIC
 
         if procedure_category_ids and not procedure_ids:  # NEW_LOGIC
             preferred_procedure_ids = list(
@@ -76,12 +75,24 @@ class DoctorSearchHelper:
                     'preferred_procedure_id', flat=True))
             procedure_ids = preferred_procedure_ids
 
-        if len(procedure_ids) > 0:  # NEW_LOGIC
-            ps = list(procedure_ids)
-            ps = [str(i) for i in ps]
-            procedure_mapped_ids.extend(ps)
+        # if len(procedure_ids) > 0:  # NEW_LOGIC
+        #     ps = list(procedure_ids)
+        #     ps = [str(i) for i in ps]
+        #     procedure_mapped_ids.extend(ps)
+        #     filtering_params.append(
+        #         " dcp.procedure_id IN({})".format(",".join((procedure_ids))))
+        counter = 1
+        if len(procedure_ids) > 0:
+            dcp_str = 'dcp.procedure_id IN('
+            for id in procedure_ids:
+                if not counter == 1:
+                    dcp_str += ','
+                dcp_str = dcp_str + '%(' + 'procedure' + str(counter) + ')s'
+                params['procedure' + str(counter)] = id
+                counter += 1
             filtering_params.append(
-                " dcp.procedure_id IN({})".format(",".join(procedure_mapped_ids)))
+                dcp_str + ')'
+            )
 
         if len(procedure_ids) == 0 and self.query_params.get("min_fees") is not None:
             filtering_params.append(
@@ -131,7 +142,7 @@ class DoctorSearchHelper:
 
     def get_ordering_params(self):
         order_by_field = 'is_gold desc, distance, dc.priority desc'
-        rank_by = "rank_distance=1"
+        rank_by = "rank_distance=1"  # SHASHANK_SINGH Ask Arun Sir?
 
         if self.query_params.get('url') and not self.query_params.get('sort_on'):
             return 'distance, dc.priority desc', rank_by
@@ -183,7 +194,7 @@ class DoctorSearchHelper:
                            "FROM (SELECT " \
                            "COUNT(procedure_id) OVER (PARTITION BY dct.id) AS count_per_clinic, " \
                            "SUM(dcp.deal_price) OVER (PARTITION BY dct.id) AS sum_per_clinic, " \
-                           "St_distance(St_setsrid(St_point({lng}, {lat}), 4326), h.location) AS distance, " \
+                           "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) AS distance, " \
                            "dcp.deal_price AS procedure_deal_price, " \
                            "d.id AS doctor_id, practicing_since, " \
                            "dc.id AS doctor_clinic_id,  dct.id AS doctor_clinic_timing_id, dcp.id AS doctor_clinic_procedure_id, " \
@@ -193,20 +204,15 @@ class DoctorSearchHelper:
                            "INNER JOIN hospital h ON h.id = dc.hospital_id AND h.is_live=true " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
-                           "LEFT JOIN doctor_practice_specialization ds ON ds.doctor_id = d.id " \
-                           "LEFT JOIN practice_specialization gs ON ds.specialization_id = gs.id " \
-                           "WHERE d.is_live=true AND {fltr_prmts} AND " \
-                           "St_distance(St_setsrid(St_point({lng}, {lat}), 4326 ), h.location) < {max_dist} AND " \
-                           "St_distance(St_setsrid(St_point({lng}, {lat}), 4326 ), h.location) >= {min_dist} " \
+                           "WHERE d.is_live=true AND {filtering_params} AND " \
+                           "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) AND " \
+                           "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
                            "ORDER BY d.is_live DESC, d.enabled_for_online_booking DESC, " \
                            "d.is_license_verified DESC, is_gold desc,  dc.priority desc ) AS tempTable) " \
-                           "x WHERE {where_prms} ORDER BY {odr_prm}".format(lng=longitude,
-                                                                            lat=latitude,
-                                                                            fltr_prmts=filtering_params,
-                                                                            max_dist=max_distance,
-                                                                            min_dist=min_distance,
-                                                                            odr_prm=order_by_field,
-                                                                            where_prms=rank_by)
+                           "x WHERE {rank_by} ORDER BY {order_by_field}".format(
+                filtering_params=filtering_params.get('string'),
+                order_by_field=order_by_field,
+                rank_by=rank_by)
 
         else:
             query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \

@@ -82,10 +82,7 @@ class NotificationAction:
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
-            procedure_mappings = instance.procedure_mappings.select_related("procedure").all()
-            procedures = [{"name": mapping.procedure.name, "mrp": str(mapping.mrp), "deal_price": str(mapping.deal_price),
-                           "discount": str(mapping.mrp - mapping.deal_price)} for mapping in procedure_mappings]
-            coupon_discount = str(instance.deal_price - instance.effective_price)
+            procedures = instance.get_procedures()
             context = {
                 "doctor_name": doctor_name,
                 "patient_name": patient_name,
@@ -97,7 +94,7 @@ class NotificationAction:
                     time_slot_start.strftime("%d/%m/%y"), doctor_name
                 ),
                 "procedures": procedures,
-                "coupon_discount": coupon_discount,
+                "coupon_discount": str(instance.discount),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -155,11 +152,7 @@ class NotificationAction:
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
-            procedure_mappings = instance.procedure_mappings.select_related("procedure").all()
-            procedures = [
-                {"name": mapping.procedure.name, "mrp": str(mapping.mrp), "deal_price": str(mapping.deal_price),
-                 "discount": str(mapping.mrp - mapping.deal_price)} for mapping in procedure_mappings]
-            coupon_discount = str(instance.deal_price - instance.effective_price)
+            procedures = instance.get_procedures()
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
@@ -169,7 +162,7 @@ class NotificationAction:
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y"), doctor_name),
                 "procedures": procedures,
-                "coupon_discount": coupon_discount,
+                "coupon_discount": str(instance.discount),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -179,8 +172,7 @@ class NotificationAction:
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
-            procedure_mappings = instance.procedure_mappings.select_related("procedure").all()
-            procedures = [{"name": mapping.procedure.name} for mapping in procedure_mappings]
+            procedures = instance.get_procedures()
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,

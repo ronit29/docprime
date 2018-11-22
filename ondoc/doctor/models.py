@@ -1375,6 +1375,26 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         else:
             return delay
 
+    def get_procedures(self):
+        procedure_mappings = self.procedure_mappings.select_related("procedure").all()
+        procedures = [{"name": mapping.procedure.name, "mrp": mapping.mrp, "deal_price": mapping.deal_price,
+                       "discount": mapping.mrp - mapping.deal_price} for mapping in procedure_mappings]
+        procedures_total = {"mrp": sum([procedure["mrp"] for procedure in procedures]),
+                            "deal_price": sum([procedure["deal_price"] for procedure in procedures]),
+                            "discount": sum([procedure["discount"] for procedure in procedures])}
+        doctor_prices = {"mrp": self.mrp - procedures_total["mrp"],
+                         "deal_price": self.deal_price - procedures_total["mrp"]}
+        doctor_prices["discount"] = doctor_prices["mrp"] - doctor_prices["deal_price"]
+        procedures.insert(0, {"name": "Consultation Fees", "mrp": doctor_prices["mrp"],
+                              "deal_price": doctor_prices["deal_price"],
+                              "discount": doctor_prices["discount"]})
+        procedures = [
+            {"name": str(procedure["name"]), "mrp": str(procedure["mrp"]), "deal_price": str(procedure["deal_price"]),
+             "discount": str(procedure["discount"])} for procedure in procedures]
+
+        return procedures
+
+
     class Meta:
         db_table = "opd_appointment"
 
