@@ -189,6 +189,47 @@ class EntityUrls(TimeStampedModel):
         return self.extras
 
     @classmethod
+    def create_test_search_urls(cls):
+
+        from ondoc.api.v1.utils import RawSql
+        query = '''select nextval('entity_url_version_seq') as inc;'''
+
+        seq = RawSql(query, []).fetch_all()
+        if seq:
+            sequence = seq[0]['inc'] if seq[0]['inc'] else 0
+        else:
+            sequence = 0
+
+        update_query = '''update entity_urls set is_valid=false where sitemap_identifier in ('LAB_TEST')'''
+
+        query = '''insert into entity_urls( sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, 
+                       updated_at, sequence, extras, entity_id)
+
+                    select   x.sitemap_identifier as sitemap_identifier, x.url as url, 
+                    x.count as count, x.entity_type as entity_type, x.url_type as url_type , x.is_valid as id_valid, 
+                    x.created_at as created_at, x.updated_at as updated_at, x.sequence as sequence, x.extras as extras,
+                    x.entity_id as entity_id
+                    from
+                    (
+                    select getslug(concat(name, '-lbtst'))as url,  True as is_valid ,0 as count, id as entity_id, 'PAGEURL' as url_type, 'Test' as entity_type,
+                    'LAB_TEST' as sitemap_identifier, NOW() as created_at, NOW() as updated_at, %d as sequence, json_build_object('test',name) as extras
+                    from
+                    (
+                    select id, name from lab_test
+                    )as data
+                    ) as x''' % (sequence)
+        from django.db import connection
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute(update_query)
+                cursor.execute(query)
+            except Exception as e:
+                print(str(e))
+                return False
+
+        return True
+
+    @classmethod
     def create_doctor_search_urls(cls):
 
         from ondoc.api.v1.utils import RawSql

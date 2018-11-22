@@ -296,7 +296,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing_data = list()
         distance_related_charges = None
 
-
         distance_related_charges = 1 if lab_obj.home_collection_charges.all().exists() else 0
         if lab_obj.always_open:
             lab_timing = "12:00 AM - 23:45 PM"
