@@ -1,4 +1,4 @@
-
+from ondoc.api.v1.utils import insurance_transform
 from rest_framework import viewsets
 
 from ondoc.api.v1.utils import payment_details
@@ -269,6 +269,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                                                                                                         'user_id',
                                                                                                         'dob',
                                                                                                         'phone_number')
+            user_profile = user_profile[0]
         insurer = Insurer.objects.filter(id=valid_data.get('insurer').id).values('id', 'name', 'max_float',
                                                                                  'min_float').first()
         insurance_plan = InsurancePlans.objects.filter(id=valid_data.get('insurance_plan').id).values('id', 'amount',
@@ -276,7 +277,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                                                                                                       'type',
                                                                                                       'policy_tenure'
                                                                                                       ).first()
-        transaction_date = datetime.datetime.now().strftime('%Y-%m-%d')
+        transaction_date = datetime.datetime.now()
         if insurance_plan:
             amount = insurance_plan.get('amount')
         insurance_transaction = {'insurer': insurer.get('id'),
@@ -287,7 +288,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                           'insurance_plan': insurance_plan,
                           'user': request.user.pk}
 
-        insurance_data['insurance'] = {"profile_detail": user_profile[0], "insured_members": insured_members_list,
+        insurance_data['insurance'] = {"profile_detail": user_profile, "insured_members": insured_members_list,
                                        "insurer": insurer, "insurance_plan": insurance_plan,
                                        "user": request.user.pk, "insurance_transaction": insurance_transaction,
                                        "user_insurance": user_insurance}
@@ -299,6 +300,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         resp['is_agent'] = False
         if hasattr(request, 'agent') and request.agent:
             resp['is_agent'] = True
+
+        insurance_data = insurance_transform(insurance_data)
 
         if (request.data.get('payment_type') == doctor_models.OpdAppointment.PREPAID and
                     balance < amount or resp['is_agent']):
@@ -339,10 +342,10 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
     def profile_create_or_update(self, member, request):
         profile = {}
         profile_flag = True
-        name = member['first_name'] + " " + member['last_name']
-        if member['profile'] or UserProfile.objects.filter(name=name, user=request.user).exists():
+        name = "{fname} {lname}".format(fname=member['first_name'], lname=member['last_name'])
+        if member['profile'] or UserProfile.objects.filter(name__iexact=name, user=request.user).exists():
             # Check whether Profile exist with same name
-            existing_profile = UserProfile.objects.filter(name=name, user=request.user).first()
+            existing_profile = UserProfile.objects.filter(name__iexact=name, user=request.user).first()
             if member['profile']:
                 profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
                                                                                      'gender', 'user_id', 'dob',
