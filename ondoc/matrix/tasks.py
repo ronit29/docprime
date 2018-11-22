@@ -1,4 +1,5 @@
 from __future__ import absolute_import, unicode_literals
+from ondoc.account.models import Order
 
 from rest_framework import status
 from django.conf import settings
@@ -36,9 +37,12 @@ def prepare_and_hit(self, data):
     if task_data.get('type') == 'LAB_APPOINTMENT':
         service_name = ','.join([test_obj.test.name for test_obj in appointment.lab_test.all()])
 
+    order = data.get('order')
+
     appointment_details = {
         'AppointmentStatus': appointment.status,
         'PaymentStatus': 300,
+        'OrderId': order.id if order else 0,
         'DocPrimeBookingID': appointment.id,
         'BookingDateTime': int(appointment.created_at.timestamp()),
         'AppointmentDateTime': int(appointment.time_slot_start.timestamp()),
@@ -119,7 +123,10 @@ def push_appointment_to_matrix(self, data):
             # logger.error("[CELERY ERROR: Incorrect values provided.]")
             raise Exception("Appointment id not found, could not push to Matrix")
 
+        order_product_id = 0
+        appointment = None
         if data.get('type') == 'OPD_APPOINTMENT':
+            order_product_id = 1
             appointment = OpdAppointment.objects.filter(pk=appointment_id).first()
             if not appointment:
                 raise Exception("Appointment could not found against id - " + str(appointment_id))
@@ -131,6 +138,7 @@ def push_appointment_to_matrix(self, data):
             doctor_mobiles = [{'MobileNo': number, 'Name': appointment.doctor.name, 'Type': 2} for number in doctor_mobiles]
             mobile_list.extend(doctor_mobiles)
         elif data.get('type') == 'LAB_APPOINTMENT':
+            order_product_id = 2
             appointment = LabAppointment.objects.filter(pk=appointment_id).first()
 
             if not appointment:
@@ -143,8 +151,13 @@ def push_appointment_to_matrix(self, data):
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
 
+        appointment_order = Order.objects.filter(product_id=order_product_id, reference_id=appointment_id).first()
+
         # Preparing the data and now pushing the data to the matrix system.
-        prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data})
+        if appointment:
+            prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data, 'order': appointment_order})
+        else:
+            logger.error("Appointment not found for the appointment id ", appointment_id)
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
@@ -229,7 +242,6 @@ def push_signup_lead_to_matrix(self, data):
 @task(bind=True, max_retries=2)
 def push_order_to_matrix(self, data):
     try:
-        from ondoc.account.models import Order
         order_id = data.get('order_id', None)
         if not order_id:
             logger.error("[CELERY ERROR: Incorrect values provided.]")
