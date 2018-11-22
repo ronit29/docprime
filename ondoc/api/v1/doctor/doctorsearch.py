@@ -45,17 +45,19 @@ class DoctorSearchHelper:
 
         # " gs.id IN({})".format(",".join(specialization_ids))
 
-        counter = 1
+        counter=1
         if len(specialization_ids) > 0:
-            dcp_str = 'gs.id IN('
+            sp_str = 'gs.id IN('
             for id in specialization_ids:
+
                 if not counter == 1:
-                    dcp_str += ','
-                dcp_str = dcp_str + '%(' + 'specialization' + str(counter) + ')s'
-                params['specialization' + str(counter)] = id
+                    sp_str += ','
+                sp_str = sp_str + '%('+'specialization'+str(counter)+')s'
+                params['specialization'+str(counter)] = id
                 counter += 1
+
             filtering_params.append(
-                dcp_str + ')'
+                sp_str+')'
             )
 
         if self.query_params.get("sits_at"):
