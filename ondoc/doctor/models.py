@@ -47,6 +47,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
+import reversion
 
 logger = logging.getLogger(__name__)
 
@@ -1027,7 +1028,7 @@ class DoctorOnboardingToken(auth_model.TimeStampedModel):
 #     class Meta:
 #         db_table = "hospital_network_mapping"
 
-
+@reversion.register()
 class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     CREATED = 1
     BOOKED = 2

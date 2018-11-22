@@ -40,6 +40,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
+import reversion
 
 logger = logging.getLogger(__name__)
 
@@ -760,7 +761,7 @@ class AvailableLabTest(TimeStampedModel):
         unique_together = (("test", "lab_pricing_group"))
         db_table = "available_lab_test"
 
-
+@reversion.register()
 class LabAppointment(TimeStampedModel, CouponsMixin):
     CREATED = 1
     BOOKED = 2
