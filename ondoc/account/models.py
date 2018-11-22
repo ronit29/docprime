@@ -112,7 +112,9 @@ class Order(TimeStampedModel):
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
         elif self.product_id == self.INSURANCE_PRODUCT_ID:
-            serializer = InsuranceTransactionSerializer(data=appointment_data.get('insurance_transaction'))
+            insurance_transaction = appointment_data.get('insurance').get('insurance_transaction')
+            insurance_transaction["order"] = self.id
+            serializer = InsuranceTransactionSerializer(data=insurance_transaction)
             serializer.is_valid(raise_exception=True)
             insurance_data = serializer.validated_data
 

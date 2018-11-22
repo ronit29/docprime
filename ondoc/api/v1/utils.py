@@ -240,7 +240,7 @@ def insurance_transform(app_data):
     """A serializer helper to serialize Insurance data"""
     app_data['insurance']['insurance_transaction']['transaction_date'] = str(app_data['insurance']['insurance_transaction']['transaction_date'])
     app_data['insurance']['profile_detail']['dob'] = str(app_data['insurance']['profile_detail']['dob'])
-    insured_members = app_data['insurance']['insured_members']
+    insured_members = app_data['insurance']['insurance_transaction']['insured_members']
     for member in insured_members:
         member['dob'] = str(member['dob'])
         member['member_profile']['dob'] = str(member['member_profile']['dob'])

@@ -216,7 +216,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
     @transaction.atomic
     def create_order(self, request):
         user = request.user
-        serializer = serializers.InsuredMemberSerializer(data=request.data.get('insurance'))
+        serializer = serializers.InsuredMemberSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         amount = None
@@ -236,7 +236,6 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                                                                             valid_data.get('insurance_plan').id,
                                                                             insurer_id=valid_data.get(
                                                                                 'insurer')).first()
-                    # pre_insured_members['dob'] = self.age_validate(member, insurance_threshold)
                     dob = self.age_validate(member, insurance_threshold)
                     if dob[0]:
                         pre_insured_members['dob'] = member['dob']
@@ -283,15 +282,11 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         insurance_transaction = {'insurer': insurer.get('id'),
                                  'insurance_plan': insurance_plan.get('id'),
                                  'transaction_date': transaction_date, 'status_type': InsuranceTransaction.CREATED,
-                                 'amount': amount, 'user': request.user.pk}
-        user_insurance = {'insurer': insurer,
-                          'insurance_plan': insurance_plan,
-                          'user': request.user.pk}
+                                 'amount': amount, 'user': request.user.pk, "insured_members": insured_members_list}
 
-        insurance_data['insurance'] = {"profile_detail": user_profile, "insured_members": insured_members_list,
+        insurance_data['insurance'] = {"profile_detail": user_profile,
                                        "insurer": insurer, "insurance_plan": insurance_plan,
-                                       "user": request.user.pk, "insurance_transaction": insurance_transaction,
-                                       "user_insurance": user_insurance}
+                                       "user": request.user.pk, "insurance_transaction": insurance_transaction}
 
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
