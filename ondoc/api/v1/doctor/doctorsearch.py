@@ -138,6 +138,8 @@ class DoctorSearchHelper:
         result = {}
         result['string'] = " and ".join(filtering_params)
         result['params'] = params
+        if len(procedure_ids) > 0:
+            result['count_of_procedure'] = len(procedure_ids)
         return result
 
     def get_ordering_params(self):
@@ -181,17 +183,20 @@ class DoctorSearchHelper:
 
         if self.query_params.get("procedure_ids", []) or self.query_params.get("procedure_category_ids", []):  # NEW_LOGIC
             query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
-                           "FROM (SELECT ROW_NUMBER() OVER (PARTITION BY doctor_id ORDER BY count_per_clinic DESC, " \
-                           "distance ASC, sum_per_clinic ASC ) AS rank_procedure, " \
+                           "FROM (SELECT total_price, " \
+                           "ROW_NUMBER() OVER (PARTITION BY doctor_id ORDER BY count_per_clinic DESC, " \
+                           "distance ASC, total_price ASC ) AS rank_procedure, " \
                            "count_per_clinic, " \
-                           "Row_number() OVER( PARTITION BY doctor_id ORDER BY count_per_clinic DESC, sum_per_clinic ASC, distance ASC) as rank_fees, " \
+                           "Row_number() OVER( PARTITION BY doctor_id ORDER BY count_per_clinic DESC, total_price ASC, distance ASC) as rank_fees, " \
                            "sum_per_clinic, " \
                            "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
-                           "distance, count_per_clinic DESC, sum_per_clinic ASC) rank_distance, " \
+                           "distance, count_per_clinic DESC, total_price ASC) rank_distance, " \
                            "distance, " \
                            "procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, " \
                            "procedure_id, doctor_clinic_deal_price, hospital_id " \
-                           "FROM (SELECT " \
+                           "FROM (SELECT distance, procedure_deal_price, doctor_id, practicing_since, doctor_clinic_id, doctor_clinic_timing_id, procedure_id," \
+                           "doctor_clinic_deal_price, hospital_id , count_per_clinic, sum_per_clinic, sum_per_clinic+doctor_clinic_deal_price as total_price FROM " \
+                           "(SELECT " \
                            "COUNT(procedure_id) OVER (PARTITION BY dct.id) AS count_per_clinic, " \
                            "SUM(dcp.deal_price) OVER (PARTITION BY dct.id) AS sum_per_clinic, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) AS distance, " \
@@ -208,8 +213,10 @@ class DoctorSearchHelper:
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
                            "ORDER BY d.is_live DESC, d.enabled_for_online_booking DESC, " \
-                           "d.is_license_verified DESC, is_gold desc,  dc.priority desc ) AS tempTable) " \
+                           "d.is_license_verified DESC, is_gold desc,  dc.priority desc ) " \
+                           "AS tempTable WHERE count_per_clinic={count_of_procedure}) AS tempTable2) " \
                            "x WHERE {rank_by} ORDER BY {order_by_field}".format(
+                count_of_procedure=filtering_params.get('count_of_procedure'),
                 filtering_params=filtering_params.get('string'),
                 order_by_field=order_by_field,
                 rank_by=rank_by)
