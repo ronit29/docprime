@@ -46,10 +46,11 @@ class DoctorSearchHelper:
         #     params['longitude'] = longitude
         # if self.query_params.get('latitude'):
         #     params['latitude'] = latitude
-        hospital_id = self.query_params.get("hospital_id", 0)
 
-        if self.query_params.get('hospital_id'):
-            params['hospital_id'] = hospital_id
+        if self.query_params.get('hospital_id') is not None:
+            filtering_params.append(
+                "hospital_id=(%(hospital_id)s)")
+            params['hospital_id'] = str(self.query_params.get("hospital_id"))
 
         if len(condition_ids)>0:
             cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
@@ -173,7 +174,7 @@ class DoctorSearchHelper:
                        "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s))" \
                        "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
                         "ORDER  BY {order_by_field} ) x " \
-                        "where {rank_by} and hospital_id =(%(hospital_id)s)".format(filtering_params=filtering_params.get('string'), order_by_field=order_by_field, rank_by = rank_by)
+                        "where {rank_by}".format(filtering_params=filtering_params.get('string'), order_by_field=order_by_field, rank_by = rank_by)
                        # "ORDER  BY {ordering_field} ) x " \
                        #  "where {rank_field}" % ({'ordering_field': order_by_field, 'rank_field': rank_by})
                        # % (longitude, latitude,

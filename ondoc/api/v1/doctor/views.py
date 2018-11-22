@@ -1280,4 +1280,3 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
             # info1 = {'name' : data.name, 'List': new_list}
                 resp1 = {'hospital-Network': network_name, 'hospital-list': info}
         return Response(resp1)
-
