@@ -581,7 +581,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                             new_effective_price = doctor_hospital.deal_price - coupon_discount
 
                         if opd_appointment.procedures.count():
-                            new_fees = opd_appointment.fees
+                            doctor_details = opd_appointment.get_procedures()[0]
+                            old_agreed_price = doctor_details["agreed_price"]
+                            new_fees = opd_appointment.fees - old_agreed_price + doctor_hospital.fees
                             new_deal_price = opd_appointment.deal_price
                             new_mrp = opd_appointment.mrp
                             new_effective_price = opd_appointment.effective_price
