@@ -307,7 +307,6 @@ def is_valid_testing_lab_data(user, lab):
 
 
 def payment_details(request, order):
-    # TODO: SHASHANK_SINGH what to do?
     from ondoc.authentication.models import UserProfile
     from ondoc.account.models import PgTransaction, Order
     payment_required = True

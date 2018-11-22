@@ -54,7 +54,6 @@ class Order(TimeStampedModel):
 
     @classmethod
     def disable_pending_orders(cls, appointment_details, product_id, action):
-        # TODO: SHASHANK_SINGH include procedure_ids or not?
         if product_id == Order.DOCTOR_PRODUCT_ID:
             Order.objects.filter(
                 action_data__doctor=appointment_details.get("doctor"),

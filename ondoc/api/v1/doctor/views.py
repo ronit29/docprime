@@ -335,7 +335,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
         if can_use_insurance:
-            appointment_details['effective_price'] = insurance_effective_price  # SHASHANK_SINGH Ask Arun sir?
+            appointment_details['effective_price'] = insurance_effective_price
             appointment_details['payment_type'] = models.OpdAppointment.INSURANCE
         elif appointment_details['payment_type'] == models.OpdAppointment.INSURANCE:
             resp['status'] = 0
