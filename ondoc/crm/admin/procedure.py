@@ -23,6 +23,7 @@ class ParentProcedureCategoryInlineForm(forms.ModelForm):
 class ParentProcedureCategoryInline(AutoComplete, TabularInline):
     model = ProcedureCategoryMapping
     # exclude = ['is_manual']
+    readonly_fields = ['is_manual']
     fk_name = 'child_category'
     extra = 0
     can_delete = True
