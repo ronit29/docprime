@@ -51,6 +51,7 @@ import nested_admin
 from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
 from django import forms
+from decimal import Decimal
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -1184,7 +1185,13 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
         if self.instance.id:
-            deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
+
+            if self.instance.procedure_mappings.count():
+                doctor_details = self.instance.get_procedures()[0]
+                deal_price = Decimal(doctor_details["deal_price"])
+
+            else:
+                deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                      doctor_clinic__hospital=hospital,
                                                      day=time_slot_start.weekday(),
