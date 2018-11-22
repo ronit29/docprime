@@ -36,9 +36,9 @@ class InsurancePlansSerializer(serializers.Serializer):
     threshold = serializers.SerializerMethodField()
 
     def get_threshold(self, obj):
-        threshold = InsuranceThreshold.objects.filter(insurance_plan=obj)
+        threshold = InsuranceThreshold.objects.filter(insurance_plan=obj).first()
         if threshold:
-            insurance_threshold = InsuranceThresholdSerializer(threshold, many=True)
+            insurance_threshold = InsuranceThresholdSerializer(threshold)
             return insurance_threshold.data
 
     class Meta:
