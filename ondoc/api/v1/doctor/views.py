@@ -831,7 +831,6 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         if not name:
             return Response({"conditions": [], "specializations": []})
         medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').filter(
-            Q(condition__search_key__icontains=name) |
             Q(condition__search_key__icontains=' ' + name) |
             Q(condition__search_key__istartswith=name)
         ).annotate(search_index=StrIndex('condition__search_key',
@@ -840,13 +839,11 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                        many=True, context={'request': request})
 
         specializations = models.PracticeSpecialization.objects.filter(
-            Q(search_key__icontains=name) |
             Q(search_key__icontains=' ' + name) |
             Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
             'search_index').values("id", "name")[:5]
 
         procedures = Procedure.objects.annotate(no_of_parent_categories=Count('parent_categories_mapping')).filter(
-            Q(search_key__icontains=name) |
             Q(search_key__icontains=' ' + name) |
             Q(search_key__istartswith=name), is_enabled=True, no_of_parent_categories__gt=0).annotate(
             search_index=StrIndex('search_key', Value(name))
