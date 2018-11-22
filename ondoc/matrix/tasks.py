@@ -42,7 +42,7 @@ def prepare_and_hit(self, data):
     appointment_details = {
         'AppointmentStatus': appointment.status,
         'PaymentStatus': 300,
-        'OrderId': order.id if order else None,
+        'OrderId': order.id if order else 0,
         'DocPrimeBookingID': appointment.id,
         'BookingDateTime': int(appointment.created_at.timestamp()),
         'AppointmentDateTime': int(appointment.time_slot_start.timestamp()),
@@ -154,10 +154,10 @@ def push_appointment_to_matrix(self, data):
         appointment_order = Order.objects.filter(product_id=order_product_id, reference_id=appointment_id).first()
 
         # Preparing the data and now pushing the data to the matrix system.
-        if appointment_order and appointment:
+        if appointment:
             prepare_and_hit(self, {'appointment': appointment, 'mobile_list': mobile_list, 'task_data': data, 'order': appointment_order})
         else:
-            logger.error("Order not found for the appointment id ", appointment_id)
+            logger.error("Appointment not found for the appointment id ", appointment_id)
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
