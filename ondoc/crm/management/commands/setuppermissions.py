@@ -28,6 +28,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument, CommonTest,
                                      CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges,
                                      TestParameter, ParameterLabTest, LabTestPackage)
+
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping
 from ondoc.reports import models as report_models
@@ -63,6 +64,11 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+        #needed for a wierd django error
+        content_types = ContentType.objects.get_for_model(DoctorClinicProcedure)
+        content_types = ContentType.objects.get_for_model(Procedure)
+
 
         content_types = ContentType.objects.get_for_models(
             DoctorClinic, DoctorClinicTiming,
