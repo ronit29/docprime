@@ -628,6 +628,25 @@ class DoctorListSerializer(serializers.Serializer):
     max_distance = serializers.IntegerField(required=False, allow_null=True)
     min_distance = serializers.IntegerField(required=False, allow_null=True)
 
+    def validate_procedure_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            if Procedure.objects.filter(id__in=temp_attrs, is_enabled=True).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Procedure IDs')
+        raise serializers.ValidationError('Invalid Procedure IDs')
+
+
+    def validate_procedure_category_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            if ProcedureCategory.objects.filter(id__in=temp_attrs, is_live=True).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Procedure Category IDs')
+        raise serializers.ValidationError('Invalid Procedure Category IDs')
+
     def validate_specialization_id(self, value):
         request = self.context.get("request")
         if not Specialization.objects.filter(id__in=value.strip()).count() == len(value.strip()):
@@ -1081,3 +1100,30 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         return super().validate(attrs)
+
+    def validate_procedure_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            if Procedure.objects.filter(id__in=temp_attrs, is_enabled=True).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Procedure IDs')
+        raise serializers.ValidationError('Invalid Procedure IDs')
+
+    def validate_procedure_category_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            if ProcedureCategory.objects.filter(id__in=temp_attrs, is_live=True).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Procedure Category IDs')
+        raise serializers.ValidationError('Invalid Procedure Category IDs')
+
+    def validate_hospital_id(self, attrs):
+        try:
+            temp_attr = int(attrs)
+            if Hospital.objects.filter(id=temp_attr, is_live=True).count():
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Hospital ID.')
+        raise serializers.ValidationError('Invalid Hospital ID.')

@@ -7,7 +7,7 @@ from ondoc.procedure.models import Procedure, DoctorClinicProcedure, ProcedureTo
 class ProcedureSerializer(serializers.ModelSerializer):
     class Meta:
         model = Procedure
-        fields = ('id', 'name', 'details', 'duration')
+        fields = ('id', 'name', 'details', 'duration', 'is_enabled')
 
 
 class ProcedureInSerializer(serializers.ModelSerializer):

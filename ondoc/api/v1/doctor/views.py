@@ -847,8 +847,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         procedures = Procedure.objects.filter(
             Q(search_key__icontains=name) |
             Q(search_key__icontains=' ' + name) |
-            Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))
-                                                      ).order_by('search_index')[:5]
+            Q(search_key__istartswith=name), is_enabled=True).annotate(search_index=StrIndex('search_key', Value(name))
+                                                                       ).order_by('search_index')[:5]
         serializer = ProcedureInSerializer(procedures, many=True)
         procedures = serializer.data
 

@@ -26,6 +26,7 @@ class DoctorSearchHelper:
 
     def __init__(self, query_params):
         self.query_params = query_params
+        self.count_of_procedure = 0
 
     def get_filtering_params(self):
         """Helper function that prepare dynamic query for filtering"""
@@ -70,10 +71,9 @@ class DoctorSearchHelper:
         procedure_ids = self.query_params.get("procedure_ids", [])  # NEW_LOGIC
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
 
-
         if procedure_category_ids and not procedure_ids:  # NEW_LOGIC
             preferred_procedure_ids = list(
-                ProcedureCategory.objects.filter(pk__in=procedure_category_ids, is_live=True).values_list(
+                ProcedureCategory.objects.select_related('preferred_procedure').filter(pk__in=procedure_category_ids, is_live=True, preferred_procedure__is_enabled=True).values_list(
                     'preferred_procedure_id', flat=True))
             procedure_ids = preferred_procedure_ids
 
@@ -142,6 +142,7 @@ class DoctorSearchHelper:
         result['params'] = params
         if len(procedure_ids) > 0:
             result['count_of_procedure'] = len(procedure_ids)
+            self.count_of_procedure = len(procedure_ids)
         return result
 
     def get_ordering_params(self):
@@ -151,7 +152,7 @@ class DoctorSearchHelper:
         if self.query_params.get('url') and not self.query_params.get('sort_on'):
             return 'distance, dc.priority desc', rank_by
 
-        if self.query_params.get("procedure_ids", []) or self.query_params.get("procedure_category_ids", []):  # NEW_LOGIC
+        if self.count_of_procedure:
             order_by_field = 'count_per_clinic desc, distance, sum_per_clinic'  # NEW_LOGIC
             rank_by = "rank_procedure=1"
             if self.query_params.get('sort_on'):
@@ -183,7 +184,7 @@ class DoctorSearchHelper:
         # max_distance = 10000000000000000000000
         data = dict()
 
-        if self.query_params.get("procedure_ids", []) or self.query_params.get("procedure_category_ids", []):  # NEW_LOGIC
+        if self.count_of_procedure:
             query_string = "SELECT doctor_id, hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (SELECT total_price, " \
                            "ROW_NUMBER() OVER (PARTITION BY doctor_id ORDER BY count_per_clinic DESC, " \
