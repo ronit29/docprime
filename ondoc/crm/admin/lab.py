@@ -27,7 +27,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabNetwork, Lab, LabOnboardingToken, LabService, LabDoctorAvailability,
                                      LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument,
                                      LabAppointment, HomePickupCharges,
-                                     TestParameter, ParameterLabTest, QuestionAnswer, FrequentlyAddedTogetherTests)
+                                     TestParameter, ParameterLabTest, FrequentQuestions, FrequentlyAddedTogetherTests)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
@@ -951,7 +951,7 @@ class ParameterLabTestInline(admin.TabularInline):
 
 
 class FAQLabTestInLine(admin.StackedInline):
-    model = QuestionAnswer
+    model = FrequentQuestions
     verbose_name = 'Frequently Asked Questions'
     can_delete = True
     fields = ['question', 'answer']
