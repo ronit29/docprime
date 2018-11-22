@@ -47,6 +47,11 @@ class DoctorSearchHelper:
         # if self.query_params.get('latitude'):
         #     params['latitude'] = latitude
 
+        if self.query_params.get('hospital_id') is not None:
+            filtering_params.append(
+                "hospital_id=(%(hospital_id)s)")
+            params['hospital_id'] = str(self.query_params.get("hospital_id"))
+
         if len(condition_ids)>0:
             cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
             cs = [str(i) for i in cs]

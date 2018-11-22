@@ -1,7 +1,7 @@
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
-from ondoc.doctor.models import Hospital
+from ondoc.doctor.models import Hospital, DoctorClinic
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -1259,6 +1259,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         return Response([])
 
 class HospitalNetworkListViewset(viewsets.GenericViewSet):
+
     def list(self, request, hospital_network_id):
         parameters = request.query_params
         queryset = Hospital.objects.filter(network_id=hospital_network_id)
@@ -1278,6 +1279,5 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
                 info.append(resp.copy())
                 if not network_name :
                     network_name = data.network.name
-            resp1 = {"network_name": network_name, "hospitals": info}
+                    resp1 = {"network_name": network_name, "hospitals": info}
         return Response(resp1)
-
