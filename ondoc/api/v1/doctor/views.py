@@ -1512,6 +1512,23 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             return Response(response)
         return Response([])
 
+    def delete(self, request):
+        serializer = serializers.AdminDeleteBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        queryset = auth_models.GenericAdmin.objects.filter(entity_type=valid_data['entity_type'],)
+        if valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
+            queryset = queryset.filter(hospital_id=valid_data.get('id'), phone_number=valid_data.get('phone_number'))
+        elif valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
+            queryset = queryset.filter(doctor_id=valid_data.get('id'), phone_number=valid_data.get('phone_number'))
+        else:
+            queryset = auth_models.GenericLabAdmin.objects.filter(lab_id=valid_data.get('id'), phone_number=valid_data.get('phone_number'))
+        try:
+            queryset.delete()
+        except Exception as e:
+            return Response({'error': 'something went wrong!'})
+        return Response({'success': 'Deleted Successfully'})
+
     def update(self, request):
         serializer = serializers.AdminUpdateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

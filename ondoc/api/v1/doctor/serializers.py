@@ -1080,3 +1080,9 @@ class DoctorEntitySerializer(serializers.ModelSerializer):
 class AdminUpdateBodySerializer(AdminCreateBodySerializer):
     remove_list = serializers.ListField()
     old_phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999, required=False)
+
+
+class AdminDeleteBodySerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
+    entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
+    id = serializers.IntegerField()

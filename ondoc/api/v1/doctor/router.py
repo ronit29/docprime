@@ -43,6 +43,7 @@ urlpatterns = [
     path('hospital-autocomplete', HospitalAutocomplete.as_view(), name='hospital-autocomplete'),
     path('create_admin', CreateAdminViewSet.as_view({'post': 'create'}), name='create_admin'),
     path('update_admin', CreateAdminViewSet.as_view({'post': 'update'}), name='update_admin'),
+    path('delete_admin', CreateAdminViewSet.as_view({'post': 'delete'}), name='delete_admin'),
     path('list_admin_entities', CreateAdminViewSet.as_view({'get': 'list_entities'}), name='list_entities'),
     path('list_admins', CreateAdminViewSet.as_view({'get': 'list_entity_admins'}), name='list_admins'),
     path('admins_assoc_doctors/<int:pk>', CreateAdminViewSet.as_view({'get': 'assoc_doctors'}), name='assoc_doctors'),
