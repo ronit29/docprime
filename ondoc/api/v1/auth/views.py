@@ -52,6 +52,7 @@ from collections import defaultdict
 import copy
 import logging
 import jwt
+from decimal import Decimal
 
 from ondoc.web.models import ContactUs
 
@@ -582,7 +583,7 @@ class UserAppointmentsViewSet(OndocViewSet):
 
                         if opd_appointment.procedures.count():
                             doctor_details = opd_appointment.get_procedures()[0]
-                            old_agreed_price = doctor_details["agreed_price"]
+                            old_agreed_price = Decimal(doctor_details["agreed_price"])
                             new_fees = opd_appointment.fees - old_agreed_price + doctor_hospital.fees
                             new_deal_price = opd_appointment.deal_price
                             new_mrp = opd_appointment.mrp
