@@ -665,6 +665,7 @@ class LabTest(TimeStampedModel, SearchKey):
     about_test = models.TextField(blank=True, verbose_name='About the test')
     why_get_tested = models.TextField(blank=True, verbose_name='Why get tested?')
     preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
+    rank = models.PositiveIntegerField(default=0, null=True)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,

@@ -287,7 +287,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
-        demo_lab_test = AvailableLabTest.objects.filter(lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).prefetch_related('test')[:10]
+        demo_lab_test = AvailableLabTest.objects.filter(lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).order_by("test__rank").prefetch_related('test')[:2]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = list()
@@ -295,6 +295,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing = None
         lab_timing_data = list()
         distance_related_charges = None
+
 
         distance_related_charges = 1 if lab_obj.home_collection_charges.all().exists() else 0
         if lab_obj.always_open:
@@ -321,6 +322,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                                    entity_type__iexact='Lab').values('url')
         # if entity.exists():
         #     lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+
         temp_data = dict()
         temp_data['lab'] = lab_serializable_data
         temp_data['distance_related_charges'] = distance_related_charges
