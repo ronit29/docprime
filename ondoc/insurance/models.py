@@ -55,6 +55,8 @@ class InsurancePlans(auth_model.TimeStampedModel):
     type = models.CharField(max_length=100)
     amount = models.PositiveIntegerField(default=None)
     policy_tenure = models.PositiveIntegerField(default=None)
+    adult_count = models.SmallIntegerField(default=None)
+    child_count = models.SmallIntegerField(default=None)
     is_disabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
@@ -83,79 +85,6 @@ class InsuranceThreshold(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "insurance_threshold"
-
-
-class InsuredMembers(auth_model.TimeStampedModel):
-    MALE = 'm'
-    FEMALE = 'f'
-    OTHER = 'o'
-    GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
-    SELF = 'self'
-    HUSBAND = 'husband'
-    WIFE = 'wife'
-    SON = 'son'
-    DAUGHTER = 'daughter'
-    RELATION_CHOICES = [(HUSBAND, 'Husband'), (WIFE, 'Wife'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
-    ADULT = "adult"
-    CHILD = "child"
-    MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
-    insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
-    insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
-    first_name = models.CharField(max_length=50, null=False)
-    last_name = models.CharField(max_length=50, null=False)
-    dob = models.DateField(blank=True, null=True)
-    email = models.EmailField(max_length=100)
-    relation = models.CharField(max_length=50, choices=RELATION_CHOICES)
-    pincode = models.PositiveIntegerField(default=None)
-    address = models.TextField(default=None)
-    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, null=True, blank=True, default=None)
-    phone_number = models.BigIntegerField(blank=True, null=True,
-                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
-    profile = models.ForeignKey(auth_model.UserProfile, on_delete=models.SET_NULL, null=True)
-    hypertension = models.NullBooleanField(blank=True, null=True)
-    diabetes = models.NullBooleanField(blank=True, null=True)
-    liver_disease = models.NullBooleanField(blank=True, null=True)
-    heart_disease = models.NullBooleanField(blank=True, null=True)
-
-    class Meta:
-        db_table = "insured_members"
-
-    @classmethod
-    def create_insured_members(self, insurance_data):
-        insured_members = insurance_data.get("members")
-        insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
-        insurance_plan_id = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
-
-        list_members = []
-        for member in insured_members:
-            user_profile = UserProfile.objects.get(id=member.get('member_profile').get('id'))
-            insured_members_obj = InsuredMembers.objects.create( first_name=member.get('first_name'),
-                                                                    last_name=member.get('last_name'),
-                                                                    dob=member.get('dob'), email=member.get('email'),
-                                                                    relation=member.get('relation'),
-                                                                    address=member.get('address'),
-                                                                    pincode=member.get('pincode'),
-                                                                    phone_number=member.get('member_profile').get('phone_number'),
-                                                                    gender=member.get('member_profile').get('gender'),
-                                                                    profile=user_profile,
-                                                                    insurer=insurer,
-                                                                 insurance_plan=insurance_plan_id
-                                                                    )
-            list_members.append(model_to_dict(insured_members_obj))
-        members_data = {"members": list_members}
-        return members_data
-
-
-class Insurance(auth_model.TimeStampedModel):
-    insurer = models.ForeignKey(Insurer, on_delete=models.SET_NULL, null=True)
-    product_id = models.PositiveSmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
-    name = models.CharField(max_length=100)
-    insurance_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    insured_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    max_profile = models.PositiveSmallIntegerField(blank=True, null=True)
-
-    class Meta:
-        db_table = "insurance"
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
@@ -204,6 +133,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     policy_number = models.CharField(max_length=50, blank=True, null=True)
     insurance_transaction = models.ForeignKey(InsuranceTransaction, on_delete=models.DO_NOTHING, null=True)
     insured_members = JSONField(blank=True, null=True)
+    premium_amount = models.PositiveIntegerField(default=None)
 
     def __str__(self):
         return str(self.user)
@@ -230,3 +160,90 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                       )
         return user_insurance
 
+
+class InsuredMembers(auth_model.TimeStampedModel):
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
+    SELF = 'self'
+    HUSBAND = 'husband'
+    WIFE = 'wife'
+    SON = 'son'
+    DAUGHTER = 'daughter'
+    RELATION_CHOICES = [(HUSBAND, 'Husband'), (WIFE, 'Wife'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    ADULT = "adult"
+    CHILD = "child"
+    MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
+    MR = 'mr.'
+    MISS = 'miss'
+    MRS = 'mrs.'
+    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss')]
+    insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
+    insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
+    first_name = models.CharField(max_length=50, null=False)
+    last_name = models.CharField(max_length=50, null=False)
+    dob = models.DateField(blank=True, null=True)
+    email = models.EmailField(max_length=100)
+    relation = models.CharField(max_length=50, choices=RELATION_CHOICES)
+    pincode = models.PositiveIntegerField(default=None)
+    address = models.TextField(default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, null=True, blank=True, default=None)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    profile = models.ForeignKey(auth_model.UserProfile, on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, null=True, blank=True, default=None)
+    middle_name = models.CharField(max_length=50, null=True)
+    town = models.CharField(max_length=100, null=False)
+    district = models.CharField(max_length=100, null=False)
+    state = models.CharField(max_length=100, null=False)
+    user_insurance = models.ForeignKey(UserInsurance, on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = "insured_members"
+
+    @classmethod
+    def create_insured_members(self, insurance_data):
+        insured_members = insurance_data.get("members")
+        insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
+        insurance_plan_id = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
+
+        list_members = []
+        for member in insured_members:
+            user_profile = UserProfile.objects.get(id=member.get('member_profile').get('id'))
+            insured_members_obj = InsuredMembers.objects.create( first_name=member.get('first_name'),
+                                                                    last_name=member.get('last_name'),
+                                                                    dob=member.get('dob'), email=member.get('email'),
+                                                                    relation=member.get('relation'),
+                                                                    address=member.get('address'),
+                                                                    pincode=member.get('pincode'),
+                                                                    phone_number=member.get('member_profile').get('phone_number'),
+                                                                    gender=member.get('member_profile').get('gender'),
+                                                                    profile=user_profile,
+                                                                    insurer=insurer,
+                                                                 insurance_plan=insurance_plan_id
+                                                                    )
+            list_members.append(model_to_dict(insured_members_obj))
+        members_data = {"members": list_members}
+        return members_data
+
+
+class Insurance(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, on_delete=models.SET_NULL, null=True)
+    product_id = models.PositiveSmallIntegerField(choices=account_model.Order.PRODUCT_IDS)
+    name = models.CharField(max_length=100)
+    insurance_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    insured_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    max_profile = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = "insurance"
+
+
+class InsuranceDisease(auth_model.TimeStampedModel):
+    disease = models.CharField(max_length=100, blank=True, null=True)
+    is_disabled = models.BooleanField(default=False)
+    is_live = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "insurance_disease"

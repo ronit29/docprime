@@ -85,7 +85,7 @@ class Order(TimeStampedModel):
     def process_order(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
-        from ondoc.insurance.models import InsuranceTransaction
+        from ondoc.insurance.models import InsuranceTransaction, InsurerFloat
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
         from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
@@ -159,13 +159,15 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
         elif self.action == Order.INSURANCE_CREATE:
-            insurance_data = appointment_data
+            new_insurance_data = insurance_data
             if consumer_account.balance >= insurance_data['amount']:
                 appointment_obj = InsuranceTransaction.create_insurance_transaction(insurance_data)
+                amount = appointment_obj.amount
         if order_dict:
             self.update_order(order_dict)
         # If payment is required and appointment is created successfully, debit consumer's account
         if appointment_obj and not payment_not_required:
+            InsurerFloat.debit_float_schedule(appointment_obj.insurer_id, amount)
             consumer_account.debit_schedule(appointment_obj, self.product_id, amount)
         return appointment_obj
 

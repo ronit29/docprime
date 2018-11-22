@@ -241,7 +241,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                     if dob[0]:
                         pre_insured_members['dob'] = member['dob']
                     else:
-                        return Response(dob[1], status.HTTP_404_NOT_FOUND)
+                        return Response(dob[1], status=status.HTTP_404_NOT_FOUND)
 
                 # User Profile creation or updation
                 profile = self.profile_create_or_update(member, request)
@@ -262,13 +262,9 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
                 insured_members_list.append(pre_insured_members.copy())
 
-            user_profile = UserProfile.objects.filter(id=logged_in_user_profile_id, user_id=request.user.pk).values('id'
-                                                                                                        ,'name',
-                                                                                                        'email',
-                                                                                                        'gender',
-                                                                                                        'user_id',
-                                                                                                        'dob',
-                                                                                                        'phone_number')
+            user_profile = UserProfile.objects.filter(id=logged_in_user_profile_id,
+                                                      user_id=request.user.pk).values('id', 'name', 'email', 'gender',
+                                                                                      'user_id', 'dob', 'phone_number')
         insurer = Insurer.objects.filter(id=valid_data.get('insurer').id).values('id', 'name', 'max_float',
                                                                                  'min_float').first()
         insurance_plan = InsurancePlans.objects.filter(id=valid_data.get('insurance_plan').id).values('id', 'amount',
@@ -346,14 +342,14 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             if member['profile']:
                 profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
                                                                                      'gender', 'user_id', 'dob',
-                                                                                     'phone_number')
+                                                                                     'phone_number').first()
             else:
                 if existing_profile:
                     profile = UserProfile.objects.filter(id=existing_profile.id).values('id', 'name', 'email',
                                                                                         'gender', 'user_id',
                                                                                         'dob',
-                                                                                        'phone_number')
-            profile = profile[0]
+                                                                                        'phone_number').first()
+
             if profile:
                 if profile.get('user_id') == request.user.pk:
                     member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
