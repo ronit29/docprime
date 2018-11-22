@@ -331,10 +331,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if hasattr(request, 'agent') and request.agent:
             resp['is_agent'] = True
 
-        if not appointment_details.get('procedures'):
-            insurance_effective_price = appointment_details['fees']
-        else:
-            insurance_effective_price = appointment_details['deal_price']  # SHASHANK_SINGH Ask Arun sir?
+        insurance_effective_price = appointment_details['fees']
 
         can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
         if can_use_insurance:
@@ -354,14 +351,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if ((appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
              balance < appointment_details.get("effective_price")) or resp['is_agent']):
 
-            payable_amount = appointment_details.get("effective_price") - balance
+            payable_amount = max(0, appointment_details.get("effective_price") - balance)
+            wallet_amount = min(balance, appointment_details.get("effective_price"))
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.OPD_APPOINTMENT_CREATE,
                 action_data=appointment_action_data,
                 amount=payable_amount,
-                wallet_amount=balance,
+                wallet_amount=wallet_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = payable_amount
