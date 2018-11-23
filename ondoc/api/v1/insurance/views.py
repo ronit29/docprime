@@ -236,28 +236,35 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                                                                             valid_data.get('insurance_plan').id,
                                                                             insurer_id=valid_data.get(
                                                                                 'insurer')).first()
-                    dob = self.age_validate(member, insurance_threshold)
-                    if dob[0]:
+                    dob_flag, error_message = self.age_validate(member, insurance_threshold)
+                    if dob_flag:
                         pre_insured_members['dob'] = member['dob']
                     else:
-                        return Response(dob[1], status=status.HTTP_404_NOT_FOUND)
+                        return Response(error_message, status=status.HTTP_404_NOT_FOUND)
 
                 # User Profile creation or updation
-                profile = self.profile_create_or_update(member, request)
-                if profile[0]:
-                    member_profile = profile[1]
-                    logged_in_user_profile_id = profile[2]
+                profile_flag, profile, profile_id = self.profile_create_or_update(member, request)
+                if profile_flag:
+                    member_profile = profile
+                    logged_in_user_profile_id = profile_id
                 else:
                     return Response({"message": "User is not valid"},
                                 status.HTTP_404_NOT_FOUND)
 
+                pre_insured_members['title'] = member['title']
                 pre_insured_members['first_name'] = member['first_name']
+                pre_insured_members['middle_name'] = member['middle_name']
                 pre_insured_members['last_name'] = member['last_name']
                 pre_insured_members['address'] = member['address']
                 pre_insured_members['pincode'] = member['pincode']
                 pre_insured_members['email'] = member['email']
                 pre_insured_members['relation'] = member['relation']
-                pre_insured_members['member_profile'] = member_profile
+                pre_insured_members['profile'] = member_profile.get('id')
+                pre_insured_members['gender'] = member['gender']
+                pre_insured_members['member_type'] = member['member_type']
+                pre_insured_members['town'] = member['town']
+                pre_insured_members['district'] = member['district']
+                pre_insured_members['state'] = member['state']
 
                 insured_members_list.append(pre_insured_members.copy())
 

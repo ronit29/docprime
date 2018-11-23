@@ -15,6 +15,7 @@ import copy
 import json
 import logging
 import requests
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -114,9 +115,18 @@ class Order(TimeStampedModel):
         elif self.product_id == self.INSURANCE_PRODUCT_ID:
             insurance_transaction = appointment_data.get('insurance').get('insurance_transaction')
             insurance_transaction["order"] = self.id
+            transaction_date = appointment_data.get('insurance').get('insurance_transaction').get('transaction_date')
+            transaction_date = datetime.datetime.strptime(transaction_date, "%Y-%m-%d %H:%M:%S.%f")
+            members = appointment_data.get('insurance').get('insurance_transaction').get('insured_members')
+            for member in members:
+                dob = member['dob']
+                dob = datetime.datetime.strptime(dob, "%Y-%m-%d").date()
+                member['dob'] = dob
+            insurance_transaction['insured_members'] = members
+            insurance_transaction["transaction_date"] = transaction_date
             serializer = InsuranceTransactionSerializer(data=insurance_transaction)
             serializer.is_valid(raise_exception=True)
-            insurance_data = serializer.validated_data
+            appointment_data = serializer.validated_data
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
@@ -161,9 +171,9 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
         elif self.action == Order.INSURANCE_CREATE:
-            new_insurance_data = insurance_data
+            insurance_data = appointment_data
             if consumer_account.balance >= insurance_data['amount']:
-                appointment_obj = InsuranceTransaction.create_insurance_transaction(insurance_data)
+                appointment_obj = InsuranceTransaction.create_insurance_transaction(insurance_data,self)
                 amount = appointment_obj.amount
         if order_dict:
             self.update_order(order_dict)

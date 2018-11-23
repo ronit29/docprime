@@ -236,6 +236,7 @@ class IsMatrixUser(permissions.BasePermission):
                 return True
         return False
 
+
 def insurance_transform(app_data):
     """A serializer helper to serialize Insurance data"""
     app_data['insurance']['insurance_transaction']['transaction_date'] = str(app_data['insurance']['insurance_transaction']['transaction_date'])
@@ -243,9 +244,8 @@ def insurance_transform(app_data):
     insured_members = app_data['insurance']['insurance_transaction']['insured_members']
     for member in insured_members:
         member['dob'] = str(member['dob'])
-        member['member_profile']['dob'] = str(member['member_profile']['dob'])
+        # member['member_profile']['dob'] = str(member['member_profile']['dob'])
     return app_data
-
 
 
 def opdappointment_transform(app_data):

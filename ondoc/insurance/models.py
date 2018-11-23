@@ -14,7 +14,11 @@ class Insurer(auth_model.TimeStampedModel):
     max_float = models.PositiveIntegerField(default=None)
     min_float = models.PositiveIntegerField(default=None)
     is_disabled = models.BooleanField(default=False)
+    website = models.CharField(max_length=100, null=True)
+    phone_number = models.BigIntegerField(blank=True, null=True)
+    email = models.EmailField(max_length=100, null=True)
     is_live = models.BooleanField(default=False)
+
 
     def __str__(self):
         return self.name
@@ -88,10 +92,12 @@ class InsuranceThreshold(auth_model.TimeStampedModel):
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
-    CREATED = 1
-    COMPLETED = 2
-    FAILED = 3
-    STATUS_CHOICES = [(CREATED, 'Created'), (COMPLETED, 'Completed'),
+    INITIATE = 1
+    CREATED = 2
+    PROCESSED = 3
+    COMPLETED = 4
+    FAILED = 5
+    STATUS_CHOICES = [(INITIATE, 'Initiate'), (CREATED, 'Created'), (PROCESSED, 'Processed'), (COMPLETED, 'Completed'),
                       (FAILED, 'Failed')]
     insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
     insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
@@ -99,7 +105,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     amount = models.PositiveIntegerField(default=None)
     user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
     transaction_date = models.DateTimeField(blank=True, null=True)
-    status_type = models.CharField(max_length=50)
+    status_type = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=INITIATE)
     insured_members = JSONField(blank=True, null=True)
     policy_number = models.CharField(max_length=50, blank=False, null=True, default=None)
 
@@ -107,8 +113,8 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
         db_table = "insurance_transaction"
 
     @classmethod
-    def create_insurance_transaction(self, data, insured_members, order):
-
+    def create_insurance_transaction(self, data, order):
+        insured_members = InsuredMembers.create_insured_members(data)
         insurer = Insurer.objects.get(id=data.get('insurer').id)
         insurance_plan = InsurancePlans.objects.get(id=data.get('insurance_plan').id)
         insurance_transaction_obj = InsuranceTransaction.objects.create(insurer=insurer,
@@ -185,46 +191,51 @@ class InsuredMembers(auth_model.TimeStampedModel):
     last_name = models.CharField(max_length=50, null=False)
     dob = models.DateField(blank=True, null=True)
     email = models.EmailField(max_length=100)
-    relation = models.CharField(max_length=50, choices=RELATION_CHOICES)
+    relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
     pincode = models.PositiveIntegerField(default=None)
     address = models.TextField(default=None)
-    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, null=True, blank=True, default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     profile = models.ForeignKey(auth_model.UserProfile, on_delete=models.SET_NULL, null=True)
-    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, null=True, blank=True, default=None)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
     middle_name = models.CharField(max_length=50, null=True)
     town = models.CharField(max_length=100, null=False)
     district = models.CharField(max_length=100, null=False)
     state = models.CharField(max_length=100, null=False)
-    user_insurance = models.ForeignKey(UserInsurance, on_delete=models.DO_NOTHING)
+    user_insurance = models.ForeignKey(UserInsurance, on_delete=models.DO_NOTHING, null=True)
 
     class Meta:
         db_table = "insured_members"
 
     @classmethod
     def create_insured_members(self, insurance_data):
-        insured_members = insurance_data.get("members")
-        insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
-        insurance_plan_id = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
+        insured_members = insurance_data.get("insured_members")
+        insurer = Insurer.objects.get(id=insurance_data.get('insurer').id)
+        insurance_plan = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').id)
 
         list_members = []
         for member in insured_members:
-            user_profile = UserProfile.objects.get(id=member.get('member_profile').get('id'))
-            insured_members_obj = InsuredMembers.objects.create( first_name=member.get('first_name'),
+            user_profile = UserProfile.objects.get(id=member.get('profile').id)
+            insured_members_obj = InsuredMembers.objects.create(first_name=member.get('first_name'),
+                                                                    title=member.get('title'),
+                                                                    middle_name=member.get('middle_name'),
                                                                     last_name=member.get('last_name'),
                                                                     dob=member.get('dob'), email=member.get('email'),
                                                                     relation=member.get('relation'),
                                                                     address=member.get('address'),
                                                                     pincode=member.get('pincode'),
-                                                                    phone_number=member.get('member_profile').get('phone_number'),
-                                                                    gender=member.get('member_profile').get('gender'),
+                                                                    phone_number=user_profile.phone_number,
+                                                                    gender=member.get('gender'),
                                                                     profile=user_profile,
                                                                     insurer=insurer,
-                                                                 insurance_plan=insurance_plan_id
+                                                                    insurance_plan=insurance_plan,
+                                                                    town=member.get('town'),
+                                                                    district=member.get('district'),
+                                                                    state=member.get('state')
                                                                     )
             list_members.append(model_to_dict(insured_members_obj))
-        members_data = {"members": list_members}
+        members_data = {"insured_members": list_members}
         return members_data
 
 

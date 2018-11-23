@@ -65,16 +65,21 @@ class InsuranceThresholdSerializer(serializers.Serializer):
 
 class MemberListSerializer(serializers.Serializer):
 
+    title = serializers.ChoiceField(choices=InsuredMembers.TITLE_TYPE_CHOICES)
     first_name = serializers.CharField(max_length=50)
+    middle_name = serializers.CharField(max_length=50, allow_blank=True)
     last_name = serializers.CharField(max_length=50)
     dob = serializers.DateField()
     email = serializers.EmailField()
-    relation = serializers.CharField(max_length=50)
+    relation = serializers.ChoiceField(choices=InsuredMembers.RELATION_CHOICES)
     address = serializers.CharField(max_length=250)
     pincode = serializers.IntegerField()
     member_type = serializers.ChoiceField(choices=InsuredMembers.MEMBER_TYPE_CHOICES)
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=True)
     gender = serializers.ChoiceField(choices=InsuredMembers.GENDER_CHOICES)
+    town = serializers.CharField(max_length=100)
+    district = serializers.CharField(max_length=100)
+    state = serializers.CharField(max_length=100)
 
 
 class InsuredMemberSerializer(serializers.Serializer):
