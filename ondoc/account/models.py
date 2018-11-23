@@ -86,7 +86,7 @@ class Order(TimeStampedModel):
     def process_order(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
-        from ondoc.insurance.models import InsuranceTransaction, InsurerFloat
+        from ondoc.insurance.models import InsuranceTransaction, InsurerAccount
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
         from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer

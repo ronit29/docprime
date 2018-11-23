@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
-from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerFloat, InsuredMembers,
+from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
                                     InsuranceTransaction, UserInsurance)
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
@@ -9,31 +9,12 @@ from ondoc.account.models import (Order)
 from django.contrib.postgres.fields import JSONField
 
 
-class InsurerSerializer(serializers.Serializer):
-    id = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all(), required=True)
-    name = serializers.CharField(max_length=50)
-    max_float = serializers.IntegerField()
-    min_float = serializers.IntegerField()
-    plans = serializers.SerializerMethodField()
+class InsurancePlansSerializer(serializers.ModelSerializer):
 
-    def get_plans(self, obj):
-        plans = InsurancePlans.objects.filter(insurer=obj)
-        if plans:
-            insurance_plans = InsurancePlansSerializer(plans, many=True)
-            return insurance_plans.data
-
-
-    class Meta:
-        model = Insurer
-        field = ('id', 'name', 'plans', )
-
-
-class InsurancePlansSerializer(serializers.Serializer):
-
-    id = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all(), required=True)
-    type = serializers.CharField(max_length=100)
-    amount = serializers.IntegerField()
-    threshold = serializers.SerializerMethodField()
+    #id = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all(), required=True)
+    #type = serializers.CharField(max_length=100)
+    #amount = serializers.IntegerField()
+    #threshold = serializers.SerializerMethodField()
 
     def get_threshold(self, obj):
         threshold = InsuranceThreshold.objects.filter(insurance_plan=obj).first()
@@ -43,7 +24,25 @@ class InsurancePlansSerializer(serializers.Serializer):
 
     class Meta:
         model = InsurancePlans
-        field = ('id', 'type', 'amount', 'threshold')
+        fields = ('id', 'name', 'amount')
+        #fields = '__all__'
+
+class InsurerSerializer(serializers.ModelSerializer):
+    #id = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all(), required=True)
+    #plans = serializers.SerializerMethodField()
+
+    # def get_plans(self, obj):
+    #     plans = InsurancePlans.objects.filter(insurer=obj)
+    #     if plans:
+    #         insurance_plans = InsurancePlansSerializer(plans, many=True)
+    #         return insurance_plans.data
+    plans = InsurancePlansSerializer(source='get_active_plans', many=True)
+
+
+    class Meta:
+        model = Insurer
+        #fields = '__all__'
+        fields = ('id', 'name', 'min_float','logo','website','phone_number','email','plans')
 
 
 class InsuranceThresholdSerializer(serializers.Serializer):
@@ -96,7 +95,7 @@ class InsuranceTransactionSerializer(serializers.Serializer):
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
     amount = serializers.IntegerField()
-    status_type = serializers.ChoiceField(choices=InsuranceTransaction.STATUS_CHOICES)
+    #status_type = serializers.ChoiceField(choices=InsuranceTransaction.STATUS_CHOICES)
     # insured_members = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all))
     insured_members = serializers.ListSerializer(child=MemberListSerializer())
     transaction_date = serializers.DateTimeField()

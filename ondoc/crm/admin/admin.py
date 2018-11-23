@@ -44,8 +44,8 @@ from ondoc.authentication.models import OtpVerifications, UserProfile
 
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
-from ondoc.insurance.models import Insurer, InsurerFloat, InsurancePlans, InsuranceThreshold, UserInsurance, \
-    InsuredMembers, InsuranceTransaction
+from ondoc.insurance.models import Insurer, InsurerAccount, InsurancePlans, InsuranceThreshold, UserInsurance, \
+    InsuredMembers, InsuranceTransaction, InsurancePlanContent
 from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, UserInsuranceAdmin, InsuredMembersAdmin
 from ondoc.insurance import models as insurance_model
 from ondoc.ratings_review.models import RatingsReview, ReviewCompliments
@@ -126,9 +126,11 @@ admin.site.register(Procedure, ProcedureAdmin)
 admin.site.register(Insurer, InsurerAdmin)
 admin.site.register(InsuranceThreshold, InsuranceThresholdAdmin)
 admin.site.register(InsurancePlans, InsurancePlansAdmin)
-admin.site.register(InsurerFloat, InsurerFloatAdmin)
+admin.site.register(InsurerAccount, InsurerFloatAdmin)
 admin.site.register(UserInsurance, UserInsuranceAdmin)
 admin.site.register(InsuredMembers, InsuredMembersAdmin)
+admin.site.register(InsurancePlanContent)
+
 admin.site.register(InsuranceTransaction)
 admin.site.register(Order)
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
