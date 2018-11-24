@@ -629,7 +629,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         resp = dict()
         user = request.user
 
-        if appointment_details.payment_type == OpdAppointment.PREPAID and not appointment_details.procedures.count():
+        if appointment_details.payment_type == OpdAppointment.PREPAID and isinstance(appointment_details,OpdAppointment) and not appointment_details.procedures.count():
             remaining_amount = 0
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
             consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
