@@ -170,7 +170,7 @@ class DoctorSearchHelper:
                     order_by_field = " distance ASC, total_price ASC "
                     rank_by = "rnk=1"
             else:
-                order_by_field = " floor(distance/{bucket_size}) ASC, total_price ASC".format(bucket_size=str(bucket_size))
+                order_by_field = " floor(distance/{bucket_size}) ASC, distance, total_price ASC".format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
             order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ' ,order_by_field)
         else:
@@ -204,6 +204,8 @@ class DoctorSearchHelper:
         data = dict()
 
         specialization_ids = self.query_params.get("specialization_ids", [])
+        condition_ids = self.query_params.get("condition_ids", [])
+
 
         if self.count_of_procedure:
             rank_part = "Row_number() OVER( PARTITION BY doctor_id ORDER BY " \
@@ -245,7 +247,6 @@ class DoctorSearchHelper:
                 rank_part = rank_part, filtering_params=filtering_params.get('string'),
                 count_of_procedure=filtering_params.get('count_of_procedure'),
                 rank_by=rank_by, order_by_field=order_by_field)
-            print(query_string)               
 
         else:
             sp_cond = ''
@@ -253,7 +254,7 @@ class DoctorSearchHelper:
             rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                 "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location),dct.deal_price ASC) rnk " \
 
-            if len(specialization_ids)>0:
+            if len(specialization_ids)>0 or len(condition_ids)>0:
                 sp_cond = " LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
                        " LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id "
             if min_distance>0:
