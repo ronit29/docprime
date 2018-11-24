@@ -455,6 +455,9 @@ def doctor_query_parameters(entity_params, req_params):
     else:
         params_dict["specialization_ids"] = ''
 
+    params_dict["procedure_ids"] = ''
+    params_dict["procedure_category_ids"] = ''
+
     return params_dict
 
 
