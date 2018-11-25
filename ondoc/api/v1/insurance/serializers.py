@@ -9,22 +9,41 @@ from ondoc.account.models import (Order)
 from django.contrib.postgres.fields import JSONField
 
 
+class InsuranceThresholdSerializer(serializers.ModelSerializer):
+
+    # id = serializers.PrimaryKeyRelatedField(queryset=InsuranceThreshold.objects.all(), required=True)
+    # lab_amount_limit = serializers.IntegerField()
+    # lab_count_limit = serializers.IntegerField()
+    # opd_count_limit = serializers.IntegerField()
+    # opd_amount_limit = serializers.IntegerField()
+    # max_age = serializers.IntegerField()
+    # min_age = serializers.IntegerField()
+    # child_min_age = serializers.IntegerField()
+
+    class Meta:
+        model = InsuranceThreshold
+
+        # fields = '__all__'
+        exclude = ('created_at', 'updated_at', 'enabled', 'is_live')
+
+
 class InsurancePlansSerializer(serializers.ModelSerializer):
 
     #id = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all(), required=True)
     #type = serializers.CharField(max_length=100)
     #amount = serializers.IntegerField()
     #threshold = serializers.SerializerMethodField()
+    threshold = InsuranceThresholdSerializer(source='get_active_threshold', many=True)
 
-    def get_threshold(self, obj):
-        threshold = InsuranceThreshold.objects.filter(insurance_plan=obj).first()
-        if threshold:
-            insurance_threshold = InsuranceThresholdSerializer(threshold)
-            return insurance_threshold.data
+    # def get_threshold(self, obj):
+    #     threshold = InsuranceThreshold.objects.filter(insurance_plan=obj).first()
+    #     if threshold:
+    #         insurance_threshold = InsuranceThresholdSerializer(threshold)
+    #         return insurance_threshold.data
 
     class Meta:
         model = InsurancePlans
-        fields = ('id', 'name', 'amount')
+        fields = ('id', 'name', 'amount', 'threshold')
         #fields = '__all__'
 
 class InsurerSerializer(serializers.ModelSerializer):
@@ -42,24 +61,7 @@ class InsurerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Insurer
         #fields = '__all__'
-        fields = ('id', 'name', 'min_float','logo','website','phone_number','email','plans')
-
-
-class InsuranceThresholdSerializer(serializers.Serializer):
-
-    id = serializers.PrimaryKeyRelatedField(queryset=InsuranceThreshold.objects.all(), required=True)
-    lab_amount_limit = serializers.IntegerField()
-    lab_count_limit = serializers.IntegerField()
-    opd_count_limit = serializers.IntegerField()
-    opd_amount_limit = serializers.IntegerField()
-    max_age = serializers.IntegerField()
-    min_age = serializers.IntegerField()
-    child_min_age = serializers.IntegerField()
-
-    class Meta:
-        model = InsuranceThreshold
-        field = {'id', 'lab_amount_limit', 'lab_count_limit', 'opd_count_limit', 'opd_amount_limit',
-                 'max_age', 'min_age', 'child_min_age'}
+        fields = ('id', 'name', 'min_float', 'logo', 'website', 'phone_number', 'email', 'plans')
 
 
 class MemberListSerializer(serializers.Serializer):

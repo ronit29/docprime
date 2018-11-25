@@ -79,6 +79,10 @@ class InsurancePlans(auth_model.TimeStampedModel):
     enabled = models.BooleanField(default=True)
     is_live = models.BooleanField(default=False)
 
+    @property
+    def get_active_threshold(self):
+        return self.threshold.filter(is_live=True)
+
     def __str__(self):
         return self.name
 
@@ -91,9 +95,10 @@ class InsurancePlanContent(auth_model.TimeStampedModel):
     title = models.CharField(max_length=500, blank=False)
     content = models.CharField(max_length=5000, blank=False)
 
+
 class InsuranceThreshold(auth_model.TimeStampedModel):
     #insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
-    insurance_plan = models.ForeignKey(InsurancePlans,related_name="threshold", on_delete=models.CASCADE)
+    insurance_plan = models.ForeignKey(InsurancePlans, related_name="threshold", on_delete=models.CASCADE)
     opd_count_limit = models.PositiveIntegerField(default=None)
     opd_amount_limit = models.PositiveIntegerField(default=None)
     lab_count_limit = models.PositiveIntegerField(default=None)
