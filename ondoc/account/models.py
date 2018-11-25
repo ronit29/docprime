@@ -86,10 +86,11 @@ class Order(TimeStampedModel):
     def process_order(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
-        from ondoc.insurance.models import InsuranceTransaction, InsurerAccount
+        from ondoc.insurance.models import InsuranceTransaction, InsurerAccount, UserInsurance
+        from ondoc.api.v1.utils import insurance_reverse_transform
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
-        from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
+        from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
 
         # Initial validations for appointment data
         appointment_data = self.action_data
@@ -113,18 +114,24 @@ class Order(TimeStampedModel):
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
         elif self.product_id == self.INSURANCE_PRODUCT_ID:
-            insurance_transaction = appointment_data.get('insurance').get('insurance_transaction')
-            insurance_transaction["order"] = self.id
-            transaction_date = appointment_data.get('insurance').get('insurance_transaction').get('transaction_date')
-            transaction_date = datetime.datetime.strptime(transaction_date, "%Y-%m-%d %H:%M:%S.%f")
-            members = appointment_data.get('insurance').get('insurance_transaction').get('insured_members')
-            for member in members:
-                dob = member['dob']
-                dob = datetime.datetime.strptime(dob, "%Y-%m-%d").date()
-                member['dob'] = dob
-            insurance_transaction['insured_members'] = members
-            insurance_transaction["transaction_date"] = transaction_date
-            serializer = InsuranceTransactionSerializer(data=insurance_transaction)
+            # insurance_transaction = appointment_data.get('insurance').get('insurance_transaction')
+            # insurance_transaction["order"] = self.id
+            # transaction_date = appointment_data.get('insurance').get('insurance_transaction').get('transaction_date')
+            # transaction_date = datetime.datetime.strptime(transaction_date, "%Y-%m-%d %H:%M:%S.%f")
+            # members = appointment_data.get('insurance').get('insurance_transaction').get('insured_members')
+            # for member in members:
+            #     dob = member['dob']
+            #     dob = datetime.datetime.strptime(dob, "%Y-%m-%d").date()
+            #     member['dob'] = dob
+            # insurance_transaction['insured_members'] = members
+            # insurance_transaction["transaction_date"] = transaction_date
+            # serializer = InsuranceTransactionSerializer(data=insurance_transaction)
+            # serializer.is_valid(raise_exception=True)
+            # appointment_data = serializer.validated_data
+            insurance_data = self.action_data
+            insurance_data = insurance_reverse_transform(insurance_data)
+            insurance_data['insurance']['user_insurance']['order'] = self.id
+            serializer = UserInsuranceSerializer(data=insurance_data.get('insurance').get('user_insurance'))
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
 
@@ -172,14 +179,14 @@ class Order(TimeStampedModel):
                 }
         elif self.action == Order.INSURANCE_CREATE:
             insurance_data = appointment_data
-            if consumer_account.balance >= insurance_data['amount']:
-                appointment_obj = InsuranceTransaction.create_insurance_transaction(insurance_data,self)
+            if consumer_account.balance >= self.amount:
+                appointment_obj = UserInsurance.create_user_insurance(self, appointment_data)
                 amount = appointment_obj.amount
         if order_dict:
             self.update_order(order_dict)
         # If payment is required and appointment is created successfully, debit consumer's account
         if appointment_obj and not payment_not_required:
-            InsurerFloat.debit_float_schedule(appointment_obj.insurer_id, amount)
+            # InsurerFloat.debit_float_schedule(appointment_obj.insurer_id, amount)
             consumer_account.debit_schedule(appointment_obj, self.product_id, amount)
         return appointment_obj
 

@@ -86,8 +86,15 @@ class MemberListSerializer(serializers.Serializer):
 class InsuredMemberSerializer(serializers.Serializer):
 
     members = serializers.ListSerializer(child=MemberListSerializer())
-    insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
-    insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+    # insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
+    # insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+
+
+# class InsuredMemberSerializer(serializers.ListSerializer):
+#
+#     class Meta:
+#         model = InsuredMembers
+#         exclude = ('created_at', 'updated_at')
 
 
 class InsuranceTransactionSerializer(serializers.Serializer):
@@ -116,12 +123,11 @@ class InsuredMemberIdsSerializer(serializers.Serializer):
     diabetes = serializers.NullBooleanField(required=False)
 
 
-# class UserInsuranceSerializer(serializers.Serializer):
-#
-#     insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
-#     insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
-#     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
-#     amount = serializers.IntegerField()
-#     insured_members = serializers.ListField(
-#         child=serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all))
-#     transaction_date = serializers.DateTimeField()
+class UserInsuranceSerializer(serializers.Serializer):
+
+    insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    premium_amount = serializers.IntegerField()
+    insured_members = serializers.ListSerializer(child=MemberListSerializer())
+    purchase_date = serializers.DateTimeField()
+    expiry_date = serializers.DateTimeField()

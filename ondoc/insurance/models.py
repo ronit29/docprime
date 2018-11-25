@@ -175,24 +175,26 @@ class UserInsurance(auth_model.TimeStampedModel):
         db_table = "user_insurance"
 
     @classmethod
-    def create_user_insurance(self, insurance_data, insured_members, insurance_transaction):
-        insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
-        insurance_plan = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
-        insurance_transaction_obj = InsuranceTransaction.objects.get(id=insurance_transaction.id)
-        tenure = insurance_plan.policy_tenure
-        expiry_date = insurance_transaction_obj.transaction_date + timedelta(days=tenure*365)
-        user = User.objects.get(id=insurance_data.get('user'))
-        user_insurance = UserInsurance.objects.create(insurer=insurer,
-                                                      insurance_plan=insurance_plan,
-                                                      user=user,
-                                                      insurance_transaction=insurance_transaction_obj,
-                                                      insured_members=insured_members,
-                                                      policy_number=insurance_transaction.policy_number,
-                                                      purchase_date=insurance_transaction.transaction_date.date(),
-                                                      expiry_date=expiry_date.date()
-                                                      )
-        return user_insurance
-
+    # def create_user_insurance(self, insurance_data, insured_members, insurance_transaction):
+    #     insurer = Insurer.objects.get(id=insurance_data.get('insurer').get('id'))
+    #     insurance_plan = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').get('id'))
+    #     insurance_transaction_obj = InsuranceTransaction.objects.get(id=insurance_transaction.id)
+    #     tenure = insurance_plan.policy_tenure
+    #     expiry_date = insurance_transaction_obj.transaction_date + timedelta(days=tenure*365)
+    #     user = User.objects.get(id=insurance_data.get('user'))
+    #     user_insurance = UserInsurance.objects.create(insurer=insurer,
+    #                                                   insurance_plan=insurance_plan,
+    #                                                   user=user,
+    #                                                   insurance_transaction=insurance_transaction_obj,
+    #                                                   insured_members=insured_members,
+    #                                                   policy_number=insurance_transaction.policy_number,
+    #                                                   purchase_date=insurance_transaction.transaction_date.date(),
+    #                                                   expiry_date=expiry_date.date()
+    #                                                   )
+    #     return user_insurance
+    def create_user_insurance(self, insurance_data):
+        user_insurance_obj = UserInsurance.objects.create(**insurance_data)
+        return user_insurance_obj
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
     CREDIT = 1

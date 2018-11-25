@@ -16,6 +16,8 @@ from django.db.models import F
 import datetime
 from django.db import transaction
 from ondoc.authentication.models import User
+from datetime import timedelta
+
 
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):
@@ -113,19 +115,19 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             logged_in_user_id = None
             pre_insured_members = {}
             insured_members_list = []
+            insurance_plan = request.data.get('insurance_plan')
             for member in members:
-                if valid_data.get('insurance_plan'):
+                if insurance_plan:
                     # Age Validation for parent and child
                     insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
-                                                                            valid_data.get('insurance_plan').id,
-                                                                            insurer_id=valid_data.get(
-                                                                                'insurer')).first()
+                                                                            insurance_plan).first()
                     dob_flag, error_message = self.age_validate(member, insurance_threshold)
                     if dob_flag:
                         pre_insured_members['dob'] = member['dob']
                     else:
                         return Response(error_message, status=status.HTTP_404_NOT_FOUND)
-
+                else:
+                    return Response({"message": "Insurance Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
                 # User Profile creation or updation
                 profile_flag, profile, profile_id = self.profile_create_or_update(member, request)
                 if profile_flag:
@@ -160,24 +162,33 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                                                                                                         'dob',
                                                                                                         'phone_number')
             user_profile = user_profile[0]
-        insurer = Insurer.objects.filter(id=valid_data.get('insurer').id).values('id', 'name', 'max_float',
-                                                                                 'min_float').first()
-        insurance_plan = InsurancePlans.objects.filter(id=valid_data.get('insurance_plan').id).values('id', 'amount',
-                                                                                                      'insurer_id',
-                                                                                                      'type',
-                                                                                                      'policy_tenure'
-                                                                                                      ).first()
+
+        # insurer = Insurer.objects.get(id=request.data.get('insurer'))
+        # insurance_plan = InsurancePlans.objects.filter(id=request.data.get('insurance_plan')).values('id', 'amount',
+        #                                                                                               'insurer_id',
+        #                                                                                               'type',
+        #                                                                                               'policy_tenure'
+        #                                                                                               ).first()
+        insurance_plan = InsurancePlans.objects.get(id=request.data.get('insurance_plan'))
+        # if insurer:
+        #     insurer = insurer.id
         transaction_date = datetime.datetime.now()
         if insurance_plan:
-            amount = insurance_plan.get('amount')
-        insurance_transaction = {'insurer': insurer.get('id'),
-                                 'insurance_plan': insurance_plan.get('id'),
-                                 'transaction_date': transaction_date, 'status_type': InsuranceTransaction.CREATED,
-                                 'amount': amount, 'user': request.user.pk, "insured_members": insured_members_list}
+            amount = insurance_plan.amount
+
+        expiry_date = transaction_date + timedelta(days=insurance_plan.policy_tenure*365)
+        user_insurance = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
+                            transaction_date, 'expiry_date': expiry_date, 'premium_amount': amount,
+                            'user': request.user.pk, "insured_members": insured_members_list}
+
+        # insurance_transaction = {'insurance_plan': insurance_plan.get('id'),
+        #                          'transaction_date': transaction_date, 'status_type': InsuranceTransaction.CREATED,
+        #                          'premium_amount': amount, 'user': request.user.pk,
+        #                          "insured_members": insured_members_list}
 
         insurance_data['insurance'] = {"profile_detail": user_profile,
-                                       "insurer": insurer, "insurance_plan": insurance_plan,
-                                       "user": request.user.pk, "insurance_transaction": insurance_transaction}
+                                       "insurance_plan": insurance_plan.id,
+                                       "user": request.user.pk, "user_insurance": user_insurance}
 
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
