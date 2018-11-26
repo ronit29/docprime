@@ -1314,13 +1314,22 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
                                                  write_permission=True
                                                  ),
                                                (
-                                                 Q(entity_type=GenericAdminEntity.DOCTOR,
-                                                   doctor__doctor_clinics__hospital__is_appointment_manager=False,
+                                                 Q(Q(entity_type=GenericAdminEntity.DOCTOR,
+                                                   doctor__doctor_clinics__hospital__is_billing_enabled=False),
+                                                   (Q(hospital__isnull=False, doctor__doctor_clinics__hospital=F('hospital'))
+                                                    |
+                                                    Q(hospital__isnull=True)
+                                                    )
                                                   )
                                                  |
-                                                 Q(Q(entity_type=GenericAdminEntity.HOSPITAL),
-                                                   (Q(hospital__hospital_doctors__doctor=F('doctor'), doctor__isnull=False) | Q(doctor__isnull=True))
-                                                )
+                                                 Q(
+                                                     Q(entity_type=GenericAdminEntity.HOSPITAL),
+                                                     (Q(doctor__isnull=False,
+                                                        hospital__hospital_doctors__doctor=F('doctor'))
+                                                      |
+                                                      Q(doctor__isnull=True)
+                                                      )
+                                                  )
                                                ))\
                                         .annotate(doctor_ids=F('hospital__hospital_doctors__doctor'),
                                                   doctor_names=F('hospital__hospital_doctors__doctor__name'),
@@ -1353,7 +1362,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
 
         resp_data = defaultdict(dict)
         for data in queryset:
-            if data['hospital_id'] is None:
+            if data['hospital_ids']:
                 temp_tuple = (data['doctor_id'], data['doctor_name'])
                 if temp_tuple not in resp_data:
                     temp_dict = {

@@ -611,16 +611,18 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
         if self.cleaned_data:
             validate_unique = []
             for data in self.cleaned_data:
-                row = (data.get('phone_number'), data.get('hospital'))
-                if row in validate_unique:
-                    raise forms.ValidationError("Duplicate Permission with this phone number exists.")
-                else:
-                    validate_unique.append(row)
-            numbers = list(zip(*validate_unique))[0]
-            for row in validate_unique:
-                if row[1] is None and numbers.count(row[0]) > 1:
-                    raise forms.ValidationError(
-                        "Permissions for all Hospitals already allocated for %s." % (row[0]))
+                if not data.get('DELETE'):
+                    row = (data.get('phone_number'), data.get('hospital'))
+                    if row in validate_unique:
+                        raise forms.ValidationError("Duplicate Permission with this phone number exists.")
+                    else:
+                        validate_unique.append(row)
+            if validate_unique:
+                numbers = list(zip(*validate_unique))[0]
+                for row in validate_unique:
+                    if row[1] is None and numbers.count(row[0]) > 1:
+                        raise forms.ValidationError(
+                            "Permissions for all Hospitals already allocated for %s." % (row[0]))
 
 
 class GenericAdminInline(nested_admin.NestedTabularInline):

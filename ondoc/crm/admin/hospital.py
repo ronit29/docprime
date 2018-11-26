@@ -88,11 +88,12 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
                 if data.get('phone_number') and data.get('permission_type') == GenericAdmin.APPOINTMENT:
                     phone_number = True
                     # break
-                row = (data.get('phone_number'), data.get('doctor'))
-                if row in validate_unique:
-                    raise forms.ValidationError("Duplicate Permission with this %s exists." % (data.get('phone_number')))
-                else:
-                    validate_unique.append(row)
+                if not data.get('DELETE'):
+                    row = (data.get('phone_number'), data.get('doctor'))
+                    if row in validate_unique:
+                        raise forms.ValidationError("Duplicate Permission with this %s exists." % (data.get('phone_number')))
+                    else:
+                        validate_unique.append(row)
             if phone_number:
                 if not appnt_manager_flag:
                     if not(len(self.deleted_forms) == len(self.cleaned_data)):
@@ -109,11 +110,12 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
             if appnt_manager_flag:
                 raise forms.ValidationError(
                     "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
-        numbers = list(zip(*validate_unique))[0]
-        for row in validate_unique:
-            if row[1] is None and numbers.count(row[0]) > 1:
-                raise forms.ValidationError(
-                    "Permissions for all doctors already allocated for %s." % (row[0]))
+        if validate_unique:
+            numbers = list(zip(*validate_unique))[0]
+            for row in validate_unique:
+                if row[1] is None and numbers.count(row[0]) > 1:
+                    raise forms.ValidationError(
+                        "Permissions for all doctors already allocated for %s." % (row[0]))
 
 
 class GenericAdminInline(admin.TabularInline):
