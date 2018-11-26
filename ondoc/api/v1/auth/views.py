@@ -1258,15 +1258,22 @@ class UserLabViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        user_lab_queryset = Lab.objects.filter(Q(manageable_lab_admins__user=user,
-                                                 manageable_lab_admins__is_disabled=False,
-                                                 manageable_lab_admins__write_permission=True) |
-                                               Q(network__manageable_lab_network_admins__user=user,
-                                                 network__manageable_lab_network_admins__is_disabled=False,
-                                                 network__manageable_lab_network_admins__write_permission=True
+        user_lab_queryset = Lab.objects.filter(
+                                              Q(Q(manageable_lab_admins__user=user,
+                                                  manageable_lab_admins__is_disabled=False,
+                                                  manageable_lab_admins__write_permission=True) |
+                                                Q(network__manageable_lab_network_admins__user=user,
+                                                  network__manageable_lab_network_admins__is_disabled=False,
+                                                  network__manageable_lab_network_admins__write_permission=True
                                                  )
-                                               ,
-                                               is_live=True
+                                                )
+                                                 |
+                                                (
+                                                 Q(manageable_lab_admins__user=user,
+                                                   manageable_lab_admins__is_disabled=False,
+                                                   manageable_lab_admins__super_user_permission=True)
+                                                 ),
+                                               Q(is_live=True)
                                                ).values('id', 'name')
         return Response(user_lab_queryset)
 
@@ -1278,39 +1285,10 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        # queryset = (
-        #     DoctorClinic.objects
-        #         .select_related('doctor', 'hospital')
-        #         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-        #         .filter(
-        #             Q(
-        #                 Q(
-        #                   doctor__manageable_doctors__user=user,
-        #                   doctor__manageable_doctors__is_disabled=False,
-        #                   doctor__manageable_doctors__permission_type__in=[GenericAdmin.BILLINNG, GenericAdmin.ALL],
-        #                   doctor__manageable_doctors__write_permission=True) |
-        #                 Q(
-        #                   hospital__manageable_hospitals__user=user,
-        #                   hospital__manageable_hospitals__is_disabled=False,
-        #                   hospital__manageable_hospitals__permission_type__in=[GenericAdmin.BILLINNG, GenericAdmin.ALL],
-        #                   hospital__manageable_hospitals__write_permission=True))|
-        #             Q(
-        #                 Q(doctor__manageable_doctors__user=user,
-        #                   doctor__manageable_doctors__super_user_permission=True,
-        #                   doctor__manageable_doctors__is_disabled=False,
-        #                   doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR ) |
-        #                 Q(hospital__manageable_hospitals__user=user,
-        #                   hospital__manageable_hospitals__super_user_permission=True,
-        #                   hospital__manageable_hospitals__is_disabled=False,
-        #                   hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-        #             )
-        #         )
-                # .values('hospital', 'doctor', 'hospital__manageable_hospitals__hospital', 'doctor__manageable_doctors__doctor')
-                # .annotate(doc_admin_doc=F('doctor__manageable_doctors__doctor'), doc_admin_hosp=F('doctor__manageable_doctors__hospital'), hosp_admin_doc=F('hospital__manageable_hospitals__doctor'), hosp_admin_hosp=F('hospital__manageable_hospitals__hospital'), hosp_name=F('hospital__name'), doc_name=F('doctor__name'))
-            # )
+
         queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter(Q(user=user,
                                                  is_disabled=False,
-                                                 permission_type=GenericAdmin.BILLINNG,
+                                                 permission_type__in=[GenericAdmin.BILLINNG, GenericAdmin.ALL],
                                                  write_permission=True
                                                  ),
                                                (
