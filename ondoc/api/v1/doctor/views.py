@@ -1534,7 +1534,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         if hos_data:
             hos_list = [i for i in hos_data]
         result_data = opd_list + hos_list
-        lab_queryset = lab_models.Lab.objects.prefetch_related('manageable_lab_admins').filter(is_live= True,
+        lab_queryset = lab_models.Lab.objects.prefetch_related('manageable_lab_admins').filter(is_live= True,
                                 manageable_lab_admins__user=user,
                                 manageable_lab_admins__is_disabled=False,
                                 manageable_lab_admins__super_user_permission=True).distinct('id')
