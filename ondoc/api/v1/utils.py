@@ -595,8 +595,8 @@ class CouponsMixin(object):
         elif not (coupon_obj.lab_network or coupon_obj.lab or coupon_obj.test.exists()) or coupon_obj.lab_network:
             filtered_tests = lab_test_queryset
 
-        if filtered_tests.values("custom_deal_price").exists():
-            total_price = filtered_tests.values("custom_deal_price").aggregate(Sum('custom_deal_price')).get("custom_deal_price__sum")
+        if filtered_tests.filter(custom_deal_price__isnull=False).exists():
+            total_price = filtered_tests.filter(custom_deal_price__isnull=False).values("custom_deal_price").aggregate(Sum('custom_deal_price')).get("custom_deal_price__sum")
         else:
             total_price = filtered_tests.values("computed_deal_price").aggregate(Sum('computed_deal_price')).get("computed_deal_price__sum")
 
