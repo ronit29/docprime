@@ -213,7 +213,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     is_home_collection_enabled = serializers.SerializerMethodField()
     package = serializers.SerializerMethodField()
     parameters = serializers.SerializerMethodField()
-    is_corporate = serializers.ReadOnlyField(source='test.is_corporate')
+    hide_price = serializers.ReadOnlyField(source='test.hide_price')
 
     def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
@@ -263,7 +263,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat', 'is_corporate')
+                  'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat', 'hide_price')
 
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):

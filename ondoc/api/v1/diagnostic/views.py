@@ -74,7 +74,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class LabTestList(viewsets.ReadOnlyModelViewSet):
-    queryset = LabTest.objects.all()
+    queryset = LabTest.objects.filter(searchable=True).all()
     serializer_class = diagnostic_serializer.LabTestListSerializer
     lookup_field = 'id'
     filter_backends = (SearchFilter,)
@@ -92,7 +92,7 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             test_queryset = LabTest.objects.filter(
                 Q(search_key__icontains=search_key) |
                 Q(search_key__icontains=' ' + search_key) |
-                Q(search_key__istartswith=search_key)).annotate(search_index=StrIndex('search_key', Value(search_key))).order_by(
+                Q(search_key__istartswith=search_key)).filter(searchable=True).annotate(search_index=StrIndex('search_key', Value(search_key))).order_by(
                 'search_index')
             test_queryset = paginate_queryset(test_queryset, request)
             lab_queryset = Lab.objects.filter(is_live=True, is_test_lab=False).filter(
@@ -215,7 +215,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids',[])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name','hide_price'))
         seo = None
         breadcrumb = None
         location = None
@@ -900,13 +900,13 @@ class LabTimingListView(mixins.ListModelMixin,
 class AvailableTestViewSet(mixins.RetrieveModelMixin,
                            viewsets.GenericViewSet):
 
-    queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs__is_live=True).all()
+    queryset = AvailableLabTest.objects.filter(test__searchable=True, lab_pricing_group__labs__is_live=True).all()
     serializer_class = diagnostic_serializer.AvailableLabTestSerializer
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
         params = request.query_params
-        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True, enabled=True)
+        queryset = AvailableLabTest.objects.select_related().filter(test__searchable=True, lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True, enabled=True)
         if not queryset:
             return Response([])
         lab_obj = Lab.objects.filter(pk=lab_id).first()

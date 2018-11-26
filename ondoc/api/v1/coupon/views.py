@@ -18,6 +18,7 @@ from django.db.models import Q, Sum, Count, F
 from . import serializers
 from django.conf import settings
 import requests, re, json
+import sys
 
 User = get_user_model()
 
@@ -65,6 +66,12 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                 Q(lab__isnull=True, lab_network__isnull=True)
             coupons_data = coupons_data.filter(lab_qs)
 
+        if product_id:
+            coupons_data = coupons_data.filter(is_corporate=False)
+        else:
+            coupons_data = coupons_data.order_by("is_corporate")
+
+
         applicable_coupons = []
         for coupon in coupons_data:
             used_count = 0
@@ -87,11 +94,13 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
 
         # sort coupons on discount granted
-        if applicable_coupons and input_data.get("deal_price"):
+        if applicable_coupons:
             def compare_coupon(coupon):
                 obj = CouponsMixin()
-                discount = obj.get_discount(coupon["coupon"], input_data.get("deal_price"))
-                return discount
+                deal_price = input_data.get("deal_price", None)
+                deal_price = deal_price if deal_price is not None else sys.maxsize
+                discount = obj.get_discount(coupon["coupon"], deal_price)
+                return ( 1 if coupon["is_corporate"] else 0 , discount )
             applicable_coupons = sorted(applicable_coupons, key=compare_coupon, reverse=True)
 
         def remove_coupon_data(c):
