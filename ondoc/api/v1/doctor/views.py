@@ -1285,7 +1285,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
-                    return Response({'error': 'something went wrong!'})
+                    return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 user = None
                 if user_queryset:
@@ -1308,12 +1308,12 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
             hosp = Hospital.objects.get(id=valid_data['id'])
             name = valid_data.get('name', None)
-            if valid_data['type'] == User.DOCTOR  and valid_data.get('doc_profile'):
+            if valid_data['type'] == User.DOCTOR and valid_data.get('doc_profile'):
                 name = valid_data['doc_profile'].name
                 try:
-                    auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('number'), doctor=valid_data.get('profile'))
+                    auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('phone_number'), doctor=valid_data.get('doc_profile'), hospital=hosp)
                 except Exception as e:
-                    return Response({'error': 'something went wrong!'})
+                    return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             if valid_data.get('assoc_doc'):
                 create_admins = []
                 for doc in valid_data['assoc_doc']:
@@ -1334,7 +1334,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
-                    return Response({'error': 'something went wrong!'})
+                    return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 user = None
                 if user_queryset:
@@ -1573,7 +1573,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
-                    return Response({'error': 'something went wrong!'})
+                    return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 user = None
                 if user_queryset:
@@ -1599,11 +1599,19 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             if valid_data['type'] == User.DOCTOR and valid_data.get('doc_profile'):
                 name = valid_data['doc_profile'].name
                 dn = auth_models.DoctorNumber.objects.filter(hospital=hosp, doctor=valid_data.get('doc_profile'))
-                try:
-                    if dn.first():
+                if dn.first():
+                    try:
                         dn.update(phone_number=valid_data.get('phone_number'))
-                except Exception as e:
-                    return Response({'error': 'something went wrong!'})
+                    except Exception as e:
+                        return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                else:
+                    try:
+                        auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('phone_number'),
+                                                                doctor=valid_data.get('doc_profile'),
+                                                                hospital=hosp)
+                    except Exception as e:
+                        return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
             delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=valid_data.get('phone_number'),
                                                                       entity_type=GenericAdminEntity.HOSPITAL)
@@ -1613,11 +1621,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 delete_queryset = delete_queryset.filter(doctor_id=None)
             if len(delete_queryset):
                 delete_queryset.delete()
-            if valid_data['type'] == User.DOCTOR:
-                try:
-                    auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('number'), doctor=valid_data.get('profile'))
-                except Exception as e:
-                    return Response({'error': 'something went wrong!'})
+
+
             if valid_data.get('assoc_doc'):
                 create_admins = []
                 for doc in valid_data['assoc_doc']:
@@ -1638,7 +1643,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
-                    return Response({'error': 'something went wrong!'})
+                    return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 user = None
                 if user_queryset:
