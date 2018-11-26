@@ -223,7 +223,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         response_queryset = self.form_lab_whole_data(paginated_queryset)
 
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset,  many=True,
-                                         context={"request": request})
+                                         context={"request": request, "ids": parameters.get('ids')})
 
         entity_ids = [lab_data['id'] for lab_data in response_queryset]
 
