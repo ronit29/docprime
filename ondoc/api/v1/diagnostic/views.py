@@ -637,7 +637,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         appointment_data = self.form_lab_app_data(request, serializer.validated_data)
-        resp = self.extract_payment_details(request, appointment_data, account_models.Order.LAB_PRODUCT_ID)
+
+        resp = self.create_order(request, appointment_data, account_models.Order.LAB_PRODUCT_ID)
 
         return Response(data=resp)
 
@@ -758,7 +759,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         }
         return Response(response)
 
-    def extract_payment_details(self, request, appointment_details, product_id):
+    def create_order(self, request, appointment_details, product_id):
         remaining_amount = 0
         user = request.user
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
@@ -766,8 +767,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
         balance = consumer_account.balance
         resp = {}
 
-        can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
+        resp['is_agent'] = False
+        if hasattr(request, 'agent') and request.agent:
+            balance = 0
+            resp['is_agent'] = True
 
+        can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
         if can_use_insurance:
             appointment_details['effective_price'] = appointment_details['agreed_price']
             appointment_details["effective_price"] += appointment_details["home_pickup_charges"]
@@ -777,26 +782,24 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp['message'] = insurance_fail_message
             return resp
 
-        temp_appointment_details = copy.deepcopy(appointment_details)
-        temp_appointment_details = labappointment_transform(temp_appointment_details)
+        appointment_action_data = copy.deepcopy(appointment_details)
+        appointment_action_data = labappointment_transform(appointment_action_data)
 
-        account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
+        account_models.Order.disable_pending_orders(appointment_action_data, product_id,
                                                     account_models.Order.LAB_APPOINTMENT_CREATE)
-        resp['is_agent'] = False
-        if hasattr(request, 'agent') and request.agent:
-            balance = 0
-            resp['is_agent'] = True
 
-        if (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
-                balance < appointment_details.get("effective_price")):
+
+        if ( (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
+                balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
 
             payable_amount = appointment_details.get("effective_price") - balance
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.LAB_APPOINTMENT_CREATE,
-                action_data=temp_appointment_details,
+                action_data=appointment_action_data,
                 amount=payable_amount,
+                wallet_amount=balance,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 
@@ -816,13 +819,26 @@ class LabAppointmentView(mixins.CreateModelMixin,
             except:
                 pass
         else:
-            lab_appointment = LabAppointment.create_appointment(appointment_details)
-            if appointment_details["payment_type"] == doctor_model.OpdAppointment.PREPAID:
-                consumer_account.debit_schedule(lab_appointment, product_id, appointment_details.get("effective_price"))
+            wallet_amount = 0
+            if appointment_details['payment_type'] == models.OpdAppointment.PREPAID:
+                wallet_amount = appointment_details.get("effective_price")
+
+            order = account_models.Order.objects.create(
+                product_id=product_id,
+                action=account_models.Order.LAB_APPOINTMENT_CREATE,
+                action_data=appointment_action_data,
+                amount=0,
+                wallet_amount=wallet_amount,
+                payment_status=account_models.Order.PAYMENT_PENDING
+            )
+
+            appointment_object = order.process_order()
+
             resp["status"] = 1
             resp["payment_required"] = False
-            resp["data"] = {"id": lab_appointment.id,
+            resp["data"] = {"id": appointment_object.id,
                             "type": diagnostic_serializer.LabAppointmentModelSerializer.LAB_TYPE}
+
         return resp
 
     def get_payment_details(self, request, appointment_details, product_id, order_id):

@@ -42,7 +42,7 @@ def prepare_and_hit(self, data):
     appointment_details = {
         'AppointmentStatus': appointment.status,
         'PaymentStatus': 300,
-        'OrderId': order.id if order else 0,
+        'OrderID': order.id if order else 0,
         'DocPrimeBookingID': appointment.id,
         'BookingDateTime': int(appointment.created_at.timestamp()),
         'AppointmentDateTime': int(appointment.time_slot_start.timestamp()),
@@ -165,6 +165,7 @@ def push_appointment_to_matrix(self, data):
 
 @task(bind=True, max_retries=2)
 def push_signup_lead_to_matrix(self, data):
+    # TODO: SHASHANK_SINGH Not sure what to do.
     try:
         from ondoc.web.models import OnlineLead
         lead_id = data.get('lead_id', None)
@@ -252,8 +253,8 @@ def push_order_to_matrix(self, data):
             raise Exception("Order could not found against id - " + str(order_id))
 
         appointment_details = order_obj.appointment_details()
+        # TODO: SHASHANK_SINGH not sure if any changes?
         request_data = {
-            'OrderId': appointment_details.get('order_id', 0),
             'LeadSource': 'DocPrime',
             'HospitalName': appointment_details.get('hospital_name'),
             'Name': appointment_details.get('profile_name', ''),
@@ -263,6 +264,7 @@ def push_order_to_matrix(self, data):
             'ProductId': 5,
             'SubProductId': 4,
             'AppointmentDetails': {
+                'OrderID': appointment_details.get('order_id', 0),
                 'ProviderName': appointment_details.get('doctor_name', '') if appointment_details.get('doctor_name') else appointment_details.get('lab_name'),
                 'BookingDateTime': int(data.get('created_at')),
                 'AppointmentDateTime': int(data.get('timeslot')),
