@@ -25,8 +25,8 @@ def fetch_and_upload_json(self, data):
     try:
         obj_id = data.get('id', None)
         obj = elastic_models.DemoElastic.objects.filter(id=obj_id).first()
-        if obj:
-            mongo_client = MongoClient(settings.MONGO_URL)
+        if obj and obj.mongo_connection_string.strip():
+            mongo_client = MongoClient(obj.mongo_connection_string.strip())
             db = mongo_client.__getattr__(obj.mongo_database.strip())
             collection = db.__getattr__(obj.mongo_collection.strip())
             if db and collection:

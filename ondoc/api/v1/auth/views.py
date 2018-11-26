@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from django.db import transaction, IntegrityError
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
-from django.db.models import F, Sum, Max, Q, Prefetch, Case, When
+from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
@@ -1288,79 +1288,122 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (
-            DoctorClinic.objects
-                .select_related('doctor', 'hospital')
-                .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                .filter(
-                    Q(
-                        Q(
-                          doctor__manageable_doctors__user=user,
-                          doctor__manageable_doctors__is_disabled=False,
-                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.BILLINNG, GenericAdmin.ALL],
-                          doctor__manageable_doctors__read_permission=True) |
-                        Q(
-                          hospital__manageable_hospitals__user=user,
-                          hospital__manageable_hospitals__is_disabled=False,
-                          hospital__manageable_hospitals__permission_type__in=[GenericAdmin.BILLINNG, GenericAdmin.ALL],
-                          hospital__manageable_hospitals__read_permission=True))|
-                    Q(
-                        Q(doctor__manageable_doctors__user=user,
-                          doctor__manageable_doctors__super_user_permission=True,
-                          doctor__manageable_doctors__is_disabled=False,
-                          doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR ) |
-                        Q(hospital__manageable_hospitals__user=user,
-                          hospital__manageable_hospitals__super_user_permission=True,
-                          hospital__manageable_hospitals__is_disabled=False,
-                          hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-                    )
-                )
-                .values('hospital', 'doctor', 'hospital__manageable_hospitals__hospital', 'doctor__manageable_doctors__doctor')
-                .annotate(doc_admin_doc=F('doctor__manageable_doctors__doctor'), doc_admin_hosp=F('doctor__manageable_doctors__hospital'), hosp_admin_doc=F('hospital__manageable_hospitals__doctor'), hosp_admin_hosp=F('hospital__manageable_hospitals__hospital'), hosp_name=F('hospital__name'), doc_name=F('doctor__name'))
-            )
+        # queryset = (
+        #     DoctorClinic.objects
+        #         .select_related('doctor', 'hospital')
+        #         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
+        #         .filter(
+        #             Q(
+        #                 Q(
+        #                   doctor__manageable_doctors__user=user,
+        #                   doctor__manageable_doctors__is_disabled=False,
+        #                   doctor__manageable_doctors__permission_type__in=[GenericAdmin.BILLINNG, GenericAdmin.ALL],
+        #                   doctor__manageable_doctors__write_permission=True) |
+        #                 Q(
+        #                   hospital__manageable_hospitals__user=user,
+        #                   hospital__manageable_hospitals__is_disabled=False,
+        #                   hospital__manageable_hospitals__permission_type__in=[GenericAdmin.BILLINNG, GenericAdmin.ALL],
+        #                   hospital__manageable_hospitals__write_permission=True))|
+        #             Q(
+        #                 Q(doctor__manageable_doctors__user=user,
+        #                   doctor__manageable_doctors__super_user_permission=True,
+        #                   doctor__manageable_doctors__is_disabled=False,
+        #                   doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR ) |
+        #                 Q(hospital__manageable_hospitals__user=user,
+        #                   hospital__manageable_hospitals__super_user_permission=True,
+        #                   hospital__manageable_hospitals__is_disabled=False,
+        #                   hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+        #             )
+        #         )
+                # .values('hospital', 'doctor', 'hospital__manageable_hospitals__hospital', 'doctor__manageable_doctors__doctor')
+                # .annotate(doc_admin_doc=F('doctor__manageable_doctors__doctor'), doc_admin_hosp=F('doctor__manageable_doctors__hospital'), hosp_admin_doc=F('hospital__manageable_hospitals__doctor'), hosp_admin_hosp=F('hospital__manageable_hospitals__hospital'), hosp_name=F('hospital__name'), doc_name=F('doctor__name'))
+            # )
+        queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter(Q(user=user,
+                                                 is_disabled=False,
+                                                 permission_type=GenericAdmin.BILLINNG,
+                                                 write_permission=True
+                                                 ),
+                                               (
+                                                 Q(entity_type=GenericAdminEntity.DOCTOR,
+                                                   doctor__doctor_clinics__hospital__is_appointment_manager=False,
+                                                  )
+                                                 |
+                                                 Q(Q(entity_type=GenericAdminEntity.HOSPITAL),
+                                                   (Q(hospital__hospital_doctors__doctor=F('doctor'), doctor__isnull=False) | Q(doctor__isnull=True))
+                                                )
+                                               ))\
+                                        .annotate(doctor_ids=F('hospital__hospital_doctors__doctor'),
+                                                  doctor_names=F('hospital__hospital_doctors__doctor__name'),
+                                                  hospital_name=F('hospital__name'),
+                                                  doctor_name=F('doctor__name'),
+                                                  hospital_ids=F('doctor__doctor_clinics__hospital'),
+                                                  hospital_names=F('doctor__doctor_clinics__hospital__name')) \
+                                        .values('doctor_ids', 'doctor_name', 'doctor_names', 'doctor_id',
+                                                'hospital_ids', 'hospital_name', 'hospital_names', 'hospital_id')
+
+        # doc_hosp_queryset = (
+        #     DoctorClinic.objects.filter(
+        #         Q(
+        #           doctor__manageable_doctors__user=user,
+        #           doctor__manageable_doctors__is_disabled=False,
+        #           doctor__manageable_doctors__permission_type=GenericAdmin.BILLINNG,
+        #           doctor__manageable_doctors__read_permission=True) |
+        #         Q(
+        #           hospital__manageable_hospitals__user=user,
+        #           hospital__manageable_hospitals__is_disabled=False,
+        #           hospital__manageable_hospitals__permission_type=GenericAdmin.BILLINNG,
+        #           hospital__manageable_hospitals__read_permission=True))
+        #         .values('hospital', 'doctor', 'hospital__manageable_hospitals__hospital', 'doctor__manageable_doctors__doctor')
+        #         .annotate(doc_admin_doc=F('doctor__manageable_doctors__doctor'),
+        #                   doc_admin_hosp=F('doctor__manageable_doctors__hospital'),
+        #                   hosp_admin_doc=F('hospital__manageable_hospitals__doctor'),
+        #                   hosp_admin_hosp=F('hospital__manageable_hospitals__hospital'),
+        #                   hosp_name=F('hospital__name'), doc_name=F('doctor__name'))
+        #     )
 
         resp_data = defaultdict(dict)
-        for data in doc_hosp_queryset:
-            if data['doc_admin_hosp'] is None and data['doc_admin_doc'] is not None:
-                temp_tuple = (data['doc_admin_hosp'], data['doc_admin_doc'])
+        for data in queryset:
+            if data['hospital_id'] is None:
+                temp_tuple = (data['doctor_id'], data['doctor_name'])
                 if temp_tuple not in resp_data:
                     temp_dict = {
-                        "admin_id": data["doctor"],
+                        "admin_id": data["doctor_id"],
                         "level": Outstanding.DOCTOR_LEVEL,
-                        "doctor_name": data["doc_name"],
+                        "doctor_name": data["doctor_name"],
                         "hospital_list": list()
                     }
                     temp_dict["hospital_list"].append({
-                        "id": data["hospital"],
-                        "name": data["hosp_name"]
+                        "id": data["hospital_ids"],
+                        "name": data["hospital_names"]
                     })
                     resp_data[temp_tuple] = temp_dict
                 else:
                     temp_name = {
-                        "id": data["hospital"],
-                        "name": data["hosp_name"]
+                        "id": data["hospital_ids"],
+                        "name": data["hospital_names"]
                     }
                     if temp_name not in resp_data[temp_tuple]["hospital_list"]:
                         resp_data[temp_tuple]["hospital_list"].append(temp_name)
 
-            if data['hosp_admin_doc'] is None and data['hosp_admin_hosp'] is not None:
-                temp_tuple = (data['hosp_admin_hosp'], data['hosp_admin_doc'])
+            # if data['hosp_admin_doc'] is None and data['hosp_admin_hosp'] is not None:
+            else:
+                temp_tuple = (data['hospital_id'], data['hospital_name'])
                 if temp_tuple not in resp_data:
                     temp_dict = {
-                        "admin_id": data["hospital"],
+                        "admin_id": data["hospital_id"],
                         "level": Outstanding.HOSPITAL_LEVEL,
-                        "hospital_name": data["hosp_name"],
+                        "hospital_name": data["hospital_name"],
                         "doctor_list": list()
                     }
                     temp_dict["doctor_list"].append({
-                        "id": data["doctor"],
-                        "name": data["doc_name"]
+                        "id": data["doctor_ids"],
+                        "name": data["doctor_names"]
                     })
                     resp_data[temp_tuple] = temp_dict
                 else:
                     temp_name = {
-                        "id": data["doctor"],
-                        "name": data["doc_name"]
+                        "id": data["doctor_ids"],
+                        "name": data["doctor_names"]
                     }
                     if temp_name not in resp_data[temp_tuple]["doctor_list"]:
                         resp_data[temp_tuple]["doctor_list"].append(temp_name)
