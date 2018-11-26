@@ -10,6 +10,7 @@ from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request, form_pg_refund_data
 from django.conf import settings
 from rest_framework import status
+from copy import deepcopy
 import hashlib
 import copy
 import json
@@ -86,11 +87,8 @@ class Order(TimeStampedModel):
     def process_order(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
-        from ondoc.insurance.models import InsuranceTransaction, InsurerAccount, UserInsurance
-        from ondoc.api.v1.utils import insurance_reverse_transform
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
-        from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
 
         # Initial validations for appointment data
         appointment_data = self.action_data
@@ -112,29 +110,6 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
-        elif self.product_id == self.INSURANCE_PRODUCT_ID:
-            # insurance_transaction = appointment_data.get('insurance').get('insurance_transaction')
-            # insurance_transaction["order"] = self.id
-            # transaction_date = appointment_data.get('insurance').get('insurance_transaction').get('transaction_date')
-            # transaction_date = datetime.datetime.strptime(transaction_date, "%Y-%m-%d %H:%M:%S.%f")
-            # members = appointment_data.get('insurance').get('insurance_transaction').get('insured_members')
-            # for member in members:
-            #     dob = member['dob']
-            #     dob = datetime.datetime.strptime(dob, "%Y-%m-%d").date()
-            #     member['dob'] = dob
-            # insurance_transaction['insured_members'] = members
-            # insurance_transaction["transaction_date"] = transaction_date
-            # serializer = InsuranceTransactionSerializer(data=insurance_transaction)
-            # serializer.is_valid(raise_exception=True)
-            # appointment_data = serializer.validated_data
-            from copy import deepcopy
-            insurance_data = deepcopy(self.action_data)
-            insurance_data = insurance_reverse_transform(insurance_data)
-            insurance_data['user_insurance']['order'] = self.id
-            insurance_data['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
-            serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
-            serializer.is_valid(raise_exception=True)
-            appointment_data = serializer.validated_data
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
@@ -179,67 +154,46 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
         elif self.action == Order.INSURANCE_CREATE:
-            if consumer_account.balance >= appointment_data['premium_amount']:
-                appointment_obj = UserInsurance.create_user_insurance(appointment_data)
-                amount = appointment_obj.premium_amount
-                order_dict = {
-                    "reference_id": appointment_obj.id,
-                    "payment_status": Order.PAYMENT_ACCEPTED
-                }
-                insurer = appointment_obj.insurance_plan.insurer
-                # insurer_account = InsuerAccount.objects.get(insurer=insurer)
-                InsuranceTransaction.objects.create(user_insurance=appointment_obj, account=insurer.float.all().first(),
-                                                    transaction_type=InsuranceTransaction.DEBIT, amount=amount)
+            appointment_obj = self.process_insurance_order(consumer_account)
+            amount = appointment_obj.premium_amount
+            order_dict = {
+                "reference_id": appointment_obj.id,
+                "payment_status": Order.PAYMENT_ACCEPTED
+            }
+
         if order_dict:
             self.update_order(order_dict)
         # If payment is required and appointment is created successfully, debit consumer's account
         if appointment_obj and not payment_not_required:
-
             # InsurerFloat.debit_float_schedule(appointment_obj.insurer_id, amount)
             consumer_account.debit_schedule(appointment_obj, self.product_id, amount)
         return appointment_obj
 
     @transaction.atomic
-    def process_insurance_order(self, consumer_account, pg_data, order_obj, insurance_transaction):
-        # New code for processing order
-        insurance_data = order_obj.action_data
-        from ondoc.insurance.models import (InsuranceTransaction, InsuredMembers, UserInsurance, InsurerFloat)
-        insurance_obj = None
-        order_dict = dict()
+    def process_insurance_order(self, consumer_account):
+        from ondoc.api.v1.utils import insurance_reverse_transform
+        from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
+        from ondoc.insurance.models import UserInsurance, InsuranceTransaction
+        insurance_data = deepcopy(self.action_data)
+        insurance_data = insurance_reverse_transform(insurance_data)
+        insurance_data['user_insurance']['order'] = self.id
+        insurance_data['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
+        serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
+        serializer.is_valid(raise_exception=True)
+        appointment_data = serializer.validated_data
 
-        amount = None
-        if self.action == Order.INSURANCE_CREATE:
-            if consumer_account.balance >= order_obj.amount:
-                insured_member_dict = InsuredMembers.create_insured_members(insurance_data)
-
-                if insured_member_dict:
-                    insurance_transaction_obj = InsuranceTransaction.create_insurance_transaction(insurance_transaction,
-                                                                                                  insured_member_dict, order_obj)
-                    if insurance_transaction_obj:
-                        user_insurance_obj = UserInsurance.create_user_insurance(insurance_data, insured_member_dict,
-                                                                                 insurance_transaction_obj)
-
-                        id_list = []
-
-                        for members in insured_member_dict.get('members'):
-                            member_id = members.get('profile')
-                            id_list.append(member_id)
-
-                        user_profile_insured = UserProfile.objects.filter(id__in=id_list).update(is_insured=True)
-
-
+        if consumer_account.balance >= appointment_data['premium_amount']:
+            user_insurance_obj = UserInsurance.create_user_insurance(appointment_data)
+            amount = user_insurance_obj.premium_amount
             order_dict = {
-                "reference_id": insurance_transaction_obj.id,
+                "reference_id": user_insurance_obj.id,
                 "payment_status": Order.PAYMENT_ACCEPTED
             }
-            amount = insurance_transaction_obj.amount
-        if order_dict:
-            self.update_order(order_dict)
-        if insurance_transaction_obj:
-            consumer_account.debit_schedule(insurance_transaction_obj, pg_data.get("product_id"), amount)
-            InsurerFloat.debit_float_schedule(insurance_transaction_obj.insurer_id, amount)
-
-        return insurance_obj
+            insurer = user_insurance_obj.insurance_plan.insurer
+            # insurer_account = InsuerAccount.objects.get(insurer=insurer)
+            InsuranceTransaction.objects.create(user_insurance=user_insurance_obj, account=insurer.float.all().first(),
+                                                transaction_type=InsuranceTransaction.DEBIT, amount=amount)
+        return user_insurance_obj
 
     def update_order(self, data):
         self.reference_id = data.get("reference_id", self.reference_id)
