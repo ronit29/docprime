@@ -193,6 +193,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     #                                                   )
     #     return user_insurance
     def create_user_insurance(self, insurance_data):
+        import json
         members = insurance_data['insured_members']
         for member in members:
             member['dob'] = str(member['dob'])
@@ -200,12 +201,14 @@ class UserInsurance(auth_model.TimeStampedModel):
         insurance_data['insured_members'] = members
         user_insurance_obj = UserInsurance.objects.create(insurance_plan=insurance_data['insurance_plan'],
                                                             user=insurance_data['user'],
-                                                            insured_members=insurance_data['insured_members'],
+                                                            insured_members=json.dumps(insurance_data['insured_members']),
                                                             policy_number="",
                                                             purchase_date=insurance_data['purchase_date'],
                                                             expiry_date=insurance_data['expiry_date'],
                                                             premium_amount=insurance_data['premium_amount'],
                                                             order=insurance_data['order'])
+
+        insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
 
         return user_insurance_obj
 
@@ -278,34 +281,56 @@ class InsuredMembers(auth_model.TimeStampedModel):
         db_table = "insured_members"
 
     @classmethod
-    def create_insured_members(self, insurance_data):
-        insured_members = insurance_data.get("insured_members")
-        insurer = Insurer.objects.get(id=insurance_data.get('insurer').id)
-        insurance_plan = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').id)
-
-        list_members = []
-        for member in insured_members:
-            user_profile = UserProfile.objects.get(id=member.get('profile').id)
+    def create_insured_members(cls, user_insurance):
+        import json
+        members = user_insurance.insured_members
+        members = json.loads(members)
+        for member in members:
+            user_profile = UserProfile.objects.get(id=member.get('profile'))
             insured_members_obj = InsuredMembers.objects.create(first_name=member.get('first_name'),
-                                                                    title=member.get('title'),
-                                                                    middle_name=member.get('middle_name'),
-                                                                    last_name=member.get('last_name'),
-                                                                    dob=member.get('dob'), email=member.get('email'),
-                                                                    relation=member.get('relation'),
-                                                                    address=member.get('address'),
-                                                                    pincode=member.get('pincode'),
-                                                                    phone_number=user_profile.phone_number,
-                                                                    gender=member.get('gender'),
-                                                                    profile=user_profile,
-                                                                    insurer=insurer,
-                                                                    insurance_plan=insurance_plan,
-                                                                    town=member.get('town'),
-                                                                    district=member.get('district'),
-                                                                    state=member.get('state')
-                                                                    )
-            list_members.append(model_to_dict(insured_members_obj))
-        members_data = {"insured_members": list_members}
-        return members_data
+                                                                        title=member.get('title'),
+                                                                        middle_name=member.get('middle_name'),
+                                                                        last_name=member.get('last_name'),
+                                                                        dob=member.get('dob'), email=member.get('email'),
+                                                                        relation=member.get('relation'),
+                                                                        address=member.get('address'),
+                                                                        pincode=member.get('pincode'),
+                                                                        phone_number=user_profile.phone_number,
+                                                                        gender=member.get('gender'),
+                                                                        profile=user_profile,
+                                                                        town=member.get('town'),
+                                                                        district=member.get('district'),
+                                                                        state=member.get('state'),
+                                                                        user_insurance=user_insurance
+                                                                        )
+
+        # insured_members = insurance_data.get("insured_members")
+        # insurer = Insurer.objects.get(id=insurance_data.get('insurer').id)
+        # insurance_plan = InsurancePlans.objects.get(id=insurance_data.get('insurance_plan').id)
+        #
+        # list_members = []
+        # for member in insured_members:
+        #     user_profile = UserProfile.objects.get(id=member.get('profile').id)
+        #     insured_members_obj = InsuredMembers.objects.create(first_name=member.get('first_name'),
+        #                                                             title=member.get('title'),
+        #                                                             middle_name=member.get('middle_name'),
+        #                                                             last_name=member.get('last_name'),
+        #                                                             dob=member.get('dob'), email=member.get('email'),
+        #                                                             relation=member.get('relation'),
+        #                                                             address=member.get('address'),
+        #                                                             pincode=member.get('pincode'),
+        #                                                             phone_number=user_profile.phone_number,
+        #                                                             gender=member.get('gender'),
+        #                                                             profile=user_profile,
+        #                                                             insurer=insurer,
+        #                                                             insurance_plan=insurance_plan,
+        #                                                             town=member.get('town'),
+        #                                                             district=member.get('district'),
+        #                                                             state=member.get('state')
+        #                                                             )
+        #     list_members.append(model_to_dict(insured_members_obj))
+        # members_data = {"insured_members": list_members}
+        # return members_data
 
 
 class Insurance(auth_model.TimeStampedModel):

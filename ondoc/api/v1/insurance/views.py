@@ -44,7 +44,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         serializer = serializers.UserInsuranceIdsSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         parameter = serializer.validated_data
-        user_insurance = UserInsurance.objects.get(id=parameter['id'])
+        user_insurance = UserInsurance.objects.get(id=parameter.get('id').id)
         member_list = user_insurance.members.all()
         # member_list = InsuranceTransaction.objects.filter(id=parameter['id'].id).values('insured_members',
         #                                                                                 insurer_name=F('insurer__name'))
@@ -257,11 +257,11 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                     member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
                                                     dob=member['dob'])
 
-                    if member['relation'].lower() == 'self'.lower():
-                        if member['profile']:
-                            logged_in_user_profile_id = member['profile'].id
-                        else:
-                            logged_in_user_profile_id = existing_profile.id
+                    # if member['relation'].lower() == 'self'.lower():
+                    if member['profile']:
+                        logged_in_user_profile_id = member['profile'].id
+                    else:
+                        logged_in_user_profile_id = existing_profile.id
                 else:
                     profile_flag = False
                     # return Response({"message": "User is not valid"},
@@ -278,8 +278,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                        'gender': member_profile.gender, 'user_id': member_profile.user_id,
                        'dob': member_profile.dob, 'phone_number': member_profile.phone_number}
 
-            if member['relation'].lower() == 'self'.lower():
-                logged_in_user_profile_id = member_profile.id
+            # if member['relation'].lower() == 'self'.lower():
+            logged_in_user_profile_id = member_profile.id
 
         return profile_flag, profile, logged_in_user_profile_id
 

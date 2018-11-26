@@ -956,7 +956,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     #     pg_tx_queryset = None
                     if True:
                         try:
-                            # pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
                             pg_tx_queryset = True
                         except Exception as e:
                             logger.error("Error in saving PG Transaction Data - " + str(e))
