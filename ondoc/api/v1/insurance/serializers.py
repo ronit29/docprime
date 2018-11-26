@@ -110,9 +110,8 @@ class InsuranceTransactionSerializer(serializers.Serializer):
     transaction_date = serializers.DateTimeField()
 
 
-class InsuredTransactionIdsSerializer(serializers.Serializer):
-    # ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=InsuranceTransaction.objects.all()))
-    id = serializers.PrimaryKeyRelatedField(queryset=InsuranceTransaction.objects.all())
+class UserInsuranceIdsSerializer(serializers.Serializer):
+    id = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all())
 
 
 class InsuredMemberIdsSerializer(serializers.Serializer):

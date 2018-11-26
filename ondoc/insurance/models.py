@@ -193,6 +193,10 @@ class UserInsurance(auth_model.TimeStampedModel):
     #                                                   )
     #     return user_insurance
     def create_user_insurance(self, insurance_data):
+        members = insurance_data['insured_members']
+        for member in members:
+            member['dob'] = str(member['dob'])
+        insurance_data['insured_members'] = members
         user_insurance_obj = UserInsurance.objects.create(insurance_plan=insurance_data['insurance_plan'],
                                                             user=insurance_data['user'],
                                                             insured_members=insurance_data['insured_members'],

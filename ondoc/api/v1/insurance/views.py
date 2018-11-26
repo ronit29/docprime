@@ -41,13 +41,15 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
     def memberlist(self, request):
         data = {}
         data['id'] = request.query_params.get('id')
-        serializer = serializers.InsuredTransactionIdsSerializer(data=data)
+        serializer = serializers.UserInsuranceIdsSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         parameter = serializer.validated_data
-        member_list = InsuranceTransaction.objects.filter(id=parameter['id'].id).values('insured_members',
-                                                                                        insurer_name=F('insurer__name'))
+        user_insurance = UserInsurance.objects.get(id=parameter['id'])
+        member_list = user_insurance.members.all()
+        # member_list = InsuranceTransaction.objects.filter(id=parameter['id'].id).values('insured_members',
+        #                                                                                 insurer_name=F('insurer__name'))
 
-        return Response(member_list[0])
+        return Response(member_list)
 
     def update(self, request):
         serializer = serializers.InsuredMemberIdsSerializer(data=request.data.get('members'), many=True)
