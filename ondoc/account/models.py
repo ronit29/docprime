@@ -94,7 +94,6 @@ class Order(TimeStampedModel):
 
         # Initial validations for appointment data
         appointment_data = self.action_data
-        insurance_data = self.action_data
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:
@@ -131,6 +130,7 @@ class Order(TimeStampedModel):
             insurance_data = self.action_data
             insurance_data = insurance_reverse_transform(insurance_data)
             insurance_data['insurance']['user_insurance']['order'] = self.id
+            insurance_data['insurance']['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
             serializer = UserInsuranceSerializer(data=insurance_data.get('insurance').get('user_insurance'))
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
@@ -178,10 +178,9 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
         elif self.action == Order.INSURANCE_CREATE:
-            insurance_data = appointment_data
-            if consumer_account.balance >= self.amount:
-                appointment_obj = UserInsurance.create_user_insurance(self, appointment_data)
-                amount = appointment_obj.amount
+            if consumer_account.balance >= appointment_data['premium_amount']:
+                appointment_obj = UserInsurance.create_user_insurance(appointment_data)
+                amount = appointment_obj.premium_amount
         if order_dict:
             self.update_order(order_dict)
         # If payment is required and appointment is created successfully, debit consumer's account

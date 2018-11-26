@@ -193,7 +193,15 @@ class UserInsurance(auth_model.TimeStampedModel):
     #                                                   )
     #     return user_insurance
     def create_user_insurance(self, insurance_data):
-        user_insurance_obj = UserInsurance.objects.create(**insurance_data)
+        user_insurance_obj = UserInsurance.objects.create(insurance_plan=insurance_data['insurance_plan'],
+                                                            user=insurance_data['user'],
+                                                            insured_members=insurance_data['insured_members'],
+                                                            policy_number="",
+                                                            purchase_date=insurance_data['purchase_date'],
+                                                            expiry_date=insurance_data['expiry_date'],
+                                                            premium_amount=insurance_data['premium_amount'],
+                                                            order=insurance_data['order'])
+
         return user_insurance_obj
 
 class InsuranceTransaction(auth_model.TimeStampedModel):

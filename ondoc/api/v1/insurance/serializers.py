@@ -131,3 +131,4 @@ class UserInsuranceSerializer(serializers.Serializer):
     insured_members = serializers.ListSerializer(child=MemberListSerializer())
     purchase_date = serializers.DateTimeField()
     expiry_date = serializers.DateTimeField()
+    order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
