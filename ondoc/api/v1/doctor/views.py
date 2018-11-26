@@ -1534,6 +1534,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         pem_type = auth_models.GenericAdmin.APPOINTMENT
+        phone_number = valid_data.get('old_phone_number') if valid_data.get('old_phone_number') else valid_data.get('phone_number')
         if valid_data.get('billing_enabled') and valid_data.get('appointment_enabled'):
             pem_type = auth_models.GenericAdmin.ALL
         elif valid_data.get('billing_enabled') and not valid_data.get('appointment_enabled'):
@@ -1542,7 +1543,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
 
-            delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=valid_data.get('phone_number'),
+            delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=phone_number,
                                                                       entity_type=GenericAdminEntity.DOCTOR)
             if valid_data.get('remove_list'):
                 delete_queryset = delete_queryset.filter(hospital_id__in=valid_data.get('remove_list'))
