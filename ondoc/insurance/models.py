@@ -110,7 +110,7 @@ class InsuranceThreshold(auth_model.TimeStampedModel):
     is_live = models.BooleanField(default=False)
 
     def __str__(self):
-        return str(self.insurer)
+        return str(self.insurance_plan)
 
     class Meta:
         db_table = "insurance_threshold"

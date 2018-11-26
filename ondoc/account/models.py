@@ -127,11 +127,12 @@ class Order(TimeStampedModel):
             # serializer = InsuranceTransactionSerializer(data=insurance_transaction)
             # serializer.is_valid(raise_exception=True)
             # appointment_data = serializer.validated_data
-            insurance_data = self.action_data
+            from copy import deepcopy
+            insurance_data = deepcopy(self.action_data)
             insurance_data = insurance_reverse_transform(insurance_data)
-            insurance_data['insurance']['user_insurance']['order'] = self.id
-            insurance_data['insurance']['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
-            serializer = UserInsuranceSerializer(data=insurance_data.get('insurance').get('user_insurance'))
+            insurance_data['user_insurance']['order'] = self.id
+            insurance_data['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
+            serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
 

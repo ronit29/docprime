@@ -246,12 +246,12 @@ def insurance_transform(app_data):
     #     member['dob'] = str(member['dob'])
     #     # member['member_profile']['dob'] = str(member['member_profile']['dob'])
     # return app_data
-    app_data['insurance']['user_insurance']['purchase_date'] = str(
-        app_data['insurance']['user_insurance']['purchase_date'])
-    app_data['insurance']['user_insurance']['expiry_date'] = str(
-        app_data['insurance']['user_insurance']['expiry_date'])
-    app_data['insurance']['profile_detail']['dob'] = str(app_data['insurance']['profile_detail']['dob'])
-    insured_members = app_data['insurance']['user_insurance']['insured_members']
+    app_data['user_insurance']['purchase_date'] = str(
+        app_data['user_insurance']['purchase_date'])
+    app_data['user_insurance']['expiry_date'] = str(
+        app_data['user_insurance']['expiry_date'])
+    app_data['profile_detail']['dob'] = str(app_data['profile_detail']['dob'])
+    insured_members = app_data['user_insurance']['insured_members']
     for member in insured_members:
         member['dob'] = str(member['dob'])
         # member['member_profile']['dob'] = str(member['member_profile']['dob'])
@@ -259,15 +259,15 @@ def insurance_transform(app_data):
 
 
 def insurance_reverse_transform(insurance_data):
-    insurance_data['insurance']['user_insurance']['purchase_date'] = \
-        datetime.datetime.strptime(insurance_data['insurance']['user_insurance']['purchase_date'], "%Y-%m-%d %H:%M:%S.%f")
-    insurance_data['insurance']['user_insurance']['expiry_date'] = \
-        datetime.datetime.strptime(insurance_data['insurance']['user_insurance']['expiry_date'],
+    insurance_data['user_insurance']['purchase_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['purchase_date'], "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['user_insurance']['expiry_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['expiry_date'],
                                    "%Y-%m-%d %H:%M:%S.%f")
-    insurance_data['insurance']['profile_detail']['dob'] = \
-        datetime.datetime.strptime(insurance_data['insurance']['profile_detail']['dob'],
+    insurance_data['profile_detail']['dob'] = \
+        datetime.datetime.strptime(insurance_data['profile_detail']['dob'],
                                    "%Y-%m-%d")
-    insured_members = insurance_data['insurance']['user_insurance']['insured_members']
+    insured_members = insurance_data['user_insurance']['insured_members']
     for member in insured_members:
         member['dob'] = datetime.datetime.strptime(member['dob'], "%Y-%m-%d").date()
     return insurance_data

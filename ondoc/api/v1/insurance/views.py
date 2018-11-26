@@ -163,7 +163,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                                                                                                         'user_id',
                                                                                                         'dob',
                                                                                                         'phone_number')
-            user_profile = user_profile[0]
+        user_profile = user_profile[0]
 
         # insurer = Insurer.objects.get(id=request.data.get('insurer'))
         # insurance_plan = InsurancePlans.objects.filter(id=request.data.get('insurance_plan')).values('id', 'amount',
@@ -188,9 +188,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         #                          'premium_amount': amount, 'user': request.user.pk,
         #                          "insured_members": insured_members_list}
 
-        insurance_data['insurance'] = {"profile_detail": user_profile,
-                                       "insurance_plan": insurance_plan.id,
-                                       "user": request.user.pk, "user_insurance": user_insurance}
+        insurance_data = {"profile_detail": user_profile, "insurance_plan": insurance_plan.id,
+                          "user": request.user.pk, "user_insurance": user_insurance}
 
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
@@ -202,8 +201,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
         insurance_data = insurance_transform(insurance_data)
 
-        if (request.data.get('payment_type') == doctor_models.OpdAppointment.PREPAID and
-                    balance < amount or resp['is_agent']):
+        if balance < amount or resp['is_agent']:
 
             payable_amount = amount - balance
 
@@ -218,9 +216,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             resp["status"] = 1
             resp['data'], resp["payment_required"] = payment_details(request, order)
         else:
-            wallet_amount = 0
-            if request.data.get('payment_type') == doctor_models.OpdAppointment.PREPAID:
-                wallet_amount = amount
+            wallet_amount = amount
 
             order = account_models.Order.objects.create(
                 product_id=account_models.Order.INSURANCE_PRODUCT_ID,
@@ -234,7 +230,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             insurance_object = order.process_order()
             resp["status"] = 1
             resp["payment_required"] = False
-            resp["data"] = {'id': insurance_object}
+            resp["data"] = {'id': insurance_object.id}
 
         return Response(resp)
 
