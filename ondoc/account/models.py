@@ -181,10 +181,19 @@ class Order(TimeStampedModel):
             if consumer_account.balance >= appointment_data['premium_amount']:
                 appointment_obj = UserInsurance.create_user_insurance(appointment_data)
                 amount = appointment_obj.premium_amount
+                order_dict = {
+                    "reference_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                insurer = appointment_obj.insurance_plan.insurer
+                # insurer_account = InsuerAccount.objects.get(insurer=insurer)
+                InsuranceTransaction.objects.create(user_insurance=appointment_obj, account=insurer.float.all().first(),
+                                                    transaction_type=InsuranceTransaction.DEBIT, amount=amount)
         if order_dict:
             self.update_order(order_dict)
         # If payment is required and appointment is created successfully, debit consumer's account
         if appointment_obj and not payment_not_required:
+
             # InsurerFloat.debit_float_schedule(appointment_obj.insurer_id, amount)
             consumer_account.debit_schedule(appointment_obj, self.product_id, amount)
         return appointment_obj

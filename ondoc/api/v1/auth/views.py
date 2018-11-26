@@ -982,6 +982,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                    order_obj.action_data.get("hospital"),
                                                                    response.get('statusCode'))
+                elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
+                    if appointment_obj:
+                        REDIRECT_URL = INSURANCE_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
+                    elif order_obj:
+                        REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data.get("insurance"),
+                                                                   response.get('statusCode'))
             else:
                 if not order_obj:
                     REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
@@ -993,6 +999,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         REDIRECT_URL = OPD_FAILURE_REDIRECT_URL % (order_obj.action_data.get("doctor"),
                                                                    order_obj.action_data.get("hospital"),
                                                                    response.get('statusCode'))
+                    elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
+                        REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data.get("insurance"),
+                                                                   response.get('statusCode'))
+
         except Exception as e:
             logger.error("Error - " + str(e))
 

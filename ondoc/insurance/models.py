@@ -196,6 +196,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         members = insurance_data['insured_members']
         for member in members:
             member['dob'] = str(member['dob'])
+            member['profile'] = member['profile'].id
         insurance_data['insured_members'] = members
         user_insurance_obj = UserInsurance.objects.create(insurance_plan=insurance_data['insurance_plan'],
                                                             user=insurance_data['user'],
@@ -224,10 +225,10 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
 
         super().save(*args, **kwargs)
         transaction_amount = self.amount
-        if self.transaction_type == DEBIT:
-            -1*transaction_amount
+        if self.transaction_type == self.DEBIT:
+            self.amount = -1*transaction_amount
 
-        self.account.current_float += amount
+        self.account.current_float += self.amount
         self.account.save()
 
     class Meta:
