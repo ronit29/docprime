@@ -171,7 +171,32 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
             #entity_id = entity.entity_id
-            response = self.retrieve(request, entity.entity_id, entity)
+            response = self.retrieve(request, entity.entity_id, None, entity)
+            return response
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+    @transaction.non_atomic_requests
+    def retrieve_test_by_url(self, request):
+
+        url = request.GET.get('url')
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        url = url.lower()
+        entity = EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_TEST).order_by('-is_valid')
+        if len(entity) > 0:
+            entity = entity[0]
+            if not entity.is_valid:
+                valid_entity_url_qs = EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_TEST, entity_id=entity.entity_id,
+                                                                is_valid='t')
+                if valid_entity_url_qs.exists():
+                    corrected_url = valid_entity_url_qs[0].url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+            response = self.retrieve(request, None, entity.entity_id , None)
             return response
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -262,7 +287,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          "seo": seo, "breadcrumb": breadcrumb})
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, lab_id, entity=None):
+    def retrieve(self, request, lab_id, test_id=None, entity=None):
+
+        if test_id:
+            lab_test = LabTest.objects.filter(id=test_id).values('id', 'name', 'pre_test_info', 'why',
+                                                                 'about_test', 'why_get_tested', 'preparations')
+            if lab_test:
+                return Response(lab_test)
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         lab_obj = Lab.objects.prefetch_related('rating','lab_documents').filter(id=lab_id, is_live=True).first()
 
@@ -275,6 +307,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 '-is_valid')
             if len(entity) > 0:
                 entity = entity[0]
+
 
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
         queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter')\
