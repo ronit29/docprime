@@ -1,1 +1,1 @@
-Appointment Cancellation (ID- {{instance.id}})
+docprime.com || Appointment Cancelled || ID - {{instance.id}} || {{patient_name|capfirst}}

@@ -1,1 +1,12 @@
-We have received your appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}. You will receive a confirmation as soon as it is accepted by the doctor.
+We have received an appointment request for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}}.
+
+The booking details are as below :
+Booking ID : {{instance.id}}
+Patient Name : {{patient_name|capfirst}}
+Doctor Name : Dr. {{doctor_name|capfirst}}
+Clinic : {{instance.hospital.name|capfirst}}
+Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+Helpline Toll Free Number : 1800-123-9419
+You will receive a confirmation email and sms once the booking is confirmed by the doctor.
+
+Thanks for choosing docprime.com

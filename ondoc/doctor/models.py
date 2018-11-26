@@ -44,8 +44,10 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix
+# from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
+import reversion
 
 logger = logging.getLogger(__name__)
 
@@ -1026,7 +1028,7 @@ class DoctorOnboardingToken(auth_model.TimeStampedModel):
 #     class Meta:
 #         db_table = "hospital_network_mapping"
 
-
+@reversion.register()
 class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     CREATED = 1
     BOOKED = 2
@@ -1088,6 +1090,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
+    procedures = models.ManyToManyField('procedure.Procedure', through='OpdAppointmentProcedureMapping',
+                                        through_fields=('opd_appointment', 'procedure'), null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1123,7 +1127,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
         coupon_list = appointment_data.pop("coupon", None)
+        procedure_details = appointment_data.pop('extra_details', [])
         app_obj = cls.objects.create(**appointment_data)
+        if procedure_details:
+            procedure_to_be_added = []
+            for procedure in procedure_details:
+                procedure['opd_appointment_id'] = app_obj.id
+                procedure.pop('procedure_name')
+                procedure_to_be_added.append(OpdAppointmentProcedureMapping(**procedure))
+            OpdAppointmentProcedureMapping.objects.bulk_create(procedure_to_be_added)
         if coupon_list:
             app_obj.coupon.add(*coupon_list)
         return app_obj
@@ -1364,8 +1376,47 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         else:
             return delay
 
+    def get_procedures(self):
+        procedure_mappings = self.procedure_mappings.select_related("procedure").all()
+        procedures = [{"name": mapping.procedure.name, "mrp": mapping.mrp, "deal_price": mapping.deal_price,
+                       "agreed_price": mapping.agreed_price,
+                       "discount": mapping.mrp - mapping.deal_price} for mapping in procedure_mappings]
+        procedures_total = {"mrp": sum([procedure["mrp"] for procedure in procedures]),
+                            "deal_price": sum([procedure["deal_price"] for procedure in procedures]),
+                            "agreed_price": sum([procedure["agreed_price"] for procedure in procedures]),
+                            "discount": sum([procedure["discount"] for procedure in procedures])}
+        doctor_prices = {"mrp": self.mrp - procedures_total["mrp"],
+                         "deal_price": self.deal_price - procedures_total["deal_price"],
+                         "agreed_price": self.fees - procedures_total["agreed_price"]}
+        doctor_prices["discount"] = doctor_prices["mrp"] - doctor_prices["deal_price"]
+        procedures.insert(0, {"name": "Consultation Fees", "mrp": doctor_prices["mrp"],
+                              "deal_price": doctor_prices["deal_price"],
+                              "agreed_price": doctor_prices["agreed_price"],
+                              "discount": doctor_prices["discount"]})
+        procedures = [
+            {"name": str(procedure["name"]), "mrp": str(procedure["mrp"]), "deal_price": str(procedure["deal_price"]),
+             "discount": str(procedure["discount"]), "agreed_price": str(procedure["agreed_price"])} for procedure in
+            procedures]
+
+        return procedures
+
+
     class Meta:
         db_table = "opd_appointment"
+
+
+class OpdAppointmentProcedureMapping(models.Model):
+    opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
+    procedure = models.ForeignKey('procedure.Procedure', on_delete=models.CASCADE, related_name='opd_appointment_mappings')
+    mrp = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    deal_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def __str__(self):
+        return '{}>{}'.format(self.opd_appointment, self.procedure)
+
+    class Meta:
+        db_table = 'opd_appointment_procedure_mapping'
 
 
 class DoctorLeave(auth_model.TimeStampedModel):
@@ -1622,30 +1673,6 @@ class CompetitorMonthlyVisit(models.Model):
     class Meta:
         db_table = "competitor_monthly_visits"
         unique_together = ('doctor', 'name')
-
-
-class Procedure(auth_model.TimeStampedModel):
-    name = models.CharField(max_length=500, unique=True)
-    details = models.CharField(max_length=2000)
-    duration = models.IntegerField()
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        db_table = "procedure"
-
-
-class DoctorClinicProcedure(auth_model.TimeStampedModel):
-    procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE)
-    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE)
-    mrp = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    listing_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-
-    class Meta:
-        db_table = "doctor_clinic_procedure"
-        unique_together = ('procedure', 'doctor_clinic')
 
 
 class SourceIdentifier(auth_model.TimeStampedModel):

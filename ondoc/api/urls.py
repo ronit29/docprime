@@ -18,6 +18,7 @@ from .v1.geoip.router import urlpatterns as geoip_url
 
 # from .v1.account.router import urlpatterns as acct_url
 from .v1.coupon.router import urlpatterns as coupon_url
+from .v1.procedure.router import urlpatterns as procedure_url
 
 
 urlpatterns = [
@@ -37,4 +38,5 @@ urlpatterns = [
     path('v1/ratings/', include(rating_url)),
     path('v1/geoip/', include(geoip_url)),
     path('v1/coupon/', include(coupon_url)),
+    path('v1/procedure/', include(procedure_url)),
 ]
