@@ -1130,7 +1130,7 @@ class HospitalEntitySerializer(HospitalModelSerializer):
 
     class Meta:
         model = Hospital
-        fields = ('id', 'name', 'entity_type', 'address')
+        fields = ('id', 'name', 'entity_type', 'address', 'is_billing_enabled')
 
 
 class DoctorEntitySerializer(serializers.ModelSerializer):
