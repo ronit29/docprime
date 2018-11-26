@@ -1093,8 +1093,6 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             # result['test_may_include'] =
             result['preparations'] = queryset.preparations
 
-        if not query:
-            return Response(result)
         if len(query) > 0:
             info=[]
             for data in query:
@@ -1104,17 +1102,12 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                     info.append(name)
             result['test_may_include'] = info
 
-
-        queryset1 = QuestionAnswer.objects.filter(lab_test_id=test_id).values('question','answer')
-        if not queryset1:
-            return Response(result)
+        queryset1 = QuestionAnswer.objects.filter(lab_test_id=test_id).values('test_question','test_answer')
         if len(queryset1) > 0:
             result['faqs']= queryset1
 
         queryset2 = FrequentlyAddedTogetherTests.objects.filter(original_test_id=test_id)
         booked_together=[]
-        if not queryset2:
-            return Response(result)
         if len(queryset2) > 0:
             for data in queryset2:
                  if data.booked_together_test.name:
@@ -1122,7 +1115,6 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                     name = data.booked_together_test.name
                     id = data.booked_together_test.id
                     booked_together.append({'id':id, 'lab_test': name})
-
 
             result['frequently_booked_together'] = booked_together
 

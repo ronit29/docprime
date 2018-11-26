@@ -954,7 +954,7 @@ class FAQLabTestInLine(admin.StackedInline):
     model = QuestionAnswer
     verbose_name = 'Frequently Asked Questions'
     can_delete = True
-    fields = ['question', 'answer']
+    fields = ['test_question', 'test_answer']
     extra = 0
 
 
