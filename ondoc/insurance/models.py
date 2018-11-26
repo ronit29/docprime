@@ -353,7 +353,7 @@ class InsuranceDisease(auth_model.TimeStampedModel):
     class Meta:
         db_table = "insurance_disease"
 
-class InsuranceDiseaseReponse(auth_model.TimeStampedModel):
+class InsuranceDiseaseResponse(auth_model.TimeStampedModel):
     disease = models.ForeignKey(InsuranceDisease,related_name="affected_members", on_delete=models.SET_NULL, null=True)
     member = models.ForeignKey(InsuredMembers, related_name="diseases", on_delete=models.SET_NULL, null=True)
     response = models.BooleanField(default=False)

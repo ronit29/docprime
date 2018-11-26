@@ -1,3 +1,4 @@
+from ondoc.api.v1.insurance.serializers import InsuredMemberIdSerializer, InsuranceDiseaseIdSerializer
 from ondoc.api.v1.utils import insurance_transform
 from rest_framework import viewsets
 from django.core import serializers as core_serializer
@@ -8,7 +9,7 @@ from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance,
-                                    InsuranceTransaction, InsuranceDisease)
+                                    InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -54,21 +55,21 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         return Response(result)
 
     def update(self, request):
-        serializer = serializers.InsuredMemberIdsSerializer(data=request.data.get('members'), many=True)
-        serializer.is_valid(raise_exception=True)
-        member_list = serializer.validated_data
-        for member in member_list:
-            insured_member = InsuredMembers.objects.filter(id=member.get('id').id).first()
-            if not member.get('hypertension') is None:
-                insured_member.hypertension = member.get('hypertension')
-            if not member.get('diabetes') is None:
-                insured_member.diabetes = member.get('diabetes')
-            if not member.get('heart_disease') is None:
-                insured_member.heart_disease = member.get('heart_disease')
-            if not member.get('liver_disease') is None:
-                insured_member.liver_disease = member.get('liver_disease')
-            insured_member.save()
-        return Response({"message": "User Profile Updated Successfully"}, status.HTTP_200_OK)
+        resp ={}
+        members = request.data.get('members')
+        if not members:
+            return Response({"message": "No members found for update."}, status.HTTP_400_BAD_REQUEST)
+        member_serializer = InsuredMemberIdSerializer(data=members, many=True)
+        member_serializer.is_valid(raise_exception=True)
+        for member in members:
+            member_id = member.get('id')
+            disease_list = member.get('disease')
+            disease_serializer = InsuranceDiseaseIdSerializer(data=disease_list, many=True)
+            disease_serializer.is_valid(raise_exception=True)
+            for disease in disease_list:
+                InsuranceDiseaseResponse.objects.create(disease_id=disease.get('id'), member_id=member_id,
+                                                        response=disease.get('response'))
+        return Response({"message": "Disease Profile Updated Successfully"}, status.HTTP_200_OK)
 
 
 class InsuranceOrderViewSet(viewsets.GenericViewSet):
