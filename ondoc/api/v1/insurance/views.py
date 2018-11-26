@@ -1,5 +1,6 @@
 from ondoc.api.v1.utils import insurance_transform
 from rest_framework import viewsets
+from django.core import serializers as core_serializer
 
 from ondoc.api.v1.utils import payment_details
 from . import serializers
@@ -7,7 +8,7 @@ from rest_framework.response import Response
 from ondoc.account import models as account_models
 from ondoc.doctor import models as doctor_models
 from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold, InsurancePlans, UserInsurance,
-                                    InsuranceTransaction)
+                                    InsuranceTransaction, InsuranceDisease)
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -32,24 +33,25 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
 
 
 class InsuredMemberViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
 
     def memberlist(self, request):
         data = {}
+        result = {}
         data['id'] = request.query_params.get('id')
         serializer = serializers.UserInsuranceIdsSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         parameter = serializer.validated_data
         user_insurance = UserInsurance.objects.get(id=parameter.get('id').id)
-        member_list = user_insurance.members.all()
-        # member_list = InsuranceTransaction.objects.filter(id=parameter['id'].id).values('insured_members',
-        #                                                                                 insurer_name=F('insurer__name'))
-
-        return Response(member_list)
+        member_list = user_insurance.members.all().values('id', 'first_name', 'last_name', 'relation')
+        result['members'] = member_list
+        disease = InsuranceDisease.objects.filter(is_live=True).values('id', 'disease')
+        result['disease'] = disease
+        return Response(result)
 
     def update(self, request):
         serializer = serializers.InsuredMemberIdsSerializer(data=request.data.get('members'), many=True)
