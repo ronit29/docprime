@@ -1472,7 +1472,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             user = None
             if user_queryset:
                 user = user_queryset
-            auth_models.GenericAdmin.objects.create(user=user,
+            auth_models.GenericLabAdmin.objects.create(user=user,
                                                     phone_number=valid_data['phone_number'],
                                                     lab_network=None,
                                                     lab=lab,
@@ -1534,10 +1534,12 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         if hos_data:
             hos_list = [i for i in hos_data]
         result_data = opd_list + hos_list
-        lab_queryset = lab_models.Lab.objects.prefetch_related('manageable_lab_admins').filter(is_live= True,
-                                manageable_lab_admins__user=user,
-                                manageable_lab_admins__is_disabled=False,
-                                manageable_lab_admins__super_user_permission=True).distinct('id')
+        lab_queryset = lab_models.Lab.objects.prefetch_related('manageable_lab_admins')\
+                                             .filter(is_live= True,
+                                                     manageable_lab_admins__user=user,
+                                                     manageable_lab_admins__is_disabled=False,
+                                                     manageable_lab_admins__super_user_permission=True)\
+                                             .distinct('id')
 
         lab_list = []
         laab_serializer = lab_serializers.LabEntitySerializer(lab_queryset, many=True, context={'request': request})
@@ -1778,10 +1780,10 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                                                    entity_type=GenericAdminEntity.HOSPITAL)
         elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
 
-            admin = auth_models.GenericLabAdmin.objects.filter(phone_number=valid_data.get('phone_number'), lab_id=valid_data.get('id'))
+            admin = auth_models.GenericLabAdmin.objects.filter(phone_number=phone_number, lab_id=valid_data.get('id'))
             user = None
             if user_queryset:
                 user = user_queryset
             if admin.exists():
-                admin.update(user=user, name=valid_data.get('name'))
+                admin.update(user=user, name=valid_data.get('name'), phone_number=valid_data.get('phone_number'))
         return Response({'success': 'Created Successfully'})
