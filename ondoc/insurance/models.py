@@ -9,6 +9,17 @@ from django.forms import model_to_dict
 from datetime import timedelta
 
 
+def generate_insurance_policy_number():
+    last_user_insurance_obj = UserInsurance.objects.all().order_by('id').last()
+    if last_user_insurance_obj and last_user_insurance_obj.policy_number:
+        policy_number = last_user_insurance_obj.policy_number
+        identifier, sequence = policy_number.split('DP')
+        sequence = int(sequence) + 1
+        return str('DP%.8d' % sequence)
+    else:
+        return str('DP%.8d' % 1)
+
+
 class LiveMixin(models.Model):
     def save(self, *args, **kwargs):
         if self.enabled:
@@ -162,7 +173,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
     purchase_date = models.DateTimeField(blank=True, null=True)
     expiry_date = models.DateTimeField(blank=True, null=True)
-    policy_number = models.CharField(max_length=50, blank=True, null=True)
+    policy_number = models.CharField(max_length=50, blank=True, null=True, default=generate_insurance_policy_number)
     #insurance_transaction = models.ForeignKey(InsuranceTransaction, related_name="purchased_insurance" , on_delete=models.DO_NOTHING, null=True)
     insured_members = JSONField(blank=True, null=True)
     premium_amount = models.PositiveIntegerField(default=None)
@@ -202,7 +213,6 @@ class UserInsurance(auth_model.TimeStampedModel):
         user_insurance_obj = UserInsurance.objects.create(insurance_plan=insurance_data['insurance_plan'],
                                                             user=insurance_data['user'],
                                                             insured_members=json.dumps(insurance_data['insured_members']),
-                                                            policy_number="",
                                                             purchase_date=insurance_data['purchase_date'],
                                                             expiry_date=insurance_data['expiry_date'],
                                                             premium_amount=insurance_data['premium_amount'],
