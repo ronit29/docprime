@@ -1109,9 +1109,10 @@ class AdminCreateBodySerializer(serializers.Serializer):
             raise serializers.ValidationError("entity Lab Not Found.")
         if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and 'assoc_doc' not in attrs:
             raise serializers.ValidationError("Associated Doctors are Required.")
-        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and attrs.get('type') == User.STAFF:
-            if DoctorNumber.objects.filter(phone_number=attrs['phone_number'], hospital_id=attrs.get('id')).exists():
-                raise serializers.ValidationError("Phone Number already assigned to Doctor.")
+        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and attrs.get('type') == User.DOCTOR:
+            dquery = DoctorNumber.objects.select_related('doctor', 'hospital').filter(phone_number=attrs['phone_number'], hospital_id=attrs.get('id'))
+            if dquery.exists():
+                raise serializers.ValidationError("Phone number already assigned to Doctor " + dquery.first().doctor.name +". Add number as admin to manage multiple doctors.")
         return attrs
         # if DoctorNumber.objects.filter(doctor=attrs['doc_profile'], phone_number=attrs['phone_number']).exists():
         #     raise serializers.ValidationError("DocProfile already Allocated.")
