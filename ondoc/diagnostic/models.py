@@ -813,6 +813,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
 
+    def get_reports(self):
+        return self.reports.all()
+
     def allowed_action(self, user_type, request):
         allowed = []
         current_datetime = timezone.now()
@@ -1376,7 +1379,7 @@ class LabPricing(Lab):
 
 
 class LabReport(auth_model.TimeStampedModel):
-    appointment = models.ForeignKey(LabAppointment, on_delete=models.CASCADE)
+    appointment = models.ForeignKey(LabAppointment, related_name='reports', on_delete=models.CASCADE)
     report_details = models.TextField(max_length=300, blank=True, null=True)
 
     def __str__(self):
@@ -1387,7 +1390,7 @@ class LabReport(auth_model.TimeStampedModel):
 
 
 class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
-    report = models.ForeignKey(LabReport, on_delete=models.SET_NULL, null=True, blank=True)
+    report = models.ForeignKey(LabReport, related_name='files', on_delete=models.SET_NULL, null=True, blank=True)
     name = models.FileField(upload_to='lab_reports/', blank=False, null=False, validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
@@ -1408,7 +1411,7 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
     def save(self, *args, **kwargs):
         database_instance = LabReportFile.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
-        self.send_notification(database_instance)
+        #self.send_notification(database_instance)
 
     class Meta:
         db_table = "lab_report_file"
