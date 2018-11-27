@@ -40,6 +40,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
+import reversion
 
 logger = logging.getLogger(__name__)
 
@@ -303,7 +304,7 @@ class LabCertification(TimeStampedModel):
     name = models.CharField(max_length=200)
 
     def __str__(self):
-        return self.lab.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "lab_certification"
@@ -314,7 +315,7 @@ class LabAccreditation(TimeStampedModel):
     name = models.CharField(max_length=200)
 
     def __str__(self):
-        return self.lab.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "lab_accreditation"
@@ -347,7 +348,7 @@ class LabManager(TimeStampedModel):
         choices=CONTACT_TYPE_CHOICES)
 
     def __str__(self):
-        return self.lab.name + " (" + self.name + ")"
+        return self.name
 
     class Meta:
         db_table = "lab_manager"
@@ -607,8 +608,8 @@ class TestParameter(TimeStampedModel):
 
 
 class ParameterLabTest(TimeStampedModel):
-    parameter = models.ForeignKey(TestParameter, on_delete=models.DO_NOTHING, related_name='test_parameters')
-    lab_test = models.ForeignKey('LabTest', on_delete=models.DO_NOTHING, related_name='labtests')
+    parameter = models.ForeignKey(TestParameter, on_delete=models.CASCADE, related_name='test_parameters')
+    lab_test = models.ForeignKey('LabTest', on_delete=models.CASCADE, related_name='labtests')
 
     class Meta:
         db_table = 'parameter_lab_test'
@@ -760,7 +761,7 @@ class AvailableLabTest(TimeStampedModel):
         unique_together = (("test", "lab_pricing_group"))
         db_table = "available_lab_test"
 
-
+@reversion.register()
 class LabAppointment(TimeStampedModel, CouponsMixin):
     CREATED = 1
     BOOKED = 2
@@ -911,6 +912,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
+        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED):
+            raise Exception('Cancelled or Completed appointment cannot be saved')
 
         try:
             if (self.payment_type != OpdAppointment.INSURANCE and self.status == self.COMPLETED and
@@ -1207,8 +1210,8 @@ class LabDoctorAvailability(TimeStampedModel):
     is_female_available = models.BooleanField(verbose_name='Female', default=False)
     slot = models.CharField(blank=False, max_length=2, choices=SLOT_CHOICES)
 
-    def __str__(self):
-        return self.lab.name
+    # def __str__(self):
+    #     return self.lab.name
 
     class Meta:
         db_table = "lab_doctor_availability"
@@ -1385,7 +1388,8 @@ class LabReport(auth_model.TimeStampedModel):
 
 class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
     report = models.ForeignKey(LabReport, on_delete=models.SET_NULL, null=True, blank=True)
-    name = models.FileField(upload_to='lab_reports/', blank=False, null=False)
+    name = models.FileField(upload_to='lab_reports/', blank=False, null=False, validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
     def __str__(self):
         return "{}-{}".format(self.id, self.report.id)

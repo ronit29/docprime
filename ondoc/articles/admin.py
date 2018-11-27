@@ -74,8 +74,8 @@ class ArticleAdmin(VersionAdmin):
         if hasattr(obj, 'url'):
             obj.url = obj.url.strip('/')
             url_components = obj.url.split('-')
-            identifier = obj.category.identifier
-            if ArticleCategory.objects.filter(identifier=url_components[-1]).exists():
+            identifier = obj.category.identifier.lower()
+            if ArticleCategory.objects.filter(identifier__iexact=url_components[-1]).exists():
                     if url_components[-1] == identifier:
                         pass
                     else:

@@ -120,14 +120,21 @@ class GenericAdminInline(admin.TabularInline):
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
 
-    def get_formset(self, request, obj=None, **kwargs):
-        from django.core.exceptions import MultipleObjectsReturned
-        formset = super().get_formset(request, obj=obj, **kwargs)
-        if not request.POST and obj is not None:
-            formset.form.base_fields['doctor'].queryset = Doctor.objects.filter(
-                        hospitals=obj).distinct()
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "doctor":
+            hospital_id = request.resolver_match.kwargs.get('object_id')
+            kwargs["queryset"] = Doctor.objects.filter(hospitals=hospital_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-        return formset
+    # def get_formset(self, request, obj=None, **kwargs):
+    #     from django.core.exceptions import MultipleObjectsReturned
+    #     formset = super().get_formset(request, obj=obj, **kwargs)
+    #     if not request.POST and obj is not None:
+    #         formset.form.base_fields['doctor'].queryset = Doctor.objects.filter(
+    #                     hospitals=obj).distinct()
+    #
+    #
+    #     return formset
 
 
 class HospitalForm(FormCleanMixin):
@@ -278,4 +285,4 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
 
     map_width = 200
     map_template = 'admin/gis/gmap.html'
-    extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyAfoicJaTk8xQOoAOQn9vtHJzgTeZDJRtA&callback=initGoogleMap']
+    extra_js = ['js/admin/GoogleMap.js','https://maps.googleapis.com/maps/api/js?key=AIzaSyA-5gVhdnhNBInTuxBxMJnGuErjQP40nNc&callback=initGoogleMap']

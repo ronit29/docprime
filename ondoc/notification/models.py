@@ -75,13 +75,15 @@ class NotificationAction:
     )
 
     @classmethod
-    def trigger(cls, instance, user, notification_type):
+    def trigger(cls, instance, user, notification_type):  # SHASHANK_SINGH all context making
+        from ondoc.doctor.models import OpdAppointment
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = instance.time_slot_start.astimezone(est)
         context = {}
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
+            procedures = instance.get_procedures()
             context = {
                 "doctor_name": doctor_name,
                 "patient_name": patient_name,
@@ -92,6 +94,8 @@ class NotificationAction:
                     patient_name, doctor_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y"), doctor_name
                 ),
+                "procedures": procedures,
+                "coupon_discount": str(instance.discount) if instance.discount else None,
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -149,6 +153,7 @@ class NotificationAction:
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
+            procedures = instance.get_procedures()
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
@@ -157,6 +162,8 @@ class NotificationAction:
                 "body": "New Appointment for {} at {}, {} with Dr. {}. You will receive a confirmation as soon as it is accepted by the doctor.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y"), doctor_name),
+                "procedures": procedures,
+                "coupon_discount": str(instance.discount) if instance.discount else None,
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -166,6 +173,7 @@ class NotificationAction:
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
+            procedures = instance.get_procedures()
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
@@ -174,6 +182,7 @@ class NotificationAction:
                 "body": "New appointment for {} at {}, {}. Please confirm.".format(
                     patient_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")),
+                "procedures": procedures,
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
@@ -224,15 +233,18 @@ class NotificationAction:
         elif notification_type == NotificationAction.DOCTOR_INVOICE:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
+            procedures = instance.get_procedures()
             context = {
                 "patient_name": patient_name,
                 "doctor_name": doctor_name,
                 "instance": instance,
                 "title": "Invoice Generated",
+                "procedures": procedures,
                 "body": "Invoice for appointment ID-{} has been generated.".format(instance.id),
                 "url": "/opd/appointment/{}".format(instance.id),
                 "action_type": NotificationAction.OPD_APPOINTMENT,
                 "action_id": instance.id,
+                "payment_type": dict(OpdAppointment.PAY_CHOICES)[instance.payment_type],
                 "image_url": ""
             }
             if user.user_type == User.CONSUMER:
@@ -480,6 +492,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
 
     @classmethod
     def ops_notification_alert(cls, data_obj, email_list, product, alert_type):
+        # TODO: SHASHANK_SINGH not sure about this code if i have to change something.
         status_choices = readable_status_choices(product)
 
         html_body = None

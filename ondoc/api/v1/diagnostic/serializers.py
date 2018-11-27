@@ -61,7 +61,7 @@ class LabModelSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
     long = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
-    lab_image = LabImageModelSerializer(many=True)
+    #lab_image = LabImageModelSerializer(many=True)
     lab_thumbnail = serializers.SerializerMethodField()
     home_pickup_charges = serializers.ReadOnlyField()
     seo = serializers.SerializerMethodField()
@@ -74,6 +74,9 @@ class LabModelSerializer(serializers.ModelSerializer):
     display_rating_widget = serializers.SerializerMethodField()
 
     def get_display_rating_widget(self, obj):
+        if self.parent:
+            return None
+
         if obj.rating.count() > 10:
             return True
         return False
@@ -85,11 +88,18 @@ class LabModelSerializer(serializers.ModelSerializer):
         return  True
 
     def get_rating(self, obj):
-        queryset = obj.rating.exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
-        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True)
+        if self.parent:
+            return None
+        
+        app = LabAppointment.objects.select_related('profile').all()
+        queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
+        reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app':app})
         return reviews.data[:5]
 
     def get_unrated_appointment(self, obj):
+        if self.parent:
+            return None
+
         request = self.context.get('request')
         if request:
             if request.user.is_authenticated:
@@ -104,6 +114,9 @@ class LabModelSerializer(serializers.ModelSerializer):
             return None
 
     def get_rating_graph(self, obj):
+        if self.parent:
+            return None
+
         if obj and obj.rating:
             data = rating_serializer.RatingsGraphSerializer(obj.rating, context={'request':self.context.get('request')}).data
             return data
@@ -113,35 +126,25 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_seo(self, obj):
         if self.parent:
             return None
-        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Lab')
-        locality = ''
-        sublocality = ''
-        if entity.exists():
-            # location_id = entity.first().additional_info.get('location_id')
-            # type = EntityAddress.objects.filter(id=location_id).values('type', 'value', 'parent')
-            entity = entity.first()
+        # entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+        #                                    entity_type__iexact='Lab')
+
+        locality = None
+        sublocality = None
+        # if entity.exists():
+            #entity = entity[0]
+        if self.context.get('entity'):
+            entity = self.context.get('entity')
             if entity.additional_info:
                 locality = entity.additional_info.get('locality_value')
                 sublocality = entity.additional_info.get('sublocality_value')
-                # if sublocality:
-                #        locality =  " " + locality
-            # if type.exists():
-            #     if type.first().get('type') == 'LOCALITY':
-            #         locality = type.first().get('value')
 
-            # if type.exists():
-            #     if type.first().get('type') == 'SUBLOCALITY':
-            #         sublocality = type.first().get('value')
-            #         parent = EntityAddress.objects.filter(id=type.first().get('parent')).values('value')
-            #         if sublocality:
-            #             locality = ' ' + parent.first().get('value')
-        if sublocality:
-            title = obj.name + ' - Diagnostic Centre in '+ sublocality + " " + locality + ' |DocPrime'
+        if sublocality and locality:
+            title = obj.name + ' - Diagnostic Centre in '+ sublocality + " " + locality + ' | DocPrime'
         elif locality:
-            title = obj.name + ' - Diagnostic Centre in ' + locality + ' |DocPrime'
+            title = obj.name + ' - Diagnostic Centre in ' + locality + ' | DocPrime'
         else:
-            title = obj.name + ' - Diagnostic Centre |DocPrime'
+            title = obj.name + ' - Diagnostic Centre | DocPrime'
 
         description = obj.name + ': Book test at ' + obj.name + ' online, check fees, packages prices and more at DocPrime. '
         return {'title': title, "description": description}
@@ -150,11 +153,13 @@ class LabModelSerializer(serializers.ModelSerializer):
 
         if self.parent:
             return None
-        entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
-                                           entity_type__iexact='Lab')
+        # entity = EntityUrls.objects.filter(entity_id=obj.id, url_type='PAGEURL', is_valid='t',
+        #                                    entity_type__iexact='Lab')
         breadcrums = None
-        if entity.exists():
-            breadcrums = entity.first().additional_info.get('breadcrums')
+        if self.context.get('entity'):
+            entity = self.context.get('entity')
+        # if entity.exists():
+            breadcrums = entity.additional_info.get('breadcrums')
             if breadcrums:
                 return breadcrums
         return breadcrums
@@ -179,7 +184,7 @@ class LabModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lab
-        fields = ('id', 'lat', 'long', 'lab_image', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
+        fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
                   'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'unrated_appointment',
                   'center_visit_enabled', 'display_rating_widget')
@@ -298,7 +303,6 @@ class LabCustomSerializer(serializers.Serializer):
     next_lab_timing = serializers.DictField()
     next_lab_timing_data = serializers.DictField()
     pickup_charges = serializers.IntegerField(default=None)
-    distance_related_charges = serializers.IntegerField(default=None)
     # insurance = serializers.SerializerMethodField()
     #
     # def get_insurance(self, obj):
@@ -320,6 +324,7 @@ class LabCustomSerializer(serializers.Serializer):
     #
     #
     #     return resp
+    distance_related_charges = serializers.IntegerField()
 
 
     # def get_lab(self, obj):

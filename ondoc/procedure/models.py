@@ -1,7 +1,7 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
 from ondoc.doctor.models import DoctorClinic, SearchKey
-from collections import deque
+from collections import deque, OrderedDict
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
@@ -26,6 +26,7 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=500, unique=True)
     details = models.CharField(max_length=2000)
     duration = models.IntegerField(default=60)
+    is_enabled = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -33,19 +34,44 @@ class Procedure(auth_model.TimeStampedModel, SearchKey):
     class Meta:
         db_table = "procedure"
 
+    @staticmethod
+    def get_first_parent(all_mappings=[], parent_category_ids=None, is_primary=False):
+        if parent_category_ids:
+            if is_primary:
+                for mapping in all_mappings:
+                    if mapping.is_primary and mapping.procedure.pk in parent_category_ids:
+                        return mapping
+            else:
+                all_mappings = sorted(all_mappings, key=lambda x: x.procedure.id)
+                for mapping in all_mappings:
+                    if mapping.procedure.pk in parent_category_ids:
+                        return mapping
+        else:
+            if is_primary:
+                for mapping in all_mappings:
+                    if mapping.is_primary:
+                        return mapping
+        return None
+
     def get_primary_parent_category(self, parent_category_ids=None):
         parent = None
-        first_parent = None
+        first_parent_mapping = None
         if parent_category_ids:
-            first_parent = self.parent_categories_mapping.filter(parent_category_id__in=parent_category_ids,
-                                                                 is_primary=True).first()  # OPTIMIZE_SHASHANK_SINGH
-            if not first_parent:
-                first_parent = self.parent_categories_mapping.filter(
-                    parent_category_id__in=parent_category_ids).order_by('pk').first()  # OPTIMIZE_SHASHANK_SINGH
-        if not first_parent:
-            first_parent = self.parent_categories_mapping.filter(is_primary=True).first()  # OPTIMIZE_SHASHANK_SINGH
-        if first_parent:
-            parent = first_parent.parent_category
+            first_parent_mapping = self.get_first_parent(list(self.parent_categories_mapping.all()),
+                                                         parent_category_ids, True)
+            # first_parent_mapping = self.parent_categories_mapping.filter(parent_category_id__in=parent_category_ids,
+            #                                                      is_primary=True).first()
+            if not first_parent_mapping:
+                # first_parent_mapping = self.parent_categories_mapping.filter(
+                #     parent_category_id__in=parent_category_ids).order_by('procedure_id').first()
+                first_parent_mapping = self.get_first_parent(list(self.parent_categories_mapping.all()),
+                                                             parent_category_ids)
+        if not first_parent_mapping:
+            # first_parent_mapping = self.parent_categories_mapping.filter(is_primary=True).first()
+            first_parent_mapping = self.get_first_parent(list(self.parent_categories_mapping.all()),
+                                                         is_primary=True)
+        if first_parent_mapping:
+            parent = first_parent_mapping.parent_category
         return parent
 
 
@@ -144,3 +170,109 @@ class CommonProcedureCategory(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_procedure_category"
+
+
+def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, all=False):
+    selected_procedure_ids = []
+    other_procedure_ids = []
+    if not all:
+        if category_ids and not procedure_ids:
+            all_procedures_under_category = ProcedureToCategoryMapping.objects.select_related('procedure').filter(
+                parent_category_id__in=category_ids, parent_category__is_live=True, procedure__is_enabled=True).values_list('procedure_id',
+                                                                                                flat=True)
+            all_procedures_under_category = set(all_procedures_under_category)
+            selected_procedure_ids = ProcedureCategory.objects.select_related('preferred_procedure').filter(
+                pk__in=category_ids, is_live=True, preferred_procedure__is_enabled=True).values_list('preferred_procedure_id', flat=True)
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
+        elif category_ids and procedure_ids:
+            all_procedures_under_category = ProcedureToCategoryMapping.objects.select_related('procedure').filter(
+                parent_category_id__in=category_ids, parent_category__is_live=True,
+                procedure__is_enabled=True).values_list('procedure_id', flat=True)
+            all_procedures_under_category = set(all_procedures_under_category)
+            selected_procedure_ids = procedure_ids
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
+        elif procedure_ids and not category_ids:
+            selected_procedure_ids = procedure_ids
+            all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
+                procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)
+            all_procedures_under_category = ProcedureToCategoryMapping.objects.select_related('procedure').filter(
+                parent_category_id__in=all_parent_procedures_category_ids, procedure__is_enabled=True).values_list(
+                'procedure_id',
+                flat=True)
+            all_procedures_under_category = set(all_procedures_under_category)
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_category - selected_procedure_ids
+    else:
+        if category_ids and not procedure_ids:
+            all_clinics_of_doctor = doctor.doctor_clinics.all()
+            all_procedures_under_doctor = []
+            for doctor_clinic in all_clinics_of_doctor:
+                all_procedures_under_doctor.extend(
+                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list(
+                        'procedure_id', flat=True))
+            all_procedures_under_doctor = set(all_procedures_under_doctor)
+            selected_procedure_ids = ProcedureCategory.objects.select_related('preferred_procedure').filter(
+                pk__in=category_ids, is_live=True, preferred_procedure__is_enabled=True).values_list(
+                'preferred_procedure_id', flat=True)
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+        elif category_ids and procedure_ids:
+            all_clinics_of_doctor = doctor.doctor_clinics.all()
+            all_procedures_under_doctor = []
+            for doctor_clinic in all_clinics_of_doctor:
+                all_procedures_under_doctor.extend(
+                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list('procedure_id',
+                                                                                                        flat=True))
+            all_procedures_under_doctor = set(all_procedures_under_doctor)
+            selected_procedure_ids = procedure_ids
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+        elif procedure_ids and not category_ids:
+            selected_procedure_ids = procedure_ids
+            all_clinics_of_doctor = doctor.doctor_clinics.all()
+            all_procedures_under_doctor = []
+            for doctor_clinic in all_clinics_of_doctor:
+                all_procedures_under_doctor.extend(
+                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list(
+                        'procedure_id', flat=True))
+            all_procedures_under_doctor = set(all_procedures_under_doctor)
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+        else:
+            all_clinics_of_doctor = doctor.doctor_clinics.all()
+            all_procedures_under_doctor = []
+            for doctor_clinic in all_clinics_of_doctor:
+                all_procedures_under_doctor.extend(
+                    doctor_clinic.doctorclinicprocedure_set.filter(procedure__is_enabled=True).values_list('procedure_id', flat=True))
+            all_procedures_under_doctor = set(all_procedures_under_doctor)
+            selected_procedure_ids = []
+            selected_procedure_ids = set(selected_procedure_ids)
+            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
+
+    return selected_procedure_ids, other_procedure_ids
+
+
+def get_included_doctor_clinic_procedure(all_data, filter_ids):
+        return [dcp for dcp in all_data if dcp.procedure.id in filter_ids]
+
+def get_procedure_categories_with_procedures(selected_procedures, other_procedures):
+    temp_result = OrderedDict()
+    all_procedures = selected_procedures + other_procedures
+    for procedure in all_procedures:
+        temp_category_id = procedure.pop('procedure_category_id')
+        temp_category_name = procedure.pop('procedure_category_name')
+        if temp_category_id in temp_result:
+            temp_result[temp_category_id]['procedures'].append(procedure)
+        else:
+            temp_result[temp_category_id] = OrderedDict()
+            temp_result[temp_category_id]['name'] = temp_category_name
+            temp_result[temp_category_id]['procedures'] = [procedure]
+
+    final_result = []
+    for key, value in temp_result.items():
+        value['procedure_category_id'] = key
+        final_result.append(value)
+
+    return final_result

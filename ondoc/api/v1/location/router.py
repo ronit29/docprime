@@ -11,4 +11,5 @@ urlpatterns = [
     path('speciality-inventory/<int:specialization_id>', SearchUrlsViewSet.as_view({'get': 'specialities_in_localities_list'}), name='top-popular-specialists'),
     path('static-footer', SearchUrlsViewSet.as_view({'get':'static_footer'}), name='static-footer-throughout-website'),
     path('dynamicfooters', DoctorsCitySearchViewSet.as_view({'get':'footer_api'}), name='footer_api'),
+    path('static-speciality-footer', SearchUrlsViewSet.as_view({'get':'top_specialities_in_top_cities'}), name ='top_specialities_in_top_cities'),
 ]
