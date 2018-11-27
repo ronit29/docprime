@@ -329,6 +329,21 @@ class DoctorSearchHelper:
         category_ids = [int(x) for x in category_ids]
         procedure_ids = [int(x) for x in procedure_ids]
         response = []
+
+        # boiler_code_for_categories =
+
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        is_user_isured = False
+        insurance_threshold_amount = 0
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().first()
+            if user_insurance:
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_threshold_amount = insurance_threshold.opd_amount_limit
+                    is_user_isured = True
+
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         for doctor in doctor_data:
 
