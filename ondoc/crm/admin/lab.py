@@ -1009,6 +1009,7 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = []
     search_fields = ['name']
+    list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)
