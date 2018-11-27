@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
-                                    InsuranceTransaction, UserInsurance, InsuranceDisease)
+                                    InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent)
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
 from ondoc.account.models import (Order)
@@ -33,6 +33,7 @@ class InsurancePlansSerializer(serializers.ModelSerializer):
     #type = serializers.CharField(max_length=100)
     #amount = serializers.IntegerField()
     #threshold = serializers.SerializerMethodField()
+    content = serializers.SerializerMethodField()
     threshold = InsuranceThresholdSerializer(source='get_active_threshold', many=True)
 
     # def get_threshold(self, obj):
@@ -41,20 +42,25 @@ class InsurancePlansSerializer(serializers.ModelSerializer):
     #         insurance_threshold = InsuranceThresholdSerializer(threshold)
     #         return insurance_threshold.data
 
+    def get_content(self, obj):
+        return obj.content.filter(title__in=InsurancePlanContent.PossibleTitles.availabilities()).values('title', 'content')
+
     class Meta:
         model = InsurancePlans
-        fields = ('id', 'name', 'amount', 'threshold')
+        fields = ('id', 'name', 'amount', 'threshold', 'content')
         #fields = '__all__'
 
 class InsurerSerializer(serializers.ModelSerializer):
     #id = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all(), required=True)
-    #plans = serializers.SerializerMethodField()
+    # plans = serializers.SerializerMethodField()
 
     # def get_plans(self, obj):
     #     plans = InsurancePlans.objects.filter(insurer=obj)
     #     if plans:
     #         insurance_plans = InsurancePlansSerializer(plans, many=True)
+    #         # plan_contents = InsurancePlanContent.objects.filter(plan__in=obj.plans.filter(is_live=True))
     #         return insurance_plans.data
+
     plans = InsurancePlansSerializer(source='get_active_plans', many=True)
 
 

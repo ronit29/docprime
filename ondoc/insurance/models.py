@@ -6,6 +6,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from ondoc.authentication.models import UserProfile, User
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
+from ondoc.common.helper import Choices
 from datetime import timedelta
 
 
@@ -102,9 +103,18 @@ class InsurancePlans(auth_model.TimeStampedModel):
 
 
 class InsurancePlanContent(auth_model.TimeStampedModel):
+
+    class PossibleTitles(Choices):
+        WHATS_COVERED = 'WHATS_COVERED'
+        WHATS_NOT_COVERED = 'WHATS_NOT_COVERED'
+
     plan = models.ForeignKey(InsurancePlans,related_name="content", on_delete=models.CASCADE)
-    title = models.CharField(max_length=500, blank=False)
-    content = models.CharField(max_length=5000, blank=False)
+    title = models.CharField(max_length=500, blank=False, choices=PossibleTitles.as_choices())
+    content = models.TextField(blank=False)
+
+    class Meta:
+        db_table = 'insurance_plan_content'
+        unique_together = (("plan", "title"),)
 
 
 class InsuranceThreshold(auth_model.TimeStampedModel):
