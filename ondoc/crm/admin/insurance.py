@@ -1,6 +1,8 @@
 from django.contrib import admin
+from django import forms
 from rest_framework import serializers
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
+from ondoc.insurance.models import InsurancePlanContent, InsurancePlans
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -50,3 +52,21 @@ class InsuredMembersAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+class InsurancePlanContentForm(forms.ModelForm):
+    content = forms.CharField(widget=forms.Textarea, required=False)
+    plan = forms.ModelChoiceField(queryset=InsurancePlans.objects.all(),widget=forms.Select)
+    title = forms.ChoiceField(choices=InsurancePlanContent.PossibleTitles.as_choices())
+
+    class Media:
+        extend=False
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'insurance/js/init.js')
+        css = {'all':('insurance/css/style.css',)}
+
+
+class InsurancePlanContentAdmin(admin.ModelAdmin):
+    form = InsurancePlanContentForm
+    model = InsurancePlanContent
+    list_display = ('plan', 'title',)
+
