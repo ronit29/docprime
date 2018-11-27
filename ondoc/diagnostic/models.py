@@ -1386,7 +1386,8 @@ class LabReport(auth_model.TimeStampedModel):
 
 class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
     report = models.ForeignKey(LabReport, on_delete=models.SET_NULL, null=True, blank=True)
-    name = models.FileField(upload_to='lab_reports/', blank=False, null=False)
+    name = models.FileField(upload_to='lab_reports/', blank=False, null=False, validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
     def __str__(self):
         return "{}-{}".format(self.id, self.report.id)
