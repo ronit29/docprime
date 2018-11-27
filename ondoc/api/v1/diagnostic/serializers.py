@@ -299,6 +299,27 @@ class LabCustomSerializer(serializers.Serializer):
     next_lab_timing_data = serializers.DictField()
     pickup_charges = serializers.IntegerField(default=None)
     distance_related_charges = serializers.IntegerField(default=None)
+    # insurance = serializers.SerializerMethodField()
+    #
+    # def get_insurance(self, obj):
+    #     request = self.context.get("request")
+    #     resp = {
+    #         'is_insurance_covered': False,
+    #         'insurance_threshold_amount': 0,
+    #         'is_user_insured': False
+    #     }
+    #     if request:
+    #         logged_in_user = request.user
+    #         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+    #             user_insurance = logged_in_user.purchased_insurance.filter().first()
+    #             if user_insurance:
+    #                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+    #                 if insurance_threshold:
+    #                     resp['insurance_threshold_amount'] = insurance_threshold.lab_amount_limit
+    #                     resp['is_user_insured'] = True
+    #
+    #
+    #     return resp
 
 
     # def get_lab(self, obj):

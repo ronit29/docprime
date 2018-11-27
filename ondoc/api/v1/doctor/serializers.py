@@ -328,6 +328,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     discounted_fees = serializers.IntegerField(read_only=True, allow_null=True, source='deal_price')
     lat = serializers.SerializerMethodField(read_only=True)
     long = serializers.SerializerMethodField(read_only=True)
+    insurance = serializers.SerializerMethodField(read_only=True)
 
     def get_lat(self, obj):
         if obj.doctor_clinic.hospital.location:
@@ -354,10 +355,32 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
         return data
 
+    def get_insurance(self, obj):
+        request = self.context.get("request")
+        resp = {
+            'is_insurance_covered': False,
+            'insurance_threshold_amount': 0,
+            'is_user_insured': False
+        }
+        if request:
+            logged_in_user = request.user
+            if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+                user_insurance = logged_in_user.purchased_insurance.filter().first()
+                if user_insurance:
+                    insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                    if insurance_threshold:
+                        resp['insurance_threshold_amount'] = insurance_threshold.opd_amount_limit
+                        resp['is_user_insured'] = True
+
+            if obj.doctor_clinic.doctor.is_insurance_enabled and obj.mrp <= resp['insurance_threshold_amount']:
+                resp['is_insurance_covered'] = True
+
+        return resp
+
     class Meta:
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
-                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id', )
+                  'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id', 'insurance',)
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
