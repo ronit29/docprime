@@ -688,9 +688,10 @@ class LabTest(TimeStampedModel, SearchKey):
 #     class Meta:
 #         db_table = "related_tests"
 
-class FrequentQuestions(TimeStampedModel):
-    question = models.TextField(null=False, verbose_name='Question')
-    answer = models.TextField(null=True, verbose_name='Answer')
+
+class QuestionAnswer(TimeStampedModel):
+    test_question = models.TextField(null=False, verbose_name='Question')
+    test_answer = models.TextField(null=True, verbose_name='Answer')
     lab_test = models.ForeignKey(LabTest, related_name='faq', null=True, blank=False, on_delete=models.CASCADE)
 
     class Meta:

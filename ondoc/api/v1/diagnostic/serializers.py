@@ -304,6 +304,20 @@ class LabCustomSerializer(serializers.Serializer):
     next_lab_timing_data = serializers.DictField()
     pickup_charges = serializers.IntegerField(default=None)
     distance_related_charges = serializers.IntegerField()
+    test = serializers.SerializerMethodField()
+
+    def get_test(self, obj):
+        test_data = AvailableLabTest.objects.filter(lab_id=4, test_id__in=self.context.get('ids')).values('test_id','test_id__name',
+                                                                            'computed_deal_price', 'custom_deal_price')
+        for tests in test_data:
+            if (tests.get("custom_deal_price") is None):
+                tests["price"] = tests.get("computed_deal_price")
+            else:
+                tests["price"] = tests.get("custom_deal_price")
+            del tests["custom_deal_price"]
+            del tests["computed_deal_price"]
+        return  test_data
+
 
 
     # def get_lab(self, obj):

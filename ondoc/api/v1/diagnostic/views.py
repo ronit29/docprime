@@ -171,7 +171,32 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
             #entity_id = entity.entity_id
-            response = self.retrieve(request, entity.entity_id, entity)
+            response = self.retrieve(request, entity.entity_id, None, entity)
+            return response
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+    @transaction.non_atomic_requests
+    def retrieve_test_by_url(self, request):
+
+        url = request.GET.get('url')
+        if not url:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        url = url.lower()
+        entity = EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_TEST).order_by('-is_valid')
+        if len(entity) > 0:
+            entity = entity[0]
+            if not entity.is_valid:
+                valid_entity_url_qs = EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_TEST, entity_id=entity.entity_id,
+                                                                is_valid='t')
+                if valid_entity_url_qs.exists():
+                    corrected_url = valid_entity_url_qs[0].url
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                else:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+            response = self.retrieve(request, None, entity.entity_id , None)
             return response
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -198,7 +223,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         response_queryset = self.form_lab_whole_data(paginated_queryset)
 
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset,  many=True,
-                                         context={"request": request})
+                                         context={"request": request, "ids": parameters.get('ids')})
 
         entity_ids = [lab_data['id'] for lab_data in response_queryset]
 
@@ -262,7 +287,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          "seo": seo, "breadcrumb": breadcrumb})
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, lab_id, entity=None):
+    def retrieve(self, request, lab_id, test_id=None, entity=None):
+
+        if test_id:
+            lab_test = LabTest.objects.filter(id=test_id).values('id', 'name', 'pre_test_info', 'why',
+                                                                 'about_test', 'why_get_tested', 'preparations')
+            if lab_test:
+                return Response(lab_test)
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         lab_obj = Lab.objects.prefetch_related('rating','lab_documents').filter(id=lab_id, is_live=True).first()
 
@@ -275,6 +307,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 '-is_valid')
             if len(entity) > 0:
                 entity = entity[0]
+
 
         test_ids = (request.query_params.get("test_ids").split(",") if request.query_params.get('test_ids') else [])
         queryset = AvailableLabTest.objects.select_related().prefetch_related('test__labtests__parameter', 'test__packages__lab_test', 'test__packages__lab_test__labtests__parameter')\
@@ -1060,8 +1093,6 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             # result['test_may_include'] =
             result['preparations'] = queryset.preparations
 
-        if not query:
-            return Response(result)
         if len(query) > 0:
             info=[]
             for data in query:
@@ -1071,17 +1102,12 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                     info.append(name)
             result['test_may_include'] = info
 
-
-        queryset1 = QuestionAnswer.objects.filter(lab_test_id=test_id).values('question','answer')
-        if not queryset1:
-            return Response(result)
+        queryset1 = QuestionAnswer.objects.filter(lab_test_id=test_id).values('test_question','test_answer')
         if len(queryset1) > 0:
             result['faqs']= queryset1
 
         queryset2 = FrequentlyAddedTogetherTests.objects.filter(original_test_id=test_id)
         booked_together=[]
-        if not queryset2:
-            return Response(result)
         if len(queryset2) > 0:
             for data in queryset2:
                  if data.booked_together_test.name:
@@ -1089,7 +1115,6 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                     name = data.booked_together_test.name
                     id = data.booked_together_test.id
                     booked_together.append({'id':id, 'lab_test': name})
-
 
             result['frequently_booked_together'] = booked_together
 
