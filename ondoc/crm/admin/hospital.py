@@ -116,7 +116,6 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
                 if row[1] is None and numbers.count(row[0]) > 1:
                     raise forms.ValidationError(
                         "Permissions for all doctors already allocated for %s." % (row[0]))
-        deleted_list = []
         doc_num = DoctorNumber.objects.filter(hospital_id=self.instance.id)
         doc_num_list = [(dn.phone_number, dn.doctor) for dn in doc_num.all()]
         if doc_num.exists():

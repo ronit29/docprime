@@ -602,7 +602,7 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
     source_choices = ((CRM, 'CRM'), (APP, 'App'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages_lab', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
+    type_choices = ((APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
     lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True,
                                     on_delete=models.CASCADE,
                                     related_name='manageable_lab_network_admins')
@@ -706,7 +706,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     source_choices = ((CRM, 'CRM'), (APP, 'App'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
+    type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
     hospital_network = models.ForeignKey("doctor.HospitalNetwork", null=True, blank=True,
                                          on_delete=models.CASCADE,
                                          related_name='manageable_hospital_networks')

@@ -1368,60 +1368,64 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return auth_models.GenericAdmin.objects.none()
 
+    def get_admin_obj(self, request, valid_data, doc, hosp, user, pem_type, entity_type):
+        return auth_models.GenericAdmin.create_permission_object(user=user, doctor=doc,
+                                                          name=valid_data.get('name', None),
+                                                          phone_number=valid_data['phone_number'],
+                                                          hospital=hosp,
+                                                          permission_type=pem_type,
+                                                          is_disabled=False,
+                                                          super_user_permission=False,
+                                                          write_permission=True,
+                                                          created_by=request.user,
+                                                          source_type=auth_models.GenericAdmin.APP,
+                                                          entity_type=entity_type)
+
     def create(self, request):
         serializer = serializers.AdminCreateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        pem_type = auth_models.GenericAdmin.APPOINTMENT
-        if valid_data.get('billing_enabled') and valid_data.get('appointment_enabled'):
-            pem_type = auth_models.GenericAdmin.ALL
-        elif valid_data.get('billing_enabled') and not valid_data.get('appointment_enabled'):
-            pem_type = auth_models.GenericAdmin.BILLINNG
+        bill_pem = False
+        app_pem = True
+        if valid_data.get('billing_enabled'):
+            bill_pem = True
+        if not valid_data.get('appointment_enabled'):
+            app_pem = False
         user_queryset = User.objects.filter(user_type=User.DOCTOR, phone_number=valid_data['phone_number']).first()
+        user = None
+        if user_queryset:
+            user = user_queryset
 
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
             doct = Doctor.objects.get(id=valid_data['id'])
             if valid_data.get('assoc_hosp'):
                 create_admins = []
                 for hos in valid_data['assoc_hosp']:
-                    user=None
-                    if user_queryset:
-                        user = user_queryset
-                    ad = auth_models.GenericAdmin.create_permission_object(user=user, doctor=doct,
-                                                                      name=valid_data.get('name', None),
-                                                                      phone_number=valid_data['phone_number'],
-                                                                      hospital=hos,
-                                                                      permission_type=pem_type,
-                                                                      is_disabled=False,
-                                                                      super_user_permission=False,
-                                                                      write_permission=True,
-                                                                      created_by=request.user,
-                                                                      source_type=auth_models.GenericAdmin.APP,
-                                                                      entity_type=GenericAdminEntity.DOCTOR)
-                    create_admins.append(ad)
+                    if app_pem:
+                        create_admins.append(self.get_admin_obj(request, valid_data, doct, hos, user,
+                                                                auth_models.GenericAdmin.APPOINTMENT, GenericAdminEntity.DOCTOR))
+                    if bill_pem:
+                        create_admins.append(self.get_admin_obj(request, valid_data, doct, hos, user,
+                                                                auth_models.GenericAdmin.BILLINNG,
+                                                                GenericAdminEntity.DOCTOR))
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
-                user = None
-                if user_queryset:
-                    user = user_queryset
+                create_admins = []
+                if app_pem:
+                    create_admins.append(self.get_admin_obj(request, valid_data, doct, None, user,
+                                                            auth_models.GenericAdmin.APPOINTMENT,
+                                                            GenericAdminEntity.DOCTOR))
+                if bill_pem:
+                    create_admins.append(self.get_admin_obj(request, valid_data, doct, None, user,
+                                                            auth_models.GenericAdmin.BILLINNG,
+                                                            GenericAdminEntity.DOCTOR))
                 try:
-                    auth_models.GenericAdmin.objects.create(user=user, doctor=doct,
-                                                                       name=valid_data.get('name', None),
-                                                                       phone_number=valid_data['phone_number'],
-                                                                       hospital=None,
-                                                                       permission_type=pem_type,
-                                                                       is_disabled=False,
-                                                                       super_user_permission=False,
-                                                                       write_permission=True,
-                                                                       is_doc_admin=False,
-                                                                       created_by=request.user,
-                                                                       source_type=auth_models.GenericAdmin.APP,
-                                                                       entity_type=GenericAdminEntity.DOCTOR)
+                    auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
-                    return Response({'error': 'something went wrong!'})
+                    return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
             hosp = Hospital.objects.get(id=valid_data['id'])
             name = valid_data.get('name', None)
@@ -1434,54 +1438,58 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             if valid_data.get('assoc_doc'):
                 create_admins = []
                 for doc in valid_data['assoc_doc']:
-                    user=None
-                    if user_queryset:
-                        user = user_queryset
-                    ad = auth_models.GenericAdmin.create_permission_object(user=user, doctor=doc,
-                                                                      name=name,
-                                                                      phone_number=valid_data['phone_number'], hospital=hosp,
-                                                                      permission_type=pem_type,
-                                                                      is_disabled=False,
-                                                                      super_user_permission=False,
-                                                                      write_permission=True,
-                                                                      created_by=request.user,
-                                                                      source_type=auth_models.GenericAdmin.APP,
-                                                                      entity_type=GenericAdminEntity.HOSPITAL)
-                    create_admins.append(ad)
+                    if app_pem:
+                        create_admins.append(self.get_admin_obj(request, valid_data, doc, hosp, user,
+                                                                auth_models.GenericAdmin.APPOINTMENT,
+                                                                GenericAdminEntity.HOSPITAL))
+                    if bill_pem:
+                        create_admins.append(self.get_admin_obj(request, valid_data, doc, hosp, user,
+                                                                auth_models.GenericAdmin.BILLINNG,
+                                                                GenericAdminEntity.HOSPITAL))
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
-                user = None
-                if user_queryset:
-                    user = user_queryset
-                auth_models.GenericAdmin.objects.create(user=user, doctor=None,
-                                                                   name=name,
-                                                                   phone_number=valid_data['phone_number'],
-                                                                   hospital=hosp,
-                                                                   permission_type=pem_type,
-                                                                   is_disabled=False,
-                                                                   super_user_permission=False,
-                                                                   write_permission=True,
-                                                                   created_by=request.user,
-                                                                   source_type=auth_models.GenericAdmin.APP,
-                                                                   entity_type=GenericAdminEntity.HOSPITAL)
+                create_admins = []
+                if app_pem:
+                    create_admins.append(self.get_admin_obj(request, valid_data, None, hosp, user,
+                                                            auth_models.GenericAdmin.APPOINTMENT,
+                                                            GenericAdminEntity.HOSPITAL))
+                if bill_pem:
+                    create_admins.append(self.get_admin_obj(request, valid_data, None, hosp, user,
+                                                            auth_models.GenericAdmin.BILLINNG,
+                                                            GenericAdminEntity.HOSPITAL))
+                try:
+                    auth_models.GenericAdmin.objects.bulk_create(create_admins)
+                except Exception as e:
+                    return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
             lab = lab_models.Lab.objects.get(id=valid_data.get('id'))
-            user = None
-            if user_queryset:
-                user = user_queryset
-            auth_models.GenericLabAdmin.objects.create(user=user,
-                                                    phone_number=valid_data['phone_number'],
-                                                    lab_network=None,
-                                                    lab=lab,
-                                                    permission_type=pem_type,
-                                                    is_disabled=False,
-                                                    super_user_permission=False,
-                                                    write_permission=True,
-                                                    read_permission=True
+            if app_pem:
+                auth_models.GenericLabAdmin.objects.create(user=user,
+                                                           phone_number=valid_data['phone_number'],
+                                                           lab_network=None,
+                                                           lab=lab,
+                                                           permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
+                                                           is_disabled=False,
+                                                           super_user_permission=False,
+                                                           write_permission=True,
+                                                           read_permission=True,
+                                                           source_type=auth_models.GenericLabAdmin.APP
                                                     )
+            if bill_pem:
+                auth_models.GenericLabAdmin.objects.create(user=user,
+                                                           phone_number=valid_data['phone_number'],
+                                                           lab_network=None,
+                                                           lab=lab,
+                                                           permission_type=auth_models.GenericLabAdmin.BILLING,
+                                                           is_disabled=False,
+                                                           super_user_permission=False,
+                                                           write_permission=True,
+                                                           read_permission=True,
+                                                           source_type=auth_models.GenericLabAdmin.APP
+                                                           )
         return Response({'success': 'Created Successfully'})
 
     def assoc_doctors(self, request, pk=None):
@@ -1569,7 +1577,10 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                     'hospital_ids_count', 'updated_at')
             for x in query:
                 if temp.get(x['phone_number']):
-                    temp[x['phone_number']]['hospital_id'].append(x['hospital_id'])
+                    if x['hospital_ids'] not in temp[x['phone_number']]['hospital_ids']:
+                        temp[x['phone_number']]['hospital_ids'].append(x['hospital_ids'])
+                    if temp[x['phone_number']]['permission_type'] != x['permission_type']:
+                        temp[x['phone_number']]['permission_type'] = auth_models.GenericAdmin.ALL
                 else:
                     x['hospital_ids'] = [x['hospital_ids']] if x['hospital_ids'] else []
                     if len(x['hospital_ids']) > 0:
@@ -1600,7 +1611,10 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 
             for x in response:
                 if temp.get(x['phone_number']):
-                    temp[x['phone_number']]['doctor_ids'].append(x['doctor_ids'])
+                    if x['doctor_ids'] not in temp[x['phone_number']]['doctor_ids']:
+                        temp[x['phone_number']]['doctor_ids'].append(x['doctor_ids'])
+                    if temp[x['phone_number']]['permission_type'] != x['permission_type']:
+                        temp[x['phone_number']]['permission_type'] = auth_models.GenericAdmin.ALL
                 else:
                     for doc in assoc_docs:
                         if doc.get('phone_number') and doc.get('phone_number') == x['phone_number']:
@@ -1652,14 +1666,17 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         serializer = serializers.AdminUpdateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        pem_type = auth_models.GenericAdmin.APPOINTMENT
         phone_number = valid_data.get('old_phone_number') if valid_data.get('old_phone_number') else valid_data.get('phone_number')
-        if valid_data.get('billing_enabled') and valid_data.get('appointment_enabled'):
-            pem_type = auth_models.GenericAdmin.ALL
-        elif valid_data.get('billing_enabled') and not valid_data.get('appointment_enabled'):
-            pem_type = auth_models.GenericAdmin.BILLINNG
+        bill_pem = False
+        app_pem = True
+        if valid_data.get('billing_enabled'):
+            bill_pem = True
+        if not valid_data.get('appointment_enabled'):
+            app_pem = False
         user_queryset = User.objects.filter(user_type=User.DOCTOR, phone_number=valid_data['phone_number']).first()
-
+        user = None
+        if user_queryset:
+            user = user_queryset
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
 
             delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=phone_number,
@@ -1674,44 +1691,31 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             if valid_data.get('assoc_hosp'):
                 create_admins = []
                 for hos in valid_data['assoc_hosp']:
-                    user=None
-                    if user_queryset:
-                        user = user_queryset
-                    ad = auth_models.GenericAdmin.create_permission_object(user=user, doctor=doct,
-                                                                      name=valid_data.get('name', None),
-                                                                      phone_number=valid_data['phone_number'],
-                                                                      hospital=hos,
-                                                                      permission_type=pem_type,
-                                                                      is_disabled=False,
-                                                                      super_user_permission=False,
-                                                                      write_permission=True,
-                                                                      created_by=request.user,
-                                                                      source_type=auth_models.GenericAdmin.APP,
-                                                                      entity_type=GenericAdminEntity.DOCTOR)
-                    create_admins.append(ad)
+                    if app_pem:
+                        create_admins.append(self.get_admin_obj(request, valid_data, doct, hos, user,
+                                                                auth_models.GenericAdmin.APPOINTMENT, GenericAdminEntity.DOCTOR))
+                    if bill_pem:
+                        create_admins.append(self.get_admin_obj(request, valid_data, doct, hos, user,
+                                                                auth_models.GenericAdmin.BILLINNG,
+                                                                GenericAdminEntity.DOCTOR))
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
-                user = None
-                if user_queryset:
-                    user = user_queryset
+                create_admins = []
+                if app_pem:
+                    create_admins.append(self.get_admin_obj(request, valid_data, doct, None, user,
+                                                            auth_models.GenericAdmin.APPOINTMENT,
+                                                            GenericAdminEntity.DOCTOR))
+                if bill_pem:
+                    create_admins.append(self.get_admin_obj(request, valid_data, doct, None, user,
+                                                            auth_models.GenericAdmin.BILLINNG,
+                                                            GenericAdminEntity.DOCTOR))
                 try:
-                    auth_models.GenericAdmin.objects.create(user=user, doctor=doct,
-                                                            name=valid_data.get('name', None),
-                                                            phone_number=valid_data['phone_number'],
-                                                            hospital=None,
-                                                            permission_type=pem_type,
-                                                            is_disabled=False,
-                                                            super_user_permission=False,
-                                                            write_permission=True,
-                                                            is_doc_admin=False,
-                                                            created_by=request.user,
-                                                            source_type=auth_models.GenericAdmin.APP,
-                                                            entity_type=GenericAdminEntity.DOCTOR)
+                    auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
-                    return Response({'error': 'something went wrong!'})
+                    return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
             hosp = Hospital.objects.get(id=valid_data['id'])
             name = valid_data.get('name',  None)
@@ -1741,49 +1745,37 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             if len(delete_queryset):
                 delete_queryset.delete()
 
-
             if valid_data.get('assoc_doc'):
                 create_admins = []
                 for doc in valid_data['assoc_doc']:
-                    user=None
-                    if user_queryset:
-                        user = user_queryset
-                    ad = auth_models.GenericAdmin.create_permission_object(user=user, doctor=doc,
-                                                                           name=name,
-                                                                           phone_number=valid_data['phone_number'], hospital=hosp,
-                                                                           permission_type=pem_type,
-                                                                           is_disabled=False,
-                                                                           super_user_permission=False,
-                                                                           write_permission=True,
-                                                                           created_by=request.user,
-                                                                           source_type=auth_models.GenericAdmin.APP,
-                                                                           entity_type=GenericAdminEntity.HOSPITAL)
-                    create_admins.append(ad)
+                    if app_pem:
+                        create_admins.append(self.get_admin_obj(request, valid_data, doc, hosp, user,
+                                                                auth_models.GenericAdmin.APPOINTMENT,
+                                                                GenericAdminEntity.HOSPITAL))
+                    if bill_pem:
+                        create_admins.append(self.get_admin_obj(request, valid_data, doc, hosp, user,
+                                                                auth_models.GenericAdmin.BILLINNG,
+                                                                GenericAdminEntity.HOSPITAL))
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
-                user = None
-                if user_queryset:
-                    user = user_queryset
-                auth_models.GenericAdmin.objects.create(user=user, doctor=None,
-                                                                   name=name,
-                                                                   phone_number=valid_data['phone_number'],
-                                                                   hospital=hosp,
-                                                                   permission_type=pem_type,
-                                                                   is_disabled=False,
-                                                                   super_user_permission=False,
-                                                                   write_permission=True,
-                                                                   created_by=request.user,
-                                                                   source_type=auth_models.GenericAdmin.APP,
-                                                                   entity_type=GenericAdminEntity.HOSPITAL)
+                create_admins = []
+                if app_pem:
+                    create_admins.append(self.get_admin_obj(request, valid_data, None, hosp, user,
+                                                            auth_models.GenericAdmin.APPOINTMENT,
+                                                            GenericAdminEntity.HOSPITAL))
+                if bill_pem:
+                    create_admins.append(self.get_admin_obj(request, valid_data, None, hosp, user,
+                                                            auth_models.GenericAdmin.BILLINNG,
+                                                            GenericAdminEntity.HOSPITAL))
+                try:
+                    auth_models.GenericAdmin.objects.bulk_create(create_admins)
+                except Exception as e:
+                    return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
-
             admin = auth_models.GenericLabAdmin.objects.filter(phone_number=phone_number, lab_id=valid_data.get('id'))
-            user = None
-            if user_queryset:
-                user = user_queryset
             if admin.exists():
                 admin.update(user=user, name=valid_data.get('name'), phone_number=valid_data.get('phone_number'))
         return Response({'success': 'Created Successfully'})
