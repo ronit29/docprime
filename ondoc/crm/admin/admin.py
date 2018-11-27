@@ -33,7 +33,7 @@ from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
 from .report import ReportAdmin
-from .coupon import CouponAdmin
+from .coupon import CouponAdmin, UserSpecificCouponAdmin
 from ondoc.reports import models as report_models
 from ondoc.authentication.models import GenericLabAdmin
 
@@ -128,7 +128,7 @@ admin.site.register(RatingsReview, RatingsReviewAdmin)
 admin.site.register(SitemapManger, SitemapManagerAdmin)
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
 admin.site.register(Coupon, CouponAdmin)
-admin.site.register(UserSpecificCoupon)
+admin.site.register(UserSpecificCoupon, UserSpecificCouponAdmin)
 admin.site.register(VisitReason, VisitReasonAdmin)
 admin.site.register(CancellationReason)
 admin.site.register(SeoSpecialization, SeoSpecializationAdmin)

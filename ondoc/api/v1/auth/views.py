@@ -17,6 +17,8 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
+
+from ondoc.coupon.models import UserSpecificCoupon
 from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
@@ -137,6 +139,7 @@ class UserViewset(GenericViewSet):
             user = User.objects.create(phone_number=data['phone_number'],
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
+            self.set_coupons(user)
 
         token_object = JWTAuthentication.generate_token(user)
 
@@ -150,6 +153,9 @@ class UserViewset(GenericViewSet):
             "expiration_time": token_object['payload']['exp']
         }
         return Response(response)
+
+    def set_coupons(self, user):
+        UserSpecificCoupon.objects.filter(phone_number=user.phone_number, user__isnull=True).update(user=user)
 
     @transaction.atomic
     def logout(self, request):

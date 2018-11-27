@@ -65,7 +65,7 @@ class UserSpecificCoupon(auth_model.TimeStampedModel):
 
     coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, null=False, related_name="user_specific_coupon")
     phone_number = models.CharField(max_length=10, blank=False, null=False)
-    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True)
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return self.coupon.code
