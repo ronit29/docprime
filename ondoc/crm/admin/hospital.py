@@ -9,7 +9,7 @@ from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
-from ondoc.authentication.models import GenericAdmin, User, QCModel
+from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber
 from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
 from django import forms
 
@@ -85,7 +85,7 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
             validate_unique = []
             phone_number = False
             for data in self.cleaned_data:
-                if data.get('phone_number') and data.get('permission_type') == GenericAdmin.APPOINTMENT:
+                if data.get('phone_number') and data.get('permission_type') in [GenericAdmin.APPOINTMENT, GenericAdmin.ALL]:
                     phone_number = True
                     # break
                 if not data.get('DELETE'):
@@ -116,6 +116,16 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
                 if row[1] is None and numbers.count(row[0]) > 1:
                     raise forms.ValidationError(
                         "Permissions for all doctors already allocated for %s." % (row[0]))
+        deleted_list = []
+        doc_num = DoctorNumber.objects.filter(hospital_id=self.instance.id)
+        doc_num_list = [(dn.phone_number, dn.doctor) for dn in doc_num.all()]
+        if doc_num.exists():
+            for data in self.deleted_forms:
+                del_tuple = (data.cleaned_data.get('phone_number'), data.cleaned_data.get('doctor'))
+                if del_tuple[0] not in dict(validate_unique) and (del_tuple in doc_num_list or
+                                                                  (del_tuple[1] is None and del_tuple[0] in dict(doc_num_list))):
+                    raise forms.ValidationError(
+                        "Doctor (%s) Mapping with this number needs to be deleted." % (dict(doc_num_list).get(del_tuple[0])))
 
 
 class GenericAdminInline(admin.TabularInline):
