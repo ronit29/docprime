@@ -488,24 +488,25 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.order_by("-order_priority", "distance")
         return queryset
 
-    def form_lab_whole_data(self, queryset, test_ids):
+    def form_lab_whole_data(self, queryset, test_ids=None):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
         labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
 
-        group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
-                "available_lab_tests",
-                queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
-                to_attr="selected_tests"
-            )).all()
+        if test_ids:
+            group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
+                    "available_lab_tests",
+                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    to_attr="selected_tests"
+                )).all()
 
-        labs = labs.prefetch_related(
-            Prefetch(
-                "lab_pricing_group",
-                queryset=group_queryset,
-                to_attr="selected_group"
+            labs = labs.prefetch_related(
+                Prefetch(
+                    "lab_pricing_group",
+                    queryset=group_queryset,
+                    to_attr="selected_group"
+                )
             )
-        )
         labs = labs.filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
@@ -514,13 +515,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         for obj in labs:
             temp_var[obj.id] = obj
             tests[obj.id] = list()
-            if obj.selected_group and obj.selected_group.selected_tests:
+            if test_ids and obj.selected_group and obj.selected_group.selected_tests:
                 for test in obj.selected_group.selected_tests:
                     if test.custom_deal_price:
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id":test.test_id, "name":test.test.name, "deal_price":deal_price, "mrp":test.mrp})
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
         day_now = timezone.now().weekday()
         days_array = [i for i in range(7)]
         rotated_days_array = days_array[day_now:] + days_array[:day_now]
@@ -573,7 +574,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row["lab_timing_data"] = lab_timing_data
             row["next_lab_timing"] = next_lab_timing_dict
             row["next_lab_timing_data"] = next_lab_timing_data_dict
-            row["tests"] = tests[row["id"]]
+            row["tests"] = tests.get(row["id"])
             resp_queryset.append(row)
 
         return resp_queryset
