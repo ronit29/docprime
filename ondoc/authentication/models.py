@@ -334,7 +334,6 @@ class UserProfile(TimeStampedModel):
     is_otp_verified = models.BooleanField(default=False)
     is_default_user = models.BooleanField(default=False)
     dob = models.DateField(blank=True, null=True)
-    is_insured = models.BooleanField(default=False)
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
 

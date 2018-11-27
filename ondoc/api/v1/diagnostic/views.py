@@ -6,6 +6,7 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      CommonDiagnosticCondition, CommonTest, CommonPackage)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
+from ondoc.insurance.models import UserInsurance
 from ondoc.notification.models import EmailNotification
 from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
@@ -843,9 +844,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
         return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
+        insurance_check, fail_message = UserInsurance.validate_insurance(appointment_details)
+
+        return insurance_check, fail_message
         # Check if appointment can be covered under insurance
         # also return a valid message
-        return False, 'Not covered under insurance'
+        # return False, 'Not covered under insurance'
 
     def is_insured_cod(self, app_details):
         return False

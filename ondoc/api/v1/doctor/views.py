@@ -5,6 +5,7 @@ from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.doctor.models import Hospital, DoctorClinic
+from ondoc.insurance.models import UserInsurance
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -380,9 +381,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
+        insurance_check, fail_message = UserInsurance.validate_insurance(appointment_details)
+
+        return insurance_check, fail_message
         # Check if appointment can be covered under insurance
         # also return a valid message         
-        return False, 'Not covered under insurance'
+        # return False, 'Not covered under insurance'
 
     def is_insured_cod(self, app_details):
         return False
