@@ -696,8 +696,10 @@ class LabAppointmentForm(forms.ModelForm):
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
 
-        if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
-            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+
+        # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
+        #     raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+
 
         if not cleaned_data.get('status') is LabAppointment.CANCELLED and (cleaned_data.get(
                 'cancellation_reason') or cleaned_data.get('cancellation_comments')):
@@ -939,7 +941,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
                 if dt_field:
                     obj.time_slot_start = dt_field
-            if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
+            if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.CANCELLED or \
+                int(request.POST['status']) == LabAppointment.COMPLETED):
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
