@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
-                                    InsurancePlanContent, InsuranceTransaction, UserInsurance)
+                                    InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent)
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
 from ondoc.account.models import (Order)
@@ -96,11 +96,12 @@ class InsuredMemberSerializer(serializers.Serializer):
     # insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
 
 
-# class InsuredMemberSerializer(serializers.ListSerializer):
-#
-#     class Meta:
-#         model = InsuredMembers
-#         exclude = ('created_at', 'updated_at')
+class InsuredMemberIdSerializer(serializers.Serializer):
+    id = serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all())
+
+
+class InsuranceDiseaseIdSerializer(serializers.Serializer):
+    id = serializers.PrimaryKeyRelatedField(queryset=InsuranceDisease.objects.all())
 
 
 class InsuranceTransactionSerializer(serializers.Serializer):
