@@ -2,7 +2,7 @@ from django.contrib import admin
 from django import forms
 from rest_framework import serializers
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
-from ondoc.insurance.models import InsurancePlanContent, InsurancePlans
+from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -27,13 +27,25 @@ class InsuranceThresholdAdmin(admin.ModelAdmin):
 
 # class InsuranceTransaction
 
+class InsuredMembersInline(admin.TabularInline):
+    model = InsuredMembers
+    fields = ('first_name', 'last_name', 'relation', 'dob', 'gender',)
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = False
+    readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
+
+
 class UserInsuranceAdmin(admin.ModelAdmin):
 
     def user_policy_number(self, obj):
-        return str(obj.insurance_transaction.policy_number)
+        return str(obj.policy_number)
 
     list_display = ['insurance_plan', 'user_policy_number', 'user']
-    readonly_fields = ['insurance_plan', 'user', 'user_policy_number']
+    fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount']
+    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',)
+    inlines = [InsuredMembersInline]
 
     def has_add_permission(self, request, obj=None):
         return False
