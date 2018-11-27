@@ -612,7 +612,7 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
             validate_unique = []
             for data in self.cleaned_data:
                 if not data.get('DELETE'):
-                    row = (data.get('phone_number'), data.get('hospital'))
+                    row = (data.get('phone_number'), data.get('hospital'), data.get('permission_type'))
                     if row in validate_unique:
                         raise forms.ValidationError("Duplicate Permission with this phone number exists.")
                     else:
@@ -620,7 +620,7 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
             if validate_unique:
                 numbers = list(zip(*validate_unique))[0]
                 for row in validate_unique:
-                    if row[1] is None and numbers.count(row[0]) > 1:
+                    if row[1] is None and numbers.count(row[0]) > 2:
                         raise forms.ValidationError(
                             "Permissions for all Hospitals already allocated for %s." % (row[0]))
 

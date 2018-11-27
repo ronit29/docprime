@@ -1435,6 +1435,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     auth_models.DoctorNumber.objects.create(phone_number=valid_data.get('phone_number'), doctor=valid_data.get('doc_profile'), hospital=hosp)
                 except Exception as e:
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            valid_data['name'] = name
             if valid_data.get('assoc_doc'):
                 create_admins = []
                 for doc in valid_data['assoc_doc']:
