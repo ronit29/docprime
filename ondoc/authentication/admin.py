@@ -43,7 +43,7 @@ class DoctorNumberForm(forms.ModelForm):
 
 class DoctorNumberAdmin(VersionAdmin):
     list_display = ('doctor', 'phone_number', 'updated_at')
-    search_fields = ['phone_number', 'doctor']
+    search_fields = ['phone_number', 'doctor__name']
     date_hierarchy = 'created_at'
     # form = DoctorNumberForm
     autocomplete_fields = ['doctor']
