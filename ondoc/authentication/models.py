@@ -1272,7 +1272,7 @@ class DoctorNumber(TimeStampedModel):
 
     class Meta:
         db_table = 'doctor_number'
-        unique_together = (("phone_number", "doctor", "hospital"), )
+        unique_together = (("doctor", "hospital"), )
 
     def __str__(self):
         return '{}-{}'.format(self.phone_number, self.doctor)
