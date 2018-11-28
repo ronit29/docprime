@@ -914,6 +914,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
+        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED):
+            raise Exception('Cancelled or Completed appointment cannot be saved')
 
         try:
             if (self.payment_type != OpdAppointment.INSURANCE and self.status == self.COMPLETED and
@@ -1388,7 +1390,8 @@ class LabReport(auth_model.TimeStampedModel):
 
 class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
     report = models.ForeignKey(LabReport, on_delete=models.SET_NULL, null=True, blank=True)
-    name = models.FileField(upload_to='lab_reports/', blank=False, null=False)
+    name = models.FileField(upload_to='lab_reports/', blank=False, null=False, validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
     def __str__(self):
         return "{}-{}".format(self.id, self.report.id)
