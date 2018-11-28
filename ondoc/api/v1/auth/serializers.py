@@ -411,11 +411,13 @@ class OrderDetailDoctorSerializer(serializers.Serializer):
         value = round(float(app_date_time.hour) + (float(app_date_time.minute)*1/60), 2)
         lab_obj = LabList()
         text = lab_obj.convert_time(value)
+        doc_deal_price, doc_mrp, doc_agreed_price = obj.get_doctor_prices()
+        doc_deal_price, doc_mrp = str(doc_deal_price), str(doc_mrp)
         data = {
-            'deal_price': obj.action_data.get("deal_price"),
+            'deal_price': doc_deal_price,
             'is_available': True,
             'effective_price': obj.action_data.get("effective_price"),
-            'mrp': obj.action_data.get("mrp"),
+            'mrp': doc_mrp,
             'value': value,
             'text': text
         }

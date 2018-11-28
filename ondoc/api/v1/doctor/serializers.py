@@ -23,6 +23,8 @@ import math
 import datetime
 import pytz
 from django.contrib.staticfiles.templatetags.staticfiles import static
+from django.contrib.gis.geos import Point
+from django.contrib.gis.measure import D
 import json
 import logging
 from dateutil import tz
@@ -344,7 +346,13 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     
     def get_enabled_for_online_booking(self, obj):
-        return obj.doctor_clinic.enabled_for_online_booking
+        enable_for_online_booking = False
+        if obj.doctor_clinic:
+            doctor_clinic = obj.doctor_clinic
+            if obj.doctor_clinic.hospital and obj.doctor_clinic.doctor:
+                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.doctor.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                   enable_for_online_booking = True
+        return enable_for_online_booking
 
     def get_lat(self, obj):
         if obj.doctor_clinic.hospital.location:
@@ -696,7 +704,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     hospitals = serializers.SerializerMethodField(read_only=True)
     procedures = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
-    enabled_for_online_booking = serializers.BooleanField(read_only=True)
+    enabled_for_online_booking = serializers.BooleanField()
     availability = None
     seo = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
@@ -716,6 +724,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         title = None
         locality = None
         sublocality = None
+        max_distance = 15000
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
 
         if clinics:
@@ -731,7 +740,6 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                     if entity_address.type_blueprint == 'SUBLOCALITY':
                         sublocality = entity_address.alternative_value
 
-
         if len(obj.doctorpracticespecializations.all())>0:
             dsp = [specialization.specialization for specialization in obj.doctorpracticespecializations.all()]
             top_specialization = DoctorPracticeSpecialization.objects.filter(specialization__in=dsp).values('specialization')\
@@ -741,11 +749,21 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 specialization = top_specialization.get('name')
                 specialization_id = top_specialization.get('specialization')
 
+                doctors = Doctor.objects.filter(
+                    doctorpracticespecializations__specialization=specialization_id,
+                    hospitals__location__dwithin=(Point(long, lat), D(m=max_distance)),
+                    is_live=True,
+                    is_test_doctor=False,
+                    is_internal=False,
+                    hospitals__is_live=True
+                )
+                result_count = doctors.values('id').distinct().count()
+
         if sublocality and locality and specialization:
             title = specialization + 's near ' + sublocality + ' ' + locality
 
-        if lat and long and specialization and title:
-            return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title}
+        if lat and long and top_specialization and title and result_count:
+            return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title, 'result_count':result_count}
         return None
 
     def get_display_rating_widget(self, obj):

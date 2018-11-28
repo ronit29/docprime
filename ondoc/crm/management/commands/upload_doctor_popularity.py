@@ -14,6 +14,7 @@ from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeS
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation,
                                  DoctorPopularity)
 from django.contrib.gis.geos import Point, GEOSGeometry
+from django.db import IntegrityError
 
 
 class Command(BaseCommand):
@@ -44,8 +45,12 @@ class UploadDoctor:
         all_data = []
         for i in range(2, len(rows) + 1):
             data = self.get_data(row=i, sheet=sheet, headers=headers)
-            all_data.append(DoctorPopularity(**data))
-        DoctorPopularity.objects.bulk_create(all_data)
+            try:
+                DoctorPopularity.objects.create(**data)
+            except IntegrityError:
+                print(data)
+        #     all_data.append(DoctorPopularity(**data))
+        # DoctorPopularity.objects.bulk_create(all_data)
 
     def get_data(self, row, sheet, headers):
         unique_identifier = self.clean_data(sheet.cell(row=row, column=headers.get('unique_identifier')).value)

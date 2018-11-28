@@ -23,7 +23,7 @@ from collections import defaultdict
 
 
 class DoctorSearchHelper:
-    MAX_DISTANCE = "20000"
+    MAX_DISTANCE = "15000"
 
     def __init__(self, query_params):
         self.query_params = query_params
@@ -122,8 +122,22 @@ class DoctorSearchHelper:
             params['current_hour'] = str(current_hour)
 
         if self.query_params.get("doctor_name"):
-            search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
+            name = self.query_params.get("doctor_name").lower().strip()
+            removals = ['doctor.','doctor ','dr.','dr ']
+            for rm in removals:
+                # if name.startswith(rm):
+                if name.startswith(rm):
+                    name = name[len(rm):].strip()
+                    break
+
+                # stripped = name.lstrip(rm)
+                # if len(stripped) != len(name):
+                #     name = stripped
+                #     break
+            search_key = re.findall(r'[a-z0-9A-Z.]+', name)
+            # search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
             search_key = " ".join(search_key).lower()
+
             search_key = "".join(search_key.split("."))
             filtering_params.append(
                 "d.search_key ilike (%(doctor_name)s)"
@@ -137,9 +151,12 @@ class DoctorSearchHelper:
                 "h.search_key ilike (%(hospital_name)s)")
             params['hospital_name'] = '%' + search_key + '%'
 
-        if not filtering_params:
-            return "1=1"
         result = {}
+        if not filtering_params:
+            result['string'] = "1=1"
+            result['params'] = params
+            return result
+
         result['string'] = " and ".join(filtering_params)
         result['params'] = params
         if len(procedure_ids) > 0:
@@ -386,11 +403,17 @@ class DoctorSearchHelper:
                                                                         other_procedures_list)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
 
+                enable_online_booking = False
+                if doctor_clinic and doctor and doctor_clinic.hospital:
+                    if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                        enable_online_booking = True
+
                 is_insurance_covered = False
                 if doctor.is_insurance_enabled and min_price["mrp"] <= insurance_threshold_amount:
                     is_insurance_covered = True
 
                 hospitals = [{
+                    "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
                     "insurance_threshold_amount": insurance_threshold_amount,
                     "is_user_insured": is_user_isured,
