@@ -619,6 +619,35 @@ class ParameterLabTest(TimeStampedModel):
         return "{}".format(self.parameter.name)
 
 
+class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
+    name = models.CharField(max_length=500, unique=True)
+    preferred_lab_test = models.ForeignKey('LabTest', on_delete=models.SET_NULL,
+                                            related_name='preferred_in_lab_test_category', null=True, blank=True)
+    is_live = models.BooleanField(default=False)
+    is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "lab_test_category"
+
+
+class LabTestCategoryMapping(models.Model):
+    lab_test = models.ForeignKey('LabTest', on_delete=models.CASCADE,
+                                 related_name='parent_lab_test_category_mappings')
+    parent_category = models.ForeignKey(LabTestCategory, on_delete=models.CASCADE,
+                                 related_name='lab_test_mappings')
+    is_primary = models.BooleanField(default=False)
+
+    def __str__(self):
+        return '({}){}'.format(self.lab_test, self.parent_category)
+
+    class Meta:
+        db_table = "lab_test_to_category_mapping"
+        unique_together = (('lab_test', 'parent_category'),)
+
+
 class LabTest(TimeStampedModel, SearchKey):
     RADIOLOGY = 1
     PATHOLOGY = 2
@@ -654,6 +683,10 @@ class LabTest(TimeStampedModel, SearchKey):
     report_schedule = models.CharField(max_length=150, default='After 2 days of test.', verbose_name='What is the report schedule for the test?')
     enable_for_ppc = models.BooleanField(default=False)
     enable_for_retail = models.BooleanField(default=False)
+    categories = models.ManyToManyField(LabTestCategory,
+                                        through=LabTestCategoryMapping,
+                                        through_fields=('lab_test', 'parent_category'),
+                                        related_name='lab_tests')
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,

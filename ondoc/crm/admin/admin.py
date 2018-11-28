@@ -8,9 +8,10 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  DoctorClinic, DoctorMapping, DoctorImage, OpdAppointment, CompetitorInfo,
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization,
                                  VisitReason, CancellationReason, PracticeSpecializationContent)
-from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
-                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
-                                     TestParameter, CommonPackage)
+from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
+                                     AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
+                                     LabPricingGroup,
+                                     TestParameter, CommonPackage, LabTestCategory)
 from ondoc.coupon.models import Coupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount
@@ -28,7 +29,7 @@ from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
-    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin
+    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -98,6 +99,8 @@ admin.site.register(LabTest, LabTestAdmin)
 admin.site.register(LabTestType, LabTestTypeAdmin)
 #admin.site.register(LabTestSubType, LabSubTestTypeAdmin)
 admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
+admin.site.register(LabTestCategory, LabTestCategoryAdmin)
+
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
 admin.site.register(Cities, CitiesAdmin)
