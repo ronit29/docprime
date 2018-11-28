@@ -1286,29 +1286,39 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     def list(self, request):
         user = request.user
 
-        queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter(Q(user=user,
-                                                 is_disabled=False,
-                                                 permission_type__in=[GenericAdmin.BILLINNG, GenericAdmin.ALL],
-                                                 write_permission=True
-                                                 ),
-                                               (
-                                                 Q(Q(entity_type=GenericAdminEntity.DOCTOR,
-                                                   doctor__doctor_clinics__hospital__is_billing_enabled=False),
-                                                   (Q(hospital__isnull=False, doctor__doctor_clinics__hospital=F('hospital'))
-                                                    |
-                                                    Q(hospital__isnull=True)
-                                                    )
-                                                  )
-                                                 |
-                                                 Q(
-                                                     Q(entity_type=GenericAdminEntity.HOSPITAL),
-                                                     (Q(doctor__isnull=False,
-                                                        hospital__hospital_doctors__doctor=F('doctor'))
-                                                      |
-                                                      Q(doctor__isnull=True)
+        queryset = GenericAdmin.objects.select_related('doctor', 'hospital')\
+                                       .filter(Q
+                                                  (Q(user=user,
+                                                     is_disabled=False,
+                                                     permission_type__in=[GenericAdmin.BILLINNG, GenericAdmin.ALL],
+                                                     write_permission=True
+                                                     ),
+                                                   (
+                                                     Q(Q(entity_type=GenericAdminEntity.DOCTOR,
+                                                       doctor__doctor_clinics__hospital__is_billing_enabled=False),
+                                                       (Q(hospital__isnull=False, doctor__doctor_clinics__hospital=F('hospital'))
+                                                        |
+                                                        Q(hospital__isnull=True)
+                                                        )
                                                       )
-                                                  )
-                                               ))\
+                                                     |
+                                                     Q(
+                                                         Q(entity_type=GenericAdminEntity.HOSPITAL),
+                                                         (Q(doctor__isnull=False,
+                                                            hospital__hospital_doctors__doctor=F('doctor'))
+                                                          |
+                                                          Q(doctor__isnull=True)
+                                                          )
+                                                      )
+                                                   )
+                                                )
+                                                |
+                                                Q(
+                                                    is_disabled=False,
+                                                    super_user_permission=True,
+                                                    user=user
+                                                )
+                                               )\
                                         .annotate(doctor_ids=F('hospital__hospital_doctors__doctor'),
                                                   doctor_names=F('hospital__hospital_doctors__doctor__name'),
                                                   hospital_name=F('hospital__name'),
