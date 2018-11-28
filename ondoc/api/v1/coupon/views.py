@@ -111,8 +111,6 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                                "network_id": coupon.lab_network.id if coupon.lab_network else None,
                                                "tnc": coupon.tnc})
 
-
-        # sort coupons on discount granted
         if applicable_coupons:
             def compare_coupon(coupon):
                 obj = CouponsMixin()
@@ -120,12 +118,24 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 deal_price = deal_price if deal_price is not None else sys.maxsize
                 discount = obj.get_discount(coupon["coupon"], deal_price)
                 return ( 1 if coupon["is_corporate"] else 0 , discount )
+
+            def filter_coupon(coupon):
+                obj = CouponsMixin()
+                deal_price = input_data.get("deal_price", None)
+                if deal_price:
+                    discount = obj.get_discount(coupon["coupon"], deal_price)
+                    return discount > 0
+                return True
+
+            # sort coupons on discount granted
             applicable_coupons = sorted(applicable_coupons, key=compare_coupon, reverse=True)
+            # filter if no discount is offered
+            applicable_coupons = list(filter(filter_coupon, applicable_coupons))
 
         def remove_coupon_data(c):
             c.pop('coupon')
             return c
-        applicable_coupons = list(map(remove_coupon_data ,applicable_coupons))
+        applicable_coupons = list(map(remove_coupon_data, applicable_coupons))
 
         return Response(applicable_coupons)
 
