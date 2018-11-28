@@ -71,6 +71,13 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         else:
             coupons_data = coupons_data.order_by("is_corporate")
 
+        # check if request is made to fetch a specific coupon, if not only return visible coupons
+        coupon_code = input_data.get("coupon_code", None)
+        if coupon_code:
+            coupons_data = coupons_data.filter(code__iexact=coupon_code)
+        else:
+            coupons_data = coupons_data.filter(is_visible=True)
+
 
         applicable_coupons = []
         for coupon in coupons_data:

@@ -25,6 +25,7 @@ class Coupon(auth_model.TimeStampedModel):
     show_price = models.BooleanField(default=True)
     is_user_specific = models.BooleanField(default=False)
     is_corporate = models.BooleanField(default=False)
+    is_visible = models.BooleanField(default=True)
 
     def save(self, *args, **kwargs):
         if self.percentage_discount == 100:

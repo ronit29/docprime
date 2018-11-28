@@ -15,6 +15,7 @@ class ProductIDSerializer(serializers.Serializer):
     lab_id = serializers.PrimaryKeyRelatedField(required=False, queryset=Lab.objects.filter(is_live=True))
     test_ids = CommaSepratedToListField(required=False)
     deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    coupon_code = serializers.CharField(required=False)
 
 class CouponListSerializer(serializers.Serializer):
 
