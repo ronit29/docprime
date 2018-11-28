@@ -47,11 +47,11 @@ class Command(BaseCommand):
         specialization = UploadSpecialization()
 
         #doctor.p_image(sheets[0], source, batch)
-        # doctor.upload(sheets[0], source, batch, lines)
-        # qualification.upload(sheets[1], lines)
-        # experience.upload(sheets[2], lines)
-        # membership.upload(sheets[3], lines)
-        # award.upload(sheets[4], lines)
+        doctor.upload(sheets[0], source, batch, lines)
+        qualification.upload(sheets[1], lines)
+        experience.upload(sheets[2], lines)
+        membership.upload(sheets[3], lines)
+        award.upload(sheets[4], lines)
         hospital.upload(sheets[5], source, batch, lines)
         specialization.upload(sheets[6], lines)
 
