@@ -288,7 +288,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                            context={"lab": lab_obj})
         # for Demo
         demo_lab_test = AvailableLabTest.objects.filter(lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).prefetch_related('test')[:10]
-        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
+        lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj, "request": request})
         day_now = timezone.now().weekday()
         timing_queryset = list()
         lab_serializable_data = list()

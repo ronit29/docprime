@@ -271,6 +271,31 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
+    insurance = serializers.SerializerMethodField()
+
+    def get_insurance(self, obj):
+        request = self.context.get("request")
+        resp = {
+            'is_insurance_covered': False,
+            'insurance_threshold_amount': 0,
+            'is_user_insured': False
+        }
+        if request:
+            logged_in_user = request.user
+            if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+                user_insurance = logged_in_user.purchased_insurance.filter().first()
+                if user_insurance:
+                    insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                    if insurance_threshold:
+                        resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                            insurance_threshold.lab_amount_limit
+                        resp['is_user_insured'] = True
+
+            lab = obj.lab
+            if lab and lab.is_insurance_enabled and obj.mrp <= resp['insurance_threshold_amount']:
+                resp['is_insurance_covered'] = True
+
+        return resp
 
     def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
@@ -290,7 +315,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AvailableLabTest
-        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled')
+        fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled', 'insurance')
 
 
 class LabCustomSerializer(serializers.Serializer):
@@ -305,28 +330,32 @@ class LabCustomSerializer(serializers.Serializer):
     next_lab_timing = serializers.DictField()
     next_lab_timing_data = serializers.DictField()
     pickup_charges = serializers.IntegerField(default=None)
-    # insurance = serializers.SerializerMethodField()
-    #
-    # def get_insurance(self, obj):
-    #     request = self.context.get("request")
-    #     resp = {
-    #         'is_insurance_covered': False,
-    #         'insurance_threshold_amount': 0,
-    #         'is_user_insured': False
-    #     }
-    #     if request:
-    #         logged_in_user = request.user
-    #         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-    #             user_insurance = logged_in_user.purchased_insurance.filter().first()
-    #             if user_insurance:
-    #                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-    #                 if insurance_threshold:
-    #                     resp['insurance_threshold_amount'] = insurance_threshold.lab_amount_limit
-    #                     resp['is_user_insured'] = True
-    #
-    #
-    #     return resp
+    insurance = serializers.SerializerMethodField()
     distance_related_charges = serializers.IntegerField()
+
+    def get_insurance(self, obj):
+        request = self.context.get("request")
+        resp = {
+            'is_insurance_covered': False,
+            'insurance_threshold_amount': 0,
+            'is_user_insured': False
+        }
+        if request:
+            logged_in_user = request.user
+            if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+                user_insurance = logged_in_user.purchased_insurance.filter().first()
+                if user_insurance:
+                    insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                    if insurance_threshold:
+                        resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                            insurance_threshold.lab_amount_limit
+                        resp['is_user_insured'] = True
+
+            lab = obj.get('lab', None)
+            if lab and lab.is_insurance_enabled and obj.get('mrp', 0) <= resp['insurance_threshold_amount']:
+                resp['is_insurance_covered'] = True
+
+        return resp
 
 
     # def get_lab(self, obj):

@@ -341,7 +341,8 @@ class DoctorSearchHelper:
             if user_insurance:
                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                 if insurance_threshold:
-                    insurance_threshold_amount = insurance_threshold.opd_amount_limit
+                    insurance_threshold_amount = 0 if insurance_threshold.opd_amount_limit is None else \
+                        insurance_threshold.opd_amount_limit
                     is_user_isured = True
 
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
