@@ -1,6 +1,6 @@
 from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
-    ProcedureSerializer, DoctorClinicProcedureSerializer
+    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
@@ -12,7 +12,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
-    get_selected_and_other_procedures
+    get_selected_and_other_procedures, CommonProcedure
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
@@ -878,8 +878,12 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(procedure_category__is_live=True).all().order_by("priority")[:10]
         common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories, many=True)
 
+        common_procedures = CommonProcedure.objects.select_related('procedure').filter(procedure__is_enabled=True).all().order_by("priority")[:10]
+        common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
+
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
-                         "procedure_categories": common_procedure_categories_serializer.data})
+                         "procedure_categories": common_procedure_categories_serializer.data,
+                         "procedures": common_procedures_serializer.data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
