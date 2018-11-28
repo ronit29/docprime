@@ -346,6 +346,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp['message'] = insurance_fail_message
             return resp
 
+        else:
+            appointment_details['insurance'] = None
+
         appointment_action_data = copy.deepcopy(appointment_details)
         appointment_action_data = opdappointment_transform(appointment_action_data)
 

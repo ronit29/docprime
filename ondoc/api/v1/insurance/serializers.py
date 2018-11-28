@@ -47,7 +47,7 @@ class InsurancePlansSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InsurancePlans
-        fields = ('id', 'name', 'amount', 'threshold', 'content')
+        fields = ('id', 'name', 'amount', 'threshold', 'content', 'adult_count', 'child_count')
         #fields = '__all__'
 
 class InsurerSerializer(serializers.ModelSerializer):
