@@ -498,7 +498,7 @@ class CouponsMixin(object):
             elif isinstance(self, LabAppointment) and coupon_obj.type not in [Coupon.LAB, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
 
-            if (timezone.now() - max(coupon_obj.created_at, user.date_joined)).days > coupon_obj.validity:
+            if (timezone.now() - coupon_obj.created_at).days > coupon_obj.validity:
                 return {"is_valid": False, "used_count": None}
 
             allowed_coupon_count = coupon_obj.count
@@ -511,7 +511,7 @@ class CouponsMixin(object):
             count = coupon_obj.used_coupon_count(user)
             total_used_count = coupon_obj.total_used_coupon_count()
 
-            if count < allowed_coupon_count and ( not coupon_obj.total_count or ( total_used_count < coupon_obj.total_count ) ):
+            if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:
                 return {"is_valid": False, "used_count": count}

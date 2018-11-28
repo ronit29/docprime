@@ -45,7 +45,7 @@ class Coupon(auth_model.TimeStampedModel):
                                                                OpdAppointment.RESCHEDULED_PATIENT,
                                                                OpdAppointment.ACCEPTED,
                                                                OpdAppointment.COMPLETED],
-                                                   coupon__code=self).count()
+                                                   coupon=self).count()
         if str(self.type) == str(self.LAB) or str(self.type) == str(self.ALL):
             count += LabAppointment.objects.filter(user=user,
                                                    status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
@@ -53,7 +53,7 @@ class Coupon(auth_model.TimeStampedModel):
                                                                LabAppointment.RESCHEDULED_PATIENT,
                                                                LabAppointment.ACCEPTED,
                                                                LabAppointment.COMPLETED],
-                                                   coupon__code=self).count()
+                                                   coupon=self).count()
         return count
 
     def total_used_coupon_count(self):
@@ -67,14 +67,14 @@ class Coupon(auth_model.TimeStampedModel):
                                                                OpdAppointment.RESCHEDULED_PATIENT,
                                                                OpdAppointment.ACCEPTED,
                                                                OpdAppointment.COMPLETED],
-                                                   coupon__code=self).count()
+                                                   coupon=self).count()
         if str(self.type) == str(self.LAB) or str(self.type) == str(self.ALL):
             count += LabAppointment.objects.filter(status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
                                                                LabAppointment.RESCHEDULED_LAB,
                                                                LabAppointment.RESCHEDULED_PATIENT,
                                                                LabAppointment.ACCEPTED,
                                                                LabAppointment.COMPLETED],
-                                                   coupon__code=self).count()
+                                                   coupon=self).count()
         return count
 
     def __str__(self):

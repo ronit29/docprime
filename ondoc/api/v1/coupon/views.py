@@ -19,6 +19,7 @@ from . import serializers
 from django.conf import settings
 import requests, re, json
 import sys
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -56,17 +57,21 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                           total_lab_used_count = Count('lab_appointment_coupon', filter=(~Q(lab_appointment_coupon__status__in=[LabAppointment.CANCELLED])), distinct=True))\
                 .filter(coupon_qs).prefetch_related('lab_appointment_coupon', 'opd_appointment_coupon', 'test')
         else:
-            coupons_data = Coupon.objects.filter(coupon_qs)
+            coupons_data = Coupon.objects \
+                .select_related('lab_network') \
+                .annotate(total_opd_used_count=Count('opd_appointment_coupon', filter=(~Q(opd_appointment_coupon__status__in=[OpdAppointment.CANCELLED])), distinct=True),
+                          total_lab_used_count=Count('lab_appointment_coupon', filter=(~Q(lab_appointment_coupon__status__in=[LabAppointment.CANCELLED])), distinct=True)) \
+                .filter(coupon_qs).prefetch_related('lab_appointment_coupon', 'opd_appointment_coupon')
 
-        if product_id and product_id == Order.LAB_PRODUCT_ID and lab:
-            lab_qs = Q(lab=lab)
+
+        if product_id and product_id == Order.LAB_PRODUCT_ID:
+            if lab:
+                lab_qs = Q(lab=lab) | Q(lab_network=lab.network, lab__isnull=True) | Q(lab__isnull=True, lab_network__isnull=True)
+                coupons_data = coupons_data.filter(lab_qs)
+
             if test_ids:
-                lab_qs = lab_qs & (Q(test__in=test_ids, lab=lab) | Q(test__isnull=True, lab=lab)) | (Q(lab_network=lab.network, lab__isnull=True, test__in=test_ids))
-
-            lab_qs = lab_qs |   Q(lab_network=lab.network, lab=lab) | \
-                                Q(lab_network=lab.network, lab__isnull=True, test__isnull=True) | \
-                                Q(lab__isnull=True, lab_network__isnull=True)
-            coupons_data = coupons_data.filter(lab_qs)
+                test_qs = Q(test__in=test_ids) | Q(test__isnull=True)
+                coupons_data = coupons_data.filter(test_qs)
 
         if product_id:
             coupons_data = coupons_data.filter(is_corporate=False)
@@ -91,19 +96,20 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             if hasattr(coupon, "total_opd_used_count") and hasattr(coupon, "total_lab_used_count"):
                 total_used_count = coupon.total_opd_used_count + coupon.total_lab_used_count
 
-            if used_count < coupon.count and ( not coupon.total_count or ( total_used_count < coupon.total_count ) ):
-                applicable_coupons.append({"coupon_type": coupon.type,
-                                           "coupon_id": coupon.id,
-                                           "code": coupon.code,
-                                           "desc": coupon.description,
-                                           "coupon_count": coupon.count,
-                                           "used_count": used_count,
-                                           "coupon": coupon,
-                                           "heading": coupon.heading,
-                                           "is_corporate" : coupon.is_corporate,
-                                           "tests": [ test.id for test in coupon.test.all() ],
-                                           "network_id": coupon.lab_network.id if coupon.lab_network else None,
-                                           "tnc": coupon.tnc})
+            if (coupon.count is None or used_count < coupon.count) and (coupon.total_count is None or total_used_count < coupon.total_count):
+                if (timezone.now() - coupon.created_at).days <= coupon.validity:
+                    applicable_coupons.append({"coupon_type": coupon.type,
+                                               "coupon_id": coupon.id,
+                                               "code": coupon.code,
+                                               "desc": coupon.description,
+                                               "coupon_count": coupon.count,
+                                               "used_count": used_count,
+                                               "coupon": coupon,
+                                               "heading": coupon.heading,
+                                               "is_corporate" : coupon.is_corporate,
+                                               "tests": [ test.id for test in coupon.test.all() ],
+                                               "network_id": coupon.lab_network.id if coupon.lab_network else None,
+                                               "tnc": coupon.tnc})
 
 
         # sort coupons on discount granted
