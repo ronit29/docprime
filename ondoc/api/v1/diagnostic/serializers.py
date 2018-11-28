@@ -501,7 +501,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     address = serializers.JSONField(required=False)
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all())
+    insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):

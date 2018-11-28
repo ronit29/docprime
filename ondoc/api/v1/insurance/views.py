@@ -295,15 +295,17 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
         user_id = request.user.pk
         resp = {}
         if user_id:
+
             user = User.objects.get(id=user_id)
-            user_insurance = UserInsurance.objects.filter(user=user).values('insured_members',
-                                                                            'purchase_date',
-                                                                            'expiry_date',
-                                                                            'policy_number',
-                                                                            insurer_name=F('insurer__name'),
-                                                                            insurance_amount=F('insurance_transaction__amount'),
-                                                                            )
-            resp['profile'] = user_insurance[0]
+            user_insurance = UserInsurance.objects.get(user=user)
+            insurer = user_insurance.insurance_plan.insurer
+            resp['insured_members'] = user_insurance.members.all().values('first_name', 'last_name', 'dob')
+            resp['purchase_date'] = user_insurance.purchase_date
+            resp['expiry_date'] = user_insurance.expiry_date
+            resp['policy_number'] = user_insurance.policy_number
+            resp['insurer_name'] = insurer.name
+            resp['insurer_img'] = str(insurer.logo)
+            resp['premium_amount'] = user_insurance.premium_amount
         else:
             return Response({"message": "User is not valid"},
                             status.HTTP_404_NOT_FOUND)
