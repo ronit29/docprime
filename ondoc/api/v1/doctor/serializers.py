@@ -397,7 +397,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                             insurance_threshold.opd_amount_limit
                         resp['is_user_insured'] = True
 
-            if obj.doctor_clinic.doctor.is_insurance_enabled and obj.mrp <= resp['insurance_threshold_amount']:
+            if obj.mrp <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp
@@ -661,6 +661,7 @@ class DoctorListSerializer(serializers.Serializer):
     hospital_name = serializers.CharField(required=False)
     max_distance = serializers.IntegerField(required=False, allow_null=True)
     min_distance = serializers.IntegerField(required=False, allow_null=True)
+    is_insurance = serializers.BooleanField(required=False)
 
     def validate_procedure_ids(self, attrs):
         try:

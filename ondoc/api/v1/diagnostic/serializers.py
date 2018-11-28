@@ -292,7 +292,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
                         resp['is_user_insured'] = True
 
             lab = obj.lab
-            if lab and lab.is_insurance_enabled and obj.mrp <= resp['insurance_threshold_amount']:
+            if lab and obj.mrp <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp
@@ -353,7 +353,7 @@ class LabCustomSerializer(serializers.Serializer):
                         resp['is_user_insured'] = True
 
             lab = obj.get('lab', None)
-            if lab and lab.is_insurance_enabled and obj.get('mrp', 0) <= resp['insurance_threshold_amount']:
+            if lab and obj.get('mrp', 0) <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp
