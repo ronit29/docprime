@@ -42,11 +42,14 @@ class DoctorNumberForm(forms.ModelForm):
 
 
 class DoctorNumberAdmin(VersionAdmin):
-    list_display = ('doctor', 'phone_number', 'updated_at')
-    search_fields = ['phone_number', 'doctor__name']
+    list_display = ('phone_number', 'doctor', 'hospital', 'updated_at')
+    search_fields = ['phone_number', 'doctor__name', 'hospital__name']
     date_hierarchy = 'created_at'
     # form = DoctorNumberForm
     autocomplete_fields = ['doctor']
+    list_display_links = None
 
+    def has_add_permission(self, request, obj=None):
+        return False
 
 admin.site.register(DoctorNumber, DoctorNumberAdmin)
