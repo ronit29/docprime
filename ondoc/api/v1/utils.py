@@ -504,15 +504,14 @@ class CouponsMixin(object):
             allowed_coupon_count = coupon_obj.count
 
             if coupon_obj.is_user_specific:
-                user_specific_coupon = coupon_obj.user_specific_coupon.filter(user=user)
+                user_specific_coupon = coupon_obj.user_specific_coupon.filter(user=user).exists()
                 if not user_specific_coupon:
                     return {"is_valid": False, "used_count": None}
-                else:
-                    allowed_coupon_count = coupon_obj.count
 
             count = coupon_obj.used_coupon_count(user)
+            total_used_count = coupon_obj.total_used_coupon_count()
 
-            if count < allowed_coupon_count:
+            if count < allowed_coupon_count and ( not coupon_obj.total_count or ( total_used_count < coupon_obj.total_count ) ):
                 return {"is_valid": True, "used_count": count}
             else:
                 return {"is_valid": False, "used_count": count}

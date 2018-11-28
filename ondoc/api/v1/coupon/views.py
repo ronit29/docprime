@@ -50,8 +50,10 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
             coupons_data = Coupon.objects\
                 .select_related('lab_network')\
-                .annotate(opd_used_count=Count('opd_appointment_coupon', filter=(Q(opd_appointment_coupon__user=user) & ~Q(opd_appointment_coupon__status__in=[OpdAppointment.CANCELLED])), distinct=True),
-                          lab_used_count=Count('lab_appointment_coupon', filter=(Q(lab_appointment_coupon__user=user) & ~Q(lab_appointment_coupon__status__in=[LabAppointment.CANCELLED])), distinct=True))\
+                .annotate(opd_used_count= Count('opd_appointment_coupon', filter=(Q(opd_appointment_coupon__user=user) & ~Q(opd_appointment_coupon__status__in=[OpdAppointment.CANCELLED])), distinct=True),
+                          lab_used_count= Count('lab_appointment_coupon', filter=(Q(lab_appointment_coupon__user=user) & ~Q(lab_appointment_coupon__status__in=[LabAppointment.CANCELLED])), distinct=True),
+                          total_opd_used_count = Count('opd_appointment_coupon', filter=(~Q(opd_appointment_coupon__status__in=[OpdAppointment.CANCELLED])), distinct=True),
+                          total_lab_used_count = Count('lab_appointment_coupon', filter=(~Q(lab_appointment_coupon__status__in=[LabAppointment.CANCELLED])), distinct=True))\
                 .filter(coupon_qs).prefetch_related('lab_appointment_coupon', 'opd_appointment_coupon', 'test')
         else:
             coupons_data = Coupon.objects.filter(coupon_qs)
@@ -82,10 +84,14 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         applicable_coupons = []
         for coupon in coupons_data:
             used_count = 0
+            total_used_count = 0
             if hasattr(coupon, "opd_used_count") and hasattr(coupon, "lab_used_count"):
                 used_count = coupon.opd_used_count + coupon.lab_used_count
 
-            if used_count < coupon.count:
+            if hasattr(coupon, "total_opd_used_count") and hasattr(coupon, "total_lab_used_count"):
+                total_used_count = coupon.total_opd_used_count + coupon.total_lab_used_count
+
+            if used_count < coupon.count and ( not coupon.total_count or ( total_used_count < coupon.total_count ) ):
                 applicable_coupons.append({"coupon_type": coupon.type,
                                            "coupon_id": coupon.id,
                                            "code": coupon.code,
