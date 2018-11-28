@@ -418,14 +418,11 @@ class DoctorSearchHelper:
                                                                         other_procedures_list)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
 
+
                 enable_online_booking = False
                 if doctor_clinic and doctor and doctor_clinic.hospital:
                     if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
                         enable_online_booking = True
-
-                is_insurance_covered = False
-                if doctor.is_insurance_enabled and min_price["mrp"] <= insurance_threshold_amount:
-                    is_insurance_covered = True
 
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
