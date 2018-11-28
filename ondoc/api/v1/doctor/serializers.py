@@ -385,7 +385,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 if user_insurance:
                     insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                     if insurance_threshold:
-                        resp['insurance_threshold_amount'] = insurance_threshold.opd_amount_limit
+                        resp['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
+                            insurance_threshold.opd_amount_limit
                         resp['is_user_insured'] = True
 
             if obj.doctor_clinic.doctor.is_insurance_enabled and obj.mrp <= resp['insurance_threshold_amount']:
