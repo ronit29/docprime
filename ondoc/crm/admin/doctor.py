@@ -51,6 +51,7 @@ import nested_admin
 from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
 from django import forms
+from decimal import Decimal
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -59,7 +60,7 @@ class AutoComplete:
 
 class ReadOnlyInline(nested_admin.NestedTabularInline):
     def get_readonly_fields(self, request, obj=None):
-        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             all_fields = [f for f in self.model._meta.get_fields()
                           if f.concrete and (
                                   not f.is_relation
@@ -530,7 +531,7 @@ class DoctorForm(FormCleanMixin):
         qc_required = {'name': 'req', 'gender': 'req',
                        # 'practicing_since': 'req',
                        'emails': 'count',
-                       'qualifications': 'count', 'doctor_clinics': 'count', 'languages': 'count',
+                       'doctor_clinics': 'count', 'languages': 'count',
                        'doctorpracticespecializations': 'count'}
 
         # Q(hospital__is_billing_enabled=False, doctor=self.instance) &&
@@ -568,9 +569,10 @@ class CityFilter(SimpleListFilter):
     parameter_name = 'hospitals__city'
 
     def lookups(self, request, model_admin):
-        cities = set(
-            [(c['hospitals__city'].upper(), c['hospitals__city'].upper()) if (c.get('hospitals__city')) else ('', '')
-             for c in Doctor.objects.all().values('hospitals__city')])
+        cities = Hospital.objects.distinct('city').values_list('city','city')
+        # cities = set(
+        #     [(c['hospitals__city'].upper(), c['hospitals__city'].upper()) if (c.get('hospitals__city')) else ('', '')
+        #      for c in Doctor.objects.all().values('hospitals__city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -637,16 +639,22 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
 
-    def get_formset(self, request, obj=None, **kwargs):
-        formset = super().get_formset(request, obj=obj, **kwargs)
-        if not request.POST:
-            if obj is not None:
-                try:
-                    formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
-                        assoc_doctors=obj).distinct()
-                except MultipleObjectsReturned:
-                    pass
-        return formset
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "hospital":
+            doctor_id = request.resolver_match.kwargs.get('object_id')
+            kwargs["queryset"] = Hospital.objects.filter(assoc_doctors=doctor_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    # def get_formset(self, request, obj=None, **kwargs):
+    #     formset = super().get_formset(request, obj=obj, **kwargs)
+    #     if not request.POST:
+    #         if obj is not None:
+    #             try:
+    #                 formset.form.base_fields['hospital'].queryset = Hospital.objects.filter(
+    #                     assoc_doctors=obj).distinct()
+    #             except MultipleObjectsReturned:
+    #                 pass
+    #     return formset
 
 
 
@@ -862,10 +870,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         CompetitorMonthlyVisitsInline,
         DoctorMobileInline,
         DoctorEmailInline,
-        #ProcedureInline,
         DoctorPracticeSpecializationInline,
         DoctorQualificationInline,
-        # DoctorHospitalInline,
         DoctorClinicInline,
         DoctorLanguageInline,
         DoctorAwardInline,
@@ -893,7 +899,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             qs = qs.filter(source='pr')
             if request.path.endswith('doctor/'):
                 qs = Doctor.objects.none()
@@ -904,19 +910,19 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         exclude = ['source', 'user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code', 'search_key', 'live_at',
                'onboarded_at', 'qc_approved_at','enabled_for_online_booking_at']
 
-        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             exclude += ['source', 'batch', 'lead_url', 'registered', 'created_by', 'about', 'raw_about',
             'additional_details', 'is_insurance_enabled', 'is_insurance_enabled', 'is_online_consultation_enabled',
             'online_consultation_fees', 'is_retail_enabled', 'is_internal', 'is_test_doctor', 'doctor_signature',
-            'is_enabled', 'matrix_reference_id', 'doctor_signature']
+            'is_enabled', 'matrix_reference_id', 'doctor_signature','enabled_for_online_booking']
 
         return exclude
 
     def get_readonly_fields(self, request, obj=None):
-        read_only_fields = ['is_gold','source', 'lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'enabled_for_online_booking', 'onboarding_url', 'get_onboard_link']
-        if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
+        read_only_fields = ['is_gold','source', 'lead_url', 'registered', 'matrix_lead_id', 'matrix_reference_id', 'about', 'is_live', 'onboarding_url', 'get_onboard_link']
+        if not request.user.is_member_of(constants['SUPER_QC_GROUP']) and not request.user.is_superuser:
             read_only_fields += ['onboarding_status']
-        if request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             read_only_fields += ['name', 'gender', 'practicing_since',  'license', 'additional_details',
                                  'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
                                  'online_consultation_fees', 'live_at', 'is_internal',
@@ -1003,13 +1009,13 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         return ""
 
     def get_form(self, request, obj=None, **kwargs):
-        if not request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
             kwargs['form'] = DoctorForm
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
-        if (not request.user.is_superuser) and (
-                (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists() and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists())):
+        if not request.user.is_superuser and\
+            (not request.user.is_member_of(constants['QC_GROUP_NAME']) and not request.user.is_member_of(constants['SUPER_QC_GROUP']) ):
             form.base_fields['assigned_to'].disabled = True
         return form
 
@@ -1060,7 +1066,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     #             GenericAdmin.create_admin_billing_permissions(doctor)
 
     def save_model(self, request, obj, form, change):
-        if not request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+        if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):        
             if not obj.created_by:
                 obj.created_by = request.user
             if not obj.assigned_to:
@@ -1179,7 +1185,13 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
         if self.instance.id:
-            deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
+
+            if self.instance.procedure_mappings.count():
+                doctor_details = self.instance.get_procedures()[0]
+                deal_price = Decimal(doctor_details["deal_price"])
+
+            else:
+                deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                      doctor_clinic__hospital=hospital,
                                                      day=time_slot_start.weekday(),
@@ -1242,7 +1254,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
             return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
-                    'contact_details', 'profile', 'profile_detail', 'user', 'booked_by',
+                    'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments',
                     'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
@@ -1250,25 +1262,35 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
                     'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_id', 'user_number', 'booked_by',
+                    'default_profile_number', 'user_id', 'user_number', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time')
+                    'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
+                    'start_date', 'start_time')
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc'
+            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details'
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details')
         else:
             return ()
+
+    def procedures_details(self, obj):
+        procedure_mappings = obj.procedure_mappings.all()
+        if procedure_mappings:
+            result = []
+            for mapping in procedure_mappings:
+                result.append('{}, mrp was {}, booking price was {}'.format(mapping.procedure, mapping.mrp, mapping.deal_price))
+            return ",\n".join(result)
+        return None
 
     def kyc(self, obj):
         count = 0

@@ -1,2 +1,5 @@
-New appointment received for {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}
-Kindly accept the same to confirm in your docprime account.
+We have received an appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} at {{instance.hospital.name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}
+Please confirm the booking at the earliest by accepting the booking using docprime provider app.
+
+Thanks
+Team docprime

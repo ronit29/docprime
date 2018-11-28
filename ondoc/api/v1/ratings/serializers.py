@@ -56,8 +56,8 @@ class RatingsGraphSerializer(serializers.Serializer):
         response = []
         comp_count = {}
         request = self.context.get('request')
-        for rate in obj.all():
-            for cmlmnt in rate.compliment.filter(rating_level__in=[4, 5]):
+        for rate in obj.prefetch_related('compliment').filter(compliment__rating_level__in=[4, 5]):
+            for cmlmnt in rate.compliment.all():
                 r = {'id': cmlmnt.id,
                      'message': cmlmnt.message,
                      'level': cmlmnt.rating_level,
@@ -81,9 +81,7 @@ class RatingsGraphSerializer(serializers.Serializer):
         return response
 
     def get_rating_count(self, obj):
-        count = 0
-        if obj.exists():
-            count = obj.count()
+        count = obj.count()
         return count
 
     def get_review_count(self, obj):
@@ -121,15 +119,17 @@ class RatingsModelSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
 
     def get_user_name(self, obj):
-        name= None
-        if obj.appointment_type == RatingsReview.OPD:
-            app = doc_models.OpdAppointment.objects.filter(id=obj.appointment_id).first()
-        else:
-            app = lab_models.LabAppointment.objects.filter(id=obj.appointment_id).first()
-        if app:
-            profile = app.profile
-            if profile:
-                name = profile.name
+        name = app = None
+        app_obj = self.context.get('app')
+        if app_obj:
+            for ap in app_obj:
+                if obj.appointment_id == ap.id:
+                    app = ap
+                    break
+            if app:
+                profile = app.profile
+                if profile:
+                    name = profile.name
         return name
 
     def get_date(self, obj):
@@ -140,8 +140,10 @@ class RatingsModelSerializer(serializers.ModelSerializer):
 
     def get_compliment(self, obj):
         compliments_string = ''
-        if obj.compliment:
-            c_list = obj.compliment.values_list('message', flat=True)
+        c_list = []
+        for cm in obj.compliment.all():
+            c_list.append(cm.message)
+        if c_list:
             compliments_string = (', ').join(c_list)
         return compliments_string
 

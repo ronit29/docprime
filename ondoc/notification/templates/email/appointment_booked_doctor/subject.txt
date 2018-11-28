@@ -1,1 +1,1 @@
-New Appointment (ID - {{instance.id}})
+docprime.com || New Appointment ID - {{instance.id}} || {{patient_name|capfirst}}

@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from django.db import transaction, IntegrityError
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
-from django.db.models import F, Sum, Max, Q, Prefetch, Case, When
+from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 from ondoc.sms.api import send_otp
 from django.forms.models import model_to_dict
@@ -54,6 +54,7 @@ import copy
 import logging
 import jwt
 from ondoc.insurance.models import InsuranceTransaction
+from decimal import Decimal
 
 from ondoc.web.models import ContactUs
 
@@ -566,7 +567,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                         }
                         return resp
 
-                    doctor_hospital = DoctorClinicTiming.objects.filter(doctor_clinic__doctor__is_live=True,doctor_clinic__hospital__is_live=True,doctor_clinic__doctor=opd_appointment.doctor,
+                    doctor_hospital = DoctorClinicTiming.objects.filter(doctor_clinic__doctor__is_live=True,
+                                                                        doctor_clinic__hospital__is_live=True,
+                                                                        doctor_clinic__doctor=opd_appointment.doctor,
                                                                         doctor_clinic__hospital=opd_appointment.hospital,
                                                                         day=time_slot_start.weekday(),
                                                                         start__lte=time_slot_start.hour,
@@ -575,11 +578,22 @@ class UserAppointmentsViewSet(OndocViewSet):
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
                         coupon_discount = opd_appointment.discount
-
                         if coupon_discount > doctor_hospital.deal_price:
                             new_effective_price = 0
                         else:
                             new_effective_price = doctor_hospital.deal_price - coupon_discount
+
+                        if opd_appointment.procedures.count():
+                            doctor_details = opd_appointment.get_procedures()[0]
+                            old_agreed_price = Decimal(doctor_details["agreed_price"])
+                            new_fees = opd_appointment.fees - old_agreed_price + doctor_hospital.fees
+                            new_deal_price = opd_appointment.deal_price
+                            new_mrp = opd_appointment.mrp
+                            new_effective_price = opd_appointment.effective_price
+                        else:
+                            new_fees = doctor_hospital.fees
+                            new_deal_price = doctor_hospital.deal_price
+                            new_mrp = doctor_hospital.mrp
 
                         new_appointment = {
                             "id": opd_appointment.id,
@@ -590,16 +604,21 @@ class UserAppointmentsViewSet(OndocViewSet):
                             "user": opd_appointment.user,
 
                             "booked_by": opd_appointment.booked_by,
-                            "fees": doctor_hospital.fees,
-                            "deal_price": doctor_hospital.deal_price,
+                            "fees": new_fees,
+                            "deal_price": new_deal_price,
                             "effective_price": new_effective_price,
-                            "mrp": doctor_hospital.mrp,
+                            "mrp": new_mrp,
                             "time_slot_start": time_slot_start,
                             "payment_type": opd_appointment.payment_type,
                             "discount": coupon_discount
                         }
                         resp = self.extract_payment_details(request, opd_appointment, new_appointment,
                                                             account_models.Order.DOCTOR_PRODUCT_ID)
+                    else:
+                        resp = {
+                            "status": 0,
+                            "message": "No time slot available for the give day and time."
+                        }
 
             return resp
 
@@ -612,7 +631,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         resp = dict()
         user = request.user
 
-        if appointment_details.payment_type == OpdAppointment.PREPAID:
+        if appointment_details.payment_type == OpdAppointment.PREPAID and isinstance(appointment_details,OpdAppointment) and not appointment_details.procedures.count():
             remaining_amount = 0
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
             consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
@@ -1312,64 +1331,93 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (
-            DoctorClinic.objects.filter(
-                Q(
-                  doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type=GenericAdmin.BILLINNG,
-                  doctor__manageable_doctors__read_permission=True) |
-                Q(
-                  hospital__manageable_hospitals__user=user,
-                  hospital__manageable_hospitals__is_disabled=False,
-                  hospital__manageable_hospitals__permission_type=GenericAdmin.BILLINNG,
-                  hospital__manageable_hospitals__read_permission=True))
-                .values('hospital', 'doctor', 'hospital__manageable_hospitals__hospital', 'doctor__manageable_doctors__doctor')
-                .annotate(doc_admin_doc=F('doctor__manageable_doctors__doctor'), doc_admin_hosp=F('doctor__manageable_doctors__hospital'), hosp_admin_doc=F('hospital__manageable_hospitals__doctor'), hosp_admin_hosp=F('hospital__manageable_hospitals__hospital'), hosp_name=F('hospital__name'), doc_name=F('doctor__name'))
-            )
+        queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter(Q(user=user,
+                                                 is_disabled=False,
+                                                 permission_type=GenericAdmin.BILLINNG,
+                                                 read_permission=True,
+                                                 write_permission=True
+                                                 ),
+                                               (
+                                                 Q(hospital__isnull=True,
+                                                   doctor__doctor_clinics__hospital__is_appointment_manager=False,
+                                                  )
+                                                 |
+                                                 Q(Q(hospital__isnull=False),
+                                                   (Q(hospital__hospital_doctors__doctor=F('doctor'), doctor__isnull=False) | Q(doctor__isnull=True))
+                                                )
+                                               ))\
+                                        .annotate(doctor_ids=F('hospital__hospital_doctors__doctor'),
+                                                  doctor_names=F('hospital__hospital_doctors__doctor__name'),
+                                                  hospital_name=F('hospital__name'),
+                                                  doctor_name=F('doctor__name'),
+                                                  hospital_ids=F('doctor__doctor_clinics__hospital'),
+                                                  hospital_names=F('doctor__doctor_clinics__hospital__name')) \
+                                        .values('doctor_ids', 'doctor_name', 'doctor_names', 'doctor_id',
+                                                'hospital_ids', 'hospital_name', 'hospital_names', 'hospital_id')
+
+        # doc_hosp_queryset = (
+        #     DoctorClinic.objects.filter(
+        #         Q(
+        #           doctor__manageable_doctors__user=user,
+        #           doctor__manageable_doctors__is_disabled=False,
+        #           doctor__manageable_doctors__permission_type=GenericAdmin.BILLINNG,
+        #           doctor__manageable_doctors__read_permission=True) |
+        #         Q(
+        #           hospital__manageable_hospitals__user=user,
+        #           hospital__manageable_hospitals__is_disabled=False,
+        #           hospital__manageable_hospitals__permission_type=GenericAdmin.BILLINNG,
+        #           hospital__manageable_hospitals__read_permission=True))
+        #         .values('hospital', 'doctor', 'hospital__manageable_hospitals__hospital', 'doctor__manageable_doctors__doctor')
+        #         .annotate(doc_admin_doc=F('doctor__manageable_doctors__doctor'),
+        #                   doc_admin_hosp=F('doctor__manageable_doctors__hospital'),
+        #                   hosp_admin_doc=F('hospital__manageable_hospitals__doctor'),
+        #                   hosp_admin_hosp=F('hospital__manageable_hospitals__hospital'),
+        #                   hosp_name=F('hospital__name'), doc_name=F('doctor__name'))
+        #     )
 
         resp_data = defaultdict(dict)
-        for data in doc_hosp_queryset:
-            if data['doc_admin_hosp'] is None and data['doc_admin_doc'] is not None:
-                temp_tuple = (data['doc_admin_hosp'], data['doc_admin_doc'])
+        for data in queryset:
+            if data['hospital_id'] is None:
+                temp_tuple = (data['doctor_id'], data['doctor_name'])
                 if temp_tuple not in resp_data:
                     temp_dict = {
-                        "admin_id": data["doctor"],
+                        "admin_id": data["doctor_id"],
                         "level": Outstanding.DOCTOR_LEVEL,
-                        "doctor_name": data["doc_name"],
+                        "doctor_name": data["doctor_name"],
                         "hospital_list": list()
                     }
                     temp_dict["hospital_list"].append({
-                        "id": data["hospital"],
-                        "name": data["hosp_name"]
+                        "id": data["hospital_ids"],
+                        "name": data["hospital_names"]
                     })
                     resp_data[temp_tuple] = temp_dict
                 else:
                     temp_name = {
-                        "id": data["hospital"],
-                        "name": data["hosp_name"]
+                        "id": data["hospital_ids"],
+                        "name": data["hospital_names"]
                     }
                     if temp_name not in resp_data[temp_tuple]["hospital_list"]:
                         resp_data[temp_tuple]["hospital_list"].append(temp_name)
 
-            if data['hosp_admin_doc'] is None and data['hosp_admin_hosp'] is not None:
-                temp_tuple = (data['hosp_admin_hosp'], data['hosp_admin_doc'])
+            # if data['hosp_admin_doc'] is None and data['hosp_admin_hosp'] is not None:
+            else:
+                temp_tuple = (data['hospital_id'], data['hospital_name'])
                 if temp_tuple not in resp_data:
                     temp_dict = {
-                        "admin_id": data["hospital"],
+                        "admin_id": data["hospital_id"],
                         "level": Outstanding.HOSPITAL_LEVEL,
-                        "hospital_name": data["hosp_name"],
+                        "hospital_name": data["hospital_name"],
                         "doctor_list": list()
                     }
                     temp_dict["doctor_list"].append({
-                        "id": data["doctor"],
-                        "name": data["doc_name"]
+                        "id": data["doctor_ids"],
+                        "name": data["doctor_names"]
                     })
                     resp_data[temp_tuple] = temp_dict
                 else:
                     temp_name = {
-                        "id": data["doctor"],
-                        "name": data["doc_name"]
+                        "id": data["doctor_ids"],
+                        "name": data["doctor_names"]
                     }
                     if temp_name not in resp_data[temp_tuple]["doctor_list"]:
                         resp_data[temp_tuple]["doctor_list"].append(temp_name)
@@ -1530,12 +1578,24 @@ class OrderDetailViewSet(GenericViewSet):
         if not queryset:
             return Response(status=status.HTTP_404_NOT_FOUND)
         resp = dict()
+
         if queryset.product_id == Order.DOCTOR_PRODUCT_ID:
             serializer = serializers.OrderDetailDoctorSerializer(queryset)
             resp = serializer.data
+            procedure_ids = []
+            if queryset.action_data:
+                action_data = queryset.action_data
+                if action_data.get('extra_details'):
+                    extra_details = action_data.get('extra_details')
+                    for data in extra_details:
+                        if data.get('procedure_id'):
+                            procedure_ids.append(int(data.get('procedure_id')))
+            resp['procedure_ids'] = procedure_ids
+
         elif queryset.product_id == Order.LAB_PRODUCT_ID:
             serializer = serializers.OrderDetailLabSerializer(queryset)
             resp = serializer.data
+
         return Response(resp)
 
 

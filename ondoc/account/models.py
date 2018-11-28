@@ -235,6 +235,7 @@ class Order(TimeStampedModel):
                 "order_id": self.id
             }
         elif self.product_id == self.DOCTOR_PRODUCT_ID:
+            # TODO: SHASHANK_SINGH some logic here also.
             doctor_name = None
             hospital_name = None
             profile_name = None

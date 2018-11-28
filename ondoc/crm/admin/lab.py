@@ -26,7 +26,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
     LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges,
-                                     TestParameter, ParameterLabTest)
+                                     TestParameter, ParameterLabTest, LabReport, LabReportFile)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
@@ -36,6 +36,7 @@ from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 import logging
+import nested_admin
 
 logger = logging.getLogger(__name__)
 
@@ -384,8 +385,10 @@ class LabCityFilter(SimpleListFilter):
     parameter_name = 'city'
 
     def lookups(self, request, model_admin):
-        cities = set([(c['city'].upper(), c['city'].upper()) if (c.get('city')) else ('', '') for c in
-                      Lab.objects.values('city')])
+        cities = Lab.objects.distinct('city').values_list('city','city')
+
+        # cities = set([(c['city'].upper(), c['city'].upper()) if (c.get('city')) else ('', '') for c in
+        #               Lab.objects.values('city')])
         return cities
 
     def queryset(self, request, queryset):
@@ -505,13 +508,13 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         js = ('js/admin/ondoc.js',)
 
     def get_queryset(self, request):
-        return Lab.objects.all().prefetch_related('lab_documents')
+        return super().get_queryset(request).prefetch_related('lab_documents')
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['lead_url', 'matrix_lead_id', 'matrix_reference_id', 'is_live']
-        if (not request.user.groups.filter(name='qc_group').exists()) and (not request.user.is_superuser):
+        if (not request.user.is_member_of(constants['QC_GROUP_NAME'])) and (not request.user.is_superuser):
             read_only_fields += ['lab_pricing_group']
-        if (not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()) and (not request.user.is_superuser):
+        if (not request.user.is_member_of(constants['SUPER_QC_GROUP'])) and (not request.user.is_superuser):
             read_only_fields += ['onboarding_status']
         return read_only_fields
 
@@ -656,7 +659,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
         form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = 2) | Q(data_status = 3) | Q(created_by = request.user))
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
-        if (not request.user.is_superuser) and (not request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists()):
+        if not request.user.is_superuser and not request.user.is_member_of(constants['QC_GROUP_NAME']):
             form.base_fields['assigned_to'].disabled = True
         return form
 
@@ -693,8 +696,10 @@ class LabAppointmentForm(forms.ModelForm):
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
 
-        if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
-            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+
+        # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
+        #     raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+
 
         if not cleaned_data.get('status') is LabAppointment.CANCELLED and (cleaned_data.get(
                 'cancellation_reason') or cleaned_data.get('cancellation_comments')):
@@ -734,11 +739,30 @@ class LabAppointmentForm(forms.ModelForm):
         return cleaned_data
 
 
-class LabAppointmentAdmin(admin.ModelAdmin):
+class LabReportFileInline(nested_admin.NestedTabularInline):
+    model = LabReportFile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class LabReportInline(nested_admin.NestedTabularInline):
+    model = LabReport
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    inlines = [LabReportFileInline]
+
+
+class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
     list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at', 'updated_at')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
+
+    inlines = [
+        LabReportInline
+    ]
 
     def get_profile(self, obj):
         if not obj.profile:
@@ -917,7 +941,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
                 if dt_field:
                     obj.time_slot_start = dt_field
-            if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
+            if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.CANCELLED or \
+                int(request.POST['status']) == LabAppointment.COMPLETED):
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
@@ -984,6 +1009,7 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = []
     search_fields = ['name']
+    list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)

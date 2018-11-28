@@ -9,13 +9,15 @@ from django.core.validators import FileExtensionValidator
 class DemoElastic(TimeStampedModel):
     file = models.FileField(upload_to='demoelastic', validators=[FileExtensionValidator(allowed_extensions=['json'])],
                             null=True, blank=True, default='')
+    query = models.TextField(null=True, blank=False)
+    mongo_database = models.CharField(max_length=100, null=True, blank=False)
+    mongo_collection = models.CharField(max_length=100, null=True, blank=False)
+    mongo_connection_string = models.CharField(max_length=200, default='', null=False, blank=False)
 
     def save(self, *args, **kwargs):
-        to_be_uploaded = self.id is None
         super(DemoElastic, self).save(*args, **kwargs)
 
-        if to_be_uploaded:
-            fetch_and_upload_json.apply_async(({'id': self.id}, ), countdown=5)
+        fetch_and_upload_json.apply_async(({'id': self.id}, ), countdown=5)
 
     class Meta:
         db_table = "demo_elastic"

@@ -12,7 +12,8 @@ from ondoc.coupon.models import Coupon
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress
-from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping
+from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
+    get_selected_and_other_procedures
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
@@ -31,8 +32,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
-from django.db.models import Q, Value
-from django.db.models import Case, When
+from django.db.models import Q, Value, Case, When
 from operator import itemgetter
 from itertools import groupby
 from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_parameters
@@ -54,6 +54,8 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
 from dal import autocomplete
+from django.contrib.staticfiles.templatetags.staticfiles import static
+from django.db.models import Count
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -189,12 +191,27 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         opd_appointment_serializer = serializers.DoctorAppointmentRetrieveSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
+    @staticmethod
+    def get_procedure_prices(procedures, doctor, selected_hospital, dct):
+        doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
+        doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by(
+            'procedure_id')
+        total_deal_price, total_agreed_price, total_mrp = 0, 0, 0
+        for doctor_clinic_procedure in doctor_clinic_procedures:
+            total_agreed_price += doctor_clinic_procedure.agreed_price
+            total_deal_price += doctor_clinic_procedure.deal_price
+            total_mrp += doctor_clinic_procedure.mrp
+        return total_deal_price + dct.deal_price, total_agreed_price + dct.fees, total_mrp + dct.mrp
+
     @transaction.atomic
     def create(self, request):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-
+        procedures = data.get('procedure_ids', [])
+        # procedure_categories = data.get('procedure_category_ids', [])
+        selected_hospital = data.get('hospital')
+        doctor = data.get('doctor')
         time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
         doctor_clinic_timing = models.DoctorClinicTiming.objects.filter(
             doctor_clinic__doctor=data.get('doctor'),
@@ -208,8 +225,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "gender": profile_model.gender,
             "dob": str(profile_model.dob)
         }
-        req_data = request.data
-
         coupon_list = []
         coupon_discount = 0
         if data.get("coupon_code"):
@@ -218,13 +233,43 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             for coupon in data.get("coupon_code"):
                 coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
 
-        if data.get("payment_type") == models.OpdAppointment.INSURANCE:
-            effective_price = doctor_clinic_timing.deal_price
-        elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
-            if coupon_discount >= doctor_clinic_timing.deal_price:
-                effective_price = 0
-            else:
-                effective_price = doctor_clinic_timing.deal_price - coupon_discount
+        extra_details = []
+        effective_price = 0
+        if not procedures:
+            if data.get("payment_type") == models.OpdAppointment.INSURANCE:
+                effective_price = doctor_clinic_timing.deal_price
+            elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
+                if coupon_discount >= doctor_clinic_timing.deal_price:
+                    effective_price = 0
+                else:
+                    effective_price = doctor_clinic_timing.deal_price - coupon_discount
+            deal_price = doctor_clinic_timing.deal_price
+            mrp = doctor_clinic_timing.mrp
+            fees = doctor_clinic_timing.fees
+        else:
+            total_deal_price, total_agreed_price, total_mrp = self.get_procedure_prices(procedures, doctor,
+                                                                                        selected_hospital,
+                                                                                        doctor_clinic_timing)
+            if data.get("payment_type") == models.OpdAppointment.INSURANCE:
+                effective_price = total_deal_price
+            elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
+                if coupon_discount >= total_deal_price:
+                    effective_price = 0
+                else:
+                    effective_price = total_deal_price - coupon_discount
+            deal_price = total_deal_price
+            mrp = total_mrp
+            fees = total_agreed_price
+
+            doctor_clinic = doctor.doctor_clinics.filter(hospital=selected_hospital).first()
+            doctor_clinic_procedures = doctor_clinic.doctorclinicprocedure_set.filter(procedure__in=procedures).order_by('procedure_id')
+            for doctor_clinic_procedure in doctor_clinic_procedures:
+                temp_extra = {'procedure_id': doctor_clinic_procedure.procedure.id,
+                              'procedure_name': doctor_clinic_procedure.procedure.name,
+                              'deal_price': doctor_clinic_procedure.deal_price,
+                              'agreed_price': doctor_clinic_procedure.agreed_price,
+                              'mrp': doctor_clinic_procedure.mrp}
+                extra_details.append(temp_extra)
 
         opd_data = {
             "doctor": data.get("doctor"),
@@ -233,10 +278,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "profile_detail": profile_detail,
             "user": request.user,
             "booked_by": request.user,
-            "fees": doctor_clinic_timing.fees,
-            "deal_price": doctor_clinic_timing.deal_price,
+            "fees": fees,
+            "deal_price": deal_price,
             "effective_price": effective_price,
-            "mrp": doctor_clinic_timing.mrp,
+            "mrp": mrp,
+            "extra_details": extra_details,
             "time_slot_start": time_slot_start,
             "payment_type": data.get("payment_type"),
             "coupon": coupon_list,
@@ -287,11 +333,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if hasattr(request, 'agent') and request.agent:
             resp['is_agent'] = True
 
+        insurance_effective_price = appointment_details['fees']
+
         can_use_insurance, insurance_id, insurance_fail_message = self.can_use_insurance(appointment_details)
         if can_use_insurance:
             appointment_details['insurance'] = insurance_id
             appointment_details['effective_price'] = appointment_details['fees']
             appointment_details['payment_type'] = models.OpdAppointment.INSURANCE
+
         elif appointment_details['payment_type'] == models.OpdAppointment.INSURANCE:
             resp['status'] = 0
             resp['message'] = insurance_fail_message
@@ -303,17 +352,18 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         account_models.Order.disable_pending_orders(appointment_action_data, product_id,
                                                     account_models.Order.OPD_APPOINTMENT_CREATE)
 
-        if ( (appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
-            balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
+        if ((appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
+             balance < appointment_details.get("effective_price")) or resp['is_agent']):
 
-            payable_amount = appointment_details.get("effective_price") - balance
+            payable_amount = max(0, appointment_details.get("effective_price") - balance)
+            wallet_amount = min(balance, appointment_details.get("effective_price"))
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.OPD_APPOINTMENT_CREATE,
                 action_data=appointment_action_data,
                 amount=payable_amount,
-                wallet_amount=balance,
+                wallet_amount=wallet_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = payable_amount
@@ -497,17 +547,20 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("end", None)
             hospital.pop("day",  None)
             hospital.pop("discounted_fees", None)
-            hospital['procedure_categories'] = procedures.get(key) if procedures else None
-            hospital['is_selected'] = bool(key == selected_hospital)
-            availability.append(hospital)
+            hospital['procedure_categories'] = procedures.get(key) if procedures else []
+            if key == selected_hospital:
+                availability.insert(0, hospital)
+            else:
+                availability.append(hospital)
         response_data['hospitals'] = availability
         return response_data
 
     @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
-        url = request.query_params.get('url', None)
+        url = request.GET.get('url')
         if not url:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
         url = url.lower()
         entity = location_models.EntityUrls.objects.filter(url=url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).order_by('-is_valid')
         if entity.exists():
@@ -519,98 +572,62 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     corrected_url = valid_entity_url_qs.first().url
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
                 else:
-                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                    return Response(status=status.HTTP_404_NOT_FOUND)
 
             entity_id = entity.entity_id
-            response = self.retrieve(request, entity_id)
+            response = self.retrieve(request, entity_id, entity)
             return response
 
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, pk):
+    def retrieve(self, request, pk, entity=None):
         serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         response_data = []
-        category_ids = validated_data.get('procedure_category_ids')
-        procedure_ids = validated_data.get('procedure_ids')
-        selected_hospital = validated_data.get('hospital_id')
-        selected_procedure_ids = []
-        other_procedure_ids = []
+        category_ids = validated_data.get('procedure_category_ids', None)
+        procedure_ids = validated_data.get('procedure_ids', None)
+        selected_hospital = validated_data.get('hospital_id', None)
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
-                                    'doctor_clinics__doctorclinicprocedure_set',
+                                    'doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
                                     'qualifications__college',
-                                    'doctorpractices'
-                                    'pecializations__specialization',
+                                    'doctorpracticespecializations__specialization',
                                     'images',
-                                    'rating',
+                                    'rating'
                                     )
                   .filter(pk=pk).first())
-        if category_ids and not procedure_ids:
-            # all_procedures_under_category = ProcedureToCategoryMapping.objects.filter(
-            #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-            #                                                                                     flat=True)  # OPTIMISE_SHASHANK_SINGH
-            all_clinics_of_doctor = doctor.doctor_clinics.all()
-            all_procedures_under_doctor = []
-            for doctor_clinic in all_clinics_of_doctor:
-                all_procedures_under_doctor.extend(doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
-            all_procedures_under_doctor = set(all_procedures_under_doctor)
-            selected_procedure_ids = ProcedureCategory.objects.filter(
-                pk__in=category_ids, is_live=True).values_list('preferred_procedure_id', flat=True)
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
-        elif category_ids and procedure_ids:
-            # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
-            #     parent_category_id__in=category_ids, parent_category__is_live=True).values_list('procedure_id',
-            #                                                      flat=True)  # OPTIMISE_SHASHANK_SINGH
-            all_clinics_of_doctor = doctor.doctor_clinics.all()
-            all_procedures_under_doctor = []
-            for doctor_clinic in all_clinics_of_doctor:
-                all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
-            all_procedures_under_doctor = set(all_procedures_under_doctor)
-            selected_procedure_ids = procedure_ids
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
-        elif procedure_ids and not category_ids:
-            selected_procedure_ids = procedure_ids
-            all_parent_procedures_category_ids = ProcedureToCategoryMapping.objects.filter(
-                procedure_id__in=procedure_ids).values_list('parent_category_id', flat=True)  # OPTIMISE_SHASHANK_SINGH
-            # all_procedures_under_doctor = ProcedureToCategoryMapping.objects.filter(
-            #     parent_category_id__in=all_parent_procedures_category_ids).values_list('procedure_id',
-            #                                                                            flat=True)  # OPTIMISE_SHASHANK_SINGH
-            all_clinics_of_doctor = doctor.doctor_clinics.all()
-            all_procedures_under_doctor = []
-            for doctor_clinic in all_clinics_of_doctor:
-                all_procedures_under_doctor.extend(
-                    doctor_clinic.doctorclinicprocedure_set.all().values_list('procedure_id', flat=True))
-            all_procedures_under_doctor = set(all_procedures_under_doctor)
-            selected_procedure_ids = set(selected_procedure_ids)
-            other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
-
-
         # if not doctor or not is_valid_testing_data(request.user, doctor):
         #     return Response(status=status.HTTP_400_BAD_REQUEST)
-        if doctor:
-            serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
+        if not doctor or (not doctor.is_live and not doctor.is_internal):
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not entity:
+            entity = EntityUrls.objects.filter(entity_id=pk, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, is_valid='t')
+            if len(entity) > 0:
+                entity = entity[0]
+
+        selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids,
+                                                                                        doctor, all=True)
+        serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                      context={"request": request
                                                                          ,
                                                                               "selected_procedure_ids": selected_procedure_ids
-                                                                         , "other_procedure_ids": other_procedure_ids
+                                                                         ,
+                                                                              "other_procedure_ids": other_procedure_ids
                                                                          , "category_ids": category_ids
                                                                          , "hospital_id": selected_hospital
+                                                                         , "entity":entity 
                                                                               })
 
-            entity = EntityUrls.objects.filter(entity_id=serializer.data['id'], url_type='PAGEURL', is_valid='t',
-                                                entity_type__iexact='Doctor').values('url')
-            response_data = self.prepare_response(serializer.data, selected_hospital)
+        response_data = self.prepare_response(serializer.data, selected_hospital)
 
-            response_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+        if entity:
+            response_data['url'] = entity.url
         return Response(response_data)
 
 
@@ -820,7 +837,6 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         if not name:
             return Response({"conditions": [], "specializations": []})
         medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').filter(
-            Q(condition__search_key__icontains=name) |
             Q(condition__search_key__icontains=' ' + name) |
             Q(condition__search_key__istartswith=name)
         ).annotate(search_index=StrIndex('condition__search_key',
@@ -829,16 +845,16 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                        many=True, context={'request': request})
 
         specializations = models.PracticeSpecialization.objects.filter(
-            Q(search_key__icontains=name) |
             Q(search_key__icontains=' ' + name) |
             Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))).order_by(
             'search_index').values("id", "name")[:5]
 
-        procedures = Procedure.objects.filter(
-            Q(search_key__icontains=name) |
+        procedures = Procedure.objects.annotate(no_of_parent_categories=Count('parent_categories_mapping')).filter(
             Q(search_key__icontains=' ' + name) |
-            Q(search_key__istartswith=name)).annotate(search_index=StrIndex('search_key', Value(name))
-                                                      ).order_by('search_index')[:5]
+            Q(search_key__istartswith=name), is_enabled=True, no_of_parent_categories__gt=0).annotate(
+            search_index=StrIndex('search_key', Value(name))
+            ).order_by('search_index')[:5]
+
         serializer = ProcedureInSerializer(procedures, many=True)
         procedures = serializer.data
 
@@ -885,8 +901,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         entity_url_qs = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
                                            entity_type__iexact='Doctor').order_by('-sequence')
-        if entity_url_qs.exists():
-            entity = entity_url_qs.first()
+        if len(entity_url_qs) > 0:
+            entity = entity_url_qs[0]
             if not entity.is_valid:
                 valid_qs = EntityUrls.objects.filter(url_type=EntityUrls.UrlType.SEARCHURL, is_valid=True,
                                           entity_type__iexact='Doctor', specialization_id=entity.specialization_id,
@@ -932,7 +948,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             order_by_field, rank_by = doctor_search_helper.get_ordering_params()
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
-            doctor_search_result = RawSql(query_string).fetch_all()
+            doctor_search_result = RawSql(query_string.get('query'),
+                                         query_string.get('params')).fetch_all()
+
             result_count = len(doctor_search_result)
             # sa
             # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
@@ -945,9 +963,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
                                                 "doctor_clinics__hospital",
                                                 "doctorpracticespecializations", "doctorpracticespecializations__specialization",
-                                                "experiences", "images", "qualifications",
-                                                "qualifications__qualification", "qualifications__specialization",
-                                                "qualifications__college", "doctor_clinics__doctorclinicprocedure_set").order_by(preserved)
+                                                "images",
+                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping").order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request)
 
@@ -1083,6 +1100,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 "title": title,
                 "description": description,
                 "location": location,
+                "image": static('web/images/dclogo-placeholder.png'),
                 'schema': {
                     "@context": "http://schema.org",
                     "@type": "MedicalBusiness",

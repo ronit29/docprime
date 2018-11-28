@@ -3,6 +3,7 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
                                          UserPermission, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor.models import DoctorMobile
+from ondoc.insurance.models import InsuredMembers
 from ondoc.diagnostic.models import AvailableLabTest
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
 import datetime, calendar
@@ -157,12 +158,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
-
+    is_insured = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
-                  "profile_image", "age", "user", "dob")
+                  "profile_image", "age", "user", "dob", "is_insured")
+
+    def get_is_insured(self, obj):
+        return InsuredMembers.objects.filter(profile=obj).exists()
 
     def get_age(self, obj):
         from datetime import date
