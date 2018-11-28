@@ -1024,15 +1024,8 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         else:
             if any([parent_category.is_package_category for parent_category in all_parent_categories]):
                 raise forms.ValidationError("Parent Categories must be a lab test category.")
-
-        # if not count_is_primary == 1:
-        #     raise forms.ValidationError("Must have one and only one primary parent category.")
-        # if all_parent_categories and ProcedureCategoryMapping.objects.filter(parent_category__in=all_parent_categories,
-        #                                                                      child_category__in=all_parent_categories).count():
-        #     raise forms.ValidationError("Some Categories are already related, so can't be added together.")
-        # if any([category.related_parent_category.count() for category in
-        #         all_parent_categories]):  # PROCEDURE_category_SAME_level
-        #     raise forms.ValidationError("Procedure and Category can't be on same level.")
+            if not count_is_primary == 1:
+                raise forms.ValidationError("Must have one and only one primary parent category.")
 
 
 class LabTestCategoryInline(AutoComplete, TabularInline):
@@ -1052,7 +1045,7 @@ class LabTestAdminForm(forms.ModelForm):
         if any(self.errors):
             return
         cleaned_data = self.cleaned_data
-        # TODO : SHASHANK_SINGH is_package toggles handling
+        # is_package toggles handling
         if cleaned_data.get('is_package', False):
             if self.instance:
                 if self.instance.parent_lab_test_category_mappings.filter(parent_category__is_package_category=False).count():
@@ -1100,14 +1093,14 @@ class LabTestCategoryForm(forms.ModelForm):
         if any(self.errors):
             return
         cleaned_data = self.cleaned_data
-        # TODO : SHASHANK_SINGH is_live toggles handling
+        # is_live toggles handling
         if cleaned_data.get('is_live', False) and not cleaned_data.get('is_package_category', False) \
                 and not cleaned_data.get('preferred_lab_test', None):
             raise forms.ValidationError('This category cannot go live without preferred lab test.')
         if cleaned_data.get('is_live', False) and cleaned_data.get('is_package_category', False) \
                 and cleaned_data.get('preferred_lab_test', None):
             raise forms.ValidationError('This category cannot have preferred lab test.')
-        # TODO : SHASHANK_SINGH is_package_category toggles handling
+        # is_package_category toggles handling
         if cleaned_data.get('is_package_category', False):
             if self.instance:
                 if self.instance.lab_test_mappings.filter(lab_test__is_package=False).count():
@@ -1116,25 +1109,14 @@ class LabTestCategoryForm(forms.ModelForm):
             if self.instance:
                 if self.instance.lab_test_mappings.filter(lab_test__is_package=True).count():
                     raise forms.ValidationError('This category has lab test package(s) under it, delete all of them and try again.')
-
-        # procedure = cleaned_data.get('preferred_procedure', None)
-        # is_live = cleaned_data.get('is_live', False)
-        # if is_live and not procedure:
-        #     raise forms.ValidationError('Category can\'t go live without a preferred procedure.')
-        # if procedure:
-        #     if self.instance.pk:
-        #         all_organic_parents = procedure.categories.all().values_list('pk', flat=True)
-        #         all_parents = ProcedureCategoryMapping.objects.filter(
-        #             child_category__in=all_organic_parents).values_list('parent_category', flat=True)
-        #         all_parents = set(all_organic_parents).union(set(all_parents))
-        #         if self.instance.pk not in all_parents:
-        #                 raise forms.ValidationError('Category and preferred procedure should be related.')
-        #         if not procedure.categories.filter(pk=self.instance.pk).exists():  # PROCEDURE_category_SAME_level
-        #             raise forms.ValidationError(
-        #                 'Category should be direct parent of the preferred procedure.')
-        #     else:
-        #         raise forms.ValidationError('Category and preferred procedure should be related.')
-
+        preferred_lab_test = cleaned_data.get('preferred_lab_test')
+        if preferred_lab_test:
+            if self.instance.pk:
+                if not preferred_lab_test.parent_lab_test_category_mappings.filter(parent_category=self.instance):
+                    raise forms.ValidationError(
+                        'This category and preferred lab test are not related.')
+            else:
+                raise forms.ValidationError('Category and preferred lab_test should be related.')
 
 
 class LabTestCategoryAdmin(VersionAdmin):
