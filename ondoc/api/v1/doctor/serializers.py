@@ -730,7 +730,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if sublocality and locality and specialization:
             title = specialization + 's near ' + sublocality + ' ' + locality
 
-        if lat and long and specialization and title and result_count:
+        if lat and long and top_specialization and title and result_count:
             return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title, 'result_count':result_count}
         return None
 
