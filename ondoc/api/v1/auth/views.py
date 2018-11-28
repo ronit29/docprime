@@ -1551,12 +1551,24 @@ class OrderDetailViewSet(GenericViewSet):
         if not queryset:
             return Response(status=status.HTTP_404_NOT_FOUND)
         resp = dict()
+
         if queryset.product_id == Order.DOCTOR_PRODUCT_ID:
             serializer = serializers.OrderDetailDoctorSerializer(queryset)
             resp = serializer.data
+            procedure_ids = []
+            if queryset.action_data:
+                action_data = queryset.action_data
+                if action_data.get('extra_details'):
+                    extra_details = action_data.get('extra_details')
+                    for data in extra_details:
+                        if data.get('procedure_id'):
+                            procedure_ids.append(int(data.get('procedure_id')))
+            resp['procedure_ids'] = procedure_ids
+
         elif queryset.product_id == Order.LAB_PRODUCT_ID:
             serializer = serializers.OrderDetailLabSerializer(queryset)
             resp = serializer.data
+
         return Response(resp)
 
 
