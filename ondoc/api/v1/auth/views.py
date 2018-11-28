@@ -186,9 +186,11 @@ class UserViewset(GenericViewSet):
         user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
 
         if not user:
+            user = User.objects.create(phone_number=data['phone_number'], is_phone_number_verified=True,
+                                       user_type=User.DOCTOR)
             # doctor_mobile = DoctorMobile.objects.filter(number=phone_number, is_primary=True)
+        if not hasattr(user, 'doctor'):
             doctor_mobile = DoctorNumber.objects.filter(phone_number=phone_number)
-            user = User.objects.create(phone_number=data['phone_number'], is_phone_number_verified=True, user_type=User.DOCTOR)
             if doctor_mobile.exists():
                 doctor = doctor_mobile.first().doctor
                 doctor.user = user
