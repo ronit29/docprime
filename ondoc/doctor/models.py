@@ -1077,7 +1077,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     time_slot_start = models.DateTimeField(blank=True, null=True)
     time_slot_end = models.DateTimeField(blank=True, null=True)
     payment_type = models.PositiveSmallIntegerField(choices=PAY_CHOICES, default=PREPAID)
-    insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
+    insurance = models.ForeignKey(insurance_model.UserInsurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
@@ -1121,6 +1121,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
         appointment_data["status"] = OpdAppointment.BOOKED
         appointment_data["otp"] = otp
+        # if appointment_data["insurance_id"] :
+        #     appointment_data["insurance"] = insurance_model.UserInsurance.objects.get(id=appointment_data["insurance_id"].id)
         coupon_list = appointment_data.pop("coupon", None)
         app_obj = cls.objects.create(**appointment_data)
         if coupon_list:

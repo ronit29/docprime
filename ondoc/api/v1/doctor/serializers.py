@@ -28,6 +28,7 @@ import logging
 from dateutil import tz
 from django.conf import settings
 
+from ondoc.insurance.models import UserInsurance
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure
 
@@ -143,6 +144,7 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     payment_type = serializers.IntegerField()
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
@@ -161,6 +163,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     time_slot_start = serializers.DateTimeField(required=False)
     payment_type = serializers.ChoiceField(choices=OpdAppointment.PAY_CHOICES)
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
+    # insurance_id = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
 
     # time_slot_end = serializers.DateTimeField()
 

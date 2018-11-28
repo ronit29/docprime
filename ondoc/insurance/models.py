@@ -8,6 +8,7 @@ from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from ondoc.common.helper import Choices
 from datetime import timedelta
+from django.utils import timezone
 
 
 def generate_insurance_policy_number():
@@ -137,46 +138,6 @@ class InsuranceThreshold(auth_model.TimeStampedModel):
         db_table = "insurance_threshold"
 
 
-# class InsuranceTransaction(auth_model.TimeStampedModel):
-#     INITIATE = 1
-#     CREATED = 2
-#     PROCESSED = 3
-#     COMPLETED = 4
-#     FAILED = 5
-#     STATUS_CHOICES = [(INITIATE, 'Initiate'), (CREATED, 'Created'), (PROCESSED, 'Processed'), (COMPLETED, 'Completed'),
-#                       (FAILED, 'Failed')]
-#     #insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
-#     #insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
-#     #order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING, null=True)
-#     amount = models.PositiveIntegerField(default=None)
-#     #user = models.ForeignKey(auth_model.User, on_delete=models.DO_NOTHING)
-#     #transaction_date = models.DateTimeField(blank=True, null=True)
-#     status_type = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=INITIATE)
-#     user_insurance = models.ForeignKey(UserInsurance, related_name="transaction" , on_delete=models.DO_NOTHING, null=True)
-#     #insured_members = JSONField(blank=True, null=True)
-#     #policy_number = models.CharField(max_length=50, blank=False, null=True, default=None)
-
-#     class Meta:
-#         db_table = "insurance_transaction"
-
-#     @classmethod
-#     def create_insurance_transaction(self, data, order):
-#         insured_members = InsuredMembers.create_insured_members(data)
-#         insurer = Insurer.objects.get(id=data.get('insurer').id)
-#         insurance_plan = InsurancePlans.objects.get(id=data.get('insurance_plan').id)
-#         insurance_transaction_obj = InsuranceTransaction.objects.create(insurer=insurer,
-#                                                                 insurance_plan=insurance_plan,
-#                                                                 user=data.get('user'),
-#                                                                 status_type=InsuranceTransaction.CREATED,
-#                                                                 insured_members=insured_members,
-#                                                                 amount=data.get('amount'),
-#                                                                 order=order,
-#                                                                 transaction_date=datetime.datetime.now(),
-#                                                                 )
-
-#         return insurance_transaction_obj
-
-
 class UserInsurance(auth_model.TimeStampedModel):
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING, null=True)
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
@@ -219,28 +180,28 @@ class UserInsurance(auth_model.TimeStampedModel):
         user_insurance = UserInsurance.objects.filter(user=user).first()
         if 'lab' in appointment_data:
             if user_insurance:
-                if datetime.datetime.now() < user_insurance.expiry_date:
+                if timezone.now() < user_insurance.expiry_date:
                     insured_members = user_insurance.members.all().filter(profile=profile)
                     if insured_members.exists():
-                        return True, 'Covered Under Insurance'
+                        return True, user_insurance.id, 'Covered Under Insurance'
                     else:
-                        return False, 'Profile Not covered under insurance'
+                        return False, user_insurance.id, 'Profile Not covered under insurance'
                 else:
-                    return False, 'Insurance Expired'
+                    return False, user_insurance.id, 'Insurance Expired'
             else:
-                return False, 'Not covered under insurance'
+                return False, "", 'Not covered under insurance'
         elif 'doctor' in appointment_data:
             if user_insurance:
-                if datetime.datetime.now() < user_insurance.expiry_date:
+                if timezone.now() < user_insurance.expiry_date:
                     insured_members = user_insurance.members.all().filter(profile=profile)
-                    if insured_members.exists():
-                        return True, 'Covered Under Insurance'
+                    if insured_members:
+                        return True, user_insurance.id, 'Covered Under Insurance'
                     else:
-                        return False, 'Profile Not covered under insurance'
+                        return False, user_insurance.id, 'Profile Not covered under insurance'
                 else:
-                    return False, 'Insurance Expired'
+                    return False, user_insurance.id, 'Insurance Expired'
             else:
-                return False, 'Not covered under insurance'
+                return False, "", 'Not covered under insurance'
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):

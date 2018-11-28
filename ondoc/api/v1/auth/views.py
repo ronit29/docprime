@@ -925,18 +925,18 @@ class TransactionViewSet(viewsets.GenericViewSet):
             response = None
             data = request.data
             # Commenting below for testing
-            # try:
-            #     coded_response = data.get("response")
-            #     if isinstance(coded_response, list):
-            #         coded_response = coded_response[0]
-            #     coded_response += "=="
-            #     decoded_response = base64.b64decode(coded_response).decode()
-            #     response = json.loads(decoded_response)
-            # except Exception as e:
-            #     logger.error("Cannot decode pg data - " + str(e))
+            try:
+                coded_response = data.get("response")
+                if isinstance(coded_response, list):
+                    coded_response = coded_response[0]
+                coded_response += "=="
+                decoded_response = base64.b64decode(coded_response).decode()
+                response = json.loads(decoded_response)
+            except Exception as e:
+                logger.error("Cannot decode pg data - " + str(e))
 
             # For testing only
-            response = request.data
+            # response = request.data
             appointment_obj = None
 
             try:
@@ -951,10 +951,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 resp_serializer = serializers.TransactionSerializer(data=response)
                 if resp_serializer.is_valid():
                     response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-                    #For Testing
-                    # if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
-                    #     pg_tx_queryset = None
-                    if True:
+                    # For Testing
+                    if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                        pg_tx_queryset = None
+                    # if True:
                         try:
                             pg_tx_queryset = PgTransaction.objects.create(**response_data)
                             pg_tx_queryset = True

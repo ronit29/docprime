@@ -798,7 +798,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     payment_status = models.PositiveIntegerField(choices=OpdAppointment.PAYMENT_STATUS_CHOICES,
                                                  default=OpdAppointment.PAYMENT_PENDING)
     payment_type = models.PositiveSmallIntegerField(choices=OpdAppointment.PAY_CHOICES, default=OpdAppointment.PREPAID)
-    insurance = models.ForeignKey(insurance_model.Insurance, blank=True, null=True, default=None,
+    insurance = models.ForeignKey(insurance_model.UserInsurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
     is_home_pickup = models.BooleanField(default=False)
     address = JSONField(blank=True, null=True)

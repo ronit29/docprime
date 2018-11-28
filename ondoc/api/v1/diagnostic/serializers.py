@@ -19,6 +19,8 @@ import pytz
 import random
 import logging
 import json
+
+from ondoc.insurance.models import UserInsurance
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
 from django.db.models import Q
@@ -444,6 +446,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     address = serializers.JSONField(required=False)
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all())
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):

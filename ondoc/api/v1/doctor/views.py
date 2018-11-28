@@ -287,8 +287,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if hasattr(request, 'agent') and request.agent:
             resp['is_agent'] = True
 
-        can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
+        can_use_insurance, insurance_id, insurance_fail_message = self.can_use_insurance(appointment_details)
         if can_use_insurance:
+            appointment_details['insurance'] = insurance_id
             appointment_details['effective_price'] = appointment_details['fees']
             appointment_details['payment_type'] = models.OpdAppointment.INSURANCE
         elif appointment_details['payment_type'] == models.OpdAppointment.INSURANCE:
@@ -381,9 +382,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return pgdata, payment_required
 
     def can_use_insurance(self, appointment_details):
-        insurance_check, fail_message = UserInsurance.validate_insurance(appointment_details)
+        insurance_check, insurance, fail_message = UserInsurance.validate_insurance(appointment_details)
 
-        return insurance_check, fail_message
+        return insurance_check, insurance, fail_message
         # Check if appointment can be covered under insurance
         # also return a valid message         
         # return False, 'Not covered under insurance'
