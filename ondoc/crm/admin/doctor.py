@@ -1044,6 +1044,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         for instance in instances:
             if isinstance(instance, GenericAdmin):
+                if instance.hospital.is_appointment_manager:
+                    instance.is_disabled = True
                 if (not instance.created_by):
                     instance.created_by = request.user
                 if (not instance.id):

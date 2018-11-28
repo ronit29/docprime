@@ -11,7 +11,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
 from ondoc.diagnostic import models as lab_models
-from ondoc.authentication.models import UserProfile, DoctorNumber
+from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
 from django.db.models import Q
 
@@ -1109,6 +1109,18 @@ class AdminCreateBodySerializer(serializers.Serializer):
             raise serializers.ValidationError("entity Lab Not Found.")
         if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and 'assoc_doc' not in attrs:
             raise serializers.ValidationError("Associated Doctors are Required.")
+        if attrs.get('type') == User.STAFF:
+            valid_query = GenericAdmin.objects.filter(phone_number=attrs['phone_number'], entity_type=attrs['entity_type'])
+            if attrs.get('entity_type')==GenericAdminEntity.DOCTOR:
+                valid_query = valid_query.filter(doctor_id=attrs['id'], hospital_id__in=attrs.get('assoc_hosp')) \
+                    if attrs.get('assoc_hosp') else valid_query.filter(doctor_id=attrs['id'], hospital_id=None)
+            elif attrs.get('entity_type') == GenericAdminEntity.HOSPITAL:
+                valid_query = valid_query.filter(hospital_id=attrs['id'], doctor_id__in=attrs.get('assoc_doc')) \
+                    if attrs.get('assoc_doc') else valid_query.filter(hospital_id=attrs['id'], doctor_id=None)
+            else:
+                valid_query = GenericLabAdmin.objects.filter(lab_id=attrs['id'], phone_number=attrs['phone_number'])
+            if valid_query.exists():
+                raise serializers.ValidationError("Duplicate Permissions Exists.")
         if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and attrs.get('type') == User.DOCTOR:
             dquery = DoctorNumber.objects.select_related('doctor', 'hospital').filter(phone_number=attrs['phone_number'], hospital_id=attrs.get('id'))
             if dquery.exists():
