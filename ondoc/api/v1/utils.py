@@ -576,8 +576,8 @@ class CouponsMixin(object):
 
     def get_applicable_tests_with_total_price(self, **kwargs):
         from django.db.models import Sum
-        from ondoc.diagnostic.models import LabAppointment
-        
+        from ondoc.diagnostic.models import AvailableLabTest
+
         coupon_obj = kwargs.get("coupon_obj")
         lab = kwargs.get("lab")
         test_ids = kwargs.get("test_ids")
