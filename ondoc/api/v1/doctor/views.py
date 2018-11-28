@@ -324,7 +324,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
     def update(self, request, pk=None):
         user = request.user
-        queryset = self.get_pem_queryset(user)
+        queryset = self.get_pem_queryset(user).distinct()
         opd_appointment = get_object_or_404(queryset, pk=pk)
         serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
