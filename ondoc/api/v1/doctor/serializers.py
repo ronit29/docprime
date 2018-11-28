@@ -686,7 +686,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     def get_enabled_for_online_booking(self, obj):
         enable_for_online_booking = False
 
-        if obj.doctor_clinics.all():
+        if len(obj.doctor_clinics.all())>0:
             doctor_clinic = obj.doctor_clinics.all()
 
             for data in doctor_clinic:
