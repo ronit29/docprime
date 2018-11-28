@@ -119,9 +119,10 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
         doc_num = DoctorNumber.objects.filter(hospital_id=self.instance.id)
         doc_num_list = [(dn.phone_number, dn.doctor) for dn in doc_num.all()]
         if doc_num.exists():
+            validate_unique_del = [(d[0],d[1]) for d in validate_unique]
             for data in self.deleted_forms:
                 del_tuple = (data.cleaned_data.get('phone_number'), data.cleaned_data.get('doctor'))
-                if del_tuple[0] not in dict(validate_unique) and (del_tuple in doc_num_list or
+                if del_tuple[0] not in dict(validate_unique_del) and (del_tuple in doc_num_list or
                                                                   (del_tuple[1] is None and del_tuple[0] in dict(doc_num_list))):
                     raise forms.ValidationError(
                         "Doctor (%s) Mapping with this number needs to be deleted." % (dict(doc_num_list).get(del_tuple[0])))
