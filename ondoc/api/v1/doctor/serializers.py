@@ -344,7 +344,14 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     
     def get_enabled_for_online_booking(self, obj):
-        return obj.doctor_clinic.enabled_for_online_booking
+        enable_for_online_booking = False
+        if obj.doctor_clinic:
+            doctor_clinic = obj.doctor_clinic
+            if obj.doctor_clinic.hospital and obj.doctor_clinic.doctor:
+                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.doctor.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                   enable_for_online_booking = True
+        return enable_for_online_booking
+
     def get_lat(self, obj):
         if obj.doctor_clinic.hospital.location:
             return obj.doctor_clinic.hospital.location.y
@@ -672,7 +679,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     hospitals = serializers.SerializerMethodField(read_only=True)
     procedures = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
-    enabled_for_online_booking = serializers.SerializerMethodField()
+    enabled_for_online_booking = serializers.BooleanField()
     availability = None
     seo = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
@@ -682,26 +689,6 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     unrated_appointment = serializers.SerializerMethodField()
     is_gold = serializers.SerializerMethodField()
     search_data = serializers.SerializerMethodField()
-
-    def get_enabled_for_online_booking(self, obj):
-        enable_for_online_booking = False
-
-        if obj.doctor_clinics.all():
-            doctor_clinic = obj.doctor_clinics.all()
-
-            for data in doctor_clinic:
-                if data.enabled_for_online_booking and data.hospital.enabled_for_online_booking:
-                    enable_for_online_booking = True
-                else:
-                    enable_for_online_booking = False
-                    break
-
-        if obj.enabled_for_online_booking and enable_for_online_booking:
-            enable_for_online_booking = True
-        else:
-            enable_for_online_booking = False
-
-        return enable_for_online_booking
 
     def get_search_data(self, obj):
         data = {}
