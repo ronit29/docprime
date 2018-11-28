@@ -671,7 +671,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             obj = models.LabAppointment()
             for coupon in coupon_obj:
                 if coupon.is_user_specific and coupon.test.exists():
-                    total_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, lab_test_queryset=lab_test_queryset).get("total_price")
+                    total_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
                     coupon_discount += obj.get_discount(coupon, total_price)
                 else:
                     coupon_discount += obj.get_discount(coupon, effective_price)

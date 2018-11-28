@@ -576,30 +576,24 @@ class CouponsMixin(object):
 
     def get_applicable_tests_with_total_price(self, **kwargs):
         from django.db.models import Sum
-
+        from ondoc.diagnostic.models import LabAppointment
+        
         coupon_obj = kwargs.get("coupon_obj")
-        lab_test_queryset = kwargs.get("lab_test_queryset")
+        lab = kwargs.get("lab")
+        test_ids = kwargs.get("test_ids")
 
-        if coupon_obj.lab:
+        queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=lab, test__in=test_ids)
+        if coupon_obj.test.exists():
+            queryset = queryset.filter(test__in=coupon_obj.test.all())
 
-            if coupon_obj.test.exists():
-                test_ids = lab_test_queryset.values_list("test_id")
+        total_price = 0
+        for test in queryset:
+            if test.custom_deal_price is not None:
+                total_price += test.custom_deal_price
+            else:
+                total_price += test.computed_deal_price
 
-                applicable_tests = set(test_ids) & set(coupon_obj.test.all().values_list("id"))
-
-                filtered_tests = lab_test_queryset.filter(test_id__in=applicable_tests)
-            elif not (coupon_obj.test.exists()):
-                filtered_tests = lab_test_queryset
-
-        elif not (coupon_obj.lab_network or coupon_obj.lab or coupon_obj.test.exists()) or coupon_obj.lab_network:
-            filtered_tests = lab_test_queryset
-
-        if filtered_tests.filter(custom_deal_price__isnull=False).exists():
-            total_price = filtered_tests.filter(custom_deal_price__isnull=False).values("custom_deal_price").aggregate(Sum('custom_deal_price')).get("custom_deal_price__sum")
-        else:
-            total_price = filtered_tests.values("computed_deal_price").aggregate(Sum('computed_deal_price')).get("computed_deal_price__sum")
-
-        return {"applicable_tests": filtered_tests, "total_price": total_price}
+        return {"total_price": total_price}
 
 
 

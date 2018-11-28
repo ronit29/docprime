@@ -167,9 +167,8 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         for coupon in coupons_data:
             if obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
                 if lab and tests:
-                    tests = AvailableLabTest.objects.filter(lab_pricing_group__labs=lab, test__in=tests)
                     total_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon,
-                                                                            lab_test_queryset=tests).get("total_price")
+                                                                            test_ids=tests, lab=lab).get("total_price")
                     discount += obj.get_discount(coupon, total_price)
                     continue
                 if doctor:
