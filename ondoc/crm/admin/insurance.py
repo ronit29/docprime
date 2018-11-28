@@ -66,19 +66,19 @@ class InsuredMembersAdmin(admin.ModelAdmin):
         return False
 
 
-class InsurancePlanContentForm(forms.ModelForm):
-    content = forms.CharField(widget=forms.Textarea, required=False)
-    plan = forms.ModelChoiceField(queryset=InsurancePlans.objects.all(),widget=forms.Select)
-    title = forms.ChoiceField(choices=InsurancePlanContent.PossibleTitles.as_choices())
-
-    class Media:
-        extend=False
-        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'insurance/js/init.js')
-        css = {'all':('insurance/css/style.css',)}
+# class InsurancePlanContentForm(forms.ModelForm):
+#     content = forms.CharField(widget=forms.Textarea, required=False)
+#     plan = forms.ModelChoiceField(queryset=InsurancePlans.objects.all(),widget=forms.Select)
+#     title = forms.ChoiceField(choices=InsurancePlanContent.PossibleTitles.as_choices())
+#
+#     class Media:
+#         extend=False
+#         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'insurance/js/init.js')
+#         css = {'all':('insurance/css/style.css',)}
 
 
 class InsurancePlanContentAdmin(admin.ModelAdmin):
-    form = InsurancePlanContentForm
     model = InsurancePlanContent
+    fields = ('plan', 'title', 'content')
     list_display = ('plan', 'title',)
 
