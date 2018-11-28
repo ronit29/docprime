@@ -22,7 +22,7 @@ from collections import defaultdict
 
 
 class DoctorSearchHelper:
-    MAX_DISTANCE = "20000"
+    MAX_DISTANCE = "15000"
 
     def __init__(self, query_params):
         self.query_params = query_params

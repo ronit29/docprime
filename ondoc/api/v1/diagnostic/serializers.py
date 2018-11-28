@@ -304,7 +304,7 @@ class LabCustomSerializer(serializers.Serializer):
     next_lab_timing_data = serializers.DictField()
     pickup_charges = serializers.IntegerField(default=None)
     distance_related_charges = serializers.IntegerField()
-
+    tests = serializers.ListField(child=serializers.DictField())
 
     # def get_lab(self, obj):
     #     queryset = Lab.objects.get(pk=obj['lab'])
@@ -760,6 +760,13 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     lab_test = AvailableLabTestSerializer(many=True)
     address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
+    reports = serializers.SerializerMethodField()
+
+    def get_reports(self, obj):
+        reports = []
+        for rep in obj.get_reports():
+            reports.append({"details": rep.report_details, "files":[file.name.url for file in rep.files.all()]})
+        return reports
 
     def get_address(self, obj):
         resp_address = ""
@@ -783,7 +790,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
