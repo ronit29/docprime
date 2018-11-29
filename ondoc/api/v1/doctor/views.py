@@ -1749,7 +1749,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                         return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-            delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=valid_data.get('phone_number'),
+            delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=phone_number,
                                                                       entity_type=GenericAdminEntity.HOSPITAL)
             if valid_data.get('remove_list'):
                 delete_queryset = delete_queryset.filter(doctor_id__in=valid_data.get('remove_list'))
