@@ -933,8 +933,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
     def save(self, request):
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/home"
-        INSURANCE_FAILURE_REDIRECT_URL = settings.BASE_URL + "/insurance/%s/book?error_code=%s"
+        INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
+        INSURANCE_FAILURE_REDIRECT_URL = settings.BASE_URL + "/preview"
         LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
         OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
         ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
@@ -944,18 +944,18 @@ class TransactionViewSet(viewsets.GenericViewSet):
             response = None
             data = request.data
             # Commenting below for testing
-            # try:
-            #     coded_response = data.get("response")
-            #     if isinstance(coded_response, list):
-            #         coded_response = coded_response[0]
-            #     coded_response += "=="
-            #     decoded_response = base64.b64decode(coded_response).decode()
-            #     response = json.loads(decoded_response)
-            # except Exception as e:
-            #     logger.error("Cannot decode pg data - " + str(e))
+            try:
+                coded_response = data.get("response")
+                if isinstance(coded_response, list):
+                    coded_response = coded_response[0]
+                coded_response += "=="
+                decoded_response = base64.b64decode(coded_response).decode()
+                response = json.loads(decoded_response)
+            except Exception as e:
+                logger.error("Cannot decode pg data - " + str(e))
 
             # For testing only
-            response = request.data
+            # response = request.data
             appointment_obj = None
 
             try:
@@ -971,9 +971,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if resp_serializer.is_valid():
                     response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                     # For Testing
-                    # if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
-                    #     pg_tx_queryset = None
-                    if True:
+                    if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                        pg_tx_queryset = None
+                    # if True:
                         try:
                             pg_tx_queryset = PgTransaction.objects.create(**response_data)
                             pg_tx_queryset = True
@@ -1005,7 +1005,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     if appointment_obj:
                         REDIRECT_URL = INSURANCE_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
                     elif order_obj:
-                        REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data.get("insurance"),
+                        REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data,
                                                                    response.get('statusCode'))
             else:
                 if not order_obj:
@@ -1019,7 +1019,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                                                    order_obj.action_data.get("hospital"),
                                                                    response.get('statusCode'))
                     elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
-                        REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data.get("insurance"),
+                        REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data,
                                                                    response.get('statusCode'))
 
         except Exception as e:
