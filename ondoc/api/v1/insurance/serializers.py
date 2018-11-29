@@ -11,36 +11,16 @@ from django.contrib.postgres.fields import JSONField
 
 class InsuranceThresholdSerializer(serializers.ModelSerializer):
 
-    # id = serializers.PrimaryKeyRelatedField(queryset=InsuranceThreshold.objects.all(), required=True)
-    # lab_amount_limit = serializers.IntegerField()
-    # lab_count_limit = serializers.IntegerField()
-    # opd_count_limit = serializers.IntegerField()
-    # opd_amount_limit = serializers.IntegerField()
-    # max_age = serializers.IntegerField()
-    # min_age = serializers.IntegerField()
-    # child_min_age = serializers.IntegerField()
-
     class Meta:
         model = InsuranceThreshold
 
-        # fields = '__all__'
         exclude = ('created_at', 'updated_at', 'enabled', 'is_live')
 
 
 class InsurancePlansSerializer(serializers.ModelSerializer):
 
-    #id = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all(), required=True)
-    #type = serializers.CharField(max_length=100)
-    #amount = serializers.IntegerField()
-    #threshold = serializers.SerializerMethodField()
     content = serializers.SerializerMethodField()
     threshold = InsuranceThresholdSerializer(source='get_active_threshold', many=True)
-
-    # def get_threshold(self, obj):
-    #     threshold = InsuranceThreshold.objects.filter(insurance_plan=obj).first()
-    #     if threshold:
-    #         insurance_threshold = InsuranceThresholdSerializer(threshold)
-    #         return insurance_threshold.data
 
     def get_content(self, obj):
         return obj.content.filter(title__in=InsurancePlanContent.PossibleTitles.availabilities()).values('title', 'content')
@@ -51,15 +31,6 @@ class InsurancePlansSerializer(serializers.ModelSerializer):
         #fields = '__all__'
 
 class InsurerSerializer(serializers.ModelSerializer):
-    #id = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all(), required=True)
-    # plans = serializers.SerializerMethodField()
-
-    # def get_plans(self, obj):
-    #     plans = InsurancePlans.objects.filter(insurer=obj)
-    #     if plans:
-    #         insurance_plans = InsurancePlansSerializer(plans, many=True)
-    #         # plan_contents = InsurancePlanContent.objects.filter(plan__in=obj.plans.filter(is_live=True))
-    #         return insurance_plans.data
 
     plans = InsurancePlansSerializer(source='get_active_plans', many=True)
 
@@ -75,7 +46,7 @@ class MemberListSerializer(serializers.Serializer):
     title = serializers.ChoiceField(choices=InsuredMembers.TITLE_TYPE_CHOICES)
     first_name = serializers.CharField(max_length=50)
     middle_name = serializers.CharField(max_length=50, allow_blank=True)
-    last_name = serializers.CharField(max_length=50)
+    last_name = serializers.CharField(max_length=50, allow_blank=True)
     dob = serializers.DateField()
     email = serializers.EmailField()
     relation = serializers.ChoiceField(choices=InsuredMembers.RELATION_CHOICES)

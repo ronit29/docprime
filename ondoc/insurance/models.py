@@ -1,5 +1,9 @@
 import datetime
+import json
+
 from django.db import models
+from django.db.models import Q
+
 from ondoc.authentication import models as auth_model
 from ondoc.account import models as account_model
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -9,7 +13,7 @@ from django.forms import model_to_dict
 from ondoc.common.helper import Choices
 from datetime import timedelta
 from django.utils import timezone
-
+from django.conf import settings
 
 def generate_insurance_policy_number():
     last_user_insurance_obj = UserInsurance.objects.all().order_by('id').last()
@@ -82,7 +86,7 @@ class InsurerAccount(auth_model.TimeStampedModel):
             return False
 
 
-class InsurancePlans(auth_model.TimeStampedModel):
+class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     insurer = models.ForeignKey(Insurer,related_name="plans", on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     amount = models.PositiveIntegerField(default=None)
@@ -118,7 +122,7 @@ class InsurancePlanContent(auth_model.TimeStampedModel):
         unique_together = (("plan", "title"),)
 
 
-class InsuranceThreshold(auth_model.TimeStampedModel):
+class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
     #insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name="threshold", on_delete=models.CASCADE)
     opd_count_limit = models.PositiveIntegerField(default=None)
@@ -154,6 +158,13 @@ class UserInsurance(auth_model.TimeStampedModel):
     class Meta:
         db_table = "user_insurance"
 
+    def is_valid(self):
+        if len(self)>0 and self.expiry_date >= timezone.now():
+            return True
+        else:
+            return False
+
+
     @classmethod
     def create_user_insurance(self, insurance_data):
         import json
@@ -175,6 +186,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     @classmethod
     def validate_insurance(self, appointment_data):
+        from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
         profile = appointment_data['profile']
         user = appointment_data['user']
         user_insurance = UserInsurance.objects.filter(user=user).first()
@@ -195,7 +207,35 @@ class UserInsurance(auth_model.TimeStampedModel):
                 if timezone.now() < user_insurance.expiry_date:
                     insured_members = user_insurance.members.all().filter(profile=profile)
                     if insured_members:
-                        return True, user_insurance.id, 'Covered Under Insurance'
+                        doctor = DoctorPracticeSpecialization.objects.get(doctor_id=appointment_data['doctor'])
+                        gynecologist_list = json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS)
+                        oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
+                        if doctor.specialization_id in oncologist_list or \
+                                        doctor.specialization_id in gynecologist_list:
+                            if doctor.specialization_id in gynecologist_list:
+                                doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
+                                    specialization_id__in=gynecologist_list).values_list(
+                                    'doctor_id', flat=True)
+                                opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
+                                    doctor_id__in=doctor_with_same_specialization, payment_type=3,
+                                    insurance_id__isnull=False).count()
+                                if opd_appointment_count >= 5:
+                                    return False, user_insurance.id, 'Gynecologist Limit of 5 exceeded'
+                                else:
+                                    return True, user_insurance.id, 'Covered Under Insurance'
+                            elif doctor.specialization_id in oncologist_list:
+                                doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
+                                    specialization_id__in=oncologist_list).values_list(
+                                    'doctor_id', flat=True)
+                                opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
+                                    doctor_id__in=doctor_with_same_specialization, payment_type=3,
+                                    insurance_id__isnull=False).count()
+                                if opd_appointment_count >= 5:
+                                    return False, user_insurance.id, 'Oncologist Limit of 5 exceeded'
+                                else:
+                                    return True, user_insurance.id, 'Covered Under Insurance'
+                        else:
+                            return True, user_insurance.id, 'Covered Under Insurance'
                     else:
                         return False, user_insurance.id, 'Profile Not covered under insurance'
                 else:
@@ -252,7 +292,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
     # insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
     # insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
     first_name = models.CharField(max_length=50, null=False)
-    last_name = models.CharField(max_length=50, null=False)
+    last_name = models.CharField(max_length=50, null=True)
     dob = models.DateField(blank=True, null=True)
     email = models.EmailField(max_length=100)
     relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
