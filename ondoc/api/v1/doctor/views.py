@@ -105,12 +105,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                   doctor__manageable_doctors__is_disabled=False,
                   doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
                                                                    auth_models.GenericAdmin.ALL]) |
-                Q(Q(Q(hospital__manageable_hospitals__user=user), ~Q(hospital__manageable_hospitals__doctor=F('doctor'))),
-                  Q(doctor__manageable_doctors__user=user,
+                Q(doctor__manageable_doctors__user=user,
                     doctor__manageable_doctors__hospital__isnull=True,
                     doctor__manageable_doctors__is_disabled=False,
                     doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                   auth_models.GenericAdmin.ALL]))
+                                                                   auth_models.GenericAdmin.ALL])
                  |
                 Q(hospital__manageable_hospitals__doctor__isnull=True,
                   hospital__manageable_hospitals__user=user,
