@@ -85,6 +85,12 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         else:
             coupons_data = coupons_data.filter(is_visible=True)
 
+        # check if a user is new i.e user has done any appointments
+        new_user = True
+        if request.user.is_authenticated:
+            user = request.user
+            mixin_obj = CouponsMixin()
+            new_user = mixin_obj.is_user_first_time(user)
 
         applicable_coupons = []
         for coupon in coupons_data:
@@ -98,18 +104,19 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
             if (coupon.count is None or used_count < coupon.count) and (coupon.total_count is None or total_used_count < coupon.total_count):
                 if (timezone.now() - coupon.created_at).days <= coupon.validity:
-                    applicable_coupons.append({"coupon_type": coupon.type,
-                                               "coupon_id": coupon.id,
-                                               "code": coupon.code,
-                                               "desc": coupon.description,
-                                               "coupon_count": coupon.count,
-                                               "used_count": used_count,
-                                               "coupon": coupon,
-                                               "heading": coupon.heading,
-                                               "is_corporate" : coupon.is_corporate,
-                                               "tests": [ test.id for test in coupon.test.all() ],
-                                               "network_id": coupon.lab_network.id if coupon.lab_network else None,
-                                               "tnc": coupon.tnc})
+                    if not coupon.new_user_constraint or new_user:
+                        applicable_coupons.append({"coupon_type": coupon.type,
+                                                "coupon_id": coupon.id,
+                                                "code": coupon.code,
+                                                "desc": coupon.description,
+                                                "coupon_count": coupon.count,
+                                                "used_count": used_count,
+                                                "coupon": coupon,
+                                                "heading": coupon.heading,
+                                                "is_corporate" : coupon.is_corporate,
+                                                "tests": [ test.id for test in coupon.test.all() ],
+                                                "network_id": coupon.lab_network.id if coupon.lab_network else None,
+                                                "tnc": coupon.tnc})
 
         if applicable_coupons:
             def compare_coupon(coupon):

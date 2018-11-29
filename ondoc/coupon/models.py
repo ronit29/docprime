@@ -21,7 +21,6 @@ class Coupon(auth_model.TimeStampedModel):
     tnc = models.CharField(max_length=2000, default="")
     lab_network = models.ForeignKey("diagnostic.LabNetwork", on_delete=models.CASCADE, blank=True, null=True)
     lab = models.ForeignKey("diagnostic.Lab", on_delete=models.CASCADE, blank=True, null=True)
-    # test = models.ManyToManyField("diagnostic.LabTest", blank=True, null=True, )
     test = models.ManyToManyField("diagnostic.LabTest", blank=True, null=True)
     show_price = models.BooleanField(default=True)
     is_user_specific = models.BooleanField(default=False)

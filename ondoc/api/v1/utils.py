@@ -4,7 +4,7 @@ from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
 from django.db import connection, transaction
-from django.db.models import F, Func
+from django.db.models import F, Func, Q, Count, Sum
 from django.utils import timezone
 import math
 import datetime
@@ -508,9 +508,14 @@ class CouponsMixin(object):
                 if not user_specific_coupon:
                     return {"is_valid": False, "used_count": None}
 
+            # check if a user is new i.e user has done any appointments
+            if user and coupon_obj.new_user_constraint:
+                if not self.is_user_first_time(user):
+                    return {"is_valid": False, "used_count": 0}
+
             count = coupon_obj.used_coupon_count(user)
             total_used_count = coupon_obj.total_used_coupon_count()
-
+            
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:
@@ -549,7 +554,6 @@ class CouponsMixin(object):
                     pass
 
         return is_valid
-
 
     def get_discount(self, coupon_obj, price):
 
@@ -595,6 +599,15 @@ class CouponsMixin(object):
 
         return {"total_price": total_price}
 
+    def is_user_first_time(self, user):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        new_user = True
+        all_appointments = LabAppointment.objects.filter(Q(user=user), ~Q(status__in=[LabAppointment.CANCELLED])).count() + OpdAppointment.objects.filter(Q(user=user), ~Q(status__in=[OpdAppointment.CANCELLED])).count()
+        if all_appointments > 0:
+            new_user = False
+        return new_user
 
 
 class TimeSlotExtraction(object):
