@@ -293,7 +293,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
     first_name = models.CharField(max_length=50, null=False)
     last_name = models.CharField(max_length=50, null=True)
     dob = models.DateField(blank=True, null=True)
-    email = models.EmailField(max_length=100)
+    email = models.EmailField(max_length=100, null=True)
     relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
     pincode = models.PositiveIntegerField(default=None)
     address = models.TextField(default=None)
