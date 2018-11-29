@@ -347,7 +347,14 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     
     def get_enabled_for_online_booking(self, obj):
-        return obj.doctor_clinic.enabled_for_online_booking
+        enable_for_online_booking = False
+        if obj.doctor_clinic:
+            doctor_clinic = obj.doctor_clinic
+            if obj.doctor_clinic.hospital and obj.doctor_clinic.doctor:
+                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.doctor.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                   enable_for_online_booking = True
+        return enable_for_online_booking
+
     def get_lat(self, obj):
         if obj.doctor_clinic.hospital.location:
             return obj.doctor_clinic.hospital.location.y
@@ -675,7 +682,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     hospitals = serializers.SerializerMethodField(read_only=True)
     procedures = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
-    enabled_for_online_booking = serializers.BooleanField(read_only=True)
+    enabled_for_online_booking = serializers.BooleanField()
     availability = None
     seo = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
@@ -733,7 +740,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if sublocality and locality and specialization:
             title = specialization + 's near ' + sublocality + ' ' + locality
 
-        if lat and long and specialization and title and result_count:
+        if lat and long and top_specialization and title and result_count:
             return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title, 'result_count':result_count}
         return None
 
