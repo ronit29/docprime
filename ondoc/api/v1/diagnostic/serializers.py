@@ -285,6 +285,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
             if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
                 user_insurance = logged_in_user.purchased_insurance.filter().first()
                 if user_insurance:
+                    # TODO: check if still insurance is valid
                     insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                     if insurance_threshold:
                         resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
@@ -292,7 +293,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
                         resp['is_user_insured'] = True
 
             lab = obj.lab
-            if lab and lab.is_insurance_enabled and obj.mrp <= resp['insurance_threshold_amount']:
+            if lab and obj.mrp <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp
@@ -332,31 +333,20 @@ class LabCustomSerializer(serializers.Serializer):
     pickup_charges = serializers.IntegerField(default=None)
     insurance = serializers.SerializerMethodField()
     distance_related_charges = serializers.IntegerField()
+    tests = serializers.ListField(child=serializers.DictField())
 
     def get_insurance(self, obj):
-        request = self.context.get("request")
-        resp = {
-            'is_insurance_covered': False,
-            'insurance_threshold_amount': 0,
-            'is_user_insured': False
+        insurance_data_dict = self.context.get("insurance_data_dict")
+        is_insurance_covered = False
+        lab = obj.get('lab', None)
+        if lab and obj.get('mrp', 0) <= insurance_data_dict['insurance_threshold_amount']:
+            is_insurance_covered = True
+
+        return {
+            "is_insurance_covered": is_insurance_covered,
+            "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
+            "is_user_insured": insurance_data_dict['is_user_insured'],
         }
-        if request:
-            logged_in_user = request.user
-            if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-                user_insurance = logged_in_user.purchased_insurance.filter().first()
-                if user_insurance:
-                    insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                    if insurance_threshold:
-                        resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
-                            insurance_threshold.lab_amount_limit
-                        resp['is_user_insured'] = True
-
-            lab = obj.get('lab', None)
-            if lab and lab.is_insurance_enabled and obj.get('mrp', 0) <= resp['insurance_threshold_amount']:
-                resp['is_insurance_covered'] = True
-
-        return resp
-
 
     # def get_lab(self, obj):
     #     queryset = Lab.objects.get(pk=obj['lab'])
@@ -797,6 +787,7 @@ class SearchLabListSerializer(serializers.Serializer):
     sort_on = serializers.CharField(required=False)
     name = serializers.CharField(required=False)
     network_id = serializers.IntegerField(required=False)
+    is_insurance = serializers.BooleanField(required=False)
 
 
 class UpdateStatusSerializer(serializers.Serializer):
@@ -813,6 +804,13 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     lab_test = AvailableLabTestSerializer(many=True)
     address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
+    reports = serializers.SerializerMethodField()
+
+    def get_reports(self, obj):
+        reports = []
+        for rep in obj.get_reports():
+            reports.append({"details": rep.report_details, "files":[file.name.url for file in rep.files.all()]})
+        return reports
 
     def get_address(self, obj):
         resp_address = ""
@@ -836,7 +834,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):

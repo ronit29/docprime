@@ -23,7 +23,7 @@ from collections import defaultdict
 
 
 class DoctorSearchHelper:
-    MAX_DISTANCE = "20000"
+    MAX_DISTANCE = "1500000000"
 
     def __init__(self, query_params):
         self.query_params = query_params
@@ -122,8 +122,22 @@ class DoctorSearchHelper:
             params['current_hour'] = str(current_hour)
 
         if self.query_params.get("doctor_name"):
-            search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
+            name = self.query_params.get("doctor_name").lower().strip()
+            removals = ['doctor.','doctor ','dr.','dr ']
+            for rm in removals:
+                # if name.startswith(rm):
+                if name.startswith(rm):
+                    name = name[len(rm):].strip()
+                    break
+
+                # stripped = name.lstrip(rm)
+                # if len(stripped) != len(name):
+                #     name = stripped
+                #     break
+            search_key = re.findall(r'[a-z0-9A-Z.]+', name)
+            # search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
             search_key = " ".join(search_key).lower()
+
             search_key = "".join(search_key.split("."))
             filtering_params.append(
                 "d.search_key ilike (%(doctor_name)s)"
@@ -137,9 +151,20 @@ class DoctorSearchHelper:
                 "h.search_key ilike (%(hospital_name)s)")
             params['hospital_name'] = '%' + search_key + '%'
 
+        if self.query_params.get('is_insurance'):
+            filtering_params.append(
+                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_online_booking=True and d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True"
+            )
+            params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
+
         if not filtering_params:
             return "1=1"
         result = {}
+        if not filtering_params:
+            result['string'] = "1=1"
+            result['params'] = params
+            return result
+
         result['string'] = " and ".join(filtering_params)
         result['params'] = params
         if len(procedure_ids) > 0:
@@ -320,7 +345,7 @@ class DoctorSearchHelper:
                 # return doctor_hospital.deal_price
         return None
 
-    def prepare_search_response(self, doctor_data, doctor_search_result, request):
+    def prepare_search_response(self, doctor_data, doctor_search_result, request, **kwargs):
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
@@ -332,18 +357,18 @@ class DoctorSearchHelper:
 
         # boiler_code_for_categories =
 
-        # Insurance check for logged in user
-        logged_in_user = request.user
-        is_user_isured = False
-        insurance_threshold_amount = 0
-        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-            user_insurance = logged_in_user.purchased_insurance.filter().first()
-            if user_insurance:
-                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                if insurance_threshold:
-                    insurance_threshold_amount = 0 if insurance_threshold.opd_amount_limit is None else \
-                        insurance_threshold.opd_amount_limit
-                    is_user_isured = True
+        # # Insurance check for logged in user
+        # logged_in_user = request.user
+        # is_user_isured = False
+        # insurance_threshold_amount = 0
+        # if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+        #     user_insurance = logged_in_user.purchased_insurance.filter().first()
+        #     if user_insurance:
+        #         insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+        #         if insurance_threshold:
+        #             insurance_threshold_amount = 0 if insurance_threshold.opd_amount_limit is None else \
+        #                 insurance_threshold.opd_amount_limit
+        #             is_user_isured = True
 
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         for doctor in doctor_data:
@@ -364,6 +389,7 @@ class DoctorSearchHelper:
                         "mrp": data.mrp
                     }
             # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
+
             if not doctor_clinic:
                 hospitals = []
             else:
@@ -386,14 +412,26 @@ class DoctorSearchHelper:
                                                                         other_procedures_list)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
 
+                enable_online_booking = False
+                if doctor_clinic and doctor and doctor_clinic.hospital:
+                    if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                        enable_online_booking = True
+
+                # We cover the insurance for only those users which have purchased the insurance and their insurance
+                # threshold value is greater than the doctor fees and if doctor is enabled for the online booking.
+                # Insurance is not valid for the procedures hence negating the procedure request.
+
                 is_insurance_covered = False
-                if doctor.is_insurance_enabled and min_price["mrp"] <= insurance_threshold_amount:
+                insurance_data_dict = kwargs.get('insurance_data')
+                if enable_online_booking and insurance_data_dict and min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
+                        not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True
 
                 hospitals = [{
+                    "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
-                    "insurance_threshold_amount": insurance_threshold_amount,
-                    "is_user_insured": is_user_isured,
+                    "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
+                    "is_user_insured": insurance_data_dict['is_user_insured'],
                     "hospital_name": doctor_clinic.hospital.name,
                     "address": ", ".join(
                         [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if

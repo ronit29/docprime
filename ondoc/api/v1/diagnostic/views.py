@@ -3,10 +3,10 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonDiagnosticCondition, CommonTest, CommonPackage)
+                                     CommonDiagnosticCondition, CommonTest, CommonPackage, LabPricingGroup)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
-from ondoc.insurance.models import UserInsurance
+from ondoc.insurance.models import UserInsurance, InsuranceThreshold
 from ondoc.notification.models import EmailNotification
 from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
@@ -27,6 +27,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
+from django.db.models import Prefetch
 from django.db import transaction
 from django.db.models import Count, Sum, Max, When, Case, F, Q, Value, DecimalField, IntegerField
 from django.http import Http404
@@ -190,15 +191,35 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if kwargs.get('url'):
             serializer.validated_data['url'] = kwargs['url']
 
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        insurance_data_dict = {
+            'is_user_insured': False,
+            'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000
+        }
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().first()
+            if user_insurance:
+                # TODO: check if still insurance is valid
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    insurance_data_dict['is_user_insured'] = True
+
         parameters = serializer.validated_data
+
+        parameters['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
 
         queryset = self.get_lab_list(parameters)
         count = queryset.count()
         paginated_queryset = paginate_queryset(queryset, request)
-        response_queryset = self.form_lab_whole_data(paginated_queryset)
+        response_queryset = self.form_lab_whole_data(paginated_queryset, parameters.get("ids"))
 
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset,  many=True,
-                                         context={"request": request})
+                                         context={"request": request, "insurance_data_dict": insurance_data_dict})
 
         entity_ids = [lab_data['id'] for lab_data in response_queryset]
 
@@ -397,6 +418,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_price = parameters.get('max_price')
         name = parameters.get('name')
         network_id = parameters.get("network_id")
+        is_insurance = parameters.get('is_insurance')
+        insurance_threshold_amount = parameters.get('insurance_threshold_amount')
 
         # queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
         #                                                                                         lab_pricing_group__labs__is_test_lab=False)
@@ -455,6 +478,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                pickup_charges=Max(home_pickup_calculation),
                                                order_priority=Max('order_priority')).filter(count__gte=len(ids)))
 
+            if is_insurance:
+                queryset = queryset.filter(mrp__lte=insurance_threshold_amount)
+
             if min_price is not None:
                 queryset = queryset.filter(price__gte=min_price)
 
@@ -488,15 +514,40 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.order_by("-order_priority", "distance")
         return queryset
 
-    def form_lab_whole_data(self, queryset):
+    def form_lab_whole_data(self, queryset, test_ids=None):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges').filter(id__in=ids)
+        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
+
+        if test_ids:
+            group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
+                    "available_lab_tests",
+                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    to_attr="selected_tests"
+                )).all()
+
+            labs = labs.prefetch_related(
+                Prefetch(
+                    "lab_pricing_group",
+                    queryset=group_queryset,
+                    to_attr="selected_group"
+                )
+            )
+        labs = labs.filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
+        tests = dict()
 
         for obj in labs:
             temp_var[obj.id] = obj
+            tests[obj.id] = list()
+            if test_ids and obj.selected_group and obj.selected_group.selected_tests:
+                for test in obj.selected_group.selected_tests:
+                    if test.custom_deal_price:
+                        deal_price=test.custom_deal_price
+                    else:
+                        deal_price=test.computed_deal_price
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
         day_now = timezone.now().weekday()
         days_array = [i for i in range(7)]
         rotated_days_array = days_array[day_now:] + days_array[:day_now]
@@ -549,6 +600,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row["lab_timing_data"] = lab_timing_data
             row["next_lab_timing"] = next_lab_timing_dict
             row["next_lab_timing_data"] = next_lab_timing_data_dict
+            row["tests"] = tests.get(row["id"])
             resp_queryset.append(row)
 
         return resp_queryset

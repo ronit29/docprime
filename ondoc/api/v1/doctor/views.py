@@ -56,6 +56,7 @@ from ondoc.matrix.tasks import push_order_to_matrix
 from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Count
+from ondoc.insurance.models import InsuranceThreshold
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -945,6 +946,27 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         specialization_id = kwargs.get('specialization_id', None)
         specialization_dynamic_content = ''
 
+
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_data_dict = {
+            'is_user_insured': False,
+            'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000
+        }
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().first()
+            if user_insurance:
+                # TODO: check if still insurance is valid
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
+                        insurance_threshold.opd_amount_limit
+                    insurance_data_dict['is_user_insured'] = True
+
+        validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
             filtering_params = doctor_search_helper.get_filtering_params()
@@ -969,7 +991,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "images",
                                                 "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping").order_by(preserved)
 
-        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request)
+        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request, insurance_data=insurance_data_dict)
 
         entity_ids = [doctor_data['id'] for doctor_data in response]
 

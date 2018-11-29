@@ -17,6 +17,7 @@ import json
 import logging
 import requests
 import datetime
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +259,21 @@ class Order(TimeStampedModel):
             }
 
         return ops_data
+
+    def get_doctor_prices(self):
+        total_deal_price = Decimal(self.action_data.get('deal_price'))
+        total_mrp = Decimal(self.action_data.get('mrp'))
+        total_agreed_price = Decimal(self.action_data.get('fees'))
+        procedures_details = self.action_data.get('extra_details', [])
+        procedures_deal_price, procedures_mrp, procedures_agreed_price = 0, 0, 0
+        for procedure in procedures_details:
+            procedures_mrp += procedure.get('mrp')
+            procedures_deal_price += procedure.get('deal_price')
+            procedures_agreed_price += procedure.get('agreed_price')
+        doctor_deal_price = total_deal_price - procedures_deal_price
+        doctor_mrp = total_mrp - procedures_mrp
+        doctor_agreed_price = total_agreed_price - procedures_agreed_price
+        return doctor_deal_price, doctor_mrp, doctor_agreed_price
 
     class Meta:
         db_table = "order"
