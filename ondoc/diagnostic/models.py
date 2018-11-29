@@ -725,7 +725,7 @@ class LabTestPackage(TimeStampedModel):
 
 
 class AvailableLabTest(TimeStampedModel):
-    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests', null=True, blank=True)
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='availabletests', null=True, blank=True)  # Don't use
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='availablelabs')
     mrp = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     computed_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)

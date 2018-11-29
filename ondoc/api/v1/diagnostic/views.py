@@ -658,9 +658,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
     @transaction.atomic
     def create(self, request, **kwargs):
-        data = request.data
+        data = dict(request.data)
         if not data.get("is_home_pickup"):
-            data.pop("address")
+            data.pop("address", None)
         serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         appointment_data = self.form_lab_app_data(request, serializer.validated_data)
