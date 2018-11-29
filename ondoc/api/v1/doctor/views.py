@@ -259,10 +259,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         coupon_list = []
         coupon_discount = 0
         if data.get("coupon_code"):
-            coupon_list = list(Coupon.objects.filter(code__in=data.get("coupon_code")).values_list('id', flat=True))
+            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
             obj = models.OpdAppointment()
-            for coupon in data.get("coupon_code"):
+            for coupon in coupon_obj:
                 coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
+                coupon_list.append(coupon.id)
 
         extra_details = []
         effective_price = 0
@@ -1474,6 +1475,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 auth_models.GenericLabAdmin.objects.create(user=user,
                                                            phone_number=valid_data['phone_number'],
                                                            lab_network=None,
+                                                           name=valid_data.get('name'),
                                                            lab=lab,
                                                            permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
                                                            is_disabled=False,
@@ -1486,6 +1488,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 auth_models.GenericLabAdmin.objects.create(user=user,
                                                            phone_number=valid_data['phone_number'],
                                                            lab_network=None,
+                                                           name=valid_data.get('name'),
                                                            lab=lab,
                                                            permission_type=auth_models.GenericLabAdmin.BILLING,
                                                            is_disabled=False,
@@ -1547,7 +1550,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             hos_list = [i for i in hos_data]
         result_data = opd_list + hos_list
         lab_queryset = lab_models.Lab.objects.prefetch_related('manageable_lab_admins')\
-                                             .filter(is_live= True,
+                                             .filter(is_live=True,
                                                      manageable_lab_admins__user=user,
                                                      manageable_lab_admins__is_disabled=False,
                                                      manageable_lab_admins__super_user_permission=True)\
@@ -1747,7 +1750,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                         return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-            delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=valid_data.get('phone_number'),
+            delete_queryset = auth_models.GenericAdmin.objects.filter(phone_number=phone_number,
                                                                       entity_type=GenericAdminEntity.HOSPITAL)
             if valid_data.get('remove_list'):
                 delete_queryset = delete_queryset.filter(doctor_id__in=valid_data.get('remove_list'))

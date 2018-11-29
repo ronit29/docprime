@@ -264,7 +264,7 @@ class GenericLabAdminInline(admin.TabularInline):
     show_change_link = False
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    fields = ['user', 'phone_number', 'lab', 'permission_type', 'super_user_permission', 'is_disabled', 'read_permission', 'write_permission']
+    fields = ['user', 'phone_number', 'name', 'lab', 'permission_type', 'super_user_permission', 'is_disabled', 'write_permission']
 
 
 class LabDocumentFormSet(forms.BaseInlineFormSet):
