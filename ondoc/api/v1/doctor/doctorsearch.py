@@ -121,8 +121,22 @@ class DoctorSearchHelper:
             params['current_hour'] = str(current_hour)
 
         if self.query_params.get("doctor_name"):
-            search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
+            name = self.query_params.get("doctor_name").lower().strip()
+            removals = ['doctor.','doctor ','dr.','dr ']
+            for rm in removals:
+                # if name.startswith(rm):
+                if name.startswith(rm):
+                    name = name[len(rm):].strip()
+                    break
+
+                # stripped = name.lstrip(rm)
+                # if len(stripped) != len(name):
+                #     name = stripped
+                #     break
+            search_key = re.findall(r'[a-z0-9A-Z.]+', name)
+            # search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
             search_key = " ".join(search_key).lower()
+
             search_key = "".join(search_key.split("."))
             filtering_params.append(
                 "d.search_key ilike (%(doctor_name)s)"
