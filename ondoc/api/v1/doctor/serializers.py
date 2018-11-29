@@ -16,6 +16,7 @@ from django.db.models import Avg
 from django.db.models import Q
 
 from ondoc.coupon.models import Coupon
+from ondoc.account.models import Order
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.ratings import serializers as rating_serializer
@@ -246,10 +247,24 @@ class CreateAppointmentSerializer(serializers.Serializer):
                     request.data))
             raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
 
-        if data.get("coupon_code"):
-            for coupon in data.get("coupon_code"):
+        coupon_code = data.get("coupon_code", [])
+        coupon_obj = Coupon.objects.filter(code__in=coupon_code)
+        if len(coupon_code) == len(coupon_obj):
+            ##### DO NOT DELETE ######
+            # for coupon in coupon_obj:
+            #     obj = OpdAppointment()
+            #     if obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
+            #         if coupon.is_user_specific:
+            #             if not obj.validate_product_coupon(coupon_obj=coupon,
+            #                                                      lab=data.get("lab"), test=data.get("test_ids"),
+            #                                                      product_id=Order.LAB_PRODUCT_ID):
+            #                 raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+            #     else:
+            #         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+            ##########################
+            for coupon in coupon_obj:
                 obj = OpdAppointment()
-                if not obj.validate_coupon(request.user, coupon).get("is_valid"):
+                if not obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
                     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         return data
