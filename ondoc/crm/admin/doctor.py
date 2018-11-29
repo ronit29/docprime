@@ -631,7 +631,8 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
     formset = GenericAdminFormSet
     form = GenericAdminForm
     show_change_link = False
-    exclude = ('hospital_network', 'source_type', 'is_doc_admin', 'read_permission')
+    # exclude = ('hospital_network', 'source_type', 'is_doc_admin', 'read_permission')
+    fields = ('phone_number', 'hospital', 'name', 'permission_type', 'super_user_permission', 'write_permission', 'user', 'updated_at')
     verbose_name_plural = "Admins"
 
     # def has_delete_permission(self, request, obj=None):
@@ -651,7 +652,7 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
         #     return ['phone_number', 'is_disabled', 'write_permission', 'read_permission', 'hospital',  'permission_type',
         #             'user', 'is_doc_admin']
         # else:
-        return ['user']
+        return ['user', 'updated_at']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
