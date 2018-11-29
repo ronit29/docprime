@@ -6,7 +6,7 @@ from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointm
                                      CommonDiagnosticCondition, CommonTest, CommonPackage, LabPricingGroup)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
-from ondoc.insurance.models import UserInsurance
+from ondoc.insurance.models import UserInsurance, InsuranceThreshold
 from ondoc.notification.models import EmailNotification
 from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
@@ -191,7 +191,27 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if kwargs.get('url'):
             serializer.validated_data['url'] = kwargs['url']
 
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        insurance_data_dict = {
+            'is_user_insured': False,
+            'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000
+        }
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().first()
+            if user_insurance:
+                # TODO: check if still insurance is valid
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
+                        insurance_threshold.lab_amount_limit
+                    insurance_data_dict['is_user_insured'] = True
+
         parameters = serializer.validated_data
+
+        parameters['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
 
         queryset = self.get_lab_list(parameters)
         count = queryset.count()
@@ -199,7 +219,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         response_queryset = self.form_lab_whole_data(paginated_queryset, parameters.get("ids"))
 
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset,  many=True,
-                                         context={"request": request})
+                                         context={"request": request, "insurance_data_dict": insurance_data_dict})
 
         entity_ids = [lab_data['id'] for lab_data in response_queryset]
 
@@ -398,6 +418,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_price = parameters.get('max_price')
         name = parameters.get('name')
         network_id = parameters.get("network_id")
+        is_insurance = parameters.get('is_insurance')
+        insurance_threshold_amount = parameters.get('insurance_threshold_amount')
 
         # queryset = AvailableLabTest.objects.select_related('lab').exclude(enabled=False).filter(lab_pricing_group__labs__is_live=True,
         #                                                                                         lab_pricing_group__labs__is_test_lab=False)
@@ -455,6 +477,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                name=Max('name'),
                                                pickup_charges=Max(home_pickup_calculation),
                                                order_priority=Max('order_priority')).filter(count__gte=len(ids)))
+
+            if is_insurance:
+                queryset = queryset.filter(mrp__lte=insurance_threshold_amount)
 
             if min_price is not None:
                 queryset = queryset.filter(price__gte=min_price)
