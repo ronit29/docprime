@@ -398,7 +398,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                             insurance_threshold.opd_amount_limit
                         resp['is_user_insured'] = True
 
-            if obj.mrp <= resp['insurance_threshold_amount']:
+            if obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp

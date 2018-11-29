@@ -119,7 +119,7 @@ class InsurancePlanContent(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'insurance_plan_content'
-        unique_together = (("plan", "title"),)
+        # unique_together = (("plan", "title"),)
 
 
 class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):

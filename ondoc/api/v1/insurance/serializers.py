@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from collections import defaultdict
 from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
@@ -23,7 +24,11 @@ class InsurancePlansSerializer(serializers.ModelSerializer):
     threshold = InsuranceThresholdSerializer(source='get_active_threshold', many=True)
 
     def get_content(self, obj):
-        return obj.content.filter(title__in=InsurancePlanContent.PossibleTitles.availabilities()).values('title', 'content')
+        resp = defaultdict(list)
+        qs = obj.content.all().values('title', 'content')
+        for e in qs:
+            resp[e['title'].lower()].append(e['content'])
+        return resp
 
     class Meta:
         model = InsurancePlans

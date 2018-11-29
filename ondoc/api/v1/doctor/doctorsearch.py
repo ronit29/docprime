@@ -423,7 +423,8 @@ class DoctorSearchHelper:
 
                 is_insurance_covered = False
                 insurance_data_dict = kwargs.get('insurance_data')
-                if enable_online_booking and insurance_data_dict and min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
+                if enable_online_booking and insurance_data_dict and min_price.get("mrp") is not None and \
+                        min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
                         not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True
 

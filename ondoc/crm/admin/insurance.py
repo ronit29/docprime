@@ -15,9 +15,19 @@ class InsurerFloatAdmin(admin.ModelAdmin):
     list_display = ['insurer']
 
 
+class InsurancePlanContentInline(admin.TabularInline):
+    model = InsurancePlanContent
+    fields = ('title', 'content')
+    extra = 0
+    # can_delete = False
+    # show_change_link = False
+    # can_add = False
+    # readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
+
 class InsurancePlansAdmin(admin.ModelAdmin):
 
     list_display = ['insurer', 'name', 'amount']
+    inlines = [InsurancePlanContentInline]
 
 
 class InsuranceThresholdAdmin(admin.ModelAdmin):
@@ -77,8 +87,9 @@ class InsuredMembersAdmin(admin.ModelAdmin):
 #         css = {'all':('insurance/css/style.css',)}
 
 
-class InsurancePlanContentAdmin(admin.ModelAdmin):
-    model = InsurancePlanContent
-    fields = ('plan', 'title', 'content')
-    list_display = ('plan', 'title',)
-
+# class InsurancePlanContentAdmin(admin.ModelAdmin):
+#     model = InsurancePlanContent
+#     fields = ('plan', 'title', 'content')
+#     list_display = ('plan', 'title',)
+#
+#
