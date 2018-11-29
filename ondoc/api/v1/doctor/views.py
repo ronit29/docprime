@@ -1474,6 +1474,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 auth_models.GenericLabAdmin.objects.create(user=user,
                                                            phone_number=valid_data['phone_number'],
                                                            lab_network=None,
+                                                           name=valid_data.get('name'),
                                                            lab=lab,
                                                            permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
                                                            is_disabled=False,
@@ -1486,6 +1487,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 auth_models.GenericLabAdmin.objects.create(user=user,
                                                            phone_number=valid_data['phone_number'],
                                                            lab_network=None,
+                                                           name=valid_data.get('name'),
                                                            lab=lab,
                                                            permission_type=auth_models.GenericLabAdmin.BILLING,
                                                            is_disabled=False,
@@ -1547,7 +1549,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             hos_list = [i for i in hos_data]
         result_data = opd_list + hos_list
         lab_queryset = lab_models.Lab.objects.prefetch_related('manageable_lab_admins')\
-                                             .filter(is_live= True,
+                                             .filter(is_live=True,
                                                      manageable_lab_admins__user=user,
                                                      manageable_lab_admins__is_disabled=False,
                                                      manageable_lab_admins__super_user_permission=True)\
