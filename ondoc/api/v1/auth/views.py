@@ -147,7 +147,7 @@ class UserViewset(GenericViewSet):
     @transaction.atomic
     def logout(self, request):
         required_token = request.data.get("token", None)
-        if required_token:
+        if required_token and request.user.is_authenticated:
             NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
         return Response({"message": "success"})
 

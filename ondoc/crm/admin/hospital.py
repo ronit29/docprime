@@ -81,8 +81,8 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
         if any(self.errors):
             return
         appnt_manager_flag = self.instance.is_appointment_manager
+        validate_unique = []
         if self.cleaned_data:
-            validate_unique = []
             phone_number = False
             for data in self.cleaned_data:
                 if data.get('phone_number') and data.get('permission_type') in [GenericAdmin.APPOINTMENT, GenericAdmin.ALL]:
@@ -116,16 +116,18 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
                 if row[1] is None and numbers.count(row[0]) > 2:
                     raise forms.ValidationError(
                         "Permissions for all doctors already allocated for %s." % (row[0]))
-        doc_num = DoctorNumber.objects.filter(hospital_id=self.instance.id)
-        doc_num_list = [(dn.phone_number, dn.doctor) for dn in doc_num.all()]
-        if doc_num.exists():
-            validate_unique_del = [(d[0],d[1]) for d in validate_unique]
-            for data in self.deleted_forms:
-                del_tuple = (data.cleaned_data.get('phone_number'), data.cleaned_data.get('doctor'))
-                if del_tuple[0] not in dict(validate_unique_del) and (del_tuple in doc_num_list or
-                                                                  (del_tuple[1] is None and del_tuple[0] in dict(doc_num_list))):
-                    raise forms.ValidationError(
-                        "Doctor (%s) Mapping with this number needs to be deleted." % (dict(doc_num_list).get(del_tuple[0])))
+        doc_num_list = []
+        if self.instance:
+            doc_num = DoctorNumber.objects.filter(hospital_id=self.instance.id)
+            doc_num_list = [(dn.phone_number, dn.doctor) for dn in doc_num.all()]
+            if doc_num.exists():
+                validate_unique_del = [(d[0],d[1]) for d in validate_unique]
+                for data in self.deleted_forms:
+                    del_tuple = (data.cleaned_data.get('phone_number'), data.cleaned_data.get('doctor'))
+                    if del_tuple[0] not in dict(validate_unique_del) and (del_tuple in doc_num_list or
+                                                                      (del_tuple[1] is None and del_tuple[0] in dict(doc_num_list))):
+                        raise forms.ValidationError(
+                            "Doctor (%s) Mapping with this number needs to be deleted." % (dict(doc_num_list).get(del_tuple[0])))
 
 
 class GenericAdminInline(admin.TabularInline):
