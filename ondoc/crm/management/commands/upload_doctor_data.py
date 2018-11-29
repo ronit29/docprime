@@ -47,11 +47,11 @@ class Command(BaseCommand):
         specialization = UploadSpecialization()
 
         #doctor.p_image(sheets[0], source, batch)
-        # doctor.upload(sheets[0], source, batch, lines)
-        # qualification.upload(sheets[1], lines)
-        # experience.upload(sheets[2], lines)
-        # membership.upload(sheets[3], lines)
-        # award.upload(sheets[4], lines)
+        doctor.upload(sheets[0], source, batch, lines)
+        qualification.upload(sheets[1], lines)
+        experience.upload(sheets[2], lines)
+        membership.upload(sheets[3], lines)
+        award.upload(sheets[4], lines)
         hospital.upload(sheets[5], source, batch, lines)
         specialization.upload(sheets[6], lines)
 
@@ -230,7 +230,7 @@ class UploadDoctor(Doc):
             return doctor
 
         doctor = Doctor.objects.create(name=data['name'], license=data.get('license',''), gender=data['gender'],
-                                                       practicing_since=data['practicing_since'], source=source, batch=batch, enabled=False)
+                                                       practicing_since=data['practicing_since'], source=source, batch=batch, enabled=False, enabled_for_online_booking=False)
         SourceIdentifier.objects.create(type=SourceIdentifier.DOCTOR, unique_identifier=data.get('identifier'), reference_id=doctor.id)
         #self.save_image(batch,data.get('image_url'),data.get('identifier'))
         return doctor
@@ -587,7 +587,7 @@ class UploadHospital(Doc):
                 building = self.clean_data(sheet.cell(row=row, column=headers.get('building')).value)
                 city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
                 location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('gaddress')).value))
-                hospital = Hospital.objects.create(name=hospital_name, building=building, city=city, country='India', location=location, source=source, batch=batch)
+                hospital = Hospital.objects.create(name=hospital_name, building=building, city=city, country='India', location=location, source=source, batch=batch, enabled_for_online_booking=False)
                 SourceIdentifier.objects.create(reference_id=hospital.id, unique_identifier=hospital_identifier,
                                                     type=SourceIdentifier.HOSPITAL)
         except Exception as e:
@@ -600,7 +600,7 @@ class UploadHospital(Doc):
         # if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
         #     doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
         # else:
-        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj, defaults={'followup_charges':0, 'followup_duration':7})
+        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj, defaults={'followup_charges':0, 'followup_duration':7,enabled_for_online_booking:False})
         # doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
 
         return doc_clinic_obj
