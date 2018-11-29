@@ -717,7 +717,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                         locality = entity_address.alternative_value
                     if entity_address.type_blueprint == 'SUBLOCALITY':
                         sublocality = entity_address.alternative_value
-
+        top_specialization = None
         if len(obj.doctorpracticespecializations.all())>0:
             dsp = [specialization.specialization for specialization in obj.doctorpracticespecializations.all()]
             top_specialization = DoctorPracticeSpecialization.objects.filter(specialization__in=dsp).values('specialization')\
@@ -1190,6 +1190,23 @@ class AdminUpdateBodySerializer(AdminCreateBodySerializer):
     remove_list = serializers.ListField()
     old_phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999, required=False)
 
+
+    def validate(self, attrs):
+        if attrs['type'] == User.STAFF and 'name' not in attrs:
+            raise serializers.ValidationError("Name is Required.")
+        if attrs['type'] == User.DOCTOR and 'doc_profile' not in attrs and not attrs.get('doc_profile'):
+            raise serializers.ValidationError("DocProfile is Required.")
+        if attrs['entity_type'] == GenericAdminEntity.DOCTOR and 'assoc_hosp'not in attrs:
+            raise serializers.ValidationError("Associated Hospitals  are Required.")
+        if attrs['entity_type'] == GenericAdminEntity.DOCTOR and not Doctor.objects.filter(id=attrs['id']).exists():
+            raise serializers.ValidationError("entity Doctor Not Found.")
+        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and not Hospital.objects.filter(id=attrs['id']).exists():
+            raise serializers.ValidationError("entity Hospital Not Found.")
+        if attrs['entity_type'] == GenericAdminEntity.LAB and not lab_models.Lab.objects.filter(id=attrs['id']).exists():
+            raise serializers.ValidationError("entity Lab Not Found.")
+        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and 'assoc_doc' not in attrs:
+            raise serializers.ValidationError("Associated Doctors are Required.")
+        return attrs
 
 class AdminDeleteBodySerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
