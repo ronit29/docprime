@@ -6,7 +6,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
-from ondoc.api.v1.utils import form_time_slot
+from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity
 from ondoc.doctor.models import OpdAppointment
 from ondoc.account.models import Order
 from ondoc.coupon.models import Coupon
@@ -307,7 +307,7 @@ class LabCustomSerializer(serializers.Serializer):
     next_lab_timing_data = serializers.DictField()
     pickup_charges = serializers.IntegerField(default=None)
     distance_related_charges = serializers.IntegerField()
-
+    tests = serializers.ListField(child=serializers.DictField())
 
     # def get_lab(self, obj):
     #     queryset = Lab.objects.get(pk=obj['lab'])
@@ -772,6 +772,13 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     lab_test = AvailableLabTestSerializer(many=True)
     address = serializers.SerializerMethodField()
     type = serializers.ReadOnlyField(default='lab')
+    reports = serializers.SerializerMethodField()
+
+    def get_reports(self, obj):
+        reports = []
+        for rep in obj.get_reports():
+            reports.append({"details": rep.report_details, "files":[file.name.url for file in rep.files.all()]})
+        return reports
 
     def get_address(self, obj):
         resp_address = ""
@@ -795,7 +802,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
@@ -855,3 +862,28 @@ class LabReportSerializer(serializers.Serializer):
                   lab__network__manageable_lab_network_admins__is_disabled=False))).exists():
             raise serializers.ValidationError("User is not authorized to upload report.")
         return value
+
+
+
+class LabEntitySerializer(serializers.ModelSerializer):
+
+    address = serializers.SerializerMethodField()
+    entity_type = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
+
+
+    def get_thumbnail(self, obj):
+        request = self.context.get("request")
+        if not request:
+            raise ValueError("request is not passed in serializer.")
+        return request.build_absolute_uri(obj.get_thumbnail()) if obj.get_thumbnail() else None
+
+    def get_entity_type(self, obj):
+        return GenericAdminEntity.LAB
+
+    def get_address(self, obj):
+        return obj.get_lab_address() if obj.get_lab_address() else None
+
+    class Meta:
+        model = Lab
+        fields = ('id',  'thumbnail', 'name', 'address', 'entity_type')

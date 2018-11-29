@@ -9,7 +9,7 @@ from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
-from ondoc.authentication.models import GenericAdmin, User, QCModel
+from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber
 from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
 from django import forms
 
@@ -81,12 +81,19 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
         if any(self.errors):
             return
         appnt_manager_flag = self.instance.is_appointment_manager
+        validate_unique = []
         if self.cleaned_data:
             phone_number = False
             for data in self.cleaned_data:
-                if data.get('phone_number') and data.get('permission_type') == GenericAdmin.APPOINTMENT:
+                if data.get('phone_number') and data.get('permission_type') in [GenericAdmin.APPOINTMENT, GenericAdmin.ALL]:
                     phone_number = True
-                    break
+                    # break
+                if not data.get('DELETE'):
+                    row = (data.get('phone_number'), data.get('doctor'), data.get('permission_type'))
+                    if row in validate_unique:
+                        raise forms.ValidationError("Duplicate Permission with this %s exists." % (data.get('phone_number')))
+                    else:
+                        validate_unique.append(row)
             if phone_number:
                 if not appnt_manager_flag:
                     if not(len(self.deleted_forms) == len(self.cleaned_data)):
@@ -103,6 +110,24 @@ class GenericAdminFormSet(forms.BaseInlineFormSet):
             if appnt_manager_flag:
                 raise forms.ValidationError(
                     "An Admin phone number is required if 'Enabled for Managing Appointment' Field is Set.")
+        if validate_unique:
+            numbers = list(zip(*validate_unique))[0]
+            for row in validate_unique:
+                if row[1] is None and numbers.count(row[0]) > 2:
+                    raise forms.ValidationError(
+                        "Permissions for all doctors already allocated for %s." % (row[0]))
+        doc_num_list = []
+        if self.instance:
+            doc_num = DoctorNumber.objects.filter(hospital_id=self.instance.id)
+            doc_num_list = [(dn.phone_number, dn.doctor) for dn in doc_num.all()]
+            if doc_num.exists():
+                validate_unique_del = [(d[0],d[1]) for d in validate_unique]
+                for data in self.deleted_forms:
+                    del_tuple = (data.cleaned_data.get('phone_number'), data.cleaned_data.get('doctor'))
+                    if del_tuple[0] not in dict(validate_unique_del) and (del_tuple in doc_num_list or
+                                                                      (del_tuple[1] is None and del_tuple[0] in dict(doc_num_list))):
+                        raise forms.ValidationError(
+                            "Doctor (%s) Mapping with this number needs to be deleted." % (dict(doc_num_list).get(del_tuple[0])))
 
 
 class GenericAdminInline(admin.TabularInline):
@@ -112,10 +137,10 @@ class GenericAdminInline(admin.TabularInline):
     show_change_link = False
     form = GenericAdminForm
     formset = GenericAdminFormSet
-    readonly_fields = ['user']
+    readonly_fields = ['user', 'updated_at']
     verbose_name_plural = "Admins"
-    fields = ['phone_number', 'name', 'doctor', 'permission_type', 'super_user_permission', 'read_permission',
-              'write_permission', 'user', 'entity_type']
+    fields = ['phone_number', 'name', 'doctor', 'permission_type', 'super_user_permission',
+              'write_permission', 'user', 'updated_at']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')

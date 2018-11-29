@@ -7,9 +7,9 @@ from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
 from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
+from dal import autocomplete
 from rest_framework import mixins, viewsets, status
-from rest_framework.exceptions import ValidationError as RestValidationError
 from ondoc.api.v1.auth import serializers
 from rest_framework.response import Response
 from django.db import transaction, IntegrityError
@@ -20,11 +20,10 @@ from django.forms.models import model_to_dict
 
 from ondoc.coupon.models import UserSpecificCoupon
 from ondoc.sms.api import send_otp
-from django.forms.models import model_to_dict
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken)
+                                         AgentToken, DoctorNumber)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog
 from django.contrib.auth import get_user_model
@@ -36,26 +35,21 @@ from ondoc.api.v1.doctor.serializers import (OpdAppointmentSerializer, Appointme
                                              UpdateStatusSerializer, CreateAppointmentSerializer,
                                              AppointmentRetrieveSerializer, OpdAppTransactionModelSerializer,
                                              OpdAppModelSerializer)
-from ondoc.api.v1.doctor.views import DoctorAppointmentsViewSet
 from ondoc.api.v1.diagnostic.serializers import (LabAppointmentModelSerializer,
                                                  LabAppointmentRetrieveSerializer, LabAppointmentCreateSerializer,
                                                  LabAppTransactionModelSerializer, LabAppRescheduleModelSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
-from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from ondoc.authentication.backends import JWTAuthentication
-from ondoc.api.v1.utils import IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform, \
-    ErrorCodeMapping, IsNotAgent
-from ondoc.api.v1.auth .serializers import OnlineLeadSerializer
-import decimal
+from ondoc.api.v1.utils import (IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform,
+                                ErrorCodeMapping, IsNotAgent, GenericAdminEntity)
 from django.conf import settings
 from collections import defaultdict
 import copy
 import logging
 import jwt
 from decimal import Decimal
-
 from ondoc.web.models import ContactUs
 
 logger = logging.getLogger(__name__)
@@ -160,7 +154,7 @@ class UserViewset(GenericViewSet):
     @transaction.atomic
     def logout(self, request):
         required_token = request.data.get("token", None)
-        if required_token:
+        if required_token and request.user.is_authenticated:
             NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
         return Response({"message": "success"})
 
@@ -199,8 +193,11 @@ class UserViewset(GenericViewSet):
         user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
 
         if not user:
-            doctor_mobile = DoctorMobile.objects.filter(number=phone_number, is_primary=True)
-            user = User.objects.create(phone_number=data['phone_number'], is_phone_number_verified=True, user_type=User.DOCTOR)
+            user = User.objects.create(phone_number=data['phone_number'], is_phone_number_verified=True,
+                                       user_type=User.DOCTOR)
+            # doctor_mobile = DoctorMobile.objects.filter(number=phone_number, is_primary=True)
+        if not hasattr(user, 'doctor'):
+            doctor_mobile = DoctorNumber.objects.filter(phone_number=phone_number)
             if doctor_mobile.exists():
                 doctor = doctor_mobile.first().doctor
                 doctor.user = user
@@ -1226,24 +1223,39 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        doc_hosp_queryset = (DoctorClinic.objects.filter(doctor__is_live=True, hospital__is_live=True).annotate(
+        doc_hosp_queryset = (DoctorClinic.objects
+                             .select_related('doctor', 'hospital')
+                             .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
+                             .filter(doctor__is_live=True, hospital__is_live=True).annotate(
             hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital=F('hospital'),
-              doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-              doctor__manageable_doctors__write_permission=True) |
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital__isnull=True,
-              doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-              doctor__manageable_doctors__write_permission=True) |
-            Q(hospital__manageable_hospitals__doctor__isnull=True,
-              hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__is_disabled=False,
-              hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-              hospital__manageable_hospitals__write_permission=True)).
-                             values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
+            Q(
+                Q(doctor__manageable_doctors__user=user,
+                  doctor__manageable_doctors__hospital=F('hospital'),
+                  doctor__manageable_doctors__is_disabled=False,
+                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                  doctor__manageable_doctors__write_permission=True) |
+                Q(doctor__manageable_doctors__user=user,
+                  doctor__manageable_doctors__hospital__isnull=True,
+                  doctor__manageable_doctors__is_disabled=False,
+                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                  doctor__manageable_doctors__write_permission=True) |
+                Q(hospital__manageable_hospitals__doctor__isnull=True,
+                  hospital__manageable_hospitals__user=user,
+                  hospital__manageable_hospitals__is_disabled=False,
+                  hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                  hospital__manageable_hospitals__write_permission=True)
+            )|
+                Q(
+                    Q(doctor__manageable_doctors__user=user,
+                     doctor__manageable_doctors__super_user_permission=True,
+                     doctor__manageable_doctors__is_disabled=False,
+                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
+                    Q(hospital__manageable_hospitals__user=user,
+                      hospital__manageable_hospitals__super_user_permission=True,
+                      hospital__manageable_hospitals__is_disabled=False,
+                      hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+            )
+            ).values('hospital', 'doctor', 'hospital_name', 'doctor_name').distinct('hospital', 'doctor')
                              )
         return Response(doc_hosp_queryset)
 
@@ -1255,15 +1267,22 @@ class UserLabViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        user_lab_queryset = Lab.objects.filter(Q(manageable_lab_admins__user=user,
-                                                 manageable_lab_admins__is_disabled=False,
-                                                 manageable_lab_admins__write_permission=True) |
-                                               Q(network__manageable_lab_network_admins__user=user,
-                                                 network__manageable_lab_network_admins__is_disabled=False,
-                                                 network__manageable_lab_network_admins__write_permission=True
+        user_lab_queryset = Lab.objects.filter(
+                                              Q(Q(manageable_lab_admins__user=user,
+                                                  manageable_lab_admins__is_disabled=False,
+                                                  manageable_lab_admins__write_permission=True) |
+                                                Q(network__manageable_lab_network_admins__user=user,
+                                                  network__manageable_lab_network_admins__is_disabled=False,
+                                                  network__manageable_lab_network_admins__write_permission=True
                                                  )
-                                               ,
-                                               is_live=True
+                                                )
+                                                 |
+                                                (
+                                                 Q(manageable_lab_admins__user=user,
+                                                   manageable_lab_admins__is_disabled=False,
+                                                   manageable_lab_admins__super_user_permission=True)
+                                                 ),
+                                               Q(is_live=True)
                                                ).values('id', 'name')
         return Response(user_lab_queryset)
 
@@ -1275,21 +1294,40 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        queryset = GenericAdmin.objects.select_related('doctor', 'hospital').filter(Q(user=user,
-                                                 is_disabled=False,
-                                                 permission_type=GenericAdmin.BILLINNG,
-                                                 read_permission=True,
-                                                 write_permission=True
-                                                 ),
-                                               (
-                                                 Q(hospital__isnull=True,
-                                                   doctor__doctor_clinics__hospital__is_appointment_manager=False,
-                                                  )
-                                                 |
-                                                 Q(Q(hospital__isnull=False),
-                                                   (Q(hospital__hospital_doctors__doctor=F('doctor'), doctor__isnull=False) | Q(doctor__isnull=True))
+
+        queryset = GenericAdmin.objects.select_related('doctor', 'hospital')\
+                                       .filter(Q
+                                                  (Q(user=user,
+                                                     is_disabled=False,
+                                                     permission_type__in=[GenericAdmin.BILLINNG, GenericAdmin.ALL],
+                                                     write_permission=True
+                                                     ),
+                                                   (
+                                                     Q(Q(entity_type=GenericAdminEntity.DOCTOR,
+                                                       doctor__doctor_clinics__hospital__is_billing_enabled=False),
+                                                       (Q(hospital__isnull=False, doctor__doctor_clinics__hospital=F('hospital'))
+                                                        |
+                                                        Q(hospital__isnull=True)
+                                                        )
+                                                      )
+                                                     |
+                                                     Q(
+                                                         Q(entity_type=GenericAdminEntity.HOSPITAL),
+                                                         (Q(doctor__isnull=False,
+                                                            hospital__hospital_doctors__doctor=F('doctor'))
+                                                          |
+                                                          Q(doctor__isnull=True)
+                                                          )
+                                                      )
+                                                   )
                                                 )
-                                               ))\
+                                                |
+                                                Q(
+                                                    is_disabled=False,
+                                                    super_user_permission=True,
+                                                    user=user
+                                                )
+                                               )\
                                         .annotate(doctor_ids=F('hospital__hospital_doctors__doctor'),
                                                   doctor_names=F('hospital__hospital_doctors__doctor__name'),
                                                   hospital_name=F('hospital__name'),
@@ -1321,7 +1359,7 @@ class HospitalDoctorBillingPermissionViewSet(GenericViewSet):
 
         resp_data = defaultdict(dict)
         for data in queryset:
-            if data['hospital_id'] is None:
+            if data['hospital_ids']:
                 temp_tuple = (data['doctor_id'], data['doctor_name'])
                 if temp_tuple not in resp_data:
                     temp_dict = {
@@ -1568,3 +1606,14 @@ class ContactUsViewSet(GenericViewSet):
         validated_data = serializer.validated_data
         ContactUs.objects.create(**validated_data)
         return Response({'message': 'success'})
+
+
+class DoctorNumberAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Doctor.objects.all()
+        # dn = DoctorNumber.objects.values_list('doctor', flat=True)
+        #
+        # qs = Doctor.objects.exclude(id__in=dn)
+        if self.q:
+            qs = qs.filter(name__icontains=self.q).order_by('name')
+        return qs

@@ -10,7 +10,10 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
                                  CommonMedicalCondition,CommonSpecialization, 
                                  DoctorPracticeSpecialization, DoctorClinic)
-from ondoc.authentication.models import UserProfile
+from ondoc.diagnostic import models as lab_models
+from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
+from django.db.models import Avg
+from django.db.models import Q
 
 from ondoc.coupon.models import Coupon
 from ondoc.account.models import Order
@@ -101,14 +104,14 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
                   'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name')
 
     def get_patient_image(self, obj):
-        if obj.profile.profile_image:
+        if obj.profile and obj.profile.profile_image:
             return obj.profile.profile_image.url
         else:
             return ""
 
     def get_patient_thumbnail(self, obj):
         request = self.context.get('request')
-        if obj.profile.profile_image:
+        if obj.profile and obj.profile.profile_image:
             photo_url = obj.profile.profile_image.url
             return request.build_absolute_uri(photo_url)
         else:
@@ -359,7 +362,14 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     
     def get_enabled_for_online_booking(self, obj):
-        return obj.doctor_clinic.enabled_for_online_booking
+        enable_for_online_booking = False
+        if obj.doctor_clinic:
+            doctor_clinic = obj.doctor_clinic
+            if obj.doctor_clinic.hospital and obj.doctor_clinic.doctor:
+                if doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.doctor.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                   enable_for_online_booking = True
+        return enable_for_online_booking
+
     def get_lat(self, obj):
         if obj.doctor_clinic.hospital.location:
             return obj.doctor_clinic.hospital.location.y
@@ -687,7 +697,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     hospitals = serializers.SerializerMethodField(read_only=True)
     procedures = serializers.SerializerMethodField(read_only=True)
     hospital_count = serializers.IntegerField(read_only=True, allow_null=True)
-    enabled_for_online_booking = serializers.BooleanField(read_only=True)
+    enabled_for_online_booking = serializers.BooleanField()
     availability = None
     seo = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
@@ -745,7 +755,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if sublocality and locality and specialization:
             title = specialization + 's near ' + sublocality + ' ' + locality
 
-        if lat and long and specialization and title and result_count:
+        if lat and long and top_specialization and title and result_count:
             return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title, 'result_count':result_count}
         return None
 
@@ -1107,15 +1117,97 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
 
 class AdminCreateBodySerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
-    name = serializers.CharField(max_length=24)
+    name = serializers.CharField(max_length=24, required=False)
     billing_enabled = serializers.BooleanField()
     appointment_enabled = serializers.BooleanField()
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
+    entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
+    id = serializers.IntegerField()
+    type = serializers.ChoiceField(choices=User.USER_TYPE_CHOICES)
+    doc_profile = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), required=False)
+    assoc_doc = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all()), required=False)
+    assoc_hosp = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all()),
+                                      required=False)
+
+    def validate(self, attrs):
+        if attrs['type'] == User.STAFF and 'name' not in attrs:
+            raise serializers.ValidationError("Name is Required.")
+        if attrs['type'] == User.DOCTOR and 'doc_profile' not in attrs and not attrs.get('doc_profile'):
+            raise serializers.ValidationError("DocProfile is Required.")
+        if attrs['entity_type'] == GenericAdminEntity.DOCTOR and 'assoc_hosp'not in attrs:
+            raise serializers.ValidationError("Associated Hospitals  are Required.")
+        if attrs['entity_type'] == GenericAdminEntity.DOCTOR and not Doctor.objects.filter(id=attrs['id']).exists():
+            raise serializers.ValidationError("entity Doctor Not Found.")
+        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and not Hospital.objects.filter(id=attrs['id']).exists():
+            raise serializers.ValidationError("entity Hospital Not Found.")
+        if attrs['entity_type'] == GenericAdminEntity.LAB and not lab_models.Lab.objects.filter(id=attrs['id']).exists():
+            raise serializers.ValidationError("entity Lab Not Found.")
+        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and 'assoc_doc' not in attrs:
+            raise serializers.ValidationError("Associated Doctors are Required.")
+        if attrs.get('type') == User.STAFF:
+            valid_query = GenericAdmin.objects.filter(phone_number=attrs['phone_number'], entity_type=attrs['entity_type'])
+            if attrs.get('entity_type')==GenericAdminEntity.DOCTOR:
+                valid_query = valid_query.filter(doctor_id=attrs['id'], hospital_id__in=attrs.get('assoc_hosp')) \
+                    if attrs.get('assoc_hosp') else valid_query.filter(doctor_id=attrs['id'], hospital_id=None)
+            elif attrs.get('entity_type') == GenericAdminEntity.HOSPITAL:
+                valid_query = valid_query.filter(hospital_id=attrs['id'], doctor_id=None)
+                #     if attrs.get('assoc_doc') else valid_query.filter(hospital_id=attrs['id'], doctor_id=None)
+            else:
+                valid_query = GenericLabAdmin.objects.filter(lab_id=attrs['id'], phone_number=attrs['phone_number'])
+            if valid_query.exists():
+                raise serializers.ValidationError("Duplicate Permissions Exists.")
+        if attrs['entity_type'] == GenericAdminEntity.HOSPITAL and attrs.get('type') == User.DOCTOR:
+            dquery = DoctorNumber.objects.select_related('doctor', 'hospital').filter(phone_number=attrs['phone_number'], hospital_id=attrs.get('id'))
+            if dquery.exists():
+                raise serializers.ValidationError("Phone number already assigned to Doctor " + dquery.first().doctor.name +". Add number as admin to manage multiple doctors.")
+        return attrs
+        # if DoctorNumber.objects.filter(doctor=attrs['doc_profile'], phone_number=attrs['phone_number']).exists():
+        #     raise serializers.ValidationError("DocProfile already Allocated.")
 
 
 class EntityListQuerySerializer(serializers.Serializer):
+    entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
+    id = serializers.IntegerField()
 
+
+class HospitalEntitySerializer(HospitalModelSerializer):
+    entity_type = serializers.SerializerMethodField()
+
+    def get_entity_type(self, obj):
+        return GenericAdminEntity.HOSPITAL
+
+    class Meta:
+        model = Hospital
+        fields = ('id', 'name', 'entity_type', 'address', 'is_billing_enabled', 'is_appointment_manager')
+
+
+class DoctorEntitySerializer(serializers.ModelSerializer):
+    thumbnail = serializers.SerializerMethodField()
+    qualifications = DoctorQualificationSerializer(read_only=True, many=True)
+    entity_type = serializers.SerializerMethodField()
+
+    def get_entity_type(self, obj):
+        return GenericAdminEntity.DOCTOR
+
+    def get_thumbnail(self, obj):
+        request = self.context.get('request')
+        thumbnail = obj.get_thumbnail()
+        if thumbnail:
+            return request.build_absolute_uri(thumbnail) if thumbnail else None
+        else:
+            return None
+
+    class Meta:
+        model = Doctor
+        fields = ('id', 'thumbnail', 'name', 'entity_type', 'qualifications')
+
+
+class AdminUpdateBodySerializer(AdminCreateBodySerializer):
+    remove_list = serializers.ListField()
+    old_phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999, required=False)
+
+
+class AdminDeleteBodySerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
     entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
     id = serializers.IntegerField()
 

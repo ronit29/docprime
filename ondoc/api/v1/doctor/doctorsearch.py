@@ -121,8 +121,22 @@ class DoctorSearchHelper:
             params['current_hour'] = str(current_hour)
 
         if self.query_params.get("doctor_name"):
-            search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
+            name = self.query_params.get("doctor_name").lower().strip()
+            removals = ['doctor.','doctor ','dr.','dr ']
+            for rm in removals:
+                # if name.startswith(rm):
+                if name.startswith(rm):
+                    name = name[len(rm):].strip()
+                    break
+
+                # stripped = name.lstrip(rm)
+                # if len(stripped) != len(name):
+                #     name = stripped
+                #     break
+            search_key = re.findall(r'[a-z0-9A-Z.]+', name)
+            # search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("doctor_name"))
             search_key = " ".join(search_key).lower()
+
             search_key = "".join(search_key.split("."))
             filtering_params.append(
                 "d.search_key ilike (%(doctor_name)s)"
@@ -136,9 +150,12 @@ class DoctorSearchHelper:
                 "h.search_key ilike (%(hospital_name)s)")
             params['hospital_name'] = '%' + search_key + '%'
 
-        if not filtering_params:
-            return "1=1"
         result = {}
+        if not filtering_params:
+            result['string'] = "1=1"
+            result['params'] = params
+            return result
+
         result['string'] = " and ".join(filtering_params)
         result['params'] = params
         if len(procedure_ids) > 0:
@@ -368,7 +385,14 @@ class DoctorSearchHelper:
                 final_result = get_procedure_categories_with_procedures(selected_procedures_list,
                                                                         other_procedures_list)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
+
+                enable_online_booking = False
+                if doctor_clinic and doctor and doctor_clinic.hospital:
+                    if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
+                        enable_online_booking = True
+
                 hospitals = [{
+                    "enabled_for_online_booking": enable_online_booking,
                     "hospital_name": doctor_clinic.hospital.name,
                     "address": ", ".join(
                         [value for value in [doctor_clinic.hospital.sublocality, doctor_clinic.hospital.locality] if

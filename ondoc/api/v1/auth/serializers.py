@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         UserPermission, Address, GenericAdmin, UserSecretKey,
+                                         DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor.models import DoctorMobile
 from ondoc.diagnostic.models import AvailableLabTest
@@ -56,7 +56,7 @@ class DoctorLoginSerializer(serializers.Serializer):
         if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.DOCTOR).exists():
             doctor_not_exists = admin_not_exists = False
             lab_admin_not_exists = False
-            if not DoctorMobile.objects.filter(number=attrs['phone_number'], is_primary=True).exists():
+            if not DoctorNumber.objects.filter(phone_number=attrs['phone_number']).exists():
                 doctor_not_exists = True
             if not GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False).exists():
                 admin_not_exists = True
@@ -407,11 +407,13 @@ class OrderDetailDoctorSerializer(serializers.Serializer):
         value = round(float(app_date_time.hour) + (float(app_date_time.minute)*1/60), 2)
         lab_obj = LabList()
         text = lab_obj.convert_time(value)
+        doc_deal_price, doc_mrp, doc_agreed_price = obj.get_doctor_prices()
+        doc_deal_price, doc_mrp = str(doc_deal_price), str(doc_mrp)
         data = {
-            'deal_price': obj.action_data.get("deal_price"),
+            'deal_price': doc_deal_price,
             'is_available': True,
             'effective_price': obj.action_data.get("effective_price"),
-            'mrp': obj.action_data.get("mrp"),
+            'mrp': doc_mrp,
             'value': value,
             'text': text
         }

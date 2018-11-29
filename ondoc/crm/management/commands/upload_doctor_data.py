@@ -46,13 +46,14 @@ class Command(BaseCommand):
         hospital = UploadHospital()
         specialization = UploadSpecialization()
 
-        doctor.p_image(sheets[0], source, batch)
-        # qualification.upload(sheets[1], lines)
-        # experience.upload(sheets[2], lines)
-        # membership.upload(sheets[3], lines)
-        # award.upload(sheets[4], lines)
-        # hospital.upload(sheets[5], source, batch, lines)
-        # specialization.upload(sheets[6], lines)
+        #doctor.p_image(sheets[0], source, batch)
+        doctor.upload(sheets[0], source, batch, lines)
+        qualification.upload(sheets[1], lines)
+        experience.upload(sheets[2], lines)
+        membership.upload(sheets[3], lines)
+        award.upload(sheets[4], lines)
+        hospital.upload(sheets[5], source, batch, lines)
+        specialization.upload(sheets[6], lines)
 
 
 
@@ -229,7 +230,7 @@ class UploadDoctor(Doc):
             return doctor
 
         doctor = Doctor.objects.create(name=data['name'], license=data.get('license',''), gender=data['gender'],
-                                                       practicing_since=data['practicing_since'], source=source, batch=batch, enabled=False)
+                                                       practicing_since=data['practicing_since'], source=source, batch=batch, enabled=False, enabled_for_online_booking=False)
         SourceIdentifier.objects.create(type=SourceIdentifier.DOCTOR, unique_identifier=data.get('identifier'), reference_id=doctor.id)
         #self.save_image(batch,data.get('image_url'),data.get('identifier'))
         return doctor
@@ -496,6 +497,9 @@ class UploadHospital(Doc):
                 continue
 
             hospital_obj = self.get_hospital(i, sheet, headers, hospital_obj_dict, source, batch)
+            if not hospital_obj:
+                print('hospital not found')
+                continue
             doc_clinic_obj = self.get_doc_clinic(doctor_obj, hospital_obj, doc_clinic_obj_dict)
             day_list = self.parse_day_range(sheet.cell(row=i, column=headers.get('day_range')).value, reverse_day_map)
             start, end = self.parse_timing(sheet.cell(row=i, column=headers.get('timing')).value)
@@ -534,6 +538,10 @@ class UploadHospital(Doc):
 
 
             number_entry = []
+            if not ph_source:
+                ph_source=''
+            # else:
+            #     print(ph_source)
 
             num = self.get_number(primary_number, True, '', ph_source)
             if num:
@@ -573,15 +581,17 @@ class UploadHospital(Doc):
                                                      unique_identifier=hospital_identifier).first()
             if si_obj:
                 hospital = Hospital.objects.filter(pk=si_obj.reference_id).first()
-
-        if not hospital:
-            hospital_name = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_name')).value)
-            building = self.clean_data(sheet.cell(row=row, column=headers.get('building')).value)
-            city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
-            location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('gaddress')).value))
-            hospital = Hospital.objects.create(name=hospital_name, building=building, city=city, country='India', location=location, source=source, batch=batch)
-            SourceIdentifier.objects.create(reference_id=hospital.id, unique_identifier=hospital_identifier,
-                                                type=SourceIdentifier.HOSPITAL)
+        try:
+            if not hospital:
+                hospital_name = self.clean_data(sheet.cell(row=row, column=headers.get('hospital_name')).value)
+                building = self.clean_data(sheet.cell(row=row, column=headers.get('building')).value)
+                city = self.clean_data(sheet.cell(row=row, column=headers.get('city')).value)
+                location = self.parse_gaddress(self.clean_data(sheet.cell(row=row, column=headers.get('gaddress')).value))
+                hospital = Hospital.objects.create(name=hospital_name, building=building, city=city, country='India', location=location, source=source, batch=batch, enabled_for_online_booking=False)
+                SourceIdentifier.objects.create(reference_id=hospital.id, unique_identifier=hospital_identifier,
+                                                    type=SourceIdentifier.HOSPITAL)
+        except Exception as e:
+            print(str(e))
 
         return hospital
 
@@ -590,7 +600,7 @@ class UploadHospital(Doc):
         # if doc_clinic_obj_dict.get((doctor_obj, hospital_obj)):
         #     doc_clinic_obj = doc_clinic_obj_dict.get((doctor_obj, hospital_obj))
         # else:
-        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj, defaults={'followup_charges':0, 'followup_duration':7})
+        doc_clinic_obj, is_field_created = DoctorClinic.objects.get_or_create(doctor=doctor_obj, hospital=hospital_obj, defaults={'followup_charges':0, 'followup_duration':7,enabled_for_online_booking:False})
         # doc_clinic_obj_dict[(doctor_obj, hospital_obj)] = doc_clinic_obj
 
         return doc_clinic_obj
@@ -608,6 +618,9 @@ class UploadHospital(Doc):
         return pnt
 
     def parse_day_range(self, day_range, reverse_day_map):
+
+        if not day_range:
+            return list()
         temp_list = day_range.split(',')
         days_list = list()
         for dr in temp_list:
@@ -641,6 +654,8 @@ class UploadHospital(Doc):
         return days_list
 
     def parse_timing(self, timing):
+        if not timing:
+            return None, None
         tlist = timing.strip().split("-")
         start = None
         end = None
