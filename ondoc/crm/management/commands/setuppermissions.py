@@ -24,10 +24,11 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabNetwork, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabTest,
-                                     LabTestType, LabService, LabAppointment,LabDoctorAvailability,
+                                     LabTestType, LabService, LabAppointment, LabDoctorAvailability,
                                      LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument, CommonTest,
                                      CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges,
-                                     TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport)
+                                     TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport,
+                                     CommonPackage, LabTestCategory, LabTestCategoryMapping)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping
@@ -218,7 +219,7 @@ class Command(BaseCommand):
             LabTestType, LabService, TestParameter, PracticeSpecialization,
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
-            ProcedureToCategoryMapping, ProcedureCategoryMapping
+            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, LabTestCategoryMapping
         )
 
         for cl, ct in content_types.items():
@@ -497,7 +498,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(CommonMedicalCondition, CommonSpecialization,
                                                            MedicalConditionSpecialization,  MedicalCondition,
                                                            CommonTest, CommonDiagnosticCondition,
-                                                           DiagnosticConditionLabTest)
+                                                           DiagnosticConditionLabTest, CommonPackage, CommonProcedureCategory)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
