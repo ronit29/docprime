@@ -1309,6 +1309,8 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
     def feedback(self, request):
         resp = {}
         user = request.user
+        subject_string = "Feedback Mail from " + str(user.phone_number)
+
         serializer = serializers.DoctorFeedbackBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
@@ -1348,7 +1350,7 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         try:
             emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com", "rajendra@docprime.com", "harpreet@docprime.com"]
             for x in emails:
-                notif_models.EmailNotification.publish_ops_email(str(x), mark_safe(message), 'Feedback Mail')
+                notif_models.EmailNotification.publish_ops_email(str(x), mark_safe(message), subject_string)
             resp['status'] = "success"
         except:
             resp['status'] = "error"
