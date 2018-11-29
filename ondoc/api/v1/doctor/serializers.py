@@ -184,7 +184,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
 
         ACTIVE_APPOINTMENT_STATUS = [OpdAppointment.BOOKED, OpdAppointment.ACCEPTED,
                                      OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.RESCHEDULED_DOCTOR]
-        MAX_APPOINTMENTS_ALLOWED = 3
+        MAX_APPOINTMENTS_ALLOWED = 10
         MAX_FUTURE_DAY = 40
         request = self.context.get("request")
         time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))

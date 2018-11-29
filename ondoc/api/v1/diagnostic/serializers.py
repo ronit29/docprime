@@ -520,7 +520,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
     def validate(self, data):
-        MAX_APPOINTMENTS_ALLOWED = 3
+        MAX_APPOINTMENTS_ALLOWED = 10
         ACTIVE_APPOINTMENT_STATUS = [LabAppointment.BOOKED, LabAppointment.ACCEPTED,
                                      LabAppointment.RESCHEDULED_PATIENT, LabAppointment.RESCHEDULED_LAB]
         request = self.context.get("request")
