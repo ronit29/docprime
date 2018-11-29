@@ -1610,7 +1610,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 hos_name = hos_obj.name
                 assoc_docs = hos_obj.assoc_doctors.extra(select={
                     'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END',
-                    'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id AND hospital_id = id'}) \
+                    'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id'}) \
                     .values('name', 'id', 'assigned', 'phone_number')
 
             for x in response:
@@ -1641,10 +1641,17 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                     admin_final_list.append(a_d)
             response = admin_final_list
         elif valid_data.get('entity_type') == GenericAdminEntity.LAB:
-            response = auth_models.GenericLabAdmin.objects\
+            query = auth_models.GenericLabAdmin.objects\
                 .exclude(user=request.user)\
                 .filter(lab_id=valid_data.get('id'))\
                 .values('phone_number', 'name', 'updated_at', 'is_disabled', 'super_user_permission', 'permission_type')
+            for x in query:
+                if temp.get(x['phone_number']):
+                    if temp[x['phone_number']]['permission_type'] != x['permission_type']:
+                        temp[x['phone_number']]['permission_type'] = auth_models.GenericAdmin.ALL
+                else:
+                    temp[x['phone_number']] = x
+            response = list(temp.values())
         if response:
             return Response(response)
         return Response([])
