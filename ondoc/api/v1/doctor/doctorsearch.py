@@ -23,7 +23,7 @@ from collections import defaultdict
 
 
 class DoctorSearchHelper:
-    MAX_DISTANCE = "15000"
+    MAX_DISTANCE = "1500000000"
 
     def __init__(self, query_params):
         self.query_params = query_params
@@ -151,10 +151,9 @@ class DoctorSearchHelper:
                 "h.search_key ilike (%(hospital_name)s)")
             params['hospital_name'] = '%' + search_key + '%'
 
-
         if self.query_params.get('is_insurance'):
             filtering_params.append(
-                "mrp<=(%(insurance_threshold_amount)s)"
+                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_online_booking=True and d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True"
             )
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
@@ -390,11 +389,6 @@ class DoctorSearchHelper:
                         "mrp": data.mrp
                     }
             # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
-            is_insurance_covered = False
-            insurance_data_dict = kwargs.get('insurance_data')
-            if insurance_data_dict and min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
-                    not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
-                is_insurance_covered = True
 
             if not doctor_clinic:
                 hospitals = []
@@ -418,11 +412,20 @@ class DoctorSearchHelper:
                                                                         other_procedures_list)
                 # fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
 
-
                 enable_online_booking = False
                 if doctor_clinic and doctor and doctor_clinic.hospital:
                     if doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and doctor_clinic.enabled_for_online_booking:
                         enable_online_booking = True
+
+                # We cover the insurance for only those users which have purchased the insurance and their insurance
+                # threshold value is greater than the doctor fees and if doctor is enabled for the online booking.
+                # Insurance is not valid for the procedures hence negating the procedure request.
+
+                is_insurance_covered = False
+                insurance_data_dict = kwargs.get('insurance_data')
+                if enable_online_booking and insurance_data_dict and min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
+                        not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
+                    is_insurance_covered = True
 
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
