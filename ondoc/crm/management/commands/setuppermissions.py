@@ -31,7 +31,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
-    ProcedureCategoryMapping, ProcedureToCategoryMapping
+    ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -498,7 +498,8 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(CommonMedicalCondition, CommonSpecialization,
                                                            MedicalConditionSpecialization,  MedicalCondition,
                                                            CommonTest, CommonDiagnosticCondition,
-                                                           DiagnosticConditionLabTest, CommonPackage, CommonProcedureCategory)
+                                                           DiagnosticConditionLabTest, CommonPackage, CommonProcedureCategory,
+                                                           CommonProcedure)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
