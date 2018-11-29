@@ -1127,8 +1127,8 @@ class AdminCreateBodySerializer(serializers.Serializer):
                 valid_query = valid_query.filter(doctor_id=attrs['id'], hospital_id__in=attrs.get('assoc_hosp')) \
                     if attrs.get('assoc_hosp') else valid_query.filter(doctor_id=attrs['id'], hospital_id=None)
             elif attrs.get('entity_type') == GenericAdminEntity.HOSPITAL:
-                valid_query = valid_query.filter(hospital_id=attrs['id'], doctor_id__in=attrs.get('assoc_doc')) \
-                    if attrs.get('assoc_doc') else valid_query.filter(hospital_id=attrs['id'], doctor_id=None)
+                valid_query = valid_query.filter(hospital_id=attrs['id'], doctor_id=None)
+                #     if attrs.get('assoc_doc') else valid_query.filter(hospital_id=attrs['id'], doctor_id=None)
             else:
                 valid_query = GenericLabAdmin.objects.filter(lab_id=attrs['id'], phone_number=attrs['phone_number'])
             if valid_query.exists():

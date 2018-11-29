@@ -105,11 +105,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                   doctor__manageable_doctors__is_disabled=False,
                   doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
                                                                    auth_models.GenericAdmin.ALL]) |
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital__isnull=True,
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                   auth_models.GenericAdmin.ALL]) |
+                Q(Q(Q(hospital__manageable_hospitals__user=user), ~Q(hospital__manageable_hospitals__doctor=F('doctor'))),
+                  Q(doctor__manageable_doctors__user=user,
+                    doctor__manageable_doctors__hospital__isnull=True,
+                    doctor__manageable_doctors__is_disabled=False,
+                    doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
+                                                                   auth_models.GenericAdmin.ALL]))
+                 |
                 Q(hospital__manageable_hospitals__doctor__isnull=True,
                   hospital__manageable_hospitals__user=user,
                   hospital__manageable_hospitals__is_disabled=False,
@@ -1599,7 +1601,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                                        ) \
                 .annotate(doctor_ids=F('doctor__id'), hospital_name=F('hospital__name'), doctor_ids_count=Count('hospital__hospital_doctors__doctor')) \
                 .values('phone_number', 'name', 'is_disabled', 'permission_type', 'super_user_permission', 'doctor_ids',
-                        'doctor_ids_count' ,'hospital_id', 'hospital_name', 'updated_at')
+                        'doctor_ids_count', 'hospital_id', 'hospital_name', 'updated_at')
 
             hos_queryset = Hospital.objects.prefetch_related('assoc_doctors').filter(id=valid_data.get('id'))
             if hos_queryset.exists():
@@ -1607,7 +1609,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 hos_name = hos_obj.name
                 assoc_docs = hos_obj.assoc_doctors.extra(select={
                     'assigned': 'CASE WHEN  ((SELECT COUNT(*) FROM doctor_number WHERE doctor_id = doctor.id) = 0) THEN 0 ELSE 1  END',
-                    'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id'}) \
+                    'phone_number': 'SELECT phone_number FROM doctor_number WHERE doctor_id = doctor.id AND hospital_id = id'}) \
                     .values('name', 'id', 'assigned', 'phone_number')
 
             for x in response:
