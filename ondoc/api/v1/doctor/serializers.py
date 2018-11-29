@@ -719,6 +719,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         sublocality = None
         max_distance = 15000
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
+        top_specialization = None
 
         if clinics:
             hospital = clinics[0]
