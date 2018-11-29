@@ -602,19 +602,19 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
     source_choices = ((CRM, 'CRM'), (APP, 'App'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages_lab', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
+    type_choices = ((APPOINTMENT, 'Appointment'), (BILLING, 'Billing'),)
     lab_network = models.ForeignKey("diagnostic.LabNetwork", null=True, blank=True,
                                     on_delete=models.CASCADE,
                                     related_name='manageable_lab_network_admins')
     lab = models.ForeignKey("diagnostic.Lab", null=True, blank=True, on_delete=models.CASCADE,
                             related_name='manageable_lab_admins')
-    permission_type = models.PositiveSmallIntegerField(max_length=20, choices=type_choices, default=APPOINTMENT)
+    permission_type = models.PositiveSmallIntegerField(choices=type_choices, default=APPOINTMENT)
     is_disabled = models.BooleanField(default=False)
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
     name = models.CharField(max_length=24, blank=True, null=True)
-    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=CRM)
+    source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
 
     class Meta:
         db_table = 'generic_lab_admin'
@@ -706,7 +706,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     source_choices = ((CRM, 'CRM'), (APP, 'App'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
     phone_number = models.CharField(max_length=10)
-    type_choices = ((ALL, 'All'), (APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
+    type_choices = ((APPOINTMENT, 'Appointment'), (BILLINNG, 'Billing'),)
     hospital_network = models.ForeignKey("doctor.HospitalNetwork", null=True, blank=True,
                                          on_delete=models.CASCADE,
                                          related_name='manageable_hospital_networks')
@@ -714,15 +714,15 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                                  related_name='manageable_hospitals')
     doctor = models.ForeignKey("doctor.Doctor", null=True, blank=True, on_delete=models.CASCADE,
                                related_name='manageable_doctors')
-    permission_type = models.PositiveSmallIntegerField(max_length=20, choices=type_choices, default=APPOINTMENT)
+    permission_type = models.PositiveSmallIntegerField(choices=type_choices, default=APPOINTMENT)
     is_doc_admin = models.BooleanField(default=False)
     is_disabled = models.BooleanField(default=False)
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
     write_permission = models.BooleanField(default=False)
     name = models.CharField(max_length=24, blank=True, null=True)
-    source_type = models.PositiveSmallIntegerField(max_length=20, choices=source_choices, default=CRM)
-    entity_type = models.PositiveSmallIntegerField(max_length=20, choices=entity_choices, default=OTHER)
+    source_type = models.PositiveSmallIntegerField(choices=source_choices, default=CRM)
+    entity_type = models.PositiveSmallIntegerField(choices=entity_choices, default=OTHER)
 
 
     class Meta:
@@ -877,19 +877,23 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
             cls.objects.bulk_create(admin_objs)
 
     @classmethod
-    def create_permission_object(cls, user, doctor, phone_number, hospital_network, hospital, permission_type,
-                                 is_doc_admin, is_disabled, super_user_permission, write_permission, read_permission):
+    def create_permission_object(cls, user, doctor, name, phone_number, hospital, permission_type, is_disabled,
+                             super_user_permission, write_permission, created_by, source_type, entity_type):
         return GenericAdmin(user=user,
                             doctor=doctor,
+                            name=name,
                             phone_number=phone_number,
-                            hospital_network=hospital_network,
+                            hospital_network=None,
                             hospital=hospital,
                             permission_type=permission_type,
-                            is_doc_admin=is_doc_admin,
+                            is_doc_admin=False,
                             is_disabled=is_disabled,
                             super_user_permission=super_user_permission,
                             write_permission=write_permission,
-                            read_permission=read_permission
+                            read_permission=True,
+                            created_by=created_by,
+                            source_type=source_type,
+                            entity_type=entity_type
                             )
 
     @classmethod
@@ -962,7 +966,7 @@ class BillingAccount(models.Model):
     )
     pan_copy = models.ImageField('Pan Card Image',upload_to='billing/documents', null=True, blank=True)
     account_copy = models.ImageField('Account/Cheque Image',upload_to='billing/documents', null=True, blank=True)
-    type = models.PositiveIntegerField(max_length=1, choices=TYPE_CHOICES, null=True)
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES, null=True)
     enabled = models.BooleanField(default=False)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -1258,3 +1262,17 @@ class SPOCDetails(TimeStampedModel):
 
     class Meta:
         db_table = "spoc_details"
+
+
+class DoctorNumber(TimeStampedModel):
+    phone_number = models.CharField(max_length=10)
+    doctor = models.ForeignKey("doctor.Doctor", on_delete=models.CASCADE, related_name='doctor_number')
+    hospital = models.ForeignKey("doctor.Hospital", on_delete=models.CASCADE, related_name='hospital_doctor_number', null=True)
+
+
+    class Meta:
+        db_table = 'doctor_number'
+        unique_together = (("doctor", "hospital"), )
+
+    def __str__(self):
+        return '{}-{}'.format(self.phone_number, self.doctor)

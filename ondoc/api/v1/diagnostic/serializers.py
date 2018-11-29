@@ -6,7 +6,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
 from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializer
-from ondoc.api.v1.utils import form_time_slot
+from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity
 from ondoc.doctor.models import OpdAppointment
 from django.db.models import Count, Sum, When, Case, Q, F
 from django.contrib.auth import get_user_model
@@ -850,3 +850,28 @@ class LabReportSerializer(serializers.Serializer):
                   lab__network__manageable_lab_network_admins__is_disabled=False))).exists():
             raise serializers.ValidationError("User is not authorized to upload report.")
         return value
+
+
+
+class LabEntitySerializer(serializers.ModelSerializer):
+
+    address = serializers.SerializerMethodField()
+    entity_type = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
+
+
+    def get_thumbnail(self, obj):
+        request = self.context.get("request")
+        if not request:
+            raise ValueError("request is not passed in serializer.")
+        return request.build_absolute_uri(obj.get_thumbnail()) if obj.get_thumbnail() else None
+
+    def get_entity_type(self, obj):
+        return GenericAdminEntity.LAB
+
+    def get_address(self, obj):
+        return obj.get_lab_address() if obj.get_lab_address() else None
+
+    class Meta:
+        model = Lab
+        fields = ('id',  'thumbnail', 'name', 'address', 'entity_type')
