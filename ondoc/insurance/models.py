@@ -66,24 +66,24 @@ class InsurerAccount(auth_model.TimeStampedModel):
     current_float = models.PositiveIntegerField(default=None)
 
     def __str__(self):
-        return self.insurer
+        return str(self.insurer)
 
     class Meta:
         db_table = "insurer_account"
 
-    @classmethod
-    def debit_float_schedule(self, insurer, amount):
-        insurer_float = InsurerAccount.objects.get(insurer=insurer)
-        if insurer_float:
-            current_float = insurer_float.current_float
-            if amount <= current_float:
-                updated_current_float = current_float - amount
-                insurer_float.current_float = updated_current_float
-                insurer_float.save()
-            else:
-                return False
-        else:
-            return False
+    # @classmethod
+    # def debit_float_schedule(self, insurer, amount):
+    #     insurer_float = InsurerAccount.objects.get(insurer=insurer)
+    #     if insurer_float:
+    #         current_float = insurer_float.current_float
+    #         if amount <= current_float:
+    #             updated_current_float = current_float - amount
+    #             insurer_float.current_float = updated_current_float
+    #             insurer_float.save()
+    #         else:
+    #             return False
+    #     else:
+    #         return False
 
 
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
@@ -277,11 +277,10 @@ class InsuredMembers(auth_model.TimeStampedModel):
     OTHER = 'o'
     GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
     SELF = 'self'
-    HUSBAND = 'husband'
-    WIFE = 'wife'
+    SPOUSE = 'spouse'
     SON = 'son'
     DAUGHTER = 'daughter'
-    RELATION_CHOICES = [(HUSBAND, 'Husband'), (WIFE, 'Wife'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    RELATION_CHOICES = [(SPOUSE, 'Spouse'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
     ADULT = "adult"
     CHILD = "child"
     MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
