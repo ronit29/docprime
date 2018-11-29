@@ -306,7 +306,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                     test__in=test_ids)
 
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
-                                                                           context={"lab": lab_obj})
+                                                                           context={"lab": lab_obj, "request": request})
         # for Demo
         demo_lab_test = AvailableLabTest.objects.filter(lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).prefetch_related('test')[:10]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj, "request": request})
