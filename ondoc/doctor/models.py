@@ -148,6 +148,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     source = models.CharField(max_length=20, blank=True)
     batch = models.CharField(max_length=20, blank=True)
+    enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
 
     def __str__(self):
         return self.name
