@@ -1,6 +1,7 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
 from django.core.validators import MaxValueValidator, MinValueValidator
+import datetime
 
 class Coupon(auth_model.TimeStampedModel):
     DOCTOR = 1
@@ -13,6 +14,7 @@ class Coupon(auth_model.TimeStampedModel):
     max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     flat_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     validity = models.PositiveIntegerField(blank=False, null=False)
+    start_date = models.DateTimeField(default=None, null=True, blank=True)
     type = models.IntegerField(choices=TYPE_CHOICES)
     count = models.PositiveIntegerField()
     total_count = models.PositiveIntegerField(null=True, blank=True)
@@ -29,8 +31,8 @@ class Coupon(auth_model.TimeStampedModel):
     new_user_constraint = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
-        if self.percentage_discount == 100:
-            self.show_price = False
+        if not self.id:
+            self.start_date = datetime.datetime.now()
         return super().save(*args, **kwargs)
 
     def used_coupon_count(self, user):

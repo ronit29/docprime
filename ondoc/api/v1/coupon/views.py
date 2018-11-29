@@ -103,7 +103,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 total_used_count = coupon.total_opd_used_count + coupon.total_lab_used_count
 
             if (coupon.count is None or used_count < coupon.count) and (coupon.total_count is None or total_used_count < coupon.total_count):
-                if (timezone.now() - coupon.created_at).days <= coupon.validity:
+                diff_days = (timezone.now() - (coupon.start_date or coupon.created_at)).days
+                if diff_days >= 0 and diff_days <= coupon.validity:
                     if not coupon.new_user_constraint or new_user:
                         applicable_coupons.append({"coupon_type": coupon.type,
                                                 "coupon_id": coupon.id,
