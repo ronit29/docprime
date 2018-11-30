@@ -754,10 +754,15 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 result_count = doctors.values('id').distinct().count()
 
         if sublocality and locality and specialization:
+
+            url = EntityUrls.objects.filter(sublocality_value=sublocality, locality_value=locality, specialization_id=specialization_id,
+                                      is_valid=True, sitemap_identifier='SPECIALIZATION_LOCALITY_CITY').values_list('url').first()
+
             title = specialization + 's near ' + sublocality + ' ' + locality
 
-        if lat and long and top_specialization and title and result_count:
-            return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title, 'result_count':result_count}
+        if lat and long and top_specialization and title and result_count and url:
+            return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title,
+                    'result_count':result_count, 'url': url[0]}
         return None
 
     def get_display_rating_widget(self, obj):
