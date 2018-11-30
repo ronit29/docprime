@@ -711,58 +711,69 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     def get_search_data(self, obj):
         data = {}
         lat = None
-        long = None
+        lng = None
         specialization = None
         specialization_id = None
         title = None
         locality = None
         sublocality = None
         max_distance = 15000
-        clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
-        top_specialization = None
+        #clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
+        #top_specialization = None
+        result_count = None
+        url = None
 
-        if clinics:
-            hospital = clinics[0]
-            if hospital.hospital and hospital.hospital.location:
-                lat = hospital.hospital.location.y
-                long = hospital.hospital.location.x
-                hosp_entity_relation = hospital.hospital.entity.all().prefetch_related('location')
-                for entity_relation in hosp_entity_relation:
-                    entity_address = entity_relation.location
-                    if entity_address.type_blueprint == 'LOCALITY':
-                        locality = entity_address.alternative_value
-                    if entity_address.type_blueprint == 'SUBLOCALITY':
-                        sublocality = entity_address.alternative_value
-        top_specialization = None
-        if len(obj.doctorpracticespecializations.all())>0:
-            dsp = [specialization.specialization for specialization in obj.doctorpracticespecializations.all()]
-            top_specialization = DoctorPracticeSpecialization.objects.filter(specialization__in=dsp).values('specialization')\
-                .annotate(doctor_count=Count('doctor'),name=Max('specialization__name')).order_by('-doctor_count').first()
+        entity = self.context.get('entity')
+        if entity:
+            locality = entity.locality_value
+            sublocality = entity.sublocality_value
+            lat = entity.sublocality_latitude
+            lng = entity.sublocality_longitude
 
-            if top_specialization:
-                specialization = top_specialization.get('name')
-                specialization_id = top_specialization.get('specialization')
 
+        # if clinics:
+        #     hospital = clinics[0]
+        #     if hospital.hospital and hospital.hospital.location:
+        #         lat = hospital.hospital.location.y
+        #         long = hospital.hospital.location.x
+        #         hosp_entity_relation = hospital.hospital.entity.all().prefetch_related('location')
+        #         for entity_relation in hosp_entity_relation:
+        #             entity_address = entity_relation.location
+        #             if entity_address.type_blueprint == 'LOCALITY':
+        #                 locality = entity_address.alternative_value
+        #             if entity_address.type_blueprint == 'SUBLOCALITY':
+        #                 sublocality = entity_address.alternative_value
+            if len(obj.doctorpracticespecializations.all())>0:
+                dsp = [specialization.specialization for specialization in obj.doctorpracticespecializations.all()]
+                top_specialization = DoctorPracticeSpecialization.objects.filter(specialization__in=dsp).values('specialization')\
+                    .annotate(doctor_count=Count('doctor'),name=Max('specialization__name')).order_by('-doctor_count').first()
+
+                if top_specialization:
+                        specialization = top_specialization.get('name')
+                        specialization_id = top_specialization.get('specialization')
+
+            if lat and lng and specialization_id:
                 doctors = Doctor.objects.filter(
                     doctorpracticespecializations__specialization=specialization_id,
-                    hospitals__location__dwithin=(Point(long, lat), D(m=max_distance)),
+                    hospitals__location__dwithin=(Point(float(lng), float(lat)), D(m=max_distance)),
                     is_live=True,
                     is_test_doctor=False,
                     is_internal=False,
                     hospitals__is_live=True
                 )
+
                 result_count = doctors.values('id').distinct().count()
 
-        if sublocality and locality and specialization:
+            if sublocality and locality and specialization_id:
 
-            url = EntityUrls.objects.filter(sublocality_value=sublocality, locality_value=locality, specialization_id=specialization_id,
-                                      is_valid=True, sitemap_identifier='SPECIALIZATION_LOCALITY_CITY').values_list('url').first()
+                url = EntityUrls.objects.filter(sublocality_value=sublocality, locality_value=locality, specialization_id=specialization_id,
+                                          is_valid=True, sitemap_identifier='SPECIALIZATION_LOCALITY_CITY').values_list('url').first()
 
-            title = specialization + 's near ' + sublocality + ' ' + locality
+                title = specialization + 's in ' + sublocality + ' ' + locality
 
-        if lat and long and top_specialization and title and result_count and url:
-            return {'lat':lat, 'long':long, 'specialization_id': specialization_id, 'title':title,
-                    'result_count':result_count, 'url': url[0]}
+            if lat and lng and specialization_id and title and result_count and url:
+                return {'lat':lat, 'long':lng, 'specialization_id': specialization_id, 'title':title,
+                        'result_count':result_count, 'url': url[0]}
         return None
 
     def get_display_rating_widget(self, obj):
