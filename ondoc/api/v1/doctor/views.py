@@ -511,7 +511,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
               lab__network__manageable_lab_network_admins__is_disabled=False),
             Q(status=lab_models.LabAppointment.ACCEPTED,
               time_slot_start__date=today)).distinct().count()
-        if hasattr(request.user, 'doctor') and request.user.doctor:
+        if hasattr(request.user, 'doctor') and request.user.doctor and request.user.doctor.is_live:
             doctor = request.user.doctor
             doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
                                                                  context={"request": request})
@@ -1630,8 +1630,6 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                             x['id'] = doc.get('id')
                             x['assigned'] = doc.get('assigned')
                             break
-                    if x['phone_number'] == request.user.phone_number:
-                        continue
                     if not x.get('is_doctor'):
                         x['is_doctor'] = False
                     x['doctor_ids'] = [x['doctor_ids']] if x['doctor_ids'] else []
