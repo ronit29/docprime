@@ -226,9 +226,9 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             logged_in_user = request.user
             if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
                 user_insurance = logged_in_user.purchased_insurance.filter().first()
-                if user_insurance:
+                if user_insurance and user_insurance.is_valid():
                     insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                    if insurance_threshold and insurance_threshold.is_valid():
+                    if insurance_threshold:
                         resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
                             insurance_threshold.lab_amount_limit
                         resp['is_user_insured'] = True
@@ -325,8 +325,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
             logged_in_user = request.user
             if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
                 user_insurance = logged_in_user.purchased_insurance.filter().first()
-                if user_insurance:
-                    # TODO: check if still insurance is valid
+                if user_insurance and user_insurance.is_valid():
                     insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                     if insurance_threshold:
                         resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
