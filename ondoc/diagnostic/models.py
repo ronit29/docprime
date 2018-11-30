@@ -654,6 +654,8 @@ class LabTest(TimeStampedModel, SearchKey):
     report_schedule = models.CharField(max_length=150, default='After 2 days of test.', verbose_name='What is the report schedule for the test?')
     enable_for_ppc = models.BooleanField(default=False)
     enable_for_retail = models.BooleanField(default=False)
+    hide_price = models.BooleanField(default=False)
+    searchable = models.BooleanField(default=True)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -808,7 +810,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     matrix_lead_id = models.IntegerField(null=True)
     is_rated = models.BooleanField(default=False)
     rating_declined = models.BooleanField(default=False)
-    coupon = models.ManyToManyField(Coupon, blank=True, null=True)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="lab_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
