@@ -16,16 +16,20 @@ from ondoc.common.helper import Choices
 from datetime import timedelta
 from django.utils import timezone
 from django.conf import settings
+from ondoc.api.v1.utils import RawSql
+
 
 def generate_insurance_policy_number():
-    last_user_insurance_obj = UserInsurance.objects.all().order_by('id').last()
-    if last_user_insurance_obj and last_user_insurance_obj.policy_number:
-        policy_number = last_user_insurance_obj.policy_number
-        identifier, sequence = policy_number.split('DP')
-        sequence = int(sequence) + 1
+    query = '''select nextval('userinsurance_policy_num_seq') as inc'''
+    seq = RawSql(query, []).fetch_all()
+    sequence = None
+    if seq:
+        sequence = seq[0]['inc'] if seq[0]['inc'] else None
+
+    if sequence:
         return str('DP%.8d' % sequence)
     else:
-        return str('DP%.8d' % 1)
+        raise ValueError('Sequence Produced is not valid.')
 
 
 class LiveMixin(models.Model):
@@ -148,8 +152,8 @@ class UserInsurance(auth_model.TimeStampedModel):
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
     purchase_date = models.DateTimeField(blank=False, null=False)
-    expiry_date = models.DateTimeField(blank=False, null=False)
-    policy_number = models.CharField(max_length=50, blank=False, null=False, default=generate_insurance_policy_number)
+    expiry_date = models.DateTimeField(blank=False, null=False, default=timezone.now)
+    policy_number = models.CharField(max_length=50, blank=False, null=False, unique=True, default=generate_insurance_policy_number)
     insured_members = JSONField(blank=False, null=False)
     premium_amount = models.PositiveIntegerField(default=0)
     order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING)
@@ -169,7 +173,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
 
     @classmethod
-    def create_user_insurance(self, insurance_data):
+    def create_user_insurance(cls, insurance_data):
         import json
         members = insurance_data['insured_members']
         for member in members:
@@ -259,8 +263,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
 
     def after_commit_tasks(self):
         if self.transaction_type == InsuranceTransaction.DEBIT:
-            send_insurance_notifications.apply_async(kwargs={'user_id': self.user_insurance.user.id},
-                                                     countdown=5)
+            send_insurance_notifications(self.user_insurance.user.id)
 
     def save(self, *args, **kwargs):
         if self.pk:

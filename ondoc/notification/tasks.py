@@ -160,7 +160,7 @@ def send_opd_rating_message(appointment_id, type):
         notification_models.SmsNotification.send_rating_link(data)
 
 
-@task
+# @task
 def send_insurance_notifications(user_id):
     from ondoc.authentication import models as auth_model
 

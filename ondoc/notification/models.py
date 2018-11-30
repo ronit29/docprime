@@ -14,6 +14,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from weasyprint import HTML
 from django.conf import settings
+import datetime
 import pytz
 import logging
 
@@ -289,14 +290,15 @@ class NotificationAction:
             member_list = list()
             count = 1
             for member in insured_members:
+                name = '%s %s %s' % (member.first_name, member.middle_name, member.last_name)
                 data = {
-                    'name': '%s %s %s' % (member.first_name, member.middle_name, member.last_name),
+                    'name': name.title(),
                     'member_number': count,
                     'dob': member.dob.strftime('%d-%m-%Y'),
                     'relation': member.relation,
                     'id': member.id,
-                    'gender': member.gender,
-                    # 'age': member.age,
+                    'gender': member.gender.title(),
+                    'age': int((datetime.datetime.now().date() - member.dob).days/365),
                 }
                 member_list.append(data)
                 count = count + 1
@@ -306,11 +308,27 @@ class NotificationAction:
                 'purchase_data': str(instance.purchase_date.date().strftime('%d-%m-%Y')),
                 'expiry_date': str(instance.expiry_date.date().strftime('%d-%m-%Y')),
                 'premium': instance.premium_amount,
-                'proposer_name': proposer_name,
+                'proposer_name': proposer_name.title(),
                 'proposer_address': proposer.address,
                 'proposer_mobile': proposer.phone_number,
                 'proposer_email': user.email,
+                'intermediary_name': 'DIRECT',
+                'intermediary_code': 'AMHI CODE',
+                'intermediary_contact_number': '1800-102-0333',
+                'issuing_office_address': 'iLABS Centre, 2nd & 3rd Floor, Plot No 404 - 405, Udyog Vihar, Phase – III, Gurgaon-122016, Haryana',
+                'issuing_office_gstin': 'AMHI’s GSTIN no.',
+                'group_policy_name': 'Docprime',
+                'group_policy_address': 'Plot No. 119, Sector 44, Gurugram, Haryana 122001',
+                'group_policy_email': 'customercare@docprime.com',
+                'nominee_name': 'Legal Heir',
+                'nominee_relation': 'Legal Heir',
+                'nominee_address': '',
+                'policy_related_email': 'customerservice@apollomunichinsurance.com and customercare@docprime.com',
+                'policy_related_tollno': '1800-102-0333 and 1800-123-9419',
+                'policy_related_website': 'www.apollomunichinsurance.com and https://docprime.com/',
+                'current_date': datetime.datetime.now().date().strftime('%d-%m-%Y'),
                 'policy_number': instance.policy_number,
+                'application_number': instance.id,
                 'total_member_covered': len(member_list),
                 'plan': instance.insurance_plan.name,
                 'insured_members': member_list,
