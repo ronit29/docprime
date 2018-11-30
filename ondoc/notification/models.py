@@ -44,6 +44,8 @@ class NotificationAction:
     DOCTOR_INVOICE = 10
     LAB_INVOICE = 11
 
+    INSURANCE_CONFIRMED=15
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -64,6 +66,8 @@ class NotificationAction:
         (RECEIPT, "Receipt"),
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
+
+        (INSURANCE_CONFIRMED, "Insurance Confirmed"),
     )
 
     OPD_APPOINTMENT = "opd_appointment"
@@ -78,7 +82,7 @@ class NotificationAction:
     def trigger(cls, instance, user, notification_type):  # SHASHANK_SINGH all context making
         from ondoc.doctor.models import OpdAppointment
         est = pytz.timezone(settings.TIME_ZONE)
-        time_slot_start = instance.time_slot_start.astimezone(est)
+        time_slot_start = instance.time_slot_start.astimezone(est) if hasattr(instance, 'time_slot_start') else None
         context = {}
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             patient_name = instance.profile.name if instance.profile.name else ""
@@ -277,6 +281,43 @@ class NotificationAction:
                 "image_url": ""
             }
             NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
+        elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
+            insured_members = instance.members.all()
+            proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
+            proposer = proposer[0]
+            proposer_name = '%s %s %s %s' % (proposer.title, proposer.first_name, proposer.middle_name, proposer.last_name)
+            member_list = list()
+            count = 1
+            for member in insured_members:
+                data = {
+                    'name': '%s %s %s' % (member.first_name, member.middle_name, member.last_name),
+                    'member_number': count,
+                    'dob': member.dob.strftime('%d-%m-%Y'),
+                    'relation': member.relation,
+                    'id': member.id,
+                    'gender': member.gender,
+                    # 'age': member.age,
+                }
+                member_list.append(data)
+                count = count + 1
+
+            context = {
+                'instance': instance,
+                'purchase_data': str(instance.purchase_date.date().strftime('%d-%m-%Y')),
+                'expiry_date': str(instance.expiry_date.date().strftime('%d-%m-%Y')),
+                'premium': instance.premium_amount,
+                'proposer_name': proposer_name,
+                'proposer_address': proposer.address,
+                'proposer_mobile': proposer.phone_number,
+                'proposer_email': user.email,
+                'policy_number': instance.policy_number,
+                'total_member_covered': len(member_list),
+                'plan': instance.insurance_plan.name,
+                'insured_members': member_list,
+                'insurer_logo': instance.insurance_plan.insurer.logo.url
+            }
+            EmailNotification.send_notification(user=user, notification_type=notification_type,
+                                                context=context, email=user.email)
 
 
     @classmethod
@@ -373,6 +414,21 @@ class EmailNotificationOpdMixin:
             context.update({"invoice_url": invoice.file.url})
             html_body = render_to_string("email/doctor_invoice/body.html", context=context)
             email_subject = render_to_string("email/doctor_invoice/subject.txt", context=context)
+
+        elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
+            html_body = render_to_string("email/insurance_confirmed/pdfbody.html", context=context)
+            instance = context.get('instance')
+            filename = "COI_{}.pdf".format(str(timezone.now().timestamp()))
+            try:
+                pdf_file = HTML(string=html_body).write_pdf()
+                instance.coi = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
+                instance.save()
+            except Exception as e:
+                logger.error("Got error while creating pdf for opd invoice {}".format(e))
+            context.update({"invoice_url": instance.coi.url})
+            html_body = render_to_string("email/insurance_confirmed/body.html", context=context)
+            email_subject = render_to_string("email/insurance_confirmed/subject.txt", context=context)
+
         return html_body, email_subject
 
 

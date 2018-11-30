@@ -202,9 +202,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
             user_insurance = logged_in_user.purchased_insurance.filter().first()
             if user_insurance:
-                # TODO: check if still insurance is valid
                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                if insurance_threshold:
+                if insurance_threshold and insurance_threshold.is_valid():
                     insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
                         insurance_threshold.lab_amount_limit
                     insurance_data_dict['is_user_insured'] = True

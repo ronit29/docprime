@@ -1,7 +1,9 @@
 import datetime
+from django.core.validators import FileExtensionValidator
+from ondoc.notification.tasks import send_insurance_notifications
 import json
 
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 
 from ondoc.authentication import models as auth_model
@@ -151,6 +153,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     insured_members = JSONField(blank=True, null=True)
     premium_amount = models.PositiveIntegerField(default=None)
     order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING, null=True)
+    coi = models.FileField(default=None, null=True, upload_to='insurance/coi', validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
 
     def __str__(self):
         return str(self.user)
@@ -159,7 +162,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         db_table = "user_insurance"
 
     def is_valid(self):
-        if len(self)>0 and self.expiry_date >= timezone.now():
+        if self.expiry_date >= timezone.now():
             return True
         else:
             return False
@@ -254,6 +257,11 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     transaction_type = models.PositiveSmallIntegerField(choices=TRANSACTION_TYPE_CHOICES)
     amount = models.PositiveSmallIntegerField()
 
+    def after_commit_tasks(self):
+        if self.transaction_type == InsuranceTransaction.DEBIT:
+            send_insurance_notifications.apply_async(kwargs={'user_id': self.user_insurance.user.id},
+                                                     countdown=5)
+
     def save(self, *args, **kwargs):
         if self.pk:
             return
@@ -265,6 +273,8 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
 
         self.account.current_float += self.amount
         self.account.save()
+
+        transaction.on_commit(lambda: self.after_commit_tasks())
 
     class Meta:
         db_table = "insurance_transaction"

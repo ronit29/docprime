@@ -160,4 +160,20 @@ def send_opd_rating_message(appointment_id, type):
         notification_models.SmsNotification.send_rating_link(data)
 
 
+@task
+def send_insurance_notifications(user_id):
+    from ondoc.authentication import models as auth_model
 
+    user = auth_model.User.objects.filter(id=user_id).first()
+    if not user:
+        logger.error("Invalid user id passed for insurance email notification")
+
+    user_insurance = user.purchased_insurance.filter().last()
+    if not user_insurance or not user_insurance.is_valid():
+        logger.error("Invalid or None user insurance found for email notification")
+
+    notification_models.NotificationAction.trigger(
+        instance=user_insurance,
+        user=user,
+        notification_type=notification_models.NotificationAction.INSURANCE_CONFIRMED,
+    )

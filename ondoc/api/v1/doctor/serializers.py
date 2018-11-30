@@ -391,9 +391,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
                 user_insurance = logged_in_user.purchased_insurance.filter().first()
                 if user_insurance:
-                    # TODO: check if still insurance is valid
                     insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                    if insurance_threshold:
+                    if insurance_threshold and insurance_threshold.is_valid():
                         resp['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
                             insurance_threshold.opd_amount_limit
                         resp['is_user_insured'] = True
