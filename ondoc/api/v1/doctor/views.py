@@ -1232,17 +1232,32 @@ class DoctorContactNumberViewSet(viewsets.GenericViewSet):
 
     def retrieve(self, request, doctor_id):
 
+        hospital_id = request.query_params.get("hospital_id")
         doctor_obj = get_object_or_404(models.Doctor, pk=doctor_id)
+
+        hospital = doctor_obj.hospitals.filter(id=hospital_id).first()
+        spoc_details = hospital.spoc_details.all()
+        if hospital and hospital.is_live and len(spoc_details)>0:
+            for type in [auth_models.SPOCDetails.SPOC, auth_models.SPOCDetails.MANAGER, auth_models.SPOCDetails.OTHER, auth_models.SPOCDetails.OWNER]:
+                for spoc in spoc_details:
+                    if spoc.contact_type == type:
+                        final = None
+                        if spoc.std_code:
+                            final = '0' + str(spoc.std_code).lstrip('0') + str(spoc.number).lstrip('0')
+                        else:
+                            final = '0' + str(spoc.number).lstrip('0')
+                        if final:
+                            return Response({'status': 1, 'number': final}, status.HTTP_200_OK)
 
         doctor_details = models.DoctorMobile.objects.filter(doctor=doctor_obj).values('is_primary','number','std_code').order_by('-is_primary').first()
 
-        if not doctor_details:
-            return Response({'status': 0, 'message': 'No Contact Number found'}, status.HTTP_404_NOT_FOUND)
-        else:
-            final = str(doctor_details.get('number'))
+        if doctor_details:
+            final = str(doctor_details.get('number')).lstrip('0')
             if doctor_details.get('std_code'):
-                final = '0'+str(doctor_details.get('std_code'))+' '+str(doctor_details.get('number'))
+                final = '0'+str(doctor_details.get('std_code')).lstrip('0')+str(doctor_details.get('number')).lstrip('0')
             return Response({'status': 1, 'number': final}, status.HTTP_200_OK)
+
+        return Response({'status': 0, 'message': 'No Contact Number found'}, status.HTTP_404_NOT_FOUND)
 
 
 class DoctorFeedbackViewSet(viewsets.GenericViewSet):
