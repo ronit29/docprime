@@ -29,13 +29,13 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
         return Insurer.objects.filter(is_live=True)
 
     def list(self, request):
-        user_insurance = UserInsurance.objects.get(user=request.user)
-        if user_insurance.is_valid():
-            return Response({"message": "Already a Insurance Holder."}, status.HTTP_400_BAD_REQUEST)
-        else:
-            insurer_data = self.get_queryset()
-            body_serializer = serializers.InsurerSerializer(insurer_data, many=True)
-            return Response(body_serializer.data)
+        # user_insurance = UserInsurance.objects.get(user=request.user)
+        # if user_insurance.is_valid():
+        #     return Response({"message": "Already a Insurance Holder."}, status.HTTP_400_BAD_REQUEST)
+        # else:
+        insurer_data = self.get_queryset()
+        body_serializer = serializers.InsurerSerializer(insurer_data, many=True)
+        return Response(body_serializer.data)
 
 
 class InsuredMemberViewSet(viewsets.GenericViewSet):
