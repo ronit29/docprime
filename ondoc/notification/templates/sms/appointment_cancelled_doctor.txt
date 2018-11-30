@@ -2,7 +2,7 @@ Your appointment with {{patient_name|capfirst}} on {{instance.time_slot_start|da
 
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
-Doctor Name : {{doctor_name|capfirst}}
+Doctor Name : Dr. {{doctor_name|capfirst}}
 
 Apologies for the inconvenience caused.
 Team docprime

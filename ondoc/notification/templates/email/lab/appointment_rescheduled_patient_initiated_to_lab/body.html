@@ -61,7 +61,7 @@
                 <tr>
                     <td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
                         We have received a reschedule request for the appointment of {{patient_name|capfirst}} with
-                        {{instance.lab.name|capfirst}}.
+                        {{lab_name|capfirst}}.
                     </td>
                 </tr>
                 <tr>
@@ -123,7 +123,6 @@
                     <td>
                         <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 0;">
                             <tbody>
-                            {% if instance.lab.name %}
                             <tr>
                                 <td style="color: #000000; font-weight: 600; font-size: 16px;">
                                     Lab Name
@@ -131,10 +130,9 @@
                             </tr>
                             <tr>
                                 <td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-                                    {{instance.lab.name|capfirst}}
+                                    {{lab_name|capfirst}}
                                 </td>
                             </tr>
-                            {% endif %}
                             </tbody>
                         </table>
                     </td>
