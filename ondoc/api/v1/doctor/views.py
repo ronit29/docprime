@@ -1569,9 +1569,9 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         serializer = serializers.EntityListQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital').prefetch_related('doctor__doctor_clinic').exclude(user=request.user)
+        queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital').prefetch_related('doctor__doctor_clinic')
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
-            query = queryset.filter(doctor_id=valid_data.get('id'),
+            query = queryset.exclude(user=request.user).filter(doctor_id=valid_data.get('id'),
                                     entity_type=GenericAdminEntity.DOCTOR
                                     # (
                                     #     Q(hospital__isnull=True)|
@@ -1629,6 +1629,8 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                             x['id'] = doc.get('id')
                             x['assigned'] = doc.get('assigned')
                             break
+                    if x['phone_number'] == request.user.phone_number:
+                        continue
                     if not x.get('is_doctor'):
                         x['is_doctor'] = False
                     x['doctor_ids'] = [x['doctor_ids']] if x['doctor_ids'] else []

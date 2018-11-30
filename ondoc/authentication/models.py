@@ -900,9 +900,17 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     def get_user_admin_obj(cls, user):
         from ondoc.payout.models import Outstanding
         access_list = []
-        get_permissions = (GenericAdmin.objects.select_related('hospital_network', 'hospital', 'doctor').
-                           filter(user_id=user.id, write_permission=True, permission_type=GenericAdmin.BILLINNG,
-                                  is_disabled=False))
+        get_permissions = (GenericAdmin.objects.select_related('hospital_network', 'hospital', 'doctor')
+                           .filter(Q(user_id=user.id,
+                                     write_permission=True,
+                                     permission_type=GenericAdmin.BILLINNG,
+                                     is_disabled=False)
+                                   |
+                                   Q(user_id=user.id,
+                                     super_user_permission=True,
+                                     is_disabled=False)
+                                   )
+                           )
         if get_permissions:
             for permission in get_permissions:
                 if permission.hospital_network_id:
