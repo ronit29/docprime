@@ -311,6 +311,9 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
             resp['insurer_name'] = insurer.name
             resp['insurer_img'] = str(insurer.logo)
             resp['premium_amount'] = user_insurance.premium_amount
+            resp['proposer_name'] = user_insurance.members.all().fliter(relation='self').values('first_name',
+                                                                                                'middle_name',
+                                                                                                'last_name')
         else:
             return Response({"message": "User is not valid"},
                             status.HTTP_404_NOT_FOUND)
