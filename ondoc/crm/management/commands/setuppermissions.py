@@ -3,6 +3,7 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
+from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
                                  DoctorQualification, Qualification, Specialization, DoctorLanguage,
@@ -40,7 +41,7 @@ from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 
-from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin
+from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User
 
 from ondoc.seo.models import Sitemap
 from ondoc.elastic.models import DemoElastic
@@ -318,6 +319,30 @@ class Command(BaseCommand):
                 content_type=ct, codename='change_' + ct.model)
 
             group.permissions.add(*permissions)
+
+
+        # Create coupon group
+        group, created = Group.objects.get_or_create(name=constants['COUPON_MANAGEMENT_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Coupon, UserSpecificCoupon)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        # content_types = ContentType.objects.get_for_models(LabTest)
+        #
+        # for cl, ct in content_types.items():
+        #     permissions = Permission.objects.filter(
+        #         Q(content_type=ct),
+        #         Q(codename='change_' + ct.model))
+        #
+        #     group.permissions.add(*permissions)
 
         # Create about doctor group
         self.create_about_doctor_group()

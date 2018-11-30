@@ -606,15 +606,33 @@ class DoctorPracticeSpecializationInline(ReadOnlyInline):
 class GenericAdminFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
+        if self.cleaned_data:
+            validate_unique = []
+            for data in self.cleaned_data:
+                if not data.get('DELETE'):
+                    row = (data.get('phone_number'), data.get('hospital'), data.get('permission_type'))
+                    if row in validate_unique:
+                        raise forms.ValidationError("Duplicate Permission with this phone number exists.")
+                    else:
+                        validate_unique.append(row)
+            if validate_unique:
+                numbers = list(zip(*validate_unique))[0]
+                for row in validate_unique:
+                    if row[1] is None and numbers.count(row[0]) > 2:
+                        raise forms.ValidationError(
+                            "Permissions for all Hospitals already allocated for %s." % (row[0]))
 
 
 class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
-    # formset = GenericAdminFormSet
+    formset = GenericAdminFormSet
     form = GenericAdminForm
     show_change_link = False
-    exclude = ('hospital_network', 'source_type')
+    # exclude = ('hospital_network', 'source_type', 'is_doc_admin', 'read_permission')
+    fields = ('phone_number', 'hospital', 'name', 'permission_type', 'super_user_permission', 'write_permission', 'user', 'updated_at')
     verbose_name_plural = "Admins"
 
     # def has_delete_permission(self, request, obj=None):
@@ -634,7 +652,7 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
         #     return ['phone_number', 'is_disabled', 'write_permission', 'read_permission', 'hospital',  'permission_type',
         #             'user', 'is_doc_admin']
         # else:
-        return ['user']
+        return ['user', 'updated_at']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
@@ -1027,6 +1045,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         for instance in instances:
             if isinstance(instance, GenericAdmin):
+                if instance.hospital and instance.hospital.is_appointment_manager:
+                    instance.is_disabled = True
                 if (not instance.created_by):
                     instance.created_by = request.user
                 if (not instance.id):
