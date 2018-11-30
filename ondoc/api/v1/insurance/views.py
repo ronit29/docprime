@@ -21,21 +21,26 @@ from ondoc.authentication.models import User
 from datetime import timedelta
 
 
-
 class ListInsuranceViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
 
     def list(self, request):
-        insurer_data = self.get_queryset()
-        body_serializer = serializers.InsurerSerializer(insurer_data, many=True)
-        return Response(body_serializer.data)
+        user_insurance = UserInsurance.objects.get(user=request.user)
+        if user_insurance.is_valid():
+            return Response({"message": "Already a Insurance Holder."}, status.HTTP_400_BAD_REQUEST)
+        else:
+            insurer_data = self.get_queryset()
+            body_serializer = serializers.InsurerSerializer(insurer_data, many=True)
+            return Response(body_serializer.data)
 
 
 class InsuredMemberViewSet(viewsets.GenericViewSet):
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated,)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
@@ -58,7 +63,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         resp ={}
         members = request.data.get('members')
         if not members:
-            return Response({"message": "No members found for update."}, status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "No members found for update."}, status.HTTP_200_OK)
         member_serializer = InsuredMemberIdSerializer(data=members, many=True)
         member_serializer.is_valid(raise_exception=True)
         for member in members:

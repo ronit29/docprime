@@ -89,11 +89,11 @@ class InsurerAccount(auth_model.TimeStampedModel):
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     insurer = models.ForeignKey(Insurer,related_name="plans", on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
-    amount = models.PositiveIntegerField(default=None)
-    policy_tenure = models.PositiveIntegerField(default=None)
-    adult_count = models.SmallIntegerField(default=None)
-    child_count = models.SmallIntegerField(default=None)
-    enabled = models.BooleanField(default=True)
+    amount = models.PositiveIntegerField(default=0)
+    policy_tenure = models.PositiveIntegerField(default=1)
+    adult_count = models.SmallIntegerField(default=0)
+    child_count = models.SmallIntegerField(default=0)
+    enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
     @property
@@ -125,14 +125,14 @@ class InsurancePlanContent(auth_model.TimeStampedModel):
 class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
     #insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name="threshold", on_delete=models.CASCADE)
-    opd_count_limit = models.PositiveIntegerField(default=None)
-    opd_amount_limit = models.PositiveIntegerField(default=None)
-    lab_count_limit = models.PositiveIntegerField(default=None)
-    lab_amount_limit = models.PositiveIntegerField(default=None)
-    min_age = models.PositiveIntegerField(default=None)
-    max_age = models.PositiveIntegerField(default=None)
-    child_min_age = models.PositiveIntegerField(default=None)
-    enabled = models.BooleanField(default=True)
+    opd_count_limit = models.PositiveIntegerField(default=0)
+    opd_amount_limit = models.PositiveIntegerField(default=0)
+    lab_count_limit = models.PositiveIntegerField(default=0)
+    lab_amount_limit = models.PositiveIntegerField(default=0)
+    min_age = models.PositiveIntegerField(default=0)
+    max_age = models.PositiveIntegerField(default=0)
+    child_min_age = models.PositiveIntegerField(default=0)
+    enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
     def __str__(self):
@@ -143,14 +143,14 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
 
 
 class UserInsurance(auth_model.TimeStampedModel):
-    insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING, null=True)
+    insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
-    purchase_date = models.DateTimeField(blank=True, null=True)
-    expiry_date = models.DateTimeField(blank=True, null=True)
-    policy_number = models.CharField(max_length=50, blank=True, null=True, default=generate_insurance_policy_number)
-    insured_members = JSONField(blank=True, null=True)
-    premium_amount = models.PositiveIntegerField(default=None)
-    order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING, null=True)
+    purchase_date = models.DateTimeField(blank=False, null=False)
+    expiry_date = models.DateTimeField(blank=False, null=True)
+    policy_number = models.CharField(max_length=50, blank=False, null=False, default=generate_insurance_policy_number)
+    insured_members = JSONField(blank=False, null=False)
+    premium_amount = models.PositiveIntegerField(default=0)
+    order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return str(self.user)
@@ -159,7 +159,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         db_table = "user_insurance"
 
     def is_valid(self):
-        if len(self)>0 and self.expiry_date >= timezone.now():
+        if self.expiry_date >= timezone.now():
             return True
         else:
             return False
@@ -252,7 +252,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     user_insurance = models.ForeignKey(UserInsurance,related_name='transactions', on_delete=models.DO_NOTHING)
     account = models.ForeignKey(InsurerAccount,related_name='transactions', on_delete=models.DO_NOTHING)
     transaction_type = models.PositiveSmallIntegerField(choices=TRANSACTION_TYPE_CHOICES)
-    amount = models.PositiveSmallIntegerField()
+    amount = models.PositiveSmallIntegerField(default=0)
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -292,7 +292,7 @@ class InsuredMembers(auth_model.TimeStampedModel):
     # insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
     first_name = models.CharField(max_length=50, null=False)
     last_name = models.CharField(max_length=50, null=True)
-    dob = models.DateField(blank=True, null=True)
+    dob = models.DateField(blank=False, null=False)
     email = models.EmailField(max_length=100, null=True)
     relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
     pincode = models.PositiveIntegerField(default=None)
@@ -300,13 +300,13 @@ class InsuredMembers(auth_model.TimeStampedModel):
     gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
-    profile = models.ForeignKey(auth_model.UserProfile,related_name="insurance", on_delete=models.SET_NULL, null=True)
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="insurance", on_delete=models.SET_NULL, null=True)
     title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
     middle_name = models.CharField(max_length=50, null=True)
     town = models.CharField(max_length=100, null=False)
     district = models.CharField(max_length=100, null=False)
     state = models.CharField(max_length=100, null=False)
-    user_insurance = models.ForeignKey(UserInsurance,related_name="members", on_delete=models.DO_NOTHING, null=True)
+    user_insurance = models.ForeignKey(UserInsurance, related_name="members", on_delete=models.DO_NOTHING, null=False)
 
     class Meta:
         db_table = "insured_members"
@@ -349,9 +349,9 @@ class Insurance(auth_model.TimeStampedModel):
 
 
 class InsuranceDisease(auth_model.TimeStampedModel):
-    disease = models.CharField(max_length=100, blank=True, null=True)
-    enabled = models.BooleanField(default=True)
-    is_live = models.BooleanField(default=False)
+    disease = models.CharField(max_length=100)
+    enabled = models.BooleanField()
+    is_live = models.BooleanField()
 
     class Meta:
         db_table = "insurance_disease"
