@@ -21,21 +21,26 @@ from ondoc.authentication.models import User
 from datetime import timedelta
 
 
-
 class ListInsuranceViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
 
     def list(self, request):
+        # user_insurance = UserInsurance.objects.get(user=request.user)
+        # if user_insurance.is_valid():
+        #     return Response({"message": "Already a Insurance Holder."}, status.HTTP_400_BAD_REQUEST)
+        # else:
         insurer_data = self.get_queryset()
         body_serializer = serializers.InsurerSerializer(insurer_data, many=True)
         return Response(body_serializer.data)
 
 
 class InsuredMemberViewSet(viewsets.GenericViewSet):
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated,)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
@@ -58,7 +63,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         resp ={}
         members = request.data.get('members')
         if not members:
-            return Response({"message": "No members found for update."}, status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "No members found for update."}, status.HTTP_200_OK)
         member_serializer = InsuredMemberIdSerializer(data=members, many=True)
         member_serializer.is_valid(raise_exception=True)
         for member in members:
@@ -306,6 +311,9 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
             resp['insurer_name'] = insurer.name
             resp['insurer_img'] = str(insurer.logo)
             resp['premium_amount'] = user_insurance.premium_amount
+            resp['proposer_name'] = user_insurance.members.all().fliter(relation='self').values('first_name',
+                                                                                                'middle_name',
+                                                                                                'last_name')
         else:
             return Response({"message": "User is not valid"},
                             status.HTTP_404_NOT_FOUND)

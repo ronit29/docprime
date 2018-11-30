@@ -1003,7 +1003,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                                                    response.get('statusCode'))
                 elif order_obj.product_id == account_models.Order.INSURANCE_PRODUCT_ID:
                     if appointment_obj:
-                        REDIRECT_URL = INSURANCE_REDIRECT_URL + "/" + str(appointment_obj.id) + "?payment_success=true"
+                        REDIRECT_URL = INSURANCE_REDIRECT_URL + "?payment_success=true&id=" + str(appointment_obj.id)
                     elif order_obj:
                         REDIRECT_URL = INSURANCE_FAILURE_REDIRECT_URL % (order_obj.action_data,
                                                                    response.get('statusCode'))
