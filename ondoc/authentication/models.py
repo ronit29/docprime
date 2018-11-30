@@ -641,8 +641,15 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
         from ondoc.payout.models import Outstanding
         access_list = []
         permissions = (cls.objects.select_related('lab_network', 'lab').
-                           filter(user_id=user.id, permission_type=cls.BILLINNG, is_disabled=False).
-                           filter(Q(write_permission=True) | Q(read_permission=True)))
+                           filter(Q(user_id=user.id,
+                                    permission_type=cls.BILLINNG,
+                                    is_disabled=False,
+                                    write_permission=True)
+                                  |
+                                  Q(user_id=user.id,
+                                    super_user_permission=True,
+                                    is_disabled=False))
+                       )
         if permissions:
             for permission in permissions:
                 if permission.lab_network and permission.lab_network.is_billing_enabled:
