@@ -305,7 +305,7 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
             resp['insurer_name'] = insurer.name
             resp['insurer_img'] = str(insurer.logo)
             resp['premium_amount'] = user_insurance.premium_amount
-            resp['proposer_name'] = user_insurance.members.all().fliter(relation='self').values('first_name',
+            resp['proposer_name'] = user_insurance.members.all().filter(relation='self').values('first_name',
                                                                                                 'middle_name',
                                                                                                 'last_name')
         else:
