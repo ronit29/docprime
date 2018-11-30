@@ -957,8 +957,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
             user_insurance = logged_in_user.purchased_insurance.filter().first()
-            if user_insurance:
-                # TODO: check if still insurance is valid
+            if user_insurance and user_insurance.is_valid():
                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                 if insurance_threshold:
                     insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \

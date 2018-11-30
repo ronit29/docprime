@@ -50,10 +50,10 @@ class MemberListSerializer(serializers.Serializer):
 
     title = serializers.ChoiceField(choices=InsuredMembers.TITLE_TYPE_CHOICES)
     first_name = serializers.CharField(max_length=50)
-    middle_name = serializers.CharField(max_length=50, allow_blank=True)
-    last_name = serializers.CharField(max_length=50, allow_blank=True)
+    middle_name = serializers.CharField(max_length=50, allow_blank=True, allow_null=True)
+    last_name = serializers.CharField(max_length=50, allow_blank=True, allow_null=True)
     dob = serializers.DateField()
-    email = serializers.EmailField()
+    email = serializers.EmailField(allow_blank=True, allow_null=True)
     relation = serializers.ChoiceField(choices=InsuredMembers.RELATION_CHOICES)
     address = serializers.CharField(max_length=250)
     pincode = serializers.IntegerField()

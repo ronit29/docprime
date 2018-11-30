@@ -1,7 +1,9 @@
 import datetime
+from django.core.validators import FileExtensionValidator
+from ondoc.notification.tasks import send_insurance_notifications
 import json
 
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 
 from ondoc.authentication import models as auth_model
@@ -14,16 +16,20 @@ from ondoc.common.helper import Choices
 from datetime import timedelta
 from django.utils import timezone
 from django.conf import settings
+from ondoc.api.v1.utils import RawSql
+
 
 def generate_insurance_policy_number():
-    last_user_insurance_obj = UserInsurance.objects.all().order_by('id').last()
-    if last_user_insurance_obj and last_user_insurance_obj.policy_number:
-        policy_number = last_user_insurance_obj.policy_number
-        identifier, sequence = policy_number.split('DP')
-        sequence = int(sequence) + 1
+    query = '''select nextval('userinsurance_policy_num_seq') as inc'''
+    seq = RawSql(query, []).fetch_all()
+    sequence = None
+    if seq:
+        sequence = seq[0]['inc'] if seq[0]['inc'] else None
+
+    if sequence:
         return str('DP%.8d' % sequence)
     else:
-        return str('DP%.8d' % 1)
+        raise ValueError('Sequence Produced is not valid.')
 
 
 class LiveMixin(models.Model):
@@ -66,34 +72,34 @@ class InsurerAccount(auth_model.TimeStampedModel):
     current_float = models.PositiveIntegerField(default=None)
 
     def __str__(self):
-        return self.insurer
+        return str(self.insurer)
 
     class Meta:
         db_table = "insurer_account"
 
-    @classmethod
-    def debit_float_schedule(self, insurer, amount):
-        insurer_float = InsurerAccount.objects.get(insurer=insurer)
-        if insurer_float:
-            current_float = insurer_float.current_float
-            if amount <= current_float:
-                updated_current_float = current_float - amount
-                insurer_float.current_float = updated_current_float
-                insurer_float.save()
-            else:
-                return False
-        else:
-            return False
+    # @classmethod
+    # def debit_float_schedule(self, insurer, amount):
+    #     insurer_float = InsurerAccount.objects.get(insurer=insurer)
+    #     if insurer_float:
+    #         current_float = insurer_float.current_float
+    #         if amount <= current_float:
+    #             updated_current_float = current_float - amount
+    #             insurer_float.current_float = updated_current_float
+    #             insurer_float.save()
+    #         else:
+    #             return False
+    #     else:
+    #         return False
 
 
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     insurer = models.ForeignKey(Insurer,related_name="plans", on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
-    amount = models.PositiveIntegerField(default=None)
-    policy_tenure = models.PositiveIntegerField(default=None)
-    adult_count = models.SmallIntegerField(default=None)
-    child_count = models.SmallIntegerField(default=None)
-    enabled = models.BooleanField(default=True)
+    amount = models.PositiveIntegerField(default=0)
+    policy_tenure = models.PositiveIntegerField(default=1)
+    adult_count = models.SmallIntegerField(default=0)
+    child_count = models.SmallIntegerField(default=0)
+    enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
     @property
@@ -125,14 +131,14 @@ class InsurancePlanContent(auth_model.TimeStampedModel):
 class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
     #insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name="threshold", on_delete=models.CASCADE)
-    opd_count_limit = models.PositiveIntegerField(default=None)
-    opd_amount_limit = models.PositiveIntegerField(default=None)
-    lab_count_limit = models.PositiveIntegerField(default=None)
-    lab_amount_limit = models.PositiveIntegerField(default=None)
-    min_age = models.PositiveIntegerField(default=None)
-    max_age = models.PositiveIntegerField(default=None)
-    child_min_age = models.PositiveIntegerField(default=None)
-    enabled = models.BooleanField(default=True)
+    opd_count_limit = models.PositiveIntegerField(default=0)
+    opd_amount_limit = models.PositiveIntegerField(default=0)
+    lab_count_limit = models.PositiveIntegerField(default=0)
+    lab_amount_limit = models.PositiveIntegerField(default=0)
+    min_age = models.PositiveIntegerField(default=0)
+    max_age = models.PositiveIntegerField(default=0)
+    child_min_age = models.PositiveIntegerField(default=0)
+    enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
     def __str__(self):
@@ -143,14 +149,15 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
 
 
 class UserInsurance(auth_model.TimeStampedModel):
-    insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING, null=True)
+    insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
-    purchase_date = models.DateTimeField(blank=True, null=True)
-    expiry_date = models.DateTimeField(blank=True, null=True)
-    policy_number = models.CharField(max_length=50, blank=True, null=True, default=generate_insurance_policy_number)
-    insured_members = JSONField(blank=True, null=True)
-    premium_amount = models.PositiveIntegerField(default=None)
-    order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING, null=True)
+    purchase_date = models.DateTimeField(blank=False, null=False)
+    expiry_date = models.DateTimeField(blank=False, null=False, default=timezone.now)
+    policy_number = models.CharField(max_length=50, blank=False, null=False, unique=True, default=generate_insurance_policy_number)
+    insured_members = JSONField(blank=False, null=False)
+    premium_amount = models.PositiveIntegerField(default=0)
+    order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING)
+    coi = models.FileField(default=None, null=True, upload_to='insurance/coi', validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
 
     def __str__(self):
         return str(self.user)
@@ -159,14 +166,14 @@ class UserInsurance(auth_model.TimeStampedModel):
         db_table = "user_insurance"
 
     def is_valid(self):
-        if len(self)>0 and self.expiry_date >= timezone.now():
+        if self.expiry_date >= timezone.now():
             return True
         else:
             return False
 
 
     @classmethod
-    def create_user_insurance(self, insurance_data):
+    def create_user_insurance(cls, insurance_data):
         import json
         members = insurance_data['insured_members']
         for member in members:
@@ -252,7 +259,11 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     user_insurance = models.ForeignKey(UserInsurance,related_name='transactions', on_delete=models.DO_NOTHING)
     account = models.ForeignKey(InsurerAccount,related_name='transactions', on_delete=models.DO_NOTHING)
     transaction_type = models.PositiveSmallIntegerField(choices=TRANSACTION_TYPE_CHOICES)
-    amount = models.PositiveSmallIntegerField()
+    amount = models.PositiveSmallIntegerField(default=0)
+
+    def after_commit_tasks(self):
+        if self.transaction_type == InsuranceTransaction.DEBIT:
+            send_insurance_notifications(self.user_insurance.user.id)
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -266,6 +277,8 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
         self.account.current_float += self.amount
         self.account.save()
 
+        transaction.on_commit(lambda: self.after_commit_tasks())
+
     class Meta:
         db_table = "insurance_transaction"
         unique_together = (("user_insurance", "account", "transaction_type"),)
@@ -277,11 +290,10 @@ class InsuredMembers(auth_model.TimeStampedModel):
     OTHER = 'o'
     GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
     SELF = 'self'
-    HUSBAND = 'husband'
-    WIFE = 'wife'
+    SPOUSE = 'spouse'
     SON = 'son'
     DAUGHTER = 'daughter'
-    RELATION_CHOICES = [(HUSBAND, 'Husband'), (WIFE, 'Wife'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    RELATION_CHOICES = [(SPOUSE, 'Spouse'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
     ADULT = "adult"
     CHILD = "child"
     MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
@@ -293,21 +305,21 @@ class InsuredMembers(auth_model.TimeStampedModel):
     # insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
     first_name = models.CharField(max_length=50, null=False)
     last_name = models.CharField(max_length=50, null=True)
-    dob = models.DateField(blank=True, null=True)
-    email = models.EmailField(max_length=100)
+    dob = models.DateField(blank=False, null=False)
+    email = models.EmailField(max_length=100, null=True)
     relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
     pincode = models.PositiveIntegerField(default=None)
     address = models.TextField(default=None)
     gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
-    profile = models.ForeignKey(auth_model.UserProfile,related_name="insurance", on_delete=models.SET_NULL, null=True)
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="insurance", on_delete=models.SET_NULL, null=True)
     title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
     middle_name = models.CharField(max_length=50, null=True)
     town = models.CharField(max_length=100, null=False)
     district = models.CharField(max_length=100, null=False)
     state = models.CharField(max_length=100, null=False)
-    user_insurance = models.ForeignKey(UserInsurance,related_name="members", on_delete=models.DO_NOTHING, null=True)
+    user_insurance = models.ForeignKey(UserInsurance, related_name="members", on_delete=models.DO_NOTHING, null=False)
 
     class Meta:
         db_table = "insured_members"
@@ -350,9 +362,9 @@ class Insurance(auth_model.TimeStampedModel):
 
 
 class InsuranceDisease(auth_model.TimeStampedModel):
-    disease = models.CharField(max_length=100, blank=True, null=True)
-    enabled = models.BooleanField(default=True)
-    is_live = models.BooleanField(default=False)
+    disease = models.CharField(max_length=100)
+    enabled = models.BooleanField()
+    is_live = models.BooleanField()
 
     class Meta:
         db_table = "insurance_disease"

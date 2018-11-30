@@ -21,8 +21,9 @@ from ondoc.authentication.models import User
 from datetime import timedelta
 
 
-
 class ListInsuranceViewSet(viewsets.GenericViewSet):
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
@@ -34,8 +35,8 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
 
 
 class InsuredMemberViewSet(viewsets.GenericViewSet):
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated,)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return Insurer.objects.filter(is_live=True)
@@ -57,8 +58,6 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
     def update(self, request):
         resp ={}
         members = request.data.get('members')
-        if not members:
-            return Response({"message": "No members found for update."}, status.HTTP_400_BAD_REQUEST)
         member_serializer = InsuredMemberIdSerializer(data=members, many=True)
         member_serializer.is_valid(raise_exception=True)
         for member in members:
@@ -305,7 +304,12 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
             resp['policy_number'] = user_insurance.policy_number
             resp['insurer_name'] = insurer.name
             resp['insurer_img'] = str(insurer.logo)
+            resp['coi_url'] = request.build_absolute_uri(user_insurance.coi.url) if hasattr(user_insurance, 'coi') \
+                                            and user_insurance.coi is not None and user_insurance.coi.name else None
             resp['premium_amount'] = user_insurance.premium_amount
+            resp['proposer_name'] = user_insurance.members.all().filter(relation='self').values('first_name',
+                                                                                                'middle_name',
+                                                                                                'last_name')
         else:
             return Response({"message": "User is not valid"},
                             status.HTTP_404_NOT_FOUND)

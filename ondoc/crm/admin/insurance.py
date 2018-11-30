@@ -76,6 +76,9 @@ class InsuredMembersAdmin(admin.ModelAdmin):
         return False
 
 
+class InsuranceDiseaseAdmin(admin.ModelAdmin):
+    list_display = ['disease']
+
 # class InsurancePlanContentForm(forms.ModelForm):
 #     content = forms.CharField(widget=forms.Textarea, required=False)
 #     plan = forms.ModelChoiceField(queryset=InsurancePlans.objects.all(),widget=forms.Select)
