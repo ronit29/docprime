@@ -83,7 +83,8 @@ class NotificationAction:
     def trigger(cls, instance, user, notification_type):  # SHASHANK_SINGH all context making
         from ondoc.doctor.models import OpdAppointment
         est = pytz.timezone(settings.TIME_ZONE)
-        time_slot_start = instance.time_slot_start.astimezone(est) if hasattr(instance, 'time_slot_start') else None
+        if notification_type != cls.INSURANCE_CONFIRMED:
+            time_slot_start = instance.time_slot_start.astimezone(est)
         context = {}
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             patient_name = instance.profile.name if instance.profile.name else ""
