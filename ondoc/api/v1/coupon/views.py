@@ -28,6 +28,8 @@ User = get_user_model()
 
 class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
+    queryset=Coupon.objects.all()
+
     def list(self, request, *args, **kwargs):
         serializer = serializers.ProductIDSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -51,6 +53,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
 
         user = request.user
+        if not user.is_authenticated:
+            user = None
 
         coupons = Coupon.objects.filter(type__in=types)
 
@@ -66,7 +70,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         if test_ids:
             coupons = coupons.filter(Q(test__in=test_ids) | Q(test__isnull=True))
 
-        if user and request.user.is_authenticated:
+        if user and user.is_authenticated:
             coupons = coupons.filter(Q(is_user_specific=False) \
                 | (Q(is_user_specific=True) & Q(user_specific_coupon__user=user)))
         else:
@@ -97,7 +101,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
 
         coupons = coupons.prefetch_related('test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
-
+        coupons = coupons.distinct()
 
         applicable_coupons = []
         for coupon in coupons:
