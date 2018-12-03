@@ -511,8 +511,11 @@ class DoctorProfileView(viewsets.GenericViewSet):
               lab__network__manageable_lab_network_admins__is_disabled=False),
             Q(status=lab_models.LabAppointment.ACCEPTED,
               time_slot_start__date=today)).distinct().count()
-        if hasattr(request.user, 'doctor') and request.user.doctor and request.user.doctor.is_live:
-            doctor = request.user.doctor
+        doctor_mobile = auth_models.DoctorNumber.objects.filter(phone_number=request.user.phone_number)
+        doctor = doctor_mobile.first().doctor if doctor_mobile.exists() else None
+        if not doctor:
+            doctor = request.user.doctor if hasattr(request.user, 'doctor') else None
+        if doctor and doctor.is_live:
             doc_serializer = serializers.DoctorProfileSerializer(doctor, many=False,
                                                                  context={"request": request})
             resp_data = doc_serializer.data

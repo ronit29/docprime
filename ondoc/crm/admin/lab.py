@@ -1004,7 +1004,17 @@ class LabTestPackageInline(admin.TabularInline):
             lab_test__is_package=False, package__is_package=True)
 
 
+class LabTestAdminForm(forms.ModelForm):
+    why = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        extend = False
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'lab_test/js/init.js')
+        css = {'all': ('lab_test/css/style.css',)}
+
+
 class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
+    form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = []

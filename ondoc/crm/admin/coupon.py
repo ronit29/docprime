@@ -72,7 +72,7 @@ class UserSpecificCouponResource(resources.ModelResource):
                 import_coupons.append(coupon_id)
 
         self.users_dict = {}
-        users = User.objects.filter(phone_number__in=import_phone_numbers).all()
+        users = User.objects.filter(phone_number__in=import_phone_numbers, user_type=User.CONSUMER).all()
         for user in users:
             self.users_dict[user.phone_number] = user.id
 
