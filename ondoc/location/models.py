@@ -86,6 +86,90 @@ class EntityAddress(TimeStampedModel):
     centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
     geocoding = models.ForeignKey(GeocodingResults, null=True, on_delete=models.DO_NOTHING)
 
+    def create(geocoding_obj, value):
+        mapping_dictionary = {
+            'bengaluru': 'Bangalore',
+            'bengalooru': 'Bangalore',
+            'gurugram': 'Gurgaon',
+            'gurugram rural': 'Gurgaon'
+        }
+
+        response_list = list()
+        longitude = geocoding_obj.longitude
+        latitude = geocoding_obj.latitude
+
+        # Take the address component with longest length as it can provide us the most relevant address.
+        max_length = 0
+        address_component = None
+        # result_value.get('results')[00].get('address_components')
+        if value.get('results'):
+            result_list = value.get('results')
+        for result in result_list:
+            if len(result.get('address_components', [])) > max_length:
+                address_component = result.get('address_components')
+                max_length = len(result.get('address_components'))
+
+        if not address_component:
+            return response_list
+
+        resp_data = dict()
+
+        # address_component.reverse()
+        for component in address_component:
+            for key in component.get('types', []):
+                resp_data[key.upper()] = component['long_name']
+
+        # never change the order. As it could affect the parsed address.
+        for type in ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2', 'LOCALITY', 'SUBLOCALITY',
+                     'SUBLOCALITY_LEVEL_1', 'SUBLOCALITY_LEVEL_2', 'SUBLOCALITY_LEVEL_3']:
+
+            if type.upper() in resp_data.keys():
+
+                if type.upper().startswith('SUBLOCALITY_LEVEL'):
+                    response_list.append(
+                        {'key': 'SUBLOCALITY', 'type': type, 'postal_code': resp_data.get('POSTAL_CODE', None),
+                         'value': resp_data[type.upper()]})
+                else:
+                    response_list.append({'key': type, 'type': type, 'postal_code': resp_data.get('POSTAL_CODE', None),
+                                          'value': resp_data[type.upper()]})
+
+        parent_id = None
+        postal_code = None
+        ea_list = list()
+
+        for meta in response_list:
+            point = None
+            if meta['key'] in EntityAddress.AllowedKeys.availabilities():
+                if meta['key'].startswith('SUBLOCALITY'):
+                    postal_code = meta['postal_code']
+                if meta['key'] not in [EntityAddress.AllowedKeys.COUNTRY,
+                                       EntityAddress.AllowedKeys.ADMINISTRATIVE_AREA_LEVEL_1,
+                                       EntityAddress.AllowedKeys.ADMINISTRATIVE_AREA_LEVEL_2]:
+                    point = Point(float(longitude), float(latitude))
+                saved_data = EntityAddress.objects.filter(type=meta['key'], postal_code=postal_code,
+                                                          type_blueprint=meta['type'],
+                                                          value=meta['value'], parent=parent_id)
+                if len(saved_data) == 1:
+                    entity_address = saved_data[0]
+                    parent_id = entity_address.id
+                elif len(saved_data) == 0:
+                    alternative_name = mapping_dictionary.get(meta['value'].lower()) if mapping_dictionary.get(
+                        meta['value'].lower(), None) else meta['value']
+
+                    entity_address = EntityAddress(type=meta['key'], centroid=point, postal_code=postal_code,
+                                                   type_blueprint=meta['type'], value=meta['value'], parent=parent_id,
+                                                   alternative_value=alternative_name, geocoding=geocoding_obj)
+                    entity_address.save()
+                    parent_id = entity_address.id
+
+            if entity_address.type in ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2',
+                                       'LOCALITY', 'SUBLOCALITY']:
+                ea_list.append(entity_address)
+        if ea_list:
+            return "success"
+        else:
+            return "failure"
+
     @classmethod
     def get_or_create(cls, *args, **kwargs):
         mapping_dictionary = {
