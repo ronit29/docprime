@@ -1,7 +1,5 @@
 from django.core.management.base import BaseCommand
-from ondoc.doctor.models import Hospital
-from ondoc.diagnostic.models import Lab
-from ondoc.location.models import EntityLocationRelationship, GeocodingResults, EntityAddress
+from ondoc.location.models import GeocodingResults, EntityAddress
 import json
 
 

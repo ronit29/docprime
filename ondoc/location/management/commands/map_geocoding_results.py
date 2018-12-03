@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import Lab
-from ondoc.location.models import EntityLocationRelationship, GeocodingResults
+from ondoc.location.models import  GeocodingResults
 
 def map_geocoding_results():
     all_hospitals = Hospital.objects.filter(is_live=True)
@@ -17,7 +17,6 @@ def map_geocoding_results():
             #     print("Successfull for hospital id ", hospital.id)
             # else:
             #     print("Failed for hospital id ", hospital.id)
-
 
     for lab in all_labs:
         if lab.location:
