@@ -1768,3 +1768,75 @@ class CancellationReason(auth_model.TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class OfflinePatients(auth_model.TimeStampedModel):
+    DOCPRIME = 1
+    GOOGLE = 2
+    JUSTDIAL = 3
+    FRIENDS = 4
+    OTHERS = 5
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, "Male"), (FEMALE, "Female"), (OTHER, "Other")]
+    REFERENCE_CHOICES = [(DOCPRIME, "Docprime"), (GOOGLE, "Google"), (JUSTDIAL, "JustDial"), (FRIENDS, "Friends"),
+                         (OTHERS, "Others")]
+    name = models.CharField(max_length=32)
+    sms_notification = models.BooleanField(default=False)
+    gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=GENDER_CHOICES)
+    dob = models.DateField(blank=True, null=True)
+    referred_by = models.PositiveSmallIntegerField(choices=REFERENCE_CHOICES, null=True, blank=True)
+    medical_history = models.CharField(max_length=256, null=True, blank=True)
+    welcome_message = models.CharField(max_length=128, null=True, blank=True)
+    display_welcome_message = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'offline_patients'
+
+
+class PatientMobile(auth_model.TimeStampedModel):
+    patient = models.ForeignKey(OfflinePatients, related_name="patient_mobiles", on_delete=models.CASCADE)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(6000000000)])
+    is_default = models.BooleanField(verbose_name='Default Number?', default=False)
+
+    class Meta:
+        db_table = "patient_mobile"
+
+
+class OfflineOPDAppointments(auth_model.TimeStampedModel):
+    CREATED = 1
+    BOOKED = 2
+    RESCHEDULED_DOCTOR = 3
+    RESCHEDULED_PATIENT = 4
+    ACCEPTED = 5
+    CANCELLED = 6
+    COMPLETED = 7
+
+    STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
+                      (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
+                      (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                      (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
+                      (COMPLETED, 'Completed')]
+    doctor = models.ForeignKey(Doctor, related_name="offline_doctor_appointments", on_delete=models.SET_NULL, null=True)
+    hospital = models.ForeignKey(Hospital, related_name="offline_hospital_appointments", on_delete=models.SET_NULL, null=True)
+    user = models.ForeignKey(OfflinePatients, related_name="offline_patients_appointment", on_delete=models.SET_NULL, null=True)
+    booked_by = models.ForeignKey(auth_model.User, related_name="offline_booked_appointements",
+                                  on_delete=models.SET_NULL,
+                                  null=True)
+    fees = models.DecimalField(max_digits=10, decimal_places=2)
+    effective_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
+    mrp = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
+    deal_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, default=None, null=False)
+    status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
+    # otp = models.PositiveIntegerField(blank=True, null=True)
+    time_slot_start = models.DateTimeField(blank=True, null=True)
+    time_slot_end = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = "offline_opd_appointments"
+
