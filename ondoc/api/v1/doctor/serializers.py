@@ -8,7 +8,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
-                                 CommonMedicalCondition,CommonSpecialization, 
+                                 CommonMedicalCondition,CommonSpecialization, OfflinePatients,
                                  DoctorPracticeSpecialization, DoctorClinic)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
@@ -1284,3 +1284,19 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError('Invalid Hospital ID.')
         raise serializers.ValidationError('Invalid Hospital ID.')
+
+
+class OfflinePatientBodySerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=24)
+    sms_notification = serializers.BooleanField(required=False)
+    gender = serializers.ChoiceField(choices=OfflinePatients.GENDER_CHOICES, required=False)
+    dob = serializers.DateField(required=False)
+    referred_by = serializers.ChoiceField(choices=OfflinePatients.REFERENCE_CHOICES)
+    medical_history = serializers.CharField(required=False, max_length=256)
+    welcome_message = serializers.CharField(required=False, max_length=256)
+    display_welcome_message = serializers.BooleanField(required=False)
+    phone_number = serializers.ListField()
+
+
+class OfflinePatientCreateListSerializer(serializers.Serializer):
+    patient = OfflinePatientBodySerializer(many=True)

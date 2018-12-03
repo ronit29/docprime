@@ -1808,3 +1808,11 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             if admin.exists():
                 admin.update(user=user, name=valid_data.get('name'), phone_number=valid_data.get('phone_number'))
         return Response({'success': 'Created Successfully'})
+
+
+class OfflineCustomerViewSet(viewsets.GenericViewSet):
+
+    def create_patients(self, request):
+        serializer = serializers.OfflinePatientCreateListSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
