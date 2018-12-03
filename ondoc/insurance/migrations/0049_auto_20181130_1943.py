@@ -13,12 +13,12 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunSQL(
+            '''CREATE SEQUENCE IF NOT EXISTS userinsurance_policy_num_seq START 30000000;'''
+        ),
         migrations.AlterField(
             model_name='userinsurance',
             name='policy_number',
             field=models.CharField(default=ondoc.insurance.models.generate_insurance_policy_number, max_length=50, unique=True),
-        ),
-        migrations.RunSQL(
-            '''CREATE SEQUENCE IF NOT EXISTS userinsurance_policy_num_seq START 30000000;'''
-        ),
+        )
     ]
