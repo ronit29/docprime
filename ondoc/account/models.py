@@ -264,6 +264,7 @@ class PgTransaction(TimeStampedModel):
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
     reference_id = models.PositiveIntegerField(blank=True, null=True)
     order = models.ForeignKey(Order, on_delete=models.CASCADE, null=True, related_name="txn")
+    #order_id = models.PositiveIntegerField()
     order_no = models.CharField(max_length=100, blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
