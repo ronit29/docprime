@@ -1138,15 +1138,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
         queryset = None
 
-        if permission:
-            out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
-                                                 outstanding_month=month, outstanding_year=year)
+        # if permission:
+        out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
+                                             outstanding_month=month, outstanding_year=year)
 
-            queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
-                                                      time_slot_start__gte=start_date_time,
-                                                      time_slot_start__lte=end_date_time,
-                                                      payment_type__in=payment_type,
-                                                      outstanding=out_obj))
+        queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+                                                  time_slot_start__gte=start_date_time,
+                                                  time_slot_start__lte=end_date_time,
+                                                  payment_type__in=payment_type,
+                                                  outstanding=out_obj))
 
         return queryset
         # lab_data = UserPermission.get_billable_doctor_hospital(user)

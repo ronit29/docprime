@@ -1040,6 +1040,13 @@ class LabTestCategoryInline(AutoComplete, TabularInline):
 
 
 class LabTestAdminForm(forms.ModelForm):
+    why = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        extend = False
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'lab_test/js/init.js')
+        css = {'all': ('lab_test/css/style.css',)}
+
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -1057,6 +1064,7 @@ class LabTestAdminForm(forms.ModelForm):
 
 
 class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
+    form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = [LabTestCategoryInline]
