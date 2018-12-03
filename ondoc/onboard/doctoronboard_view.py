@@ -244,7 +244,7 @@ def otp(request):
         action = request.POST.get('_resend_otp')
         if action:
             otp = randint(200000, 900000)
-            message = 'You have initiated onboarding process on DocPrime for '+existing.doctor.name+'. OTP is '+str(otp)
+            message = 'You have initiated onboarding process on DocPrime for '+existing.doctor.name+'. WELCOME CODE is '+str(otp)
             api.send_sms(message, str(existing.doctor.mobiles.filter(is_primary=True)[0].number))
 
             # print(otp)
