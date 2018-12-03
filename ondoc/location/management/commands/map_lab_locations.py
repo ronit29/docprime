@@ -11,10 +11,10 @@ def map_lab_location_urls():
     content_type = ContentType.objects.get(model='lab')
     if content_type:
         query = '''select distinct(l.id) from lab l inner join entity_location_relations elr on l.id = elr.object_id 
-        and elr.content_type_id=%d and l.is_live=True and (ST_Distance(l.location, elr.entity_geo_location)>0 
-        or elr.entity_geo_location is null) order by l.id''' % content_type.id
+        and elr.content_type_id=%s and l.is_live=True and (ST_Distance(l.location, elr.entity_geo_location)>0 
+        or elr.entity_geo_location is null) order by l.id'''
 
-        result = RawSql(query).fetch_all()
+        result = RawSql(query, [content_type.id]).fetch_all()
 
         all_labs_id = list(map(lambda h: h.get('id', 0), result))
         all_labs = Lab.objects.filter(id__in=all_labs_id)

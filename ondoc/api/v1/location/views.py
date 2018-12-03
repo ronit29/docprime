@@ -35,7 +35,7 @@ class LabProfileFooter(Footer):
         self.sublocality_location = entity.sublocality_location
 
         location_id = int(entity.extras.get('location_id'))
-        address = EntityAddress.objects.filter(pk=location_id).first()
+        address = EntityAddress.objects.filter(pk=location_id)[0]
 
         if address:
             self.centroid = address.centroid
@@ -43,8 +43,9 @@ class LabProfileFooter(Footer):
             if address.type_blueprint=='SUBLOCALITY':
                 self.sublocality_id = address.id
                 self.sublocality = address.alternative_value
-                address = EntityAddress.objects.filter(pk=address.parent).first()
-                if address:
+                address = EntityAddress.objects.filter(pk=address.parent)
+                if len(address)>0:
+                    address = address[0]
                     self.locality_id = address.id
                     self.locality= address.alternative_value
 
@@ -55,6 +56,7 @@ class LabProfileFooter(Footer):
     def get_footer(self):
         response = {}
         response['menu'] = []
+        labs_in_same_locality = []
 
         if self.locality:
             labs_in_same_locality = self.labs_in_same_locality()
@@ -69,7 +71,7 @@ class LabProfileFooter(Footer):
                     {'sub_heading':'Labs in Nearby Localities','url_list':labs_in_nearby_localities})
 
         if self.centroid:
-            popular_labs_in_city = self.popular_labs_in_city()
+            popular_labs_in_city = self.popular_labs_in_city(labs_in_same_locality)
             if popular_labs_in_city:
                 response['menu'].append(
                     {'sub_heading':'Popular Labs in City','url_list':popular_labs_in_city})
@@ -80,9 +82,9 @@ class LabProfileFooter(Footer):
     def labs_in_same_locality(self):
            query = '''select eu.url, lb.name, concat(lb.name ) title from entity_urls eu inner join 
                         lab lb on eu.entity_id = lb.id
-                        and eu.sitemap_identifier = 'LAB_PAGE' and eu.locality_value ilike %s and ST_DWithin(lb.location, %s, 20000)
+                        and eu.sitemap_identifier = 'LAB_PAGE' and eu.locality_value ilike %s and ST_DWithin(eu.location, %s, 20000)
                         and eu.is_valid = True 
-                        order by st_distance(lb.location, %s) asc limit 10
+                        order by st_distance(eu.location, %s) asc limit 10
                         '''
 
            return self.get_urls(query,[self.locality, self.centroid.ewkt, self.centroid.ewkt])
@@ -94,30 +96,43 @@ class LabProfileFooter(Footer):
 
         return self.get_urls(query, [self.locality, self.centroid.ewkt])
 
-    def popular_labs_in_city(self):
+    def popular_labs_in_city(self, labs_in_same_locality):
         result = []
+        urls_nearby_labs = [lab_url['url'] for lab_url in labs_in_same_locality if 'url' in lab_url]
+        # query = '''select a.url, a.title from
+        #               (
+        #         select url, lb.name title,
+        #         row_number() over (partition by ln.id order by st_distance(lb.location, %s) ASC) as row_number
+        #         from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' and
+        #         eu.is_valid = True  and eu.locality_value ilike %s and
+        #         ST_DWithin(lb.location, %s, 20000)
+        #         inner join seo_lab_network sln on lb.network_id = sln.lab_network_id
+        #         inner join lab_network ln on ln.id=sln.lab_network_id  order by rank
+        #                             )a where row_number=1 and url NOT IN(
+        #
+        #         select url  from entity_urls eu inner join
+        #                             lab lb on eu.entity_id = lb.id
+        #                             and eu.sitemap_identifier = 'LAB_PAGE' and eu.locality_value ilike %s and ST_DWithin(lb.location, %s, 20000)
+        #                             and eu.is_valid = True
+        #                             order by st_distance(lb.location, %s) asc limit 10
+        #     )limit 10'''
+
         query = '''select a.url, a.title from
                       (
                 select url, lb.name title,
-                row_number() over (partition by ln.id order by st_distance(lb.location, %s) ASC) as row_number 
+                row_number() over (partition by ln.id order by st_distance(eu.location, %s) ASC) as row_number 
                 from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' and 
                 eu.is_valid = True  and eu.locality_value ilike %s and
-                ST_DWithin(lb.location, %s, 20000)
+                ST_DWithin(eu.location, %s, 20000)
                 inner join seo_lab_network sln on lb.network_id = sln.lab_network_id 
                 inner join lab_network ln on ln.id=sln.lab_network_id  order by rank
-                                    )a where row_number=1 and url NOT IN(
-                                    
-                select url  from entity_urls eu inner join 
-                                    lab lb on eu.entity_id = lb.id
-                                    and eu.sitemap_identifier = 'LAB_PAGE' and eu.locality_value ilike %s and ST_DWithin(lb.location, %s, 20000)
-                                    and eu.is_valid = True 
-                                    order by st_distance(lb.location, %s) asc limit 10
-            )limit 10'''
+                                    )a where row_number=1 limit 20'''
 
-        query_result = self.get_urls(query, [self.centroid.ewkt, self.locality, self.centroid.ewkt, self.locality, self.centroid.ewkt, self.centroid.ewkt])
+        query_result = self.get_urls(query, [self.centroid.ewkt, self.locality, self.centroid.ewkt])
 
         for data in query_result:
-            result.append({'url': data.get('url'), 'title': data.get('title')})
+            if not urls_nearby_labs.__contains__(data.get('url')):
+                result.append({'url': data.get('url'), 'title': data.get('title')})
         return result
 
 
@@ -163,9 +178,9 @@ class LabLocalityCityFooter(Footer):
         query = '''select * from
                         (                                                                       
                         select url, lb.name title,
-                        row_number() over (partition by ln.id order by st_distance(lb.location, %s)asc ) as row_number 
+                        row_number() over (partition by ln.id order by st_distance(eu.location, %s)asc ) as row_number 
                         from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' and 
-                        ST_DWithin(lb.location, %s, 20000) and eu.sublocality_value ilike %s  
+                        ST_DWithin(eu.location, %s, 20000) and eu.sublocality_value ilike %s  
                         and eu.is_valid = True inner join seo_lab_network sln on lb.network_id = sln.lab_network_id
                         left join lab_network ln on ln.id=sln.lab_network_id  order by rank
                         )a where row_number=1 limit 10'''
@@ -219,9 +234,9 @@ class LabCityFooter(Footer):
         query = '''select * from
                         (
                         select url, lb.name title,
-                        row_number() over (partition by ln.id order by st_distance(lb.location, %s)asc ) as row_number 
+                        row_number() over (partition by ln.id order by st_distance(eu.location, %s)asc ) as row_number 
                         from entity_urls eu inner join lab lb on eu.entity_id = lb.id and eu.sitemap_identifier = 'LAB_PAGE' 
-                        and ST_DWithin(lb.location, %s, 20000) and eu.locality_value ilike %s
+                        and ST_DWithin(eu.location, %s, 20000) and eu.locality_value ilike %s
                         and eu.is_valid = True inner join seo_lab_network sln on lb.network_id = sln.lab_network_id
                         left join lab_network ln on ln.id=sln.lab_network_id  order by rank
                         )a where row_number=1 limit 10'''
@@ -583,11 +598,11 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
 
         url = url.lower()
         entity = location_models.EntityUrls.objects.filter(url=url, is_valid=True)
-        if not entity.exists():
+        if not len(entity)>0:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         response = {}
-        entity = entity.first()
+        entity = entity[0]
         footer = None
         try:
             if entity.sitemap_identifier == EntityUrls.SitemapIdentifier.SPECIALIZATION_CITY:

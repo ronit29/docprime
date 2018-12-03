@@ -132,6 +132,7 @@ LOCAL_APPS = (
     'ondoc.seo',
     'ondoc.ratings_review',
     'ondoc.geoip',
+    'ondoc.procedure',
     'ondoc.elastic'
 )
 

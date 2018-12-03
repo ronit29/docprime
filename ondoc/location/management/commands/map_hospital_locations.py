@@ -11,9 +11,9 @@ def map_hospital_locations():
     content_type = ContentType.objects.get(model='hospital')
     if content_type:
         query = '''select distinct(h.id) from hospital h inner join entity_location_relations elr on h.id = elr.object_id 
-        and elr.content_type_id=%d and h.is_live=True and (ST_Distance(h.location, elr.entity_geo_location)>0 
-        or elr.entity_geo_location is null) order by h.id''' % content_type.id
-        result = RawSql(query).fetch_all()
+        and elr.content_type_id=%s and h.is_live=True and (ST_Distance(h.location, elr.entity_geo_location)>0 
+        or elr.entity_geo_location is null) order by h.id'''
+        result = RawSql(query, [content_type.id]).fetch_all()
 
         all_hospitals_id = list(map(lambda h: h.get('id', 0), result))
         all_hospitals = Hospital.objects.filter(id__in=all_hospitals_id)

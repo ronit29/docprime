@@ -20,8 +20,8 @@ import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
-
 from ondoc.doctor.admin import AppointmentRatingInline
+from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorMapping, HospitalDocument, HospitalNetworkDocument, HospitalNetwork,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
-                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit, DoctorClinicProcedure, Procedure,
+                                 DoctorPracticeSpecialization, CompetitorMonthlyVisit,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent)
 from ondoc.authentication.models import User
 from .common import *
@@ -51,6 +51,7 @@ import nested_admin
 from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
 from django import forms
+from decimal import Decimal
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -605,15 +606,33 @@ class DoctorPracticeSpecializationInline(ReadOnlyInline):
 class GenericAdminFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
+        if self.cleaned_data:
+            validate_unique = []
+            for data in self.cleaned_data:
+                if not data.get('DELETE'):
+                    row = (data.get('phone_number'), data.get('hospital'), data.get('permission_type'))
+                    if row in validate_unique:
+                        raise forms.ValidationError("Duplicate Permission with this phone number exists.")
+                    else:
+                        validate_unique.append(row)
+            if validate_unique:
+                numbers = list(zip(*validate_unique))[0]
+                for row in validate_unique:
+                    if row[1] is None and numbers.count(row[0]) > 2:
+                        raise forms.ValidationError(
+                            "Permissions for all Hospitals already allocated for %s." % (row[0]))
 
 
 class GenericAdminInline(nested_admin.NestedTabularInline):
     model = GenericAdmin
     extra = 0
-    # formset = GenericAdminFormSet
+    formset = GenericAdminFormSet
     form = GenericAdminForm
     show_change_link = False
-    exclude = ('hospital_network', 'source_type')
+    # exclude = ('hospital_network', 'source_type', 'is_doc_admin', 'read_permission')
+    fields = ('phone_number', 'hospital', 'name', 'permission_type', 'super_user_permission', 'write_permission', 'user', 'updated_at')
     verbose_name_plural = "Admins"
 
     # def has_delete_permission(self, request, obj=None):
@@ -633,7 +652,7 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
         #     return ['phone_number', 'is_disabled', 'write_permission', 'read_permission', 'hospital',  'permission_type',
         #             'user', 'is_doc_admin']
         # else:
-        return ['user']
+        return ['user', 'updated_at']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
@@ -1026,6 +1045,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
 
         for instance in instances:
             if isinstance(instance, GenericAdmin):
+                if instance.hospital and instance.hospital.is_appointment_manager:
+                    instance.is_disabled = True
                 if (not instance.created_by):
                     instance.created_by = request.user
                 if (not instance.id):
@@ -1184,7 +1205,13 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
             raise forms.ValidationError("Doctor do not sit at the given hospital in this time slot.")
 
         if self.instance.id:
-            deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
+
+            if self.instance.procedure_mappings.count():
+                doctor_details = self.instance.get_procedures()[0]
+                deal_price = Decimal(doctor_details["deal_price"])
+
+            else:
+                deal_price = cleaned_data.get('deal_price') if cleaned_data.get('deal_price') else self.instance.deal_price
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
                                                      doctor_clinic__hospital=hospital,
                                                      day=time_slot_start.weekday(),
@@ -1248,7 +1275,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
             return ('booking_id', 'doctor', 'doctor_id', 'doctor_details', 'hospital', 'hospital_details', 'kyc',
-                    'contact_details', 'profile', 'profile_detail', 'user', 'booked_by',
+                    'contact_details', 'profile', 'profile_detail', 'user', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments',
                     'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding')
@@ -1256,25 +1283,35 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                     'kyc', 'contact_details', 'used_profile_name',
                     'used_profile_number', 'default_profile_name',
-                    'default_profile_number', 'user_id', 'user_number', 'booked_by',
+                    'default_profile_number', 'user_id', 'user_number', 'booked_by', 'procedures_details',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                     'payment_type', 'admin_information', 'otp', 'insurance', 'outstanding',
-                    'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time')
+                    'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
+                    'start_date', 'start_time')
         else:
             return ()
 
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser and request.user.is_staff:
-            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc'
+            return 'booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc', 'procedures_details'
         elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
             return ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
                     'hospital_details', 'kyc', 'contact_details',
                     'used_profile_name', 'used_profile_number', 'default_profile_name',
                     'default_profile_number', 'user_id', 'user_number', 'booked_by',
                     'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
-                    'admin_information', 'otp', 'insurance', 'outstanding')
+                    'admin_information', 'otp', 'insurance', 'outstanding', 'procedures_details')
         else:
             return ()
+
+    def procedures_details(self, obj):
+        procedure_mappings = obj.procedure_mappings.all()
+        if procedure_mappings:
+            result = []
+            for mapping in procedure_mappings:
+                result.append('{}, mrp was {}, booking price was {}'.format(mapping.procedure, mapping.mrp, mapping.deal_price))
+            return ",\n".join(result)
+        return None
 
     def kyc(self, obj):
         count = 0
@@ -1652,11 +1689,6 @@ class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin)
     inlines = [PracticeSpecializationDepartmentMappingInline, ]
     resource_class = PracticeSpecializationSynonymResource
     search_fields = ['name', ]
-
-
-class ProcedureAdmin(AutoComplete, VersionAdmin):
-    model = Procedure
-    search_fields = ['name']
 
 
 class GoogleDetailingResource(resources.ModelResource):

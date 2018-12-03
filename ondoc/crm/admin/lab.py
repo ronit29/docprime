@@ -27,7 +27,8 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabNetwork, Lab, LabOnboardingToken, LabService, LabDoctorAvailability,
                                      LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument,
                                      LabAppointment, HomePickupCharges,
-                                     TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer)
+                                     TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,LabReport, LabReportFile)
+
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
@@ -37,6 +38,7 @@ from ondoc.authentication import forms as auth_forms
 from ondoc.authentication.admin import BillingAccountInline
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 import logging
+import nested_admin
 
 logger = logging.getLogger(__name__)
 
@@ -264,7 +266,7 @@ class GenericLabAdminInline(admin.TabularInline):
     show_change_link = False
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    fields = ['user', 'phone_number', 'lab', 'permission_type', 'super_user_permission', 'is_disabled', 'read_permission', 'write_permission']
+    fields = ['user', 'phone_number', 'name', 'lab', 'permission_type', 'super_user_permission', 'is_disabled', 'write_permission']
 
 
 class LabDocumentFormSet(forms.BaseInlineFormSet):
@@ -696,8 +698,10 @@ class LabAppointmentForm(forms.ModelForm):
         else:
             raise forms.ValidationError("Lab and lab test details not entered.")
 
-        if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
-            raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+
+        # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
+        #     raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
+
 
         if not cleaned_data.get('status') is LabAppointment.CANCELLED and (cleaned_data.get(
                 'cancellation_reason') or cleaned_data.get('cancellation_comments')):
@@ -737,11 +741,30 @@ class LabAppointmentForm(forms.ModelForm):
         return cleaned_data
 
 
-class LabAppointmentAdmin(admin.ModelAdmin):
+class LabReportFileInline(nested_admin.NestedTabularInline):
+    model = LabReportFile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class LabReportInline(nested_admin.NestedTabularInline):
+    model = LabReport
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    inlines = [LabReportFileInline]
+
+
+class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
     list_display = ('booking_id', 'get_profile', 'get_lab', 'status', 'time_slot_start', 'created_at', 'updated_at')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
+
+    inlines = [
+        LabReportInline
+    ]
 
     def get_profile(self, obj):
         if not obj.profile:
@@ -920,7 +943,8 @@ class LabAppointmentAdmin(admin.ModelAdmin):
 
                 if dt_field:
                     obj.time_slot_start = dt_field
-            if request.POST.get('status') and int(request.POST['status']) == LabAppointment.CANCELLED:
+            if request.POST.get('status') and (int(request.POST['status']) == LabAppointment.CANCELLED or \
+                int(request.POST['status']) == LabAppointment.COMPLETED):
                 obj.cancellation_type = LabAppointment.AGENT_CANCELLED
                 cancel_type = int(request.POST.get('cancel_type'))
                 if cancel_type is not None:
@@ -998,11 +1022,22 @@ class LabTestPackageInline(admin.TabularInline):
             lab_test__is_package=False, package__is_package=True)
 
 
+class LabTestAdminForm(forms.ModelForm):
+    why = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        extend = False
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'lab_test/js/init.js')
+        css = {'all': ('lab_test/css/style.css',)}
+
+
 class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
+    form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = [FAQLabTestInLine, FrequentlyBookedTogetherTestInLine]
     search_fields = ['name']
+    list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)

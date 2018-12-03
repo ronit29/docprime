@@ -40,6 +40,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 from decimal import Decimal
+import reversion
 
 logger = logging.getLogger(__name__)
 
@@ -666,6 +667,8 @@ class LabTest(TimeStampedModel, SearchKey):
     why_get_tested = models.TextField(blank=True, verbose_name='Why get tested?')
     preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
     rank = models.PositiveIntegerField(default=0, null=True)
+    hide_price = models.BooleanField(default=False)
+    searchable = models.BooleanField(default=True)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -791,7 +794,7 @@ class AvailableLabTest(TimeStampedModel):
         unique_together = (("test", "lab_pricing_group"))
         db_table = "available_lab_test"
 
-
+@reversion.register()
 class LabAppointment(TimeStampedModel, CouponsMixin):
     CREATED = 1
     BOOKED = 2
@@ -838,10 +841,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     matrix_lead_id = models.IntegerField(null=True)
     is_rated = models.BooleanField(default=False)
     rating_declined = models.BooleanField(default=False)
-    coupon = models.ManyToManyField(Coupon, blank=True, null=True)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="lab_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
+
+    def get_reports(self):
+        return self.reports.all()
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -942,6 +948,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
+        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED):
+            raise Exception('Cancelled or Completed appointment cannot be saved')
 
         try:
             if (self.payment_type != OpdAppointment.INSURANCE and self.status == self.COMPLETED and
@@ -1127,15 +1135,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
         queryset = None
 
-        if permission:
-            out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
-                                                 outstanding_month=month, outstanding_year=year)
+        # if permission:
+        out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
+                                             outstanding_month=month, outstanding_year=year)
 
-            queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
-                                                      time_slot_start__gte=start_date_time,
-                                                      time_slot_start__lte=end_date_time,
-                                                      payment_type__in=payment_type,
-                                                      outstanding=out_obj))
+        queryset = (LabAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+                                                  time_slot_start__gte=start_date_time,
+                                                  time_slot_start__lte=end_date_time,
+                                                  payment_type__in=payment_type,
+                                                  outstanding=out_obj))
 
         return queryset
         # lab_data = UserPermission.get_billable_doctor_hospital(user)
@@ -1404,7 +1412,7 @@ class LabPricing(Lab):
 
 
 class LabReport(auth_model.TimeStampedModel):
-    appointment = models.ForeignKey(LabAppointment, on_delete=models.CASCADE)
+    appointment = models.ForeignKey(LabAppointment, related_name='reports', on_delete=models.CASCADE)
     report_details = models.TextField(max_length=300, blank=True, null=True)
 
     def __str__(self):
@@ -1415,8 +1423,9 @@ class LabReport(auth_model.TimeStampedModel):
 
 
 class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
-    report = models.ForeignKey(LabReport, on_delete=models.SET_NULL, null=True, blank=True)
-    name = models.FileField(upload_to='lab_reports/', blank=False, null=False)
+    report = models.ForeignKey(LabReport, related_name='files', on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.FileField(upload_to='lab_reports/', blank=False, null=False, validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])])
 
     def __str__(self):
         return "{}-{}".format(self.id, self.report.id)
@@ -1435,7 +1444,7 @@ class LabReportFile(auth_model.TimeStampedModel, auth_model.Document):
     def save(self, *args, **kwargs):
         database_instance = LabReportFile.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
-        self.send_notification(database_instance)
+        #self.send_notification(database_instance)
 
     class Meta:
         db_table = "lab_report_file"

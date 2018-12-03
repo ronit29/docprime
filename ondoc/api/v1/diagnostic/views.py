@@ -4,7 +4,7 @@ from ondoc.api.v1.auth.serializers import AddressSerializer
 
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
-                                     FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer)
+                                     FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer, LabPricingGroup)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.notification.models import EmailNotification
@@ -27,6 +27,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.db.models.functions import Distance
 from django.shortcuts import get_object_or_404
 
+from django.db.models import Prefetch
 from django.db import transaction
 from django.db.models import Count, Sum, Max, When, Case, F, Q, Value, DecimalField, IntegerField
 from django.http import Http404
@@ -75,7 +76,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class LabTestList(viewsets.ReadOnlyModelViewSet):
-    queryset = LabTest.objects.all()
+    queryset = LabTest.objects.filter(searchable=True).all()
     serializer_class = diagnostic_serializer.LabTestListSerializer
     lookup_field = 'id'
     filter_backends = (SearchFilter,)
@@ -93,7 +94,7 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
             test_queryset = LabTest.objects.filter(
                 Q(search_key__icontains=search_key) |
                 Q(search_key__icontains=' ' + search_key) |
-                Q(search_key__istartswith=search_key)).annotate(search_index=StrIndex('search_key', Value(search_key))).order_by(
+                Q(search_key__istartswith=search_key)).filter(searchable=True).annotate(search_index=StrIndex('search_key', Value(search_key))).order_by(
                 'search_index')
             test_queryset = paginate_queryset(test_queryset, request)
             lab_queryset = Lab.objects.filter(is_live=True, is_test_lab=False).filter(
@@ -220,7 +221,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         queryset = self.get_lab_list(parameters)
         count = queryset.count()
         paginated_queryset = paginate_queryset(queryset, request)
-        response_queryset = self.form_lab_whole_data(paginated_queryset)
+        response_queryset = self.form_lab_whole_data(paginated_queryset, parameters.get("ids"))
 
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset,  many=True,
                                          context={"request": request, "ids": parameters.get('ids')})
@@ -241,7 +242,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids',[])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name'))
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name','hide_price'))
         seo = None
         breadcrumb = None
         location = None
@@ -522,15 +523,40 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.order_by("-order_priority", "distance")
         return queryset
 
-    def form_lab_whole_data(self, queryset):
+    def form_lab_whole_data(self, queryset, test_ids=None):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges').filter(id__in=ids)
+        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
+
+        if test_ids:
+            group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
+                    "available_lab_tests",
+                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    to_attr="selected_tests"
+                )).all()
+
+            labs = labs.prefetch_related(
+                Prefetch(
+                    "lab_pricing_group",
+                    queryset=group_queryset,
+                    to_attr="selected_group"
+                )
+            )
+        labs = labs.filter(id__in=ids)
         resp_queryset = list()
         temp_var = dict()
+        tests = dict()
 
         for obj in labs:
             temp_var[obj.id] = obj
+            tests[obj.id] = list()
+            if test_ids and obj.selected_group and obj.selected_group.selected_tests:
+                for test in obj.selected_group.selected_tests:
+                    if test.custom_deal_price:
+                        deal_price=test.custom_deal_price
+                    else:
+                        deal_price=test.computed_deal_price
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
         day_now = timezone.now().weekday()
         days_array = [i for i in range(7)]
         rotated_days_array = days_array[day_now:] + days_array[:day_now]
@@ -583,6 +609,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row["lab_timing_data"] = lab_timing_data
             row["next_lab_timing"] = next_lab_timing_dict
             row["next_lab_timing_data"] = next_lab_timing_data_dict
+            row["tests"] = tests.get(row["id"])
             resp_queryset.append(row)
 
         return resp_queryset
@@ -672,7 +699,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         appointment_data = self.form_lab_app_data(request, serializer.validated_data)
-        resp = self.extract_payment_details(request, appointment_data, account_models.Order.LAB_PRODUCT_ID)
+
+        resp = self.create_order(request, appointment_data, account_models.Order.LAB_PRODUCT_ID)
 
         return Response(data=resp)
 
@@ -701,10 +729,15 @@ class LabAppointmentView(mixins.CreateModelMixin,
         coupon_list = []
         coupon_discount = 0
         if data.get("coupon_code"):
-            coupon_list = list(Coupon.objects.filter(code__in=data.get("coupon_code")).values_list('id', flat=True))
+            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
             obj = models.LabAppointment()
-            for coupon in data.get("coupon_code"):
-                coupon_discount += obj.get_discount(coupon, effective_price)
+            for coupon in coupon_obj:
+                if coupon.is_user_specific and coupon.test.exists():
+                    total_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
+                    coupon_discount += obj.get_discount(coupon, total_price)
+                else:
+                    coupon_discount += obj.get_discount(coupon, effective_price)
+                coupon_list.append(coupon.id)
 
         if data.get("payment_type") in [doctor_model.OpdAppointment.COD, doctor_model.OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
@@ -793,7 +826,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         }
         return Response(response)
 
-    def extract_payment_details(self, request, appointment_details, product_id):
+    def create_order(self, request, appointment_details, product_id):
         remaining_amount = 0
         user = request.user
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
@@ -801,8 +834,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
         balance = consumer_account.balance
         resp = {}
 
-        can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
+        resp['is_agent'] = False
+        if hasattr(request, 'agent') and request.agent:
+            balance = 0
+            resp['is_agent'] = True
 
+        can_use_insurance, insurance_fail_message = self.can_use_insurance(appointment_details)
         if can_use_insurance:
             appointment_details['effective_price'] = appointment_details['agreed_price']
             appointment_details["effective_price"] += appointment_details["home_pickup_charges"]
@@ -812,26 +849,24 @@ class LabAppointmentView(mixins.CreateModelMixin,
             resp['message'] = insurance_fail_message
             return resp
 
-        temp_appointment_details = copy.deepcopy(appointment_details)
-        temp_appointment_details = labappointment_transform(temp_appointment_details)
+        appointment_action_data = copy.deepcopy(appointment_details)
+        appointment_action_data = labappointment_transform(appointment_action_data)
 
-        account_models.Order.disable_pending_orders(temp_appointment_details, product_id,
+        account_models.Order.disable_pending_orders(appointment_action_data, product_id,
                                                     account_models.Order.LAB_APPOINTMENT_CREATE)
-        resp['is_agent'] = False
-        if hasattr(request, 'agent') and request.agent:
-            balance = 0
-            resp['is_agent'] = True
 
-        if (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
-                balance < appointment_details.get("effective_price")):
+
+        if ( (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
+                balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
 
             payable_amount = appointment_details.get("effective_price") - balance
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.LAB_APPOINTMENT_CREATE,
-                action_data=temp_appointment_details,
+                action_data=appointment_action_data,
                 amount=payable_amount,
+                wallet_amount=balance,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 
@@ -851,13 +886,26 @@ class LabAppointmentView(mixins.CreateModelMixin,
             except:
                 pass
         else:
-            lab_appointment = LabAppointment.create_appointment(appointment_details)
-            if appointment_details["payment_type"] == doctor_model.OpdAppointment.PREPAID:
-                consumer_account.debit_schedule(lab_appointment, product_id, appointment_details.get("effective_price"))
+            wallet_amount = 0
+            if appointment_details['payment_type'] == models.OpdAppointment.PREPAID:
+                wallet_amount = appointment_details.get("effective_price")
+
+            order = account_models.Order.objects.create(
+                product_id=product_id,
+                action=account_models.Order.LAB_APPOINTMENT_CREATE,
+                action_data=appointment_action_data,
+                amount=0,
+                wallet_amount=wallet_amount,
+                payment_status=account_models.Order.PAYMENT_PENDING
+            )
+
+            appointment_object = order.process_order()
+
             resp["status"] = 1
             resp["payment_required"] = False
-            resp["data"] = {"id": lab_appointment.id,
+            resp["data"] = {"id": appointment_object.id,
                             "type": diagnostic_serializer.LabAppointmentModelSerializer.LAB_TYPE}
+
         return resp
 
     def get_payment_details(self, request, appointment_details, product_id, order_id):
@@ -931,13 +979,13 @@ class LabTimingListView(mixins.ListModelMixin,
 class AvailableTestViewSet(mixins.RetrieveModelMixin,
                            viewsets.GenericViewSet):
 
-    queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs__is_live=True).all()
+    queryset = AvailableLabTest.objects.filter(test__searchable=True, lab_pricing_group__labs__is_live=True).all()
     serializer_class = diagnostic_serializer.AvailableLabTestSerializer
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id):
         params = request.query_params
-        queryset = AvailableLabTest.objects.select_related().filter(lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True, enabled=True)
+        queryset = AvailableLabTest.objects.select_related().filter(test__searchable=True, lab_pricing_group__labs=lab_id, lab_pricing_group__labs__is_live=True, enabled=True)
         if not queryset:
             return Response([])
         lab_obj = Lab.objects.filter(pk=lab_id).first()
