@@ -57,7 +57,7 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
 
     @property
     def get_active_plans(self):
-        return self.plans.filter(is_live=True)
+        return self.plans.filter(is_live=True).order_by('-total_allowed_members')
 
     def __str__(self):
         return self.name
@@ -101,6 +101,7 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     child_count = models.SmallIntegerField(default=0)
     enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
+    total_allowed_members = models.PositiveSmallIntegerField(default=0)
 
     @property
     def get_active_threshold(self):

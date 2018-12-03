@@ -14,9 +14,18 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from weasyprint import HTML
 from django.conf import settings
+from num2words import num2words
 import datetime
 import pytz
 import logging
+import string
+import random
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
+from django.core.files import File
+from hardcopy import bytestring_to_pdf
+
 
 import copy
 
@@ -309,6 +318,7 @@ class NotificationAction:
                 'purchase_data': str(instance.purchase_date.date().strftime('%d-%m-%Y')),
                 'expiry_date': str(instance.expiry_date.date().strftime('%d-%m-%Y')),
                 'premium': instance.premium_amount,
+                'premium_in_words': ('%s rupees only.' % num2words(instance.premium_amount)).title(),
                 'proposer_name': proposer_name.title(),
                 'proposer_address': proposer.address,
                 'proposer_mobile': proposer.phone_number,
@@ -439,8 +449,27 @@ class EmailNotificationOpdMixin:
             instance = context.get('instance')
             filename = "COI_{}.pdf".format(str(timezone.now().timestamp()))
             try:
-                pdf_file = HTML(string=html_body).write_pdf()
-                instance.coi = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
+                # random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+                path = 'insurance/coi/test/' + filename
+                file = default_storage.open(path, 'wb')
+
+                extra_args = {
+                    'virtual-time-budget': 6000
+                }
+
+                bytestring_to_pdf(html_body.encode(), file, **extra_args)
+
+                file.close()
+
+                ff = File(default_storage.open(path, 'rb'))
+
+                # random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+                # name = random_string + '.pdf'
+
+                instance.coi = InMemoryUploadedFile(ff.file, None, filename, 'application/pdf', ff.file.tell(), None)
+
+                # pdf_file = HTML(string=html_body).write_pdf()
+                # instance.coi = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
                 instance.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
