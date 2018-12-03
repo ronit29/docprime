@@ -1813,6 +1813,16 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
     def create_patients(self, request):
-        serializer = serializers.OfflinePatientCreateListSerializer(data=request.data)
+        serializer = serializers.OfflinePatientCreateListSerializer(data=                                                                                                                                                                                                                                                                                                                                                                                                                 .data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
+        for data in valid_data:
+            models.OfflinePatients(name=data.get('name'),
+                                   sms_notification=data.get('sms_notification'),
+                                   gender=data.get('gender'),
+                                   dob=data.get("dob"),
+                                   referred_by=data.get('referred_by'),
+                                   medical_history=data.get('medical_history'),
+                                   welcome_message=data.get('welcome_message'),
+                                   display_welcome_message=data.get('display_welcome_message')
+                                   )
