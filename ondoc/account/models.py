@@ -16,6 +16,9 @@ import json
 import logging
 import requests
 from decimal import Decimal
+from ondoc.account.tasks import set_order_dummy_transaction
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +151,11 @@ class Order(TimeStampedModel):
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
+
+        # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
+        if not self.txn.first():
+            set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5)
+
         if order_dict:
             self.update_order(order_dict)
         # If payment is required and appointment is created successfully, debit consumer's account
@@ -255,7 +263,7 @@ class PgTransaction(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
     reference_id = models.PositiveIntegerField(blank=True, null=True)
-    order_id = models.PositiveIntegerField()
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, null=True, related_name="txn")
     order_no = models.CharField(max_length=100, blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
@@ -380,6 +388,44 @@ class PgTransaction(TimeStampedModel):
 
     class Meta:
         db_table = "pg_transaction"
+
+
+class DummyTransactions(TimeStampedModel):
+    PG_REFUND_SUCCESS_OK_STATUS = '1'
+    PG_REFUND_FAILURE_OK_STATUS = '0'
+    PG_REFUND_FAILURE_STATUS = 'FAIL'
+    PG_REFUND_ALREADY_REQUESTED_STATUS = 'ALREADY_REQUESTED'
+
+    REFUND_UPDATE_FAILURE_STATUS = 'REFUND_FAILURE_BY_PG'
+
+    DOCTOR_APPOINTMENT = 1
+    LAB_APPOINTMENT = 2
+    CREDIT = 0
+    DEBIT = 1
+    TYPE_CHOICES = [(CREDIT, "Credit"), (DEBIT, "Debit")]
+
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
+    reference_id = models.PositiveIntegerField(blank=True, null=True)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, null=True, related_name="dummy_txn")
+    order_no = models.CharField(max_length=100, blank=True, null=True)
+    type = models.SmallIntegerField(choices=TYPE_CHOICES)
+
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_mode = models.CharField(max_length=50, null=True, blank=True)
+    response_code = models.CharField(max_length=50, null=True, blank=True)
+    bank_id = models.CharField(max_length=50, null=True, blank=True)
+    transaction_date = models.DateTimeField(auto_now=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
+    currency = models.CharField(max_length=15, null=True, blank=True)
+    status_code = models.IntegerField(null=True, blank=True)
+    pg_name = models.CharField(max_length=100, null=True, blank=True)
+    status_type = models.CharField(max_length=50, null=True, blank=True)
+    transaction_id = models.CharField(max_length=100, unique=True)
+    pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
+
+    class Meta:
+        db_table = "dummy_transaction"
 
 
 class ConsumerAccount(TimeStampedModel):
@@ -641,7 +687,6 @@ class Invoice(TimeStampedModel):
     reference_id = models.PositiveIntegerField()
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
     file = models.FileField(upload_to='invoices', null=True, blank=True)
-
 
 
 class OrderLog(TimeStampedModel):

@@ -98,3 +98,69 @@ def refund_curl_task(self, req_data):
             countdown_time = (2 ** self.request.retries) * 60 * 10
             logger.error("Error in Refund with next retry countdown - " + str(countdown_time) + " of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
             self.retry([req_data], countdown=countdown_time)
+
+
+@task()
+def set_order_dummy_transaction(order_id, user_id):
+    from .models import Order, DummyTransactions
+    from ondoc.account.models import User
+    try:
+        order_row = Order.objects.filter(id=order_id).first()
+        user = User.objects.filter(id=user_id).first()
+        if order_row and user:
+            token = settings.PG_DUMMY_TRANSACTION_TOKEN
+            headers = {
+                "auth": token,
+                "Content-Type": "application/json"
+            }
+            url = settings.PG_DUMMY_TRANSACTION_URL
+
+            req_data = {
+                "customerId": user_id,
+                "mobile": user.phone_number,
+                "email": user.email or "dummyemail@docprime.com",
+                "productId": order_row.product_id,
+                "orderId": order_id,
+                "name": "DocPrime Dummy",
+                "txAmount": 0,
+                "couponCode": "dummy",
+                "couponAmt": 0,
+                "paymentMode": "DC",
+                "AppointmentId": order_row.reference_id,
+                "buCallbackSuccessUrl": "",
+                "buCallbackFailureUrl": ""
+            }
+
+            response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
+                if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                    tx_data = {}
+                    tx_data['user'] = user
+                    tx_data['product_id'] = order_row.product_id
+                    tx_data['order_no'] = resp_data.get('orderNo')
+                    tx_data['order_id'] = order_row.id
+                    tx_data['reference_id'] = order_row.reference_id
+                    tx_data['type'] = DummyTransactions.CREDIT
+                    tx_data['amount'] = 0
+                    tx_data['payment_mode'] = "DC"
+                    tx_data['transaction_id'] = resp_data.get('orderNo')
+
+                    # tx_data['response_code'] = response.get('responseCode')
+                    # tx_data['bank_id'] = response.get('bankTxId')
+                    # transaction_time = parse(response.get("txDate"))
+                    # tx_data['transaction_date'] = transaction_time
+                    # tx_data['bank_name'] = response.get('bankName')
+                    # tx_data['currency'] = response.get('currency')
+                    # tx_data['status_code'] = response.get('statusCode')
+                    # tx_data['pg_name'] = response.get('pgGatewayName')
+                    # tx_data['status_type'] = response.get('txStatus')
+                    # tx_data['pb_gateway_name'] = response.get('pbGatewayName')
+
+                    DummyTransactions.objects.create(**tx_data)
+                    print("SAVED DUMMY TRANSACTION")
+            else:
+                raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+    except Exception as e:
+        logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
