@@ -1019,3 +1019,9 @@ class EntityListQuerySerializer(serializers.Serializer):
 
     entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
     id = serializers.IntegerField()
+
+class HospitalCardSerializer(serializers.Serializer):
+
+    latitude = serializers.FloatField()
+    longitude = serializers.FloatField()
+

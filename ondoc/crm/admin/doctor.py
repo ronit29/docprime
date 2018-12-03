@@ -21,6 +21,7 @@ from django.db import transaction
 import logging
 from dal import autocomplete
 
+from ondoc.doctor.admin import AppointmentRatingInline
 
 logger = logging.getLogger(__name__)
 
@@ -1196,6 +1197,7 @@ class DoctorOpdAppointmentForm(forms.ModelForm):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
+    inlines = [AppointmentRatingInline]
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'created_at', 'updated_at')
     list_filter = ('status', )
     date_hierarchy = 'created_at'
