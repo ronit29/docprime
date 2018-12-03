@@ -31,6 +31,33 @@ class GeocodingResults(TimeStampedModel):
     class Meta:
         db_table = 'geocoding_results'
 
+    @classmethod
+    def get_or_create(cls, *args, **kwargs):
+
+        from .models import GeocodingResults
+        saved_json = GeocodingResults.objects.filter(latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'))
+
+        if not saved_json.exists():
+            response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?sensor=false',
+                                    params={'latlng': '%s,%s' % (kwargs.get('latitude'), kwargs.get('longitude')),
+                                            'key': settings.REVERSE_GEOCODING_API_KEY, 'language': 'en'})
+            if response.status_code != status.HTTP_200_OK or not response.ok:
+                logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
+                logger.info("[ERROR] %s", response.reason)
+                return 'failure'
+
+            resp_data = response.json()
+
+            if resp_data.get('status', None) == 'OK' and isinstance(resp_data.get('results'), list) and \
+                    len(resp_data.get('results')) > 0:
+                geo_result = GeocodingResults(value=json.dumps(resp_data), latitude=kwargs.get('latitude'), longitude= kwargs.get('longitude')).save()
+            else:
+                logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
+                logger.info("[ERROR] %s", response.reason)
+                return 'failure'
+
+        return 'success'
+
 
 class CityInventory(TimeStampedModel):
 
