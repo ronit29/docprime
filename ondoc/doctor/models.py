@@ -150,6 +150,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     source = models.CharField(max_length=20, blank=True)
     batch = models.CharField(max_length=20, blank=True)
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
 
     def __str__(self):
         return self.name
@@ -527,6 +528,7 @@ class DoctorClinic(auth_model.TimeStampedModel):
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=False)
     enabled = models.BooleanField(verbose_name='Enabled', default=True)
     priority = models.PositiveSmallIntegerField(blank=True, null=True, default=0)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
     class Meta:
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
@@ -900,6 +902,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital_networks')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     spoc_details = GenericRelation(auth_model.SPOCDetails)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
 
     def __str__(self):
         return self.name
@@ -1415,8 +1418,23 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         return procedures
 
-    def get_marchant(self):
-        pass
+    @property
+    def get_billed_to(self):
+        doctor_clinic = self.doctor.doctor_clinics.filter(hospital=self.hospital, enabled_for_online_booking=True).first()
+        if self.hospital.network and self.hospital.network.is_billing_enabled:
+            return self.hospital.network
+        if self.hospital.is_billing_enabled:
+            return self.hospital
+        if doctor_clinic and doctor_clinic.is_billing_enabled:
+            return doctor_clinic
+        return self.doctor
+
+    @property
+    def get_merchant(self):
+        billed_to = self.get_billed_to
+        if billed_to:
+            return billed_to.merchant.first()
+        return None
 
     class Meta:
         db_table = "opd_appointment"

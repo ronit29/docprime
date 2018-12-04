@@ -28,7 +28,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges,
                                      TestParameter, ParameterLabTest, LabReport, LabReportFile)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
+from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin, AssociatedMerchant
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
 from ondoc.crm.admin.autocomplete import PackageAutoCompleteView
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -479,6 +479,14 @@ class LabResource(resources.ModelResource):
                 status = 'Submitted'
         return status
 
+class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    can_delete = False
+    extra = 0
+    model = AssociatedMerchant
+    show_change_link = False
+    #fields = "__all__"
+    #readonly_fields = ['merchant_id']
+    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
 
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
@@ -498,7 +506,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
                LabAccreditationInline,
                LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
-               BillingAccountInline, GenericLabAdminInline]
+               BillingAccountInline, GenericLabAdminInline, AssociatedMerchantInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200

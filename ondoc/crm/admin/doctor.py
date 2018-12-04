@@ -165,6 +165,15 @@ class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
                     raise forms.ValidationError("Duplicate records not allowed.")
 
 
+class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    can_delete = False
+    extra = 0
+    model = AssociatedMerchant
+    show_change_link = False
+    #fields = "__all__"
+    #readonly_fields = ['merchant_id']
+    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
+
 class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     model = DoctorClinicProcedure
     extra = 0
@@ -204,7 +213,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     formset = DoctorClinicFormSet
     show_change_link = False
     # autocomplete_fields = ['hospital']
-    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline]
+    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, AssociatedMerchantInline]
 
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
@@ -868,16 +877,6 @@ class CompetitorMonthlyVisitsInline(ReadOnlyInline):
     show_change_link = False
     verbose_name = 'Monthly Visit through Competitor Info'
     verbose_name_plural = 'Monthly Visits through Competitor Info'
-
-
-class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
-    can_delete = False
-    extra = 0
-    model = AssociatedMerchant
-    show_change_link = False
-    #fields = "__all__"
-    #readonly_fields = ['merchant_id']
-    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
 
 
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):

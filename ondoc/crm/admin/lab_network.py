@@ -11,10 +11,11 @@ from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabNetworkDocument)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User, GenericLabAdmin
+from ondoc.authentication.models import GenericAdmin, User, GenericLabAdmin, AssociatedMerchant
 from django.contrib.contenttypes.admin import GenericTabularInline
 
 from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
+import nested_admin
 
 class LabNetworkCertificationInline(admin.TabularInline):
     model = LabNetworkCertification
@@ -185,6 +186,14 @@ class GenericLabNetworkAdminInline(admin.TabularInline):
     verbose_name_plural = "Admins"
     fields = ['user', 'phone_number', 'lab_network', 'super_user_permission', 'permission_type', 'read_permission', 'write_permission']
 
+class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    can_delete = False
+    extra = 0
+    model = AssociatedMerchant
+    show_change_link = False
+    #fields = "__all__"
+    #readonly_fields = ['merchant_id']
+    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
 
 class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     form = LabNetworkForm
@@ -222,7 +231,8 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
                LabNetworkDocumentInline,
                GenericLabNetworkAdminInline,
                BillingAccountInline,
-               SPOCDetailsInline]
+               SPOCDetailsInline,
+               AssociatedMerchantInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

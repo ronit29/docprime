@@ -1168,10 +1168,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
     @property
     def get_merchant(self):
-
         billed_to = self.get_billed_to
         if billed_to:
-            return billed_to.first()
+            return billed_to.merchant.first()
         return None
 
     def __str__(self):

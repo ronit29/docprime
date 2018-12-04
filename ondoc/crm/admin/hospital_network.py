@@ -1,10 +1,11 @@
+from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
 from django.contrib.gis import forms
 from django.db import models
 from django.utils.safestring import mark_safe
 from reversion.admin import VersionAdmin
 from django.db.models import Q
-from ondoc.authentication.models import GenericAdmin, User
+from ondoc.authentication.models import GenericAdmin, User, AssociatedMerchant
 from ondoc.crm.admin.doctor import CreatedByFilter
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
@@ -13,7 +14,7 @@ from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
 import datetime
 from .common import *
 from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
-
+import nested_admin
 
 class HospitalNetworkCertificationInline(admin.TabularInline):
     model = HospitalNetworkCertification
@@ -147,6 +148,14 @@ class HospitalNetworkDocumentInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
+class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    can_delete = False
+    extra = 0
+    model = AssociatedMerchant
+    show_change_link = False
+    #fields = "__all__"
+    #readonly_fields = ['merchant_id']
+    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
 
 class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     form = HospitalNetworkForm
@@ -169,7 +178,8 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalNetworkDocumentInline,
         GenericAdminInline,
         BillingAccountInline,
-        SPOCDetailsInline
+        SPOCDetailsInline,
+        AssociatedMerchantInline,
     ]
 
     def associated_hospitals(self, instance):

@@ -1,3 +1,4 @@
+from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
 from reversion.admin import VersionAdmin
 from django.db.models import Q
@@ -9,10 +10,10 @@ from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
-from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber
+from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant
 from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
 from django import forms
-
+import nested_admin
 
 class HospitalImageInline(admin.TabularInline):
     model = HospitalImage
@@ -215,6 +216,14 @@ class HospCityFilter(SimpleListFilter):
         if self.value():
             return queryset.filter(city__iexact=self.value()).distinct()
 
+class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    can_delete = False
+    extra = 0
+    model = AssociatedMerchant
+    show_change_link = False
+    #fields = "__all__"
+    #readonly_fields = ['merchant_id']
+    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', HospCityFilter, CreatedByFilter)
@@ -305,7 +314,8 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalCertificationInline,
         GenericAdminInline,
         BillingAccountInline,
-        SPOCDetailsInline
+        SPOCDetailsInline,
+        AssociatedMerchantInline
     ]
 
     map_width = 200
