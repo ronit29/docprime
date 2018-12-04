@@ -266,9 +266,13 @@ class EntityLocationRelationship(TimeStampedModel):
             entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type, object_id__in=object_ids)
             if entity_location_qs:
                 entity_location_qs.delete()
-            query = '''select l.id as object_id, ea.id as location_id, %s as content_type_id, type, l.location as entity_geo_location from entity_address ea
-                                inner join geocoding_results gs on ea.geocoding_id = gs.id inner join lab l on 
-                                l.location = st_setsrid(st_point(gs.longitude, gs.latitude), 4326)::geography where l.is_live=True'''
+            query = '''select l.id as object_id, ea.id as location_id, %s as content_type_id, type, l.location as entity_geo_location
+                        from lab l
+                        inner join geocoding_results gs on 
+                        st_x(l.location::geometry)=gs.longitude and st_y(l.location::geometry)=gs.latitude
+                         and l.is_live = True
+                        inner join entity_address ea on ea.geocoding_id = gs.id
+                        '''
             results = RawSql(query, [content_type_id]).fetch_all()
             results = [EntityLocationRelationship(**result) for result in results]
             EntityLocationRelationship.objects.bulk_create(results)
@@ -284,11 +288,12 @@ class EntityLocationRelationship(TimeStampedModel):
                 content_type_id = content_type.id
             object_ids = kwargs.get('object_ids')
             entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type, object_id__in=object_ids)
-            if entity_location_qs:
-                entity_location_qs.delete()
-            query = '''select h.id as object_id, ea.id as location_id, %s as content_type_id, type, h.location as entity_geo_location from entity_address ea
-                        inner join geocoding_results gs on ea.geocoding_id = gs.id inner join hospital h on 
-                        h.location = st_setsrid(st_point(gs.longitude, gs.latitude), 4326)::geography where h.is_live = True'''
+            # if entity_location_qs:
+            #     entity_location_qs.delete()
+            query = '''select h.id as object_id, ea.id as location_id, %s as content_type_id, type, h.location as entity_geo_location
+                        from hospital h inner join geocoding_results gs on 
+                        st_x(h.location::geometry)=gs.longitude and st_y(h.location::geometry)=gs.latitude
+                         and h.is_live = True inner join entity_address ea on ea.geocoding_id = gs.id'''
             results = RawSql(query, [content_type_id]).fetch_all()
             results = [EntityLocationRelationship(**result) for result in results]
             EntityLocationRelationship.objects.bulk_create(results)
@@ -1284,6 +1289,13 @@ class DoctorPageURL(object):
             url = url + "-in-%s-%s-dpp" % (self.sublocality, self.locality)
         elif self.locality:
             url = url + "-in-%s-dpp" % (self.locality)
+        else:
+            url = url + "-dpp"
+        entity_url = EntityUrls.objects.filter(url=url).order_by('-created_at')
+        if len(entity_url)>0:
+           entity_url = entity_url[0]
+
+
 
         url = slugify(url)
 
@@ -1323,4 +1335,7 @@ class DoctorPageURL(object):
         extras['breadcrums'] = []
         data['extras'] = extras
         data['sequence'] = self.sequence
-        return "success"
+        EntityUrls.objects.filter(entity_id=self.doctor.id,
+                                  sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(~Q(url=url)).update(is_valid=False)
+        EntityUrls.objects.filter(entity_id=self.doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,url=url).delete()
+        EntityUrls.objects.create(**data)
