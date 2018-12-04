@@ -15,7 +15,8 @@ from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.location import models as location_models
-from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund
+from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
+    MerchantPayout
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.tasks import doc_app_auto_cancel
@@ -1095,6 +1096,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     procedures = models.ManyToManyField('procedure.Procedure', through='OpdAppointmentProcedureMapping',
                                         through_fields=('opd_appointment', 'procedure'), null=True, blank=True)
 
+    merchant_payout = models.ForeignKey(MerchantPayout, related_name="opd_appointment", on_delete=models.SET_NULL, null=True)
+
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
@@ -1257,7 +1260,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         #     logger.error("Error in auto cancel flow - " + str(e))
         print('all ops tasks completed')
 
-
     def save(self, *args, **kwargs):
         logger.warning("opd save started - " + str(self.id) + " timezone - " + str(timezone.now()))
         database_instance = OpdAppointment.objects.filter(pk=self.id).first()
@@ -1268,9 +1270,26 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         if 'push_again_to_matrix' in kwargs.keys():
             kwargs.pop('push_again_to_matrix')
 
+        try:
+            # while completing appointment, add a merchant_payout entry
+            if database_instance.status != self.status and self.status == self.COMPLETED:
+                if self.merchant_payout is None:
+                    self.save_merchant_payout()
+        except Exception as e:
+            pass
+
         super().save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
+
+    def save_merchant_payout(self):
+        payout_data = {
+            "charged_amount" : self.effective_price,
+            "payable_amount" : self.fees,
+        }
+
+        merchant_payout = MerchantPayout.objects.create(**payout_data)
+        self.merchant_payout = merchant_payout
 
     def doc_payout_amount(self):
         amount = 0
@@ -1396,6 +1415,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         return procedures
 
+    def get_marchant(self):
+        pass
 
     class Meta:
         db_table = "opd_appointment"

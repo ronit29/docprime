@@ -708,16 +708,22 @@ class OrderLog(TimeStampedModel):
 
 
 class MerchantPayout(TimeStampedModel):
+    PENDING = 1
+    PAID = 2
+
+    STATUS_CHOICES = [(PENDING, 'Pending'), (PAID, 'Paid')]
+
     charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payout_approved = models.BooleanField(default=False)
-    status = models.PositiveIntegerField()
+    status = models.PositiveIntegerField(default=PENDING, choices=STATUS_CHOICES)
     payout_time = models.DateTimeField(null=True, blank=True)
     api_response = JSONField(blank=True, null=True)
     retry_count = models.PositiveIntegerField(default=0)
-    paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, related_name='payouts')
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
+    paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, related_name='payouts', null=True)
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
     content_object = GenericForeignKey()
 
     class Meta:
