@@ -229,6 +229,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             id_url_dict[data['entity_id']] = data['url']
 
         for resp in serializer.data:
+
+            resp_tests = resp['tests']
+            bool_array = list()
+            for resp_test in resp_tests:
+                insurance_coverage = resp_test.get('mrp') <= insurance_data_dict['insurance_threshold_amount']
+                bool_array.append(insurance_coverage)
+
+            if False not in bool_array and len(bool_array) > 0:
+                resp['insurance']['is_insurance_covered'] = True
+
             if id_url_dict.get(resp['lab']['id']):
                 resp['lab']['url'] = id_url_dict[resp['lab']['id']]
             else:

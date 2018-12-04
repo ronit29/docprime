@@ -361,10 +361,10 @@ class LabCustomSerializer(serializers.Serializer):
     def get_insurance(self, obj):
         insurance_data_dict = self.context.get("insurance_data_dict")
         is_insurance_covered = False
-        lab = obj.get('lab', None)
-        mrp = obj.get('mrp', None)
-        if lab and mrp is not None and mrp <= insurance_data_dict['insurance_threshold_amount']:
-            is_insurance_covered = True
+        # lab = obj.get('lab', None)
+        # mrp = obj.get('mrp', None)
+        # if lab and mrp is not None and mrp <= insurance_data_dict['insurance_threshold_amount']:
+        #     is_insurance_covered = True
 
         return {
             "is_insurance_covered": is_insurance_covered,
