@@ -1,3 +1,4 @@
+from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
 import datetime
 from django.contrib.gis import forms
@@ -6,12 +7,13 @@ from ondoc.crm.constants import constants
 from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
-from ondoc.authentication.models import Merchant
+from ondoc.authentication.models import Merchant, AssociatedMerchant
 from ondoc.account.models import MerchantPayout
 from ondoc.common.models import Cities, MatrixCityMapping
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin
 from reversion.admin import VersionAdmin
+import nested_admin
 
 def practicing_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
@@ -294,3 +296,13 @@ class MerchantPayoutAdmin(VersionAdmin):
         if appt and appt.get_merchant:
             return appt.get_merchant
         return ''
+
+
+class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    can_delete = False
+    extra = 0
+    model = AssociatedMerchant
+    show_change_link = False
+    #fields = "__all__"
+    #readonly_fields = ['merchant_id']
+    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']

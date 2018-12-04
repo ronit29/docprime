@@ -15,6 +15,7 @@ import datetime
 from .common import *
 from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
 import nested_admin
+from .common import AssociatedMerchantInline
 
 class HospitalNetworkCertificationInline(admin.TabularInline):
     model = HospitalNetworkCertification
@@ -148,14 +149,6 @@ class HospitalNetworkDocumentInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
 
-class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
-    can_delete = False
-    extra = 0
-    model = AssociatedMerchant
-    show_change_link = False
-    #fields = "__all__"
-    #readonly_fields = ['merchant_id']
-    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
 
 class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     form = HospitalNetworkForm

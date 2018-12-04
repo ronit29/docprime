@@ -37,6 +37,7 @@ from ondoc.authentication.admin import BillingAccountInline
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 import logging
 import nested_admin
+from .common import AssociatedMerchantInline
 
 logger = logging.getLogger(__name__)
 
@@ -479,14 +480,6 @@ class LabResource(resources.ModelResource):
                 status = 'Submitted'
         return status
 
-class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
-    can_delete = False
-    extra = 0
-    model = AssociatedMerchant
-    show_change_link = False
-    #fields = "__all__"
-    #readonly_fields = ['merchant_id']
-    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
 
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'

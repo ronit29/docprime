@@ -52,6 +52,7 @@ from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
 from django import forms
 from decimal import Decimal
+from .common import AssociatedMerchantInline
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -163,16 +164,6 @@ class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
                     temp.add(t)
                 else:
                     raise forms.ValidationError("Duplicate records not allowed.")
-
-
-class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
-    can_delete = False
-    extra = 0
-    model = AssociatedMerchant
-    show_change_link = False
-    #fields = "__all__"
-    #readonly_fields = ['merchant_id']
-    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
 
 class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     model = DoctorClinicProcedure
