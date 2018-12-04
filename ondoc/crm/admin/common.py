@@ -7,6 +7,7 @@ from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant
+from ondoc.account.models import MerchantPayout
 from ondoc.common.models import Cities, MatrixCityMapping
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin
@@ -254,3 +255,42 @@ class MerchantAdmin(VersionAdmin):
         if obj:
             return [f.name for f in self.model._meta.fields if f.name not in ['enabled','verified_by_finance']]
         return []
+
+class MerchantPayoutAdmin(VersionAdmin):
+    model = MerchantPayout
+    fields = ['id','charged_amount','updated_at','created_at','payable_amount','status','payout_time','paid_to',
+    'appointment_id', 'get_billed_to', 'get_merchant']
+
+    def get_readonly_fields(self, request, obj=None):
+        base = ['appointment_id', 'get_billed_to', 'get_merchant']
+        readonly = [f.name for f in self.model._meta.fields if f.name not in ['payout_approved']]
+        return base + readonly
+
+    def appointment_id(self, instance):
+        appt = self.get_appointment(instance)
+        if appt:
+            return appt.id
+
+        return None
+
+    def get_appointment(self, instance):
+        if instance.lab_appointment.first():
+            return instance.lab_appointment.first()
+        elif instance.opd_appointment.first():
+            return instance.opd_appointment.first()
+        return None
+
+
+    def get_billed_to(self, instance):
+        appt = self.get_appointment(instance)
+
+        if appt and appt.get_billed_to:
+            return appt.get_billed_to
+        return ''
+
+    def get_merchant(self, instance):
+        appt = self.get_appointment(instance)
+
+        if appt and appt.get_merchant:
+            return appt.get_merchant
+        return ''

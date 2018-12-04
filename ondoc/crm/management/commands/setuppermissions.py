@@ -551,7 +551,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['MERCHANT_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Merchant, for_concrete_models=False)
+        content_types = ContentType.objects.get_for_models(Merchant)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -561,7 +561,7 @@ class Command(BaseCommand):
 
         group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(AssociatedMerchant, for_concrete_models=False)
+        content_types = ContentType.objects.get_for_models(AssociatedMerchant)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -572,6 +572,14 @@ class Command(BaseCommand):
 
         group.permissions.add(*permissions)
 
+        content_types = ContentType.objects.get_for_models(MerchantPayout)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+        group.permissions.add(*permissions)
 
     def create_elastic_group(self):
 

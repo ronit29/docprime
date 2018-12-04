@@ -202,6 +202,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     booking_closing_hours_from_dayend = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))])
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
+
     def __str__(self):
         return self.name
 
@@ -480,6 +482,8 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
     spoc_details = GenericRelation(auth_model.SPOCDetails)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
+
 
 
     def all_associated_labs(self):
@@ -1153,6 +1157,22 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         #                                           payment_type__in=payment_type,
         #                                           lab__in=lab_list))
         # return queryset
+
+    @property
+    def get_billed_to(self):
+        network = self.lab.network
+        if network and network.is_billing_enabled:
+            return network
+        else:
+            return self.lab
+
+    @property
+    def get_merchant(self):
+
+        billed_to = self.get_billed_to
+        if billed_to:
+            return billed_to.first()
+        return None
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
