@@ -6,10 +6,11 @@ from ondoc.crm.constants import constants
 from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
-
+from ondoc.authentication.models import Merchant
 from ondoc.common.models import Cities, MatrixCityMapping
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin
+from reversion.admin import VersionAdmin
 
 def practicing_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
@@ -244,3 +245,12 @@ class GenericAdminForm(forms.ModelForm):
     class Meta:
         widgets = {'name': forms.TextInput(attrs={'size': 13}),
                    'phone_number': forms.NumberInput(attrs={'size': 8})}
+
+
+class MerchantAdmin(VersionAdmin):
+    model = Merchant
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return [f.name for f in self.model._meta.fields if f.name not in ['enabled','verified_by_finance']]
+        return []
