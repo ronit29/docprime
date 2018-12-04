@@ -1132,6 +1132,7 @@ class LabTestCategoryAdmin(VersionAdmin):
     exclude = ['search_key']
     search_fields = ['name']
     form = LabTestCategoryForm
+    autocomplete_fields = ['preferred_lab_test']
 
 
 class AvailableLabTestAdmin(VersionAdmin):
