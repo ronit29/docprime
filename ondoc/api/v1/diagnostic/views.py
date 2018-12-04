@@ -200,7 +200,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         }
 
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-            user_insurance = logged_in_user.purchased_insurance.filter().first()
+            user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
             if user_insurance and user_insurance.is_valid():
                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                 if insurance_threshold:
@@ -229,6 +229,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             id_url_dict[data['entity_id']] = data['url']
 
         for resp in serializer.data:
+
+            resp_tests = resp['tests']
+            bool_array = list()
+            for resp_test in resp_tests:
+                insurance_coverage = resp_test.get('mrp') <= insurance_data_dict['insurance_threshold_amount']
+                bool_array.append(insurance_coverage)
+
+            if False not in bool_array and len(bool_array) > 0:
+                resp['insurance']['is_insurance_covered'] = True
+
             if id_url_dict.get(resp['lab']['id']):
                 resp['lab']['url'] = id_url_dict[resp['lab']['id']]
             else:
