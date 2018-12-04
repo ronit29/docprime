@@ -326,9 +326,10 @@ class NotificationAction:
                 'intermediary_name': 'DIRECT',
                 'intermediary_code': 'AMHI CODE',
                 'intermediary_contact_number': '1800-102-0333',
-                'issuing_office_address': 'iLABS Centre, 2nd & 3rd Floor, Plot No 404 - 405, Udyog Vihar, Phase – III, Gurgaon-122016, Haryana',
+                'issuing_office_address': 'Apollo Munich Health Insurance Co. Ltd. , iLABS Centre, 2nd & 3rd Floor, '
+                                          'Plot No 404 - 405, Udyog Vihar, Phase – III, Gurgaon-122016, Haryana',
                 'issuing_office_gstin': 'AMHI’s GSTIN no.',
-                'group_policy_name': 'Docprime',
+                'group_policy_name': 'Docprime Technologies Pvt. Ltd.',
                 'group_policy_address': 'Plot No. 119, Sector 44, Gurugram, Haryana 122001',
                 'group_policy_email': 'customercare@docprime.com',
                 'nominee_name': 'Legal Heir',

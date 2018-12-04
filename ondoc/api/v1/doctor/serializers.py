@@ -389,7 +389,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         if request:
             logged_in_user = request.user
             if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-                user_insurance = logged_in_user.purchased_insurance.filter().first()
+                user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
                 if user_insurance and user_insurance.is_valid():
                     insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                     if insurance_threshold:

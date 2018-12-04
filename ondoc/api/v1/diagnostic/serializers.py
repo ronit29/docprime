@@ -225,7 +225,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         if request:
             logged_in_user = request.user
             if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-                user_insurance = logged_in_user.purchased_insurance.filter().first()
+                user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
                 if user_insurance and user_insurance.is_valid():
                     insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                     if insurance_threshold:
@@ -233,8 +233,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
                             insurance_threshold.lab_amount_limit
                         resp['is_user_insured'] = True
 
-            lab = obj.lab
-            if lab and obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
+            if obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp
@@ -324,7 +323,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         if request:
             logged_in_user = request.user
             if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-                user_insurance = logged_in_user.purchased_insurance.filter().first()
+                user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
                 if user_insurance and user_insurance.is_valid():
                     insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                     if insurance_threshold:
@@ -332,8 +331,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
                             insurance_threshold.lab_amount_limit
                         resp['is_user_insured'] = True
 
-            lab = obj.lab
-            if lab and obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
+            if obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
                 resp['is_insurance_covered'] = True
 
         return resp
