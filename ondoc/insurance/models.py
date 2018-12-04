@@ -154,7 +154,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
     purchase_date = models.DateTimeField(blank=False, null=False)
     expiry_date = models.DateTimeField(blank=False, null=False, default=timezone.now)
-    policy_number = models.CharField(max_length=50, blank=False, null=False, unique=True, default=generate_insurance_policy_number)
+    policy_number = models.CharField(max_length=100, blank=False, null=False, unique=True, default=generate_insurance_policy_number)
     insured_members = JSONField(blank=False, null=False)
     premium_amount = models.PositiveIntegerField(default=0)
     order = models.ForeignKey(account_model.Order, on_delete=models.DO_NOTHING)
