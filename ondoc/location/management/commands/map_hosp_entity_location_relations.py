@@ -3,7 +3,7 @@ from ondoc.location.models import EntityLocationRelationship
 from ondoc.doctor.models import Hospital
 from django.contrib.contenttypes.models import ContentType
 
-def map_lab_entity_location_relations():
+def map_hosp_entity_location_relations():
     content_type = ContentType.objects.get(model='hospital')
     if content_type:
         id = content_type.id
@@ -19,4 +19,4 @@ def map_lab_entity_location_relations():
 
 class Command(BaseCommand):
     def handle(self, **options):
-        map_lab_entity_location_relations()
+        map_hosp_entity_location_relations()
