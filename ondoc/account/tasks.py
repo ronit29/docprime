@@ -164,3 +164,8 @@ def set_order_dummy_transaction(order_id, user_id):
 
     except Exception as e:
         logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
+
+
+@task()
+def process_payout(payout_id):
+    pass

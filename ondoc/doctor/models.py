@@ -529,7 +529,6 @@ class DoctorClinic(auth_model.TimeStampedModel):
     enabled = models.BooleanField(verbose_name='Enabled', default=True)
     priority = models.PositiveSmallIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
-    is_billing_enabled = models.BooleanField(verbose_name='Enabled for Billing', default=False)
 
     class Meta:
         db_table = "doctor_clinic"
@@ -1427,7 +1426,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             return self.hospital.network
         if self.hospital.is_billing_enabled:
             return self.hospital
-        if doctor_clinic and doctor_clinic.is_billing_enabled:
+        if doctor_clinic and doctor_clinic.merchant.first():
             return doctor_clinic
         return self.doctor
 
