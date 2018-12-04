@@ -1815,17 +1815,81 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 
 class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
-    def create_patients(self, request):
-        serializer = serializers.OfflinePatientCreateListSerializer(data=                                                                                                                                                                                                                                                                                                                                                                                                                 .data)
+    def get_queryset(self):
+        return None
+
+    @transaction.atomic
+    def create_appointments(self, request):
+        serializer = serializers.OfflineAppointmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        for data in valid_data:
-            models.OfflinePatients(name=data.get('name'),
-                                   sms_notification=data.get('sms_notification'),
-                                   gender=data.get('gender'),
-                                   dob=data.get("dob"),
-                                   referred_by=data.get('referred_by'),
-                                   medical_history=data.get('medical_history'),
-                                   welcome_message=data.get('welcome_message'),
-                                   display_welcome_message=data.get('display_welcome_message')
-                                   )
+        sms_list = None
+        appntment_list = []
+        for data in valid_data.get('data'):
+            if not data.get('patient_id') and data.get('patient'):
+                patient_data = self.create_patient(valid_data, data['patient'])
+                patient = patient_data['patient']
+            else:
+                patient = valid_data.get('patient_id')
+            time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+            appnt = models.OfflineOPDAppointments(doctor=data.get('doctor'),
+                                                  hospital=data.get('hospital'),
+                                                  time_slot_start=time_slot_start,
+                                                  booked_by=request.user,
+                                                  user=patient
+                                                 )
+            appntment_list.append(appnt)
+        models.OfflineOPDAppointments.objects.bulk_create(appntment_list)
+        transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
+        return Response({'status': 'Created Successfully'})
+
+    def create_patient(self, valid_data, data):
+        sms_list = []
+        hospital = valid_data.get('hospital') if valid_data.get('share_with_hospital') else None
+        patient = models.OfflinePatients.objects.create(name=data.get('name'),
+                                                        sms_notification=data.get('sms_notification', False),
+                                                        gender=data.get('gender'),
+                                                        dob=data.get("dob"),
+                                                        referred_by=data.get('referred_by'),
+                                                        medical_history=data.get('medical_history'),
+                                                        welcome_message=data.get('welcome_message'),
+                                                        display_welcome_message=data.get('display_welcome_message',
+                                                                                         False),
+                                                        doctor=valid_data.get('doctor'),
+                                                        hospital=hospital
+                                                        )
+        default_num = None
+        for num in data.get('phone_number'):
+            models.PatientMobile.objects.create(patient=patient,
+                                                phone_number=num.get('phone_number'),
+                                                is_default=num.get('is_default', False))
+
+            if 'is_default' in num and num['is_default']:
+                default_num = num['phone_number']
+        if default_num and ('sms_notification' in valid_data and valid_data['sms_notification']):
+            sms_list.append(default_num)
+        return {"sms_list": sms_list, "patient": patient}
+
+    def offline_timings(self, request):
+        serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
+                                                            doctor_clinic__hospital=validated_data.get(
+                                                                'hospital_id')).order_by("start")
+        doctor_leave_serializer = serializers.DoctorLeaveSerializer(
+            models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True),
+            many=True)
+
+        timeslots = dict()
+        obj = TimeSlotExtraction()
+
+        for data in queryset:
+            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+                                data.deal_price, data.mrp, True)
+
+        timeslots = obj.get_timing_list()
+        for i in timeslots:
+            pass
+        return Response({"timeslots": timeslots,
+                         "doctor_leaves": doctor_leave_serializer.data})

@@ -3,7 +3,7 @@ from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospital
                     DoctorBlockCalendarViewSet, PrescriptionFileViewset, SearchedItemsViewSet, DoctorListViewSet,
                     DoctorProfileUserViewSet, DoctorAvailabilityTimingViewSet, HealthTipView, ConfigView,
                     DoctorAppointmentNoAuthViewSet, DoctorContactNumberViewSet, DoctorFeedbackViewSet,
-                    HospitalAutocomplete, CreateAdminViewSet)
+                    HospitalAutocomplete, CreateAdminViewSet, OfflineCustomerViewSet)
 
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
@@ -48,4 +48,6 @@ urlpatterns = [
     path('list_admins', CreateAdminViewSet.as_view({'get': 'list_entity_admins'}), name='list_admins'),
     path('admins_assoc_doctors/<int:pk>', CreateAdminViewSet.as_view({'get': 'assoc_doctors'}), name='assoc_doctors'),
     path('admins_assoc_hosp/<int:pk>', CreateAdminViewSet.as_view({'get': 'assoc_hosp'}), name='assoc_hosp'),
+    path('create_offline_appointments', OfflineCustomerViewSet.as_view({'post': 'create_appointments'}), name='create_appointments'),
+    path('offline_timings', OfflineCustomerViewSet.as_view({'get': 'offline_timings'}), name='offline_timings'),
 ]

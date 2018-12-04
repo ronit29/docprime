@@ -40,7 +40,8 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent, OfflinePatients,
+                                 PatientMobile)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
@@ -1737,3 +1738,15 @@ class PracticeSpecializationContentAdmin(admin.ModelAdmin):
     display = ('specialization', 'content', )
     autocomplete_fields = ('specialization', )
 
+
+class PatientMobileInline(admin.TabularInline):
+    model = PatientMobile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class OfflinePatientAdmin(VersionAdmin):
+    list_display = ('name', 'gender', 'referred_by')
+    date_hierarchy = 'created_at'
+    inlines = [PatientMobileInline]

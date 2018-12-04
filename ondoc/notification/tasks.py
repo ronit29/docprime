@@ -160,4 +160,14 @@ def send_opd_rating_message(appointment_id, type):
         notification_models.SmsNotification.send_rating_link(data)
 
 
+@task
+def send_offline_welcome_message(number):
+    from django.utils.safestring import mark_safe
+    data = {}
+    data['phone_number'] = number
+    text = '''Welcome to Docprime'''
+    data['text'] = mark_safe(text)
+    notification_models.SmsNotification.send_rating_link(data)
+
+
 

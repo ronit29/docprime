@@ -1290,13 +1290,22 @@ class OfflinePatientBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=24)
     sms_notification = serializers.BooleanField(required=False)
     gender = serializers.ChoiceField(choices=OfflinePatients.GENDER_CHOICES, required=False)
-    dob = serializers.DateField(required=False)
-    referred_by = serializers.ChoiceField(choices=OfflinePatients.REFERENCE_CHOICES)
+    dob = serializers.DateField(required=False, format="%Y-%m-%d")
+    referred_by = serializers.ChoiceField(choices=OfflinePatients.REFERENCE_CHOICES, required=False)
     medical_history = serializers.CharField(required=False, max_length=256)
     welcome_message = serializers.CharField(required=False, max_length=256)
     display_welcome_message = serializers.BooleanField(required=False)
     phone_number = serializers.ListField()
 
 
-class OfflinePatientCreateListSerializer(serializers.Serializer):
-    patient = OfflinePatientBodySerializer(many=True)
+class OfflineAppointmentBodySerializer(serializers.Serializer):
+    patient = OfflinePatientBodySerializer(many=False, allow_null=True, required=False)
+    patient_id = serializers.PrimaryKeyRelatedField(queryset=OfflinePatients.objects.all(), required=False, allow_empty=True)
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
+    start_date = serializers.DateTimeField()
+    start_time = serializers.FloatField()
+
+
+class OfflineAppointmentCreateSerializer(serializers.Serializer):
+    data = OfflineAppointmentBodySerializer(many=True)

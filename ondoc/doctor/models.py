@@ -1790,9 +1790,18 @@ class OfflinePatients(auth_model.TimeStampedModel):
     medical_history = models.CharField(max_length=256, null=True, blank=True)
     welcome_message = models.CharField(max_length=128, null=True, blank=True)
     display_welcome_message = models.BooleanField(default=False)
+    doctor = models.ForeignKey(Doctor, related_name="patients_doc", on_delete=models.SET_NULL, null=True)
+    hospital = models.ForeignKey(Hospital, related_name="patients_hos", on_delete=models.SET_NULL, null=True, blank=True)
+    share_with_hospital = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
+
+    @staticmethod
+    def after_commit_sms(sms_list):
+        if sms_list:
+            for number in sms_list:
+                notification_tasks.send_offline_welcome_message.apply_async(kwargs={'number': number}, countdown=1)
 
     class Meta:
         db_table = 'offline_patients'
@@ -1803,6 +1812,9 @@ class PatientMobile(auth_model.TimeStampedModel):
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(6000000000)])
     is_default = models.BooleanField(verbose_name='Default Number?', default=False)
+
+    def __str__(self):
+        return '{}'.format(self.phone_number)
 
     class Meta:
         db_table = "patient_mobile"
@@ -1828,14 +1840,11 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     booked_by = models.ForeignKey(auth_model.User, related_name="offline_booked_appointements",
                                   on_delete=models.SET_NULL,
                                   null=True)
-    fees = models.DecimalField(max_digits=10, decimal_places=2)
-    effective_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
-    mrp = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=None)
-    deal_price = models.DecimalField(max_digits=10, decimal_places=2, blank=False, default=None, null=False)
     status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
-    # otp = models.PositiveIntegerField(blank=True, null=True)
     time_slot_start = models.DateTimeField(blank=True, null=True)
-    time_slot_end = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return '{}-{}'.format(self.doctor, self.hospital)
 
     class Meta:
         db_table = "offline_opd_appointments"
