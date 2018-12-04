@@ -14,11 +14,10 @@ def doctor_page_urls():
     else:
         sequence = 0
 
-    doc_obj =Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization').filter(is_live=True, is_test_doctor=False)[:10]
+    doc_obj =Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization').filter(is_live=True, is_test_doctor=False)
     for doctor in doc_obj:
         try:
-            dp = DoctorPageURL(doctor, sequence)
-            dp.create_page_urls()
+            print(DoctorPageURL.create_page_urls(doctor,sequence))
         except Exception as e:
             print(str(e))
 

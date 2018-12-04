@@ -1160,14 +1160,25 @@ class DoctorPageURL(object):
     def __init__(self, doctor, sequence):
         self.doctor = doctor
         self.locality = None
-        self.specializations =[sc.specialization for sc in doctor.doctorpracticespecializations.all()]
-        self.specialization_ids =[sc.specialization_id for sc in doctor.doctorpracticespecializations.all()]
+        self.specializations =None
         self.sequence = sequence
-
         self.sublocality = None
         self.sublocality_id = None
         self.sublocality_longitude = None
         self.sublocality_latitude = None
+
+    def init(doctor, sequence):
+        doctor = doctor
+        locality = None
+        specializations =[sc.specialization.name for sc in doctor.doctorpracticespecializations.all()]
+        specialization_ids =[sc.specialization_id for sc in doctor.doctorpracticespecializations.all()]
+        sequence = sequence
+
+        sublocality = None
+        sublocality_id = None
+        sublocality_longitude = None
+        sublocality_latitude = None
+
 
     def init_preferred_hospital(self):
 
@@ -1263,39 +1274,48 @@ class DoctorPageURL(object):
             EntityUrls.objects.filter(entity_id=self.doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE, url=url).delete()
             EntityUrls.objects.create(**data)
 
-    def create_page_urls(self):
-        if self.doctor.hospitals.all():
-            hospital = self.doctor.hospitals.all()[0]
+    def create_page_urls(doctor, sequence):
+        doctor = doctor
+        locality = None
+        specializations =[sc.specialization.name for sc in doctor.doctorpracticespecializations.all()]
+        specialization_ids =[sc.specialization_id for sc in doctor.doctorpracticespecializations.all()]
+        sequence = sequence
+        locality_id = None
+        sublocality = None
+        sublocality_id = None
+        sublocality_longitude = None
+        sublocality_latitude = None
+
+        if doctor.hospitals.all():
+            hospital = doctor.hospitals.all()[0]
             if hospital.is_live:
                 doc_sublocality = hospital.entity.filter(type="SUBLOCALITY", valid=True).first()
                 if doc_sublocality:
-                    self.sublocality = doc_sublocality.location.alternative_value
-                    self.sublocality_id = doc_sublocality.location.id
-                    self.sublocality_longitude = doc_sublocality.location.centroid.x
-                    self.sublocality_latitude = doc_sublocality.location.centroid.y
+                    sublocality = doc_sublocality.location.alternative_value
+                    sublocality_id = doc_sublocality.location.id
+                    sublocality_longitude = doc_sublocality.location.centroid.x
+                    sublocality_latitude = doc_sublocality.location.centroid.y
 
                 doc_locality = hospital.entity.filter(type="LOCALITY", valid=True).first()
                 if doc_locality:
-                    self.locality = doc_locality.location.alternative_value
-                    self.locality_id = doc_locality.location.id
-                    self.locality_longitude = doc_locality.location.centroid.x
-                    self.locality_latitude = doc_locality.location.centroid.y
+                    locality = doc_locality.location.alternative_value
+                    locality_id = doc_locality.location.id
+                    locality_longitude = doc_locality.location.centroid.x
+                    locality_latitude = doc_locality.location.centroid.y
 
-        if self.specializations:
-            url = "dr-%s-%s" % (self.doctor.name, "-".join(self.specializations))
-        else:
-            url = "dr-%s" % (self.doctor.name)
-        if self.locality and self.sublocality:
-            url = url + "-in-%s-%s-dpp" % (self.sublocality, self.locality)
-        elif self.locality:
-            url = url + "-in-%s-dpp" % (self.locality)
-        else:
+        if specializations:
+            url = "dr-%s-%s" % (doctor.name, "-".join(specializations))
+        if not specializations:
+            url = "dr-%s" % (doctor.name)
+        if locality and sublocality:
+            url = url + "-in-%s-%s-dpp" % (sublocality, locality)
+        elif locality:
+            url = url + "-in-%s-dpp" % (locality)
+        if not (specializations or locality or sublocality):
             url = url + "-dpp"
-        entity_url = EntityUrls.objects.filter(url=url).order_by('-created_at')
-        if len(entity_url)>0:
-           entity_url = entity_url[0]
-
-
+        # entity_url = EntityUrls.objects.filter(url=url).order_by('-created_at')
+        # if len(entity_url)>0:
+        #    entity_url = entity_url[0]
 
         url = slugify(url)
 
@@ -1304,38 +1324,43 @@ class DoctorPageURL(object):
         data['is_valid'] = True
         data['url_type'] = EntityUrls.UrlType.PAGEURL
         data['entity_type'] = 'Doctor'
-        data['entity_id'] = self.doctor.id
+        data['entity_id'] = doctor.id
         data['sitemap_identifier'] = EntityUrls.SitemapIdentifier.DOCTOR_PAGE
-        data['locality_id'] = self.locality_id
-        data['locality_value'] = self.locality
-        data['locality_latitude'] = self.locality_latitude
-        data['locality_longitude'] = self.locality_longitude
+        if doc_locality:
+            data['locality_id'] = locality_id
+            data['locality_value'] = locality
+            data['locality_latitude'] = locality_latitude
+            data['locality_longitude'] = locality_longitude
 
-        if self.locality_latitude and self.locality_longitude:
-            data['locality_location'] = Point(self.locality_longitude, self.locality_latitude)
+            if locality_latitude and locality_longitude:
+                data['locality_location'] = Point(locality_longitude, locality_latitude)
 
-        if self.sublocality_latitude and self.sublocality_longitude:
-            data['sublocality_location'] = Point(self.sublocality_longitude, self.sublocality_latitude)
+            if sublocality_latitude and sublocality_longitude:
+                data['sublocality_location'] = Point(sublocality_longitude, sublocality_latitude)
 
-        data['sublocality_id'] = self.sublocality_id
-        data['sublocality_value'] = self.sublocality
-        data['sublocality_latitude'] = self.sublocality_latitude
-        data['sublocality_longitude'] = self.sublocality_longitude
-        data['location'] = self.hospital.location
+        if doc_sublocality:
+            data['sublocality_id'] = sublocality_id
+            data['sublocality_value'] = sublocality
+            data['sublocality_latitude'] = sublocality_latitude
+            data['sublocality_longitude'] = sublocality_longitude
+        if hospital:
+            data['location'] = hospital.location
 
-        if self.specializations and self.specialization_ids:
-            data['specialization'] = self.specializations[0]
-            data['specialization_id'] = self.specialization_ids[0]
+        if specializations and specialization_ids:
+            data['specialization'] = specializations[0]
+            data['specialization_id'] = specialization_ids[0]
 
         extras = {}
-        extras['related_entity_id'] = self.doctor.id
-        extras['location_id'] = self.sublocality_id if self.sublocality_id else self.locality_id
-        extras['locality_value'] = self.locality if self.locality else ''
-        extras['sublocality_value'] = self.sublocality if self.sublocality else ''
-        extras['breadcrums'] = []
+        extras['related_entity_id'] = doctor.id
+        if sublocality_id or locality_id:
+            extras['location_id'] = sublocality_id if sublocality_id else locality_id
+            extras['locality_value'] = locality if locality else ''
+            extras['sublocality_value'] = sublocality if sublocality else ''
+            extras['breadcrums'] = []
         data['extras'] = extras
-        data['sequence'] = self.sequence
-        EntityUrls.objects.filter(entity_id=self.doctor.id,
+        data['sequence'] = sequence
+        EntityUrls.objects.filter(entity_id=doctor.id,
                                   sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(~Q(url=url)).update(is_valid=False)
-        EntityUrls.objects.filter(entity_id=self.doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,url=url).delete()
+        EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,url=url).delete()
         EntityUrls.objects.create(**data)
+        return "success"
