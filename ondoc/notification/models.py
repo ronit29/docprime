@@ -446,35 +446,35 @@ class EmailNotificationOpdMixin:
             email_subject = render_to_string("email/doctor_invoice/subject.txt", context=context)
 
         elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
-            html_body = render_to_string("email/insurance_confirmed/pdfbody.html", context=context)
-            instance = context.get('instance')
-            filename = "COI_{}.pdf".format(str(timezone.now().timestamp()))
-            try:
+            # html_body = render_to_string("email/insurance_confirmed/pdfbody.html", context=context)
+            # instance = context.get('instance')
+            # filename = "COI_{}.pdf".format(str(timezone.now().timestamp()))
+            # try:
                 # random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
-                path = 'insurance/coi/test/' + filename
-                file = default_storage.open(path, 'wb')
-
-                extra_args = {
-                    'virtual-time-budget': 6000
-                }
-
-                bytestring_to_pdf(html_body.encode(), file, **extra_args)
-
-                file.close()
-
-                ff = File(default_storage.open(path, 'rb'))
+                # path = 'insurance/coi/test/' + filename
+                # file = default_storage.open(path, 'wb')
+                #
+                # extra_args = {
+                #     'virtual-time-budget': 6000
+                # }
+                #
+                # bytestring_to_pdf(html_body.encode(), file, **extra_args)
+                #
+                # file.close()
+                #
+                # ff = File(default_storage.open(path, 'rb'))
 
                 # random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
                 # name = random_string + '.pdf'
 
-                instance.coi = InMemoryUploadedFile(ff.file, None, filename, 'application/pdf', ff.file.tell(), None)
+                # instance.coi = InMemoryUploadedFile(ff.file, None, filename, 'application/pdf', ff.file.tell(), None)
 
                 # pdf_file = HTML(string=html_body).write_pdf()
                 # instance.coi = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
-                instance.save()
-            except Exception as e:
-                logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            context.update({"invoice_url": instance.coi.url})
+                # instance.save()
+            # except Exception as e:
+            #     logger.error("Got error while creating pdf for opd invoice {}".format(e))
+            # context.update({"invoice_url": instance.coi.url})
             html_body = render_to_string("email/insurance_confirmed/body.html", context=context)
             email_subject = render_to_string("email/insurance_confirmed/subject.txt", context=context)
 
