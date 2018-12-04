@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(
-            '''CREATE SEQUENCE IF NOT EXISTS userinsurance_policy_num_seq START 30000000;'''
+            '''CREATE SEQUENCE IF NOT EXISTS userinsurance_policy_num_seq START 1;'''
         ),
         migrations.AlterField(
             model_name='userinsurance',
