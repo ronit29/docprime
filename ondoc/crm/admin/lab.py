@@ -7,7 +7,7 @@ from import_export.admin import ImportMixin, base_formats
 from django.utils.safestring import mark_safe
 from django.contrib.gis import forms
 from django.contrib.gis import admin
-from django.contrib.admin import SimpleListFilter
+from django.contrib.admin import SimpleListFilter, TabularInline
 from reversion.admin import VersionAdmin
 from import_export.admin import ImportExportMixin
 from django.db.models import Q
@@ -23,13 +23,14 @@ import pytz
 from ondoc.account.models import Order
 from ondoc.doctor.models import Hospital
 from ondoc.diagnostic.models import (LabTiming, LabImage,
-    LabManager,LabAccreditation, LabAward, LabCertification, AvailableLabTest,
-    LabNetwork, Lab, LabOnboardingToken, LabService,LabDoctorAvailability,
-    LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument, LabAppointment, HomePickupCharges,
-                                     TestParameter, ParameterLabTest, LabReport, LabReportFile)
+                                     LabManager, LabAccreditation, LabAward, LabCertification, AvailableLabTest,
+                                     LabNetwork, Lab, LabOnboardingToken, LabService, LabDoctorAvailability,
+                                     LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument,
+                                     LabAppointment, HomePickupCharges,
+                                     TestParameter, ParameterLabTest, LabReport, LabReportFile, LabTestCategoryMapping)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
-from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter
+from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
 from ondoc.crm.admin.autocomplete import PackageAutoCompleteView
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
@@ -1004,6 +1005,40 @@ class LabTestPackageInline(admin.TabularInline):
             lab_test__is_package=False, package__is_package=True)
 
 
+class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        all_parent_categories = []
+        count_is_primary = 0
+        for value in self.cleaned_data:
+            if not value.get("DELETE"):
+                all_parent_categories.append(value.get('parent_category'))
+                if value.get('is_primary', False):
+                    count_is_primary += 1
+        # If lab test is a package its parent can only be package category.
+        if self.instance.is_package:
+            if any([not parent_category.is_package_category for parent_category in all_parent_categories]):
+                raise forms.ValidationError("Parent Categories must be a lab test package category.")
+        else:
+            if any([parent_category.is_package_category for parent_category in all_parent_categories]):
+                raise forms.ValidationError("Parent Categories must be a lab test category.")
+            if not count_is_primary == 1:
+                raise forms.ValidationError("Must have one and only one primary parent category.")
+
+
+class LabTestCategoryInline(AutoComplete, TabularInline):
+    model = LabTestCategoryMapping
+    fk_name = 'lab_test'
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['parent_category']
+    verbose_name = "Parent Category"
+    verbose_name_plural = "Parent Categories"
+    formset = LabTestToParentCategoryInlineFormset
+
+
 class LabTestAdminForm(forms.ModelForm):
     why = forms.CharField(widget=forms.Textarea, required=False)
 
@@ -1012,14 +1047,30 @@ class LabTestAdminForm(forms.ModelForm):
         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'lab_test/js/init.js')
         css = {'all': ('lab_test/css/style.css',)}
 
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        # is_package toggles handling
+        if cleaned_data.get('is_package', False):
+            if self.instance:
+                if self.instance.parent_lab_test_category_mappings.filter(parent_category__is_package_category=False).count():
+                    raise forms.ValidationError("Already has lab test category as parent(s). Remove all of them and try again.")
+        else:
+            if self.instance:
+                if self.instance.parent_lab_test_category_mappings.filter(parent_category__is_package_category=True).count():
+                    raise forms.ValidationError("Already has lab test package category as parent(s). Remove all of them and try again.")
+
 
 class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
-    form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
-    inlines = []
+    inlines = [LabTestCategoryInline]
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
+    exclude = ['search_key']
+    form = LabTestAdminForm
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)
@@ -1042,6 +1093,45 @@ class LabTestTypeAdmin(VersionAdmin):
 
 # class LabSubTestTypeAdmin(VersionAdmin):
 #     search_fields = ['name']
+
+class LabTestCategoryForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        # is_live toggles handling
+        if cleaned_data.get('is_live', False) and not cleaned_data.get('is_package_category', False) \
+                and not cleaned_data.get('preferred_lab_test', None):
+            raise forms.ValidationError('This category cannot go live without preferred lab test.')
+        if cleaned_data.get('is_live', False) and cleaned_data.get('is_package_category', False) \
+                and cleaned_data.get('preferred_lab_test', None):
+            raise forms.ValidationError('This category cannot have preferred lab test.')
+        # is_package_category toggles handling
+        if cleaned_data.get('is_package_category', False):
+            if self.instance:
+                if self.instance.lab_test_mappings.filter(lab_test__is_package=False).count():
+                    raise forms.ValidationError('This category has lab test under it, delete all of them and try again.')
+        else:
+            if self.instance:
+                if self.instance.lab_test_mappings.filter(lab_test__is_package=True).count():
+                    raise forms.ValidationError('This category has lab test package(s) under it, delete all of them and try again.')
+        preferred_lab_test = cleaned_data.get('preferred_lab_test')
+        if preferred_lab_test:
+            if self.instance.pk:
+                if not preferred_lab_test.parent_lab_test_category_mappings.filter(parent_category=self.instance):
+                    raise forms.ValidationError(
+                        'This category and preferred lab test are not related.')
+            else:
+                raise forms.ValidationError('Category and preferred lab_test should be related.')
+
+
+class LabTestCategoryAdmin(VersionAdmin):
+    # list_display = ['test', 'lab_pricing_group', 'get_type', 'mrp', 'computed_agreed_price',
+    #                 'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'enabled']
+    exclude = ['search_key']
+    search_fields = ['name']
+    form = LabTestCategoryForm
 
 
 class AvailableLabTestAdmin(VersionAdmin):

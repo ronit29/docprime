@@ -161,6 +161,17 @@ class DoctorClinicProcedure(auth_model.TimeStampedModel):
         unique_together = ('procedure', 'doctor_clinic')
 
 
+class CommonProcedure(auth_model.TimeStampedModel):
+    procedure = models.ForeignKey(Procedure, on_delete=models.CASCADE)
+    priority = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return "{}".format(self.procedure.name)
+
+    class Meta:
+        db_table = "common_procedure"
+
+
 class CommonProcedureCategory(auth_model.TimeStampedModel):
     procedure_category = models.ForeignKey(ProcedureCategory, on_delete=models.CASCADE)
     priority = models.PositiveIntegerField(default=0)
