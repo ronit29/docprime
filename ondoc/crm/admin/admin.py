@@ -41,7 +41,7 @@ from ondoc.web.models import OnlineLead, Career
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
-from ondoc.authentication.models import OtpVerifications, UserProfile
+from ondoc.authentication.models import OtpVerifications, UserProfile, Merchant, AssociatedMerchant
 
 from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
@@ -137,4 +137,5 @@ admin.site.register(SeoLabNetwork, SeoLabNetworkAdmin)
 admin.site.register(PracticeSpecializationContent, PracticeSpecializationContentAdmin)
 admin.site.register(CommonProcedureCategory)
 admin.site.register(DemoElastic, DemoElasticAdmin)
-
+admin.site.register(Merchant)
+#admin.site.register(AssociatedMerchant)

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 from ondoc.account.models import Order
 from django.contrib.contenttypes.admin import GenericTabularInline
-from ondoc.authentication.models import GenericAdmin, BillingAccount, SPOCDetails
+from ondoc.authentication.models import GenericAdmin, BillingAccount, SPOCDetails, AssociatedMerchant, Merchant
 from ondoc.authentication.admin import BillingAccountInline
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
@@ -870,6 +870,16 @@ class CompetitorMonthlyVisitsInline(ReadOnlyInline):
     verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
+class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    can_delete = False
+    extra = 0
+    model = AssociatedMerchant
+    show_change_link = False
+    #fields = "__all__"
+    #readonly_fields = ['merchant_id']
+    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
+
+
 class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -899,7 +909,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         DoctorImageInline,
         DoctorDocumentInline,
         GenericAdminInline,
-        BillingAccountInline
+        BillingAccountInline,
+        AssociatedMerchantInline
     ]
 
     search_fields = ['name']

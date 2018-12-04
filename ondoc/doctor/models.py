@@ -359,6 +359,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     enabled_for_online_booking = models.BooleanField(default=False)
     enabled_for_online_booking_at = models.DateTimeField(null=True, blank=True)
     is_gold = models.BooleanField(verbose_name='Is Gold', default=False)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
 
     def __str__(self):
         return self.name

@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
-from ondoc.authentication.models import TimeStampedModel, User, UserProfile
+from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
@@ -705,3 +705,20 @@ class OrderLog(TimeStampedModel):
 
     class Meta:
         db_table = "order_log"
+
+
+class MerchantPayout(TimeStampedModel):
+    charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payout_approved = models.BooleanField(default=False)
+    status = models.PositiveIntegerField()
+    payout_time = models.DateTimeField(null=True, blank=True)
+    api_response = JSONField(blank=True, null=True)
+    retry_count = models.PositiveIntegerField(default=0)
+    paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, related_name='payouts')
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = "merchant_payout"

@@ -40,7 +40,7 @@ from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 
-from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User
+from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant
 
 from ondoc.seo.models import Sitemap
 from ondoc.elastic.models import DemoElastic
@@ -367,6 +367,8 @@ class Command(BaseCommand):
 
         self.create_elastic_group()
 
+        self.create_merchant_team()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
@@ -543,6 +545,32 @@ class Command(BaseCommand):
             Permission.objects.get_or_create(content_type=ct, codename='change_' + ct.model)
             permissions = Permission.objects.filter(content_type=ct, codename='change_' + ct.model)
             group.permissions.add(*permissions)
+
+
+    def create_merchant_team(self):
+        group, created = Group.objects.get_or_create(name=constants['MERCHANT_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Merchant, for_concrete_models=False)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+        group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(AssociatedMerchant, for_concrete_models=False)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model) |
+                Q(codename='delete_' + ct.model))
+
+        group.permissions.add(*permissions)
 
 
     def create_elastic_group(self):
