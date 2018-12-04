@@ -265,7 +265,7 @@ class GenericLabAdminInline(admin.TabularInline):
     show_change_link = False
     readonly_fields = ['user']
     verbose_name_plural = "Admins"
-    fields = ['user', 'phone_number', 'lab', 'permission_type', 'super_user_permission', 'is_disabled', 'read_permission', 'write_permission']
+    fields = ['user', 'phone_number', 'name', 'lab', 'permission_type', 'super_user_permission', 'is_disabled', 'write_permission']
 
 
 class LabDocumentFormSet(forms.BaseInlineFormSet):
@@ -1040,6 +1040,13 @@ class LabTestCategoryInline(AutoComplete, TabularInline):
 
 
 class LabTestAdminForm(forms.ModelForm):
+    why = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        extend = False
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'lab_test/js/init.js')
+        css = {'all': ('lab_test/css/style.css',)}
+
     def clean(self):
         super().clean()
         if any(self.errors):

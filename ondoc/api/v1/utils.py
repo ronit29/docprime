@@ -4,7 +4,7 @@ from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
 from django.db import connection, transaction
-from django.db.models import F, Func
+from django.db.models import F, Func, Q, Count, Sum
 from django.utils import timezone
 import math
 import datetime
@@ -483,88 +483,132 @@ def form_pg_refund_data(refund_objs):
 
 class CouponsMixin(object):
 
-    # def used_coupon_count(self, user, coupon_code):
-    #     from ondoc.coupon.models import Coupon
-    #     from ondoc.doctor.models import OpdAppointment
-    #     from ondoc.diagnostic.models import LabAppointment
-    #
-    #     data = Coupon.objects.filter(code__exact=coupon_code).first()
-    #
-    #     count = 0
-    #     if data:
-    #         if str(data.type) == str(Coupon.DOCTOR) or str(data.type) == str(Coupon.ALL):
-    #             count += OpdAppointment.objects.filter(user=user,
-    #                                                    status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
-    #                                                                OpdAppointment.RESCHEDULED_DOCTOR,
-    #                                                                OpdAppointment.RESCHEDULED_PATIENT,
-    #                                                                OpdAppointment.ACCEPTED,
-    #                                                                OpdAppointment.COMPLETED],
-    #                                                    coupon__code__exact=coupon_code).count()
-    #         if str(data.type) == str(Coupon.LAB) or str(data.type) == str(Coupon.ALL):
-    #             count += LabAppointment.objects.filter(user=user,
-    #                                                    status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
-    #                                                                LabAppointment.RESCHEDULED_LAB,
-    #                                                                LabAppointment.RESCHEDULED_PATIENT,
-    #                                                                LabAppointment.ACCEPTED,
-    #                                                                LabAppointment.COMPLETED],
-    #                                                    coupon__code__exact=coupon_code).count()
-    #     return count
-
-    def validate_coupon(self, user, coupon_code):
+    def validate_user_coupon(self, **kwargs):
         from ondoc.coupon.models import Coupon
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
-        data = Coupon.objects.filter(code__exact=coupon_code).first()
+        user = kwargs.get("user")
+        coupon_obj = kwargs.get("coupon_obj")
 
-        if data:
-            if isinstance(self, OpdAppointment) and data.type not in [Coupon.DOCTOR, Coupon.ALL]:
+        if coupon_obj:
+
+            if isinstance(self, OpdAppointment) and coupon_obj.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
-            elif isinstance(self, LabAppointment) and data.type not in [Coupon.LAB, Coupon.ALL]:
+            elif isinstance(self, LabAppointment) and coupon_obj.type not in [Coupon.LAB, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
 
-            if (timezone.now() - max(data.created_at, user.date_joined)).days > data.validity:
+            diff_days = (timezone.now() - (coupon_obj.start_date or coupon_obj.created_at)).days
+            if  diff_days < 0 or diff_days > coupon_obj.validity:
                 return {"is_valid": False, "used_count": None}
 
-            allowed_coupon_count = data.count
-            count = data.used_coupon_count(user)
+            allowed_coupon_count = coupon_obj.count
 
-            if count < allowed_coupon_count:
+            if coupon_obj.is_user_specific:
+                user_specific_coupon = coupon_obj.user_specific_coupon.filter(user=user).exists()
+                if not user_specific_coupon:
+                    return {"is_valid": False, "used_count": None}
+
+            # check if a user is new i.e user has done any appointments
+            if user and coupon_obj.new_user_constraint:
+                if not self.is_user_first_time(user):
+                    return {"is_valid": False, "used_count": 0}
+
+            count = coupon_obj.used_coupon_count(user)
+            total_used_count = coupon_obj.total_used_coupon_count()
+            
+            if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:
                 return {"is_valid": False, "used_count": count}
         else:
             return {"is_valid": False, "used_count": None}
 
-    def get_discount(self, coupon_code, price, coupon_object=None):
-        from ondoc.coupon.models import Coupon
+    def validate_product_coupon(self, **kwargs):
+        from ondoc.diagnostic.models import Lab
+        from ondoc.account.models import Order
 
-        if coupon_object:
-            data = coupon_object
-        else:
-            data = Coupon.objects.filter(code__exact=coupon_code).first()
+        coupon_obj = kwargs.get("coupon_obj")
+
+        is_valid = False
+
+        if coupon_obj:
+
+            if kwargs.get("product_id") == Order.LAB_PRODUCT_ID:
+                if kwargs.get("lab"):
+                    lab = Lab.objects.filter(pk=kwargs.get("lab").id)
+                    if lab:
+                        # if kwargs.get("test"):
+                        test = kwargs.get("test", [])
+                        lab = lab.filter(lab_pricing_group__available_lab_tests__test__in=test)
+                        if lab.count() == len(test):
+                            lab = lab.first()
+                            if (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and not coupon_obj.test.exists()) or \
+                                (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or \
+                                (coupon_obj.lab is not None and not coupon_obj.test.exists() and coupon_obj.lab==lab) or \
+                                (coupon_obj.lab is not None and coupon_obj.test.exists() and coupon_obj.lab==lab and set(test) & set(coupon_obj.test.all())):
+                                # (coupon_obj.lab is not None and coupon_obj.test.all() and coupon_obj.lab == lab and set(test)<=set(coupon_obj.test.all())):
+                                is_valid = True
+
+            elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
+                if kwargs.get("doctor"):
+                    pass
+
+        return is_valid
+
+    def get_discount(self, coupon_obj, price):
+
         discount = 0
 
-        if data:
-            if data.min_order_amount is not None and price < data.min_order_amount:
+        if coupon_obj:
+            if coupon_obj.min_order_amount is not None and price < coupon_obj.min_order_amount:
                 return 0
 
-            if data.flat_discount is not None:
-                discount = data.flat_discount
-            elif data.percentage_discount is not None:
-                discount = math.floor(price * data.percentage_discount / 100)
+            if coupon_obj.flat_discount is not None:
+                discount = coupon_obj.flat_discount
+            elif coupon_obj.percentage_discount is not None:
+                discount = math.floor(price * coupon_obj.percentage_discount / 100)
 
-            if data.max_discount_amount is not None:
-                discount =  min(data.max_discount_amount, discount)
+            if coupon_obj.max_discount_amount is not None:
+                discount =  min(coupon_obj.max_discount_amount, discount)
 
             if discount > price:
                 discount = price
 
             return discount
-                # else:
-                #     return discount
         else:
             return 0
+
+    def get_applicable_tests_with_total_price(self, **kwargs):
+        from django.db.models import Sum
+        from ondoc.diagnostic.models import AvailableLabTest
+
+        coupon_obj = kwargs.get("coupon_obj")
+        lab = kwargs.get("lab")
+        test_ids = kwargs.get("test_ids")
+
+        queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=lab, test__in=test_ids)
+        if coupon_obj.test.exists():
+            queryset = queryset.filter(test__in=coupon_obj.test.all())
+
+        total_price = 0
+        for test in queryset:
+            if test.custom_deal_price is not None:
+                total_price += test.custom_deal_price
+            else:
+                total_price += test.computed_deal_price
+
+        return {"total_price": total_price}
+
+    def is_user_first_time(self, user):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        new_user = True
+        all_appointments = LabAppointment.objects.filter(Q(user=user), ~Q(status__in=[LabAppointment.CANCELLED])).count() + OpdAppointment.objects.filter(Q(user=user), ~Q(status__in=[OpdAppointment.CANCELLED])).count()
+        if all_appointments > 0:
+            new_user = False
+        return new_user
 
 
 class TimeSlotExtraction(object):

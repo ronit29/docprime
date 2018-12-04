@@ -213,12 +213,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         super(Hospital, self).save(*args, **kwargs)
 
-        # if self.is_appointment_manager:
-        #     auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
-        #         .update(is_disabled=True)
-        # else:
-        #     auth_model.GenericAdmin.objects.filter(hospital=self, doctor__isnull=False, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
-        #         .update(is_disabled=False)
+        if self.is_appointment_manager:
+            auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+                .update(is_disabled=True)
+        else:
+            auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
+                .update(is_disabled=False)
 
         if build_url and self.location and self.is_live:
             ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
@@ -1087,7 +1087,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     matrix_lead_id = models.IntegerField(null=True)
     is_rated = models.BooleanField(default=False)
     rating_declined = models.BooleanField(default=False)
-    coupon = models.ManyToManyField(Coupon, blank=True, null=True)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="opd_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
@@ -1102,18 +1102,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         current_datetime = timezone.now()
         today = datetime.date.today()
         if user_type == auth_model.User.DOCTOR and self.time_slot_start.date() >= today:
-            perm_queryset = auth_model.GenericAdmin.objects.filter(is_disabled=False,
-                                                                   hospital=self.hospital,
-                                                                   user=request.user)
-            if perm_queryset.first():
-                doc_permission = perm_queryset.first()
-                if doc_permission.write_permission or doc_permission.super_user_permission:
-                    if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
-                        allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
-                    elif self.status == self.ACCEPTED:
-                        allowed = [self.RESCHEDULED_DOCTOR, self.COMPLETED]
-                    elif self.status == self.RESCHEDULED_DOCTOR:
-                        allowed = [self.ACCEPTED]
+            if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
+                allowed = [self.ACCEPTED, self.RESCHEDULED_DOCTOR]
+            elif self.status == self.ACCEPTED:
+                allowed = [self.RESCHEDULED_DOCTOR, self.COMPLETED]
+            elif self.status == self.RESCHEDULED_DOCTOR:
+                allowed = [self.ACCEPTED]
 
         elif user_type == auth_model.User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_DOCTOR, self.RESCHEDULED_PATIENT):
@@ -1351,14 +1345,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             payment_type = [cls.INSURANCE]
 
         queryset = None
-        if permission:
-            out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
-                                                 outstanding_month=month, outstanding_year=year).first()
-            queryset = (OpdAppointment.objects.filter(status=OpdAppointment.COMPLETED,
-                                                      time_slot_start__gte=start_date_time,
-                                                      time_slot_start__lte=end_date_time,
-                                                      payment_type__in=payment_type,
-                                                      outstanding=out_obj).filter(**opd_filter_query))
+        # if permission:
+        out_obj = Outstanding.objects.filter(outstanding_level=out_level, net_hos_doc_id=admin_id,
+                                             outstanding_month=month, outstanding_year=year).first()
+        queryset = (OpdAppointment.objects.filter(status=OpdAppointment.COMPLETED,
+                                                  time_slot_start__gte=start_date_time,
+                                                  time_slot_start__lte=end_date_time,
+                                                  payment_type__in=payment_type,
+                                                  outstanding=out_obj).filter(**opd_filter_query))
 
         return queryset
 

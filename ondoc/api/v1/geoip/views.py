@@ -40,71 +40,76 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
     def ip_details(self, request):
         resp = dict()
         resp["status"] = 1
-        resp["web_image_url"] = self.WEB_IMAGE_URL_LIST[0]
-        resp["mobile_image_url"] = self.MOBILE_IMAGE_URL_LIST[0]
-        resp["alt_text"] = self.ALT_TEXT_LIST[0]
-        resp["access_url"] = self.REDIRECT_PRODUCTION_URL_CHAT
+        val = self.get_rand_weighted_number(True)
+        resp["web_image_url"] = self.WEB_IMAGE_URL_LIST[val]
+        resp["mobile_image_url"] = self.MOBILE_IMAGE_URL_LIST[val]
+        resp["alt_text"] = self.ALT_TEXT_LIST[val]
+        resp["access_url"] = self.SEARCH_URL_LIST[val]
+        # resp["web_image_url"] = self.WEB_IMAGE_URL_LIST[0]
+        # resp["mobile_image_url"] = self.MOBILE_IMAGE_URL_LIST[0]
+        # resp["alt_text"] = self.ALT_TEXT_LIST[0]
+        # resp["access_url"] = self.REDIRECT_PRODUCTION_URL_CHAT
         resp["latitude"] = self.DELHI_CENTRE_LAT
         resp["longitude"] = self.DELHI_CENTRE_LONG
         resp["city_name"] = 'Delhi'
 
-        req_data = request.query_params
-        ip_address = req_data.get("address")
-        if req_data.get("detect_ip") == "1":
-            ip_address, is_routable = get_client_ip(request)
-        if not ip_address:
-            return Response(resp)
+        # req_data = request.query_params
+        # ip_address = req_data.get("address")
+        # if req_data.get("detect_ip") == "1":
+        #     ip_address, is_routable = get_client_ip(request)
+        # if not ip_address:
+        #     return Response(resp)
 
-        visitor_ip_add_obj = VisitorIpAddress.objects.create(ip_address=ip_address, visitor_id=req_data.get("visitor_id"), visit_id=req_data.get("visit_id"))
-        if ip_address.startswith('10.'):
-            return Response(resp)
-        geo_ip_obj = GeoIPEntries.objects.filter(ip_address=ip_address).first()
-        url = settings.MAXMIND_CITY_API_URL + str(ip_address)
-        if not geo_ip_obj:
-            try:
-                response = requests.get(url=url, auth=(settings.MAXMIND_ACCOUNT_ID, settings.MAXMIND_LICENSE_KEY))
-                if response.status_code == status.HTTP_200_OK:
-                    resp_data = response.json()
-                    geo_ip_obj = GeoIPEntries.objects.create(ip_address=ip_address, location_detail=resp_data)
-                    resp = self.form_response(resp_data, resp)
-                else:
-                    pass
-            except Exception as e:
-                pass
-                
-        else:
-            resp = self.form_response(geo_ip_obj.location_detail, resp)
-            resp["status"] = 1
+        # visitor_ip_add_obj = VisitorIpAddress.objects.create(ip_address=ip_address, visitor_id=req_data.get("visitor_id"), visit_id=req_data.get("visit_id"))
+        # if ip_address.startswith('10.'):
+        #     return Response(resp)
+        # geo_ip_obj = GeoIPEntries.objects.filter(ip_address=ip_address).first()
+        # url = settings.MAXMIND_CITY_API_URL + str(ip_address)
+        # if not geo_ip_obj:
+        #     try:
+        #         response = requests.get(url=url, auth=(settings.MAXMIND_ACCOUNT_ID, settings.MAXMIND_LICENSE_KEY))
+        #         if response.status_code == status.HTTP_200_OK:
+        #             resp_data = response.json()
+        #             geo_ip_obj = GeoIPEntries.objects.create(ip_address=ip_address, location_detail=resp_data)
+        #             resp = self.form_response(resp_data, resp)
+        #         else:
+        #             pass
+        #     except Exception as e:
+        #         pass
+        #
+        # else:
+        #     resp = self.form_response(geo_ip_obj.location_detail, resp)
+        #     resp["status"] = 1
 
         return Response(resp)
 
-    def form_response(self, location, resp):
-
-        try:
-            lat = location["location"]["latitude"]
-            long = location["location"]["longitude"]
-            user_loc = Point(long, lat)
-            centre_loc = Point(self.DELHI_CENTRE_LONG, self.DELHI_CENTRE_LAT)
-            dist = user_loc.distance(centre_loc)
-            if dist <= settings.MAX_DIST_USER:
-                val = self.get_rand_weighted_number(True)
-            else:
-                val = self.get_rand_weighted_number(False)
-            city_name = location["city"]["names"]["en"]
-
-            resp = dict()
-            resp["latitude"] = lat
-            resp["longitude"] = long
-            resp["web_image_url"] = self.WEB_IMAGE_URL_LIST[val]
-            resp["mobile_image_url"] = self.MOBILE_IMAGE_URL_LIST[val]
-            resp["access_url"] = self.SEARCH_URL_LIST[val]
-            resp["alt_text"] = self.ALT_TEXT_LIST[val]
-            resp["city_name"] = city_name
-            resp["status"] = 1
-        except Exception:
-            pass
-
-        return resp
+    # def form_response(self, location, resp):
+    #
+    #     try:
+    #         lat = location["location"]["latitude"]
+    #         long = location["location"]["longitude"]
+    #         user_loc = Point(long, lat)
+    #         centre_loc = Point(self.DELHI_CENTRE_LONG, self.DELHI_CENTRE_LAT)
+    #         dist = user_loc.distance(centre_loc)
+    #         if dist <= settings.MAX_DIST_USER:
+    #             val = self.get_rand_weighted_number(True)
+    #         else:
+    #             val = self.get_rand_weighted_number(False)
+    #         city_name = location["city"]["names"]["en"]
+    #
+    #         resp = dict()
+    #         resp["latitude"] = lat
+    #         resp["longitude"] = long
+    #         resp["web_image_url"] = self.WEB_IMAGE_URL_LIST[val]
+    #         resp["mobile_image_url"] = self.MOBILE_IMAGE_URL_LIST[val]
+    #         resp["access_url"] = self.SEARCH_URL_LIST[val]
+    #         resp["alt_text"] = self.ALT_TEXT_LIST[val]
+    #         resp["city_name"] = city_name
+    #         resp["status"] = 1
+    #     except Exception:
+    #         pass
+    #
+    #     return resp
 
     def get_rand_weighted_number(self, is_inside):
         x = 3
@@ -120,6 +125,50 @@ class GeoIPAddressURLViewSet(viewsets.GenericViewSet):
         else:
             resp = self.DOCTOR_QUERY_VALUE
         return resp
+
+    @transaction.non_atomic_requests
+    def get_lat_long_city(self, request):
+        resp = dict()
+        resp["latitude"] = self.DELHI_CENTRE_LAT
+        resp["longitude"] = self.DELHI_CENTRE_LONG
+        resp["city_name"] = 'Delhi'
+
+        ip_address, is_routable = get_client_ip(request)
+        if not ip_address:
+            return Response(resp)
+
+        req_data = request.query_params
+        visitor_ip_add_obj = VisitorIpAddress.objects.create(ip_address=ip_address,
+                                                             visitor_id=req_data.get("visitor_id"),
+                                                             visit_id=req_data.get("visit_id"))
+        if ip_address.startswith('10.'):
+            return Response(resp)
+        geo_ip_obj = GeoIPEntries.objects.filter(ip_address=ip_address).first()
+        url = settings.MAXMIND_CITY_API_URL + str(ip_address)
+        if not geo_ip_obj:
+            try:
+                response = requests.get(url=url, auth=(settings.MAXMIND_ACCOUNT_ID, settings.MAXMIND_LICENSE_KEY))
+                if response.status_code == status.HTTP_200_OK:
+                    resp_data = response.json()
+                    geo_ip_obj = GeoIPEntries.objects.create(ip_address=ip_address, location_detail=resp_data)
+                    resp["lat"] = resp_data["location"]["latitude"]
+                    resp["long"] = resp_data["location"]["longitude"]
+                    resp["city"] = resp_data["city"]["names"]["en"]
+                else:
+                    pass
+            except Exception as e:
+                pass
+
+        else:
+            try:
+                resp["lat"] = geo_ip_obj.location_detail["location"]["latitude"]
+                resp["long"] = geo_ip_obj.location_detail["location"]["longitude"]
+                resp["city"] = geo_ip_obj.location_detail["city"]["names"]["en"]
+                resp["status"] = 1
+            except Exception:
+                pass
+
+        return Response(resp)
 
 
 class AdwordLocationCriteriaViewset(viewsets.GenericViewSet):
