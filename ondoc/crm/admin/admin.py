@@ -16,7 +16,7 @@ from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory
-from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin
+from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -137,5 +137,5 @@ admin.site.register(SeoLabNetwork, SeoLabNetworkAdmin)
 admin.site.register(PracticeSpecializationContent, PracticeSpecializationContentAdmin)
 admin.site.register(CommonProcedureCategory)
 admin.site.register(DemoElastic, DemoElasticAdmin)
-admin.site.register(Merchant)
+admin.site.register(Merchant, MerchantAdmin)
 #admin.site.register(AssociatedMerchant)
