@@ -58,7 +58,7 @@ class MemberListSerializer(serializers.Serializer):
     address = serializers.CharField(max_length=250)
     pincode = serializers.IntegerField()
     member_type = serializers.ChoiceField(choices=InsuredMembers.MEMBER_TYPE_CHOICES)
-    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=True)
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=True, blank=True)
     gender = serializers.ChoiceField(choices=InsuredMembers.GENDER_CHOICES)
     town = serializers.CharField(max_length=100)
     district = serializers.CharField(max_length=100)
