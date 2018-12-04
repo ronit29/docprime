@@ -57,7 +57,7 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
 
     @property
     def get_active_plans(self):
-        return self.plans.filter(is_live=True).order_by('-total_allowed_members')
+        return self.plans.filter(is_live=True).order_by('total_allowed_members')
 
     def __str__(self):
         return self.name
