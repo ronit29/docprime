@@ -1,4 +1,6 @@
 from django.core.management.base import BaseCommand
+
+from ondoc.doctor.models import Hospital
 from ondoc.location.models import EntityAddress, EntityLocationRelationship
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import RawSql
