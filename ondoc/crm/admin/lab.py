@@ -1025,7 +1025,6 @@ class LabTestPackageInline(admin.TabularInline):
 class LabTestAdminForm(forms.ModelForm):
     why = forms.CharField(widget=forms.Textarea, required=False)
     about_test = forms.CharField(widget=forms.Textarea, required=False)
-    why_get_tested = forms.CharField(widget=forms.Textarea, required=False)
     preparations = forms.CharField(widget=forms.Textarea, required=False)
 
     class Media:

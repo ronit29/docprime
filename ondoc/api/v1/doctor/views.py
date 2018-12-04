@@ -1865,7 +1865,7 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
                 if ans1:
                     ans1 = set(filter(lambda v: v is not None, ans1))
                     resp['departments'] = ', '.join(ans1) if len(ans1) < 3 else '%s + %d  more.' %(', '.join(list(ans1)[:2]), len(ans1)-2)
-                resp['ratings'] = ratings_count if ratings_count else None
+                resp['hospital_ratings'] = ratings_count if ratings_count else None
                 resp['id'] = data.id
                 resp['city'] = data.city if data.city else None
                 resp['state'] = data.state if data.state else None

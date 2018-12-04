@@ -292,7 +292,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if test_id:
             lab_test = LabTest.objects.filter(id=test_id).values('id', 'name', 'pre_test_info', 'why',
-                                                                 'about_test', 'why_get_tested', 'preparations')
+                                                                 'about_test', 'preparations')
             if lab_test:
                 return Response(lab_test)
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -1137,7 +1137,6 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         if len(queryset) > 0:
             queryset = queryset[0]
             result['about_test'] = queryset.about_test
-            result['why_get_tested'] = [item.strip('\r') for item in queryset.why_get_tested.split('\n')]
             # result['test_may_include'] =
             result['preparations'] = queryset.preparations
 
