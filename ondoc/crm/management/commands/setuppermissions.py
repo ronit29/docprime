@@ -220,7 +220,7 @@ class Command(BaseCommand):
             LabTestType, LabService, TestParameter, PracticeSpecialization,
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
-            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, LabTestCategoryMapping
+            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory
         )
 
         for cl, ct in content_types.items():
@@ -231,7 +231,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
-        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage)
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
