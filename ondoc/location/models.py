@@ -19,6 +19,7 @@ from django.db.models import Q
 import requests
 from rest_framework import status
 from django.conf import settings
+from django.db import transaction
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -253,6 +254,46 @@ class EntityLocationRelationship(TimeStampedModel):
             return True
         except Exception as e:
             print(str(e))
+            return False
+
+    @transaction.atomic
+    def lab_entity_loc_rel(**kwargs):
+        try:
+            content_type = kwargs.get('content_type')
+            if content_type:
+                content_type_id = content_type.id
+            object_ids = kwargs.get('object_ids')
+            entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type, object_id__in=object_ids)
+            if entity_location_qs:
+                entity_location_qs.delete()
+            query = '''select l.id as object_id, ea.id as location_id, %s as content_type_id, type, l.location as entity_geo_location from entity_address ea
+                                inner join geocoding_results gs on ea.geocoding_id = gs.id inner join lab l on 
+                                l.location = st_setsrid(st_point(gs.longitude, gs.latitude), 4326)::geography where l.is_live=True'''
+            results = RawSql(query, [content_type_id]).fetch_all()
+            results = [EntityLocationRelationship(**result) for result in results]
+            EntityLocationRelationship.objects.bulk_create(results)
+            return True
+        except Exception as e:
+            return False
+
+    @transaction.atomic
+    def hosp_entity_loc_rel(**kwargs):
+        try:
+            content_type = kwargs.get('content_type')
+            if content_type:
+                content_type_id = content_type.id
+            object_ids = kwargs.get('object_ids')
+            entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type, object_id__in=object_ids)
+            if entity_location_qs:
+                entity_location_qs.delete()
+            query = '''select h.id as object_id, ea.id as location_id, %s as content_type_id, type, h.location as entity_geo_location from entity_address ea
+                        inner join geocoding_results gs on ea.geocoding_id = gs.id inner join hospital h on 
+                        h.location = st_setsrid(st_point(gs.longitude, gs.latitude), 4326)::geography where h.is_live = True'''
+            results = RawSql(query, [content_type_id]).fetch_all()
+            results = [EntityLocationRelationship(**result) for result in results]
+            EntityLocationRelationship.objects.bulk_create(results)
+            return True
+        except Exception as e:
             return False
 
     class Meta:
