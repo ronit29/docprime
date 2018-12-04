@@ -1323,4 +1323,10 @@ class DoctorPageURL(object):
         extras['breadcrums'] = []
         data['extras'] = extras
         data['sequence'] = self.sequence
-        return "success"
+
+        EntityUrls.objects.filter(entity_id=self.doctor.id,
+                                  sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(
+                                  ~Q(url=url)).update(is_valid=False)
+        EntityUrls.objects.filter(entity_id=self.doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
+                                  url=url).delete()
+        EntityUrls.objects.create(**data)
