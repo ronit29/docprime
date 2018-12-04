@@ -1819,7 +1819,7 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
         serializer = serializers.HospitalCardSerializer(data=parameters)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        queryset = Hospital.objects.prefetch_related('hospital_appointments', 'assoc_doctors', 'assoc_doctors__doctorpracticespecializations',
+        queryset = Hospital.objects.prefetch_related('assoc_doctors', 'assoc_doctors__rating', 'assoc_doctors__doctorpracticespecializations',
                                                      'assoc_doctors__doctorpracticespecializations__specialization',
                                                      'assoc_doctors__doctorpracticespecializations__specialization__department').filter(network_id=hospital_network_id).annotate(doctor_count=Count('assoc_doctors', distinct=True) )
         resp1 = {}
@@ -1834,7 +1834,6 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
         if len(queryset) > 0:
             info = []
             network_name = None
-            rate_queryset = RatingsReview.objects.filter(appointment_type = RatingsReview.OPD).get(appointment_id = OpdAppointment.appointment_id).filter(hospital_id = hospital_appointments__id)
 
             for data in queryset:
                 resp = {}
@@ -1846,17 +1845,13 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
                     resp['distance'] = distance
                 else:
                     resp['distance'] = None
-                # rate = data.hospital_appointments.values_list('id', flat = True)
-                rate = data.hospital_appointments.all()
-                if rate:
-                    empty=[]
-                    for hospital_ratings in rate_queryset:
-
-                        ratings = hospital_ratings.ratings
-                        empty.append(ratings)
-                        # ratings = rate_queryset.filter(appointment_id__in = rate, appointment_type=RatingsReview.OPD)
 
                 all_doctors = data.assoc_doctors.all()
+                empty = []
+                for doctor_ratings in all_doctors:
+                    final_ratings = [rating.ratings for rating in doctor_ratings.rating.all()]
+                    empty.extend(final_ratings)
+
                 ans=set()
                 ans1=set()
                 for doctor in all_doctors:
@@ -1864,7 +1859,7 @@ class HospitalNetworkListViewset(viewsets.GenericViewSet):
                      ans1 = [dpn.name for dps in doctor.doctorpracticespecializations.all() for dpn in dps.specialization.department.all()]
 
                 ratings_count = None
-                if ratings:
+                if len(empty) > 0:
                     ratings_count = sum(empty)/len(empty)
                 resp['hospital_specialization'] = ', '.join(ans) if len(ans) < 3 else 'Multispeciality'
                 if ans1:
