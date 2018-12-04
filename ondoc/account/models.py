@@ -726,5 +726,9 @@ class MerchantPayout(TimeStampedModel):
     object_id = models.PositiveIntegerField(null=True, blank=True)
     content_object = GenericForeignKey()
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+
     class Meta:
         db_table = "merchant_payout"
