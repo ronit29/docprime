@@ -262,10 +262,23 @@ class MerchantAdmin(VersionAdmin):
             return [f.name for f in self.model._meta.fields if f.name not in ['enabled','verified_by_finance']]
         return []
 
+class MerchantPayoutForm(forms.ModelForm):
+    process_payout = forms.BooleanField(required=False)
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        process_payout = self.cleaned_data.get('process_payout')
+        if process_payout and not self.instance.get_merchant:
+            raise forms.ValidationError("No verified merchant found to process payments")
+
+
 class MerchantPayoutAdmin(VersionAdmin):
+    form = MerchantPayoutForm
     model = MerchantPayout
     fields = ['id','charged_amount','updated_at','created_at','payable_amount','status','payout_time','paid_to',
-    'appointment_id', 'get_billed_to', 'get_merchant']
+    'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout']
 
     def get_readonly_fields(self, request, obj=None):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']
