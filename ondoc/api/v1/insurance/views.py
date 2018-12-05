@@ -32,7 +32,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
         user = request.user
         user_insurance = UserInsurance.objects.filter(user_id=request.user).last()
         if user_insurance and user_insurance.is_valid():
-            return Response("Already covered under insurance.", status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
         insurer_data = self.get_queryset()
         body_serializer = serializers.InsurerSerializer(insurer_data, many=True)
@@ -111,6 +111,11 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
     @transaction.atomic
     def create_order(self, request):
         user = request.user
+
+        user_insurance = UserInsurance.objects.filter(user=user).last()
+        if user_insurance and user_insurance.is_valid():
+            return Response(data={'certificate': True}, status=status.HTTP_200_OK)
+
         serializer = serializers.InsuredMemberSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
@@ -293,7 +298,9 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
         if user_id:
 
             user = User.objects.get(id=user_id)
-            user_insurance = UserInsurance.objects.get(user=user)
+            user_insurance = UserInsurance.objects.filter(user=user).last()
+            if not user_insurance or not user_insurance.is_valid():
+                return Response({"message": "Insurance not found or expired."})
             insurer = user_insurance.insurance_plan.insurer
             resp['insured_members'] = user_insurance.members.all().values('first_name', 'last_name', 'dob')
             resp['purchase_date'] = user_insurance.purchase_date
