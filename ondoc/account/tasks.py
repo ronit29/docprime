@@ -227,7 +227,13 @@ def process_payout(payout_id):
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
-                        print("SAVED DUMMY TRANSACTION")
+                        pass
+                    else:
+                        # handle all kinds of failure in payout, and save api response
+                        retry_count = payout_data.retry_count + 1
+                        api_response = json.dumps(resp_data)
+                        MerchantPayout.objects.filter(id=payout_data.id).update(retry_count=retry_count, api_response=api_response)
+                        raise Exception("Payout Response Error")
                 else:
                     raise Exception("Retry on invalid Http response status - " + str(response.content))
 
