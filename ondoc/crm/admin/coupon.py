@@ -28,13 +28,18 @@ class TestAutocomplete(autocomplete.Select2QuerySetView):
             return LabTest.objects.none()
         lab_network = self.forwarded.get('lab_network', None)
         lab = self.forwarded.get('lab', None)
-        if lab_network and lab:
-            queryset = LabTest.objects.filter(availablelabs__lab_pricing_group__labs__id=lab)
-        elif lab_network and not lab:
-            queryset = LabTest.objects.filter(availablelabs__lab_pricing_group__labs__id__in=Lab.objects.filter(network=lab_network))
+        queryset = LabTest.objects.all()
+
         if self.q:
-            queryset = queryset.filter(name__istartswith=self.q)
-        return queryset
+            queryset = queryset.filter(name__icontains=self.q)
+
+        if lab:
+            queryset = queryset.filter(availablelabs__lab_pricing_group__labs=lab, availablelabs__enabled=True)
+        elif lab_network:
+            queryset = queryset.filter(availablelabs__lab_pricing_group__labs__network=lab_network, availablelabs__enabled=True)
+
+
+        return queryset.distinct()
 
 
 class CouponForm(forms.ModelForm):
