@@ -15,13 +15,17 @@ def doctor_page_urls():
     else:
         sequence = 0
 
+<<<<<<< HEAD
     doc_obj =Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization',
-                                        (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))
-                                         ).filter(is_live=True, is_test_doctor=False)
+                                        (Prefetch('hospitals', queryset=Hospital.objects.all().order_by('hospital_type', 'id')))
+                                         ).filter(is_live=True, is_test_doctor=False)[:10]
 
+=======
+    doc_obj =Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization').filter(is_live=True, is_test_doctor=False)
+>>>>>>> 0e90d03c4be5c821fa2674c5ab50e9127cbaf5e3
     for doctor in doc_obj:
         try:
-            print(DoctorPageURL.create_doctor_page_urls(doctor,sequence))
+            print(DoctorPageURL.create_page_urls(doctor,sequence))
         except Exception as e:
             print(str(e))
 
