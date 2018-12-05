@@ -172,14 +172,39 @@ class UserInsurance(auth_model.TimeStampedModel):
         else:
             return False
 
+    @classmethod
+    def profile_create_or_update(cls, member, user):
+        profile = {}
+        name = "{fname} {lname}".format(fname=member['first_name'], lname=member['last_name'])
+        if member['profile'] or UserProfile.objects.filter(name__iexact=name, user=user.id).exists():
+            # Check whether Profile exist with same name
+            existing_profile = UserProfile.objects.filter(name__iexact=name, user=user.id).first()
+            if member['profile']:
+                profile = member['profile']
+            elif existing_profile:
+                profile = existing_profile.id
+            if profile:
+                if profile.get('user_id') == user.id:
+                    member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
+                                                    dob=member['dob'])
+        # Create Profile if not exist with name or not exist in profile id from request
+        else:
+            member_profile = UserProfile.objects.create(name=name,
+                                                        email=member['email'], gender=member['gender'],
+                                                        user_id=user.id, dob=member['dob'],
+                                                        is_default_user=False, is_otp_verified=False,
+                                                        phone_number=user.phone_number)
+            profile = member_profile.id
+
+        return profile
 
     @classmethod
-    def create_user_insurance(cls, insurance_data):
-        import json
+    def create_user_insurance(cls, insurance_data, user):
         members = insurance_data['insured_members']
         for member in members:
+            member['profile'] = UserInsurance.profile_create_or_update(member, user)
             member['dob'] = str(member['dob'])
-            member['profile'] = member['profile'].id
+            # member['profile'] = member['profile'].id if member.get('profile') else None
         insurance_data['insured_members'] = members
         user_insurance_obj = UserInsurance.objects.create(insurance_plan=insurance_data['insurance_plan'],
                                                             user=insurance_data['user'],
@@ -188,7 +213,6 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                             expiry_date=insurance_data['expiry_date'],
                                                             premium_amount=insurance_data['premium_amount'],
                                                             order=insurance_data['order'])
-
         insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
         return user_insurance_obj
 

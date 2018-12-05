@@ -138,13 +138,13 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                 else:
                     return Response({"message": "Insurance Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
                 # User Profile creation or updation
-                profile_flag, profile, profile_id = self.profile_create_or_update(member, request)
-                if profile_flag:
-                    member_profile = profile
-                    logged_in_user_profile_id = profile_id
-                else:
-                    return Response({"message": "User is not valid"},
-                                status.HTTP_404_NOT_FOUND)
+                # profile_flag, profile, profile_id = self.profile_create_or_update(member, request)
+                # if profile_flag:
+                #     member_profile = profile
+                #     logged_in_user_profile_id = profile_id
+                # else:
+                #     return Response({"message": "User is not valid"},
+                #                 status.HTTP_404_NOT_FOUND)
 
                 pre_insured_members['title'] = member['title']
                 pre_insured_members['first_name'] = member['first_name']
@@ -154,7 +154,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                 pre_insured_members['pincode'] = member['pincode']
                 pre_insured_members['email'] = member['email']
                 pre_insured_members['relation'] = member['relation']
-                pre_insured_members['profile'] = member_profile.get('id')
+                # pre_insured_members['profile'] = member_profile.get('id')
+                pre_insured_members['profile'] = member['profile']
                 pre_insured_members['gender'] = member['gender']
                 pre_insured_members['member_type'] = member['member_type']
                 pre_insured_members['town'] = member['town']
@@ -163,24 +164,21 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
                 insured_members_list.append(pre_insured_members.copy())
 
-            user_profile = UserProfile.objects.filter(id=logged_in_user_profile_id, user_id=request.user.pk).values('id'
+                if member['relation'] == 'self':
+                    user_profile = UserProfile.objects.filter(id=member['profile'], user_id=request.user.pk).values('id'
                                                                                                         ,'name',
                                                                                                         'email',
                                                                                                         'gender',
                                                                                                         'user_id',
                                                                                                         'dob',
                                                                                                         'phone_number')
-        user_profile = user_profile[0]
+                    if user_profile:
+                        user_profile = user_profile[0]
+                    else:
+                        user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
+                            member['email'], "gender": member['gender'], "dob": member['dob']}
 
-        # insurer = Insurer.objects.get(id=request.data.get('insurer'))
-        # insurance_plan = InsurancePlans.objects.filter(id=request.data.get('insurance_plan')).values('id', 'amount',
-        #                                                                                               'insurer_id',
-        #                                                                                               'type',
-        #                                                                                               'policy_tenure'
-        #                                                                                               ).first()
         insurance_plan = InsurancePlans.objects.get(id=request.data.get('insurance_plan'))
-        # if insurer:
-        #     insurer = insurer.id
         transaction_date = datetime.datetime.now()
         if insurance_plan:
             amount = insurance_plan.amount
@@ -189,12 +187,6 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         user_insurance = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
                             transaction_date, 'expiry_date': expiry_date, 'premium_amount': amount,
                             'user': request.user.pk, "insured_members": insured_members_list}
-
-        # insurance_transaction = {'insurance_plan': insurance_plan.get('id'),
-        #                          'transaction_date': transaction_date, 'status_type': InsuranceTransaction.CREATED,
-        #                          'premium_amount': amount, 'user': request.user.pk,
-        #                          "insured_members": insured_members_list}
-
         insurance_data = {"profile_detail": user_profile, "insurance_plan": insurance_plan.id,
                           "user": request.user.pk, "user_insurance": user_insurance}
 

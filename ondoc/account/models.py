@@ -175,16 +175,19 @@ class Order(TimeStampedModel):
         from ondoc.api.v1.utils import insurance_reverse_transform
         from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
+        from ondoc.authentication.models import User
         insurance_data = deepcopy(self.action_data)
         insurance_data = insurance_reverse_transform(insurance_data)
+
         insurance_data['user_insurance']['order'] = self.id
+        user = User.objects.get(id=self.action_data.get('user'))
         insurance_data['user_insurance']['premium_amount'] = self.amount + self.wallet_amount
         serializer = UserInsuranceSerializer(data=insurance_data.get('user_insurance'))
         serializer.is_valid(raise_exception=True)
-        appointment_data = serializer.validated_data
+        user_insurance_data = serializer.validated_data
 
-        if consumer_account.balance >= appointment_data['premium_amount']:
-            user_insurance_obj = UserInsurance.create_user_insurance(appointment_data)
+        if consumer_account.balance >= user_insurance_data['premium_amount']:
+            user_insurance_obj = UserInsurance.create_user_insurance(user_insurance_data, user)
             amount = user_insurance_obj.premium_amount
             order_dict = {
                 "reference_id": user_insurance_obj.id,
