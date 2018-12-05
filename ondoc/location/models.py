@@ -1153,49 +1153,52 @@ class LabPageUrl(object):
             EntityUrls.objects.create(**data)
 
     def create_lab_page_urls(lab, sequence):
-        locality = None
         sequence = sequence
+        locality_value = None
         locality_id = None
-        sublocality = None
+        locality_latitude = None
+        locality_longitude = None
+        sublocality_value = None
         sublocality_id = None
         sublocality_longitude = None
         sublocality_latitude = None
 
-        if len(lab)>0:
-            hospital = lab[0]
+        if lab:
             if lab.is_live:
                 sublocality = lab.entity.filter(type="SUBLOCALITY", valid=True).first()
                 if sublocality:
-                    sublocality = sublocality.location.alternative_value
+                    sublocality_value = sublocality.location.alternative_value
                     sublocality_id = sublocality.location.id
                     sublocality_longitude = sublocality.location.centroid.x
                     sublocality_latitude = sublocality.location.centroid.y
 
                 locality = lab.entity.filter(type="LOCALITY", valid=True).first()
                 if locality:
-                    locality = locality.location.alternative_value
+                    locality_value = locality.location.alternative_value
                     locality_id = locality.location.id
                     locality_longitude = locality.location.centroid.x
                     locality_latitude = locality.location.centroid.y
 
-                if lab and locality:
+                if lab:
                     url = "%s" % lab.name
                     if locality and sublocality:
-                        url = url + "-in-%s-%s-lpp" % (sublocality, locality)
+                        url = url + "-in-%s-%s-lpp" % (sublocality_value, locality_value)
                     elif locality:
-                        url = url + "-in-%s-lpp" % locality
+                        url = url + "-in-%s-lpp" % locality_value
+                    else:
+                        url = url + "-lpp"
 
                     url = slugify(url)
 
                     data = {}
-                    data['url'] = url
+                    # data['url'] = url
                     data['is_valid'] = True
                     data['url_type'] = EntityUrls.UrlType.PAGEURL
                     data['entity_type'] = 'Lab'
                     data['entity_id'] = lab.id
                     data['sitemap_identifier'] = EntityUrls.SitemapIdentifier.LAB_PAGE
                     data['locality_id'] = locality_id
-                    data['locality_value'] = locality
+                    data['locality_value'] = locality_value
                     data['locality_latitude'] = locality_latitude
                     data['locality_longitude'] = locality_longitude
 
@@ -1206,7 +1209,7 @@ class LabPageUrl(object):
                         data['sublocality_location'] = Point(sublocality_longitude, sublocality_latitude)
 
                     data['sublocality_id'] = sublocality_id
-                    data['sublocality_value'] = sublocality
+                    data['sublocality_value'] = sublocality_value
                     data['sublocality_latitude'] = sublocality_latitude
                     data['sublocality_longitude'] = sublocality_longitude
                     data['location'] = lab.location
@@ -1214,18 +1217,27 @@ class LabPageUrl(object):
                     extras = {}
                     extras['related_entity_id'] = lab.id
                     extras['location_id'] = sublocality_id if sublocality_id else locality_id
-                    extras['locality_value'] = locality if locality else ''
-                    extras['sublocality_value'] = sublocality if sublocality else ''
+                    extras['locality_value'] = locality_value if locality else ''
+                    extras['sublocality_value'] = sublocality_value if sublocality else ''
                     extras['breadcrums'] = []
                     data['extras'] = extras
                     data['sequence'] = sequence
 
                     EntityUrls.objects.filter(entity_id=lab.id,
-                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).filter(
+                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
+                                              is_valid=True).filter(
                         ~Q(url=url)).update(is_valid=False)
+                    # EntityUrls.objects.filter(entity_id=lab.id,
+                    #                           sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
+                    #                           is_valid=True
+                    #                           ).extra(where=["url NOT ILIKE ['%%-lpp','']"]
+                    #                                   ).update(is_valid=False)
                     EntityUrls.objects.filter(entity_id=lab.id,
                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
                                               url=url).delete()
+                    # EntityUrls.objects.filter(entity_id=lab.id,
+                    #                           sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE
+                    #                           ).extra(where=["url ILIKE '%%-lpp-%%'"]).delete()
 
                     new_url = url
                     counter = 0
@@ -1235,8 +1247,10 @@ class LabPageUrl(object):
                              new_url = url+'-'+str(counter)
 
                         dup_url = EntityUrls.objects.filter(url=new_url, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).filter(~Q(entity_id=lab.id)).first()
+                        # dup_url = EntityUrls.objects.extra(where=["url ILIKE '%%-lpp-%%'"]).filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).filter(~Q(entity_id=lab.id)).first()
                         if not dup_url:
                             break
+                        counter = counter + 1
 
                     data['url'] = new_url
                     EntityUrls.objects.create(**data)
@@ -1387,13 +1401,8 @@ class DoctorPageURL(object):
             url = url + "-in-%s-%s-dpp" % (sublocality, locality)
         elif locality:
             url = url + "-in-%s-dpp" % (locality)
-        if not (specializations or locality or sublocality):
+        else:
             url = url + "-dpp"
-        if specializations and not(locality or sublocality):
-            url = url + "-dpp"
-        # entity_url = EntityUrls.objects.filter(url=url).order_by('-created_at')
-        # if len(entity_url)>0:
-        #    entity_url = entity_url[0]
 
         url = slugify(url)
         data = {}
@@ -1450,6 +1459,7 @@ class DoctorPageURL(object):
             dup_url = EntityUrls.objects.filter(url=new_url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(~Q(entity_id=doctor.id)).first()
             if not dup_url:
                 break
+            counter = counter + 1
 
         data['url'] = new_url
         EntityUrls.objects.create(**data)
