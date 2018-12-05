@@ -23,7 +23,7 @@ from collections import defaultdict
 
 
 class DoctorSearchHelper:
-    MAX_DISTANCE = "1500000000"
+    MAX_DISTANCE = "15000"
 
     def __init__(self, query_params):
         self.query_params = query_params
@@ -157,8 +157,6 @@ class DoctorSearchHelper:
             )
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
-        if not filtering_params:
-            return "1=1"
         result = {}
         if not filtering_params:
             result['string'] = "1=1"
