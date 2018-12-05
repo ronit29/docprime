@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
-from ondoc.account.tasks import refund_curl_task
+from ondoc.account.tasks import refund_curl_task, process_payout
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
 from django.db.models import Sum, Q, F, Max
@@ -728,7 +728,16 @@ class MerchantPayout(TimeStampedModel):
     content_object = GenericForeignKey()
 
     def save(self, *args, **kwargs):
+        if self.id:
+            process_payout.apply_async((self.id,), countdown=1)
         super().save(*args, **kwargs)
+
+    def get_appointment(self):
+        if self.lab_appointment.first():
+            return self.lab_appointment.first()
+        elif self.opd_appointment.first():
+            return self.opd_appointment.first()
+        return None
 
 
     class Meta:

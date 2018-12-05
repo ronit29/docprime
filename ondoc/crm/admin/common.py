@@ -273,7 +273,7 @@ class MerchantPayoutAdmin(VersionAdmin):
         return base + readonly
 
     def appointment_id(self, instance):
-        appt = self.get_appointment(instance)
+        appt = instance.get_appointment()
         if appt:
             content_type = ContentType.objects.get_for_model(appt.__class__)
             change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[appt.id])
@@ -282,16 +282,9 @@ class MerchantPayoutAdmin(VersionAdmin):
 
         return None
 
-    def get_appointment(self, instance):
-        if instance.lab_appointment.first():
-            return instance.lab_appointment.first()
-        elif instance.opd_appointment.first():
-            return instance.opd_appointment.first()
-        return None
-
 
     def get_billed_to(self, instance):
-        appt = self.get_appointment(instance)
+        appt = instance.get_appointment()
 
         if appt and appt.get_billed_to:
             billed_to =  appt.get_billed_to
@@ -303,7 +296,7 @@ class MerchantPayoutAdmin(VersionAdmin):
         return ''
 
     def get_merchant(self, instance):
-        appt = self.get_appointment(instance)
+        appt = instance.get_appointment()
 
         if appt and appt.get_merchant:
             merchant = appt.get_merchant

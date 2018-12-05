@@ -26,6 +26,7 @@ from decimal import Decimal
 from collections import OrderedDict
 import datetime
 from django.utils.dateparse import parse_datetime
+import hashlib
 User = get_user_model()
 
 
@@ -772,3 +773,30 @@ class GenericAdminEntity():
     HOSPITAL = 2
     LAB = 3
     EntityChoices = [(DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'), (LAB, 'Lab')]
+
+
+def create_payout_checksum(all_txn, product_id):
+    from ondoc.account.models import Order
+
+    secret_key = client_key = ""
+    if product_id == Order.DOCTOR_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P1
+        client_key = settings.PG_CLIENT_KEY_P1
+    elif product_id == Order.LAB_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P2
+        client_key = settings.PG_CLIENT_KEY_P2
+
+    all_txn = sorted(all_txn, key=lambda x : x["idx"])
+    checksum = ""
+    for txn in all_txn:
+        curr = "{"
+        for k in txn.keys():
+            if str(txn[k]):
+                curr = curr + k + '=' + str(txn[k]) + ';'
+        curr = curr + "}"
+        checksum += curr
+
+    checksum = secret_key + "|[" + checksum + "]|" + client_key
+    checksum = hashlib.sha256(str(checksum).encode())
+    checksum = checksum.hexdigest()
+    return checksum

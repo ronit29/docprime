@@ -1434,7 +1434,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     def get_merchant(self):
         billed_to = self.get_billed_to
         if billed_to:
-            return billed_to.merchant.first()
+            merchant = billed_to.merchant.first()
+            if merchant:
+                return merchant.merchant
         return None
 
     class Meta:

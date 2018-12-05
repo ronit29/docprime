@@ -8,6 +8,7 @@ from celery import task
 import requests
 import json
 import logging
+from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
@@ -168,4 +169,68 @@ def set_order_dummy_transaction(order_id, user_id):
 
 @task()
 def process_payout(payout_id):
-    pass
+    from .models import MerchantPayout, Order
+    from ondoc.api.v1.utils import create_payout_checksum
+
+    try:
+        payout_data = MerchantPayout.objects.filter(id=payout_id).first()
+        if payout_data and payout_id:
+            appointment = payout_data.get_appointment()
+            billed_to = None
+            merchant = None
+            if appointment and appointment.get_billed_to and appointment.get_merchant:
+                billed_to = appointment.get_billed_to
+                merchant = appointment.get_merchant
+
+            if billed_to and merchant:
+                # assuming 1 to 1 relation between Order and Appointment
+                order_data = Order.objects.filter(reference_id=appointment.id).first()
+                if not order_data:
+                    raise Exception("Order not found for given payout " + str(payout_data))
+
+                all_txn = None
+                if order_data.txn.exists():
+                    all_txn = order_data.txn.all()
+                elif order_data.dummy_txn.exists():
+                    all_txn = order_data.dummy_txn.all()
+
+                if not all_txn or all_txn.count() == 0:
+                    raise Exception("No transactions found for given payout " + str(payout_data))
+
+                req_data = { "payload" : [], "checkSum" : "" }
+
+                idx = 0
+                for txn in all_txn:
+                    curr_txn = OrderedDict()
+                    curr_txn["idx"] = idx
+                    curr_txn["orderNo"] = txn.order_no
+                    curr_txn["orderId"] = order_data.id
+                    curr_txn["txnAmount"] = int(order_data.amount)
+                    curr_txn["settledAmount"] = int(payout_data.payable_amount)
+                    curr_txn["merchantCode"] = merchant.id
+                    curr_txn["pgtxId"] = txn.transaction_id
+                    curr_txn["refNo"] = appointment.id
+                    curr_txn["bookingId"] = appointment.id
+                    curr_txn["udf1"] = "sdafsd"
+                    curr_txn["udf2"] = ""
+                    req_data["payload"].append(curr_txn)
+                    idx += 1
+
+                req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
+                headers = {
+                    "auth": settings.PG_REFUND_AUTH_TOKEN,
+                    "Content-Type": "application/json"
+                }
+                url = settings.PG_SETTLEMENT_URL
+
+                response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                if response.status_code == status.HTTP_200_OK:
+                    resp_data = response.json()
+                    if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                        print("SAVED DUMMY TRANSACTION")
+                else:
+                    raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+
+    except Exception as e:
+        logger.error("Error in processing payout - with exception - " + str(e))
