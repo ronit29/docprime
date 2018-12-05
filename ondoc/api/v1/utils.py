@@ -791,7 +791,7 @@ def create_payout_checksum(all_txn, product_id):
     for txn in all_txn:
         curr = "{"
         for k in txn.keys():
-            if str(txn[k]):
+            if str(txn[k]) and txn[k] is not None and txn[k] is not "":
                 curr = curr + k + '=' + str(txn[k]) + ';'
         curr = curr + "}"
         checksum += curr

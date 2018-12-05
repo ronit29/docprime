@@ -102,14 +102,23 @@ def refund_curl_task(self, req_data):
             self.retry([req_data], countdown=countdown_time)
 
 
-@task()
-def set_order_dummy_transaction(order_id, user_id):
+@task(bind=True, max_retries=5)
+def set_order_dummy_transaction(self, order_id, user_id):
     from .models import Order, DummyTransactions
     from ondoc.account.models import User
     try:
         order_row = Order.objects.filter(id=order_id).first()
         user = User.objects.filter(id=user_id).first()
-        if order_row and user:
+
+        if order_row and user and order_row.reference_id:
+            if order_row.getTransactions():
+                print("dummy Transaction already set")
+                return
+
+            appointment = order_row.getAppointment()
+            if not appointment:
+                raise Exception("No Appointment found.")
+
             token = settings.PG_DUMMY_TRANSACTION_TOKEN
             headers = {
                 "auth": token,
@@ -123,9 +132,9 @@ def set_order_dummy_transaction(order_id, user_id):
                 "email": user.email or "dummyemail@docprime.com",
                 "productId": order_row.product_id,
                 "orderId": order_id,
-                "name": "DocPrime Dummy",
-                "txAmount": 0,
-                "couponCode": "dummy",
+                "name": appointment.profile.name,
+                "txAmount": str(appointment.effective_price),
+                "couponCode": "",
                 "couponAmt": 0,
                 "paymentMode": "DC",
                 "AppointmentId": order_row.reference_id,
@@ -146,8 +155,8 @@ def set_order_dummy_transaction(order_id, user_id):
                     tx_data['type'] = DummyTransactions.CREDIT
                     tx_data['amount'] = 0
                     tx_data['payment_mode'] = "DC"
-                    tx_data['transaction_id'] = resp_data.get('orderNo')
 
+                    # tx_data['transaction_id'] = resp_data.get('orderNo')
                     # tx_data['response_code'] = response.get('responseCode')
                     # tx_data['bank_id'] = response.get('bankTxId')
                     # transaction_time = parse(response.get("txDate"))
@@ -166,7 +175,7 @@ def set_order_dummy_transaction(order_id, user_id):
 
     except Exception as e:
         logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
-
+        self.retry([order_id, user_id], countdown=300)
 
 @task()
 def process_payout(payout_id):
@@ -174,23 +183,25 @@ def process_payout(payout_id):
     from ondoc.api.v1.utils import create_payout_checksum
 
     try:
+        if not payout_id:
+            raise Exception("No payout specified")
+
         payout_data = MerchantPayout.objects.filter(id=payout_id).first()
-        if payout_data and payout_id:
+        if payout_data:
+            if payout_data.status == payout_data.PAID:
+                raise Exception("Payment already done for this payout")
+
             appointment = payout_data.get_appointment()
             billed_to = payout_data.get_billed_to()
             merchant = payout_data.get_merchant()
 
             if billed_to and merchant:
                 # assuming 1 to 1 relation between Order and Appointment
-                order_data = Order.objects.filter(reference_id=appointment.id).first()
+                order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
                 if not order_data:
                     raise Exception("Order not found for given payout " + str(payout_data))
 
-                all_txn = None
-                if order_data.txn.exists():
-                    all_txn = order_data.txn.all()
-                elif order_data.dummy_txn.exists():
-                    all_txn = order_data.dummy_txn.all()
+                all_txn = order_data.getTransactions()
 
                 if not all_txn or all_txn.count() == 0:
                     raise Exception("No transactions found for given payout " + str(payout_data))
@@ -203,14 +214,12 @@ def process_payout(payout_id):
                     curr_txn["idx"] = idx
                     curr_txn["orderNo"] = txn.order_no
                     curr_txn["orderId"] = order_data.id
-                    curr_txn["txnAmount"] = int(order_data.amount)
-                    curr_txn["settledAmount"] = int(payout_data.payable_amount)
+                    curr_txn["txnAmount"] = str(order_data.amount)
+                    curr_txn["settledAmount"] = str(payout_data.payable_amount)
                     curr_txn["merchantCode"] = merchant.id
                     curr_txn["pgtxId"] = txn.transaction_id
-                    curr_txn["refNo"] = appointment.id
+                    curr_txn["refNo"] = txn.id
                     curr_txn["bookingId"] = appointment.id
-                    curr_txn["udf1"] = "sdafsd"
-                    curr_txn["udf2"] = ""
                     req_data["payload"].append(curr_txn)
                     idx += 1
 
@@ -224,18 +233,26 @@ def process_payout(payout_id):
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
-                    if True or resp_data.get("ok") is not None and resp_data.get("ok") == 1:
-                        payout_data.payout_time = datetime.datetime.now()
-                        payout_data.status = payout_data.PAID
-                        payout_data.api_response = json.dumps(resp_data)
-                        payout_data.save()
-                        print("Payout processed")
-                    else:
-                        # handle all kinds of failure in payout, and save api response
-                        payout_data.retry_count += 1
-                        payout_data.api_response = json.dumps(resp_data)
-                        payout_data.save()
-                        raise Exception("Payout Response Error")
+                    if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+                        success_payout = False
+                        result = resp_data.get('result')
+                        if result:
+                            for res_txn in result:
+                                success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+
+                        if success_payout:
+                            payout_data.payout_time = datetime.datetime.now()
+                            payout_data.status = payout_data.PAID
+                            payout_data.api_response = json.dumps(resp_data)
+                            payout_data.save()
+                            print("Payout processed")
+                            return
+
+                    payout_data.retry_count += 1
+                    payout_data.api_response = json.dumps(resp_data)
+                    payout_data.save()
+                    raise Exception("Payout Response Error")
+
                 else:
                     raise Exception("Retry on invalid Http response status - " + str(response.content))
 

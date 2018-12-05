@@ -242,6 +242,26 @@ class Order(TimeStampedModel):
         doctor_agreed_price = total_agreed_price - procedures_agreed_price
         return doctor_deal_price, doctor_mrp, doctor_agreed_price
 
+    def getAppointment(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        if not self.reference_id:
+            return None
+
+        if self.product_id == self.LAB_PRODUCT_ID:
+            return LabAppointment.objects.filter(id=self.reference_id).first()
+        elif self.product_id == self.DOCTOR_PRODUCT_ID:
+            return OpdAppointment.objects.filter(id=self.reference_id).first()
+        return None
+
+    def getTransactions(self):
+        all_txn = None
+        if self.txn.exists():
+            all_txn = self.txn.all()
+        elif self.dummy_txn.exists():
+            all_txn = self.dummy_txn.all()
+        return all_txn
+
     class Meta:
         db_table = "order"
 
@@ -422,7 +442,7 @@ class DummyTransactions(TimeStampedModel):
     status_code = models.IntegerField(null=True, blank=True)
     pg_name = models.CharField(max_length=100, null=True, blank=True)
     status_type = models.CharField(max_length=50, null=True, blank=True)
-    transaction_id = models.CharField(max_length=100, unique=True)
+    transaction_id = models.CharField(max_length=100, null=True, blank=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
@@ -735,7 +755,9 @@ class MerchantPayout(TimeStampedModel):
                 self.paid_to = self.get_merchant()
             if self.status == self.PENDING:
                 self.status = self.ATTEMPTED
-            process_payout.apply_async((self.id,), countdown=3)
+
+            transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
+
         super().save(*args, **kwargs)
 
     def get_appointment(self):
