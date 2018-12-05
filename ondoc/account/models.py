@@ -729,7 +729,13 @@ class MerchantPayout(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.id and hasattr(self,'process_payout') and self.process_payout:
-            process_payout.apply_async((self.id,), countdown=1)
+            if not self.content_object:
+                self.content_object = self.get_billed_to()
+            if not self.paid_to:
+                self.paid_to = self.get_merchant()
+            if self.status == self.PENDING:
+                self.status = self.ATTEMPTED
+            process_payout.apply_async((self.id,), countdown=3)
         super().save(*args, **kwargs)
 
     def get_appointment(self):

@@ -9,6 +9,7 @@ import requests
 import json
 import logging
 from collections import OrderedDict
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -223,13 +224,17 @@ def process_payout(payout_id):
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
-                    if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
-                        pass
+                    if True or resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                        payout_data.payout_time = datetime.datetime.now()
+                        payout_data.status = payout_data.PAID
+                        payout_data.api_response = json.dumps(resp_data)
+                        payout_data.save()
+                        print("Payout processed")
                     else:
                         # handle all kinds of failure in payout, and save api response
-                        retry_count = payout_data.retry_count + 1
-                        api_response = json.dumps(resp_data)
-                        MerchantPayout.objects.filter(id=payout_data.id).update(retry_count=retry_count, api_response=api_response)
+                        payout_data.retry_count += 1
+                        payout_data.api_response = json.dumps(resp_data)
+                        payout_data.save()
                         raise Exception("Payout Response Error")
                 else:
                     raise Exception("Retry on invalid Http response status - " + str(response.content))
