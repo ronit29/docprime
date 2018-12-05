@@ -709,9 +709,10 @@ class OrderLog(TimeStampedModel):
 
 class MerchantPayout(TimeStampedModel):
     PENDING = 1
-    PAID = 2
+    ATTEMPTED = 2
+    PAID = 3
 
-    STATUS_CHOICES = [(PENDING, 'Pending'), (PAID, 'Paid')]
+    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid')]
 
     charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
     payable_amount = models.DecimalField(max_digits=10, decimal_places=2)

@@ -14,6 +14,10 @@ from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin
 from reversion.admin import VersionAdmin
 import nested_admin
+from django.urls import reverse
+from django.utils.safestring import mark_safe
+from django.contrib.contenttypes.models import ContentType
+
 
 def practicing_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
@@ -271,7 +275,10 @@ class MerchantPayoutAdmin(VersionAdmin):
     def appointment_id(self, instance):
         appt = self.get_appointment(instance)
         if appt:
-            return appt.id
+            content_type = ContentType.objects.get_for_model(appt.__class__)
+            change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[appt.id])
+            html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, appt.id)
+            return mark_safe(html)
 
         return None
 
@@ -287,14 +294,24 @@ class MerchantPayoutAdmin(VersionAdmin):
         appt = self.get_appointment(instance)
 
         if appt and appt.get_billed_to:
-            return appt.get_billed_to
+            billed_to =  appt.get_billed_to
+            content_type = ContentType.objects.get_for_model(billed_to.__class__)
+            change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[billed_to.id])
+            html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, billed_to.name)
+            return mark_safe(html)
+
         return ''
 
     def get_merchant(self, instance):
         appt = self.get_appointment(instance)
 
         if appt and appt.get_merchant:
-            return appt.get_merchant
+            merchant = appt.get_merchant
+            content_type = ContentType.objects.get_for_model(merchant.__class__)
+            change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[merchant.id])
+            html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, merchant.id)
+            return mark_safe(html)
+
         return ''
 
 
