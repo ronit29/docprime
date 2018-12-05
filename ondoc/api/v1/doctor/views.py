@@ -1846,7 +1846,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         appntment_list = []
         for data in valid_data.get('data'):
             if not data.get('patient_id') and data.get('patient'):
-                patient_data = self.create_patient(valid_data, data['patient'])
+                patient_data = self.create_patient(request, valid_data, data['patient'])
                 patient = patient_data['patient']
             else:
                 patient = valid_data.get('patient_id')
@@ -1863,7 +1863,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
         return Response({'status': 'Created Successfully'})
 
-    def create_patient(self, valid_data, data):
+    def create_patient(self, request, valid_data, data):
         sms_list = []
         hospital = valid_data.get('hospital') if valid_data.get('share_with_hospital') else None
         patient = models.OfflinePatients.objects.create(name=data.get('name'),
@@ -1876,7 +1876,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                         display_welcome_message=data.get('display_welcome_message',
                                                                                          False),
                                                         doctor=valid_data.get('doctor'),
-                                                        hospital=hospital
+                                                        hospital=hospital,
+                                                        created_by=request.user
                                                         )
         default_num = None
         for num in data.get('phone_number'):

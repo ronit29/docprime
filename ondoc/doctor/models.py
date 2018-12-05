@@ -1793,6 +1793,7 @@ class OfflinePatients(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="patients_doc", on_delete=models.SET_NULL, null=True)
     hospital = models.ForeignKey(Hospital, related_name="patients_hos", on_delete=models.SET_NULL, null=True, blank=True)
     share_with_hospital = models.BooleanField(default=False)
+    created_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return self.name
