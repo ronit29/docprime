@@ -285,10 +285,10 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
         profile = appointment_data['profile']
         user = appointment_data['user']
-        user_insurance = UserInsurance.objects.filter(user=user).first()
+        user_insurance = UserInsurance.objects.filter(user=user).last()
         if 'lab' in appointment_data:
             if user_insurance:
-                if timezone.now() < user_insurance.expiry_date:
+                if user_insurance.is_valid():
                     insured_members = user_insurance.members.all().filter(profile=profile)
                     if insured_members.exists():
                         return True, user_insurance.id, 'Covered Under Insurance'
@@ -300,15 +300,18 @@ class UserInsurance(auth_model.TimeStampedModel):
                 return False, "", 'Not covered under insurance'
         elif 'doctor' in appointment_data:
             if user_insurance:
-                if timezone.now() < user_insurance.expiry_date:
+                if user_insurance.is_valid():
                     insured_members = user_insurance.members.all().filter(profile=profile)
                     if insured_members:
-                        doctor = DoctorPracticeSpecialization.objects.get(doctor_id=appointment_data['doctor'])
+                        doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=appointment_data['doctor']).values('specialization_id')
+                        specilization_ids = doctor
+                        specilization_ids_set = set(map(lambda specialization: specialization['specialization_id'], specilization_ids))
                         gynecologist_list = json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS)
+                        gynecologist_set = set(gynecologist_list)
                         oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
-                        if doctor.specialization_id in oncologist_list or \
-                                        doctor.specialization_id in gynecologist_list:
-                            if doctor.specialization_id in gynecologist_list:
+                        oncologist_set = set(oncologist_list)
+                        if (specilization_ids_set & oncologist_set) or (specilization_ids_set & gynecologist_set):
+                            if specilization_ids_set & gynecologist_set :
                                 doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
                                     specialization_id__in=gynecologist_list).values_list(
                                     'doctor_id', flat=True)
@@ -319,7 +322,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                     return False, user_insurance.id, 'Gynecologist Limit of 5 exceeded'
                                 else:
                                     return True, user_insurance.id, 'Covered Under Insurance'
-                            elif doctor.specialization_id in oncologist_list:
+                            elif specilization_ids_set & oncologist_set:
                                 doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
                                     specialization_id__in=oncologist_list).values_list(
                                     'doctor_id', flat=True)
@@ -352,8 +355,8 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
 
     def after_commit_tasks(self):
         if self.transaction_type == InsuranceTransaction.DEBIT:
-            send_insurance_notifications(self.user_insurance.user.id)
             self.user_insurance.generate_pdf()
+            send_insurance_notifications(self.user_insurance.user.id)
 
     def save(self, *args, **kwargs):
         if self.pk:
