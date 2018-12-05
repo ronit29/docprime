@@ -1194,7 +1194,6 @@ class LabPageUrl(object):
                     url = slugify(url)
 
                     data = {}
-                    # data['url'] = url
                     data['is_valid'] = True
                     data['url_type'] = EntityUrls.UrlType.PAGEURL
                     data['entity_type'] = 'Lab'
@@ -1226,34 +1225,26 @@ class LabPageUrl(object):
                     data['extras'] = extras
                     data['sequence'] = sequence
 
-                    EntityUrls.objects.filter(entity_id=lab.id,
-                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
-                                              is_valid=True).filter(
-                        ~Q(url=url)).update(is_valid=False)
-                    # EntityUrls.objects.filter(entity_id=lab.id,
-                    #                           sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
-                    #                           is_valid=True
-                    #                           ).extra(where=["url NOT ILIKE ['%%-lpp','']"]
-                    #                                   ).update(is_valid=False)
-                    EntityUrls.objects.filter(entity_id=lab.id,
-                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
-                                              url=url).delete()
-                    # EntityUrls.objects.filter(entity_id=lab.id,
-                    #                           sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE
-                    #                           ).extra(where=["url ILIKE '%%-lpp-%%'"]).delete()
-
                     new_url = url
                     counter = 0
 
                     while True:
                         if counter>0:
-                             new_url = url+'-'+str(counter)
-
+                            # new_url = url+'-'+'-'+''.join([random.choice(string.digits) for n in range(10)])
+                            new_url = url+'-'+str(counter)
                         dup_url = EntityUrls.objects.filter(url=new_url, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).filter(~Q(entity_id=lab.id)).first()
-                        # dup_url = EntityUrls.objects.extra(where=["url ILIKE '%%-lpp-%%'"]).filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).filter(~Q(entity_id=lab.id)).first()
                         if not dup_url:
                             break
                         counter = counter + 1
+
+                    EntityUrls.objects.filter(entity_id=lab.id,
+                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
+                                              is_valid=True).filter(
+                        ~Q(url=new_url)).update(is_valid=False)
+
+                    EntityUrls.objects.filter(entity_id=lab.id,
+                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
+                                              url=new_url).delete()
 
                     data['url'] = new_url
                     EntityUrls.objects.create(**data)
@@ -1412,7 +1403,6 @@ class DoctorPageURL(object):
 
         url = slugify(url)
         data = {}
-        # data['url'] = url
         data['is_valid'] = True
         data['url_type'] = EntityUrls.UrlType.PAGEURL
         data['entity_type'] = 'Doctor'
@@ -1451,22 +1441,22 @@ class DoctorPageURL(object):
             extras['breadcrums'] = []
         data['extras'] = extras
         data['sequence'] = sequence
-        EntityUrls.objects.filter(entity_id=doctor.id,
-                                  sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(~Q(url=url)).update(is_valid=False)
-        # EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,url=url).delete()
 
         new_url = url
         counter = 0
 
         while True:
             if counter>0:
-                new_url = url+'-'+'-'+''.join([random.choice(string.digits) for n in range(10)])
-
+                # new_url = url+'-'+'-'+''.join([random.choice(string.digits) for n in range(10)])
+                new_url = url + '-' + str(counter)
             dup_url = EntityUrls.objects.filter(url=new_url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(~Q(entity_id=doctor.id)).first()
-            counter+=1
             if not dup_url:
                 break
             counter = counter + 1
+
+        EntityUrls.objects.filter(entity_id=doctor.id,
+                                  sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(
+            ~Q(url=new_url)).update(is_valid=False)
 
         EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
                                   url=new_url).delete()
