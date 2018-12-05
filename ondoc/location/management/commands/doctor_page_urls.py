@@ -17,7 +17,7 @@ def doctor_page_urls():
     doc_obj =Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization').filter(is_live=True, is_test_doctor=False)
     for doctor in doc_obj:
         try:
-            print(DoctorPageURL.create_page_urls(doctor,sequence))
+            print(DoctorPageURL.create_doctor_page_urls(doctor,sequence))
         except Exception as e:
             print(str(e))
 
