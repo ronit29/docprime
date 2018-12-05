@@ -1,3 +1,6 @@
+import random
+import string
+
 from django.contrib.gis.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -1361,6 +1364,9 @@ class DoctorPageURL(object):
         sublocality_id = None
         sublocality_longitude = None
         sublocality_latitude = None
+        doc_sublocality = None
+        doc_locality = None
+        hospital = None
 
         if doctor.hospitals.all():
             hospital = doctor.hospitals.all()[0]
@@ -1438,18 +1444,22 @@ class DoctorPageURL(object):
         data['sequence'] = sequence
         EntityUrls.objects.filter(entity_id=doctor.id,
                                   sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(~Q(url=url)).update(is_valid=False)
-        EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,url=url).delete()
+        # EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,url=url).delete()
 
         new_url = url
         counter = 0
 
         while True:
             if counter>0:
-                new_url = url+'-'+str(counter)
+                new_url = url+'-'+'-'+''.join([random.choice(string.digits) for n in range(10)])
 
             dup_url = EntityUrls.objects.filter(url=new_url, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(~Q(entity_id=doctor.id)).first()
+            counter+=1
             if not dup_url:
                 break
+
+        EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
+                                  url=new_url).delete()
 
         data['url'] = new_url
         EntityUrls.objects.create(**data)
