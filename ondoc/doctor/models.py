@@ -151,6 +151,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     batch = models.CharField(max_length=20, blank=True)
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
+    merchant_payout = GenericRelation(MerchantPayout)
 
     def __str__(self):
         return self.name
@@ -362,6 +363,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     enabled_for_online_booking_at = models.DateTimeField(null=True, blank=True)
     is_gold = models.BooleanField(verbose_name='Is Gold', default=False)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
+    merchant_payout = GenericRelation(MerchantPayout)
 
     def __str__(self):
         return self.name
@@ -529,7 +531,8 @@ class DoctorClinic(auth_model.TimeStampedModel):
     enabled = models.BooleanField(verbose_name='Enabled', default=True)
     priority = models.PositiveSmallIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
-
+    merchant_payout = GenericRelation(MerchantPayout)
+    
     class Meta:
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)

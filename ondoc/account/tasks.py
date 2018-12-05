@@ -176,11 +176,8 @@ def process_payout(payout_id):
         payout_data = MerchantPayout.objects.filter(id=payout_id).first()
         if payout_data and payout_id:
             appointment = payout_data.get_appointment()
-            billed_to = None
-            merchant = None
-            if appointment and appointment.get_billed_to and appointment.get_merchant:
-                billed_to = appointment.get_billed_to
-                merchant = appointment.get_merchant
+            billed_to = payout_data.get_billed_to()
+            merchant = payout_data.get_merchant()
 
             if billed_to and merchant:
                 # assuming 1 to 1 relation between Order and Appointment

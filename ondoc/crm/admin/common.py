@@ -284,10 +284,8 @@ class MerchantPayoutAdmin(VersionAdmin):
 
 
     def get_billed_to(self, instance):
-        appt = instance.get_appointment()
-
-        if appt and appt.get_billed_to:
-            billed_to =  appt.get_billed_to
+        billed_to = instance.get_billed_to()
+        if billed_to:
             content_type = ContentType.objects.get_for_model(billed_to.__class__)
             change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[billed_to.id])
             html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, billed_to.name)
@@ -296,10 +294,8 @@ class MerchantPayoutAdmin(VersionAdmin):
         return ''
 
     def get_merchant(self, instance):
-        appt = instance.get_appointment()
-
-        if appt and appt.get_merchant:
-            merchant = appt.get_merchant
+        merchant = instance.get_merchant()
+        if merchant:
             content_type = ContentType.objects.get_for_model(merchant.__class__)
             change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[merchant.id])
             html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, merchant.id)
