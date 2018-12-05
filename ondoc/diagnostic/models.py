@@ -203,6 +203,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     booking_closing_hours_from_dayend = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))])
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
+    merchant_payout = GenericRelation(account_model.MerchantPayout)
 
     def __str__(self):
         return self.name
@@ -483,8 +484,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     home_collection_charges = GenericRelation(HomePickupCharges)
     spoc_details = GenericRelation(auth_model.SPOCDetails)
     merchant = GenericRelation(auth_model.AssociatedMerchant)
-
-
+    merchant_payout = GenericRelation(account_model.MerchantPayout)
 
     def all_associated_labs(self):
         if self.id:

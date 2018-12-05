@@ -739,6 +739,23 @@ class MerchantPayout(TimeStampedModel):
             return self.opd_appointment.first()
         return None
 
+    def get_billed_to(self):
+        if self.content_object:
+            return self.content_object
+        appt = self.get_appointment()
+        if appt and appt.get_billed_to:
+            return appt.get_billed_to
+        return ''
+
+
+    def get_merchant(self):
+        if self.paid_to:
+            return self.paid_to
+        appt = self.get_appointment()
+        if appt and appt.get_merchant:
+            return appt.get_merchant
+        return ''
+
 
     class Meta:
         db_table = "merchant_payout"
