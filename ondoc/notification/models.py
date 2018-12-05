@@ -296,11 +296,21 @@ class NotificationAction:
             insured_members = instance.members.all()
             proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
             proposer = proposer[0]
-            proposer_name = '%s %s %s %s' % (proposer.title, proposer.first_name, proposer.middle_name, proposer.last_name)
+
+            proposer_fname = proposer.first_name if proposer.first_name else ""
+            proposer_mname = proposer.middle_name if proposer.middle_name else ""
+            proposer_lname = proposer.last_name if proposer.last_name else ""
+
+            proposer_name = '%s %s %s %s' % (proposer.title, proposer_fname, proposer_mname, proposer_lname)
+
             member_list = list()
             count = 1
             for member in insured_members:
-                name = '%s %s %s' % (member.first_name, member.middle_name, member.last_name)
+                fname = member.first_name if member.first_name else ""
+                mname = member.middle_name if member.middle_name else ""
+                lname = member.last_name if member.last_name else ""
+
+                name = '%s %s %s' % (fname, mname, lname)
                 data = {
                     'name': name.title(),
                     'member_number': count,

@@ -309,8 +309,8 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
             resp['policy_number'] = user_insurance.policy_number
             resp['insurer_name'] = insurer.name
             resp['insurer_img'] = str(insurer.logo)
-            resp['coi_url'] = request.build_absolute_uri(user_insurance.coi.url) if hasattr(user_insurance, 'coi') \
-                                            and user_insurance.coi is not None and user_insurance.coi.name else None
+            resp['coi_url'] = request.build_absolute_uri(user_insurance.coi.url) if user_insurance.coi is not None and \
+                                                                                    user_insurance.coi.name else None
             resp['premium_amount'] = user_insurance.premium_amount
             resp['proposer_name'] = user_insurance.members.all().filter(relation='self').values('first_name',
                                                                                                 'middle_name',
