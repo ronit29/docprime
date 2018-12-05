@@ -8,6 +8,7 @@ from hardcopy import bytestring_to_pdf
 import io
 #from tempfile import NamedTemporaryFile
 from django.core.files.storage import default_storage
+from django.core.files.storage import FileSystemStorage
 from django.core.files.base import ContentFile
 from django.core.files import File
 from io import BytesIO
@@ -42,7 +43,8 @@ class PDFTester(models.Model):
 
         random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
         path = 'common/pdf/test/' + random_string + '.pdf'
-        file = default_storage.open(path, 'wb')
+        fs = FileSystemStorage()
+        file = fs.open(path, 'wb')
 
         extra_args = {
             'virtual-time-budget': 6000
@@ -52,7 +54,7 @@ class PDFTester(models.Model):
 
         file.close()
 
-        ff = File(default_storage.open(path, 'rb'))
+        ff = File(fs.open(path, 'rb'))
 
         random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
         name = random_string+'.pdf'

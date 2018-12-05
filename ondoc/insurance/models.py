@@ -5,7 +5,7 @@ import json
 
 from django.db import models, transaction
 from django.db.models import Q
-
+import logging
 from ondoc.authentication import models as auth_model
 from ondoc.account import models as account_model
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -13,10 +13,17 @@ from ondoc.authentication.models import UserProfile, User
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from ondoc.common.helper import Choices
+from django.core.files.uploadedfile import TemporaryUploadedFile
 from datetime import timedelta
 from django.utils import timezone
 from django.conf import settings
 from ondoc.api.v1.utils import RawSql
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.template.loader import render_to_string
+from num2words import num2words
+from hardcopy import bytestring_to_pdf
+
+logger = logging.getLogger(__name__)
 
 
 def generate_insurance_policy_number():
@@ -163,6 +170,87 @@ class UserInsurance(auth_model.TimeStampedModel):
     def __str__(self):
         return str(self.user)
 
+    def generate_pdf(self):
+        insured_members = self.members.all()
+        proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
+        proposer = proposer[0]
+
+        proposer_fname = proposer.first_name if proposer.first_name else ""
+        proposer_mname = proposer.middle_name if proposer.middle_name else ""
+        proposer_lname = proposer.last_name if proposer.last_name else ""
+
+        proposer_name = '%s %s %s %s' % (proposer.title, proposer_fname, proposer_mname, proposer_lname)
+
+        member_list = list()
+        count = 1
+        for member in insured_members:
+            fname = member.first_name if member.first_name else ""
+            mname = member.middle_name if member.middle_name else ""
+            lname = member.last_name if member.last_name else ""
+
+            name = '%s %s %s' % (fname, mname, lname)
+            data = {
+                'name': name.title(),
+                'member_number': count,
+                'dob': member.dob.strftime('%d-%m-%Y'),
+                'relation': member.relation,
+                'id': member.id,
+                'gender': member.gender.title(),
+                'age': int((datetime.datetime.now().date() - member.dob).days/365),
+            }
+            member_list.append(data)
+            count = count + 1
+
+        context = {
+            'purchase_data': str(self.purchase_date.date().strftime('%d-%m-%Y')),
+            'expiry_date': str(self.expiry_date.date().strftime('%d-%m-%Y')),
+            'premium': self.premium_amount,
+            'premium_in_words': ('%s rupees only.' % num2words(self.premium_amount)).title(),
+            'proposer_name': proposer_name.title(),
+            'proposer_address': proposer.address,
+            'proposer_mobile': proposer.phone_number,
+            'proposer_email': self.user.email,
+            'intermediary_name': 'DIRECT',
+            'intermediary_code': 'AMHI CODE',
+            'intermediary_contact_number': '1800-102-0333',
+            'issuing_office_address': 'Apollo Munich Health Insurance Co. Ltd. , iLABS Centre, 2nd & 3rd Floor, '
+                                      'Plot No 404 - 405, Udyog Vihar, Phase – III, Gurgaon-122016, Haryana',
+            'issuing_office_gstin': 'AMHI’s GSTIN no.',
+            'group_policy_name': 'Docprime Technologies Pvt. Ltd.',
+            'group_policy_address': 'Plot No. 119, Sector 44, Gurugram, Haryana 122001',
+            'group_policy_email': 'customercare@docprime.com',
+            'nominee_name': 'Legal Heir',
+            'nominee_relation': 'Legal Heir',
+            'nominee_address': '',
+            'policy_related_email': 'customerservice@apollomunichinsurance.com and customercare@docprime.com',
+            'policy_related_tollno': '1800-102-0333 and 1800-123-9419',
+            'policy_related_website': 'www.apollomunichinsurance.com and https://docprime.com/',
+            'current_date': datetime.datetime.now().date().strftime('%d-%m-%Y'),
+            'policy_number': self.policy_number,
+            'application_number': self.id,
+            'total_member_covered': len(member_list),
+            'plan': self.insurance_plan.name,
+            'insured_members': member_list,
+            'insurer_logo': self.insurance_plan.insurer.logo.url
+        }
+        html_body = render_to_string("pdfbody.html", context=context)
+        filename = "COI_{}.pdf".format(str(timezone.now().timestamp()))
+        try:
+            extra_args = {
+                'virtual-time-budget': 6000
+            }
+            file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+            f = open(file.temporary_file_path())
+            bytestring_to_pdf(html_body.encode(), f, **extra_args)
+            f.seek(0)
+            f.flush()
+            f.content_type = 'application/pdf'
+
+            self.coi = InMemoryUploadedFile(file, None, filename, 'application/pdf', file.tell(), None)
+            self.save()
+        except Exception as e:
+            logger.error("Got error while creating pdf for opd invoice {}".format(e))
+
     class Meta:
         db_table = "user_insurance"
 
@@ -265,6 +353,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     def after_commit_tasks(self):
         if self.transaction_type == InsuranceTransaction.DEBIT:
             send_insurance_notifications(self.user_insurance.user.id)
+            self.user_insurance.generate_pdf()
 
     def save(self, *args, **kwargs):
         if self.pk:
