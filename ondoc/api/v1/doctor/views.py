@@ -1838,18 +1838,21 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         return Response(queryset)
 
     @transaction.atomic
-    def create_appointments(self, request):
+    def create_offline_appointments(self, request):
         serializer = serializers.OfflineAppointmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
+        patient = None
+        i = 0
         sms_list = None
         appntment_list = []
+        resp = []
         for data in valid_data.get('data'):
             if not data.get('patient_id') and data.get('patient'):
                 patient_data = self.create_patient(request, valid_data, data['patient'])
                 patient = patient_data['patient']
             else:
-                patient = valid_data.get('patient_id')
+                patient = data.get('patient_id')
             time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
             appnt = models.OfflineOPDAppointments(doctor=data.get('doctor'),
                                                   hospital=data.get('hospital'),
@@ -1859,9 +1862,22 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                   status=models.OfflineOPDAppointments.ACCEPTED
                                                  )
             appntment_list.append(appnt)
-        models.OfflineOPDAppointments.objects.bulk_create(appntment_list)
+
+        created_objects = models.OfflineOPDAppointments.objects.bulk_create(appntment_list)
+
+        for obj in created_objects:
+            ret_obj= {}
+            ret_obj['doctor'] = obj.doctor.id
+            ret_obj['hospital'] = obj.hospital.id
+            ret_obj['offline_id'] = valid_data['data'][i]['offline_id']
+            ret_obj['id'] = obj.id
+            ret_obj['patient_id'] = obj.user.id
+            resp.append(ret_obj)
+            i += 1
+
         transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
-        return Response({'status': 'Created Successfully'})
+
+        return Response(resp)
 
     def create_patient(self, request, valid_data, data):
         sms_list = []
