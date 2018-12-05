@@ -728,7 +728,7 @@ class MerchantPayout(TimeStampedModel):
     content_object = GenericForeignKey()
 
     def save(self, *args, **kwargs):
-        if self.id:
+        if self.id and hasattr(self,'process_payout') and self.process_payout:
             process_payout.apply_async((self.id,), countdown=1)
         super().save(*args, **kwargs)
 

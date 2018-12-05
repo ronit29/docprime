@@ -270,8 +270,12 @@ class MerchantPayoutForm(forms.ModelForm):
         if any(self.errors):
             return
         process_payout = self.cleaned_data.get('process_payout')
-        if process_payout and not self.instance.get_merchant:
+        if process_payout and not self.instance.get_merchant():
             raise forms.ValidationError("No verified merchant found to process payments")
+        if not self.instance.status == self.instance.PENDING:
+            raise forms.ValidationError("This payout is already under process")
+
+        return self.cleaned_data
 
 
 class MerchantPayoutAdmin(VersionAdmin):
@@ -284,6 +288,10 @@ class MerchantPayoutAdmin(VersionAdmin):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']
         readonly = [f.name for f in self.model._meta.fields if f.name not in ['payout_approved']]
         return base + readonly
+
+    def save_model(self, request, obj, form, change):
+        obj.process_payout=form.cleaned_data.get('process_payout')
+        super().save_model(request, obj, form, change)
 
     def appointment_id(self, instance):
         appt = instance.get_appointment()
