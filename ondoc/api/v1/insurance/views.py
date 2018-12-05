@@ -29,6 +29,11 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
         return Insurer.objects.filter(is_live=True)
 
     def list(self, request):
+        user = request.user
+        user_insurance = UserInsurance.objects.filter(user_id=request.user).last()
+        if user_insurance and user_insurance.is_valid():
+            return Response("Already covered under insurance.", status=status.HTTP_400_BAD_REQUEST)
+
         insurer_data = self.get_queryset()
         body_serializer = serializers.InsurerSerializer(insurer_data, many=True)
         return Response(body_serializer.data)
