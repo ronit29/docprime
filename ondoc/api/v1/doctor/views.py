@@ -1824,6 +1824,19 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return None
 
+    def list_patients(self, request):
+        serializer = serializers.GetOfflinePatientsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        queryset = models.OfflinePatients.objects.filter(Q(hospital__isnull=True, doctor=valid_data.get('doctor_id'))
+                                                          |
+                                                          Q(hospital__isnull=False,
+                                                            hospital=valid_data.get('hospital_id'))
+                                                        )\
+                                                 .values('name', 'id', 'gender')\
+                                                 .distinct()
+        return Response(queryset)
+
     @transaction.atomic
     def create_appointments(self, request):
         serializer = serializers.OfflineAppointmentCreateSerializer(data=request.data)
@@ -1842,7 +1855,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                   hospital=data.get('hospital'),
                                                   time_slot_start=time_slot_start,
                                                   booked_by=request.user,
-                                                  user=patient
+                                                  user=patient,
+                                                  status=models.OfflineOPDAppointments.ACCEPTED
                                                  )
             appntment_list.append(appnt)
         models.OfflineOPDAppointments.objects.bulk_create(appntment_list)
@@ -1895,7 +1909,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                 data.deal_price, data.mrp, True)
 
         timeslots = obj.get_timing_list()
-        for i in timeslots:
-            pass
+        for day, slots in timeslots.items():
+            day_timing = []
+            for slot_unit in slots:
+                day_timing.extend(slot_unit['timing'])
+            timeslots[day] = day_timing
         return Response({"timeslots": timeslots,
                          "doctor_leaves": doctor_leave_serializer.data})

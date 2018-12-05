@@ -50,4 +50,5 @@ urlpatterns = [
     path('admins_assoc_hosp/<int:pk>', CreateAdminViewSet.as_view({'get': 'assoc_hosp'}), name='assoc_hosp'),
     path('create_offline_appointments', OfflineCustomerViewSet.as_view({'post': 'create_appointments'}), name='create_appointments'),
     path('offline_timings', OfflineCustomerViewSet.as_view({'get': 'offline_timings'}), name='offline_timings'),
+    path('list_patients', OfflineCustomerViewSet.as_view({'get': 'list_patients'}), name='list_patients'),
 ]

@@ -1309,3 +1309,8 @@ class OfflineAppointmentBodySerializer(serializers.Serializer):
 
 class OfflineAppointmentCreateSerializer(serializers.Serializer):
     data = OfflineAppointmentBodySerializer(many=True)
+
+
+class GetOfflinePatientsSerializer(serializers.Serializer):
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
