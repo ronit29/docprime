@@ -142,7 +142,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                 # else:
                 #     return Response({"message": "User is not valid"},
                 #                 status.HTTP_404_NOT_FOUND)
-
+                pre_insured_members['dob'] = member['dob']
                 pre_insured_members['title'] = member['title']
                 pre_insured_members['first_name'] = member['first_name']
                 pre_insured_members['middle_name'] = member['middle_name']
