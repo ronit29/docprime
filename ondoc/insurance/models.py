@@ -208,9 +208,15 @@ class UserInsurance(auth_model.TimeStampedModel):
             member_list.append(data)
             count = count + 1
 
+        threshold = self.insurance_plan.threshold.filter().first()
+
         context = {
             'purchase_data': str(self.purchase_date.date().strftime('%d-%m-%Y')),
+            'start_time': str(self.purchase_date.strftime('%H:%M')),
             'expiry_date': str(self.expiry_date.date().strftime('%d-%m-%Y')),
+            'end_time': str(self.expiry_date.strftime('%H:%M')),
+            'opd_amount_limit': threshold.opd_amount_limit,
+            'lab_amount_limit': threshold.lab_amount_limit,
             'premium': self.premium_amount,
             'premium_in_words': ('%s rupees only.' % num2words(self.premium_amount)).title(),
             'proposer_name': proposer_name.title(),
