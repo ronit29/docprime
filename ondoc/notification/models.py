@@ -336,7 +336,7 @@ class NotificationAction:
                 'insurer_logo': instance.insurance_plan.insurer.logo.url
             }
             EmailNotification.send_notification(user=user, notification_type=notification_type,
-                                                context=context, email=user.email)
+                                                context=context, email=proposer.email)
 
 
     @classmethod

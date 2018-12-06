@@ -173,15 +173,17 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                 insured_members_list.append(pre_insured_members.copy())
 
                 if member['relation'] == 'self':
-                    user_profile = UserProfile.objects.filter(id=member['profile'].id, user_id=request.user.pk).values('id'
-                                                                                                        ,'name',
-                                                                                                        'email',
-                                                                                                        'gender',
-                                                                                                        'user_id',
-                                                                                                        'dob',
-                                                                                                        'phone_number')
-                    if user_profile:
-                        user_profile = user_profile[0]
+                    if member['profile']:
+                        user_profile = UserProfile.objects.filter(id=member['profile'].id, user_id=request.user.pk).values('id'
+                                                                                                            ,'name',
+                                                                                                            'email',
+                                                                                                            'gender',
+                                                                                                            'user_id',
+                                                                                                            'dob',
+                                                                                                            'phone_number')
+
+                        if user_profile:
+                            user_profile = user_profile[0]
                     else:
                         user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
                             member['email'], "gender": member['gender'], "dob": member['dob']}
