@@ -1794,13 +1794,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer = serializers.GetOfflinePatientsSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        queryset = models.OfflinePatients.objects.filter(Q(hospital__isnull=True, doctor=valid_data.get('doctor_id'))
-                                                          |
-                                                          Q(hospital__isnull=False,
-                                                            hospital=valid_data.get('hospital_id'))
-                                                        )\
-                                                 .values('name', 'id', 'gender')\
-                                                 .distinct()
+        queryset = models.OfflinePatients.objects
+        if valid_data.get('doctor_id') and valid_data.get('hospital_id'):
+            queryset = queryset.filter(Q(hospital__isnull=True, doctor=valid_data.get('doctor_id'))
+                                                              |
+                                                              Q(hospital__isnull=False,
+                                                                hospital=valid_data.get('hospital_id'))
+                                                            )
+        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital').distinct()
         return Response(queryset)
 
     @transaction.atomic
@@ -1903,7 +1904,6 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
     def list_appointments(self, request):
         ONLINE = 1
         OFFLINE = 2
-        request.user = User.objects.get(id=50)
         serializer = serializers.OfflineAppointmentFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
