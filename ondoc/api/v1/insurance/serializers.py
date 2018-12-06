@@ -66,7 +66,9 @@ class MemberListSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         request = self.context.get("request")
-        insurance_plan = request.data.get('insurance_plan')
+        insurance_plan = None
+        if request:
+            insurance_plan = request.data.get('insurance_plan')
         if insurance_plan:
             insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
                                                                     insurance_plan).first()
