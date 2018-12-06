@@ -40,8 +40,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  OpdAppointment, CompetitorInfo, SpecializationDepartment,
                                  SpecializationField, PracticeSpecialization, SpecializationDepartmentMapping,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
-                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent, OfflinePatients,
-                                 PatientMobile)
+                                 GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent, PatientMobile)
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete

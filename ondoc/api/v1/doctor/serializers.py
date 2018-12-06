@@ -8,8 +8,8 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
                                  DoctorLanguage, DoctorMedicalService, DoctorMobile, DoctorQualification, DoctorLeave,
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
-                                 CommonMedicalCondition,CommonSpecialization, OfflinePatients,
-                                 DoctorPracticeSpecialization, DoctorClinic)
+                                 CommonMedicalCondition,CommonSpecialization,
+                                 DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -1296,7 +1296,7 @@ class OfflinePatientBodySerializer(serializers.Serializer):
     welcome_message = serializers.CharField(required=False, max_length=256)
     display_welcome_message = serializers.BooleanField(required=False)
     phone_number = serializers.ListField()
-
+    id = serializers.UUIDField()
 
 class OfflineAppointmentBodySerializer(serializers.Serializer):
     patient = OfflinePatientBodySerializer(many=False, allow_null=True, required=False)
@@ -1305,7 +1305,7 @@ class OfflineAppointmentBodySerializer(serializers.Serializer):
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
     start_date = serializers.DateTimeField()
     start_time = serializers.FloatField()
-    offline_id = serializers.IntegerField(required=False)
+    id = serializers.UUIDField()
 
 
 class OfflineAppointmentCreateSerializer(serializers.Serializer):

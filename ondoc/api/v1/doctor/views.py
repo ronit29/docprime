@@ -1810,18 +1810,18 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         patient = None
-        i = 0
         sms_list = None
         appntment_list = []
         resp = []
         for data in valid_data.get('data'):
             if not data.get('patient_id') and data.get('patient'):
-                patient_data = self.create_patient(request, valid_data, data['patient'])
+                patient_data = self.create_patient(request, data, data['patient'])
                 patient = patient_data['patient']
             else:
                 patient = data.get('patient_id')
             time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
             appnt = models.OfflineOPDAppointments(doctor=data.get('doctor'),
+                                                  id=data.get('id'),
                                                   hospital=data.get('hospital'),
                                                   time_slot_start=time_slot_start,
                                                   booked_by=request.user,
@@ -1836,11 +1836,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj= {}
             ret_obj['doctor'] = obj.doctor.id
             ret_obj['hospital'] = obj.hospital.id
-            ret_obj['offline_id'] = valid_data['data'][i]['offline_id']
             ret_obj['id'] = obj.id
             ret_obj['patient_id'] = obj.user.id
             resp.append(ret_obj)
-            i += 1
 
         transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
 
@@ -1850,6 +1848,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         sms_list = []
         hospital = valid_data.get('hospital') if valid_data.get('share_with_hospital') else None
         patient = models.OfflinePatients.objects.create(name=data.get('name'),
+                                                        id=data.get('id'),
                                                         sms_notification=data.get('sms_notification', False),
                                                         gender=data.get('gender'),
                                                         dob=data.get("dob"),
