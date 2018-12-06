@@ -54,6 +54,7 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         parameter = serializer.validated_data
         user_insurance = UserInsurance.objects.get(id=parameter.get('id').id)
+        result['insurer_logo'] = user_insurance.insurance_plan.insurer.logo
         member_list = user_insurance.members.all().order_by('id').values('id', 'first_name', 'last_name', 'relation')
         result['members'] = member_list
         disease = InsuranceDisease.objects.filter(is_live=True).values('id', 'disease')

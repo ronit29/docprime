@@ -324,11 +324,26 @@ class UserInsurance(auth_model.TimeStampedModel):
                 profile = profile.id
         # Create Profile if not exist with name or not exist in profile id from request
         else:
-            member_profile = UserProfile.objects.create(name=name,
-                                                        email=member['email'], gender=member['gender'],
-                                                        user_id=user.id, dob=member['dob'],
-                                                        is_default_user=False, is_otp_verified=False,
-                                                        phone_number=user.phone_number)
+            primary_user = UserProfile.objects.filter(user_id=user.id, is_default_user=True).first()
+            if primary_user and member['relation'] != 'self':
+                member_profile = UserProfile.objects.create(name=name,
+                                                            email=member['email'], gender=member['gender'],
+                                                            user_id=user.id, dob=member['dob'],
+                                                            is_default_user=False, is_otp_verified=False,
+                                                            phone_number=user.phone_number)
+            elif member['relation'] == 'self':
+                member_profile = UserProfile.objects.create(name=name,
+                                                            email=member['email'], gender=member['gender'],
+                                                            user_id=user.id, dob=member['dob'],
+                                                            is_default_user=True, is_otp_verified=False,
+                                                            phone_number=user.phone_number)
+            else:
+                member_profile = UserProfile.objects.create(name=name,
+                                                            email=member['email'], gender=member['gender'],
+                                                            user_id=user.id, dob=member['dob'],
+                                                            is_default_user=False, is_otp_verified=False,
+                                                            phone_number=user.phone_number)
+
             profile = member_profile.id
 
         return profile
