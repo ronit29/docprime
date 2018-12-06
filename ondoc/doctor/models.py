@@ -29,10 +29,7 @@ from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, Cou
 from functools import reduce
 from operator import or_
 import logging
-import math
-import random
-import os
-import re
+import re, uuid, os, math, random
 import datetime
 from django.db.models import Q
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -1782,6 +1779,7 @@ class OfflinePatients(auth_model.TimeStampedModel):
     GENDER_CHOICES = [(MALE, "Male"), (FEMALE, "Female"), (OTHER, "Other")]
     REFERENCE_CHOICES = [(DOCPRIME, "Docprime"), (GOOGLE, "Google"), (JUSTDIAL, "JustDial"), (FRIENDS, "Friends"),
                          (OTHERS, "Others")]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=32)
     sms_notification = models.BooleanField(default=False)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=GENDER_CHOICES)
@@ -1830,6 +1828,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     CANCELLED = 6
     COMPLETED = 7
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
                       (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
                       (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
