@@ -269,9 +269,24 @@ class MerchantPayoutForm(forms.ModelForm):
         super().clean()
         if any(self.errors):
             return
+
         process_payout = self.cleaned_data.get('process_payout')
-        if process_payout and not self.instance.get_merchant():
-            raise forms.ValidationError("No verified merchant found to process payments")
+        if process_payout:
+            if not self.instance.get_merchant():
+                raise forms.ValidationError("No verified merchant found to process payments")
+
+            merchant = self.instance.get_merchant()
+            if not merchant.verified_by_finance or not merchant.enabled:
+                raise forms.ValidationError("Merchant is not verified or is not enabled.")
+
+            billed_to = self.instance.get_billed_to()
+            if not billed_to:
+                raise forms.ValidationError("Billing entity not defined.")
+
+            associated_merchant = billed_to.merchant.first()
+            if not associated_merchant.verified:
+                raise forms.ValidationError("Associated Merchant not verified.")
+
         if not self.instance.status == self.instance.PENDING:
             raise forms.ValidationError("This payout is already under process")
 

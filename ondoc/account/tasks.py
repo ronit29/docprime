@@ -198,6 +198,12 @@ def process_payout(payout_id):
         if not appointment or not billed_to or not merchant:
             raise Exception("Insufficient Data " + str(payout_data))
 
+        if not merchant.verified_by_finance or not merchant.enabled:
+            raise Exception("Merchant is not verified or is not enabled. " + str(payout_data))
+
+        associated_merchant = billed_to.merchant.first()
+        if not associated_merchant.verified:
+            raise Exception("Associated Merchant not verified. " + str(payout_data))
 
         # assuming 1 to 1 relation between Order and Appointment
         order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
