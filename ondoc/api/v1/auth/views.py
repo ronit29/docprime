@@ -1591,7 +1591,7 @@ class UserTokenViewSet(GenericViewSet):
         agent_token = AgentToken.objects.filter(token=token, is_consumed=False, expiry_time__gte=timezone.now()).first()
         if agent_token:
             token_object = JWTAuthentication.generate_token(agent_token.user)
-            agent_token.is_consumed = True
+            # agent_token.is_consumed = True
             agent_token.save()
             return Response({"status": 1, "token": token_object['token'], 'order_id': agent_token.order_id})
         else:
