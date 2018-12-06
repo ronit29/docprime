@@ -1170,13 +1170,10 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
-
 class LabTestCategoryListViewSet(viewsets.GenericViewSet):
-
     # queryset = None
     def get_queryset(self):
         return None
-
     def list(self,request):
         parameters = request.query_params
         try:
@@ -1185,17 +1182,14 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 lab_tests = [int(x) for x in lab_tests.split(',')]
                 lab_tests = set(lab_tests)
         except:
-            return Response({}, status= status.HTTP_400_BAD_REQUEST)
-
+            return Response([], status= status.HTTP_400_BAD_REQUEST)
         if lab_tests:
-            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__id__in=lab_tests)
+            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__id__in=lab_tests, is_live = True)
         else:
-            categories = LabTestCategory.objects.prefetch_related('lab_tests').all()
+            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(is_live= True)
         empty = []
-
         if not categories:
-            return Response({})
-
+            return Response([])
         for lab_test_category in categories:
             resp = {}
             resp['category_name'] = lab_test_category.name
@@ -1204,16 +1198,11 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
             for lab_test in lab_test_category.lab_tests.all():
                 name = lab_test.name
                 id = lab_test.id
-
                 if lab_tests and id in lab_tests:
                     is_selected = True
                 else:
                     is_selected = False
                 temp_tests.append({'name': name, 'id': id, 'is_selected': is_selected})
             resp['tests'] = temp_tests
-
             empty.append(resp)
-
         return Response(empty)
-
-
