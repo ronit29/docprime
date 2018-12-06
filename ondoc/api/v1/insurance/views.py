@@ -305,7 +305,7 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
             if not user_insurance or not user_insurance.is_valid():
                 return Response({"message": "Insurance not found or expired."})
             insurer = user_insurance.insurance_plan.insurer
-            resp['insured_members'] = user_insurance.members.all().values('first_name', 'last_name', 'dob')
+            resp['insured_members'] = user_insurance.members.all().values('first_name', 'last_name', 'dob', 'relation')
             resp['purchase_date'] = user_insurance.purchase_date
             resp['expiry_date'] = user_insurance.expiry_date
             resp['policy_number'] = user_insurance.policy_number
