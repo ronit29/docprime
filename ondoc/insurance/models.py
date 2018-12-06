@@ -55,12 +55,19 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     name = models.CharField(max_length=100)
     #max_float = models.PositiveIntegerField(default=None)
     min_float = models.PositiveIntegerField(default=None)
-    enabled = models.BooleanField(default=True)
-    logo = models.ImageField('Insurer Logo', upload_to='insurer/images', null=True, blank=True)
-    website = models.CharField(max_length=100, null=True)
-    phone_number = models.BigIntegerField(blank=True, null=True)
-    email = models.EmailField(max_length=100, null=True)
+    logo = models.ImageField('Insurer Logo', upload_to='insurer/images', null=True, blank=False)
+    website = models.CharField(max_length=100, null=True, blank=False)
+    phone_number = models.BigIntegerField(blank=False, null=True)
+    email = models.EmailField(max_length=100, null=True, blank=False)
+    address = models.CharField(max_length=500, null=True, blank=False, default='')
+    company_name = models.CharField(max_length=100, null=True, blank=False, default='')
+    intermediary_name = models.CharField(max_length=100, null=True, blank=False, default='')
+    intermediary_code = models.CharField(max_length=100, null=True, blank=False, default='')
+    intermediary_contact_number = models.BigIntegerField(blank=False, null=True)
+    gstin_number = models.CharField(max_length=50, null=True, blank=False, default='')
+    signature = models.ImageField('Insurer Signature', upload_to='insurer/images', null=True, blank=False)
     is_live = models.BooleanField(default=False)
+    enabled = models.BooleanField(default=True)
 
     @property
     def get_active_plans(self):
@@ -171,7 +178,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         return str(self.user)
 
     def generate_pdf(self):
-        insured_members = self.members.all()
+        insured_members = self.members.filter().order_by('id')
         proposer = list(filter(lambda member: member.relation.lower() == 'self', insured_members))
         proposer = proposer[0]
 
@@ -193,7 +200,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                 'name': name.title(),
                 'member_number': count,
                 'dob': member.dob.strftime('%d-%m-%Y'),
-                'relation': member.relation,
+                'relation': member.relation.title(),
                 'id': member.id,
                 'gender': member.gender.title(),
                 'age': int((datetime.datetime.now().date() - member.dob).days/365),
@@ -207,31 +214,31 @@ class UserInsurance(auth_model.TimeStampedModel):
             'premium': self.premium_amount,
             'premium_in_words': ('%s rupees only.' % num2words(self.premium_amount)).title(),
             'proposer_name': proposer_name.title(),
-            'proposer_address': proposer.address,
+            'proposer_address': '%s, %s, %s, %s, %d' % (proposer.address, proposer.town, proposer.district, proposer.state, proposer.pincode),
             'proposer_mobile': proposer.phone_number,
-            'proposer_email': self.user.email,
-            'intermediary_name': 'DIRECT',
-            'intermediary_code': 'AMHI CODE',
-            'intermediary_contact_number': '1800-102-0333',
-            'issuing_office_address': 'Apollo Munich Health Insurance Co. Ltd. , iLABS Centre, 2nd & 3rd Floor, '
-                                      'Plot No 404 - 405, Udyog Vihar, Phase – III, Gurgaon-122016, Haryana',
-            'issuing_office_gstin': 'AMHI’s GSTIN no.',
+            'proposer_email': proposer.email,
+            'intermediary_name': self.insurance_plan.insurer.intermediary_name,
+            'intermediary_code': self.insurance_plan.insurer.intermediary_code,
+            'intermediary_contact_number': self.insurance_plan.insurer.intermediary_contact_number,
+            'issuing_office_address': self.insurance_plan.insurer.address,
+            'issuing_office_gstin': self.insurance_plan.insurer.gstin_number,
             'group_policy_name': 'Docprime Technologies Pvt. Ltd.',
             'group_policy_address': 'Plot No. 119, Sector 44, Gurugram, Haryana 122001',
             'group_policy_email': 'customercare@docprime.com',
-            'nominee_name': 'Legal Heir',
-            'nominee_relation': 'Legal Heir',
+            'nominee_name': '',
+            'nominee_relation': '',
             'nominee_address': '',
-            'policy_related_email': 'customerservice@apollomunichinsurance.com and customercare@docprime.com',
-            'policy_related_tollno': '1800-102-0333 and 1800-123-9419',
-            'policy_related_website': 'www.apollomunichinsurance.com and https://docprime.com/',
+            'policy_related_email': '%s and customercare@docprime.com' % self.insurance_plan.insurer.email,
+            'policy_related_tollno': '%d and 18001239419' % self.insurance_plan.insurer.intermediary_contact_number,
+            'policy_related_website': '%s and https://docprime.com' % self.insurance_plan.insurer.website,
             'current_date': datetime.datetime.now().date().strftime('%d-%m-%Y'),
             'policy_number': self.policy_number,
             'application_number': self.id,
             'total_member_covered': len(member_list),
             'plan': self.insurance_plan.name,
             'insured_members': member_list,
-            'insurer_logo': self.insurance_plan.insurer.logo.url
+            'insurer_logo': self.insurance_plan.insurer.logo.url,
+            'insurer_signature': self.insurance_plan.insurer.signature.url
         }
         html_body = render_to_string("pdfbody.html", context=context)
         filename = "COI_{}.pdf".format(str(timezone.now().timestamp()))
