@@ -1064,6 +1064,7 @@ class LabTestAdminForm(forms.ModelForm):
 
 
 class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
+    form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = [LabTestCategoryInline]

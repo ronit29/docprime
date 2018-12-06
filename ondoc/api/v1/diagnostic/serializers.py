@@ -87,14 +87,13 @@ class LabModelSerializer(serializers.ModelSerializer):
         if obj and obj.network and settings.THYROCARE_NETWORK_ID:
             if obj.network.id == settings.THYROCARE_NETWORK_ID:
                 return False
-        return  True
+        return True
 
     def get_rating(self, obj):
         if self.parent:
             return None
-        app = self.context.get('app', None)
-        if not app:
-            app = LabAppointment.objects.select_related('profile').all()
+
+        app = LabAppointment.objects.select_related('profile').all()
         queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app':app})
         return reviews.data[:5]
@@ -121,9 +120,7 @@ class LabModelSerializer(serializers.ModelSerializer):
             return None
 
         if obj and obj.rating:
-            data = rating_serializer.RatingsGraphSerializer(obj.rating, context={'request': self.context.get('request'),
-                                                                                 'r_count': obj.r_count if hasattr(obj,
-                                                                                                                   'r_count') else None}).data
+            data = rating_serializer.RatingsGraphSerializer(obj.rating, context={'request': self.context.get('request')}).data
             return data
         return None
 
@@ -891,6 +888,19 @@ class LabEntitySerializer(serializers.ModelSerializer):
         fields = ('id',  'thumbnail', 'name', 'address', 'entity_type')
 
 
+class CustomPackageLabSerializer(LabModelSerializer):
+    avg_rating = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Lab
+        fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
+                  'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating')
+
+    def get_avg_rating(self, obj):
+        return obj.avg_rating
+
+
 class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     lab = serializers.SerializerMethodField()
     distance = serializers.SerializerMethodField()
@@ -910,7 +920,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         for data in lab_data:
             if data.id == obj.lab:
-                return LabModelSerializer(data, context={'request': request}).data
+                return CustomPackageLabSerializer(data, context={'request': request}).data
 
     def get_distance(self, obj):
         return int(obj.distance.m)
@@ -932,3 +942,9 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         for data in lab_data:
             if data.id == obj.lab:
                 return data.lab_timings_today()[1]
+
+    def get_rating(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return data

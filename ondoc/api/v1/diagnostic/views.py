@@ -48,13 +48,11 @@ import re
 import datetime
 from django.contrib.auth import get_user_model
 from ondoc.matrix.tasks import push_order_to_matrix
-from django.db.models import Min
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
-from collections import defaultdict
-from itertools import groupby
 from django.db.models.expressions import Window
-from django.db.models.functions import Rank, RowNumber
+from django.db.models.functions import RowNumber
+from django.db.models import Avg
 User = get_user_model()
 
 
@@ -191,12 +189,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
         all_packages.extend([package for package in all_packages_in_non_network_labs])
         lab_ids = [package.lab for package in all_packages]
-        lab_data = Lab.objects.prefetch_related('rating', 'lab_documents').annotate(
-            r_count=Count('rating', filter=Q(rating__review__isnull=False), distinct=True)).filter(id__in=lab_ids)
-        app = LabAppointment.objects.select_related('profile').filter(lab_id__in=lab_ids)
+        lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network').annotate(
+            avg_rating=Avg('rating')).filter(id__in=lab_ids)
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
-                                                    context={'lab_data': lab_data, 'request': request,
-                                                             'app': app})
+                                                    context={'lab_data': lab_data, 'request': request})
         return Response(serializer.data)
 
 
