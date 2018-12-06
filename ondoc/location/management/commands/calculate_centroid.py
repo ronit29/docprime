@@ -7,50 +7,82 @@ from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
 
 
+# def new_calculate_centroid(ea):
+#     #ea = EntityAddress.objects.filter(id=ea_id).first()
+#     if ea:
+#         if ea.centroid:
+#             return ea.centroid
+#         #qs = all child of ea
+#         points=[]
+#         for x in qs:
+#             points.push(new_calculate_centroid(x))
+#
+#         #calculate centroid
+#         qa.centroid = calculated_centroid;
+#         return calculated_centroid
+#         #centroid = new_calculate_centroid(ea_)
+
 def new_calculate_centroid(ea):
     #ea = EntityAddress.objects.filter(id=ea_id).first()
     if ea:
         if ea.centroid:
             return ea.centroid
-        #qs = all child of ea
-        points=[]
-        for x in qs:
-            points.push(new_calculate_centroid(x))
+        #ea_child = all child of ea
+        ea_child_point_list = EntityAddress.objects.filter(parent=ea.id).values_list('id','centroid', flat=True)
 
         #calculate centroid
-        qa.centroid = calculated_centroid;
-        return calculated_centroid
+        if len(ea_child_point_list) > 3:
+            ea_child_point_list.append(ea_child_point_list[0])
+            p = Polygon(ea_child_point_list)
+            geo_poly = GEOSGeometry(p)
+            print("Before ", ea.centroid)
+            ea.centroid = geo_poly.centroid
+            ea.save()
+            print("After ", ea.centroid)
+            print('Successfull for location ', ea.value)
+        else:
+            print('Not sufficient point for location ', ea.value)
+
+        return ea.centroid
         #centroid = new_calculate_centroid(ea_)
 
 
-
 def calculate_centroid():
-    try:
-        entity_addr_queryset = EntityAddress.objects.filter(type__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
-        for address in entity_addr_queryset:
-            point_list = list()
-            entity_location_relationships_qs = address.associated_relations.filter(valid=True).values('object_id', 'content_type')
-            for entity_loc_relation in entity_location_relationships_qs:
-                ct = ContentType.objects.get_for_id(entity_loc_relation['content_type'])
-                obj = ct.get_object_for_this_type(pk=entity_loc_relation['object_id'])
+    entity_addr_queryset = EntityAddress.objects.all().filter(type=EntityAddress.AllowedKeys.COUNTRY).distinct('value')
+    for ea in entity_addr_queryset:
+        ea_centroid = new_calculate_centroid(ea)
 
-                point_list.append(GEOSGeometry('POINT(%s %s)' % (obj.location.x, obj.location.y)))
 
-            if len(point_list) > 3:
-                point_list.append(point_list[0])
-                p = Polygon(point_list)
-                geo_poly = GEOSGeometry(p)
-                print("Before ", address.centroid)
-                address.centroid = geo_poly.centroid
-                address.save()
-                print("After ", address.centroid)
-                print('Successfull for location ', address.value)
-            else:
-                print('Not sufficient point for location ', address.value)
 
-    except Exception as e:
-        print(str(e))
 
+#
+# def calculate_centroid():
+#     try:
+#         entity_addr_queryset = EntityAddress.objects.filter(type__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])
+#         for address in entity_addr_queryset:
+#             point_list = list()
+#             entity_location_relationships_qs = address.associated_relations.filter(valid=True).values('object_id', 'content_type')
+#             for entity_loc_relation in entity_location_relationships_qs:
+#                 ct = ContentType.objects.get_for_id(entity_loc_relation['content_type'])
+#                 obj = ct.get_object_for_this_type(pk=entity_loc_relation['object_id'])
+#
+#                 point_list.append(GEOSGeometry('POINT(%s %s)' % (obj.location.x, obj.location.y)))
+#
+#             if len(point_list) > 3:
+#                 point_list.append(point_list[0])
+#                 p = Polygon(point_list)
+#                 geo_poly = GEOSGeometry(p)
+#                 print("Before ", address.centroid)
+#                 address.centroid = geo_poly.centroid
+#                 address.save()
+#                 print("After ", address.centroid)
+#                 print('Successfull for location ', address.value)
+#             else:
+#                 print('Not sufficient point for location ', address.value)
+#
+#     except Exception as e:
+#         print(str(e))
+#
 
 class Command(BaseCommand):
     def handle(self, **options):
