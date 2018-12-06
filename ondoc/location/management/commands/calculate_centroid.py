@@ -7,6 +7,23 @@ from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
 
 
+def new_calculate_centroid(ea):
+    #ea = EntityAddress.objects.filter(id=ea_id).first()
+    if ea:
+        if ea.centroid:
+            return ea.centroid
+        #qs = all child of ea
+        points=[]
+        for x in qs:
+            points.push(new_calculate_centroid(x))
+
+        #calculate centroid
+        qa.centroid = calculated_centroid;
+        return calculated_centroid
+        #centroid = new_calculate_centroid(ea_)
+
+
+
 def calculate_centroid():
     try:
         entity_addr_queryset = EntityAddress.objects.filter(type__in=[EntityAddress.AllowedKeys.LOCALITY, EntityAddress.AllowedKeys.SUBLOCALITY])

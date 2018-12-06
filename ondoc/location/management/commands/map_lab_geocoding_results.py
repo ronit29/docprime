@@ -1,8 +1,10 @@
 from django.core.management.base import BaseCommand
 from ondoc.diagnostic.models import Lab
-from ondoc.location.models import  GeocodingResults
+from ondoc.location.models import GeocodingResults
+
 
 def map_lab_geocoding_results():
+
     all_labs = Lab.objects.filter(is_live=True)
 
     print("Attempting for lab.", len(all_labs))
