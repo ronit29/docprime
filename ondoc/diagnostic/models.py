@@ -685,7 +685,6 @@ class LabTest(TimeStampedModel, SearchKey):
     enable_for_retail = models.BooleanField(default=False)
     hide_price = models.BooleanField(default=False)
     searchable = models.BooleanField(default=True)
-
     categories = models.ManyToManyField(LabTestCategory,
                                         through=LabTestCategoryMapping,
                                         through_fields=('lab_test', 'parent_category'),

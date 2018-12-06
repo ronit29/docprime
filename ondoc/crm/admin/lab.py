@@ -1054,17 +1054,16 @@ class LabTestAdminForm(forms.ModelForm):
         cleaned_data = self.cleaned_data
         # is_package toggles handling
         if cleaned_data.get('is_package', False):
-            if self.instance:
+            if self.instance.pk:
                 if self.instance.parent_lab_test_category_mappings.filter(parent_category__is_package_category=False).count():
                     raise forms.ValidationError("Already has lab test category as parent(s). Remove all of them and try again.")
         else:
-            if self.instance:
+            if self.instance.pk:
                 if self.instance.parent_lab_test_category_mappings.filter(parent_category__is_package_category=True).count():
                     raise forms.ValidationError("Already has lab test package category as parent(s). Remove all of them and try again.")
 
 
 class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
-    form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = [LabTestCategoryInline]
@@ -1110,11 +1109,11 @@ class LabTestCategoryForm(forms.ModelForm):
             raise forms.ValidationError('This category cannot have preferred lab test.')
         # is_package_category toggles handling
         if cleaned_data.get('is_package_category', False):
-            if self.instance:
+            if self.instance.pk:
                 if self.instance.lab_test_mappings.filter(lab_test__is_package=False).count():
                     raise forms.ValidationError('This category has lab test under it, delete all of them and try again.')
         else:
-            if self.instance:
+            if self.instance.pk:
                 if self.instance.lab_test_mappings.filter(lab_test__is_package=True).count():
                     raise forms.ValidationError('This category has lab test package(s) under it, delete all of them and try again.')
         preferred_lab_test = cleaned_data.get('preferred_lab_test')
@@ -1133,6 +1132,7 @@ class LabTestCategoryAdmin(VersionAdmin):
     exclude = ['search_key']
     search_fields = ['name']
     form = LabTestCategoryForm
+    autocomplete_fields = ['preferred_lab_test']
 
 
 class AvailableLabTestAdmin(VersionAdmin):

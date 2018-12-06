@@ -133,7 +133,7 @@ class UserViewset(GenericViewSet):
             user = User.objects.create(phone_number=data['phone_number'],
                                        is_phone_number_verified=True,
                                        user_type=User.CONSUMER)
-            self.set_coupons(user)
+        self.set_coupons(user)
 
         token_object = JWTAuthentication.generate_token(user)
 
