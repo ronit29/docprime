@@ -92,8 +92,9 @@ class LabModelSerializer(serializers.ModelSerializer):
     def get_rating(self, obj):
         if self.parent:
             return None
-        
-        app = LabAppointment.objects.select_related('profile').all()
+        app = self.context.get('app', None)
+        if not app:
+            app = LabAppointment.objects.select_related('profile').all()
         queryset = obj.rating.prefetch_related('compliment').exclude(Q(review='') | Q(review=None)).filter(is_live=True).order_by('-updated_at')
         reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app':app})
         return reviews.data[:5]
@@ -120,7 +121,9 @@ class LabModelSerializer(serializers.ModelSerializer):
             return None
 
         if obj and obj.rating:
-            data = rating_serializer.RatingsGraphSerializer(obj.rating, context={'request':self.context.get('request')}).data
+            data = rating_serializer.RatingsGraphSerializer(obj.rating, context={'request': self.context.get('request'),
+                                                                                 'r_count': obj.r_count if hasattr(obj,
+                                                                                                                   'r_count') else None}).data
             return data
         return None
 
@@ -864,7 +867,6 @@ class LabReportSerializer(serializers.Serializer):
         return value
 
 
-
 class LabEntitySerializer(serializers.ModelSerializer):
 
     address = serializers.SerializerMethodField()
@@ -887,3 +889,46 @@ class LabEntitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Lab
         fields = ('id',  'thumbnail', 'name', 'address', 'entity_type')
+
+
+class CustomLabTestPackageSerializer(serializers.ModelSerializer):
+    lab = serializers.SerializerMethodField()
+    distance = serializers.SerializerMethodField()
+    mrp = serializers.SerializerMethodField()
+    deal_price = serializers.SerializerMethodField()
+    lab_timings = serializers.SerializerMethodField()
+    lab_timings_data = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabTest
+        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'deal_price', 'lab_timings', 'lab_timings_data',
+                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info')
+        # fields = ('__all__')
+
+    def get_lab(self, obj):
+        lab_data = self.context.get('lab_data')
+        request = self.context.get('request')
+        for data in lab_data:
+            if data.id == obj.lab:
+                return LabModelSerializer(data, context={'request': request}).data
+
+    def get_distance(self, obj):
+        return int(obj.distance.m)
+
+    def get_mrp(self, obj):
+        return str(obj.mrp)
+
+    def get_deal_price(self, obj):
+        return str(obj.deal_price)
+
+    def get_lab_timings(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return data.lab_timings_today()[0]
+
+    def get_lab_timings_data(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return data.lab_timings_today()[1]

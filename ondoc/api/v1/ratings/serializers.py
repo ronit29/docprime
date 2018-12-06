@@ -85,6 +85,8 @@ class RatingsGraphSerializer(serializers.Serializer):
         return count
 
     def get_review_count(self, obj):
+        if 'r_count' in self.context:
+            return self.context.get('r_count')
         count = obj.exclude(Q(review='') | Q(review=None)).count()
         return count
 

@@ -1461,3 +1461,23 @@ class LabTestGroup(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'lab_test_group'
 
+
+def get_lab_timings_today(self, day_now=timezone.now().weekday()):
+    lab_timing = list()
+    lab_timing_data = list()
+    if self.always_open:
+        lab_timing.append("12:00 AM - 11:45 PM")
+        lab_timing_data.append({
+            "start": str(0.0),
+            "end": str(23.75)
+        })
+    else:
+        timing_queryset = self.lab_timings.all()
+        for data in timing_queryset:
+            if data.day == day_now:
+                lab_timing.append('{} - {}'.format(LabTiming.TIME_CHOICES[data.start], LabTiming.TIME_CHOICES[data.end]))
+                lab_timing_data.append({"start": str(data.start), "end": str(data.end)})
+    return ' | '.join(lab_timing), lab_timing_data
+
+
+Lab.lab_timings_today = get_lab_timings_today
