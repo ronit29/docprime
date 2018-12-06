@@ -934,7 +934,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
         INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
-        INSURANCE_FAILURE_REDIRECT_URL = settings.BASE_URL + "/preview"
+        INSURANCE_FAILURE_REDIRECT_URL = settings.BASE_URL + "/insurancereviews"
         LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
         OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
         ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
