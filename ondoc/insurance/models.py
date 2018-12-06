@@ -270,11 +270,16 @@ class UserInsurance(auth_model.TimeStampedModel):
             if member['profile']:
                 profile = member['profile']
             elif existing_profile:
-                profile = existing_profile.id
+                profile = existing_profile
             if profile:
-                if profile.get('user_id') == user.id:
-                    member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
-                                                    dob=member['dob'])
+                if profile.user_id == user.id:
+                    profile.name = name
+                    profile.email = member['email']
+                    profile.gender = member['gender']
+                    profile.dob = member['dob']
+                    profile.save()
+
+                profile = profile.id
         # Create Profile if not exist with name or not exist in profile id from request
         else:
             member_profile = UserProfile.objects.create(name=name,
