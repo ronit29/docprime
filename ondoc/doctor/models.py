@@ -525,6 +525,7 @@ class DoctorClinic(auth_model.TimeStampedModel):
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=False)
     enabled = models.BooleanField(verbose_name='Enabled', default=True)
     priority = models.PositiveSmallIntegerField(blank=True, null=True, default=0)
+
     class Meta:
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
@@ -1091,6 +1092,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
+    rating = GenericRelation(ratings_models.RatingsReview)
     procedures = models.ManyToManyField('procedure.Procedure', through='OpdAppointmentProcedureMapping',
                                         through_fields=('opd_appointment', 'procedure'), null=True, blank=True)
 

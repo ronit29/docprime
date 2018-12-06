@@ -27,7 +27,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabNetwork, Lab, LabOnboardingToken, LabService, LabDoctorAvailability,
                                      LabDoctor, LabDocument, LabTest, DiagnosticConditionLabTest, LabNetworkDocument,
                                      LabAppointment, HomePickupCharges,
-                                     TestParameter, ParameterLabTest, LabReport, LabReportFile, LabTestCategoryMapping)
+                                     TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer, LabReport, LabReportFile, LabTestCategoryMapping)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
@@ -973,6 +973,22 @@ class ParameterLabTestInline(admin.TabularInline):
         return super().get_queryset(request)
 
 
+class FAQLabTestInLine(admin.StackedInline):
+    model = QuestionAnswer
+    verbose_name = 'Frequently Asked Questions'
+    can_delete = True
+    fields = ['test_question', 'test_answer']
+    extra = 0
+
+
+class FrequentlyBookedTogetherTestInLine(admin.StackedInline):
+    model = FrequentlyAddedTogetherTests
+    verbose_name = 'Frequently booked together'
+    can_delete = True
+    fk_name = 'original_test'
+    fields = ['original_test', 'booked_together_test']
+    extra = 0
+
 class TestPackageFormSet(forms.BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -1041,6 +1057,8 @@ class LabTestCategoryInline(AutoComplete, TabularInline):
 
 class LabTestAdminForm(forms.ModelForm):
     why = forms.CharField(widget=forms.Textarea, required=False)
+    about_test = forms.CharField(widget=forms.Textarea, required=False)
+    preparations = forms.CharField(widget=forms.Textarea, required=False)
 
     class Media:
         extend = False
@@ -1064,9 +1082,10 @@ class LabTestAdminForm(forms.ModelForm):
 
 
 class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
+    form = LabTestAdminForm
     change_list_template = 'superuser_import_export.html'
     formats = (base_formats.XLS, base_formats.XLSX,)
-    inlines = [LabTestCategoryInline]
+    inlines = [LabTestCategoryInline, FAQLabTestInLine, FrequentlyBookedTogetherTestInLine]
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']

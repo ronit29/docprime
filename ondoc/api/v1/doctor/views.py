@@ -4,7 +4,7 @@ from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
-from ondoc.doctor.models import Hospital, Doctor, DoctorClinic
+#from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon
@@ -19,7 +19,7 @@ from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, paymen
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import Point, GEOSGeometry
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework import mixins
@@ -54,6 +54,7 @@ from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
 from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
+from django.db.models import Avg
 from django.db.models import Count
 
 
@@ -1822,3 +1823,73 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             if admin.exists():
                 admin.update(user=user, name=valid_data.get('name'), phone_number=valid_data.get('phone_number'))
         return Response({'success': 'Created Successfully'})
+
+
+class HospitalNetworkListViewset(viewsets.GenericViewSet):
+
+    def list(self, request, hospital_network_id):
+        parameters = request.query_params
+        serializer = serializers.HospitalCardSerializer(data=parameters)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        queryset = Hospital.objects.prefetch_related('assoc_doctors', 'assoc_doctors__rating', 'assoc_doctors__doctorpracticespecializations',
+                                                     'assoc_doctors__doctorpracticespecializations__specialization',
+                                                     'assoc_doctors__doctorpracticespecializations__specialization__department').filter(network_id=hospital_network_id).annotate(doctor_count=Count('assoc_doctors', distinct=True) )
+        resp1 = {}
+        longitude = valid_data.get('longitude')
+        latitude = valid_data.get('latitude')
+
+        pnt = Point(float(longitude), float(latitude))
+
+        if not queryset.exists():
+            return Response([])
+
+        if len(queryset) > 0:
+            info = []
+            network_name = None
+
+            for data in queryset:
+                resp = {}
+                ratings = None
+
+                location = data.location if data.location else None
+                if location:
+                    distance = pnt.distance(location)*100
+                    resp['distance'] = distance
+                else:
+                    resp['distance'] = None
+
+                all_doctors = data.assoc_doctors.all()
+                empty = []
+                for doctor_ratings in all_doctors:
+                    final_ratings = [rating.ratings for rating in doctor_ratings.rating.all()]
+                    empty.extend(final_ratings)
+
+                ans=set()
+                ans1=set()
+                for doctor in all_doctors:
+                     ans = [dps.specialization.name for dps in doctor.doctorpracticespecializations.all()]
+                     ans1 = [dpn.name for dps in doctor.doctorpracticespecializations.all() for dpn in dps.specialization.department.all()]
+
+                ratings_count = None
+                if len(empty) > 0:
+                    ratings_count = sum(empty)/len(empty)
+                resp['hospital_specialization'] = ', '.join(ans) if len(ans) < 3 else 'Multispeciality'
+                if ans1:
+                    ans1 = set(filter(lambda v: v is not None, ans1))
+                    resp['departments'] = ', '.join(ans1) if len(ans1) < 3 else '%s + %d  more.' %(', '.join(list(ans1)[:2]), len(ans1)-2)
+                resp['hospital_ratings'] = ratings_count if ratings_count else None
+                resp['id'] = data.id
+                resp['city'] = data.city if data.city else None
+                resp['state'] = data.state if data.state else None
+                resp['country'] = data.country if data.country else None
+                resp['address'] = data.get_hos_address()
+                resp['name'] = data.name if data.name else None
+                resp['number_of_doctors'] = data.doctor_count if data.doctor_count else None
+                info.append(resp)
+
+                if not network_name:
+                    network_name = data.network.name if data.network else None
+                    resp1 = {"network_name": network_name, "hospitals": info}
+
+        return Response(resp1)

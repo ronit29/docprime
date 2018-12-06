@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet, LabTimingListView,
-                    AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet, DoctorLabAppointmentsNoAuthViewSet)
+                    AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet,
+                    DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset)
 # from rest_framework.routers import DefaultRouter
 #
 # router = DefaultRouter()
@@ -18,6 +19,7 @@ urlpatterns = [
     path('lablist_by_url', LabList.as_view({'get': 'list_by_url'}), name='search_by_city'),
     path('lablist/<int:lab_id>', LabList.as_view({'get': 'retrieve'}), name='lab-list-detail'),
     path('lablistbyurl', LabList.as_view({'get': 'retrieve_by_url'}), name='lab-list-by-url'),
+    path('testbyurl', LabList.as_view({'get':'retrieve_test_by_url'}), name='retrieve-test-by-url'),
     # path('lab/appointment', LabAppointmentsViewSet.as_view({'get': 'list'}), name='lab-appointment-list'),
     path('labappointment/create', LabAppointmentView.as_view({'post': 'create'}),
          name='lab-create-appointment'),
@@ -40,4 +42,5 @@ urlpatterns = [
          name='lab-appointment-complete'),
     path('appointment/complete', DoctorLabAppointmentsNoAuthViewSet.as_view({'post': 'complete'}),
          name='appointment-complete'),
+    path('test/details/<int:test_id>', TestDetailsViewset.as_view({'get':'retrieve'}), name='test-details'),
 ]
