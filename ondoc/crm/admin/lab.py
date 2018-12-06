@@ -1013,7 +1013,7 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         all_parent_categories = []
         count_is_primary = 0
         for value in self.cleaned_data:
-            if not value.get("DELETE"):
+            if value and not value.get("DELETE"):
                 all_parent_categories.append(value.get('parent_category'))
                 if value.get('is_primary', False):
                     count_is_primary += 1
