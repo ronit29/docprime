@@ -160,7 +160,10 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                 pre_insured_members['email'] = member['email']
                 pre_insured_members['relation'] = member['relation']
                 # pre_insured_members['profile'] = member_profile.get('id')
-                pre_insured_members['profile'] = member['profile']
+                if member['profile']:
+                    pre_insured_members['profile'] = member['profile'].id
+                else:
+                    pre_insured_members['profile'] = member['profile']
                 pre_insured_members['gender'] = member['gender']
                 pre_insured_members['member_type'] = member['member_type']
                 pre_insured_members['town'] = member['town']
@@ -170,7 +173,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                 insured_members_list.append(pre_insured_members.copy())
 
                 if member['relation'] == 'self':
-                    user_profile = UserProfile.objects.filter(id=member['profile'], user_id=request.user.pk).values('id'
+                    user_profile = UserProfile.objects.filter(id=member['profile'].id, user_id=request.user.pk).values('id'
                                                                                                         ,'name',
                                                                                                         'email',
                                                                                                         'gender',
@@ -302,7 +305,7 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
             if not user_insurance or not user_insurance.is_valid():
                 return Response({"message": "Insurance not found or expired."})
             insurer = user_insurance.insurance_plan.insurer
-            resp['insured_members'] = user_insurance.members.all().values('first_name', 'last_name', 'dob')
+            resp['insured_members'] = user_insurance.members.all().values('first_name', 'last_name', 'dob', 'relation')
             resp['purchase_date'] = user_insurance.purchase_date
             resp['expiry_date'] = user_insurance.expiry_date
             resp['policy_number'] = user_insurance.policy_number
