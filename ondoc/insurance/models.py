@@ -159,6 +159,35 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
     def __str__(self):
         return str(self.insurance_plan)
 
+    def age_validate(self, member):
+        message = {}
+        dob_flag = False
+        # Calculate day difference between dob and current date
+        current_date = datetime.datetime.now().date()
+        days_diff = current_date - member['dob']
+        days_diff = days_diff.days
+        years_diff = days_diff / 365
+        years_diff = int(years_diff)
+        adult_max_age = self.max_age
+        adult_min_age = self.min_age
+        child_min_age = self.child_min_age
+        # Age validation for parent in years
+        if member['member_type'] == "adult":
+            if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
+                dob_flag = True
+            elif adult_max_age <= years_diff:
+                message = {"message": "Adult Age would be less than " + str(adult_max_age) + " years"}
+            elif adult_min_age >= years_diff:
+                message = {"message": "Adult Age would be more than " + str(adult_min_age) + " years"}
+        # Age validation for child in days
+        if member['member_type'] == "child":
+            if child_min_age <= days_diff:
+                dob_flag = True
+            else:
+                message = {"message": "Child Age would be more than " + str(child_min_age) + " days"}
+        return dob_flag, message
+
+
     class Meta:
         db_table = "insurance_threshold"
 

@@ -80,33 +80,33 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    def age_validate(self, member, insurance_threshold):
-        message = {}
-        dob_flag = False
-        # Calculate day difference between dob and current date
-        current_date = datetime.datetime.now().date()
-        days_diff = current_date - member['dob']
-        days_diff = days_diff.days
-        years_diff = days_diff / 365
-        years_diff = int(years_diff)
-        adult_max_age = insurance_threshold.max_age
-        adult_min_age = insurance_threshold.min_age
-        child_min_age = insurance_threshold.child_min_age
-        # Age validation for parent in years
-        if member['member_type'] == "adult":
-            if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
-                dob_flag = True
-            elif adult_max_age <= years_diff:
-                message = {"message": "Adult Age would be less than " + str(adult_max_age) + " years"}
-            elif adult_min_age >= years_diff:
-                message = {"message": "Adult Age would be more than " + str(adult_min_age) + " years"}
-        # Age validation for child in days
-        if member['member_type'] == "child":
-            if child_min_age <= days_diff:
-                dob_flag = True
-            else:
-                message = {"message": "Child Age would be more than " + str(child_min_age) + " days"}
-        return dob_flag, message
+    # def age_validate(self, member, insurance_threshold):
+    #     message = {}
+    #     dob_flag = False
+    #     # Calculate day difference between dob and current date
+    #     current_date = datetime.datetime.now().date()
+    #     days_diff = current_date - member['dob']
+    #     days_diff = days_diff.days
+    #     years_diff = days_diff / 365
+    #     years_diff = int(years_diff)
+    #     adult_max_age = insurance_threshold.max_age
+    #     adult_min_age = insurance_threshold.min_age
+    #     child_min_age = insurance_threshold.child_min_age
+    #     # Age validation for parent in years
+    #     if member['member_type'] == "adult":
+    #         if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
+    #             dob_flag = True
+    #         elif adult_max_age <= years_diff:
+    #             message = {"message": "Adult Age would be less than " + str(adult_max_age) + " years"}
+    #         elif adult_min_age >= years_diff:
+    #             message = {"message": "Adult Age would be more than " + str(adult_min_age) + " years"}
+    #     # Age validation for child in days
+    #     if member['member_type'] == "child":
+    #         if child_min_age <= days_diff:
+    #             dob_flag = True
+    #         else:
+    #             message = {"message": "Child Age would be more than " + str(child_min_age) + " days"}
+    #     return dob_flag, message
 
     @transaction.atomic
     def create_order(self, request):
@@ -116,7 +116,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         if user_insurance and user_insurance.is_valid():
             return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
-        serializer = serializers.InsuredMemberSerializer(data=request.data)
+        serializer = serializers.InsuredMemberSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         amount = None
@@ -131,16 +131,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             insured_members_list = []
             insurance_plan = request.data.get('insurance_plan')
             for member in members:
-                if insurance_plan:
-                    # Age Validation for parent and child
-                    insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
-                                                                            insurance_plan).first()
-                    dob_flag, error_message = self.age_validate(member, insurance_threshold)
-                    if dob_flag:
-                        pre_insured_members['dob'] = member['dob']
-                    else:
-                        return Response(error_message, status=status.HTTP_404_NOT_FOUND)
-                else:
+                if not insurance_plan:
                     return Response({"message": "Insurance Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
                 # User Profile creation or updation
                 # profile_flag, profile, profile_id = self.profile_create_or_update(member, request)

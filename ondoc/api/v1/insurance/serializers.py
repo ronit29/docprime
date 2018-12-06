@@ -64,6 +64,17 @@ class MemberListSerializer(serializers.Serializer):
     district = serializers.CharField(max_length=100)
     state = serializers.CharField(max_length=100)
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+        insurance_plan = request.data.get('insurance_plan')
+        if insurance_plan:
+            insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
+                                                                    insurance_plan).first()
+            dob_flag, message = insurance_threshold.age_validate(attrs)
+            if not dob_flag:
+                raise serializers.ValidationError({'dob': message.get('message')})
+        return attrs
+
 
 class InsuredMemberSerializer(serializers.Serializer):
 
