@@ -1919,7 +1919,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             offline_queryset = offline_queryset.filter(time_slot_start__date__range=(start_date, end_date)).order_by('time_slot_start')
         final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
         resp = []
-
+        group = {}
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
             patient_name = phone_number = is_docprime = None
@@ -1946,5 +1946,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['time_slot_start'] = app.time_slot_start
             ret_obj['status'] = app.status
             ret_obj['is_docprime'] = is_docprime
-            resp.append(ret_obj)
-        return Response(resp)
+            if group.get(app.time_slot_start.strftime("%B %d, %Y")):
+                group[app.time_slot_start.strftime("%B %d, %Y")].append(ret_obj)
+            else:
+                group[app.time_slot_start.strftime("%B %d, %Y")] = [ret_obj]
+            # resp.append(ret_obj)
+        return Response(group)
