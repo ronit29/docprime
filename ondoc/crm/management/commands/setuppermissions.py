@@ -368,6 +368,8 @@ class Command(BaseCommand):
 
         self.create_elastic_group()
 
+        self.create_labtest_team()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
@@ -540,6 +542,18 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(report_models.GeneratedReport, for_concrete_models=False)
+
+        for cl, ct in content_types.items():
+            Permission.objects.get_or_create(content_type=ct, codename='change_' + ct.model)
+            permissions = Permission.objects.filter(content_type=ct, codename='change_' + ct.model)
+            group.permissions.add(*permissions)
+
+
+    def create_labtest_team(self):
+        group, created = Group.objects.get_or_create(name=constants['LAB_TEST_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(LabTest)
 
         for cl, ct in content_types.items():
             Permission.objects.get_or_create(content_type=ct, codename='change_' + ct.model)
