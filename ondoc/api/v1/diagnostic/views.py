@@ -1104,14 +1104,14 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 lab_tests = [int(x) for x in lab_tests.split(',')]
                 lab_tests = set(lab_tests)
         except:
-            return Response({}, status= status.HTTP_400_BAD_REQUEST)
+            return Response([], status= status.HTTP_400_BAD_REQUEST)
         if lab_tests:
             categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__id__in=lab_tests, is_live = True)
         else:
             categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(is_live= True)
         empty = []
         if not categories:
-            return Response({})
+            return Response([])
         for lab_test_category in categories:
             resp = {}
             resp['category_name'] = lab_test_category.name
