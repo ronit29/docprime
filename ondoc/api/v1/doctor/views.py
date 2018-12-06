@@ -15,7 +15,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     get_selected_and_other_procedures, CommonProcedure
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
-from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, TimeSlotExtraction, GenericAdminEntity
+from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, \
+    TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min
@@ -26,14 +27,13 @@ from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
 from ondoc.authentication.backends import JWTAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
 from django.db.models import Q, Value, Case, When
 from operator import itemgetter
-from itertools import groupby
+from itertools import groupby,chain
 from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_parameters
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -42,7 +42,6 @@ from django.db.models.functions import StrIndex
 import datetime
 import copy
 import re
-import hashlib
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as rating_models
@@ -93,40 +92,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         return None
 
     def get_pem_queryset(self, user):
-        queryset = models.OpdAppointment.objects \
-            .select_related('doctor', 'hospital', 'profile') \
-            .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
-                              'doctor__qualifications', 'doctor__doctorpracticespecializations') \
-            .filter(hospital__is_live=True, doctor__is_live=True) \
-            .filter(
-            Q(
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital=F('hospital'),
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                   auth_models.GenericAdmin.ALL]) |
-                Q(doctor__manageable_doctors__user=user,
-                    doctor__manageable_doctors__hospital__isnull=True,
-                    doctor__manageable_doctors__is_disabled=False,
-                    doctor__manageable_doctors__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                   auth_models.GenericAdmin.ALL])
-                 |
-                Q(hospital__manageable_hospitals__doctor__isnull=True,
-                  hospital__manageable_hospitals__user=user,
-                  hospital__manageable_hospitals__is_disabled=False,
-                  hospital__manageable_hospitals__permission_type__in=[auth_models.GenericAdmin.APPOINTMENT,
-                                                                       auth_models.GenericAdmin.ALL])
-            ) |
-            Q(
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__super_user_permission=True,
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR, ) |
-                Q(hospital__manageable_hospitals__user=user,
-                  hospital__manageable_hospitals__super_user_permission=True,
-                  hospital__manageable_hospitals__is_disabled=False,
-                  hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-            ))
+        queryset = get_opd_pem_queryset(user, models.OpdAppointment)
         return queryset
 
     @transaction.non_atomic_requests
@@ -1933,3 +1899,52 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             timeslots[day] = day_timing
         return Response({"timeslots": timeslots,
                          "doctor_leaves": doctor_leave_serializer.data})
+
+    def list_appointments(self, request):
+        ONLINE = 1
+        OFFLINE = 2
+        request.user = User.objects.get(id=50)
+        serializer = serializers.OfflineAppointmentFilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
+            .select_related('profile').distinct()
+        offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
+            .prefetch_related('user__patient_mobiles').distinct()
+        start_date = valid_data.get('start_date')
+        end_date = valid_data.get('end_date')
+        final_data = []
+        if start_date and end_date:
+            online_queryset = online_queryset.filter(time_slot_start__date__range=(start_date, end_date)).order_by('time_slot_start')
+            offline_queryset = offline_queryset.filter(time_slot_start__date__range=(start_date, end_date)).order_by('time_slot_start')
+        final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
+        resp = []
+
+        for app in final_data:
+            instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
+            patient_name = phone_number = is_docprime = None
+            if instance == OFFLINE:
+                is_docprime = False
+                patient_name = app.user.name if hasattr(app.user, 'name') else None
+                phone_number_query = app.user.patient_mobiles.filter(is_default=True) if hasattr(app.user, 'patient_mobiles') else None
+                if phone_number_query.exists():
+                    phone_number = phone_number_query.first().phone_number
+            else:
+                is_docprime = True
+                phone_number = app.user.phone_number
+                patient_name = app.profile.name if hasattr(app, 'profile') else None
+
+            ret_obj = {}
+            ret_obj['id'] = app.id
+            ret_obj['patient_number'] = phone_number
+            ret_obj['patient_name'] = patient_name
+
+            ret_obj['doctor_name'] = app.doctor.name
+            ret_obj['doctor_id'] = app.doctor.id
+            ret_obj['hospital_id'] = app.hospital.id
+            ret_obj['hospital_name'] = app.hospital.name
+            ret_obj['time_slot_start'] = app.time_slot_start
+            ret_obj['status'] = app.status
+            ret_obj['is_docprime'] = is_docprime
+            resp.append(ret_obj)
+        return Response(resp)

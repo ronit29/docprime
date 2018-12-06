@@ -772,3 +772,42 @@ class GenericAdminEntity():
     HOSPITAL = 2
     LAB = 3
     EntityChoices = [(DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'), (LAB, 'Lab')]
+
+
+def get_opd_pem_queryset(user, model):
+    from ondoc.authentication.models import GenericAdmin
+    queryset = model.objects \
+        .select_related('doctor', 'hospital', 'user') \
+        .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
+                          'doctor__qualifications', 'doctor__doctorpracticespecializations') \
+        .filter(hospital__is_live=True, doctor__is_live=True) \
+        .filter(
+        Q(
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__hospital=F('hospital'),
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT,
+                                                               GenericAdmin.ALL]) |
+            Q(doctor__manageable_doctors__user=user,
+                doctor__manageable_doctors__hospital__isnull=True,
+                doctor__manageable_doctors__is_disabled=False,
+                doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT,
+                                                               GenericAdmin.ALL])
+             |
+            Q(hospital__manageable_hospitals__doctor__isnull=True,
+              hospital__manageable_hospitals__user=user,
+              hospital__manageable_hospitals__is_disabled=False,
+              hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT,
+                                                                   GenericAdmin.ALL])
+        ) |
+        Q(
+            Q(doctor__manageable_doctors__user=user,
+              doctor__manageable_doctors__super_user_permission=True,
+              doctor__manageable_doctors__is_disabled=False,
+              doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR, ) |
+            Q(hospital__manageable_hospitals__user=user,
+              hospital__manageable_hospitals__super_user_permission=True,
+              hospital__manageable_hospitals__is_disabled=False,
+              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+        ))
+    return queryset

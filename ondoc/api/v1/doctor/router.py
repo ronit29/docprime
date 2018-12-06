@@ -51,4 +51,5 @@ urlpatterns = [
     path('create_offline_appointments', OfflineCustomerViewSet.as_view({'post': 'create_offline_appointments'}), name='create_offline_appointments'),
     path('offline_timings', OfflineCustomerViewSet.as_view({'get': 'offline_timings'}), name='offline_timings'),
     path('list_patients', OfflineCustomerViewSet.as_view({'get': 'list_patients'}), name='list_patients'),
+    path('list_appointments', OfflineCustomerViewSet.as_view({'get': 'list_appointments'}), name='list_appointments'),
 ]
