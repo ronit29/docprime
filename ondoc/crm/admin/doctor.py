@@ -932,7 +932,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             exclude += ['source', 'batch', 'lead_url', 'registered', 'created_by', 'about', 'raw_about',
             'additional_details', 'is_insurance_enabled', 'is_insurance_enabled', 'is_online_consultation_enabled',
             'online_consultation_fees', 'is_retail_enabled', 'is_internal', 'is_test_doctor', 'doctor_signature',
-            'is_enabled', 'matrix_reference_id', 'doctor_signature','enabled_for_online_booking']
+            'is_enabled', 'matrix_reference_id', 'doctor_signature','enabled_for_online_booking','raw_about']
 
         return exclude
 
@@ -941,13 +941,25 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         if not request.user.is_member_of(constants['SUPER_QC_GROUP']) and not request.user.is_superuser:
             read_only_fields += ['onboarding_status']
         if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
-            read_only_fields += ['name', 'gender', 'practicing_since',  'license', 'additional_details',
+            read_only_fields += ['name', 'gender', 'license', 'additional_details',
                                  'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
                                  'online_consultation_fees', 'live_at', 'is_internal',
-                                 'is_test_doctor', 'is_license_verified', 'signature', 'enabled']
-        excluded = self.get_exclude(request, obj) 
+                                 'is_test_doctor', 'is_license_verified', 'signature', 'enabled', 'raw_about']
+        excluded = self.get_exclude(request, obj)
         final = [x for x in read_only_fields if x not in excluded]
-                        
+        #make matrix_lead_id ediable if not present or user is superqc or superuser
+        is_matrix_id_editable = False
+        if obj:
+            if not obj.matrix_lead_id:
+                is_matrix_id_editable = True
+            if request.user.is_member_of(constants['SUPER_QC_GROUP']) or request.user.is_superuser:
+                is_matrix_id_editable = True
+        else:
+            is_matrix_id_editable = True
+
+        if is_matrix_id_editable:
+            final.remove('matrix_lead_id')
+
         return final
 
     def lead_url(self, instance):
@@ -1027,14 +1039,18 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         return ""
 
     def get_form(self, request, obj=None, **kwargs):
-        if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
-            kwargs['form'] = DoctorForm
+        # if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
+        #     kwargs['form'] = DoctorForm
+        kwargs['form'] = DoctorForm            
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
         if not request.user.is_superuser and\
             (not request.user.is_member_of(constants['QC_GROUP_NAME']) and not request.user.is_member_of(constants['SUPER_QC_GROUP']) ):
             form.base_fields['assigned_to'].disabled = True
+        if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
+            form.base_fields['raw_about'].disabled = True
+            form.base_fields['additional_details'].disabled = True
         return form
 
     def save_formset(self, request, form, formset, change):
