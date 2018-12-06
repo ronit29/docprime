@@ -1107,7 +1107,7 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 lab_tests = [int(x) for x in lab_tests.split(',')]
                 lab_tests = set(lab_tests)
         except:
-            return Response({},status= status.HTTP_400_BAD_REQUEST)
+            return Response({}, status= status.HTTP_400_BAD_REQUEST)
 
         if lab_tests:
             categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__id__in=lab_tests)
@@ -1122,7 +1122,7 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
             resp = {}
             resp['category_name'] = lab_test_category.name
             resp['category_id'] = lab_test_category.id
-            temp_tests=[]
+            temp_tests = []
             for lab_test in lab_test_category.lab_tests.all():
                 name = lab_test.name
                 id = lab_test.id
@@ -1131,8 +1131,8 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                     is_selected = True
                 else:
                     is_selected = False
-                temp_tests.append({'name' : name, 'id': id ,'is_selected':is_selected})
-            resp['tests']=temp_tests
+                temp_tests.append({'name': name, 'id': id, 'is_selected': is_selected})
+            resp['tests'] = temp_tests
 
             empty.append(resp)
 
