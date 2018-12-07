@@ -393,7 +393,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                 if user_insurance.is_valid():
                     insured_members = user_insurance.members.all().filter(profile=profile)
                     if insured_members:
-                        if appointment_data['extra_detail']:
+                        if appointment_data['extra_details']:
                             for detail in appointment_data['extra_details']:
                                 if detail['procedure_id']:
                                     return False, user_insurance.id, 'Procedure Not covered under insurance'
