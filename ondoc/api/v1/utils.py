@@ -662,23 +662,8 @@ class TimeSlotExtraction(object):
 
     def form_time_string(self, time, am_pm):
 
-        day_time_hour = int(time)
-        day_time_min = (time - day_time_hour) * 60
-
-        if day_time_hour > 12:
-            day_time_hour -= 12
-
-        day_time_hour_str = str(int(day_time_hour))
-        if int(day_time_hour) < 10:
-            day_time_hour_str = '0' + str(int(day_time_hour))
-
-        day_time_min_str = str(int(day_time_min))
-        if int(day_time_min) < 10:
-            day_time_min_str = '0' + str(int(day_time_min))
-
-        time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
-
-        return time_str
+        time = form_dc_time(time, am_pm)
+        return time
 
     def get_timing_list(self):
         whole_timing_data = dict()
@@ -811,3 +796,63 @@ def get_opd_pem_queryset(user, model):
               hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
         ))
     return queryset
+
+
+def offline_get_day_slot(time):
+    am = 'AM'
+    pm = 'PM'
+    if time < 12:
+        return am
+    elif time < 16:
+        return pm
+    else:
+        return pm
+
+
+def form_dc_time(time, am_pm):
+    day_time_hour = int(time)
+    day_time_min = (time - day_time_hour) * 60
+
+    if day_time_hour > 12:
+        day_time_hour -= 12
+
+    day_time_hour_str = str(int(day_time_hour))
+    if int(day_time_hour) < 10:
+        day_time_hour_str = '0' + str(int(day_time_hour))
+
+    day_time_min_str = str(int(day_time_min))
+    if int(day_time_min) < 10:
+        day_time_min_str = '0' + str(int(day_time_min))
+
+    time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
+
+    return time_str
+
+
+def offline_form_time_slots(data, timing, is_available=True, is_doctor=True):
+    start = Decimal(str(data['start']))
+    end = Decimal(str(data['end']))
+    time_span = TimeSlotExtraction.TIME_SPAN
+    day = data.get('day')
+
+    float_span = (Decimal(time_span) / Decimal(60))
+    if not timing[day].get('timing'):
+        timing[day] = []
+    temp_start = start
+    while temp_start <= end:
+        am_pm = offline_get_day_slot(temp_start)
+        time_str = form_dc_time(temp_start, am_pm)
+        timing[day].append({'text': time_str,
+                                      'value': temp_start,
+                                      'mrp': data['fees'],
+                                      'deal_price':data['deal_price']}
+                                     )
+        price_available_obj = {"price": data['fees'], "is_available": is_available}
+        if is_doctor:
+            price_available_obj.update({
+                "mrp": data.get('mrp'),
+                "deal_price": data.get('deal_price')
+            })
+        # price_available[day][temp_start] = price_available_obj
+        temp_start += float_span
+    return timing

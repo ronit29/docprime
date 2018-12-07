@@ -16,7 +16,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
 from . import serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, \
-    TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset
+    TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min
@@ -1787,6 +1787,9 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
 
 class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
+
     def get_queryset(self):
         return None
 
@@ -1874,31 +1877,103 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         return {"sms_list": sms_list, "patient": patient}
 
     def offline_timings(self, request):
+        user = request.user
         serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
-                                                            doctor_clinic__hospital=validated_data.get(
-                                                                'hospital_id')).order_by("start")
-        doctor_leave_serializer = serializers.DoctorLeaveSerializer(
-            models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True),
-            many=True)
+        dc_queryset = DoctorClinic.objects.filter(Q(
+                                                   Q(doctor__manageable_doctors__user=user,
+                                                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
+                                                     doctor__manageable_doctors__is_disabled=False,
+                                                     doctor__manageable_doctors__hospital__isnull=True)
+                                                   |
+                                                   Q(doctor__manageable_doctors__user=user,
+                                                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
+                                                     doctor__manageable_doctors__is_disabled=False,
+                                                     doctor__manageable_doctors__hospital__isnull=False,
+                                                     doctor__manageable_doctors__hospital=F('hospital'))
+                                                   |
+                                                   Q(hospital__manageable_hospitals__user=user,
+                                                     hospital__manageable_hospitals__is_disabled=False,
+                                                     hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+                                                   )
+                                                  |
+                                                  Q(
+                                                      Q(doctor__manageable_doctors__user=user,
+                                                        doctor__manageable_doctors__super_user_permission=True,
+                                                        doctor__manageable_doctors__is_disabled=False,
+                                                        doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR)
+                                                      |
+                                                      Q(hospital__manageable_hospitals__user=user,
+                                                        hospital__manageable_hospitals__is_disabled=False,
+                                                        hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL,
+                                                        hospital__manageable_hospitals__super_user_permission=True)
+                                                   )
+                                                  ).distinct().values('id', 'doctor', 'hospital')
+        dc_list = [(dc['id'], dc['doctor']) for dc in dc_queryset]
+        dc_id_list, dc_doc_list = zip(*dc_list)
 
-        timeslots = dict()
-        obj = TimeSlotExtraction()
+        if not validated_data.get('doctor_id') and not validated_data.get('hospital_id'):
 
-        for data in queryset:
-            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                data.deal_price, data.mrp, True)
+            dct_queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__id__in=dc_id_list).values('doctor_clinic',
+                                                                                                             'day',
+                                                                                                             'start',
+                                                                                                             'end',
+                                                                                                             'fees',
+                                                                                                             'deal_price',
+                                                                                                             'mrp')
+            dl_queryset = models.DoctorLeave.objects.filter(doctor_id__in=dc_doc_list, deleted_at__isnull=True).all()
 
-        timeslots = obj.get_timing_list()
-        for day, slots in timeslots.items():
-            day_timing = []
-            for slot_unit in slots:
-                day_timing.extend(slot_unit['timing'])
-            timeslots[day] = day_timing
-        return Response({"timeslots": timeslots,
-                         "doctor_leaves": doctor_leave_serializer.data})
+            all_timing = {}
+            for dclinic in dc_queryset:
+                key = str(dclinic['doctor']) + '_' + str(dclinic['hospital'])
+                for dclinictime in dct_queryset:
+                    if dclinictime.get('doctor_clinic') == dclinic.get('id'):
+                        if not key in all_timing:
+                            timing = {}
+                            for i in range(7):
+                                timing[i] = dict()
+                            all_timing[key] = {}
+                            for dl in dl_queryset:
+                                dl_data = None
+                                if dl.doctor_id == dclinic['doctor']:
+
+                                    dl_data = {'interval': dl.interval,
+                                               'start_time': dl.start_time,
+                                               'end_time': dl.end_time,
+                                               'leave_start_time': dl.start_time_in_float(),
+                                               'leave_end_time': dl.end_time_in_float()}
+                                all_timing[key]['doctor_leaves'] = dl_data
+                        else:
+                            timing = all_timing[key]['timeslots']
+                        timing_data = offline_form_time_slots(dclinictime, timing)
+                        all_timing[key]['timeslots'] = timing_data
+            return Response(all_timing)
+        else:
+            if not validated_data['doctor_id'].id in dc_doc_list:
+                return Response({"error": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+            queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
+                                                                doctor_clinic__hospital=validated_data.get(
+                                                                    'hospital_id')).order_by("start")
+            doctor_leave_serializer = serializers.DoctorLeaveSerializer(
+                models.DoctorLeave.objects.filter(doctor=validated_data.get("doctor_id"), deleted_at__isnull=True),
+                many=True)
+
+            timeslots = dict()
+            obj = TimeSlotExtraction()
+
+            for data in queryset:
+                obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
+                                    data.deal_price, data.mrp, True)
+
+            timeslots = obj.get_timing_list()
+            for day, slots in timeslots.items():
+                day_timing = []
+                for slot_unit in slots:
+                    day_timing.extend(slot_unit['timing'])
+                timeslots[day] = day_timing
+            return Response({"timeslots": timeslots,
+                             "doctor_leaves": doctor_leave_serializer.data})
 
     def list_appointments(self, request):
         ONLINE = 1

@@ -983,8 +983,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
-    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
-    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False)
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
 
 
 class DoctorTimeSlotSerializer(serializers.Serializer):
