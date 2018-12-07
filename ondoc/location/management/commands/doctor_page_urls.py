@@ -17,7 +17,7 @@ def doctor_page_urls():
 
     # doc_obj = Doctor.objects.prefetch_related(Prefetch('doctorpracticespecializations',
     #         queryset=DoctorPracticeSpecialization.objects.prefetch_related(
-    #         Prefetch('specialization', queryset=PracticeSpecialization.objects.all())).order_by('-id')),
+    #         Prefetch('specialization', queryset=PracticeSpecialization.objects.all())).order_by('id')),
     #         (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))
     #          ).filter(is_live=True, is_test_doctor=False)
 
