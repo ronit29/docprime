@@ -22,8 +22,8 @@ class ParentProcedureCategoryInlineForm(forms.ModelForm):
 
 class ParentProcedureCategoryInline(AutoComplete, TabularInline):
     model = ProcedureCategoryMapping
-    # exclude = ['is_manual']
-    readonly_fields = ['is_manual']
+    exclude = ['is_manual']
+    # readonly_fields = ['is_manual']
     fk_name = 'child_category'
     extra = 0
     can_delete = True
@@ -32,8 +32,8 @@ class ParentProcedureCategoryInline(AutoComplete, TabularInline):
     verbose_name_plural = "Parent Categories"
     form = ParentProcedureCategoryInlineForm
 
-    # def get_queryset(self, request):
-    #     return super().get_queryset(request).filter(is_manual=False)
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(is_manual=False)
 
 
 class ProcedureToParentCategoryInlineFormset(forms.BaseInlineFormSet):

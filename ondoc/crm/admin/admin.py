@@ -10,12 +10,12 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  VisitReason, CancellationReason, PracticeSpecializationContent)
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
-                                     TestParameter, CommonPackage)
-from ondoc.coupon.models import Coupon
+                                     TestParameter, CommonPackage, LabTestCategory)
+from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, Order
 from ondoc.notification import models as notifcation_model
-from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory
+from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
@@ -28,11 +28,12 @@ from .hospital import HospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
-    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin
+    LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
 from .report import ReportAdmin
+from .coupon import CouponAdmin, UserSpecificCouponAdmin
 from ondoc.reports import models as report_models
 from ondoc.authentication.models import GenericLabAdmin
 
@@ -103,6 +104,8 @@ admin.site.register(LabTest, LabTestAdmin)
 admin.site.register(LabTestType, LabTestTypeAdmin)
 #admin.site.register(LabTestSubType, LabSubTestTypeAdmin)
 admin.site.register(AvailableLabTest, AvailableLabTestAdmin)
+admin.site.register(LabTestCategory, LabTestCategoryAdmin)
+
 
 admin.site.register(HospitalLead, HospitalLeadAdmin)
 admin.site.register(Cities, CitiesAdmin)
@@ -140,7 +143,8 @@ admin.site.register(ProcedureCategory, ProcedureCategoryAdmin)
 admin.site.register(RatingsReview, RatingsReviewAdmin)
 admin.site.register(SitemapManger, SitemapManagerAdmin)
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
-admin.site.register(Coupon)
+admin.site.register(Coupon, CouponAdmin)
+admin.site.register(UserSpecificCoupon, UserSpecificCouponAdmin)
 admin.site.register(VisitReason, VisitReasonAdmin)
 admin.site.register(CancellationReason)
 admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
@@ -148,4 +152,6 @@ admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
 admin.site.register(SeoLabNetwork, SeoLabNetworkAdmin)
 admin.site.register(PracticeSpecializationContent, PracticeSpecializationContentAdmin)
 admin.site.register(CommonProcedureCategory)
+admin.site.register(CommonProcedure)
 admin.site.register(DemoElastic, DemoElasticAdmin)
+

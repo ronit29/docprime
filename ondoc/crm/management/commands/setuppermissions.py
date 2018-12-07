@@ -3,6 +3,7 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
+from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
                                  DoctorQualification, Qualification, Specialization, DoctorLanguage,
@@ -24,13 +25,14 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabNetwork, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabTest,
-                                     LabTestType, LabService, LabAppointment,LabDoctorAvailability,
+                                     LabTestType, LabService, LabAppointment, LabDoctorAvailability,
                                      LabDoctor, LabDocument, LabPricingGroup, LabNetworkDocument, CommonTest,
                                      CommonDiagnosticCondition, DiagnosticConditionLabTest, HomePickupCharges,
-                                     TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport)
+                                     TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport,
+                                     CommonPackage, LabTestCategory, LabTestCategoryMapping)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
-    ProcedureCategoryMapping, ProcedureToCategoryMapping
+    ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -39,7 +41,7 @@ from ondoc.web.models import Career, OnlineLead
 from ondoc.ratings_review import models as rating_models
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 
-from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin
+from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User
 
 from ondoc.seo.models import Sitemap
 from ondoc.elastic.models import DemoElastic
@@ -218,7 +220,7 @@ class Command(BaseCommand):
             LabTestType, LabService, TestParameter, PracticeSpecialization,
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
-            ProcedureToCategoryMapping, ProcedureCategoryMapping
+            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory
         )
 
         for cl, ct in content_types.items():
@@ -229,7 +231,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
-        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage)
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -318,6 +320,30 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+
+        # Create coupon group
+        group, created = Group.objects.get_or_create(name=constants['COUPON_MANAGEMENT_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Coupon, UserSpecificCoupon)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        # content_types = ContentType.objects.get_for_models(LabTest)
+        #
+        # for cl, ct in content_types.items():
+        #     permissions = Permission.objects.filter(
+        #         Q(content_type=ct),
+        #         Q(codename='change_' + ct.model))
+        #
+        #     group.permissions.add(*permissions)
+
         # Create about doctor group
         self.create_about_doctor_group()
 
@@ -341,6 +367,8 @@ class Command(BaseCommand):
         self.create_report_team()
 
         self.create_elastic_group()
+
+        self.create_labtest_team()
 
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
@@ -497,7 +525,8 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(CommonMedicalCondition, CommonSpecialization,
                                                            MedicalConditionSpecialization,  MedicalCondition,
                                                            CommonTest, CommonDiagnosticCondition,
-                                                           DiagnosticConditionLabTest)
+                                                           DiagnosticConditionLabTest, CommonPackage, CommonProcedureCategory,
+                                                           CommonProcedure)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -513,6 +542,18 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(report_models.GeneratedReport, for_concrete_models=False)
+
+        for cl, ct in content_types.items():
+            Permission.objects.get_or_create(content_type=ct, codename='change_' + ct.model)
+            permissions = Permission.objects.filter(content_type=ct, codename='change_' + ct.model)
+            group.permissions.add(*permissions)
+
+
+    def create_labtest_team(self):
+        group, created = Group.objects.get_or_create(name=constants['LAB_TEST_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(LabTest, TestParameter, ParameterLabTest)
 
         for cl, ct in content_types.items():
             Permission.objects.get_or_create(content_type=ct, codename='change_' + ct.model)

@@ -18,5 +18,7 @@ constants = {
     'DOCTOR_SALES_GROUP': 'doctor_sales_group',
     'REVIEW_TEAM_GROUP': 'review_team_group',
     'ELASTIC_TEAM': 'elastic_team',
-    'PROCEDURE_TEAM': 'procedure_team'
+    'PROCEDURE_TEAM': 'procedure_team',
+    'COUPON_MANAGEMENT_GROUP': 'coupon_group',
+    'LAB_TEST_TEAM' : 'lab_test_team'
 }
