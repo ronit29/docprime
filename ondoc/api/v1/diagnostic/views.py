@@ -1105,6 +1105,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             result['about_test'] = queryset.about_test
             # result['test_may_include'] =
             result['preparations'] = queryset.preparations
+            result['why_get_tested'] = queryset.why
 
         if len(query) > 0:
             info=[]
