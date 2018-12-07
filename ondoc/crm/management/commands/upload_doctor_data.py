@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+import concurrent.futures
 from django.conf import settings
 from io import BytesIO
 from openpyxl import load_workbook
@@ -126,24 +127,101 @@ class Doc():
             print('invalid number' + str(number))
 
 
+
+def s_image(batch, url, identifier):
+    if url and identifier:
+        #path = settings.MEDIA_ROOT+'/temp/image/'+identifier + '.jpg'
+        #final_path = settings.MEDIA_ROOT+'/temp/final/'+identifier + '.jpg'
+        path = 'temp/image/'+identifier + '.jpg'
+        final_path = 'temp/final/'+identifier + '.jpg'
+
+        if default_storage.exists(path):
+            return None
+        # if os.path.exists(path):
+        #     return None
+
+        # file = default_storage.open('storage_test', 'w')
+        # file.write('storage contents')
+        # file.close()
+
+
+        r = requests.get(url)
+        content = BytesIO(r.content)
+
+        # if os.path.exists(path):
+        #     os.remove(path)
+        # if os.path.exists(final_path):
+        #     os.remove(final_path)
+
+        # of = open(path, 'xb')
+        # of.write(content.read())
+        # of.close()
+
+        file = default_storage.open(path, 'wb')
+        file.write(content.read())
+        file.close()
+
+        # r = requests.get(url)
+        # content = BytesIO(r.content)
+        ff = default_storage.open(path, 'rb')
+        img = Img.open(ff)
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        size = img.size
+        bottom = math.floor(size[1]*.8)
+        img = img.crop((0,0,size[0],bottom))
+
+        buffer = BytesIO()
+        img.save(buffer, format='JPEG')
+        buffer.seek(0)
+        #print(len(buffer))
+        #buffer.tell()
+
+        cropped_file = default_storage.open(final_path, 'wb')
+        cropped_file.write(buffer.read())
+        cropped_file.close()
+
+
 class UploadDoctor(Doc):
 
     def p_image(self, sheet, source, batch):
         rows = [row for row in sheet.rows]
         headers = {column.value.strip().lower(): i + 1 for i, column in enumerate(rows[0]) if column.value}
         counter = 0
-        for i in range(2, len(rows) + 1):
-            print('processing = '+str(i))
-            identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
-            url = self.clean_data(sheet.cell(row=i, column=headers.get('url')).value)
-            if url:
-                counter +=1
-                print('found count='+str(counter))
-                print('url not found')
-                try:
-                    self.save_image(batch, url, identifier)
-                except Exception as e:
-                    print('exception '+str(e))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            images = []
+
+            for i in range(2, len(rows) + 1):
+                identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
+                url = self.clean_data(sheet.cell(row=i, column=headers.get('url')).value)
+                if url:
+                    images.append({'url':url, 'identifier':identifier, 'batch':batch})
+
+            future_to_images = {executor.submit(s_image, image['batch'],
+                                                image['url'],
+                                                image['identifier'] ): image for image in images}
+
+            counter=0
+            for future in concurrent.futures.as_completed(future_to_images):
+                img = future_to_images[future]
+                data = future.result()
+                counter += 1
+                print('counter= '+str(counter))
+
+            # for i in range(2, len(rows) + 1):
+            #     print('processing = '+str(i))
+            #     identifier = self.clean_data(sheet.cell(row=i, column=headers.get('identifier')).value)
+            #     url = self.clean_data(sheet.cell(row=i, column=headers.get('url')).value)
+            #     if url:
+            #         counter +=1
+            #         print('found count='+str(counter))
+            #         #print('url not found')
+            #         try:
+            #             future = executor.submit(s_image, batch, url, identifier).result()
+
+            #             #self.s_image(batch, url, identifier)
+            #         except Exception as e:
+            #             print('exception '+str(e))
 
     def upload(self, sheet, source, batch, lines):
         rows = [row for row in sheet.rows]

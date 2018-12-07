@@ -1041,16 +1041,16 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
     def get_form(self, request, obj=None, **kwargs):
         # if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
         #     kwargs['form'] = DoctorForm
-        kwargs['form'] = DoctorForm            
+        kwargs['form'] = DoctorForm
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
         if not request.user.is_superuser and\
             (not request.user.is_member_of(constants['QC_GROUP_NAME']) and not request.user.is_member_of(constants['SUPER_QC_GROUP']) ):
             form.base_fields['assigned_to'].disabled = True
-        if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
-            form.base_fields['raw_about'].disabled = True
-            form.base_fields['additional_details'].disabled = True
+        # if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
+        #     form.base_fields['raw_about'].disabled = True
+        #     form.base_fields['additional_details'].disabled = True
         return form
 
     def save_formset(self, request, form, formset, change):
