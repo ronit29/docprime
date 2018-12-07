@@ -1,3 +1,4 @@
+from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
 import datetime
 from django.contrib.gis import forms
@@ -6,10 +7,17 @@ from ondoc.crm.constants import constants
 from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
-
+from ondoc.authentication.models import Merchant, AssociatedMerchant
+from ondoc.account.models import MerchantPayout
 from ondoc.common.models import Cities, MatrixCityMapping
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin
+from reversion.admin import VersionAdmin
+import nested_admin
+from django.urls import reverse
+from django.utils.safestring import mark_safe
+from django.contrib.contenttypes.models import ContentType
+
 
 def practicing_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
@@ -244,3 +252,99 @@ class GenericAdminForm(forms.ModelForm):
     class Meta:
         widgets = {'name': forms.TextInput(attrs={'size': 13}),
                    'phone_number': forms.NumberInput(attrs={'size': 8})}
+
+
+class MerchantAdmin(VersionAdmin):
+    model = Merchant
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return [f.name for f in self.model._meta.fields if f.name not in ['enabled','verified_by_finance']]
+        return []
+
+class MerchantPayoutForm(forms.ModelForm):
+    process_payout = forms.BooleanField(required=False)
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        process_payout = self.cleaned_data.get('process_payout')
+        if process_payout:
+            if not self.instance.get_merchant():
+                raise forms.ValidationError("No verified merchant found to process payments")
+
+            merchant = self.instance.get_merchant()
+            if not merchant.verified_by_finance or not merchant.enabled:
+                raise forms.ValidationError("Merchant is not verified or is not enabled.")
+
+            billed_to = self.instance.get_billed_to()
+            if not billed_to:
+                raise forms.ValidationError("Billing entity not defined.")
+
+            associated_merchant = billed_to.merchant.first()
+            if not associated_merchant.verified:
+                raise forms.ValidationError("Associated Merchant not verified.")
+
+        if not self.instance.status == self.instance.PENDING:
+            raise forms.ValidationError("This payout is already under process")
+
+        return self.cleaned_data
+
+
+class MerchantPayoutAdmin(VersionAdmin):
+    form = MerchantPayoutForm
+    model = MerchantPayout
+    fields = ['id','charged_amount','updated_at','created_at','payable_amount','status','payout_time','paid_to',
+    'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout']
+
+    def get_readonly_fields(self, request, obj=None):
+        base = ['appointment_id', 'get_billed_to', 'get_merchant']
+        readonly = [f.name for f in self.model._meta.fields if f.name not in ['payout_approved']]
+        return base + readonly
+
+    def save_model(self, request, obj, form, change):
+        obj.process_payout=form.cleaned_data.get('process_payout')
+        super().save_model(request, obj, form, change)
+
+    def appointment_id(self, instance):
+        appt = instance.get_appointment()
+        if appt:
+            content_type = ContentType.objects.get_for_model(appt.__class__)
+            change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[appt.id])
+            html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, appt.id)
+            return mark_safe(html)
+
+        return None
+
+
+    def get_billed_to(self, instance):
+        billed_to = instance.get_billed_to()
+        if billed_to:
+            content_type = ContentType.objects.get_for_model(billed_to.__class__)
+            change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[billed_to.id])
+            html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, billed_to.name)
+            return mark_safe(html)
+
+        return ''
+
+    def get_merchant(self, instance):
+        merchant = instance.get_merchant()
+        if merchant:
+            content_type = ContentType.objects.get_for_model(merchant.__class__)
+            change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[merchant.id])
+            html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, merchant.id)
+            return mark_safe(html)
+
+        return ''
+
+
+class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
+    can_delete = False
+    extra = 0
+    model = AssociatedMerchant
+    show_change_link = False
+    #fields = "__all__"
+    #readonly_fields = ['merchant_id']
+    #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']

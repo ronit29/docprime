@@ -29,7 +29,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabAppointment, HomePickupCharges,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer, LabReport, LabReportFile, LabTestCategoryMapping)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin
+from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin, AssociatedMerchant
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
 from ondoc.crm.admin.autocomplete import PackageAutoCompleteView
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -38,6 +38,7 @@ from ondoc.authentication.admin import BillingAccountInline
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 import logging
 import nested_admin
+from .common import AssociatedMerchantInline
 
 logger = logging.getLogger(__name__)
 
@@ -499,7 +500,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
                LabAccreditationInline,
                LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
-               BillingAccountInline, GenericLabAdminInline]
+               BillingAccountInline, GenericLabAdminInline, AssociatedMerchantInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200

@@ -1291,3 +1291,38 @@ class DoctorNumber(TimeStampedModel):
 
     def __str__(self):
         return '{}-{}'.format(self.phone_number, self.doctor)
+
+
+class Merchant(TimeStampedModel):
+    SAVINGS = 1
+    CURRENT = 2
+
+    beneficiary_name = models.CharField(max_length=128, null=True)
+    account_number = models.CharField(max_length=50, null=True, default=None, blank=True)
+    ifsc_code = models.CharField(max_length=128, null=True)
+    pan_number = models.CharField(max_length=20, null=True)
+    TYPE_CHOICES = (
+        (SAVINGS, 'Savings'),
+        (CURRENT, 'Current'),
+    )
+    pan_copy = models.ImageField('Pan Card Image',upload_to='billing/documents', null=True, blank=True)
+    account_copy = models.ImageField('Account/Cheque Image',upload_to='billing/documents', null=True, blank=True)
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES, null=True)
+    enabled = models.BooleanField(default=False)
+    verified_by_finance = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'merchant'
+
+
+class AssociatedMerchant(TimeStampedModel):
+
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='establishments')
+    verified = models.BooleanField(default=False)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = 'associated_merchant'
+
