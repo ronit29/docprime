@@ -77,7 +77,10 @@ class Command(BaseCommand):
         ea_objs = EntityAddress.objects.all()
         if ea_objs:
             for ea_obj in ea_objs:
-                new_calculate_centroid(ea_obj)
-                print('success: ' + str(ea_obj.value) + '(' + str(ea_obj.id) + ')')
+                try:
+                    new_calculate_centroid(ea_obj)
+                    print('success: ' + str(ea_obj.value) + '(' + str(ea_obj.id) + ')')
+                except Exception as e:
+                    print(str(e))
         else:
             print('error: objects not found')

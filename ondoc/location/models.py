@@ -1216,6 +1216,12 @@ class LabPageUrl(object):
                     # if dup_url:
                     #     new_url = new_url + '-' + str(lab.id)
                     #
+                    dup_url = EntityUrls.objects.filter(url=new_url,
+                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE
+                                                        ).filter(~Q(entity_id=lab.id)).first()
+                    if dup_url:
+                        new_url = new_url + '-' + str(lab.id)
+
                     EntityUrls.objects.filter(entity_id=lab.id,
                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
                                               is_valid=True).filter(
@@ -1225,7 +1231,7 @@ class LabPageUrl(object):
                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
                                               url=new_url).delete()
 
-                    data['url'] = new_url + '-' + str(lab.id)
+                    data['url'] = new_url
                     EntityUrls.objects.create(**data)
                     return "success"
 
@@ -1348,7 +1354,7 @@ class DoctorPageURL(object):
         sp_dict = dict()
         for sp in practice_specializations:
             sp_dict[sp.id] = sp.specialization.name
-        sp_dict = OrderedDict.sorted(sp_dict.items())
+        sp_dict = OrderedDict(sorted(sp_dict.items()))
         specializations = sp_dict.values()
         specialization_ids = sp_dict.keys()
         # specializations =[sc.specialization.name for sc in doctor.doctorpracticespecializations.all().order_by('specialization__name')]
@@ -1443,6 +1449,11 @@ class DoctorPageURL(object):
         #     if not dup_url:
         #         break
         #     counter = counter + 1
+        dup_url = EntityUrls.objects.filter(url=new_url,
+                                            sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE
+                                            ).filter(~Q(entity_id=doctor.id)).first()
+        if dup_url:
+            new_url = new_url + '-' + str(doctor.id)
 
         EntityUrls.objects.filter(entity_id=doctor.id,
                                   sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(
@@ -1451,6 +1462,6 @@ class DoctorPageURL(object):
         EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
                                   url=new_url).delete()
 
-        data['url'] = new_url + '-' + str(doctor.id)
+        data['url'] = new_url
         EntityUrls.objects.create(**data)
         return "success"
