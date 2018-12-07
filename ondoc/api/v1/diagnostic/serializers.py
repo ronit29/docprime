@@ -20,7 +20,7 @@ import random
 import logging
 import json
 
-from ondoc.insurance.models import UserInsurance
+from ondoc.insurance.models import UserInsurance, InsuranceThreshold
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
 from django.db.models import Q
@@ -217,9 +217,10 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
     def get_insurance(self, obj):
         request = self.context.get("request")
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
         resp = {
             'is_insurance_covered': False,
-            'insurance_threshold_amount': 0,
+            'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
             'is_user_insured': False
         }
         if request:
@@ -315,9 +316,10 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
     def get_insurance(self, obj):
         request = self.context.get("request")
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
         resp = {
             'is_insurance_covered': False,
-            'insurance_threshold_amount': 0,
+            'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
             'is_user_insured': False
         }
         if request:

@@ -38,12 +38,17 @@ class InsurancePlansSerializer(serializers.ModelSerializer):
 class InsurerSerializer(serializers.ModelSerializer):
 
     plans = InsurancePlansSerializer(source='get_active_plans', many=True)
+    insurer_document = serializers.SerializerMethodField()
+
+    def get_insurer_document(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.insurer_document.url) if obj.insurer_document is not None and obj.insurer_document.name else None
 
 
     class Meta:
         model = Insurer
         #fields = '__all__'
-        fields = ('id', 'name', 'min_float', 'logo', 'website', 'phone_number', 'email', 'plans')
+        fields = ('id', 'name', 'min_float', 'logo', 'website', 'phone_number', 'email', 'plans', 'insurer_document')
 
 
 class MemberListSerializer(serializers.Serializer):
