@@ -20,6 +20,7 @@ import requests
 from rest_framework import status
 from django.conf import settings
 from django.db import transaction
+from collections import OrderedDict
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -89,8 +90,9 @@ class EntityAddress(TimeStampedModel):
     postal_code = models.PositiveIntegerField(null=True)
     parent = models.IntegerField(null=True)
     centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    abs_centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
     geocoding = models.ForeignKey(GeocodingResults, null=True, on_delete=models.DO_NOTHING)
-    no_of_childs = models.PositiveIntegerField(default=0)
+    no_of_childs = models.PositiveIntegerField(default=None, null=True)
 
     def create(geocoding_obj, value):
         mapping_dictionary = {
@@ -163,7 +165,7 @@ class EntityAddress(TimeStampedModel):
                     alternative_name = mapping_dictionary.get(meta['value'].lower()) if mapping_dictionary.get(
                         meta['value'].lower(), None) else meta['value']
 
-                    entity_address = EntityAddress(type=meta['key'], centroid=point, postal_code=postal_code,
+                    entity_address = EntityAddress(type=meta['key'], abs_centroid=point, postal_code=postal_code,
                                                    type_blueprint=meta['type'], value=meta['value'], parent=parent_id,
                                                    alternative_value=alternative_name, geocoding=geocoding_obj)
                     entity_address.save()
@@ -1141,15 +1143,17 @@ class LabPageUrl(object):
                 if sublocality:
                     sublocality_value = sublocality.location.alternative_value
                     sublocality_id = sublocality.location.id
-                    sublocality_longitude = sublocality.location.centroid.x
-                    sublocality_latitude = sublocality.location.centroid.y
+                    if sublocality.location.centroid:
+                        sublocality_longitude = sublocality.location.centroid.x
+                        sublocality_latitude = sublocality.location.centroid.y
 
                 locality = lab.entity.filter(type="LOCALITY", valid=True).first()
                 if locality:
                     locality_value = locality.location.alternative_value
                     locality_id = locality.location.id
-                    locality_longitude = locality.location.centroid.x
-                    locality_latitude = locality.location.centroid.y
+                    if locality.location.centroid:
+                        locality_longitude = locality.location.centroid.x
+                        locality_latitude = locality.location.centroid.y
 
                 if lab:
                     url = "%s" % lab.name
@@ -1337,9 +1341,16 @@ class DoctorPageURL(object):
 
     def create_doctor_page_urls(doctor, sequence):
         locality = None
-        practice_specializations = doctor.doctorpracticespecializations.all().order_by('id').values('id', 'specialization__name')
-        specializations = practice_specializations.values_list('specialization__name', flat=True)
-        specialization_ids = practice_specializations.values_list('id', flat=True)
+        # practice_specializations = doctor.doctorpracticespecializations.all().order_by('id').values('id', 'specialization__name')
+        # specializations = practice_specializations.values_list('specialization__name', flat=True)
+        # specialization_ids = practice_specializations.values_list('id', flat=True)
+        practice_specializations = doctor.doctorpracticespecializations.all()
+        sp_dict = dict()
+        for sp in practice_specializations:
+            sp_dict[sp.id] = sp.specialization.name
+        sp_dict = OrderedDict.sorted(sp_dict.items())
+        specializations = sp_dict.values()
+        specialization_ids = sp_dict.keys()
         # specializations =[sc.specialization.name for sc in doctor.doctorpracticespecializations.all().order_by('specialization__name')]
         # specialization_ids =[sc.specialization_id for sc in doctor.doctorpracticespecializations.all().order_by('id')]
         sequence = sequence
