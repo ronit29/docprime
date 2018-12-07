@@ -393,6 +393,10 @@ class UserInsurance(auth_model.TimeStampedModel):
                 if user_insurance.is_valid():
                     insured_members = user_insurance.members.all().filter(profile=profile)
                     if insured_members:
+                        if appointment_data['extra_detail']:
+                            for detail in appointment_data['extra_detail']:
+                                if detail['procedure_id']:
+                                    return False, user_insurance.id, 'Procedure Not covered under insurance'
                         doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=appointment_data['doctor']).values('specialization_id')
                         specilization_ids = doctor
                         specilization_ids_set = set(map(lambda specialization: specialization['specialization_id'], specilization_ids))
@@ -425,6 +429,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                     return True, user_insurance.id, 'Covered Under Insurance'
                         else:
                             return True, user_insurance.id, 'Covered Under Insurance'
+
                     else:
                         return False, user_insurance.id, 'Profile Not covered under insurance'
                 else:
