@@ -941,7 +941,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         if not request.user.is_member_of(constants['SUPER_QC_GROUP']) and not request.user.is_superuser:
             read_only_fields += ['onboarding_status']
         if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
-            read_only_fields += ['name', 'gender', 'practicing_since',  'license', 'additional_details',
+            read_only_fields += ['name', 'gender', 'license', 'additional_details',
                                  'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
                                  'online_consultation_fees', 'live_at', 'is_internal',
                                  'is_test_doctor', 'is_license_verified', 'signature', 'enabled']
