@@ -333,7 +333,8 @@ class NotificationAction:
                 'total_member_covered': len(member_list),
                 'plan': instance.insurance_plan.name,
                 'insured_members': member_list,
-                'insurer_logo': instance.insurance_plan.insurer.logo.url
+                'insurer_logo': instance.insurance_plan.insurer.logo.url,
+                'coi_url': instance.coi.url
             }
             EmailNotification.send_notification(user=user, notification_type=notification_type,
                                                 context=context, email=proposer.email)
