@@ -68,6 +68,8 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     signature = models.ImageField('Insurer Signature', upload_to='insurer/images', null=True, blank=False)
     is_live = models.BooleanField(default=False)
     enabled = models.BooleanField(default=True)
+    insurer_document = models.FileField(null=True,blank=False, upload_to='insurer/documents',
+                                        validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
 
     @property
     def get_active_plans(self):
