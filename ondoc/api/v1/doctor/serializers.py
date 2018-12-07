@@ -1307,6 +1307,12 @@ class OfflineAppointmentBodySerializer(serializers.Serializer):
     start_time = serializers.FloatField()
     id = serializers.UUIDField()
 
+    def validate(self, attrs):
+        if not attrs.get('patient') and not attrs.get('patient_id'):
+            raise serializers.ValidationError("Niether patient or Patient_id Provided")
+        return attrs
+
+
 
 class OfflineAppointmentCreateSerializer(serializers.Serializer):
     data = OfflineAppointmentBodySerializer(many=True)
