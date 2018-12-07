@@ -5,7 +5,8 @@ from ondoc.api.v1.auth.serializers import AddressSerializer
 
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
-                                     FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer, LabPricingGroup, LabTestCategory)
+                                     FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
+                                     LabPricingGroup, LabTestCategory, LabTestCategoryMapping)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.notification.models import EmailNotification
@@ -149,14 +150,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     lookup_field = 'id'
 
     @transaction.non_atomic_requests
-    def list_packages(self, request, **kwargs):
+    def list_packages(self, request, **kwrgs):
+        serializer = diagnostic_serializer.LabPackageListSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
         default_long = 77.071848
         default_lat = 28.450367
-        long = request.query_params.get('long', default_long)
-        lat = request.query_params.get('lat', default_lat)
+        long = validated_data.get('long', default_long)
+        lat = validated_data.get('lat', default_lat)
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = 50000
+        category_ids = validated_data.get('categories', None)
+        lab_tests =None
+        if category_ids:
+            lab_tests = LabTestCategoryMapping.objects.filter(parent_category__in=category_ids).values_list(
+                'lab_test',
+                flat=True)
         all_packages_in_network_labs = LabTest.objects.filter(is_package=True,
                                                               availablelabs__lab_pricing_group__labs__network__isnull=False,
                                                               availablelabs__lab_pricing_group__labs__location__dwithin=(
@@ -186,6 +196,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 When(availablelabs__custom_deal_price__isnull=False,
                      then=F('availablelabs__custom_deal_price'))),
         )
+        if lab_tests:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests)
+
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
         all_packages.extend([package for package in all_packages_in_non_network_labs])
         lab_ids = [package.lab for package in all_packages]

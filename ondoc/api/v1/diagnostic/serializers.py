@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage)
+                                     CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
+                                     LabTestCategory)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
@@ -948,3 +949,10 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         for data in lab_data:
             if data.id == obj.lab:
                 return data
+
+
+class LabPackageListSerializer(serializers.Serializer):
+    long = serializers.FloatField(required=False)
+    lat = serializers.FloatField(required=False)
+    categories = serializers.ListField(child=serializers.PrimaryKeyRelatedField(
+        queryset=LabTestCategory.objects.filter(is_live=True, is_package_category=True)), required=False)
