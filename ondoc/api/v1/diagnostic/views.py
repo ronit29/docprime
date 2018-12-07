@@ -919,9 +919,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
 
-    authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated,)
-
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         params = request.query_params
