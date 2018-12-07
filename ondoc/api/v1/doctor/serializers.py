@@ -30,7 +30,7 @@ import logging
 from dateutil import tz
 from django.conf import settings
 
-from ondoc.insurance.models import UserInsurance
+from ondoc.insurance.models import UserInsurance, InsuranceThreshold
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures
@@ -381,9 +381,10 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     def get_insurance(self, obj):
         request = self.context.get("request")
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
         resp = {
             'is_insurance_covered': False,
-            'insurance_threshold_amount': 0,
+            'insurance_threshold_amount':  insurance_threshold.opd_amount_limit if insurance_threshold else 5000,
             'is_user_insured': False
         }
         if request:

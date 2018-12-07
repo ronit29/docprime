@@ -266,14 +266,16 @@ class UserInsurance(auth_model.TimeStampedModel):
             'policy_related_email': '%s and customercare@docprime.com' % self.insurance_plan.insurer.email,
             'policy_related_tollno': '%d and 18001239419' % self.insurance_plan.insurer.intermediary_contact_number,
             'policy_related_website': '%s and https://docprime.com' % self.insurance_plan.insurer.website,
-            'current_date': datetime.datetime.now().date().strftime('%d-%m-%Y'),
+            'current_date': timezone.now().date().strftime('%d-%m-%Y'),
             'policy_number': self.policy_number,
             'application_number': self.id,
             'total_member_covered': len(member_list),
             'plan': self.insurance_plan.name,
             'insured_members': member_list,
             'insurer_logo': self.insurance_plan.insurer.logo.url,
-            'insurer_signature': self.insurance_plan.insurer.signature.url
+            'insurer_signature': self.insurance_plan.insurer.signature.url,
+            'company_name': self.insurance_plan.insurer.company_name,
+            'insurer_name': self.insurance_plan.insurer.name
         }
         html_body = render_to_string("pdfbody.html", context=context)
         filename = "COI_{}.pdf".format(str(timezone.now().timestamp()))
