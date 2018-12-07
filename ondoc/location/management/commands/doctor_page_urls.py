@@ -1,7 +1,7 @@
 from django.core.management import BaseCommand
 from django.template.defaultfilters import slugify
 from ondoc.api.v1.utils import RawSql
-from ondoc.doctor.models import Doctor, DoctorPracticeSpecialization, Hospital
+from ondoc.doctor.models import Doctor, DoctorPracticeSpecialization, Hospital, PracticeSpecialization
 from ondoc.location.models import DoctorPageURL, EntityUrls
 from django.contrib.gis.geos import Point
 from django.db.models import Prefetch

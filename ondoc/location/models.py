@@ -90,6 +90,7 @@ class EntityAddress(TimeStampedModel):
     parent = models.IntegerField(null=True)
     centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
     geocoding = models.ForeignKey(GeocodingResults, null=True, on_delete=models.DO_NOTHING)
+    no_of_childs = models.PositiveIntegerField(default=0)
 
     def create(geocoding_obj, value):
         mapping_dictionary = {
@@ -149,7 +150,8 @@ class EntityAddress(TimeStampedModel):
                     postal_code = meta['postal_code']
                 if meta['key'] not in [EntityAddress.AllowedKeys.COUNTRY,
                                        EntityAddress.AllowedKeys.ADMINISTRATIVE_AREA_LEVEL_1,
-                                       EntityAddress.AllowedKeys.ADMINISTRATIVE_AREA_LEVEL_2]:
+                                       EntityAddress.AllowedKeys.ADMINISTRATIVE_AREA_LEVEL_2,
+                                       EntityAddress.AllowedKeys.LOCALITY]:
                     point = Point(float(longitude), float(latitude))
                 saved_data = EntityAddress.objects.filter(type=meta['key'], postal_code=postal_code,
                                                           type_blueprint=meta['type'],
@@ -1335,8 +1337,11 @@ class DoctorPageURL(object):
 
     def create_doctor_page_urls(doctor, sequence):
         locality = None
-        specializations =[sc.specialization.name for sc in doctor.doctorpracticespecializations.all()]
-        specialization_ids =[sc.specialization_id for sc in doctor.doctorpracticespecializations.all()]
+        practice_specializations = doctor.doctorpracticespecializations.all().order_by('id').values('id', 'specialization__name')
+        specializations = practice_specializations.values_list('specialization__name', flat=True)
+        specialization_ids = practice_specializations.values_list('id', flat=True)
+        # specializations =[sc.specialization.name for sc in doctor.doctorpracticespecializations.all().order_by('specialization__name')]
+        # specialization_ids =[sc.specialization_id for sc in doctor.doctorpracticespecializations.all().order_by('id')]
         sequence = sequence
         locality_id = None
         sublocality = None
