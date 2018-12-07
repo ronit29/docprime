@@ -1,7 +1,7 @@
 from django.core.management import BaseCommand
 from django.template.defaultfilters import slugify
 from ondoc.api.v1.utils import RawSql
-from ondoc.doctor.models import Doctor, DoctorPracticeSpecialization, Hospital
+from ondoc.doctor.models import Doctor, DoctorPracticeSpecialization, Hospital, PracticeSpecialization
 from ondoc.location.models import DoctorPageURL, EntityUrls
 from django.contrib.gis.geos import Point
 from django.db.models import Prefetch
@@ -14,6 +14,12 @@ def doctor_page_urls():
         sequence = seq[0]['inc'] if seq[0]['inc'] else 0
     else:
         sequence = 0
+
+    # doc_obj = Doctor.objects.prefetch_related(Prefetch('doctorpracticespecializations',
+    #         queryset=DoctorPracticeSpecialization.objects.prefetch_related(
+    #         Prefetch('specialization', queryset=PracticeSpecialization.objects.all())).order_by('-id')),
+    #         (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))
+    #          ).filter(is_live=True, is_test_doctor=False)
 
     doc_obj =Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization',
                                         (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))

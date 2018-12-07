@@ -1,28 +1,46 @@
 from django.core.management.base import BaseCommand
-from django.contrib.gis.geos import GEOSGeometry, Polygon
+from django.contrib.gis.geos import GEOSGeometry, LineString, Polygon
 from django.contrib.contenttypes.models import ContentType
 from ondoc.diagnostic.models import Lab
 from ondoc.location.models import EntityLocationRelationship, EntityUrls, EntityAddress
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
-
+from ondoc.location.models import EntityAddress
 
 def new_calculate_centroid(ea):
-    #ea = EntityAddress.objects.filter(id=ea_id).first()
     if ea:
-        if ea.centroid:
-            return ea.centroid
-        #qs = all child of ea
-        points=[]
-        for x in qs:
-            points.push(new_calculate_centroid(x))
+        childs = EntityAddress.objects.filter(parent=ea.id)
 
-        #calculate centroid
-        qa.centroid = calculated_centroid;
+        if len(childs) == 0:
+            if ea.centroid:
+                return ea.centroid
+            if not ea.centroid:
+                return None
+
+        ea.no_of_childs = len(childs)
+        points = []
+        for x in childs:
+            point = new_calculate_centroid(x)
+            if point:
+                points.append(point)
+
+        calculated_centroid = None
+        if len(points) == 1:
+            calculated_centroid = points[0]
+        elif len(points) == 2:
+            p = LineString(points)
+            geo_poly = GEOSGeometry(p)
+            calculated_centroid = geo_poly.centroid
+        elif len(points) > 2:
+            points.append(points[0])
+            p = Polygon(points)
+            if p.area == 0:
+                p = LineString(points)
+            geo_poly = GEOSGeometry(p)
+            calculated_centroid = geo_poly.centroid
+        ea.centroid = calculated_centroid
+        ea.save()
         return calculated_centroid
-        #centroid = new_calculate_centroid(ea_)
-
-
 
 def calculate_centroid():
     try:
@@ -54,4 +72,10 @@ def calculate_centroid():
 
 class Command(BaseCommand):
     def handle(self, **options):
-        calculate_centroid()
+        # ea_id = 4729
+        countries = EntityAddress.objects.filter(type_blueprint='COUNTRY').distinct('value')
+        if countries:
+            for country in countries:
+                new_calculate_centroid(country)
+        else:
+            print('error: object not found')
