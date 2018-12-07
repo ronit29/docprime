@@ -553,7 +553,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['LAB_TEST_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(LabTest)
+        content_types = ContentType.objects.get_for_models(LabTest, TestParameter, ParameterLabTest)
 
         for cl, ct in content_types.items():
             Permission.objects.get_or_create(content_type=ct, codename='change_' + ct.model)

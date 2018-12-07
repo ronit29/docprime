@@ -1044,7 +1044,7 @@ class AgentTokenManager(models.Manager):
 
 
 class AgentToken(TimeStampedModel):
-    expiry_duration = 2  # IN HOURS
+    expiry_duration = 24  # IN HOURS
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     token = models.CharField(max_length=100)
     is_consumed = models.BooleanField(default=False)
