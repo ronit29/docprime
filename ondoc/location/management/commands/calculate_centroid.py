@@ -1,10 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.contrib.gis.geos import GEOSGeometry, LineString, Polygon
-from django.contrib.contenttypes.models import ContentType
-from ondoc.diagnostic.models import Lab
-from ondoc.location.models import EntityLocationRelationship, EntityUrls, EntityAddress
-from django.contrib.gis.geos import Point
-from django.contrib.gis.db.models.functions import Distance
+from ondoc.location.models import EntityAddress
 
 def new_calculate_centroid(ea):
 
@@ -81,7 +77,10 @@ class Command(BaseCommand):
         ea_objs = EntityAddress.objects.all()
         if ea_objs:
             for ea_obj in ea_objs:
-                new_calculate_centroid(ea_obj)
-                print('success: ' + str(ea_obj.value) + '(' + str(ea_obj.id) + ')')
+                try:
+                    new_calculate_centroid(ea_obj)
+                    print('success: ' + str(ea_obj.value) + '(' + str(ea_obj.id) + ')')
+                except Exception as e:
+                    print(str(e))
         else:
             print('error: objects not found')
