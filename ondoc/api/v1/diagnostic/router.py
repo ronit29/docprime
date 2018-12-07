@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet, LabTimingListView,
-                    AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet, DoctorLabAppointmentsNoAuthViewSet)
+                    AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet,
+                    DoctorLabAppointmentsNoAuthViewSet, LabTestCategoryListViewSet)
 # from rest_framework.routers import DefaultRouter
 #
 # router = DefaultRouter()
@@ -40,4 +41,5 @@ urlpatterns = [
          name='lab-appointment-complete'),
     path('appointment/complete', DoctorLabAppointmentsNoAuthViewSet.as_view({'post': 'complete'}),
          name='appointment-complete'),
+    path('test/category',LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
 ]

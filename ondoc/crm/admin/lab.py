@@ -1011,12 +1011,12 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         if any(self.errors):
             return
         all_parent_categories = []
-        count_is_primary = 0
+        # count_is_primary = 0
         for value in self.cleaned_data:
-            if not value.get("DELETE"):
+            if value and not value.get("DELETE"):
                 all_parent_categories.append(value.get('parent_category'))
-                if value.get('is_primary', False):
-                    count_is_primary += 1
+                # if value.get('is_primary', False):
+                #     count_is_primary += 1
         # If lab test is a package its parent can only be package category.
         if self.instance.is_package:
             if any([not parent_category.is_package_category for parent_category in all_parent_categories]):
@@ -1024,8 +1024,8 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         else:
             if any([parent_category.is_package_category for parent_category in all_parent_categories]):
                 raise forms.ValidationError("Parent Categories must be a lab test category.")
-            if not count_is_primary == 1:
-                raise forms.ValidationError("Must have one and only one primary parent category.")
+            # if not count_is_primary == 1:
+            #     raise forms.ValidationError("Must have one and only one primary parent category.")
 
 
 class LabTestCategoryInline(AutoComplete, TabularInline):
@@ -1054,11 +1054,11 @@ class LabTestAdminForm(forms.ModelForm):
         cleaned_data = self.cleaned_data
         # is_package toggles handling
         if cleaned_data.get('is_package', False):
-            if self.instance:
+            if self.instance.pk:
                 if self.instance.parent_lab_test_category_mappings.filter(parent_category__is_package_category=False).count():
                     raise forms.ValidationError("Already has lab test category as parent(s). Remove all of them and try again.")
         else:
-            if self.instance:
+            if self.instance.pk:
                 if self.instance.parent_lab_test_category_mappings.filter(parent_category__is_package_category=True).count():
                     raise forms.ValidationError("Already has lab test package category as parent(s). Remove all of them and try again.")
 
@@ -1109,11 +1109,11 @@ class LabTestCategoryForm(forms.ModelForm):
             raise forms.ValidationError('This category cannot have preferred lab test.')
         # is_package_category toggles handling
         if cleaned_data.get('is_package_category', False):
-            if self.instance:
+            if self.instance.pk:
                 if self.instance.lab_test_mappings.filter(lab_test__is_package=False).count():
                     raise forms.ValidationError('This category has lab test under it, delete all of them and try again.')
         else:
-            if self.instance:
+            if self.instance.pk:
                 if self.instance.lab_test_mappings.filter(lab_test__is_package=True).count():
                     raise forms.ValidationError('This category has lab test package(s) under it, delete all of them and try again.')
         preferred_lab_test = cleaned_data.get('preferred_lab_test')

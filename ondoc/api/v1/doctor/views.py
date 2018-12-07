@@ -222,14 +222,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "gender": profile_model.gender,
             "dob": str(profile_model.dob)
         }
-        coupon_list = []
-        coupon_discount = 0
-        if data.get("coupon_code"):
-            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
-            obj = models.OpdAppointment()
-            for coupon in coupon_obj:
-                coupon_discount += obj.get_discount(coupon, doctor_clinic_timing.deal_price)
-                coupon_list.append(coupon.id)
 
         extra_details = []
         effective_price = 0
@@ -237,6 +229,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
             elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
+                coupon_discount, coupon_list = self.getCouponDiscout(data, doctor_clinic_timing.deal_price)
                 if coupon_discount >= doctor_clinic_timing.deal_price:
                     effective_price = 0
                 else:
@@ -251,6 +244,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
                 effective_price = total_deal_price
             elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
+                coupon_discount, coupon_list = self.getCouponDiscout(data, total_deal_price)
                 if coupon_discount >= total_deal_price:
                     effective_price = 0
                 else:
@@ -318,6 +312,17 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "data": opd_appointment_serializer.data
         }
         return Response(response)
+
+    def getCouponDiscout(self, data, deal_price):
+        coupon_list = []
+        coupon_discount = 0
+        if data.get("coupon_code"):
+            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
+            obj = models.OpdAppointment()
+            for coupon in coupon_obj:
+                coupon_discount += obj.get_discount(coupon, deal_price)
+                coupon_list.append(coupon.id)
+        return coupon_discount, coupon_list
 
     @transaction.atomic
     def create_order(self, request, appointment_details, product_id):
