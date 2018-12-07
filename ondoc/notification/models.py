@@ -334,7 +334,8 @@ class NotificationAction:
                 'plan': instance.insurance_plan.name,
                 'insured_members': member_list,
                 'insurer_logo': instance.insurance_plan.insurer.logo.url,
-                'coi_url': instance.coi.url
+                'coi_url': instance.coi.url,
+                'insurer_name': instance.insurance_plan.insurer.name
             }
             EmailNotification.send_notification(user=user, notification_type=notification_type,
                                                 context=context, email=proposer.email)
