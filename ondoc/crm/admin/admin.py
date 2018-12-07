@@ -135,4 +135,3 @@ admin.site.register(SeoLabNetwork, SeoLabNetworkAdmin)
 admin.site.register(PracticeSpecializationContent, PracticeSpecializationContentAdmin)
 admin.site.register(CommonProcedureCategory)
 admin.site.register(DemoElastic, DemoElasticAdmin)
-

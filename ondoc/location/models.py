@@ -1353,8 +1353,8 @@ class DoctorPageURL(object):
         for sp in practice_specializations:
             sp_dict[sp.id] = sp.specialization.name
         sp_dict = OrderedDict(sorted(sp_dict.items()))
-        specializations = sp_dict.values()
-        specialization_ids = sp_dict.keys()
+        specializations = list(sp_dict.values())
+        specialization_ids = list(sp_dict.keys())
         # specializations =[sc.specialization.name for sc in doctor.doctorpracticespecializations.all().order_by('specialization__name')]
         # specialization_ids =[sc.specialization_id for sc in doctor.doctorpracticespecializations.all().order_by('id')]
         sequence = sequence
