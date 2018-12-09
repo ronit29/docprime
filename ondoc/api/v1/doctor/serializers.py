@@ -1298,6 +1298,11 @@ class OfflinePatientBodySerializer(serializers.Serializer):
     phone_number = serializers.ListField()
     id = serializers.UUIDField()
 
+    def validate(self, attrs):
+        if OfflinePatients.objects.filter(id=attrs['id']).exists():
+            raise serializers.ValidationError("Patient with same UUID already exists!")
+        return attrs
+
 class OfflineAppointmentBodySerializer(serializers.Serializer):
     patient = OfflinePatientBodySerializer(many=False, allow_null=True, required=False)
     patient_id = serializers.PrimaryKeyRelatedField(queryset=OfflinePatients.objects.all(), required=False, allow_empty=True)
@@ -1310,6 +1315,8 @@ class OfflineAppointmentBodySerializer(serializers.Serializer):
     def validate(self, attrs):
         if not attrs.get('patient') and not attrs.get('patient_id'):
             raise serializers.ValidationError("Niether patient or Patient_id Provided")
+        if OfflineOPDAppointments.objects.filter(id=attrs['id']).exists():
+            raise serializers.ValidationError("Appointment with same UUID already exists!")
         return attrs
 
 
