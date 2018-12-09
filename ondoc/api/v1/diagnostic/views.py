@@ -1244,11 +1244,11 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
         if lab_tests:
             categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__is_package=False,
                                                                                       lab_tests__id__in=lab_tests,
-                                                                                      is_live=True, is_package_category=False)
+                                                                                      is_live=True, is_package_category=False).distinct()
         else:
             categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__is_package=False,
                                                                                       is_live=True,
-                                                                                      is_package_category=False)
+                                                                                      is_package_category=False).distinct()
         empty = []
         not_in_others = set()
         for lab_test_category in categories:

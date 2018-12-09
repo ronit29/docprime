@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 from ondoc.account.models import Order
 from django.contrib.contenttypes.admin import GenericTabularInline
-from ondoc.authentication.models import GenericAdmin, BillingAccount, SPOCDetails
+from ondoc.authentication.models import GenericAdmin, BillingAccount, SPOCDetails, AssociatedMerchant, Merchant
 from ondoc.authentication.admin import BillingAccountInline
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
@@ -52,6 +52,7 @@ from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
 from django import forms
 from decimal import Decimal
+from .common import AssociatedMerchantInline
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -164,7 +165,6 @@ class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
                 else:
                     raise forms.ValidationError("Duplicate records not allowed.")
 
-
 class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     model = DoctorClinicProcedure
     extra = 0
@@ -204,7 +204,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     formset = DoctorClinicFormSet
     show_change_link = False
     # autocomplete_fields = ['hospital']
-    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline]
+    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, AssociatedMerchantInline]
 
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
@@ -899,7 +899,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         DoctorImageInline,
         DoctorDocumentInline,
         GenericAdminInline,
-        BillingAccountInline
+        BillingAccountInline,
+        AssociatedMerchantInline
     ]
 
     search_fields = ['name']
@@ -932,7 +933,7 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             exclude += ['source', 'batch', 'lead_url', 'registered', 'created_by', 'about', 'raw_about',
             'additional_details', 'is_insurance_enabled', 'is_insurance_enabled', 'is_online_consultation_enabled',
             'online_consultation_fees', 'is_retail_enabled', 'is_internal', 'is_test_doctor', 'doctor_signature',
-            'is_enabled', 'matrix_reference_id', 'doctor_signature','enabled_for_online_booking']
+            'is_enabled', 'matrix_reference_id', 'doctor_signature','enabled_for_online_booking','raw_about']
 
         return exclude
 
@@ -944,10 +945,22 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
             read_only_fields += ['name', 'gender', 'license', 'additional_details',
                                  'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
                                  'online_consultation_fees', 'live_at', 'is_internal',
-                                 'is_test_doctor', 'is_license_verified', 'signature', 'enabled']
-        excluded = self.get_exclude(request, obj) 
+                                 'is_test_doctor', 'is_license_verified', 'signature', 'enabled', 'raw_about']
+        excluded = self.get_exclude(request, obj)
         final = [x for x in read_only_fields if x not in excluded]
-                        
+        #make matrix_lead_id ediable if not present or user is superqc or superuser
+        is_matrix_id_editable = False
+        if obj:
+            if not obj.matrix_lead_id:
+                is_matrix_id_editable = True
+            if request.user.is_member_of(constants['SUPER_QC_GROUP']) or request.user.is_superuser:
+                is_matrix_id_editable = True
+        else:
+            is_matrix_id_editable = True
+
+        if is_matrix_id_editable:
+            final.remove('matrix_lead_id')
+
         return final
 
     def lead_url(self, instance):
@@ -1027,14 +1040,18 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         return ""
 
     def get_form(self, request, obj=None, **kwargs):
-        if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
-            kwargs['form'] = DoctorForm
+        # if not request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
+        #     kwargs['form'] = DoctorForm
+        kwargs['form'] = DoctorForm
         form = super().get_form(request, obj=obj, **kwargs)
         form.request = request
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
         if not request.user.is_superuser and\
             (not request.user.is_member_of(constants['QC_GROUP_NAME']) and not request.user.is_member_of(constants['SUPER_QC_GROUP']) ):
             form.base_fields['assigned_to'].disabled = True
+        # if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
+        #     form.base_fields['raw_about'].disabled = True
+        #     form.base_fields['additional_details'].disabled = True
         return form
 
     def save_formset(self, request, form, formset, change):

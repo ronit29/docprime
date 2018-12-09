@@ -1,6 +1,8 @@
 from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
+
+from ondoc.account.models import MerchantPayout
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
@@ -200,6 +202,9 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     booking_closing_hours_from_dayend = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))])
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
+    merchant_payout = GenericRelation(account_model.MerchantPayout)
+
     def __str__(self):
         return self.name
 
@@ -478,7 +483,8 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
     spoc_details = GenericRelation(auth_model.SPOCDetails)
-
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
+    merchant_payout = GenericRelation(account_model.MerchantPayout)
 
     def all_associated_labs(self):
         if self.id:
@@ -877,6 +883,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
+    merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
 
     def get_reports(self):
         return self.reports.all()
@@ -991,6 +998,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         except:
             pass
 
+        try:
+            # while completing appointment, add a merchant_payout entry
+            if database_instance.status != self.status and self.status == self.COMPLETED:
+                if self.merchant_payout is None:
+                    self.save_merchant_payout()
+        except Exception as e:
+            pass
+
         push_to_matrix = kwargs.get('push_again_to_matrix', True)
         if 'push_again_to_matrix' in kwargs.keys():
             kwargs.pop('push_again_to_matrix')
@@ -998,6 +1013,18 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         super().save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
+
+    def save_merchant_payout(self):
+        payout_amount = self.agreed_price
+        if self.is_home_pickup:
+            payout_amount += self.home_pickup_charges
+        payout_data = {
+            "charged_amount" : self.effective_price,
+            "payable_amount" : payout_amount,
+        }
+
+        merchant_payout = MerchantPayout.objects.create(**payout_data)
+        self.merchant_payout = merchant_payout
 
     def get_auto_cancel_delay(self, app_obj):
         delay = settings.AUTO_CANCEL_LAB_DELAY * 60
@@ -1193,6 +1220,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         #                                           payment_type__in=payment_type,
         #                                           lab__in=lab_list))
         # return queryset
+
+    @property
+    def get_billed_to(self):
+        network = self.lab.network
+        if network and network.is_billing_enabled:
+            return network
+        else:
+            return self.lab
+
+    @property
+    def get_merchant(self):
+        billed_to = self.get_billed_to
+        if billed_to:
+            merchant = billed_to.merchant.first()
+            if merchant:
+                return merchant.merchant
+        return None
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)

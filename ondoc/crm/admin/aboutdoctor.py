@@ -7,6 +7,21 @@ from django.db.models import Q
 import nested_admin
 
 
+class ReadOnlyInlineMixin(nested_admin.NestedTabularInline):
+    def get_readonly_fields(self, request, obj=None):
+        if True:
+            all_fields = [f for f in self.model._meta.get_fields()
+                          if f.concrete and (
+                                  not f.is_relation
+                                  or f.one_to_one
+                                  or (f.many_to_one and f.related_model)
+                          ) and not f.auto_created and not (f.auto_now if hasattr(f, 'auto_now') else False) and not (
+                    f.auto_now_add if hasattr(f, 'auto_now_add') else False)
+                          ]
+            return [x.name for x in all_fields]
+        return []
+
+
 class AboutDoctorForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
 
@@ -29,25 +44,25 @@ class ReadOnlyDoctorQualificationInline(nested_admin.NestedTabularInline):
         return False
 
 
-class ReadOnlyDoctorClinicTimingInline(nested_admin.NestedTabularInline):
+class ReadOnlyDoctorClinicTimingInline(ReadOnlyInlineMixin):
     model = doctor_model.DoctorClinicTiming
     # form = DoctorClinicTimingForm
     extra = 0
     can_delete = False
     show_change_link = False
-    readonly_fields = ['doctor_clinic', 'day', 'start', 'end', 'fees', 'deal_price', 'mrp']
+    #readonly_fields = ['doctor_clinic', 'day', 'start', 'end', 'fees', 'deal_price', 'mrp']
 
     def has_add_permission(self, request):
         return False
 
 
-class ReadOnlyDoctorClinicInline(nested_admin.NestedTabularInline):
+class ReadOnlyDoctorClinicInline(ReadOnlyInlineMixin):
     model = doctor_model.DoctorClinic
     extra = 0
     can_delete = False
     show_change_link = False
     autocomplete_fields = ['hospital']
-    readonly_fields = ['doctor', 'hospital']
+    #readonly_fields = ['doctor', 'hospital',]
     inlines = [ReadOnlyDoctorClinicTimingInline]
 
     def has_add_permission(self, request):
@@ -118,10 +133,10 @@ class AboutDoctorAdmin(nested_admin.NestedModelAdmin):
     list_display = ('name', 'updated_at', 'data_status', 'onboarding_status', 'about')
     list_filter = ('data_status', 'onboarding_status', AboutListFilter, CityFilter)
     form = AboutDoctorForm
-    exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code',
-               'additional_details', 'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
-               'online_consultation_fees', 'matrix_lead_id', 'matrix_reference_id', 'assigned_to', 'search_key',
-               'is_live', 'is_internal']
+    # exclude = ['user', 'created_by', 'is_phone_number_verified', 'is_email_verified', 'country_code',
+    #            'additional_details', 'is_insurance_enabled', 'is_retail_enabled', 'is_online_consultation_enabled',
+    #            'online_consultation_fees', 'matrix_lead_id', 'matrix_reference_id', 'assigned_to', 'search_key',
+    #            'is_live', 'is_internal']
     search_fields = ['name']
     inlines = [ReadOnlySpecializationInline,
                ReadOnlyDoctorQualificationInline,
@@ -131,6 +146,7 @@ class AboutDoctorAdmin(nested_admin.NestedModelAdmin):
                ReadOnlyDoctorExperienceInline,
                ReadOnlyDoctorClinicInline
                ]
+    fields = ('about', 'name', 'gender', 'practicing_since', 'raw_about', 'license', )           
     readonly_fields = ('name', 'gender', 'practicing_since', 'raw_about', 'license', 'onboarding_status')
 
     def get_queryset(self, request):

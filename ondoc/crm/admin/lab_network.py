@@ -11,10 +11,12 @@ from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
                                      LabNetworkHelpline, LabNetworkManager, LabNetworkDocument)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User, GenericLabAdmin
+from ondoc.authentication.models import GenericAdmin, User, GenericLabAdmin, AssociatedMerchant
 from django.contrib.contenttypes.admin import GenericTabularInline
 
 from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
+import nested_admin
+from .common import AssociatedMerchantInline
 
 class LabNetworkCertificationInline(admin.TabularInline):
     model = LabNetworkCertification
@@ -222,7 +224,8 @@ class LabNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
                LabNetworkDocumentInline,
                GenericLabNetworkAdminInline,
                BillingAccountInline,
-               SPOCDetailsInline]
+               SPOCDetailsInline,
+               AssociatedMerchantInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
