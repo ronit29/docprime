@@ -151,7 +151,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def list_packages(self, request, **kwrgs):
-        serializer = diagnostic_serializer.LabPackageListSerializer(data=request.data)
+        parameters = dict(request.query_params)
+        if parameters.get('categories'):
+            parameters['categories'] = [category_id for category_id in str.split(parameters['categories'][0], ',')]
+        serializer = diagnostic_serializer.LabPackageListSerializer(data=parameters)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         default_long = 77.071848
