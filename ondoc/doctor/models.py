@@ -15,7 +15,8 @@ from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.location import models as location_models
-from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund
+from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
+    MerchantPayout
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.tasks import doc_app_auto_cancel
@@ -149,6 +150,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     source = models.CharField(max_length=20, blank=True)
     batch = models.CharField(max_length=20, blank=True)
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=True)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
+    merchant_payout = GenericRelation(MerchantPayout)
 
     def __str__(self):
         return self.name
@@ -359,6 +362,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
     enabled_for_online_booking = models.BooleanField(default=False)
     enabled_for_online_booking_at = models.DateTimeField(null=True, blank=True)
     is_gold = models.BooleanField(verbose_name='Is Gold', default=False)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
+    merchant_payout = GenericRelation(MerchantPayout)
 
     def __str__(self):
         return self.name
@@ -525,6 +530,9 @@ class DoctorClinic(auth_model.TimeStampedModel):
     enabled_for_online_booking = models.BooleanField(verbose_name='enabled_for_online_booking?', default=False)
     enabled = models.BooleanField(verbose_name='Enabled', default=True)
     priority = models.PositiveSmallIntegerField(blank=True, null=True, default=0)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
+    merchant_payout = GenericRelation(MerchantPayout)
+    
     class Meta:
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
@@ -898,6 +906,7 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     assigned_to = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_hospital_networks')
     billing_merchant = GenericRelation(auth_model.BillingAccount)
     spoc_details = GenericRelation(auth_model.SPOCDetails)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
 
     def __str__(self):
         return self.name
@@ -1091,8 +1100,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
+    rating = GenericRelation(ratings_models.RatingsReview)
     procedures = models.ManyToManyField('procedure.Procedure', through='OpdAppointmentProcedureMapping',
                                         through_fields=('opd_appointment', 'procedure'), null=True, blank=True)
+
+    merchant_payout = models.ForeignKey(MerchantPayout, related_name="opd_appointment", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -1267,9 +1279,26 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         if 'push_again_to_matrix' in kwargs.keys():
             kwargs.pop('push_again_to_matrix')
 
+        try:
+            # while completing appointment, add a merchant_payout entry
+            if database_instance.status != self.status and self.status == self.COMPLETED:
+                if self.merchant_payout is None:
+                    self.save_merchant_payout()
+        except Exception as e:
+            pass
+
         super().save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
+
+    def save_merchant_payout(self):
+        payout_data = {
+            "charged_amount" : self.effective_price,
+            "payable_amount" : self.fees,
+        }
+
+        merchant_payout = MerchantPayout.objects.create(**payout_data)
+        self.merchant_payout = merchant_payout
 
     def doc_payout_amount(self):
         amount = 0
@@ -1395,6 +1424,25 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         return procedures
 
+    @property
+    def get_billed_to(self):
+        doctor_clinic = self.doctor.doctor_clinics.filter(hospital=self.hospital).first()
+        if self.hospital.network and self.hospital.network.is_billing_enabled:
+            return self.hospital.network
+        if self.hospital.is_billing_enabled:
+            return self.hospital
+        if doctor_clinic and doctor_clinic.merchant.first():
+            return doctor_clinic
+        return self.doctor
+
+    @property
+    def get_merchant(self):
+        billed_to = self.get_billed_to
+        if billed_to:
+            merchant = billed_to.merchant.first()
+            if merchant:
+                return merchant.merchant
+        return None
 
     class Meta:
         db_table = "opd_appointment"

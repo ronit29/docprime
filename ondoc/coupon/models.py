@@ -39,6 +39,10 @@ class Coupon(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
+        if not user.is_authenticated:
+            return 0
+
+
         count = 0
         if str(self.type) == str(self.DOCTOR) or str(self.type) == str(self.ALL):
             count += OpdAppointment.objects.filter(user=user,

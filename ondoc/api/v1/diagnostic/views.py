@@ -3,8 +3,8 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
-                                     CommonDiagnosticCondition, CommonTest, CommonPackage, LabPricingGroup,
-                                     LabTestCategory)
+                                     CommonDiagnosticCondition, CommonTest, CommonPackage,
+                                     FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer, LabPricingGroup, LabTestCategory)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.notification.models import EmailNotification
@@ -139,7 +139,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     corrected_url = valid_qs.first().url
                     return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
                 else:
-                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                    return Response(status=status.HTTP_404_NOT_FOUND)
 
             extras = entity.additional_info
             if extras.get('location_json'):
@@ -288,7 +288,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
                                                                            context={"lab": lab_obj})
         # for Demo
-        demo_lab_test = AvailableLabTest.objects.filter(lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).prefetch_related('test')[:10]
+        demo_lab_test = AvailableLabTest.objects.filter(lab_pricing_group=lab_obj.lab_pricing_group, enabled=True).order_by("-test__priority").prefetch_related('test')[:2]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj})
         day_now = timezone.now().weekday()
         timing_queryset = list()
@@ -919,9 +919,6 @@ class LabAppointmentView(mixins.CreateModelMixin,
 class LabTimingListView(mixins.ListModelMixin,
                         viewsets.GenericViewSet):
 
-    authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated,)
-
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         params = request.query_params
@@ -1092,11 +1089,64 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
+class TestDetailsViewset(viewsets.GenericViewSet):
+
+    def get_queryset(self):
+        return None
+
+    def retrieve(self, request):
+        params = request.query_params
+        try:
+            test_ids = params.get('test_ids', None)
+            if test_ids:
+                test_ids = [int(x) for x in test_ids.split(',')]
+                test_ids = set(test_ids)
+        except:
+            return Response([], status=status.HTTP_400_BAD_REQUEST)
+        queryset = LabTest.objects.prefetch_related('labtests__parameter', 'faq',
+                                                    'base_test__booked_together_test').filter(id__in=test_ids)
+        # query = ParameterLabTest.objects.filter(lab_test_id__in=test_ids)
+        if not queryset:
+            return Response([])
+        final_result = []
+        for data in queryset:
+            result = {}
+            result['id'] = data.id
+            result['about_test'] = data.about_test
+            # result['test_may_include'] =
+            result['preparations'] = data.preparations
+            result['why_get_tested'] = data.why
+            info=[]
+            for lab_test in data.labtests.all():
+                name = lab_test.parameter.name
+                info.append(name)
+            result['test_may_include'] = info
+
+            queryset1 = data.faq.all()
+            result['faqs'] = []
+            for qa in queryset1:
+                result['faqs'].append({'test_question': qa.test_question, 'test_answer': qa.test_answer})
+
+            # queryset2 = FrequentlyAddedTogetherTests.objects.filter(original_test_id__in=test_ids)
+            booked_together=[]
+            for fbt in data.base_test.all():
+                name = fbt.booked_together_test.name
+                id = fbt.booked_together_test.id
+                booked_together.append({'id': id, 'lab_test': name})
+
+            result['frequently_booked_together'] = booked_together
+
+            final_result.append(result)
+
+        return Response(final_result)
+
+
 class LabTestCategoryListViewSet(viewsets.GenericViewSet):
     # queryset = None
     def get_queryset(self):
         return None
-    def list(self,request):
+
+    def list(self, request):
         parameters = request.query_params
         try:
             lab_tests = parameters.get('lab_tests', None)
@@ -1106,25 +1156,48 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
         except:
             return Response([], status= status.HTTP_400_BAD_REQUEST)
         if lab_tests:
-            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__id__in=lab_tests, is_live = True)
+            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__is_package=False,
+                                                                                      lab_tests__id__in=lab_tests,
+                                                                                      is_live=True, is_package_category=False).distinct()
         else:
-            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(is_live= True)
+            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__is_package=False,
+                                                                                      is_live=True,
+                                                                                      is_package_category=False).distinct()
         empty = []
-        if not categories:
-            return Response([])
+        not_in_others = set()
         for lab_test_category in categories:
-            resp = {}
+            resp = dict()
             resp['category_name'] = lab_test_category.name
             resp['category_id'] = lab_test_category.id
             temp_tests = []
             for lab_test in lab_test_category.lab_tests.all():
-                name = lab_test.name
-                id = lab_test.id
-                if lab_tests and id in lab_tests:
-                    is_selected = True
-                else:
-                    is_selected = False
-                temp_tests.append({'name': name, 'id': id, 'is_selected': is_selected})
+                if not lab_test.is_package:
+                    name = lab_test.name
+                    id = lab_test.id
+                    if lab_tests and id in lab_tests:
+                        is_selected = True
+                        not_in_others.add(id)
+                    else:
+                        is_selected = False
+                    if not is_selected:
+                        temp_tests.append({'name': name, 'id': id, 'is_selected': is_selected})
+                    else:
+                        temp_tests.insert(0, {'name': name, 'id': id, 'is_selected': is_selected})
             resp['tests'] = temp_tests
             empty.append(resp)
+
+        if lab_tests:
+            others = lab_tests.difference(not_in_others)
+            if others:
+                resp = dict()
+                resp['category_name'] = 'Others'
+                resp['category_id'] = -1
+                temp_tests = []
+                for lab_test in LabTest.objects.filter(id__in=others, is_package=False):
+                    name = lab_test.name
+                    id = lab_test.id
+                    is_selected = True
+                    temp_tests.append({'name': name, 'id': id, 'is_selected': is_selected})
+                resp['tests'] = temp_tests
+                empty.append(resp)
         return Response(empty)

@@ -1,6 +1,8 @@
 from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
+
+from ondoc.account.models import MerchantPayout
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
@@ -200,6 +202,9 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey):
     enabled = models.BooleanField(verbose_name='Is Enabled', default=True, blank=True)
     booking_closing_hours_from_dayend = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))])
     order_priority = models.PositiveIntegerField(blank=True, null=True, default=0)
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
+    merchant_payout = GenericRelation(account_model.MerchantPayout)
+
     def __str__(self):
         return self.name
 
@@ -478,7 +483,8 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     billing_merchant = GenericRelation(BillingAccount)
     home_collection_charges = GenericRelation(HomePickupCharges)
     spoc_details = GenericRelation(auth_model.SPOCDetails)
-
+    merchant = GenericRelation(auth_model.AssociatedMerchant)
+    merchant_payout = GenericRelation(account_model.MerchantPayout)
 
     def all_associated_labs(self):
         if self.id:
@@ -618,6 +624,12 @@ class ParameterLabTest(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.parameter.name)
 
+class FrequentlyAddedTogetherTests(TimeStampedModel):
+    original_test = models.ForeignKey('diagnostic.LabTest', related_name='base_test' ,null =True, blank =False, on_delete=models.CASCADE)
+    booked_together_test = models.ForeignKey('diagnostic.LabTest', related_name='booked_together' ,null=True, blank=False, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "frequently_added_tests"
 
 class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     name = models.CharField(max_length=500, unique=True)
@@ -662,7 +674,7 @@ class LabTest(TimeStampedModel, SearchKey):
     test_type = models.PositiveIntegerField(choices=TEST_TYPE_CHOICES, blank=True, null=True)
     is_package = models.BooleanField(verbose_name= 'Is this test package type?')
     number_of_tests = models.PositiveIntegerField(blank=True, null=True)
-    why = models.TextField(blank=True)
+    why = models.TextField(blank=True, verbose_name='Why get tested?')
     pre_test_info = models.CharField(max_length=1000, blank=True)
     sample_handling_instructions = models.CharField(max_length=1000, blank=True)
     sample_collection_instructions = models.CharField(max_length=1000, blank=True)
@@ -673,16 +685,22 @@ class LabTest(TimeStampedModel, SearchKey):
     excel_id = models.CharField(max_length=100, blank=True)
     sample_type = models.CharField(max_length=500, blank=True)
     home_collection_possible = models.BooleanField(default=False, verbose_name= 'Can sample be home collected for this test?')
-    test = models.ManyToManyField('self', through='LabTestPackage', symmetrical=False,
+    test = models.ManyToManyField('self', through='LabTestPackage', symmetrical=False, related_name= 'package_test',
                                   through_fields=('package', 'lab_test'))  # self reference
     parameter = models.ManyToManyField(
         'TestParameter', through=ParameterLabTest,
         through_fields=('lab_test', 'parameter')
     )
+    frequently_booked_together = models.ManyToManyField('self', symmetrical=False, through=FrequentlyAddedTogetherTests,
+                                                        related_name= 'frequent_test',
+                                                        through_fields=('original_test','booked_together_test'))
     approximate_duration = models.CharField(max_length=50, default='15 mins', verbose_name='What is the approximate duration for the test?')
     report_schedule = models.CharField(max_length=150, default='After 2 days of test.', verbose_name='What is the report schedule for the test?')
     enable_for_ppc = models.BooleanField(default=False)
     enable_for_retail = models.BooleanField(default=False)
+    about_test = models.TextField(blank=True, verbose_name='About the test')
+    preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
+    priority = models.PositiveIntegerField(default=0, null=True)
     hide_price = models.BooleanField(default=False)
     searchable = models.BooleanField(default=True)
     categories = models.ManyToManyField(LabTestCategory,
@@ -701,6 +719,24 @@ class LabTest(TimeStampedModel, SearchKey):
 
     class Meta:
         db_table = "lab_test"
+
+#
+#
+# class FrequentlyAddedTogetherTests(TimeStampedModel):
+#     test = models.ForeignKey(LabTest, related_name='base_test' ,null =True, blank =False, on_delete=models.CASCADE)
+#     booked_together_test = models.ForeignKey(LabTest, related_name='booked_together' ,null=True, blank=False, on_delete=models.CASCADE)
+#
+#     class Meta:
+#         db_table = "related_tests"
+
+
+class QuestionAnswer(TimeStampedModel):
+    test_question = models.TextField(null=False, verbose_name='Question')
+    test_answer = models.TextField(null=True, verbose_name='Answer')
+    lab_test = models.ForeignKey(LabTest, related_name='faq', null=True, blank=False, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "question_answer"
 
 
 class LabTestPackage(TimeStampedModel):
@@ -847,6 +883,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
+    merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
 
     def get_reports(self):
         return self.reports.all()
@@ -961,6 +998,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         except:
             pass
 
+        try:
+            # while completing appointment, add a merchant_payout entry
+            if database_instance.status != self.status and self.status == self.COMPLETED:
+                if self.merchant_payout is None:
+                    self.save_merchant_payout()
+        except Exception as e:
+            pass
+
         push_to_matrix = kwargs.get('push_again_to_matrix', True)
         if 'push_again_to_matrix' in kwargs.keys():
             kwargs.pop('push_again_to_matrix')
@@ -968,6 +1013,18 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         super().save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.app_commit_tasks(database_instance, push_to_matrix))
+
+    def save_merchant_payout(self):
+        payout_amount = self.agreed_price
+        if self.is_home_pickup:
+            payout_amount += self.home_pickup_charges
+        payout_data = {
+            "charged_amount" : self.effective_price,
+            "payable_amount" : payout_amount,
+        }
+
+        merchant_payout = MerchantPayout.objects.create(**payout_data)
+        self.merchant_payout = merchant_payout
 
     def get_auto_cancel_delay(self, app_obj):
         delay = settings.AUTO_CANCEL_LAB_DELAY * 60
@@ -1163,6 +1220,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         #                                           payment_type__in=payment_type,
         #                                           lab__in=lab_list))
         # return queryset
+
+    @property
+    def get_billed_to(self):
+        network = self.lab.network
+        if network and network.is_billing_enabled:
+            return network
+        else:
+            return self.lab
+
+    @property
+    def get_merchant(self):
+        billed_to = self.get_billed_to
+        if billed_to:
+            merchant = billed_to.merchant.first()
+            if merchant:
+                return merchant.merchant
+        return None
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)

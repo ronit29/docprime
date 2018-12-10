@@ -26,6 +26,7 @@ from decimal import Decimal
 from collections import OrderedDict
 import datetime
 from django.utils.dateparse import parse_datetime
+import hashlib
 User = get_user_model()
 
 
@@ -492,6 +493,8 @@ class CouponsMixin(object):
         coupon_obj = kwargs.get("coupon_obj")
 
         if coupon_obj:
+            if coupon_obj.is_user_specific and not user.is_authenticated:
+                return {"is_valid": False, "used_count": 0}
 
             if isinstance(self, OpdAppointment) and coupon_obj.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
@@ -505,8 +508,8 @@ class CouponsMixin(object):
             allowed_coupon_count = coupon_obj.count
 
             if coupon_obj.is_user_specific:
-                user_specific_coupon = coupon_obj.user_specific_coupon.filter(user=user).exists()
-                if not user_specific_coupon:
+                allowed_coupon = coupon_obj.user_specific_coupon.filter(user=user).exists()
+                if not allowed_coupon:
                     return {"is_valid": False, "used_count": None}
 
             # check if a user is new i.e user has done any appointments
@@ -516,7 +519,7 @@ class CouponsMixin(object):
 
             count = coupon_obj.used_coupon_count(user)
             total_used_count = coupon_obj.total_used_coupon_count()
-            
+
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:
@@ -612,9 +615,9 @@ class CouponsMixin(object):
 
 
 class TimeSlotExtraction(object):
-    MORNING = "Morning"
-    AFTERNOON = "Afternoon"
-    EVENING = "Evening"
+    MORNING = "AM"
+    # AFTERNOON = "Afternoon"
+    EVENING = "PM"
     TIME_SPAN = 15  # In minutes
     timing = dict()
     price_available = dict()
@@ -634,12 +637,14 @@ class TimeSlotExtraction(object):
         if not self.timing[day].get('timing'):
             self.timing[day]['timing'] = dict()
             self.timing[day]['timing'][self.MORNING] = OrderedDict()
-            self.timing[day]['timing'][self.AFTERNOON] = OrderedDict()
+            # self.timing[day]['timing'][self.AFTERNOON] = OrderedDict()
             self.timing[day]['timing'][self.EVENING] = OrderedDict()
         temp_start = start
         while temp_start <= end:
-            day_slot, am_pm = self.get_day_slot(temp_start)
-            time_str = self.form_time_string(temp_start, am_pm)
+            # day_slot, am_pm = self.get_day_slot(temp_start)
+            day_slot = self.get_day_slot(temp_start)
+            # time_str = self.form_time_string(temp_start, am_pm)
+            time_str = self.form_time_string(temp_start)
             self.timing[day]['timing'][day_slot][temp_start] = time_str
             price_available = {"price": price, "is_available": is_available}
             if is_doctor:
@@ -651,16 +656,16 @@ class TimeSlotExtraction(object):
             temp_start += float_span
 
     def get_day_slot(self, time):
-        am = 'AM'
-        pm = 'PM'
+        # am = 'AM'
+        # pm = 'PM'
         if time < 12:
-            return self.MORNING, am
-        elif time < 16:
-            return self.AFTERNOON, pm
+            return self.MORNING  #, am
+        # elif time < 16:
+        #     return self.AFTERNOON, pm
         else:
-            return self.EVENING, pm
+            return self.EVENING  #, pm
 
-    def form_time_string(self, time, am_pm):
+    def form_time_string(self, time, am_pm=''):
 
         day_time_hour = int(time)
         day_time_min = (time - day_time_hour) * 60
@@ -676,7 +681,7 @@ class TimeSlotExtraction(object):
         if int(day_time_min) < 10:
             day_time_min_str = '0' + str(int(day_time_min))
 
-        time_str = day_time_hour_str + ":" + day_time_min_str + " " + am_pm
+        time_str = day_time_hour_str + ":" + day_time_min_str  # + " " + am_pm
 
         return time_str
 
@@ -688,7 +693,7 @@ class TimeSlotExtraction(object):
             if self.timing[i].get('timing'):
                 # data = self.format_data(self.timing[i]['timing'][self.MORNING], pa)
                 whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.MORNING], self.MORNING, pa))
-                whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
+                # whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.AFTERNOON], self.AFTERNOON, pa))
                 whole_timing_data[i].append(self.format_data(self.timing[i]['timing'][self.EVENING], self.EVENING, pa))
 
         return whole_timing_data
@@ -704,6 +709,7 @@ class TimeSlotExtraction(object):
                 data_list.append({"value": k, "text": v, "price": pa[k]["price"],
                                   "is_available": pa[k]["is_available"]})
         format_data = dict()
+        format_data['type'] = 'AM' if day_time == self.MORNING else 'PM'
         format_data['title'] = day_time
         format_data['timing'] = data_list
         return format_data
@@ -772,3 +778,30 @@ class GenericAdminEntity():
     HOSPITAL = 2
     LAB = 3
     EntityChoices = [(DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'), (LAB, 'Lab')]
+
+
+def create_payout_checksum(all_txn, product_id):
+    from ondoc.account.models import Order
+
+    secret_key = client_key = ""
+    if product_id == Order.DOCTOR_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P1
+        client_key = settings.PG_CLIENT_KEY_P1
+    elif product_id == Order.LAB_PRODUCT_ID:
+        secret_key = settings.PG_SECRET_KEY_P2
+        client_key = settings.PG_CLIENT_KEY_P2
+
+    all_txn = sorted(all_txn, key=lambda x : x["idx"])
+    checksum = ""
+    for txn in all_txn:
+        curr = "{"
+        for k in txn.keys():
+            if str(txn[k]) and txn[k] is not None and txn[k] is not "":
+                curr = curr + k + '=' + str(txn[k]) + ';'
+        curr = curr + "}"
+        checksum += curr
+
+    checksum = secret_key + "|[" + checksum + "]|" + client_key
+    checksum = hashlib.sha256(str(checksum).encode())
+    checksum = checksum.hexdigest()
+    return checksum
