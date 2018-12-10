@@ -1156,13 +1156,10 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
         except:
             return Response([], status= status.HTTP_400_BAD_REQUEST)
         if lab_tests:
-            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__is_package=False,
-                                                                                      lab_tests__id__in=lab_tests,
-                                                                                      is_live=True, is_package_category=False).distinct()
+            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__id__in=lab_tests,
+                                                                                      is_live=True).distinct()
         else:
-            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__is_package=False,
-                                                                                      is_live=True,
-                                                                                      is_package_category=False).distinct()
+            categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(is_live=True).distinct()
         empty = []
         not_in_others = set()
         for lab_test_category in categories:
@@ -1171,18 +1168,17 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
             resp['category_id'] = lab_test_category.id
             temp_tests = []
             for lab_test in lab_test_category.lab_tests.all():
-                if not lab_test.is_package:
-                    name = lab_test.name
-                    id = lab_test.id
-                    if lab_tests and id in lab_tests:
-                        is_selected = True
-                        not_in_others.add(id)
-                    else:
-                        is_selected = False
-                    if not is_selected:
-                        temp_tests.append({'name': name, 'id': id, 'is_selected': is_selected})
-                    else:
-                        temp_tests.insert(0, {'name': name, 'id': id, 'is_selected': is_selected})
+                name = lab_test.name
+                id = lab_test.id
+                if lab_tests and id in lab_tests:
+                    is_selected = True
+                    not_in_others.add(id)
+                else:
+                    is_selected = False
+                if not is_selected:
+                    temp_tests.append({'name': name, 'id': id, 'is_selected': is_selected})
+                else:
+                    temp_tests.insert(0, {'name': name, 'id': id, 'is_selected': is_selected})
             resp['tests'] = temp_tests
             empty.append(resp)
 
@@ -1193,7 +1189,7 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 resp['category_name'] = 'Others'
                 resp['category_id'] = -1
                 temp_tests = []
-                for lab_test in LabTest.objects.filter(id__in=others, is_package=False):
+                for lab_test in LabTest.objects.filter(id__in=others):
                     name = lab_test.name
                     id = lab_test.id
                     is_selected = True
