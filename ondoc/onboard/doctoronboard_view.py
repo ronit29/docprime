@@ -13,6 +13,9 @@ from ondoc.doctor.models import DoctorOnboardingToken, Doctor, DoctorImage, Doct
 from random import randint
 from ondoc.sms import api
 from ondoc.sendemail import api as email_api
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DoctorOnboard(View):
 
@@ -253,7 +256,10 @@ def otp(request):
 
             primary_email = existing.doctor.emails.filter(is_primary=True).first()
             if primary_email:
-                email_api.send_email(primary_email, 'Onboarding OTP ', email_message)
+                try:
+                    email_api.send_email(primary_email, 'Onboarding OTP ', email_message)
+                except Exception as e:
+                    logger.error(str(e))
 
             # print(otp)
             request.session['otp'] = otp
