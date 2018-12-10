@@ -416,7 +416,14 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                             insurance_threshold.opd_amount_limit
                         resp['is_user_insured'] = True
 
-            if obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
+            # enabled for online booking check
+            doctor_clinic = obj.doctor_clinic
+            doctor = doctor_clinic.doctor
+            hospital = doctor_clinic.hospital
+            enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and hospital.enabled_for_online_booking
+
+            if obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
+                    not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                 resp['is_insurance_covered'] = True
 
         return resp
