@@ -8,7 +8,7 @@ from datetime import datetime
 
 from ondoc.doctor.models import (
         Doctor, Specialization, MedicalService, DoctorImage, Symptoms,
-        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile, Hospital, DoctorEmail, DoctorMobile, DoctorMedicalService, DoctorAssociation, DoctorAward, DoctorLeave
+        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, DoctorEmail, DoctorMobile, DoctorMedicalService, DoctorAssociation, DoctorAward, DoctorLeave
     )
 
 
@@ -104,6 +104,12 @@ class DoctorSerializer(serializers.ModelSerializer):
         model = Doctor
         fields = ('id', 'name', 'practice_duration', 'profile_img', 'qualificationSpecialization',
                  'email', 'availability', 'pastExperience' )
+
+
+class ArticleAuthorSerializer(DoctorSerializer):
+    class Meta:
+        model = Doctor
+        fields = ('id', 'name')
 
 
 class DoctorApiReformData(DoctorSerializer):

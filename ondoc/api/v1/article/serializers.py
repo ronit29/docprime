@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 from ondoc.articles.models import ArticleCategory
+from ondoc.doctor.v1.serializers import DoctorSerializer, ArticleAuthorSerializer
 
 
 class LinkedArticleSerializer(serializers.ModelSerializer):
@@ -31,6 +32,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     # linked_articles = serializers.SerializerMethodField()
     published_date = serializers.SerializerMethodField()
     linked = serializers.SerializerMethodField()
+    author = ArticleAuthorSerializer()
 
     def get_linked(self, obj):
         resp = {}
@@ -79,7 +81,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Article
         fields = ('title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
-                  'linked', 'author_name', 'published_date')
+                  'linked', 'author_name', 'published_date', 'author')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
