@@ -250,16 +250,16 @@ def otp(request):
             message = 'You have initiated onboarding process on DocPrime for '+existing.doctor.name+'. WELCOME CODE is '+str(otp)
             api.send_sms(message, str(existing.doctor.mobiles.filter(is_primary=True)[0].number))
 
-            email_message = '''Dear Sir/Mam,
-                \n\nPlease find below the OTP for Onboarding Process:-
-                \n\nOTP: %d''' % otp
+            # email_message = '''Dear Sir/Mam,
+            #     \n\nPlease find below the OTP for Onboarding Process:-
+            #     \n\nOTP: %d''' % otp
 
-            primary_email = existing.doctor.emails.filter(is_primary=True).first()
-            if primary_email:
-                try:
-                    email_api.send_email(primary_email, 'Onboarding OTP ', email_message)
-                except Exception as e:
-                    logger.error(str(e))
+            # primary_email = existing.doctor.emails.filter(is_primary=True).first()
+            # if primary_email:
+            #     try:
+            #         email_api.send_email(primary_email, 'Onboarding OTP ', email_message)
+            #     except Exception as e:
+            #         logger.error(str(e))
 
             # print(otp)
             request.session['otp'] = otp
