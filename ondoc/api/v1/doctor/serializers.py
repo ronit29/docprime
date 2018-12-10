@@ -1048,12 +1048,80 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
     procedures = serializers.SerializerMethodField()
+    insurance = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
-                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp')
+                  'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
+                  'insurance')
+
+    def get_insurance(self, obj):
+        request = self.context.get("request")
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        resp = {
+            'is_insurance_covered': False,
+            'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000,
+            'is_user_insured': False
+        }
+        if request:
+            logged_in_user = request.user
+            if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+                user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+                if user_insurance and user_insurance.is_valid():
+                    insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                    if insurance_threshold:
+                        resp['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
+                            insurance_threshold.opd_amount_limit
+                        resp['is_user_insured'] = True
+
+            if user_insurance and user_insurance.is_valid():
+                if obj.mrp is not None and obj.mrp <= resp['insurance_threshold_amount']:
+                    if obj.payment_type == 3 and obj.insurance_id is not None:
+                        doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=obj.doctor).values(
+                            'specialization_id')
+                        specilization_ids = doctor
+                        specilization_ids_set = set(
+                            map(lambda specialization: specialization['specialization_id'], specilization_ids))
+                        gynecologist_list = json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS)
+                        gynecologist_set = set(gynecologist_list)
+                        oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
+                        oncologist_set = set(oncologist_list)
+                        if (specilization_ids_set & oncologist_set) or (specilization_ids_set & gynecologist_set):
+                            if specilization_ids_set & gynecologist_set:
+                                doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
+                                    specialization_id__in=gynecologist_list).values_list(
+                                    'doctor_id', flat=True)
+                                opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
+                                                                                      doctor_id__in=doctor_with_same_specialization,
+                                                                                      payment_type=3,
+                                                                                      insurance_id=user_insurance.id).count()
+                                if opd_appointment_count >= 5:
+                                    resp['is_insurance_covered'] = False
+                                else:
+                                    resp['is_insurance_covered'] = True
+                            elif specilization_ids_set & oncologist_set:
+                                doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
+                                    specialization_id__in=oncologist_list).values_list(
+                                    'doctor_id', flat=True)
+                                opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
+                                                                                      doctor_id__in=doctor_with_same_specialization,
+                                                                                      payment_type=3,
+                                                                                      insurance_id=user_insurance.id).count()
+                                if opd_appointment_count >= 5:
+                                    resp['is_insurance_covered'] = False
+                                else:
+                                    resp['is_insurance_covered'] = True
+                        else:
+                            resp['is_insurance_covered'] = True
+                    else:
+                        resp['is_insurance_covered'] = False
+                else:
+                    resp['is_insurance_covered'] = False
+            else:
+                resp['is_insurance_covered'] = False
+        return resp
 
     def get_procedures(self, obj):
         if obj:

@@ -411,7 +411,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                     'doctor_id', flat=True)
                                 opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
                                     doctor_id__in=doctor_with_same_specialization, payment_type=3,
-                                    insurance_id__isnull=False).count()
+                                    insurance_id=user_insurance.id).count()
                                 if opd_appointment_count >= 5:
                                     return False, user_insurance.id, 'Gynecologist Limit of 5 exceeded'
                                 else:
@@ -422,7 +422,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                     'doctor_id', flat=True)
                                 opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
                                     doctor_id__in=doctor_with_same_specialization, payment_type=3,
-                                    insurance_id__isnull=False).count()
+                                    insurance_id=user_insurance.id).count()
                                 if opd_appointment_count >= 5:
                                     return False, user_insurance.id, 'Oncologist Limit of 5 exceeded'
                                 else:
