@@ -1088,48 +1088,57 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
             resp = {'success':'LabAppointment Updated Successfully!'}
         return Response(resp)
 
+
 class TestDetailsViewset(viewsets.GenericViewSet):
 
-    def retrieve(self, request, test_id):
+    def get_queryset(self):
+        return None
+
+    def retrieve(self, request):
         params = request.query_params
-        queryset = LabTest.objects.filter(id=test_id)
-        query = ParameterLabTest.objects.filter(lab_test_id=test_id)
+        try:
+            test_ids = params.get('test_ids', None)
+            if test_ids:
+                test_ids = [int(x) for x in test_ids.split(',')]
+                test_ids = set(test_ids)
+        except:
+            return Response([], status=status.HTTP_400_BAD_REQUEST)
+        queryset = LabTest.objects.prefetch_related('labtests__parameter', 'faq',
+                                                    'base_test__booked_together_test').filter(id__in=test_ids)
+        # query = ParameterLabTest.objects.filter(lab_test_id__in=test_ids)
         if not queryset:
             return Response([])
-        result = {}
-        if len(queryset) > 0:
-            queryset = queryset[0]
-            result['about_test'] = queryset.about_test
+        final_result = []
+        for data in queryset:
+            result = {}
+            result['id'] = data.id
+            result['about_test'] = data.about_test
             # result['test_may_include'] =
-            result['preparations'] = queryset.preparations
-            result['why_get_tested'] = queryset.why
-
-        if len(query) > 0:
+            result['preparations'] = data.preparations
+            result['why_get_tested'] = data.why
             info=[]
-            for data in query:
-                if data.parameter.name:
-
-                    name = data.parameter.name
-                    info.append(name)
+            for lab_test in data.labtests.all():
+                name = lab_test.parameter.name
+                info.append(name)
             result['test_may_include'] = info
 
-        queryset1 = QuestionAnswer.objects.filter(lab_test_id=test_id).values('test_question','test_answer')
-        if len(queryset1) > 0:
-            result['faqs']= queryset1
+            queryset1 = data.faq.all()
+            result['faqs'] = []
+            for qa in queryset1:
+                result['faqs'].append({'test_question': qa.test_question, 'test_answer': qa.test_answer})
 
-        queryset2 = FrequentlyAddedTogetherTests.objects.filter(original_test_id=test_id)
-        booked_together=[]
-        if len(queryset2) > 0:
-            for data in queryset2:
-                 if data.booked_together_test.name:
-
-                    name = data.booked_together_test.name
-                    id = data.booked_together_test.id
-                    booked_together.append({'id':id, 'lab_test': name})
+            # queryset2 = FrequentlyAddedTogetherTests.objects.filter(original_test_id__in=test_ids)
+            booked_together=[]
+            for fbt in data.base_test.all():
+                name = fbt.booked_together_test.name
+                id = fbt.booked_together_test.id
+                booked_together.append({'id': id, 'lab_test': name})
 
             result['frequently_booked_together'] = booked_together
 
-        return Response(result)
+            final_result.append(result)
+
+        return Response(final_result)
 
 
 class LabTestCategoryListViewSet(viewsets.GenericViewSet):
