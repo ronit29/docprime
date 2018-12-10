@@ -298,7 +298,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
 class CouponDiscountViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    #permission_classes = (IsAuthenticated,)
 
     def coupon_discount(self, request, *args, **kwargs):
 

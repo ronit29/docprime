@@ -493,6 +493,8 @@ class CouponsMixin(object):
         coupon_obj = kwargs.get("coupon_obj")
 
         if coupon_obj:
+            if coupon_obj.is_user_specific and not user.is_authenticated:
+                return {"is_valid": False, "used_count": 0}
 
             if isinstance(self, OpdAppointment) and coupon_obj.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
@@ -506,8 +508,8 @@ class CouponsMixin(object):
             allowed_coupon_count = coupon_obj.count
 
             if coupon_obj.is_user_specific:
-                user_specific_coupon = coupon_obj.user_specific_coupon.filter(user=user).exists()
-                if not user_specific_coupon:
+                allowed_coupon = coupon_obj.user_specific_coupon.filter(user=user).exists()
+                if not allowed_coupon:
                     return {"is_valid": False, "used_count": None}
 
             # check if a user is new i.e user has done any appointments
@@ -517,7 +519,7 @@ class CouponsMixin(object):
 
             count = coupon_obj.used_coupon_count(user)
             total_used_count = coupon_obj.total_used_coupon_count()
-            
+
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:
