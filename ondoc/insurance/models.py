@@ -22,6 +22,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from num2words import num2words
 from hardcopy import bytestring_to_pdf
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +154,7 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         days_diff = current_date - member['dob']
         days_diff = days_diff.days
         years_diff = days_diff / 365
-        years_diff = int(years_diff)
+        years_diff = math.floor(years_diff)
         adult_max_age = self.max_age
         adult_min_age = self.min_age
         child_min_age = self.child_min_age
@@ -168,10 +169,11 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         # Age validation for child in days
         #TODO INSURANCE check max age
         if member['member_type'] == "child":
-            if child_min_age <= days_diff:
+            if child_min_age <= days_diff and math.floor(days_diff/365) < 18 :
                 dob_flag = True
             else:
-                message = {"message": "Child Age should be more than " + str(child_min_age) + " days"}
+                message = {"message": "Child Age should be more than " + str(child_min_age) + " days or less than 18 years"}
+
         return dob_flag, message
 
 
