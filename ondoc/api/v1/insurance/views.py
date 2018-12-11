@@ -19,6 +19,7 @@ import datetime
 from django.db import transaction
 from ondoc.authentication.models import User
 from datetime import timedelta
+from django.utils import timezone
 
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):
@@ -43,8 +44,8 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    def get_queryset(self):
-        return Insurer.objects.filter(is_live=True)
+    # def get_queryset(self):
+    #     return Insurer.objects.filter(is_live=True)
 
     def memberlist(self, request):
         data = {}
@@ -83,34 +84,6 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    # def age_validate(self, member, insurance_threshold):
-    #     message = {}
-    #     dob_flag = False
-    #     # Calculate day difference between dob and current date
-    #     current_date = datetime.datetime.now().date()
-    #     days_diff = current_date - member['dob']
-    #     days_diff = days_diff.days
-    #     years_diff = days_diff / 365
-    #     years_diff = int(years_diff)
-    #     adult_max_age = insurance_threshold.max_age
-    #     adult_min_age = insurance_threshold.min_age
-    #     child_min_age = insurance_threshold.child_min_age
-    #     # Age validation for parent in years
-    #     if member['member_type'] == "adult":
-    #         if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
-    #             dob_flag = True
-    #         elif adult_max_age <= years_diff:
-    #             message = {"message": "Adult Age would be less than " + str(adult_max_age) + " years"}
-    #         elif adult_min_age >= years_diff:
-    #             message = {"message": "Adult Age would be more than " + str(adult_min_age) + " years"}
-    #     # Age validation for child in days
-    #     if member['member_type'] == "child":
-    #         if child_min_age <= days_diff:
-    #             dob_flag = True
-    #         else:
-    #             message = {"message": "Child Age would be more than " + str(child_min_age) + " days"}
-    #     return dob_flag, message
-
     @transaction.atomic
     def create_order(self, request):
         user = request.user
@@ -126,24 +99,15 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         members = valid_data.get("members")
         resp = {}
         insurance_data = {}
-
+        insurance_plan = request.data.get('insurance_plan')
+        if not insurance_plan:
+            return Response({"message": "Insurance Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
         if valid_data:
             user = request.user
-            logged_in_user_id = None
             pre_insured_members = {}
             insured_members_list = []
-            insurance_plan = request.data.get('insurance_plan')
+
             for member in members:
-                if not insurance_plan:
-                    return Response({"message": "Insurance Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
-                # User Profile creation or updation
-                # profile_flag, profile, profile_id = self.profile_create_or_update(member, request)
-                # if profile_flag:
-                #     member_profile = profile
-                #     logged_in_user_profile_id = profile_id
-                # else:
-                #     return Response({"message": "User is not valid"},
-                #                 status.HTTP_404_NOT_FOUND)
                 pre_insured_members['dob'] = member['dob']
                 pre_insured_members['title'] = member['title']
                 pre_insured_members['first_name'] = member['first_name']
@@ -153,11 +117,11 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                 pre_insured_members['pincode'] = member['pincode']
                 pre_insured_members['email'] = member['email']
                 pre_insured_members['relation'] = member['relation']
-                # pre_insured_members['profile'] = member_profile.get('id')
-                if member['profile']:
-                    pre_insured_members['profile'] = member['profile'].id
-                else:
-                    pre_insured_members['profile'] = member['profile']
+                pre_insured_members['profile'] = member.get('profile').id if member.get('profile') is not None else None
+                # if member['profile']:
+                #     pre_insured_members['profile'] = member['profile'].id
+                # else:
+                #     pre_insured_members['profile'] = member['profile']
                 pre_insured_members['gender'] = member['gender']
                 pre_insured_members['member_type'] = member['member_type']
                 pre_insured_members['town'] = member['town']
@@ -168,24 +132,18 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
                 if member['relation'] == 'self':
                     if member['profile']:
-                        user_profile = UserProfile.objects.filter(id=member['profile'].id, user_id=request.user.pk).values('id'
-                                                                                                            ,'name',
-                                                                                                            'email',
-                                                                                                            'gender',
-                                                                                                            'user_id',
-                                                                                                            'dob',
-                                                                                                            'phone_number')
+                        user_profile = UserProfile.objects.filter(id=member['profile'].id,
+                                                                  user_id=request.user.pk).values('id', 'name', 'email',
+                                                                                                'gender', 'user_id',
+                                                                                                'dob', 'phone_number').first()
 
-                        if user_profile:
-                            user_profile = user_profile[0]
                     else:
                         user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
                             member['email'], "gender": member['gender'], "dob": member['dob']}
 
         insurance_plan = InsurancePlans.objects.get(id=request.data.get('insurance_plan'))
         transaction_date = datetime.datetime.now()
-        if insurance_plan:
-            amount = insurance_plan.amount
+        amount = insurance_plan.amount
 
         expiry_date = transaction_date + timedelta(days=insurance_plan.policy_tenure*365)
         user_insurance = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
@@ -236,55 +194,6 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             resp["data"] = {'id': insurance_object.id}
 
         return Response(resp)
-
-    def profile_create_or_update(self, member, request):
-        profile = {}
-        profile_flag = True
-        name = "{fname} {lname}".format(fname=member['first_name'], lname=member['last_name'])
-        if member['profile'] or UserProfile.objects.filter(name__iexact=name, user=request.user).exists():
-            # Check whether Profile exist with same name
-            existing_profile = UserProfile.objects.filter(name__iexact=name, user=request.user).first()
-            if member['profile']:
-                profile = UserProfile.objects.filter(id=member['profile'].id).values('id', 'name', 'email',
-                                                                                     'gender', 'user_id', 'dob',
-                                                                                     'phone_number').first()
-            else:
-                if existing_profile:
-                    profile = UserProfile.objects.filter(id=existing_profile.id).values('id', 'name', 'email',
-                                                                                        'gender', 'user_id',
-                                                                                        'dob',
-                                                                                        'phone_number').first()
-
-            if profile:
-                if profile.get('user_id') == request.user.pk:
-                    member_profile = profile.update(name=name, email=member['email'], gender=member['gender'],
-                                                    dob=member['dob'])
-
-                    # if member['relation'].lower() == 'self'.lower():
-                    if member['profile']:
-                        logged_in_user_profile_id = member['profile'].id
-                    else:
-                        logged_in_user_profile_id = existing_profile.id
-                else:
-                    profile_flag = False
-                    # return Response({"message": "User is not valid"},
-                    #                 status.HTTP_404_NOT_FOUND)
-
-        # Create Profile if not exist with name or not exist in profile id from request
-        else:
-            member_profile = UserProfile.objects.create(name=name,
-                                                        email=member['email'], gender=member['gender'],
-                                                        user_id=request.user.pk, dob=member['dob'],
-                                                        is_default_user=False, is_otp_verified=False,
-                                                        phone_number=request.user.phone_number)
-            profile = {'id': member_profile.id, 'name': member_profile.name, 'email': member_profile.email,
-                       'gender': member_profile.gender, 'user_id': member_profile.user_id,
-                       'dob': member_profile.dob, 'phone_number': member_profile.phone_number}
-
-            # if member['relation'].lower() == 'self'.lower():
-            logged_in_user_profile_id = member_profile.id
-
-        return profile_flag, profile, logged_in_user_profile_id
 
 
 class InsuranceProfileViewSet(viewsets.GenericViewSet):

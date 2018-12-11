@@ -53,7 +53,6 @@ class LiveMixin(models.Model):
 
 class Insurer(auth_model.TimeStampedModel, LiveMixin):
     name = models.CharField(max_length=100)
-    #max_float = models.PositiveIntegerField(default=None)
     min_float = models.PositiveIntegerField(default=None)
     logo = models.ImageField('Insurer Logo', upload_to='insurer/images', null=True, blank=False)
     website = models.CharField(max_length=100, null=True, blank=False)
@@ -84,7 +83,7 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
 
 class InsurerAccount(auth_model.TimeStampedModel):
 
-    insurer = models.ForeignKey(Insurer,related_name="float", on_delete=models.CASCADE)
+    insurer = models.ForeignKey(Insurer, related_name="float", on_delete=models.CASCADE)
     current_float = models.PositiveIntegerField(default=None)
 
     def __str__(self):
@@ -92,20 +91,6 @@ class InsurerAccount(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "insurer_account"
-
-    # @classmethod
-    # def debit_float_schedule(self, insurer, amount):
-    #     insurer_float = InsurerAccount.objects.get(insurer=insurer)
-    #     if insurer_float:
-    #         current_float = insurer_float.current_float
-    #         if amount <= current_float:
-    #             updated_current_float = current_float - amount
-    #             insurer_float.current_float = updated_current_float
-    #             insurer_float.save()
-    #         else:
-    #             return False
-    #     else:
-    #         return False
 
 
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
@@ -142,11 +127,9 @@ class InsurancePlanContent(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'insurance_plan_content'
-        # unique_together = (("plan", "title"),)
 
 
 class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
-    #insurer = models.ForeignKey(Insurer, on_delete=models.CASCADE)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name="threshold", on_delete=models.CASCADE)
     opd_count_limit = models.PositiveIntegerField(default=0)
     opd_amount_limit = models.PositiveIntegerField(default=0)
@@ -165,7 +148,8 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         message = {}
         dob_flag = False
         # Calculate day difference between dob and current date
-        current_date = datetime.datetime.now().date()
+        # current_date = datetime.datetime.now().date()
+        current_date = timezone.now().date()
         days_diff = current_date - member['dob']
         days_diff = days_diff.days
         years_diff = days_diff / 365
@@ -178,15 +162,16 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
             if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
                 dob_flag = True
             elif adult_max_age <= years_diff:
-                message = {"message": "Adult Age would be less than " + str(adult_max_age) + " years"}
+                message = {"message": "Adult Age should be less than " + str(adult_max_age) + " years"}
             elif adult_min_age >= years_diff:
-                message = {"message": "Adult Age would be more than " + str(adult_min_age) + " years"}
+                message = {"message": "Adult Age should be more than " + str(adult_min_age) + " years"}
         # Age validation for child in days
+        #TODO INSURANCE check max age
         if member['member_type'] == "child":
             if child_min_age <= days_diff:
                 dob_flag = True
             else:
-                message = {"message": "Child Age would be more than " + str(child_min_age) + " days"}
+                message = {"message": "Child Age should be more than " + str(child_min_age) + " days"}
         return dob_flag, message
 
 
@@ -309,7 +294,8 @@ class UserInsurance(auth_model.TimeStampedModel):
     @classmethod
     def profile_create_or_update(cls, member, user):
         profile = {}
-        name = "{fname} {lname}".format(fname=member['first_name'], lname=member['last_name'])
+        name = "{fname} {mname} {lname}".format(fname=member['first_name'], mname=member['middle_name'],
+                                                lname=member['last_name'])
         if member['profile'] or UserProfile.objects.filter(name__iexact=name, user=user.id).exists():
             # Check whether Profile exist with same name
             existing_profile = UserProfile.objects.filter(name__iexact=name, user=user.id).first()
@@ -329,25 +315,13 @@ class UserInsurance(auth_model.TimeStampedModel):
         # Create Profile if not exist with name or not exist in profile id from request
         else:
             primary_user = UserProfile.objects.filter(user_id=user.id, is_default_user=True).first()
-            if primary_user and member['relation'] != 'self':
-                member_profile = UserProfile.objects.create(name=name,
-                                                            email=member['email'], gender=member['gender'],
-                                                            user_id=user.id, dob=member['dob'],
-                                                            is_default_user=False, is_otp_verified=False,
-                                                            phone_number=user.phone_number)
-            elif member['relation'] == 'self':
-                member_profile = UserProfile.objects.create(name=name,
-                                                            email=member['email'], gender=member['gender'],
-                                                            user_id=user.id, dob=member['dob'],
-                                                            is_default_user=True, is_otp_verified=False,
-                                                            phone_number=user.phone_number)
-            else:
-                member_profile = UserProfile.objects.create(name=name,
-                                                            email=member['email'], gender=member['gender'],
-                                                            user_id=user.id, dob=member['dob'],
-                                                            is_default_user=False, is_otp_verified=False,
-                                                            phone_number=user.phone_number)
+            data = {'name': name, 'email': member['email'], 'gender': member['gender'], 'user_id': user.id,
+                    'dob': member['dob'], 'is_default_user': False, 'is_otp_verified': False,
+                    'phone_number': user.phone_number}
+            if primary_user or member['relation'] == 'self':
+                data['is_default_user'] = True
 
+            member_profile = UserProfile.objects.create(**data)
             profile = member_profile.id
 
         return profile
@@ -376,67 +350,55 @@ class UserInsurance(auth_model.TimeStampedModel):
         profile = appointment_data['profile']
         user = appointment_data['user']
         user_insurance = UserInsurance.objects.filter(user=user).last()
-        if 'lab' in appointment_data:
-            if user_insurance:
-                if user_insurance.is_valid():
-                    insured_members = user_insurance.members.all().filter(profile=profile)
-                    if insured_members.exists():
-                        return True, user_insurance.id, 'Covered Under Insurance'
-                    else:
-                        return False, user_insurance.id, 'Profile Not covered under insurance'
-                else:
-                    return False, user_insurance.id, 'Insurance Expired'
-            else:
-                return False, "", 'Not covered under insurance'
-        elif 'doctor' in appointment_data:
-            if user_insurance:
-                if user_insurance.is_valid():
-                    insured_members = user_insurance.members.all().filter(profile=profile)
-                    if insured_members:
-                        if appointment_data['extra_details']:
-                            for detail in appointment_data['extra_details']:
-                                if detail['procedure_id']:
-                                    return False, user_insurance.id, 'Procedure Not covered under insurance'
-                        doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=appointment_data['doctor']).values('specialization_id')
-                        specilization_ids = doctor
-                        specilization_ids_set = set(map(lambda specialization: specialization['specialization_id'], specilization_ids))
-                        gynecologist_list = json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS)
-                        gynecologist_set = set(gynecologist_list)
-                        oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
-                        oncologist_set = set(oncologist_list)
-                        if (specilization_ids_set & oncologist_set) or (specilization_ids_set & gynecologist_set):
-                            members = user_insurance.members.all().get(profile=profile)
-                            if specilization_ids_set & gynecologist_set :
-                                doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
-                                    specialization_id__in=gynecologist_list).values_list(
-                                    'doctor_id', flat=True)
-                                opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
-                                    doctor_id__in=doctor_with_same_specialization, payment_type=3,
-                                    insurance_id=user_insurance.id, profile_id=members.profile.id).count()
-                                if opd_appointment_count >= 5:
-                                    return False, user_insurance.id, 'Gynecologist Limit of 5 exceeded'
-                                else:
-                                    return True, user_insurance.id, 'Covered Under Insurance'
-                            elif specilization_ids_set & oncologist_set:
-                                doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
-                                    specialization_id__in=oncologist_list).values_list(
-                                    'doctor_id', flat=True)
-                                opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
-                                    doctor_id__in=doctor_with_same_specialization, payment_type=3,
-                                    insurance_id=user_insurance.id, profile_id=members.profile.id).count()
-                                if opd_appointment_count >= 5:
-                                    return False, user_insurance.id, 'Oncologist Limit of 5 exceeded'
-                                else:
-                                    return True, user_insurance.id, 'Covered Under Insurance'
-                        else:
-                            return True, user_insurance.id, 'Covered Under Insurance'
 
-                    else:
-                        return False, user_insurance.id, 'Profile Not covered under insurance'
-                else:
-                    return False, user_insurance.id, 'Insurance Expired'
+        if not user_insurance or not user_insurance.is_valid():
+            return False, "", 'Not covered under insurance'
+
+        insured_members = user_insurance.members.all().filter(profile=profile)
+        if not insured_members.exists():
+            return False, user_insurance.id, 'Profile Not covered under insurance'
+        if appointment_data['extra_details']:
+            return False, user_insurance.id, 'Procedure Not covered under insurance'
+
+        if not 'doctor' in appointment_data:
+            return True, user_insurance.id, 'Covered Under Insurance'
+
+        doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=appointment_data['doctor']).values('specialization_id')
+        specilization_ids = doctor
+        specilization_ids_set = set(map(lambda specialization: specialization['specialization_id'], specilization_ids))
+        gynecologist_list = json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS)
+        gynecologist_set = set(gynecologist_list)
+        oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
+        oncologist_set = set(oncologist_list)
+        if not (specilization_ids_set & oncologist_set) and not (specilization_ids_set & gynecologist_set):
+            return True, user_insurance.id, 'Covered Under Insurance'
+        members = user_insurance.members.all().get(profile=profile)
+        if specilization_ids_set & gynecologist_set:
+            doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
+                specialization_id__in=gynecologist_list).values_list(
+                'doctor_id', flat=True)
+            opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
+                                                                  doctor_id__in=doctor_with_same_specialization,
+                                                                  payment_type=3,
+                                                                  insurance_id=user_insurance.id,
+                                                                  profile_id=members.profile.id).count()
+            if opd_appointment_count >= 5:
+                return False, user_insurance.id, 'Gynecologist Limit of 5 exceeded'
             else:
-                return False, "", 'Not covered under insurance'
+                return True, user_insurance.id, 'Covered Under Insurance'
+        elif specilization_ids_set & oncologist_set:
+            doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
+                specialization_id__in=oncologist_list).values_list(
+                'doctor_id', flat=True)
+            opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
+                                                                  doctor_id__in=doctor_with_same_specialization,
+                                                                  payment_type=3,
+                                                                  insurance_id=user_insurance.id,
+                                                                  profile_id=members.profile.id).count()
+            if opd_appointment_count >= 5:
+                return False, user_insurance.id, 'Oncologist Limit of 5 exceeded'
+            else:
+                return True, user_insurance.id, 'Covered Under Insurance'
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
