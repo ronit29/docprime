@@ -1,6 +1,6 @@
 from django.contrib.gis.db import models
 from django.db import migrations, transaction
-from django.db.models import Count, Sum, When, Case, Q, F
+from django.db.models import Count, Sum, When, Case, Q, F, Avg
 from django.contrib.postgres.operations import CreateExtension
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.postgres.fields import JSONField, ArrayField
@@ -396,6 +396,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def get_ratings(self):
          return self.rating.all()
+
+    def get_avg_rating(self):
+        return self.rating.all().aggregate(avg_rating=Avg('ratings'))
 
     def get_rating_count(self):
         count = 0
