@@ -1,5 +1,8 @@
 import copy
+import json
+
 from django.db import models
+from django.forms import model_to_dict
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 import logging
@@ -7,6 +10,7 @@ import logging
 from ondoc.authentication.models import UserProfile, GenericAdmin
 from ondoc.doctor.models import OpdAppointment
 from ondoc.notification.models import NotificationAction, SmsNotification
+from ondoc.notification.rabbitmq_client import publish_message
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -47,10 +51,25 @@ class EmailNotification:
     def get_receivers(self):
         pass
 
-    def send(self, receiver, template, context):
+    def send(self, receiver, template, context, notification_type):
+        user = receiver.get('user')
+        email = receiver.get('email')
         email_subject = render_to_string(template[0], context=context)
         html_body = render_to_string(template[1], context=context)
-
+        if email and user:
+            email_noti = EmailNotification.objects.create(
+                user=user,
+                email=email,
+                notification_type=notification_type,
+                content=html_body,
+                email_subject=email_subject
+            )
+            message = {
+                "data": model_to_dict(email_noti),
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
 
 
 class TemplateLoader:
@@ -83,12 +102,12 @@ class TemplateLoader:
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
             body_template += "appointment_cancelled_patient/body.html"
             subject_template += "appointment_cancelled_patient/subject.txt"
-        elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
-            body_template += "prescription_uploaded/body.html"
-            subject_template += "prescription_uploaded/subject.txt"
-        elif notification_type == NotificationAction.DOCTOR_INVOICE:
-            body_template += "doctor_invoice/body.html"
-            subject_template += "doctor_invoice/subject.txt"
+        # elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
+        #     body_template += "prescription_uploaded/body.html"
+        #     subject_template += "prescription_uploaded/subject.txt"
+        # elif notification_type == NotificationAction.DOCTOR_INVOICE:
+        #     body_template += "doctor_invoice/body.html"
+        #     subject_template += "doctor_invoice/subject.txt"
         return subject_template, body_template
 
 
@@ -119,9 +138,10 @@ class OpdNotification(Notification, TemplateLoader):
     def send(self, event, notification_type):
         pass
 
-    def get_receivers(self, event, notification_type):
+    def get_receivers(self):
         instance = self.appointment
         receivers = []
+        notification_type = instance.status
         # doctor_admins = GenericAdmin.get_appointment_admins(instance)
         # for admin in doctor_admins:
         #     user = admin
@@ -130,40 +150,40 @@ class OpdNotification(Notification, TemplateLoader):
         if not instance.user:
             return
         doctor_admins = GenericAdmin.get_appointment_admins(instance)
-        if instance.status in [OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED_DOCTOR,
+        if notification_type in [OpdAppointment.ACCEPTED, OpdAppointment.RESCHEDULED_DOCTOR,
                                OpdAppointment.COMPLETED]:
             receivers.append(instance.user)
-        elif instance.status in [OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.BOOKED, OpdAppointment.CANCELLED]:
+        elif notification_type in [OpdAppointment.RESCHEDULED_PATIENT, OpdAppointment.BOOKED, OpdAppointment.CANCELLED]:
             receivers.extend(doctor_admins)
             receivers.append(instance.user)
 
-        # emails = []
-        # phone_numbers = []
-        #
-        # for user in receivers:
-        #     if user.user_type == User.CONSUMER:
-        #         email = instance.profile.email
-        #         phone_number = instance.profile.phone_number
-        #         # send notification to default profile also
-        #         default_user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
-        #         if default_user_profile and (
-        #                 default_user_profile.id != instance.profile.id) and default_user_profile.email:
-        #             emails.append({'email': default_user_profile.email, 'user_type': user.user_type})
-        #         if default_user_profile and (
-        #                 default_user_profile.id != instance.profile.id) and default_user_profile.phone_number:
-        #             phone_numbers.append(
-        #                 {'phone_number': default_user_profile.phone_number, 'user_type': user.user_type})
-        #     else:
-        #         email = user.email
-        #         phone_number = user.phone_number
-        #     emails.append({'email': email, 'user_type': user.user_type})
-        #     phone_numbers.append({'phone_number': phone_number, 'user_type': user.user_type})
-        return receivers
+        emails = []
+        phone_numbers = []
 
-    def send_email(self, event, notification_type):
-        receivers = self.get_receivers(event, notification_type)
+        for user in receivers:
+            if user.user_type == User.CONSUMER:
+                email = instance.profile.email
+                phone_number = instance.profile.phone_number
+                # send notification to default profile also
+                default_user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
+                if default_user_profile and (
+                        default_user_profile.id != instance.profile.id) and default_user_profile.email:
+                    emails.append({'user': user, 'email': default_user_profile.email})
+                if default_user_profile and (
+                        default_user_profile.id != instance.profile.id) and default_user_profile.phone_number:
+                    phone_numbers.append(
+                        {'user': user, 'phone_number': default_user_profile.phone_number})
+            else:
+                email = user.email
+                phone_number = user.phone_number
+            emails.append({'user': user, 'email': email})
+            phone_numbers.append({'user': user, 'phone_number': phone_number})
+        return emails, phone_numbers
+
+    def send_email(self, notification_type):
+        notification_type = self.appointment.status
+        receivers = self.get_receivers()[0]
         context = self.get_context()
         for receiver in receivers:
-            template = self.get_template(notification_type, receiver)
-            EmailNotification.send(receiver, template, context)
-        pass
+            template = self.get_template(notification_type, receiver.get('user'))
+            EmailNotification.send(receiver, template, context, notification_type)
