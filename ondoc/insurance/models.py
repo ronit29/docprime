@@ -405,13 +405,14 @@ class UserInsurance(auth_model.TimeStampedModel):
                         oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
                         oncologist_set = set(oncologist_list)
                         if (specilization_ids_set & oncologist_set) or (specilization_ids_set & gynecologist_set):
+                            members = user_insurance.members.all().get(profile=profile)
                             if specilization_ids_set & gynecologist_set :
                                 doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
                                     specialization_id__in=gynecologist_list).values_list(
                                     'doctor_id', flat=True)
                                 opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
                                     doctor_id__in=doctor_with_same_specialization, payment_type=3,
-                                    insurance_id=user_insurance.id).count()
+                                    insurance_id=user_insurance.id, profile_id=members.profile.id).count()
                                 if opd_appointment_count >= 5:
                                     return False, user_insurance.id, 'Gynecologist Limit of 5 exceeded'
                                 else:
@@ -422,7 +423,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                                     'doctor_id', flat=True)
                                 opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
                                     doctor_id__in=doctor_with_same_specialization, payment_type=3,
-                                    insurance_id=user_insurance.id).count()
+                                    insurance_id=user_insurance.id, profile_id=members.profile.id).count()
                                 if opd_appointment_count >= 5:
                                     return False, user_insurance.id, 'Oncologist Limit of 5 exceeded'
                                 else:
