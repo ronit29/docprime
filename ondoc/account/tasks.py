@@ -183,6 +183,9 @@ def process_payout(payout_id):
     from ondoc.api.v1.utils import create_payout_checksum
 
     try:
+        if not settings.PAYOUTS_ENABLED:
+            return
+
         if not payout_id:
             raise Exception("No payout specified")
 
