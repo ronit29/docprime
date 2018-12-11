@@ -39,6 +39,14 @@ def prepare_and_hit(self, data):
 
     order = data.get('order')
 
+    dob_value = ''
+    try:
+        dob_value = datetime.datetime.strptime(appointment.profile_detail.get('dob'), "%Y-%m-%d").strftime("%d-%m-%Y")\
+                        if appointment.profile_detail.get('dob', None) else ''
+    except Exception as e:
+        pass
+
+
     appointment_details = {
         'AppointmentStatus': appointment.status,
         'PaymentStatus': 300,
@@ -61,8 +69,7 @@ def prepare_and_hit(self, data):
         'EffectivePrice': float(appointment.effective_price),
         'MRP': float(appointment.mrp) if task_data.get('type') == 'OPD_APPOINTMENT' else float(appointment.price),
         'DealPrice': float(appointment.deal_price),
-        'DOB': datetime.datetime.strptime(appointment.profile_detail.get('dob'), "%Y-%m-%d").
-            strftime("%d-%m-%Y") if appointment.profile_detail.get('dob', None) else None,
+        'DOB': dob_value,
         'ProviderAddress': appointment.hospital.get_hos_address() if task_data.get('type') == 'OPD_APPOINTMENT' else appointment.lab.get_lab_address()
     }
 
@@ -217,6 +224,10 @@ def push_signup_lead_to_matrix(self, data):
         #logger.error(response.text)
 
         # save the appointment with the matrix lead id.
+
+        if not resp_data.get('Id', None):
+            raise Exception("[ERROR] Id not recieved from the matrix while pushing online lead.")
+
         online_lead_obj.matrix_lead_id = resp_data.get('Id', None)
         online_lead_obj.matrix_lead_id = int(online_lead_obj.matrix_lead_id)
 
