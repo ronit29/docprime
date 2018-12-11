@@ -1105,15 +1105,14 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             return Response([], status=status.HTTP_400_BAD_REQUEST)
         queryset = LabTest.objects.prefetch_related('labtests__parameter', 'faq',
                                                     'base_test__booked_together_test').filter(id__in=test_ids)
-        # query = ParameterLabTest.objects.filter(lab_test_id__in=test_ids)
         if not queryset:
             return Response([])
         final_result = []
         for data in queryset:
             result = {}
+            result['name'] = data.name
             result['id'] = data.id
             result['about_test'] = data.about_test
-            # result['test_may_include'] =
             result['preparations'] = data.preparations
             result['why_get_tested'] = data.why
             info=[]
@@ -1127,7 +1126,6 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             for qa in queryset1:
                 result['faqs'].append({'test_question': qa.test_question, 'test_answer': qa.test_answer})
 
-            # queryset2 = FrequentlyAddedTogetherTests.objects.filter(original_test_id__in=test_ids)
             booked_together=[]
             for fbt in data.base_test.all():
                 name = fbt.booked_together_test.name
