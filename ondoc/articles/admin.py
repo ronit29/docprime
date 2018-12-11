@@ -57,6 +57,7 @@ class ArticleAdmin(VersionAdmin):
     readonly_fields = ['icon_tag', 'preview']
     inlines = [ArticleLinkedUrlInline, LinkedArticleInline]
     actions = [bulk_publishing]
+    autocomplete_fields = ['author']
 
     def preview(self, instance):
         if instance.id:

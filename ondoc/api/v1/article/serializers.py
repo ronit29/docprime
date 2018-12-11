@@ -33,6 +33,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     published_date = serializers.SerializerMethodField()
     linked = serializers.SerializerMethodField()
     author = ArticleAuthorSerializer()
+    last_updated_at = serializers.SerializerMethodField()
 
     def get_linked(self, obj):
         resp = {}
@@ -78,10 +79,13 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     def get_published_date(self, obj):
         return '{:%d-%m-%Y}'.format(obj.published_date) if obj.published_date else None
 
+    def get_last_updated_at(self, obj):
+        return '{:%d-%m-%Y}'.format(obj.updated_at)
+
     class Meta:
         model = Article
         fields = ('title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
-                  'linked', 'author_name', 'published_date', 'author')
+                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
