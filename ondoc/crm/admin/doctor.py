@@ -509,10 +509,11 @@ class DoctorMobileFormSet(forms.BaseInlineFormSet):
             count += 1
 
             if value.get('is_primary'):
-
+                if not value.get('id'):
+                    raise forms.ValidationError('You cannot mark primary number.')
                 id = value.get('id').id
                 if id and not DoctorMobile.objects.filter(id=id, is_primary=True).exists():
-                    raise forms.ValidationError('Primary number can be changed only by checking mark_primary, '
+                    raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
                                                 'obtaining otp and entering otp again.')
 
                 if id and not DoctorMobile.objects.filter(id=id, number=value.get('number')).exists():
@@ -526,8 +527,9 @@ class DoctorMobileFormSet(forms.BaseInlineFormSet):
                 mark_primary += 1
 
         if count > 0:
-            if not primary == 1:
-                raise forms.ValidationError("Doctor must have one primary mobile number.")
+            if DoctorMobile.objects.filter(doctor=self.forms[0].instance.doctor).exists():
+                if primary > 1:
+                    raise forms.ValidationError("Doctor must have one primary mobile number.")
             if mark_primary > 1:
                 raise forms.ValidationError("Doctor can change only one primary mobile number.")
 
