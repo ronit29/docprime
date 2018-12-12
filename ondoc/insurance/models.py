@@ -351,6 +351,8 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
         profile = appointment_data['profile']
         user = appointment_data['user']
+        is_lab_insured = False
+        lab_mrp_check_list = []
         user_insurance = UserInsurance.objects.filter(user=user).last()
 
         if not user_insurance or not user_insurance.is_valid():
@@ -360,11 +362,32 @@ class UserInsurance(auth_model.TimeStampedModel):
         if not insured_members.exists():
             return False, user_insurance.id, 'Profile Not covered under insurance'
 
-        if not 'doctor' in appointment_data:
-            return True, user_insurance.id, 'Covered Under Insurance'
+        threshold = InsuranceThreshold.objects.get(insurance_plan_id=user_insurance.insurance_plan_id)
+        if threshold:
+            threshold_lab = threshold.lab_amount_limit
+            threshold_opd = threshold.opd_amount_limit
+        else:
+            return False, user_insurance.id, 'Threshold Amount Not define for plan'
 
-        if appointment_data['extra_details']:
-            return False, user_insurance.id, 'Procedure Not covered under insurance'
+        if not 'doctor' in appointment_data:
+            if appointment_data['extra_details']:
+                for detail in appointment_data['extra_details']:
+                    if int(float(detail['mrp'])) <= int(threshold_lab):
+                        is_lab_insured = True
+                    else:
+                        is_lab_insured = False
+                    lab_mrp_check_list.append(is_lab_insured)
+                if not False in lab_mrp_check_list:
+                    return True, user_insurance.id, 'Covered Under Insurance'
+                else:
+                    return False, user_insurance.id, 'Not Covered under Insurance'
+        else:
+            if appointment_data['extra_details']:
+                for detail in appointment_data:
+                    if detail['procedure_id']:
+                        return False, user_insurance.id, 'Procedure Not covered under insurance'
+            if not int(appointment_data['mrp']) <= int(threshold_opd):
+                return False, user_insurance.id, "Not Covered Under Insurance"
 
         doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=appointment_data['doctor']).values('specialization_id')
         specilization_ids = doctor
