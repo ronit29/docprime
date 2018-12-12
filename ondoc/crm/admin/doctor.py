@@ -510,7 +510,8 @@ class DoctorMobileFormSet(forms.BaseInlineFormSet):
 
             if value.get('is_primary'):
                 if not value.get('id'):
-                    raise forms.ValidationError('You cannot mark primary number.')
+                    raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
+                                                'obtaining otp and entering otp again.')
                 id = value.get('id').id
                 if id and not DoctorMobile.objects.filter(id=id, is_primary=True).exists():
                     raise forms.ValidationError('Primary number can be marked only by checking mark_primary, '
