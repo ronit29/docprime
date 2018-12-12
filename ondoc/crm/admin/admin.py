@@ -1,6 +1,7 @@
 
 from django.contrib.gis import admin
 
+from ondoc.crm.admin.banner import BannerAdmin
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
@@ -55,6 +56,7 @@ from ondoc.seo.models import SeoSpecialization
 from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
+from ondoc.banner.models import Banner
 
 # Admin Site config
 admin.site.site_header = 'Ondoc CRM'
@@ -67,6 +69,7 @@ admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
 admin.site.register(UserProfile)
 admin.site.register(ReviewCompliments, ReviewComplimentsAdmin)
+admin.site.register(Banner, BannerAdmin)
 
 admin.site.register(LabAppointment, LabAppointmentAdmin) #temp temp temp
 #admin.site.register(DoctorClinic, DoctorClinicAdmin)
