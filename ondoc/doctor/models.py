@@ -48,8 +48,9 @@ from ondoc.matrix.tasks import push_appointment_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
+from random import randint
 import reversion
-from ondoc.sms import api
+
 logger = logging.getLogger(__name__)
 
 
@@ -881,34 +882,6 @@ class DoctorMobile(auth_model.TimeStampedModel):
     otp = models.PositiveIntegerField(null=True, blank=False)
     mark_primary = models.BooleanField(default=False)
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-
-        # if self.mark_primary and not self.otp:
-        #     if not DoctorMobileOtp.objects.filter(doctor_mobile=self).exists():
-        #         dmo = DoctorMobileOtp.create_otp(self)
-        #         message = "The OTP for onboard process is %d" % dmo.otp
-        #
-        #         try:
-        #             api.send_sms(message, str(self.number))
-        #         except Exception as e:
-        #             logger.error(str(e))
-        #
-        # elif self.mark_primary and self.otp:
-        #     doctor_mobile_otp = self.mobiles_otp.all().last()
-        #     resonse = doctor_mobile_otp.consume()
-        #     if resonse:
-        #         DoctorMobile.objects.filter(doctor=self.doctor).update(is_primary=False)
-        #         self.is_primary = True
-        #         self.otp = None
-        #         self.mark_primary = False
-        #         self.save()
-        #
-        # elif not self.mark_primary and self.otp:
-        #     self.otp = None
-        #     self.save()
-
-
     class Meta:
         db_table = "doctor_mobile"
         unique_together = (("doctor", "number","std_code"),)
@@ -929,7 +902,6 @@ class DoctorMobileOtp(auth_model.TimeStampedModel):
 
     @classmethod
     def create_otp(cls, doctor_mobile_obj):
-        from random import randint
         otp = randint(100000,999999)
         dmo = cls(doctor_mobile=doctor_mobile_obj, otp=otp)
         dmo.save()
