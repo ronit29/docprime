@@ -1108,9 +1108,8 @@ class TestDetailsViewset(viewsets.GenericViewSet):
         except:
             return Response([], status=status.HTTP_400_BAD_REQUEST)
         queryset = LabTest.objects.prefetch_related('labtests__parameter', 'faq',
-                                                    'base_test__booked_together_test').filter(id__in=test_ids)
-        if lab_id:
-            queryset.filter(id__in=lab_id)
+                                                    'base_test__booked_together_test', 'availablelabs', 'availablelabs__lab_pricing_group', 'availablelabs__lab_pricing_group__labs').filter(id__in=test_ids)
+
 
         if not queryset:
             return Response([])
@@ -1129,11 +1128,19 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             result['test_may_include'] = {'title': 'This test may include', 'value': info}
 
             queryset1 = data.faq.all()
-            result['faqs'] = []
+            result['Frequently asked questions'] = []
             for qa in queryset1:
-                result['faqs'].append({'title': 'Frequently asked questions', 'value': {'test_question': qa.test_question, 'test_answer': qa.test_answer}})
+                result['Frequently asked questions'].append({'title': 'Frequently asked questions','value':{'test_question': qa.test_question, 'test_answer': qa.test_answer}})
 
             booked_together=[]
+            if lab_id:
+               for fbt in data.availablelabs.filter(lab_pricing_group__labs__id__in=lab_id).all():
+                    name = fbt.test.name
+                    id = fbt.test.id
+                    if fbt.enabled == True:
+                        booked_together.append({'id': id, 'lab_test': name})
+
+
             for fbt in data.base_test.all():
                 name = fbt.booked_together_test.name
                 id = fbt.booked_together_test.id
