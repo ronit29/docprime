@@ -1245,13 +1245,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         return False
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
+        from ondoc.notification.tasks import send_opd_notifications_refactored
         if push_to_matrix:
         # Push the appointment data to the matrix .
             push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
                                                      'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
 
         if self.is_to_send_notification(old_instance):
-            notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+            send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
             # notification_tasks.send_opd_notifications_refactored(self.id)
             # notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id},
             #                                                                  countdown=1)
