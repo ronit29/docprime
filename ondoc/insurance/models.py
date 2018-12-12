@@ -147,7 +147,7 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
 
     def age_validate(self, member):
         message = {}
-        dob_flag = False
+        is_dob_valid = False
         # Calculate day difference between dob and current date
         # current_date = datetime.datetime.now().date()
         current_date = timezone.now().date()
@@ -161,7 +161,7 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         # Age validation for parent in years
         if member['member_type'] == "adult":
             if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
-                dob_flag = True
+                is_dob_valid = True
             elif adult_max_age <= years_diff:
                 message = {"message": "Adult Age should be less than " + str(adult_max_age) + " years"}
             elif adult_min_age >= years_diff:
@@ -169,12 +169,12 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         # Age validation for child in days
         #TODO INSURANCE check max age
         if member['member_type'] == "child":
-            if child_min_age <= days_diff and math.floor(days_diff/365) < 18 :
-                dob_flag = True
+            if child_min_age <= days_diff and math.floor(days_diff/365) < 18:
+                is_dob_valid = True
             else:
                 message = {"message": "Child Age should be more than " + str(child_min_age) + " days or less than 18 years"}
 
-        return dob_flag, message
+        return is_dob_valid, message
 
 
     class Meta:
