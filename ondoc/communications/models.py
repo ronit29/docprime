@@ -121,7 +121,7 @@ class SMSNotification:
 
     def send(self, receivers):
         context = self.context
-        if context:
+        if not context:
             return
         for receiver in receivers:
             template = self.get_template(receiver.get('user'))
@@ -224,7 +224,7 @@ class EmailNotification:
 
     def send(self, receivers):
         context = self.context
-        if context:
+        if not context:
             return
         for receiver in receivers:
             template = self.get_template(receiver.get('user'))
@@ -275,7 +275,7 @@ class AppNotification:
 
     def send(self, receivers):
         context = self.context
-        if context:
+        if not context:
             return
         for receiver in receivers:
             self.trigger(receiver, context)
@@ -337,7 +337,7 @@ class PushNotification:
 
     def send(self, receivers):
         context = self.context
-        if context:
+        if not context:
             return
         for receiver in receivers:
             self.trigger(receiver, context)
