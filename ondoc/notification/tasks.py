@@ -70,7 +70,7 @@ def send_lab_notifications(appointment_id):
         return
 
 
-@task
+@task()
 def send_opd_notifications_refactored(appointment_id):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
