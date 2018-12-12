@@ -19,7 +19,7 @@ def map_lab_location_urls():
         try:
             print(LabPageUrl.create_lab_page_urls(lab, sequence))
         except Exception as e:
-            print(str(e))
+            print("failure: " + str(lab.id) + ", error: " + str(e))
 
 
 class Command(BaseCommand):

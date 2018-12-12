@@ -597,7 +597,7 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
-        entity = location_models.EntityUrls.objects.filter(url=url, is_valid=True)
+        entity = location_models.EntityUrls.objects.filter(url__iexact=url, is_valid=True)
         if not len(entity)>0:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -648,9 +648,14 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         else:
             related_entity_url_obj = related_entity_url_objs.first()
             if related_entity_url_obj.url_type == 'SEARCHURL':
-                extra_info_dict = related_entity_url_obj.additional_info
-                location_id = extra_info_dict.get('location_id', None)
-                if not location_id:
+                # extra_info_dict = related_entity_url_obj.additional_info
+                # location_id = extra_info_dict.get('location_id', None)
+                # if not location_id:
+                if related_entity_url_obj.sublocality_id:
+                    location_id = related_entity_url_obj.sublocality_id
+                elif related_entity_url_obj.locality_id:
+                    location_id = related_entity_url_obj.locality_id
+                else:
                     return Response(response)
 
                 location_dict = dict()
@@ -673,7 +678,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                         if related_entity_url_obj.entity_type.upper() == 'DOCTOR':
                             associated_doctors = obj.assoc_doctors.all()
                             for doctor in associated_doctors:
-                                if doctor.doctorpracticespecializations.all().filter(specialization__id=extra_info_dict['specialization_id']).exists():
+                                if doctor.doctorpracticespecializations.all().filter(specialization__id=related_entity_url_obj.specialization_id).exists():
                                     entities.append(doctor)
 
                 entities_list = list()

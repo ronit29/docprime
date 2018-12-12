@@ -29,7 +29,7 @@ def doctor_page_urls():
         try:
             print(DoctorPageURL.create_doctor_page_urls(doctor,sequence))
         except Exception as e:
-            print(str(e))
+            print("failure: " + str(doctor.id) + ", error: " + str(e))
 
 
 class Command(BaseCommand):
