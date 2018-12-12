@@ -69,6 +69,18 @@ def send_lab_notifications(appointment_id):
         )
         return
 
+
+@task
+def send_opd_notifications_refactored(appointment_id):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    instance = OpdAppointment.objects.filter(id=appointment_id).first()
+    if not instance:
+        return
+    opd_notification = OpdNotification(instance)
+    opd_notification.send()
+
+
 @task
 def send_opd_notifications(appointment_id):
     from ondoc.authentication.models import GenericAdmin
