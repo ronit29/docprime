@@ -49,8 +49,12 @@ from ondoc.matrix.tasks import push_appointment_to_matrix
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 import reversion
-
+from ondoc.sms import api
 logger = logging.getLogger(__name__)
+
+
+def doctor_mobile_otp_validity():
+    return timezone.now() + timezone.timedelta(hours=2)
 
 
 class Migration(migrations.Migration):
@@ -874,10 +878,80 @@ class DoctorMobile(auth_model.TimeStampedModel):
     is_primary = models.BooleanField(verbose_name='Primary Number?', default=False)
     is_phone_number_verified = models.BooleanField(verbose_name='Phone Number Verified?', default=False)
     source = models.CharField(max_length=2000, blank=True)
+    otp = models.PositiveIntegerField(null=True, blank=False)
+    mark_primary = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        # if self.mark_primary and not self.otp:
+        #     if not DoctorMobileOtp.objects.filter(doctor_mobile=self).exists():
+        #         dmo = DoctorMobileOtp.create_otp(self)
+        #         message = "The OTP for onboard process is %d" % dmo.otp
+        #
+        #         try:
+        #             api.send_sms(message, str(self.number))
+        #         except Exception as e:
+        #             logger.error(str(e))
+        #
+        # elif self.mark_primary and self.otp:
+        #     doctor_mobile_otp = self.mobiles_otp.all().last()
+        #     resonse = doctor_mobile_otp.consume()
+        #     if resonse:
+        #         DoctorMobile.objects.filter(doctor=self.doctor).update(is_primary=False)
+        #         self.is_primary = True
+        #         self.otp = None
+        #         self.mark_primary = False
+        #         self.save()
+        #
+        # elif not self.mark_primary and self.otp:
+        #     self.otp = None
+        #     self.save()
+
 
     class Meta:
         db_table = "doctor_mobile"
         unique_together = (("doctor", "number","std_code"),)
+
+
+class DoctorMobileOtpManager(models.Manager):
+    def get_queryset(self):
+        return super(DoctorMobileOtpManager, self).get_queryset().filter(usable_counter=1, validity__gte=timezone.now())
+
+
+class DoctorMobileOtp(auth_model.TimeStampedModel):
+    doctor_mobile = models.ForeignKey(DoctorMobile, related_name="mobiles_otp", on_delete=models.CASCADE)
+    otp = models.PositiveIntegerField()
+    validity = models.DateTimeField(default=doctor_mobile_otp_validity)
+    usable_counter = models.SmallIntegerField(default=1)
+
+    objects = DoctorMobileOtpManager()
+
+    @classmethod
+    def create_otp(cls, doctor_mobile_obj):
+        from random import randint
+        otp = randint(100000,999999)
+        dmo = cls(doctor_mobile=doctor_mobile_obj, otp=otp)
+        dmo.save()
+        print(dmo.otp)
+        return dmo
+
+    def is_valid(self):
+        if self.validity > timezone.now() and self.usable_counter == 1 :
+            return True
+        return False
+
+    def consume(self):
+        if self.is_valid():
+            self.usable_counter = 0
+            self.save()
+            return True
+        else:
+            print('[ERROR] Otp is expired.')
+            return False
+
+    class Meta:
+        db_table = "doctor_mobile_otp"
 
 
 class DoctorEmail(auth_model.TimeStampedModel):
