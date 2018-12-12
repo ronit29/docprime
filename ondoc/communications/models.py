@@ -8,7 +8,8 @@ import logging
 from django.conf import settings
 from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint
 from ondoc.doctor.models import OpdAppointment
-from ondoc.notification.models import NotificationAction, SmsNotification
+from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
+    PushNotification
 from ondoc.notification.rabbitmq_client import publish_message
 
 User = get_user_model()
@@ -128,7 +129,7 @@ class SMSNotification:
             self.trigger(receiver, template, context)
 
 
-class EmailNotification:
+class EMAILNotification:
 
     def __init__(self, notification_type, context=None):
         self.notification_type = notification_type
@@ -231,7 +232,7 @@ class EmailNotification:
             self.trigger(receiver, template, context)
 
 
-class AppNotification:
+class APPNotification:
 
     def __init__(self, notification_type, context=None):
         self.notification_type = notification_type
@@ -281,7 +282,7 @@ class AppNotification:
             self.trigger(receiver, context)
 
 
-class PushNotification:
+class PUSHNotification:
 
     def __init__(self, notification_type, context=None):
         self.notification_type = notification_type
@@ -378,13 +379,13 @@ class OpdNotification(Notification):
         all_receivers = self.get_receivers()
 
         if notification_type == NotificationAction.DOCTOR_INVOICE:
-            email_notification = EmailNotification(notification_type, context)
+            email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
         else:
-            email_notification = EmailNotification(notification_type, context)
+            email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
-            app_notification = AppNotification(notification_type, context)
-            push_notification = PushNotification(notification_type, context)
+            app_notification = APPNotification(notification_type, context)
+            push_notification = PUSHNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
             sms_notification.send(all_receivers.get('sms_receivers', []))
             app_notification.send(all_receivers.get('app_receivers', []))
