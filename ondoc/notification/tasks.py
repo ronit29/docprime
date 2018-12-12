@@ -1,6 +1,6 @@
 from __future__ import absolute_import, unicode_literals
-from .labnotificationaction import LabNotificationAction
-from . import models as notification_models
+from ondoc.notification.labnotificationaction import LabNotificationAction
+from ondoc.notification import models as notification_models
 from celery import task
 import logging
 
