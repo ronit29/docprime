@@ -283,7 +283,7 @@ class AppNotification:
 
 class PushNotification:
 
-    def __init__(self, appointment, notification_type, context=None):
+    def __init__(self, notification_type, context=None):
         self.notification_type = notification_type
         self.context = context
 
@@ -414,8 +414,8 @@ class OpdNotification(Notification):
         user_and_tokens = []
 
         user_and_token = [{'user': token.user, 'token': token.token} for token in
-                          NotificationEndpoint.objects.filter(user__in=receivers)]
-        user_and_token.sort(key=lambda x: x['user'])
+                          NotificationEndpoint.objects.filter(user__in=receivers).order_by('user')]
+        # user_and_token.sort(key=lambda x: x['user'])
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
             user_and_tokens.append({'user': user, 'tokens': [t['token'] for t in user_token_group]})
 

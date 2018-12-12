@@ -1252,6 +1252,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         if self.is_to_send_notification(old_instance):
             notification_tasks.send_opd_notifications_refactored.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+            # notification_tasks.send_opd_notifications_refactored(self.id)
         if not old_instance or old_instance.status != self.status:
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=Order.DOCTOR_PRODUCT_ID,
