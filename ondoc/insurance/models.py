@@ -359,11 +359,12 @@ class UserInsurance(auth_model.TimeStampedModel):
         insured_members = user_insurance.members.all().filter(profile=profile)
         if not insured_members.exists():
             return False, user_insurance.id, 'Profile Not covered under insurance'
-        if appointment_data['extra_details']:
-            return False, user_insurance.id, 'Procedure Not covered under insurance'
 
         if not 'doctor' in appointment_data:
             return True, user_insurance.id, 'Covered Under Insurance'
+
+        if appointment_data['extra_details']:
+            return False, user_insurance.id, 'Procedure Not covered under insurance'
 
         doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=appointment_data['doctor']).values('specialization_id')
         specilization_ids = doctor
