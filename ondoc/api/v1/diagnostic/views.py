@@ -1147,7 +1147,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                 booked_together.append({'id': id, 'lab_test': name})
 
             result['frequently_booked_together'] = {'title': 'Frequently booked together tests', 'value': booked_together}
-            result['show_test'] = data.show_test
+            result['show_details'] = data.show_details
             final_result.append(result)
 
         return Response(final_result)
