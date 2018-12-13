@@ -937,7 +937,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                                                      'sub_product_id': 2}, ), countdown=5)
 
         if self.is_to_send_notification(old_instance):
-            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+            # notification_tasks.send_lab_notifications_refactored(self.id)
+            notification_tasks.send_lab_notifications_refactored.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+            # notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
 
         if not old_instance or old_instance.status != self.status:
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,

@@ -2,7 +2,8 @@ import copy
 import json
 from collections import defaultdict
 from itertools import groupby
-
+from ondoc.doctor.models import OpdAppointment
+from ondoc.diagnostic.models import LabAppointment
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.forms import model_to_dict
 from django.template.loader import render_to_string
@@ -14,8 +15,7 @@ from weasyprint import HTML
 
 from ondoc.account.models import Invoice, Order
 from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint
-from ondoc.diagnostic.models import LabAppointment
-from ondoc.doctor.models import OpdAppointment
+
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification
 from ondoc.notification.sqs_client import publish_message
@@ -85,7 +85,7 @@ class SMSNotification:
 
     def __init__(self, notification_type, context=None):
         self.notification_type = notification_type
-        self.context = context
+        self.context = copy.deepcopy(context)
 
     def get_template(self, user):
         notification_type = self.notification_type
@@ -130,38 +130,6 @@ class SMSNotification:
 
         return body_template
 
-    # def get_receivers(self):
-    #     instance = self.appointment
-    #     receivers = []
-    #     notification_type = self.notification_type
-    #     if not instance or not instance.user:
-    #         return receivers
-    #     doctor_admins = GenericAdmin.get_appointment_admins(instance)
-    #     if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
-    #                              NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
-    #                              NotificationAction.PRESCRIPTION_UPLOADED]:
-    #         receivers.append(instance.user)
-    #     elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
-    #                                NotificationAction.APPOINTMENT_BOOKED,
-    #                                NotificationAction.APPOINTMENT_CANCELLED]:
-    #         receivers.extend(doctor_admins)
-    #         receivers.append(instance.user)
-    #     phone_numbers = []
-    #     for user in receivers:
-    #         if user.user_type == User.CONSUMER:
-    #             phone_number = instance.profile.phone_number
-    #             # send notification to default profile also
-    #             default_user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
-    #             if default_user_profile and (
-    #                     default_user_profile.id != instance.profile.id) and default_user_profile.phone_number:
-    #                 phone_numbers.append(
-    #                     {'user': user, 'phone_number': default_user_profile.phone_number})
-    #         else:
-    #             phone_number = user.phone_number
-    #         phone_numbers.append({'user': user, 'phone_number': phone_number})
-    #     phone_numbers = unique(phone_numbers)
-    #     return phone_numbers
-
     def trigger(self, receiver, template, context):
         user = receiver.get('user')
         phone_number = receiver.get('phone_number')
@@ -183,8 +151,7 @@ class SMSNotification:
             }
             message = json.dumps(message)
             publish_message(message)
-
-        if phone_number and user:
+        elif phone_number and user:
             sms_noti = SmsNotification.objects.create(
                 user=user,
                 phone_number=phone_number,
@@ -213,7 +180,7 @@ class EMAILNotification:
 
     def __init__(self, notification_type, context=None):
         self.notification_type = notification_type
-        self.context = context
+        self.context = copy.deepcopy(context)
 
     def get_template(self, user):
         notification_type = self.notification_type
@@ -262,8 +229,6 @@ class EMAILNotification:
             context.update({"invoice_url": invoice.file.url})
             body_template += "email/doctor_invoice/body.html"
             subject_template += "email/doctor_invoice/subject.txt"
-            # html_body = render_to_string("email/doctor_invoice/body.html", context=context)
-            # email_subject = render_to_string("email/doctor_invoice/subject.txt", context=context)
 
         if notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
             body_template = "email/lab/appointment_accepted/body.html"
@@ -305,42 +270,8 @@ class EMAILNotification:
             context.update({"invoice_url": invoice.file.url})
             body_template = "email/lab/lab_report_uploaded/body.html"
             subject_template = "email/lab/lab_report_uploaded/subject.txt"
-        #     html_body = "email/lab_invoice/body.html"
-        #     email_subject = "email/lab_invoice/subject.txt"
 
         return subject_template, body_template
-
-    # def get_receivers(self):
-    #     instance = self.appointment
-    #     receivers = []
-    #     notification_type = self.notification_type
-    #     if not instance or not instance.user:
-    #         return receivers
-    #     doctor_admins = GenericAdmin.get_appointment_admins(instance)
-    #     if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
-    #                              NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
-    #                              NotificationAction.DOCTOR_INVOICE,
-    #                              NotificationAction.PRESCRIPTION_UPLOADED]:
-    #         receivers.append(instance.user)
-    #     elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
-    #                                NotificationAction.APPOINTMENT_BOOKED,
-    #                                NotificationAction.APPOINTMENT_CANCELLED]:
-    #         receivers.extend(doctor_admins)
-    #         receivers.append(instance.user)
-    #     emails = []
-    #     for user in receivers:
-    #         if user.user_type == User.CONSUMER:
-    #             email = instance.profile.email
-    #             # send notification to default profile also
-    #             default_user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
-    #             if default_user_profile and (
-    #                     default_user_profile.id != instance.profile.id) and default_user_profile.email:
-    #                 emails.append({'user': user, 'email': default_user_profile.email})
-    #         else:
-    #             email = user.email
-    #         emails.append({'user': user, 'email': email})
-    #     emails = unique(emails)
-    #     return emails
 
     def trigger(self, receiver, template, context):
         user = receiver.get('user')
@@ -394,28 +325,7 @@ class APPNotification:
 
     def __init__(self, notification_type, context=None):
         self.notification_type = notification_type
-        self.context = context
-
-    def get_template(self, user):
-        pass
-
-    # def get_receivers(self):
-    #     instance = self.appointment
-    #     receivers = []
-    #     notification_type = self.notification_type
-    #     if not instance or not instance.user:
-    #         return receivers
-    #     doctor_admins = GenericAdmin.get_appointment_admins(instance)
-    #     if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
-    #                              NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
-    #                              NotificationAction.PRESCRIPTION_UPLOADED]:
-    #         receivers.append(instance.user)
-    #     elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
-    #                                NotificationAction.APPOINTMENT_BOOKED,
-    #                                NotificationAction.APPOINTMENT_CANCELLED]:
-    #         receivers.extend(doctor_admins)
-    #         receivers.append(instance.user)
-    #     return list(set(receivers))
+        self.context = copy.deepcopy(context)
 
     def trigger(self, receiver, context):
         user = receiver
@@ -445,34 +355,7 @@ class PUSHNotification:
 
     def __init__(self, notification_type, context=None):
         self.notification_type = notification_type
-        self.context = context
-
-    # def get_receivers(self):
-    #     instance = self.appointment
-    #     receivers = []
-    #     notification_type = self.notification_type
-    #     if not instance or not instance.user:
-    #         return receivers
-    #     doctor_admins = GenericAdmin.get_appointment_admins(instance)
-    #     if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
-    #                              NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
-    #                              NotificationAction.PRESCRIPTION_UPLOADED]:
-    #         receivers.append(instance.user)
-    #     elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
-    #                                NotificationAction.APPOINTMENT_BOOKED,
-    #                                NotificationAction.APPOINTMENT_CANCELLED]:
-    #         receivers.extend(doctor_admins)
-    #         receivers.append(instance.user)
-    #
-    #     tokens = [{'user': token.user, 'token': token.token} for token in
-    #               NotificationEndpoint.objects.filter(user__in=receivers)]
-    #     tokens.sort(key=lambda x: x['user'])
-    #     final_tokens = []
-    #     for user, user_token_group in groupby(tokens, key=lambda x: x['user']):
-    #         final_tokens.append({'user': user, 'tokens': [t['token'] for t in user_token_group]})
-    #     # final_tokens = [for token in final_tokens]
-    #     # tokens = unique(tokens)
-    #     return final_tokens
+        self.context = copy.deepcopy(context)
 
     def trigger(self, receiver, context):
         user = receiver.get('user')
@@ -666,10 +549,6 @@ class LabNotification:
                                  NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
                                  NotificationAction.LAB_REPORT_UPLOADED,
                                  NotificationAction.LAB_INVOICE]:
-
-            # LabAppointment.ACCEPTED, LabAppointment.COMPLETED, LabAppointment.RESCHEDULED_LAB
-
-            # LabAppointment.RESCHEDULED_PATIENT, LabAppointment.CANCELLED, LabAppointment.BOOKED
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.LAB_APPOINTMENT_BOOKED,

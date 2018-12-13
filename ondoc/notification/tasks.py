@@ -1,6 +1,4 @@
 from __future__ import absolute_import, unicode_literals
-
-from ondoc.communications.models import LabNotification
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
 from celery import task
@@ -12,6 +10,7 @@ logger = logging.getLogger(__name__)
 @task
 def send_lab_notifications_refactored(appointment_id):
     from ondoc.diagnostic import models as lab_models
+    from ondoc.communications.models import LabNotification
     instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
     if not instance or not instance.user:
         return
