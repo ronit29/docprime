@@ -959,9 +959,10 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
             queryset = queryset.filter(
                 Q(test__search_key__istartswith=search_key) | Q(test__search_key__icontains=" "+search_key))
 
-        queryset = queryset[:20]
+        # queryset = queryset[:20]
+        paginated_queryset = paginate_queryset(queryset, request)
 
-        serializer = diagnostic_serializer.AvailableLabTestSerializer(queryset, many=True,
+        serializer = diagnostic_serializer.AvailableLabTestSerializer(paginated_queryset, many=True,
                                                                       context={"lab": lab_obj})
         return Response(serializer.data)
 
