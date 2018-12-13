@@ -1104,12 +1104,18 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                 test_ids = set(test_ids)
             lab_id = params.get('lab_id', None)
             if lab_id:
-                lab_id = set(lab_id)
+                try:
+                    lab_id = int(lab_id)
+                except:
+                    return Response([], status=status.HTTP_400_BAD_REQUEST)
 
         except:
             return Response([], status=status.HTTP_400_BAD_REQUEST)
         queryset = LabTest.objects.prefetch_related('labtests__parameter', 'faq',
-                                                    'base_test__booked_together_test', 'availablelabs', 'availablelabs__lab_pricing_group', 'availablelabs__lab_pricing_group__labs').filter(id__in=test_ids)
+                                                    'base_test__booked_together_test', 'availablelabs',
+                                                    'availablelabs__lab_pricing_group',
+                                                    'availablelabs__lab_pricing_group__labs').filter(id__in=test_ids,
+                                                                                                     show_details=True)
 
 
         if not queryset:
@@ -1134,18 +1140,19 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                 result['faqs'].append({'title': 'Frequently asked questions','value':{'test_question': qa.test_question, 'test_answer': qa.test_answer}})
 
             booked_together=[]
+            fbts = data.frequently_booked_together.filter(availablelabs__enabled=True,
+                                                          availablelabs__lab_pricing_group__labs__id=lab_id).distinct()
             if lab_id:
-               for fbt in data.availablelabs.filter(lab_pricing_group__labs__id__in=lab_id).all():
-                    name = fbt.test.name
-                    id = fbt.test.id
-                    if fbt.enabled == True:
-                        booked_together.append({'id': id, 'lab_test': name})
+               for fbt in fbts:
+                    name = fbt.name
+                    id = fbt.id
+                    booked_together.append({'id': id, 'lab_test': name})
 
-
-            for fbt in data.base_test.all():
-                name = fbt.booked_together_test.name
-                id = fbt.booked_together_test.id
-                booked_together.append({'id': id, 'lab_test': name})
+            else:
+                for fbt in data.base_test.all():
+                    name = fbt.booked_together_test.name
+                    id = fbt.booked_together_test.id
+                    booked_together.append({'id': id, 'lab_test': name})
 
             result['frequently_booked_together'] = {'title': 'Frequently booked together tests', 'value': booked_together}
             result['show_details'] = data.show_details
