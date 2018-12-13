@@ -1288,8 +1288,7 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 empty.append(resp)
         return Response(empty)
 
-    def list_category(self):
-
+    def list_category(self, request):
         queryset = LabTestCategory.objects.filter(is_package_category=True, is_live = True)
         result = []
         for category in queryset:
