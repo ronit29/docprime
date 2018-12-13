@@ -372,7 +372,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         if not 'doctor' in appointment_data:
             if appointment_data['extra_details']:
                 for detail in appointment_data['extra_details']:
-                    if int(float(detail['mrp'])) <= int(threshold_lab):
+                    if int(float(detail['mrp'])) <= threshold_lab:
                         is_lab_insured = True
                     else:
                         is_lab_insured = False
@@ -381,12 +381,14 @@ class UserInsurance(auth_model.TimeStampedModel):
                     return True, user_insurance.id, 'Covered Under Insurance'
                 else:
                     return False, user_insurance.id, 'Not Covered under Insurance'
+            else:
+                return False, user_insurance.id, 'Not Covered under Insurance'
         else:
             if appointment_data['extra_details']:
                 for detail in appointment_data:
                     if detail['procedure_id']:
                         return False, user_insurance.id, 'Procedure Not covered under insurance'
-            if not int(appointment_data['mrp']) <= int(threshold_opd):
+            if not int(appointment_data['mrp']) <= threshold_opd:
                 return False, user_insurance.id, "Not Covered Under Insurance"
 
         doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=appointment_data['doctor']).values('specialization_id')

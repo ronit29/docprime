@@ -44,9 +44,6 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    # def get_queryset(self):
-    #     return Insurer.objects.filter(is_live=True)
-
     def memberlist(self, request):
         data = {}
         result = {}
@@ -118,10 +115,6 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                 pre_insured_members['email'] = member['email']
                 pre_insured_members['relation'] = member['relation']
                 pre_insured_members['profile'] = member.get('profile').id if member.get('profile') is not None else None
-                # if member['profile']:
-                #     pre_insured_members['profile'] = member['profile'].id
-                # else:
-                #     pre_insured_members['profile'] = member['profile']
                 pre_insured_members['gender'] = member['gender']
                 pre_insured_members['member_type'] = member['member_type']
                 pre_insured_members['town'] = member['town']
