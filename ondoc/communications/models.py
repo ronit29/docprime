@@ -11,7 +11,7 @@ from ondoc.diagnostic.models import LabAppointment
 from ondoc.doctor.models import OpdAppointment
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification
-from ondoc.notification.rabbitmq_client import publish_message
+from ondoc.notification.sqs_client import publish_message
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
