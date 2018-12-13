@@ -35,7 +35,7 @@ class Banner(auth_model.TimeStampedModel):
         return self.title
 
     class Meta:
-        db_table = 'banners'
+        db_table = 'banner'
 
 
 
