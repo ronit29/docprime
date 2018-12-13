@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 import logging
 from django.conf import settings
 from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint
+from ondoc.diagnostic.models import LabAppointment
 from ondoc.doctor.models import OpdAppointment
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification
@@ -30,13 +31,23 @@ class Notification:
     PUSH = 3
     IN_APP = 4
     OPD_NOTIFICATION_TYPE_MAPPING = \
-        {OpdAppointment.ACCEPTED: NotificationAction.APPOINTMENT_ACCEPTED,
-         OpdAppointment.RESCHEDULED_PATIENT: NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
-         OpdAppointment.RESCHEDULED_DOCTOR: NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
-         OpdAppointment.BOOKED: NotificationAction.APPOINTMENT_BOOKED,
-         OpdAppointment.CANCELLED: NotificationAction.APPOINTMENT_CANCELLED,
-         OpdAppointment.COMPLETED: NotificationAction.DOCTOR_INVOICE
-         }
+        {
+            OpdAppointment.ACCEPTED: NotificationAction.APPOINTMENT_ACCEPTED,
+            OpdAppointment.RESCHEDULED_PATIENT: NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
+            OpdAppointment.RESCHEDULED_DOCTOR: NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
+            OpdAppointment.BOOKED: NotificationAction.APPOINTMENT_BOOKED,
+            OpdAppointment.CANCELLED: NotificationAction.APPOINTMENT_CANCELLED,
+            OpdAppointment.COMPLETED: NotificationAction.DOCTOR_INVOICE
+        }
+    LAB_NOTIFICATION_TYPE_MAPPING = \
+        {
+            LabAppointment.ACCEPTED: NotificationAction.LAB_APPOINTMENT_ACCEPTED,
+            LabAppointment.RESCHEDULED_PATIENT: NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
+            LabAppointment.RESCHEDULED_LAB: NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
+            LabAppointment.BOOKED: NotificationAction.LAB_APPOINTMENT_BOOKED,
+            LabAppointment.CANCELLED: NotificationAction.LAB_APPOINTMENT_CANCELLED,
+            LabAppointment.COMPLETED: NotificationAction.LAB_INVOICE
+        }
 
 
 class SMSNotification:
@@ -345,7 +356,6 @@ class PUSHNotification:
 
 
 class OpdNotification(Notification):
-    template_path = ''
 
     def __init__(self, appointment, notification_type=None):
         self.appointment = appointment
@@ -447,3 +457,22 @@ class OpdNotification(Notification):
         all_receivers['push_receivers'] = user_and_tokens
 
         return all_receivers
+
+
+class LabNotification:
+
+    def __init__(self, appointment, notification_type=None):
+        self.appointment = appointment
+        if notification_type:
+            self.notification_type = notification_type
+        else:
+            self.notification_type = Notification.LAB_NOTIFICATION_TYPE_MAPPING[appointment.status]
+
+    def get_context(self):
+        pass
+
+    def send(self):
+        pass
+
+    def get_receivers(self):
+        pass

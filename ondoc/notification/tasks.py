@@ -74,11 +74,15 @@ def send_lab_notifications(appointment_id):
 def send_opd_notifications_refactored(appointment_id):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
-    instance = OpdAppointment.objects.filter(id=appointment_id).first()
-    if not instance:
-        return
-    opd_notification = OpdNotification(instance)
-    opd_notification.send()
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance:
+            return
+
+        opd_notification = OpdNotification(instance)
+        opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
 
 
 @task
