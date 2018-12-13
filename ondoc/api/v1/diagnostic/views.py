@@ -217,7 +217,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_ids = parameters.get('ids',[])
 
-        tests = list(LabTest.objects.filter(id__in=test_ids).values('id','name','hide_price'))
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details'))
         seo = None
         breadcrumb = None
         location = None
@@ -1101,10 +1101,16 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             if test_ids:
                 test_ids = [int(x) for x in test_ids.split(',')]
                 test_ids = set(test_ids)
+            lab_id = params.get('lab_id', None)
+            if lab_id:
+                lab_id = set(lab_id)
+
         except:
             return Response([], status=status.HTTP_400_BAD_REQUEST)
         queryset = LabTest.objects.prefetch_related('labtests__parameter', 'faq',
-                                                    'base_test__booked_together_test').filter(id__in=test_ids)
+                                                    'base_test__booked_together_test', 'availablelabs', 'availablelabs__lab_pricing_group', 'availablelabs__lab_pricing_group__labs').filter(id__in=test_ids)
+
+
         if not queryset:
             return Response([])
         final_result = []
@@ -1112,28 +1118,36 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             result = {}
             result['name'] = data.name
             result['id'] = data.id
-            result['about_test'] = data.about_test
-            result['preparations'] = data.preparations
-            result['why_get_tested'] = data.why
+            result['about_test'] = {'title': 'About the test', 'value': data.about_test}
+            result['preparations'] = {'title': 'Preparations', 'value': data.preparations}
+            result['why_get_tested'] = {'title': 'Why get tested?', 'value': data.why}
             info=[]
             for lab_test in data.labtests.all():
                 name = lab_test.parameter.name
                 info.append(name)
-            result['test_may_include'] = info
+            result['test_may_include'] = {'title': 'This test may include', 'value': info}
 
             queryset1 = data.faq.all()
-            result['faqs'] = []
+            result['Frequently asked questions'] = []
             for qa in queryset1:
-                result['faqs'].append({'test_question': qa.test_question, 'test_answer': qa.test_answer})
+                result['Frequently asked questions'].append({'title': 'Frequently asked questions','value':{'test_question': qa.test_question, 'test_answer': qa.test_answer}})
 
             booked_together=[]
+            if lab_id:
+               for fbt in data.availablelabs.filter(lab_pricing_group__labs__id__in=lab_id).all():
+                    name = fbt.test.name
+                    id = fbt.test.id
+                    if fbt.enabled == True:
+                        booked_together.append({'id': id, 'lab_test': name})
+
+
             for fbt in data.base_test.all():
                 name = fbt.booked_together_test.name
                 id = fbt.booked_together_test.id
                 booked_together.append({'id': id, 'lab_test': name})
 
-            result['frequently_booked_together'] = booked_together
-
+            result['frequently_booked_together'] = {'title': 'Frequently booked together tests', 'value': booked_together}
+            result['show_test'] = data.show_test
             final_result.append(result)
 
         return Response(final_result)

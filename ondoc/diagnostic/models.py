@@ -699,6 +699,7 @@ class LabTest(TimeStampedModel, SearchKey):
     enable_for_ppc = models.BooleanField(default=False)
     enable_for_retail = models.BooleanField(default=False)
     about_test = models.TextField(blank=True, verbose_name='About the test')
+    show_details = models.BooleanField(default=False)
     preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
     priority = models.PositiveIntegerField(default=0, null=True)
     hide_price = models.BooleanField(default=False)
