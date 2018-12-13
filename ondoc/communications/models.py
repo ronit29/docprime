@@ -419,6 +419,7 @@ class OpdNotification(Notification):
                                    NotificationAction.APPOINTMENT_CANCELLED]:
             receivers.extend(doctor_admins)
             receivers.append(instance.user)
+        receivers = list(set(receivers))
         user_and_phone_number = []
         user_and_email = []
         app_receivers = receivers
@@ -438,16 +439,21 @@ class OpdNotification(Notification):
                 default_user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
                 if default_user_profile and (
                         default_user_profile.id != instance.profile.id) and default_user_profile.phone_number:
-                    user_and_phone_number.append(
-                        {'user': user, 'phone_number': default_user_profile.phone_number})
+                    if default_user_profile.phone_number:
+                        user_and_phone_number.append(
+                            {'user': user, 'phone_number': default_user_profile.phone_number})
                 if default_user_profile and (
                         default_user_profile.id != instance.profile.id) and default_user_profile.email:
-                    user_and_email.append({'user': user, 'email': default_user_profile.email})
+                    if default_user_profile.email:
+                        user_and_email.append({'user': user, 'email': default_user_profile.email})
             else:
                 email = user.email
                 phone_number = user.phone_number
-            user_and_phone_number.append({'user': user, 'phone_number': phone_number})
-            user_and_email.append({'user': user, 'email': email})
+
+            if phone_number:
+                user_and_phone_number.append({'user': user, 'phone_number': phone_number})
+            if email:
+                user_and_email.append({'user': user, 'email': email})
         user_and_phone_number = unique(user_and_phone_number)
         user_and_email = unique(user_and_email)
 
