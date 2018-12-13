@@ -28,25 +28,21 @@ def unique_emails(list_):
     """Function accepts list of dictionaries and returns list of unique dictionaries"""
     temp = defaultdict(list)
     for item in list_:
-        if temp.get('email', None) and item.get('user', None):
-            temp[item.get('email')].append(item.get('user'))
+        if item.get('email', None) and item.get('user', None):
+            temp[item.get('email').strip().lower()].append(item.get('user'))
 
     final_result = []
     for key, value in temp.items():
         final_result.append({'user': value[0], 'email': key})
 
     return final_result
-    # temp_list = [tuple(item.items()) for item in list_]
-    # final_list = list(set(temp_list))
-    # final_list = [dict(item) for item in final_list]
-    # return final_list
 
 
 def unique_phone_numbers(list_):
     """Function accepts list of dictionaries and returns list of unique dictionaries"""
     temp = defaultdict(list)
     for item in list_:
-        if temp.get('phone_number', None) and item.get('user', None):
+        if item.get('phone_number', None) and item.get('user', None):
             temp[item.get('phone_number')].append(item.get('user'))
 
     final_result = []
@@ -188,32 +184,32 @@ class EMAILNotification:
         body_template = ''
         subject_template = ''
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
-            body_template += "email/appointment_accepted/body.html"
-            subject_template += "email/appointment_accepted/subject.txt"
+            body_template = "email/appointment_accepted/body.html"
+            subject_template = "email/appointment_accepted/subject.txt"
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
-            body_template += "email/appointment_booked_patient/body.html"
-            subject_template += "email/appointment_booked_patient/subject.txt"
+            body_template = "email/appointment_booked_patient/body.html"
+            subject_template = "email/appointment_booked_patient/subject.txt"
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.DOCTOR:
-            body_template += "email/appointment_booked_doctor/body.html"
-            subject_template += "email/appointment_booked_doctor/subject.txt"
+            body_template = "email/appointment_booked_doctor/body.html"
+            subject_template = "email/appointment_booked_doctor/subject.txt"
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
-            body_template += "email/appointment_rescheduled_patient_initiated_to_patient/body.html"
-            subject_template += "email/appointment_rescheduled_patient_initiated_to_patient/subject.txt"
+            body_template = "email/appointment_rescheduled_patient_initiated_to_patient/body.html"
+            subject_template = "email/appointment_rescheduled_patient_initiated_to_patient/subject.txt"
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.DOCTOR:
-            body_template += "email/appointment_rescheduled_patient_initiated_to_doctor/body.html"
-            subject_template += "email/appointment_rescheduled_patient_initiated_to_doctor/subject.txt"
+            body_template = "email/appointment_rescheduled_patient_initiated_to_doctor/body.html"
+            subject_template = "email/appointment_rescheduled_patient_initiated_to_doctor/subject.txt"
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user.user_type == User.CONSUMER:
-            body_template += "email/appointment_rescheduled_doctor_initiated_to_patient/body.html"
-            subject_template += "email/appointment_rescheduled_doctor_initiated_to_patient/subject.txt"
+            body_template = "email/appointment_rescheduled_doctor_initiated_to_patient/body.html"
+            subject_template = "email/appointment_rescheduled_doctor_initiated_to_patient/subject.txt"
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.DOCTOR:
-            body_template += "email/appointment_cancelled_doctor/body.html"
-            subject_template += "email/appointment_cancelled_doctor/subject.txt"
+            body_template = "email/appointment_cancelled_doctor/body.html"
+            subject_template = "email/appointment_cancelled_doctor/subject.txt"
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user.user_type == User.CONSUMER:
-            body_template += "email/appointment_cancelled_patient/body.html"
-            subject_template += "email/appointment_cancelled_patient/subject.txt"
+            body_template = "email/appointment_cancelled_patient/body.html"
+            subject_template = "email/appointment_cancelled_patient/subject.txt"
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
-            body_template += "email/prescription_uploaded/body.html"
-            subject_template += "email/prescription_uploaded/subject.txt"
+            body_template = "email/prescription_uploaded/body.html"
+            subject_template = "email/prescription_uploaded/subject.txt"
         elif notification_type == NotificationAction.DOCTOR_INVOICE:
             invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
                                                              product_id=Order.DOCTOR_PRODUCT_ID)
@@ -227,8 +223,8 @@ class EMAILNotification:
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
-            body_template += "email/doctor_invoice/body.html"
-            subject_template += "email/doctor_invoice/subject.txt"
+            body_template = "email/doctor_invoice/body.html"
+            subject_template = "email/doctor_invoice/subject.txt"
 
         if notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
             body_template = "email/lab/appointment_accepted/body.html"
@@ -255,7 +251,9 @@ class EMAILNotification:
             body_template = "email/lab/appointment_cancelled_lab/body.html"
             subject_template = "email/lab/appointment_cancelled_lab/subject.txt"
         elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
-
+            body_template = "email/lab/lab_report_uploaded/body.html"
+            subject_template = "email/lab/lab_report_uploaded/subject.txt"
+        elif notification_type == NotificationAction.LAB_INVOICE:
             invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
                                                              product_id=Order.LAB_PRODUCT_ID)
             context.update({"invoice": invoice})
@@ -268,8 +266,8 @@ class EMAILNotification:
             except Exception as e:
                 logger.error("Got error while creating pdf for lab invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
-            body_template = "email/lab/lab_report_uploaded/body.html"
-            subject_template = "email/lab/lab_report_uploaded/subject.txt"
+            body_template = "email/lab/lab_invoice/body.html"
+            subject_template = "email/lab/lab_invoice/subject.txt"
 
         return subject_template, body_template
 
@@ -451,7 +449,7 @@ class OpdNotification(Notification):
                                    NotificationAction.APPOINTMENT_CANCELLED]:
             receivers.extend(doctor_admins)
             receivers.append(instance.user)
-        # receivers = list(set(receivers))
+        receivers = list(set(receivers))
         user_and_phone_number = []
         user_and_email = []
         app_receivers = receivers
@@ -459,7 +457,6 @@ class OpdNotification(Notification):
 
         user_and_token = [{'user': token.user, 'token': token.token} for token in
                           NotificationEndpoint.objects.filter(user__in=receivers).order_by('user')]
-        # user_and_token.sort(key=lambda x: x['user'])
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
             user_and_tokens.append({'user': user, 'tokens': [t['token'] for t in user_token_group]})
 
@@ -484,8 +481,8 @@ class OpdNotification(Notification):
                 user_and_phone_number.append({'user': user, 'phone_number': phone_number})
             if email:
                 user_and_email.append({'user': user, 'email': email})
-        # user_and_phone_number = unique(user_and_phone_number)
-        # user_and_email = unique(user_and_email)
+        user_and_email = unique_emails(user_and_email)
+        user_and_phone_number = unique_phone_numbers(user_and_phone_number)
         all_receivers['sms_receivers'] = user_and_phone_number
         all_receivers['email_receivers'] = user_and_email
         all_receivers['app_receivers'] = app_receivers
@@ -555,7 +552,7 @@ class LabNotification:
                                    NotificationAction.LAB_APPOINTMENT_CANCELLED]:
             receivers.extend(lab_managers)
             receivers.append(instance.user)
-        # receivers = list(set(receivers))
+        receivers = list(set(receivers))
         user_and_phone_number = []
         user_and_email = []
         app_receivers = receivers
@@ -563,7 +560,6 @@ class LabNotification:
 
         user_and_token = [{'user': token.user, 'token': token.token} for token in
                           NotificationEndpoint.objects.filter(user__in=receivers).order_by('user')]
-        # user_and_token.sort(key=lambda x: x['user'])
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
             user_and_tokens.append({'user': user, 'tokens': [t['token'] for t in user_token_group]})
 
@@ -588,8 +584,8 @@ class LabNotification:
                 user_and_phone_number.append({'user': user, 'phone_number': phone_number})
             if email:
                 user_and_email.append({'user': user, 'email': email})
-        # user_and_phone_number = unique(user_and_phone_number)
-        # user_and_email = unique(user_and_email)
+        user_and_phone_number = unique_phone_numbers(user_and_phone_number)
+        user_and_email = unique_emails(user_and_email)
 
         all_receivers['sms_receivers'] = user_and_phone_number
         all_receivers['email_receivers'] = user_and_email
