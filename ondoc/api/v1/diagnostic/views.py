@@ -1154,7 +1154,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
                     id = fbt.booked_together_test.id
                     booked_together.append({'id': id, 'lab_test': name})
 
-            result['frequently_booked_together'] = {'title': 'Frequently booked together tests', 'value': booked_together}
+            result['frequently_booked_together'] = {'title': 'Frequently booked together', 'value': booked_together}
             result['show_details'] = data.show_details
             final_result.append(result)
 
