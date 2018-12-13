@@ -1287,3 +1287,14 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 resp['tests'] = temp_tests
                 empty.append(resp)
         return Response(empty)
+
+    def list_category(self, request):
+        queryset = LabTestCategory.objects.filter(is_package_category=True, is_live = True)
+        result = []
+        for category in queryset:
+            name = category.name
+            id = category.id
+            result.append({'name': name, 'id': id})
+
+        return Response(result)
+

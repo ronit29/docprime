@@ -46,4 +46,5 @@ urlpatterns = [
          name='appointment-complete'),
     path('test/details/<int:test_id>', TestDetailsViewset.as_view({'get':'retrieve'}), name='test-details'),
     path('test/category',LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
+    path('package/category', LabTestCategoryListViewSet.as_view({'get': 'list_category'}), name='package_category'),
 ]
