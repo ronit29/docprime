@@ -106,7 +106,8 @@ THIRD_PARTY_APPS = (
     'anymail',
     'nested_admin',
     'ipware',
-    'django_user_agents'
+    'django_user_agents',
+    'ddtrace.contrib.django',
 )
 
 LOCAL_APPS = (
