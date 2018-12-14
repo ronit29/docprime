@@ -30,6 +30,8 @@ def split_and_append(initial_str, spliter, appender):
 
 class GeocodingResults(TimeStampedModel):
 
+    geocodine_cache = None
+
     value = models.TextField()
     latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
     longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
@@ -38,18 +40,38 @@ class GeocodingResults(TimeStampedModel):
         db_table = 'geocoding_results'
 
     @classmethod
+    def get_location_dict(cls):
+
+        if not cls.geocodine_cache    
+            gr = GeocodingResults.objects.values('latitude', 'longitude')
+            results = {}
+            for x in gr:
+                results[str(x.get('latitude'))+'-'+str(x.get('longitude'))] = True
+            cls.geocodine_cache = results
+                
+
+        return cls.geocodine_cache
+
+    @classmethod
     def get_or_create(cls, *args, **kwargs):
 
         from .models import GeocodingResults
-        saved_json = GeocodingResults.objects.filter(latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'))
 
-        if not saved_json.exists():
+        latitude = kwargs.get('latitude')
+        longitude = kwargs.get('longitude')
+        exists = cls.get_location_dict().get(str(latitude)+'-'+str(longitude))
+
+        #saved_json = GeocodingResults.objects.filter(latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'))
+
+        if not exists:
             response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?sensor=false',
                                     params={'latlng': '%s,%s' % (kwargs.get('latitude'), kwargs.get('longitude')),
                                             'key': settings.REVERSE_GEOCODING_API_KEY, 'language': 'en'})
             if response.status_code != status.HTTP_200_OK or not response.ok:
-                logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
-                logger.info("[ERROR] %s", response.reason)
+                #logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
+                #logger.info("[ERROR] %s", response.reason)
+                #print('google api failed for en' + str(response.reason))
+
                 return ('failure: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
                         + str(kwargs.get('content_object').id)
                         + ', status_code: ' + response.status_code
@@ -61,8 +83,9 @@ class GeocodingResults(TimeStampedModel):
                     len(resp_data.get('results')) > 0:
                 geo_result = GeocodingResults(value=json.dumps(resp_data), latitude=kwargs.get('latitude'), longitude= kwargs.get('longitude')).save()
             else:
-                logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
-                logger.info("[ERROR] %s", response.reason)
+                #print(' google api return invalid addresses ')
+                # logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
+                # logger.info("[ERROR] %s", response.reason)
                 return ('failure: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
                         + str(kwargs.get('content_object').id)
                         + ', status_code: ' + response.status_code
@@ -157,17 +180,14 @@ class EntityAddress(TimeStampedModel):
             if meta['key'] in EntityAddress.AllowedKeys.availabilities():
                 if meta['key'].startswith('SUBLOCALITY'):
                     postal_code = meta['postal_code']
-                if meta['key'] not in [EntityAddress.AllowedKeys.COUNTRY,
-                                       EntityAddress.AllowedKeys.ADMINISTRATIVE_AREA_LEVEL_1,
-                                       EntityAddress.AllowedKeys.ADMINISTRATIVE_AREA_LEVEL_2,
-                                       EntityAddress.AllowedKeys.LOCALITY]:
+                if meta['key'] in [SUBLOCALITY]:
                     point = Point(float(longitude), float(latitude))
                 saved_data = EntityAddress.objects.filter(type=meta['key'], postal_code=postal_code,
                                                           type_blueprint=meta['type'],
                                                           value=meta['value'], parent=parent_id)
                 if len(saved_data) == 1:
                     entity_address = saved_data[0]
-                    parent_id = entity_address.id
+                    #parent_id = entity_address.id
                 elif len(saved_data) == 0:
                     alternative_name = mapping_dictionary.get(meta['value'].lower()) if mapping_dictionary.get(
                         meta['value'].lower(), None) else meta['value']
@@ -176,11 +196,13 @@ class EntityAddress(TimeStampedModel):
                                                    type_blueprint=meta['type'], value=meta['value'], parent=parent_id,
                                                    alternative_value=alternative_name, geocoding=geocoding_obj)
                     entity_address.save()
-                    parent_id = entity_address.id
-
-            if entity_address.type in ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2',
-                                       'LOCALITY', 'SUBLOCALITY']:
+                    #parent_id = entity_address.id
+                parent_id = entity_address.id    
                 ea_list.append(entity_address)
+
+            # if entity_address.type in ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2',
+            #                            'LOCALITY', 'SUBLOCALITY']:
+            #    ea_list.append(entity_address)
         if ea_list:
             return "success"
         else:
