@@ -19,5 +19,24 @@ class BannerListViewSet(viewsets.GenericViewSet):
             return Response([], status=status.HTTP_400_BAD_REQUEST)
 
 
-        queryset = Banner.objects.filter(slider_location__in=choice_id)
+        queryset = Banner.objects.filter(slider_location__in=choice_id, enable = True)
+        resp = dict()
+        final_result = []
+        for data in queryset:
+            resp['title'] = data.title
+            resp['id'] = data.id
+            resp['slider_location'] = data.slider_location
+            resp['slider_action'] = data.slider_action
+            resp['start_date'] = data.start_date
+            resp['end_date'] = data.end_date
+            resp['event_name'] = data.event_name
+            resp['latitude'] = data.latitude
+            resp['longitude'] = data.longitude
+            resp['url'] = data.url
+            resp['object_id'] = data.object_id
+            resp['image'] = data.image.url
+
+        final_result.append({'banner_content': resp})
+
+        return Response(final_result)
 
