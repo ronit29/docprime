@@ -3,7 +3,8 @@ import requests
 from django.conf import settings
 from ondoc.authentication.models import OtpVerifications
 from random import randint
-from ondoc.notification.rabbitmq_client import publish_message
+# from ondoc.notification.rabbitmq_client import publish_message
+from ondoc.notification.sqs_client import publish_message
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 
