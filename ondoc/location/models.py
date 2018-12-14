@@ -122,6 +122,14 @@ class EntityAddress(TimeStampedModel):
 
         resp_data = dict()
 
+        postal_code = None
+        for component in address_component.reverse():
+            types = [x.upper() for x in component.get('types', [])]
+            if types.contains('POSTAL_CODE'):
+                continue
+
+
+
         # address_component.reverse()
         for component in address_component:
             for key in component.get('types', []):
@@ -1308,7 +1316,7 @@ class DoctorPageURL(object):
             data = {}
             data['url'] = url
             data['is_valid'] = True
-            data['url_type'] = EntityUrls.UrlType.PAGEURL
+            data['url_type'] = EntityUrls.UrlType.PAGEURLa
             data['entity_type'] = 'Doctor'
             data['entity_id'] = self.doctor.id
             data['sitemap_identifier'] = EntityUrls.SitemapIdentifier.DOCTOR_PAGE
