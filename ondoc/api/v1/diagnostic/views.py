@@ -11,7 +11,8 @@ from ondoc.notification.models import EmailNotification
 from ondoc.coupon.models import Coupon
 from ondoc.doctor import models as doctor_model
 from ondoc.api.v1 import insurance as insurance_utility
-from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, aware_time_zone, get_lab_search_details, TimeSlotExtraction
+from ondoc.api.v1.utils import form_time_slot, IsConsumer, labappointment_transform, IsDoctor, payment_details, \
+    aware_time_zone, get_lab_search_details, TimeSlotExtraction, RawSql
 from ondoc.api.pagination import paginate_queryset
 
 from rest_framework import viewsets, mixins
@@ -261,6 +262,216 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return Response({"result": serializer.data,
                          "count": count,'tests':tests,
                          "seo": seo, "breadcrumb": breadcrumb})
+
+    @transaction.non_atomic_requests
+    def search(self, request):
+        parameters = request.query_params
+        serializer = diagnostic_serializer.SearchLabListSerializer(data=parameters)
+        serializer.is_valid(raise_exception=True)
+        parameters = serializer.validated_data
+        queryset_result = self.get_lab_search_list(parameters)
+        count = len(queryset_result)
+        paginated_queryset = paginate_queryset(queryset, request)
+        response_queryset = self.form_lab_whole_data(paginated_queryset, parameters.get("ids"))
+
+        serializer = diagnostic_serializer.LabCustomSerializer(response_queryset, many=True,
+                                                               context={"request": request})
+
+        entity_ids = [lab_data['id'] for lab_data in response_queryset]
+
+        id_url_dict = dict()
+        entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
+                                           entity_type__iexact='Lab').values('entity_id', 'url')
+        for data in entity:
+            id_url_dict[data['entity_id']] = data['url']
+
+        for resp in serializer.data:
+            if id_url_dict.get(resp['lab']['id']):
+                resp['lab']['url'] = id_url_dict[resp['lab']['id']]
+            else:
+                resp['lab']['url'] = None
+
+        test_ids = parameters.get('ids', [])
+
+        tests = list(LabTest.objects.filter(id__in=test_ids).values('id', 'name', 'hide_price', 'show_details'))
+        seo = None
+        breadcrumb = None
+        location = None
+        if parameters.get('location_json'):
+            locality = ''
+            sublocality = ''
+
+            if parameters.get('location_json') and parameters.get('location_json').get('locality_value'):
+                locality = parameters.get('location_json').get('locality_value')
+
+            if parameters.get('location_json') and parameters.get('location_json').get('sublocality_value'):
+                sublocality = parameters.get('location_json').get('sublocality_value')
+                if sublocality:
+                    sublocality += ' '
+
+            if parameters.get('location_json') and parameters.get('location_json').get('breadcrum_url'):
+                breadcrumb_locality_url = parameters.get('location_json').get('breadcrum_url')
+
+            title = "Diagnostic Centres & Labs "
+            if locality:
+                title += "in " + sublocality + locality
+            title += " | Books Tests"
+            description = "Find best Diagnostic Centres and Labs"
+            if locality:
+                description += " in " + sublocality + locality
+                location = sublocality + locality
+            elif sublocality:
+                location = sublocality
+            description += " and book test online, check fees, packages prices and more at DocPrime."
+            seo = {'title': title, "description": description, "location": location}
+            if sublocality:
+                breadcrumb = [{
+                    'name': locality,
+                    'url': breadcrumb_locality_url
+                },
+                    {
+                        'name': sublocality,
+                        'url': parameters.get('url')
+                    }]
+
+        return Response({"result": serializer.data,
+                         "count": count, 'tests': tests,
+                         "seo": seo, "breadcrumb": breadcrumb})
+
+    def get_lab_search_list(self, parameters):
+        # distance in meters
+
+        DEFAULT_DISTANCE = 20000
+        MAX_SEARCHABLE_DISTANCE = 50000
+
+        default_long = 77.071848
+        default_lat = 28.450367
+        min_distance = parameters.get('min_distance')
+        max_distance = parameters.get('max_distance')*1000 if parameters.get('max_distance') else DEFAULT_DISTANCE
+        max_distance = min(max_distance, MAX_SEARCHABLE_DISTANCE)
+        long = parameters.get('long', default_long)
+        lat = parameters.get('lat', default_lat)
+        ids = parameters.get('ids', [])
+        min_price = parameters.get('min_price',0)
+        max_price = parameters.get('max_price')
+        name = parameters.get('name')
+        network_id = parameters.get("network_id")
+
+        filtering_params = []
+        params = {}
+        if not min_distance:
+            min_distance=0
+
+        params['min_distance'] = min_distance
+        params['max_distance'] = max_distance
+
+        if network_id:
+            filtering_params.append("lb.network_id=(%(network_id)s)")
+            params['network_id'] = str(network_id)
+
+        if lat is not None and long is not None:
+            params['latitude'] = lat
+            params['longitude'] = long
+
+        if name:
+            search_key = re.findall(r'[a-z0-9A-Z.]+',name)
+            search_key = " ".join(search_key).lower()
+            search_key = "".join(search_key.split("."))
+            filtering_params.append(
+                "lb.name ilike (%(name)s)")
+            params['name'] = '%' + search_key + '%'
+
+        test_params = []
+
+        if ids:
+            counter = 1
+            if len(ids) > 0:
+                test_str = 'avlt.test_id IN('
+                for id in ids:
+                    if not counter == 1:
+                        test_str += ','
+                    test_str = test_str + '%(' + 'test' + str(counter) + ')s'
+                    params['test' + str(counter)] = id
+                    counter += 1
+                filtering_params.append(
+                    test_str + ')'
+                )
+
+            # counter = 1
+            # if len(ids) > 0:
+            #     labtest_str = 'id IN('
+            #     for id in ids:
+            #         if not counter == 1:
+            #             labtest_str += ','
+            #         labtest_str = labtest_str + '%(' + 'test' + str(counter) + ')s'
+            #         params['test' + str(counter)] = id
+            #         counter += 1
+            #     test_params.append(
+            #         labtest_str + ')'
+            #     )
+            params['length'] = len(ids)
+        else:
+            params['length']=0
+
+        price=[]
+
+        if min_price:
+            price.append("where price>=(%(min_price)s)")
+            params['min_price'] = min_price
+        if max_price:
+            if not min_price:
+                price.append("where price<=(%(max_price)s)")
+            else:
+                price.append("price<=(%(max_price)s)")
+            params['max_price'] = max_price
+        filtering_result = {}
+        if filtering_params:
+            filtering_result['string'] = " and ".join(filtering_params)
+
+        test_result={}
+
+        if test_params:
+            test_result['string'] = " and ".join(test_params)
+
+        price_result={}
+        if price:
+            price_result['string'] = " and ".join(price)
+        else:
+            price_result['string'] = 'where price>=0'
+
+        # order_by = self.apply_search_sort(parameters)
+
+        query = '''select *, a.home_pickup_calculation as pickup_charges from (
+                   select lb.*, sum(mrp) total_mrp, count(*) as test_count, 
+                   sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
+                   case when bool_and(home_collection_possible)=True then home_pickup_charges else 0 end as home_pickup_calculation from lab lb inner join available_lab_test avlt on
+                    lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
+                    and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
+                     and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
+                    and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location, (%(min_distance)s)) = false and
+                     avlt.enabled = True and 
+                     {filtering_params} inner join lab_test lt on lt.id = avlt.test_id group by lb.id having count(*)=(%(length)s))a
+                    {price}'''.format(filtering_params=filtering_result.get('string'),price=price_result.get('string'))
+
+        doctor_search_result = RawSql(query, params).fetch_all()
+        return doctor_search_result
+
+    # @staticmethod
+    # def apply_search_sort(parameters):
+    #     order_by = parameters.get("sort_on")
+    #     if order_by is not None:
+    #         if order_by == "fees" and parameters.get('ids'):
+    #             queryset_order_by = order by order_priority, F("price") + F("pickup_charges"), "distance")
+    #         elif order_by == 'distance':
+    #             queryset_order_by = order_by("-order_priority", "distance")
+    #         elif order_by == 'name':
+    #             queryset_order_by = order_by("-order_priority", "name")
+    #         else:
+    #             queryset_order_by =  order_by("-order_priority", "distance")
+    #     else:
+    #         queryset_order_by = order_by("-order_priority", "distance")
+    #     return queryset_order_by
+
 
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id, entity=None):
