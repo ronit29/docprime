@@ -988,7 +988,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
-        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED):
+        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED) \
+                and (self.status != database_instance.status):
             raise Exception('Cancelled or Completed appointment cannot be saved')
 
         try:
@@ -996,8 +997,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                     (not database_instance or database_instance.status != self.status) and not self.outstanding):
                 out_obj = self.outstanding_create()
                 self.outstanding = out_obj
-        except:
-            pass
+        except Exception as e:
+            logger.error("Error while creating outstanding for lab- " + str(self.id))
 
         try:
             # while completing appointment, add a merchant_payout entry
@@ -1005,7 +1006,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
         except Exception as e:
-            pass
+            logger.error("Error while saving payout mercahnt for lab- " + str(self.id))
 
         push_to_matrix = kwargs.get('push_again_to_matrix', True)
         if 'push_again_to_matrix' in kwargs.keys():
