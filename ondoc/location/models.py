@@ -1167,8 +1167,6 @@ class LabPageUrl(object):
                     locality_value = locality.location.alternative_value
                     locality_id = locality.location.id
                     if locality.location.centroid:
-
-
                         locality_longitude = locality.location.centroid.x
                         locality_latitude = locality.location.centroid.y
 
