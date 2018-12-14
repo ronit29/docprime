@@ -50,7 +50,10 @@ class GeocodingResults(TimeStampedModel):
             if response.status_code != status.HTTP_200_OK or not response.ok:
                 logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
                 logger.info("[ERROR] %s", response.reason)
-                return 'failure'
+                return ('failure: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
+                        + str(kwargs.get('content_object').id)
+                        + ', status_code: ' + response.status_code
+                        + ', reason: ' + response.reason)
 
             resp_data = response.json()
 
@@ -60,9 +63,13 @@ class GeocodingResults(TimeStampedModel):
             else:
                 logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
                 logger.info("[ERROR] %s", response.reason)
-                return 'failure'
+                return ('failure: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
+                        + str(kwargs.get('content_object').id)
+                        + ', status_code: ' + response.status_code
+                        + ', reason: ' + response.reason)
 
-        return 'success'
+        return ('success: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
+                        + str(kwargs.get('content_object').id))
 
 
 class CityInventory(TimeStampedModel):
@@ -381,36 +388,23 @@ class EntityUrls(TimeStampedModel):
 
         # Query for specialization in location and insertion .
 
-        # case when y.type='LOCALITY' then json_build_object('specialization_id', specialization_id,'location_json',
-        # json_build_object('locality_id',location_id,'locality_value',location_name, 'locality_latitude',latitude,
-        # 'locality_longitude',longitude),'specialization',specialization_name)
+        # select
+        # case when x.sitemap_identifier = 'SPECIALIZATION_CITY' then json_build_object('location_json',
+        #     json_build_object('locality_id', x.locality_id, 'locality_value', x.locality_value, 'locality_latitude',
+        #     x.locality_latitude, 'locality_longitude', x.locality_longitude))
         #
-        # when y.type='SUBLOCALITY' then json_build_object('specialization_id', specialization_id,'location_json',
-        # json_build_object('sublocality_id',location_id,'sublocality_value',location_name,
-        #  'locality_id', ea.id, 'locality_value', ea.alternative_value,'breadcrum_url',getslug(specialization_name || '-in-' || ea.alternative_value
-        #   ||'-sptcit'),
-        # 'sublocality_latitude',latitude, 'sublocality_longitude',longitude, 'locality_latitude',st_y(ea.centroid::geometry),
-        #  'locality_longitude',st_x(ea.centroid::geometry)),'specialization', specialization_name)
-        #
-        # end as extras,
+        # when x.sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY' then json_build_object('location_json',
+        #     json_build_object('sublocality_id', x.sublocality_id, 'sublocality_value',
+        #     x.sublocality_value, 'locality_id', x.locality_id, 'locality_value', x.locality_value, 'breadcrum_url',
+        #     getslug(x.specialization_name||'-in-'||x.locality_value||'-sptcit'), 'sublocality_latitude', x.sublocality_latitude,
+        #     'sublocality_longitude', x.sublocality_longitude, 'locality_latitude', x.locality_latitude, 'locality_longitude',
+        #     x.locality_longitude))
 
         query = '''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, 
             updated_at, sequence, sublocality_latitude, sublocality_longitude, locality_latitude, locality_longitude, locality_id, sublocality_id,
             locality_value, sublocality_value, specialization, specialization_id)
             
-            select 
-            case when x.sitemap_identifier = 'SPECIALIZATION_CITY' then json_build_object('location_json',
-                json_build_object('locality_id', x.locality_id, 'locality_value', x.locality_value, 'locality_latitude', 
-                x.locality_latitude, 'locality_longitude', x.locality_longitude))
-                
-            when x.sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY' then json_build_object('location_json',
-                json_build_object('sublocality_id', x.sublocality_id, 'sublocality_value',
-                x.sublocality_value, 'locality_id', x.locality_id, 'locality_value', x.locality_value, 'breadcrum_url',
-                getslug('labs' || '-in-' || x.locality_value || '-lbcit'), 'sublocality_latitude', x.sublocality_latitude, 
-                'sublocality_longitude', x.sublocality_longitude, 'locality_latitude', x.locality_latitude, 'locality_longitude', 
-                x.locality_longitude))
-            
-            end as extras, x.sitemap_identifier as sitemap_identifier, x.url as url, 
+            select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url, 
             x.count as count, x.entity_type as entity_type, x.url_type as url_type , x.is_valid, 
             x.created_at as created_at, x.updated_at as updated_at, x.sequence as sequence,
             x.sublocality_latitude as sublocality_latitude, x.sublocality_longitude as sublocality_longitude, x.locality_latitude as locality_latitude,
@@ -422,6 +416,18 @@ class EntityUrls(TimeStampedModel):
             select data.*, row_number() over(partition by data.url order by count desc) as rnum from 
             (
             select 
+            
+            case when y.type='LOCALITY' then json_build_object('specialization_id', specialization_id,'location_json',
+            json_build_object('locality_id',location_id,'locality_value',location_name, 'locality_latitude',latitude,
+            'locality_longitude',longitude),'specialization',specialization_name)
+
+            when y.type='SUBLOCALITY' then json_build_object('specialization_id', specialization_id,'location_json',
+            json_build_object('sublocality_id',location_id,'sublocality_value',location_name,
+             'locality_id', ea.id, 'locality_value', ea.alternative_value,'breadcrum_url',getslug(specialization_name || '-in-' || ea.alternative_value
+              ||'-sptcit'),
+            'sublocality_latitude',latitude, 'sublocality_longitude',longitude, 'locality_latitude',st_y(ea.centroid::geometry),
+             'locality_longitude',st_x(ea.centroid::geometry)),'specialization', specialization_name)
+             end as extras,
                         
             case when y.type='LOCALITY' then 'SPECIALIZATION_CITY'
             when y.type='SUBLOCALITY' then 'SPECIALIZATION_LOCALITY_CITY'
@@ -466,8 +472,8 @@ class EntityUrls(TimeStampedModel):
             
             y.*, ea.id as parent_id, ea.alternative_value as parent_name,
             st_x(ea.centroid::geometry) as parent_longitude, st_y(ea.centroid::geometry) as parent_latitude,
-            case when y.type='LOCALITY' then specialization_name || '-in-' ||location_name||'-sptcit'
-            when y.type='SUBLOCALITY' then specialization_name || '-in-' ||location_name||'-'||ea.alternative_value ||'-sptlitcit'
+            case when y.type='LOCALITY' then getslug(specialization_name || '-in-' ||location_name||'-sptcit')
+            when y.type='SUBLOCALITY' then getslug(specialization_name || '-in-' ||location_name||'-'||ea.alternative_value ||'-sptlitcit')
             end as url
             from
             (select * from 
@@ -516,7 +522,7 @@ class EntityUrls(TimeStampedModel):
             when x.sitemap_identifier = 'DOCTORS_LOCALITY_CITY' then json_build_object('location_json',
                 json_build_object('sublocality_id', x.sublocality_id, 'sublocality_value',
                 x.sublocality_value, 'locality_id', x.locality_id, 'locality_value', x.locality_value, 'breadcrum_url',
-                getslug('labs' || '-in-' || x.locality_value || '-lbcit'), 'sublocality_latitude', x.sublocality_latitude, 
+                getslug('doctors' || '-in-' || x.locality_value ||'-sptcit'), 'sublocality_latitude', x.sublocality_latitude, 
                 'sublocality_longitude', x.sublocality_longitude, 'locality_latitude', x.locality_latitude, 'locality_longitude', 
                 x.locality_longitude)) 
              
@@ -1151,6 +1157,7 @@ class LabPageUrl(object):
                 if sublocality:
                     sublocality_value = sublocality.location.alternative_value
                     sublocality_id = sublocality.location.id
+
                     if sublocality.location.centroid:
                         sublocality_longitude = sublocality.location.centroid.x
                         sublocality_latitude = sublocality.location.centroid.y
@@ -1160,6 +1167,8 @@ class LabPageUrl(object):
                     locality_value = locality.location.alternative_value
                     locality_id = locality.location.id
                     if locality.location.centroid:
+
+
                         locality_longitude = locality.location.centroid.x
                         locality_latitude = locality.location.centroid.y
 
@@ -1241,7 +1250,7 @@ class LabPageUrl(object):
 
                     data['url'] = new_url
                     EntityUrls.objects.create(**data)
-                    return "success"
+                    return ("success: " + str(lab.id))
 
 
 class DoctorPageURL(object):
@@ -1354,54 +1363,58 @@ class DoctorPageURL(object):
             EntityUrls.objects.create(**data)
 
     def create_doctor_page_urls(doctor, sequence):
-        locality = None
-        # practice_specializations = doctor.doctorpracticespecializations.all().order_by('id').values('id', 'specialization__name')
-        # specializations = practice_specializations.values_list('specialization__name', flat=True)
-        # specialization_ids = practice_specializations.values_list('id', flat=True)
-        practice_specializations = doctor.doctorpracticespecializations.all()
-        sp_dict = dict()
-        for sp in practice_specializations:
-            sp_dict[sp.id] = sp.specialization.name
-        sp_dict = OrderedDict(sorted(sp_dict.items()))
-        specializations = list(sp_dict.values())
-        specialization_ids = list(sp_dict.keys())
-        # specializations =[sc.specialization.name for sc in doctor.doctorpracticespecializations.all().order_by('specialization__name')]
-        # specialization_ids =[sc.specialization_id for sc in doctor.doctorpracticespecializations.all().order_by('id')]
-        sequence = sequence
+        locality_value = None
         locality_id = None
-        sublocality = None
+        locality_latitude = None
+        locality_longitude = None
+        sublocality_value = None
         sublocality_id = None
         sublocality_longitude = None
         sublocality_latitude = None
+        sequence = sequence
         doc_sublocality = None
         doc_locality = None
         hospital = None
+
+        practice_specializations = doctor.doctorpracticespecializations.all()
+        sp_dict = dict()
+        for sp in practice_specializations:
+            sp_dict[sp.specialization_id] = sp.specialization.name
+        sp_dict = OrderedDict(sorted(sp_dict.items()))
+        specializations = list(sp_dict.values())
+        specialization_ids = list(sp_dict.keys())
 
         if doctor.hospitals.all():
             hospital = doctor.hospitals.all()[0]
             if hospital.is_live:
                 doc_sublocality = hospital.entity.filter(type="SUBLOCALITY", valid=True).first()
                 if doc_sublocality:
-                    sublocality = doc_sublocality.location.alternative_value
+                    sublocality_value = doc_sublocality.location.alternative_value
                     sublocality_id = doc_sublocality.location.id
                     sublocality_longitude = doc_sublocality.location.centroid.x
                     sublocality_latitude = doc_sublocality.location.centroid.y
-
-                doc_locality = hospital.entity.filter(type="LOCALITY", valid=True).first()
-                if doc_locality:
-                    locality = doc_locality.location.alternative_value
-                    locality_id = doc_locality.location.id
-                    locality_longitude = doc_locality.location.centroid.x
-                    locality_latitude = doc_locality.location.centroid.y
+                    doc_locality = EntityAddress.objects.filter(id=doc_sublocality.location.parent).first()
+                    locality_value = doc_locality.alternative_value
+                    locality_id = doc_locality.id
+                    locality_longitude = doc_locality.centroid.x
+                    locality_latitude = doc_locality.centroid.y
+                else:
+                    # doc_locality = hospital.entity.filter(type="LOCALITY", valid=True).first()
+                    doc_locality = hospital.entity.filter(type="LOCALITY", valid=True, location__centroid__isnull=False).first()
+                    if doc_locality:
+                        locality_value = doc_locality.location.alternative_value
+                        locality_id = doc_locality.location.id
+                        locality_longitude = doc_locality.location.centroid.x
+                        locality_latitude = doc_locality.location.centroid.y
 
         if specializations:
             url = "dr-%s-%s" % (doctor.name, "-".join(specializations))
         if not specializations:
             url = "dr-%s" % (doctor.name)
-        if locality and sublocality:
-            url = url + "-in-%s-%s-dpp" % (sublocality, locality)
-        elif locality:
-            url = url + "-in-%s-dpp" % (locality)
+        if doc_locality and doc_sublocality:
+            url = url + "-in-%s-%s-dpp" % (sublocality_value, locality_value)
+        elif doc_locality:
+            url = url + "-in-%s-dpp" % (locality_value)
         else:
             url = url + "-dpp"
 
@@ -1414,7 +1427,7 @@ class DoctorPageURL(object):
         data['sitemap_identifier'] = EntityUrls.SitemapIdentifier.DOCTOR_PAGE
         if doc_locality:
             data['locality_id'] = locality_id
-            data['locality_value'] = locality
+            data['locality_value'] = locality_value
             data['locality_latitude'] = locality_latitude
             data['locality_longitude'] = locality_longitude
 
@@ -1426,7 +1439,7 @@ class DoctorPageURL(object):
 
         if doc_sublocality:
             data['sublocality_id'] = sublocality_id
-            data['sublocality_value'] = sublocality
+            data['sublocality_value'] = sublocality_value
             data['sublocality_latitude'] = sublocality_latitude
             data['sublocality_longitude'] = sublocality_longitude
         if hospital:
@@ -1440,8 +1453,8 @@ class DoctorPageURL(object):
         extras['related_entity_id'] = doctor.id
         if sublocality_id or locality_id:
             extras['location_id'] = sublocality_id if sublocality_id else locality_id
-            extras['locality_value'] = locality if locality else ''
-            extras['sublocality_value'] = sublocality if sublocality else ''
+            extras['locality_value'] = locality_value if doc_locality else ''
+            extras['sublocality_value'] = sublocality_value if doc_sublocality else ''
             extras['breadcrums'] = []
         data['extras'] = extras
         data['sequence'] = sequence
@@ -1472,4 +1485,4 @@ class DoctorPageURL(object):
 
         data['url'] = new_url
         EntityUrls.objects.create(**data)
-        return "success"
+        return ("success: " + str(doctor.id))
