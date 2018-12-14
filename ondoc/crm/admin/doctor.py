@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 from ondoc.account.models import Order
 from django.contrib.contenttypes.admin import GenericTabularInline
-from ondoc.authentication.models import GenericAdmin, BillingAccount, SPOCDetails
+from ondoc.authentication.models import GenericAdmin, BillingAccount, SPOCDetails, AssociatedMerchant, Merchant
 from ondoc.authentication.admin import BillingAccountInline
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
@@ -52,6 +52,7 @@ from django.contrib.admin.widgets import AdminSplitDateTime
 from ondoc.authentication import models as auth_model
 from django import forms
 from decimal import Decimal
+from .common import AssociatedMerchantInline
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -164,7 +165,6 @@ class DoctorClinicTimingFormSet(forms.BaseInlineFormSet):
                 else:
                     raise forms.ValidationError("Duplicate records not allowed.")
 
-
 class DoctorClinicProcedureInline(nested_admin.NestedTabularInline):
     model = DoctorClinicProcedure
     extra = 0
@@ -204,7 +204,7 @@ class DoctorClinicInline(nested_admin.NestedTabularInline):
     formset = DoctorClinicFormSet
     show_change_link = False
     # autocomplete_fields = ['hospital']
-    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline]
+    inlines = [DoctorClinicTimingInline, DoctorClinicProcedureInline, AssociatedMerchantInline]
 
     def get_queryset(self, request):
         return super(DoctorClinicInline, self).get_queryset(request).select_related('hospital')
@@ -901,7 +901,8 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         DoctorImageInline,
         DoctorDocumentInline,
         GenericAdminInline,
-        BillingAccountInline
+        BillingAccountInline,
+        AssociatedMerchantInline
     ]
 
     search_fields = ['name']

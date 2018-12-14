@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
-from ondoc.authentication.models import TimeStampedModel, User, UserProfile
-from ondoc.account.tasks import refund_curl_task
+from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
+from ondoc.account.tasks import refund_curl_task, process_payout
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
 from django.db.models import Sum, Q, F, Max
@@ -16,6 +16,9 @@ import json
 import logging
 import requests
 from decimal import Decimal
+from ondoc.account.tasks import set_order_dummy_transaction
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +151,11 @@ class Order(TimeStampedModel):
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
+
+        # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
+        # if not self.txn.first():
+        #     set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5)
+
         if order_dict:
             self.update_order(order_dict)
         # If payment is required and appointment is created successfully, debit consumer's account
@@ -234,6 +242,26 @@ class Order(TimeStampedModel):
         doctor_agreed_price = total_agreed_price - procedures_agreed_price
         return doctor_deal_price, doctor_mrp, doctor_agreed_price
 
+    def getAppointment(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        if not self.reference_id:
+            return None
+
+        if self.product_id == self.LAB_PRODUCT_ID:
+            return LabAppointment.objects.filter(id=self.reference_id).first()
+        elif self.product_id == self.DOCTOR_PRODUCT_ID:
+            return OpdAppointment.objects.filter(id=self.reference_id).first()
+        return None
+
+    def getTransactions(self):
+        all_txn = None
+        if self.txn.exists():
+            all_txn = self.txn.all()
+        elif self.dummy_txn.exists():
+            all_txn = self.dummy_txn.all()
+        return all_txn
+
     class Meta:
         db_table = "order"
 
@@ -255,7 +283,8 @@ class PgTransaction(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
     reference_id = models.PositiveIntegerField(blank=True, null=True)
-    order_id = models.PositiveIntegerField()
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, null=True, related_name="txn")
+    #order_id = models.PositiveIntegerField()
     order_no = models.CharField(max_length=100, blank=True, null=True)
     type = models.SmallIntegerField(choices=TYPE_CHOICES)
 
@@ -380,6 +409,44 @@ class PgTransaction(TimeStampedModel):
 
     class Meta:
         db_table = "pg_transaction"
+
+
+class DummyTransactions(TimeStampedModel):
+    PG_REFUND_SUCCESS_OK_STATUS = '1'
+    PG_REFUND_FAILURE_OK_STATUS = '0'
+    PG_REFUND_FAILURE_STATUS = 'FAIL'
+    PG_REFUND_ALREADY_REQUESTED_STATUS = 'ALREADY_REQUESTED'
+
+    REFUND_UPDATE_FAILURE_STATUS = 'REFUND_FAILURE_BY_PG'
+
+    DOCTOR_APPOINTMENT = 1
+    LAB_APPOINTMENT = 2
+    CREDIT = 0
+    DEBIT = 1
+    TYPE_CHOICES = [(CREDIT, "Credit"), (DEBIT, "Debit")]
+
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
+    reference_id = models.PositiveIntegerField(blank=True, null=True)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, null=True, related_name="dummy_txn")
+    order_no = models.CharField(max_length=100, blank=True, null=True)
+    type = models.SmallIntegerField(choices=TYPE_CHOICES)
+
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_mode = models.CharField(max_length=50, null=True, blank=True)
+    response_code = models.CharField(max_length=50, null=True, blank=True)
+    bank_id = models.CharField(max_length=50, null=True, blank=True)
+    transaction_date = models.DateTimeField(auto_now=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
+    currency = models.CharField(max_length=15, null=True, blank=True)
+    status_code = models.IntegerField(null=True, blank=True)
+    pg_name = models.CharField(max_length=100, null=True, blank=True)
+    status_type = models.CharField(max_length=50, null=True, blank=True)
+    transaction_id = models.CharField(max_length=100, null=True, blank=True)
+    pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
+
+    class Meta:
+        db_table = "dummy_transaction"
 
 
 class ConsumerAccount(TimeStampedModel):
@@ -643,7 +710,6 @@ class Invoice(TimeStampedModel):
     file = models.FileField(upload_to='invoices', null=True, blank=True)
 
 
-
 class OrderLog(TimeStampedModel):
     product_id = models.CharField(max_length=10, blank=True, null=True)
     referer_data = JSONField(blank=True, null=True)
@@ -659,3 +725,65 @@ class OrderLog(TimeStampedModel):
 
     class Meta:
         db_table = "order_log"
+
+
+class MerchantPayout(TimeStampedModel):
+    PENDING = 1
+    ATTEMPTED = 2
+    PAID = 3
+
+    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid')]
+
+    charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payout_approved = models.BooleanField(default=False)
+    status = models.PositiveIntegerField(default=PENDING, choices=STATUS_CHOICES)
+    payout_time = models.DateTimeField(null=True, blank=True)
+    api_response = JSONField(blank=True, null=True)
+    retry_count = models.PositiveIntegerField(default=0)
+    paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, related_name='payouts', null=True)
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    content_object = GenericForeignKey()
+
+    def save(self, *args, **kwargs):
+        if self.id and hasattr(self,'process_payout') and self.process_payout:
+            if not self.content_object:
+                self.content_object = self.get_billed_to()
+            if not self.paid_to:
+                self.paid_to = self.get_merchant()
+            if self.status == self.PENDING:
+                self.status = self.ATTEMPTED
+
+            transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
+
+        super().save(*args, **kwargs)
+
+    def get_appointment(self):
+        if self.lab_appointment.first():
+            return self.lab_appointment.first()
+        elif self.opd_appointment.first():
+            return self.opd_appointment.first()
+        return None
+
+    def get_billed_to(self):
+        if self.content_object:
+            return self.content_object
+        appt = self.get_appointment()
+        if appt and appt.get_billed_to:
+            return appt.get_billed_to
+        return ''
+
+
+    def get_merchant(self):
+        if self.paid_to:
+            return self.paid_to
+        appt = self.get_appointment()
+        if appt and appt.get_merchant:
+            return appt.get_merchant
+        return ''
+
+
+    class Meta:
+        db_table = "merchant_payout"

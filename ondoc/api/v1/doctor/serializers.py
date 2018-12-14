@@ -654,6 +654,7 @@ class DoctorListSerializer(serializers.Serializer):
     hospital_name = serializers.CharField(required=False)
     max_distance = serializers.IntegerField(required=False, allow_null=True)
     min_distance = serializers.IntegerField(required=False, allow_null=True)
+    hospital_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate_procedure_ids(self, attrs):
         try:
@@ -1250,6 +1251,12 @@ class AdminDeleteBodySerializer(serializers.Serializer):
     id = serializers.IntegerField()
 
 
+class HospitalCardSerializer(serializers.Serializer):
+
+    latitude = serializers.FloatField()
+    longitude = serializers.FloatField()
+
+
 class DoctorDetailsRequestSerializer(serializers.Serializer):
     procedure_category_ids = CommaSepratedToListField(required=False, max_length=500)
     procedure_ids = CommaSepratedToListField(required=False, max_length=500)
@@ -1283,7 +1290,6 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
                 return attrs
         except:
             raise serializers.ValidationError('Invalid Hospital ID.')
-        raise serializers.ValidationError('Invalid Hospital ID.')
 
 
 class OfflinePatientBodySerializer(serializers.Serializer):
@@ -1304,6 +1310,7 @@ class OfflinePatientBodySerializer(serializers.Serializer):
             raise serializers.ValidationError("Patient with same UUID already exists!")
         return attrs
 
+
 class OfflineAppointmentBodySerializer(serializers.Serializer):
     patient = OfflinePatientBodySerializer(many=False, allow_null=True, required=False)
     patient_id = serializers.PrimaryKeyRelatedField(queryset=OfflinePatients.objects.all(), required=False, allow_empty=True)
@@ -1321,7 +1328,6 @@ class OfflineAppointmentBodySerializer(serializers.Serializer):
         return attrs
 
 
-
 class OfflineAppointmentCreateSerializer(serializers.Serializer):
     data = OfflineAppointmentBodySerializer(many=True)
 
@@ -1335,6 +1341,7 @@ class OfflineAppointmentFilterSerializer(serializers.Serializer):
     start_date = serializers.DateField(format="%Y-%m-%d", required=False)
     end_date = serializers.DateField(format="%Y-%m-%d", required=False)
     updated_at = serializers.DateField(format="%Y-%m-%d", required=False)
+
 
 class OfflinePatientSerializer(serializers.ModelSerializer):
     class Meta:
