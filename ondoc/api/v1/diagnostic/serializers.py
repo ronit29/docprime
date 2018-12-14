@@ -952,7 +952,15 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
 
 class LabPackageListSerializer(serializers.Serializer):
-    long = serializers.FloatField(required=False)
-    lat = serializers.FloatField(required=False)
-    categories = serializers.ListField(child=serializers.PrimaryKeyRelatedField(
-        queryset=LabTestCategory.objects.filter(is_live=True, is_package_category=True)), required=False)
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
+    category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+
+    def validate_category_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            if LabTestCategory.objects.filter(is_live=True, is_package_category=True).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Category IDs')
+        raise serializers.ValidationError('Invalid Category IDs')

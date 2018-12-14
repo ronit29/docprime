@@ -151,23 +151,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def list_packages(self, request, **kwrgs):
-        parameters = dict(request.query_params)
-        if parameters.get('categories'):
-            parameters['categories'] = [category_id for category_id in str.split(parameters['categories'][0], ',')]
+        parameters = request.query_params
         serializer = diagnostic_serializer.LabPackageListSerializer(data=parameters)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        default_long = 77.071848
-        default_lat = 28.450367
-        long = validated_data.get('long', default_long)
-        lat = validated_data.get('lat', default_lat)
+        long = validated_data.get('long')
+        lat = validated_data.get('lat')
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = 50000
-        category_ids = validated_data.get('categories', None)
+        category_ids = validated_data.get('category_ids', None)
         lab_tests =None
         if category_ids:
-            lab_tests = LabTestCategoryMapping.objects.filter(parent_category__in=category_ids).values_list(
+            lab_tests = LabTestCategoryMapping.objects.filter(parent_category_id__in=category_ids).values_list(
                 'lab_test',
                 flat=True)
         all_packages_in_network_labs = LabTest.objects.filter(is_package=True,
