@@ -42,7 +42,7 @@ class GeocodingResults(TimeStampedModel):
     @classmethod
     def get_location_dict(cls):
 
-        if not cls.geocodine_cache    
+        if not cls.geocodine_cache:   
             gr = GeocodingResults.objects.values('latitude', 'longitude')
             results = {}
             for x in gr:
@@ -123,6 +123,8 @@ class EntityAddress(TimeStampedModel):
     abs_centroid = models.PointField(geography=True, srid=4326, blank=True, null=True)
     geocoding = models.ForeignKey(GeocodingResults, null=True, on_delete=models.DO_NOTHING)
     no_of_childs = models.PositiveIntegerField(default=None, null=True)
+    use_in_url = models.BooleanField(verbose_name='Use in URL', default=False)
+    order = models.PositiveIntegerField(default=None, null=True)
 
     def create(geocoding_obj, value):
         mapping_dictionary = {
@@ -150,63 +152,59 @@ class EntityAddress(TimeStampedModel):
         if not address_component:
             return response_list
 
-        resp_data = dict()
+        system_types = ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2', 'LOCALITY', 'SUBLOCALITY',
+                     'SUBLOCALITY_LEVEL_1', 'SUBLOCALITY_LEVEL_2', 'SUBLOCALITY_LEVEL_3']
 
-        # address_component.reverse()
-        for component in address_component:
-            for key in component.get('types', []):
-                resp_data[key.upper()] = component['long_name']
-
-        # never change the order. As it could affect the parsed address.
-        for type in ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2', 'LOCALITY', 'SUBLOCALITY',
-                     'SUBLOCALITY_LEVEL_1', 'SUBLOCALITY_LEVEL_2', 'SUBLOCALITY_LEVEL_3']:
-
-            if type.upper() in resp_data.keys():
-
-                if type.upper().startswith('SUBLOCALITY_LEVEL'):
-                    response_list.append(
-                        {'key': 'SUBLOCALITY', 'type': type, 'postal_code': resp_data.get('POSTAL_CODE', None),
-                         'value': resp_data[type.upper()]})
-                else:
-                    response_list.append({'key': type, 'type': type, 'postal_code': resp_data.get('POSTAL_CODE', None),
-                                          'value': resp_data[type.upper()]})
-
-        parent_id = None
         postal_code = None
-        ea_list = list()
+        parent_id = None
 
-        for meta in response_list:
-            point = None
-            if meta['key'] in EntityAddress.AllowedKeys.availabilities():
-                if meta['key'].startswith('SUBLOCALITY'):
-                    postal_code = meta['postal_code']
-                if meta['key'] in [SUBLOCALITY]:
-                    point = Point(float(longitude), float(latitude))
-                saved_data = EntityAddress.objects.filter(type=meta['key'], postal_code=postal_code,
-                                                          type_blueprint=meta['type'],
-                                                          value=meta['value'], parent=parent_id)
-                if len(saved_data) == 1:
-                    entity_address = saved_data[0]
-                    #parent_id = entity_address.id
-                elif len(saved_data) == 0:
-                    alternative_name = mapping_dictionary.get(meta['value'].lower()) if mapping_dictionary.get(
-                        meta['value'].lower(), None) else meta['value']
+        order = 1
+        for component in address_component.reverse():
 
-                    entity_address = EntityAddress(type=meta['key'], abs_centroid=point, postal_code=postal_code,
-                                                   type_blueprint=meta['type'], value=meta['value'], parent=parent_id,
-                                                   alternative_value=alternative_name, geocoding=geocoding_obj)
-                    entity_address.save()
-                    #parent_id = entity_address.id
-                parent_id = entity_address.id    
-                ea_list.append(entity_address)
+            long_name = component.get('long_name')
+            types = [key.upper() for key in component.get('types', [])]
+            type_blueprint = ",".join(types)
+            use_in_url = False
+
+            if types.contains('POSTAL_CODE'):
+                postal_code = component.get('POSTAL_CODE')
+                continue
+
+            selected_type = None
+            for st in system_types:
+                for tp in types:
+                    if st==tp:
+                        selected_type = st
+                        use_in_url = True
+            if not selected_type and len(types)>0:
+                selected_type = types[0]
+
+            saved_data = EntityAddress.objects.filter(type=selected_type, value=long_name, parent=parent_id)
+            if len(saved_data) > 0:
+                entity_address = saved_data[0]
+            else:
+                point = Point(float(longitude), float(latitude))
+                alternative_name = mapping_dictionary.get(long_name.lower(), long_name) 
+                entity_address = EntityAddress(type=selected_type, abs_centroid=point, postal_code=postal_code,
+                                                   type_blueprint=type_blueprint, value=long_name, parent=parent_id,
+                                                   alternative_value=alternative_name, geocoding=geocoding_obj, use_in_url=use_in_url, order=order)
+                entity_address.save()
+
+            parent_id = entity_address.id
+            order += 1
+
+
+        return "success"
+
+
 
             # if entity_address.type in ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2',
             #                            'LOCALITY', 'SUBLOCALITY']:
             #    ea_list.append(entity_address)
-        if ea_list:
-            return "success"
-        else:
-            return "failure"
+        # if ea_list:
+        #     return "success"
+        # else:
+        #     return "failure"
 
     @classmethod
     def get_or_create(cls, *args, **kwargs):
@@ -299,13 +297,13 @@ class EntityLocationRelationship(TimeStampedModel):
             entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type, object_id__in=object_ids)
             if entity_location_qs:
                 entity_location_qs.delete()
-            query = '''select l.id as object_id, ea.id as location_id, %s as content_type_id, type, l.location as entity_geo_location
+            query = '''insert into entity_location_relations(object_id, location_id, content_type_id, type, entity_geo_location) 
+                        select l.id as object_id, ea.id as location_id, %s as content_type_id, type, l.location as entity_geo_location
                         from lab l
                         inner join geocoding_results gs on 
                         st_x(l.location::geometry)=gs.longitude and st_y(l.location::geometry)=gs.latitude
                          and l.is_live = True
-                        inner join entity_address ea on ea.geocoding_id = gs.id
-                        '''
+                        inner join entity_address ea on ea.geocoding_id = gs.id and use_in_url=true'''
             results = RawSql(query, [content_type_id]).fetch_all()
             results = [EntityLocationRelationship(**result) for result in results]
             EntityLocationRelationship.objects.bulk_create(results)
@@ -319,17 +317,22 @@ class EntityLocationRelationship(TimeStampedModel):
             content_type = kwargs.get('content_type')
             if content_type:
                 content_type_id = content_type.id
+            else:
+                return False
+
             object_ids = kwargs.get('object_ids')
             entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type, object_id__in=object_ids)
             if entity_location_qs:
                 entity_location_qs.delete()
-            query = '''select h.id as object_id, ea.id as location_id, %s as content_type_id, type, h.location as entity_geo_location
+            query = '''insert into entity_location_relations(object_id, location_id, content_type_id, type, entity_geo_location) 
+                        select h.id as object_id, ea.id as location_id,
+                         %s as content_type_id, type, h.location as entity_geo_location
                         from hospital h inner join geocoding_results gs on 
                         st_x(h.location::geometry)=gs.longitude and st_y(h.location::geometry)=gs.latitude
-                         and h.is_live = True inner join entity_address ea on ea.geocoding_id = gs.id'''
+                         and h.is_live = True inner join entity_address ea on ea.geocoding_id = gs.id and use_in_url=true'''
             results = RawSql(query, [content_type_id]).fetch_all()
-            results = [EntityLocationRelationship(**result) for result in results]
-            EntityLocationRelationship.objects.bulk_create(results)
+            #results = [EntityLocationRelationship(**result) for result in results]
+            #EntityLocationRelationship.objects.bulk_create(results)
             return True
         except Exception as e:
             return False
@@ -1409,7 +1412,9 @@ class DoctorPageURL(object):
                     sublocality_id = doc_sublocality.location.id
                     sublocality_longitude = doc_sublocality.location.centroid.x
                     sublocality_latitude = doc_sublocality.location.centroid.y
-                    doc_locality = EntityAddress.objects.filter(id=doc_sublocality.location.parent).first()
+                    doc_sublocality = hospital.entity.filter(type="LOCALITY", valid=True).first()
+
+                    #doc_locality = EntityAddress.objects.filter(id=doc_sublocality.location.parent).first()
                     locality_value = doc_locality.alternative_value
                     locality_id = doc_locality.id
                     locality_longitude = doc_locality.centroid.x
@@ -1428,11 +1433,11 @@ class DoctorPageURL(object):
         if not specializations:
             url = "dr-%s" % (doctor.name)
         if doc_locality and doc_sublocality:
-            url = url + "-in-%s-%s-dpp" % (sublocality_value, locality_value)
+            url = url + "-in-%s-%s" % (sublocality_value, locality_value)
         elif doc_locality:
-            url = url + "-in-%s-dpp" % (locality_value)
+            url = url + "-in-%s" % (locality_value)
         else:
-            url = url + "-dpp"
+            url = url
 
         url = slugify(url)
         data = {}
@@ -1441,23 +1446,24 @@ class DoctorPageURL(object):
         data['entity_type'] = 'Doctor'
         data['entity_id'] = doctor.id
         data['sitemap_identifier'] = EntityUrls.SitemapIdentifier.DOCTOR_PAGE
-        if doc_locality:
-            data['locality_id'] = locality_id
-            data['locality_value'] = locality_value
-            data['locality_latitude'] = locality_latitude
-            data['locality_longitude'] = locality_longitude
+        #if doc_locality
+        data['locality_id'] = locality_id
+        data['locality_value'] = locality_value
+        data['locality_latitude'] = locality_latitude
+        data['locality_longitude'] = locality_longitude
 
-            if locality_latitude and locality_longitude:
-                data['locality_location'] = Point(locality_longitude, locality_latitude)
+        if locality_latitude and locality_longitude:
+            data['locality_location'] = Point(locality_longitude, locality_latitude)
 
-            if sublocality_latitude and sublocality_longitude:
-                data['sublocality_location'] = Point(sublocality_longitude, sublocality_latitude)
+        if sublocality_latitude and sublocality_longitude:
+            data['sublocality_location'] = Point(sublocality_longitude, sublocality_latitude)
 
-        if doc_sublocality:
-            data['sublocality_id'] = sublocality_id
-            data['sublocality_value'] = sublocality_value
-            data['sublocality_latitude'] = sublocality_latitude
-            data['sublocality_longitude'] = sublocality_longitude
+        #if doc_sublocality:
+        data['sublocality_id'] = sublocality_id
+        data['sublocality_value'] = sublocality_value
+        data['sublocality_latitude'] = sublocality_latitude
+        data['sublocality_longitude'] = sublocality_longitude
+
         if hospital:
             data['location'] = hospital.location
 
@@ -1467,11 +1473,11 @@ class DoctorPageURL(object):
 
         extras = {}
         extras['related_entity_id'] = doctor.id
-        if sublocality_id or locality_id:
-            extras['location_id'] = sublocality_id if sublocality_id else locality_id
-            extras['locality_value'] = locality_value if doc_locality else ''
-            extras['sublocality_value'] = sublocality_value if doc_sublocality else ''
-            extras['breadcrums'] = []
+        #if sublocality_id or locality_id:
+        extras['location_id'] = sublocality_id if sublocality_id else locality_id
+        extras['locality_value'] = locality_value if doc_locality else ''
+        extras['sublocality_value'] = sublocality_value if doc_sublocality else ''
+        extras['breadcrums'] = []
         data['extras'] = extras
         data['sequence'] = sequence
 
@@ -1486,11 +1492,13 @@ class DoctorPageURL(object):
         #     if not dup_url:
         #         break
         #     counter = counter + 1
-        dup_url = EntityUrls.objects.filter(url=new_url,
+        dup_url = EntityUrls.objects.filter(url=new_url + '-dpp',
                                             sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE
                                             ).filter(~Q(entity_id=doctor.id)).first()
         if dup_url:
             new_url = new_url + '-' + str(doctor.id)
+
+        new = new_url + '-dpp'    
 
         EntityUrls.objects.filter(entity_id=doctor.id,
                                   sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(
