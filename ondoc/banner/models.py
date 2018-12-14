@@ -11,12 +11,12 @@ class Banner(auth_model.TimeStampedModel):
     PROCEDURE = 2
     SPECIALIZATION = 3
     PROCEDURE_CATEGORY = 4
-    slider_choice = [{LAB_TEST, 'Lab Test'}, {PROCEDURE, 'Procedure'}, {PROCEDURE_CATEGORY, 'Procedure Category'}, {SPECIALIZATION, 'Specialization'}]
+    slider_choice = [(LAB_TEST, 'Lab Test'), (PROCEDURE, 'Procedure'), (PROCEDURE_CATEGORY, 'Procedure Category'), (SPECIALIZATION, 'Specialization')]
     HOME_PAGE = 1
     DOCTOR_RESULT = 2
     LAB_RESULT = 3
 
-    slider_location = [{HOME_PAGE, 'Home Page'}, {DOCTOR_RESULT, 'Doctor Search Page'}, {LAB_RESULT, 'Lab Search Page'}]
+    slider_location = [(HOME_PAGE, 'Home Page'), (DOCTOR_RESULT, 'Doctor Search Page'), (LAB_RESULT, 'Lab Search Page')]
     title = models.CharField(max_length=500)
     image = models.ImageField('Banner image', upload_to='banner/images')
     url = models.URLField(blank=True)
