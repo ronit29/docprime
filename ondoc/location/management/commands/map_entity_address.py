@@ -4,8 +4,8 @@ import json
 
 
 def map_entity_address():
-    geocoding_dict = GeocodingResults.objects.all()
-    for data in geocoding_dict:
+    geocoding_data = GeocodingResults.objects.all()[:10]
+    for data in geocoding_data:
         value = None
         value = json.loads(data.value)
         print(EntityAddress.create(data, value))

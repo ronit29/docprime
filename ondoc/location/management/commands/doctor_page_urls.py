@@ -10,10 +10,14 @@ from django.db.models import Prefetch
 def doctor_page_urls():
     query = '''select nextval('entity_url_version_seq') as inc'''
     seq = RawSql(query,[]).fetch_all()
-    if seq:
-        sequence = seq[0]['inc'] if seq[0]['inc'] else 0
-    else:
-        sequence = 0
+
+    #if seq:
+    sequence = seq[0]['inc']
+
+    # if seq:
+    #     sequence = seq[0]['inc'] if seq[0]['inc'] else 0
+    # else:
+    #     sequence = 0
 
     # doc_obj = Doctor.objects.prefetch_related(Prefetch('doctorpracticespecializations',
     #         queryset=DoctorPracticeSpecialization.objects.prefetch_related(
