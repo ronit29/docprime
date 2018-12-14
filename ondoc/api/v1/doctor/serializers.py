@@ -1333,3 +1333,9 @@ class GetOfflinePatientsSerializer(serializers.Serializer):
 class OfflineAppointmentFilterSerializer(serializers.Serializer):
     start_date = serializers.DateField(format="%Y-%m-%d", required=False)
     end_date = serializers.DateField(format="%Y-%m-%d", required=False)
+    updated_at = serializers.DateField(format="%Y-%m-%d", required=False)
+
+class OfflinePatientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OfflinePatients
+        fields = ('id','name','dob','gender')

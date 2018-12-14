@@ -1,4 +1,8 @@
 from collections import defaultdict, OrderedDict
+
+from ondoc.api.v1.auth.serializers import UserProfileSerializer
+from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
+    OfflinePatientSerializer
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
 from ondoc.doctor import models
@@ -1992,41 +1996,54 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             .prefetch_related('user__patient_mobiles').distinct()
         start_date = valid_data.get('start_date')
         end_date = valid_data.get('end_date')
+        updated_at = valid_data.get('updated_at')
         final_data = []
         if start_date and end_date:
             online_queryset = online_queryset.filter(time_slot_start__date__range=(start_date, end_date)).order_by('time_slot_start')
             offline_queryset = offline_queryset.filter(time_slot_start__date__range=(start_date, end_date)).order_by('time_slot_start')
+        if updated_at:
+            online_queryset = online_queryset.filter(updated_at__gte=updated_at)
+            offline_queryset = offline_queryset.filter(updated_at__gte=updated_at)
         final_data = sorted(chain(online_queryset, offline_queryset), key=lambda car: car.time_slot_start, reverse=False)
         resp = []
         group = OrderedDict()
+        final_result = []
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
             patient_name = phone_number = is_docprime = None
             if instance == OFFLINE:
+                patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
-                patient_name = app.user.name if hasattr(app.user, 'name') else None
+                # patient_name = app.user.name if hasattr(app.user, 'name') else None
                 phone_number_query = app.user.patient_mobiles.filter(is_default=True) if hasattr(app.user, 'patient_mobiles') else None
                 if phone_number_query.exists():
                     phone_number = phone_number_query.first().phone_number
             else:
                 is_docprime = True
                 phone_number = app.user.phone_number
-                patient_name = app.profile.name if hasattr(app, 'profile') else None
+                patient_profile = app.profile_detail
+                patient_profile['user_id']= app.user.id if app.user else None
+                patient_profile['profile_id'] = app.profile.id if app.profile else None
+                # patient_name = app.profile.name if hasattr(app, 'profile') else None
 
             ret_obj = {}
             ret_obj['id'] = app.id
             ret_obj['patient_number'] = phone_number
             ret_obj['patient_name'] = patient_name
-
+            ret_obj['updated_at']=app.updated_at
             ret_obj['doctor_name'] = app.doctor.name
             ret_obj['doctor_id'] = app.doctor.id
             ret_obj['hospital_id'] = app.hospital.id
             ret_obj['hospital_name'] = app.hospital.name
             ret_obj['time_slot_start'] = app.time_slot_start
             ret_obj['status'] = app.status
+            ret_obj['patient'] = patient_profile
+            ret_obj['hospital'] = HospitalModelSerializer(app.hospital).data
+            ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(app.doctor).data
             ret_obj['is_docprime'] = is_docprime
-            if group.get(app.time_slot_start.strftime("%B %d, %Y")):
-                group[app.time_slot_start.strftime("%B %d, %Y")].append(ret_obj)
-            else:
-                group[app.time_slot_start.strftime("%B %d, %Y")] = [ret_obj]
-        return Response(group)
+            final_result.append(ret_obj)
+            # if group.get(app.time_slot_start.strftime("%B %d, %Y")):
+            #     group[app.time_slot_start.strftime("%B %d, %Y")].append(ret_obj)
+            # else:
+            #     group[app.time_slot_start.strftime("%B %d, %Y")] = [ret_obj]
+        return Response(final_result)
