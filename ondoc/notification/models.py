@@ -438,6 +438,8 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     class Meta:
         db_table = "email_notification"
 
+    def __str__(self):
+        return '{} -> {} ({})'.format(self.email_subject, self.email, self.user)
 
     @classmethod
     def send_notification(cls, user, email, notification_type, context):
@@ -666,6 +668,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     class Meta:
         db_table = "sms_notification"
 
+    def __str__(self):
+        return '{} -> {} ({})'.format(self.content, self.phone_number, self.user)
+
     @classmethod
     def send_notification(cls, user, phone_number, notification_type, context):
         html_body = super().get_message_body(user, phone_number, notification_type, context)
@@ -767,6 +772,9 @@ class AppNotification(TimeStampedModel):
     class Meta:
         db_table = "app_notification"
 
+    def __str__(self):
+        return '{} -> ({})'.format(self.content, self.user)
+
     @classmethod
     def send_notification(cls, user, notification_type, context):
         context.pop("instance", None)
@@ -794,6 +802,9 @@ class PushNotification(TimeStampedModel):
 
     class Meta:
         db_table = "push_notification"
+
+    def __str__(self):
+        return '{} -> ({})'.format(self.content, self.user)
 
     @classmethod
     def send_notification(cls, user, notification_type, context):
