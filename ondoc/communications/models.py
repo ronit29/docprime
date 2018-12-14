@@ -2,6 +2,9 @@ import copy
 import json
 from collections import defaultdict
 from itertools import groupby
+
+import pytz
+
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -50,6 +53,106 @@ def unique_phone_numbers(list_):
         final_result.append({'user': value[0], 'phone_number': key})
 
     return final_result
+
+
+def get_title_body(notification_type, context, user):
+    # notification_type = self.notification_type
+    # context = self.context
+    patient_name = context.get('patient_name')
+    doctor_name = context.get('doctor_name', None)
+    lab_name = context.get('lab_name', None)
+    time_slot_start = context.get('time_slot_start')
+    instance = context.get('instance')
+    title = ''
+    body = ''
+    if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+        title = "Appointment Confirmed"
+        body = "Appointment Confirmed for {} requested with Dr. {} at {}, {}.".format(
+            patient_name, doctor_name, time_slot_start.strftime("%I:%M %P"),
+            time_slot_start.strftime("%d/%m/%y"), doctor_name)
+    elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
+        title = "Appointment Reschedule"
+        body = "Reschedule request received for the appointment with Dr. {}".format(doctor_name)
+    elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.DOCTOR:
+        title = "Appointment Reschedule"
+        body = "Reschedule request received for the appointment with Dr. {}".format(doctor_name)
+    elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user.user_type == User.CONSUMER:
+        title = "Appointment Reschedule"
+        body = "Reschedule request received for the appointment from Dr. {}".format(doctor_name)
+    elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
+        title = "New Appointment"
+        body = "New Appointment for {} at {}, {} with Dr. {}. You will receive a confirmation as soon as it is accepted by the doctor.".format(
+            patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"), doctor_name)
+    elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
+        title = "New Appointment"
+        body = "New appointment for {} at {}, {}. Please confirm.".format(
+            patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
+    elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.DOCTOR:
+        title = "Appointment Cancelled"
+        body = "Appointment with {} at {}  {} has been cancelled.".format(
+            patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
+    elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
+        if instance.cancellation_type != instance.AUTO_CANCELLED:
+            body = "Appointment with Dr. {} at {}, {} has been cancelled as per your request.".format(
+                doctor_name, time_slot_start.strftime("%I:%M %P"),
+                time_slot_start.strftime("%d/%m/%y")
+            )
+        else:
+            body = "Appointment with Dr. {} at {}, {} has been cancelled due to unavailability of doctor manager.".format(
+                doctor_name, time_slot_start.strftime("%I:%M %P"),
+                time_slot_start.strftime("%d/%m/%y"))
+        title = "Appointment Cancelled"
+    # elif notification_type == NotificationAction.DOCTOR_INVOICE:
+    #     title = "Invoice Generated"
+    #     body = "Invoice for appointment ID-{} has been generated.".format(instance.id)
+    elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
+        title = "Prescription Uploaded"
+        body = "Prescription available for your appointment with Dr. {} on {}".format(
+            doctor_name, time_slot_start.strftime("%d/%m/%y"))
+
+    elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
+        title = "Appointment Confirmed"
+        body = "Appointment Confirmed for {} requested with Lab - {} at {}, {}.".format(
+            patient_name, lab_name, time_slot_start.strftime("%I:%M %P"),
+            time_slot_start.strftime("%d/%m/%y"), lab_name)
+    elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user.user_type == User.CONSUMER:
+        title = "Appointment Reschedule"
+        body = "Reschedule request received for the appointment with Lab - {}".format(lab_name)
+    elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.DOCTOR:
+        title = "Appointment Reschedule"
+        body = "Reschedule request received for the appointment with Lab - {}".format(lab_name)
+    elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB and user.user_type == User.CONSUMER:
+        title = "Appointment Reschedule"
+        body = "Reschedule request received for the appointment from Lab - {}".format(lab_name)
+    elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
+        title = "New Appointment"
+        body = "New Appointment for {} at {}, {} with Lab - {}. You will receive a confirmation as soon as it is accepted by the lab".format(
+            patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"), lab_name)
+    elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.DOCTOR:
+        title = "New Appointment"
+        body = "New appointment for {} at {}, {}. Please confirm.".format(
+            patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
+    elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
+        if instance.cancellation_type != instance.AUTO_CANCELLED:
+            body = "Appointment with Lab - {} at {}, {} has been cancelled as per your request.".format(
+                lab_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
+        else:
+            body = "Appointment with Lab - {} at {}, {} has cancelled due to unavailability of lab manager.".format(
+                lab_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
+        title = "Appointment Cancelled"
+    elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED:
+        title = "Appointment Cancelled"
+        body = "Appointment with {} at {}  {} has been cancelled.".format(
+            patient_name, time_slot_start.strftime("%I:%M %P"),
+            time_slot_start.strftime("%d/%m/%y"))
+    # elif notification_type == NotificationAction.LAB_INVOICE:
+    #     title = "Invoice Generated"
+    #     body = "Invoice for appointment ID-{} has been generated.".format(instance.id)
+    elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
+        title = "Report Uploaded"
+        body = "Report available for your appointment with Lab - {} on {}".format(
+            lab_name, time_slot_start.strftime("%d/%m/%y"))
+    context.update({'title': title, 'body': body})
 
 
 class Notification:
@@ -346,6 +449,7 @@ class APPNotification:
         if not context:
             return
         for receiver in receivers:
+            get_title_body(self.notification_type, context, receiver)
             self.trigger(receiver, context)
 
 
@@ -382,6 +486,7 @@ class PUSHNotification:
         if not context:
             return
         for receiver in receivers:
+            get_title_body(self.notification_type, context, receiver)
             self.trigger(receiver, context)
 
 
@@ -398,6 +503,8 @@ class OpdNotification(Notification):
         patient_name = self.appointment.profile.name if self.appointment.profile.name else ""
         doctor_name = self.appointment.doctor.name if self.appointment.doctor.name else ""
         procedures = self.appointment.get_procedures()
+        est = pytz.timezone(settings.TIME_ZONE)
+        time_slot_start = self.appointment.time_slot_start.astimezone(est)
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
@@ -409,7 +516,9 @@ class OpdNotification(Notification):
             "action_type": NotificationAction.OPD_APPOINTMENT,
             "action_id": self.appointment.id,
             "payment_type": dict(OpdAppointment.PAY_CHOICES)[self.appointment.payment_type],
-            "image_url": ""
+            "image_url": "",
+            "pickup_address": self.appointment.get_pickup_address(),
+            "time_slot_start": time_slot_start
         }
         return context
 
