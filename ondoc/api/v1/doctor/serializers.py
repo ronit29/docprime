@@ -1289,6 +1289,7 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
 class OfflinePatientBodySerializer(serializers.Serializer):
     name = serializers.CharField(max_length=24)
     sms_notification = serializers.BooleanField(required=False)
+    share_with_hospital = serializers.BooleanField(required=False)
     gender = serializers.ChoiceField(choices=OfflinePatients.GENDER_CHOICES, required=False)
     dob = serializers.DateField(required=False, format="%Y-%m-%d")
     referred_by = serializers.ChoiceField(choices=OfflinePatients.REFERENCE_CHOICES, required=False)

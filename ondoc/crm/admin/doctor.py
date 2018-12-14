@@ -20,7 +20,7 @@ import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
-
+from ondoc.api.v1.utils import GenericAdminEntity
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure
 
 logger = logging.getLogger(__name__)
@@ -655,7 +655,9 @@ class GenericAdminInline(nested_admin.NestedTabularInline):
         return ['user', 'updated_at']
 
     def get_queryset(self, request):
-        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')
+        return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')\
+            .filter(entity_type=GenericAdminEntity.DOCTOR)
+
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "hospital":
