@@ -61,7 +61,7 @@ def get_title_body(notification_type, context, user):
     patient_name = context.get('patient_name')
     doctor_name = context.get('doctor_name', None)
     lab_name = context.get('lab_name', None)
-    time_slot_start = context.get('time_slot_start')
+    time_slot_start = context.get('time_slot_start', None)
     instance = context.get('instance')
     title = ''
     body = ''
@@ -184,7 +184,9 @@ class SMSNotification:
 
     def __init__(self, notification_type, context=None):
         self.notification_type = notification_type
-        self.context = copy.deepcopy(context)
+        context = copy.deepcopy(context)
+        context.pop('time_slot_start', None)
+        self.context = context
 
     def get_template(self, user):
         notification_type = self.notification_type
@@ -279,7 +281,9 @@ class EMAILNotification:
 
     def __init__(self, notification_type, context=None):
         self.notification_type = notification_type
-        self.context = copy.deepcopy(context)
+        context = copy.deepcopy(context)
+        context.pop('time_slot_start', None)
+        self.context = context
 
     def get_template(self, user):
         notification_type = self.notification_type
@@ -432,6 +436,7 @@ class APPNotification:
         user = receiver
         context = copy.deepcopy(context)
         context.pop("instance", None)
+        context.pop('time_slot_start', None)
         app_noti = AppNotification.objects.create(
             user=user,
             notification_type=self.notification_type,
@@ -464,6 +469,7 @@ class PUSHNotification:
         tokens = receiver.get('tokens')
         context = copy.deepcopy(context)
         context.pop("instance", None)
+        context.pop('time_slot_start', None)
         target_app = user.user_type
         push_noti = PushNotification.objects.create(
             user=user,
@@ -486,7 +492,7 @@ class PUSHNotification:
         if not context:
             return
         for receiver in receivers:
-            get_title_body(self.notification_type, context, receiver)
+            get_title_body(self.notification_type, context, receiver.get('user'))
             self.trigger(receiver, context)
 
 
@@ -517,7 +523,6 @@ class OpdNotification(Notification):
             "action_id": self.appointment.id,
             "payment_type": dict(OpdAppointment.PAY_CHOICES)[self.appointment.payment_type],
             "image_url": "",
-            "pickup_address": self.appointment.get_pickup_address(),
             "time_slot_start": time_slot_start
         }
         return context
@@ -613,6 +618,8 @@ class LabNotification:
         instance = self.appointment
         patient_name = instance.profile.name.title() if instance.profile.name else ""
         lab_name = instance.lab.name.title() if instance.lab.name else ""
+        est = pytz.timezone(settings.TIME_ZONE)
+        time_slot_start = self.appointment.time_slot_start.astimezone(est)
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
@@ -621,7 +628,9 @@ class LabNotification:
             "url": "/lab/appointment/{}".format(instance.id),
             "action_type": NotificationAction.LAB_APPOINTMENT,
             "action_id": instance.id,
-            "image_url": ""
+            "image_url": "",
+            "pickup_address": self.appointment.get_pickup_address(),
+            "time_slot_start": time_slot_start
         }
         return context
 
