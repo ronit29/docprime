@@ -119,7 +119,7 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
 class InsurancePlanContent(auth_model.TimeStampedModel):
 
     class PossibleTitles(Choices):
-        WHATS_COVERED = 'WHATS_COVERED'
+        SALIENT_FEATURES = 'SALIENT_FEATURES'
         WHATS_NOT_COVERED = 'WHATS_NOT_COVERED'
 
     plan = models.ForeignKey(InsurancePlans,related_name="content", on_delete=models.CASCADE)
@@ -249,8 +249,8 @@ class UserInsurance(auth_model.TimeStampedModel):
             'group_policy_name': 'Docprime Technologies Pvt. Ltd.',
             'group_policy_address': 'Plot No. 119, Sector 44, Gurugram, Haryana 122001',
             'group_policy_email': 'customercare@docprime.com',
-            'nominee_name': '',
-            'nominee_relation': '',
+            'nominee_name': 'legal heir',
+            'nominee_relation': 'legal heir',
             'nominee_address': '',
             'policy_related_email': '%s and customercare@docprime.com' % self.insurance_plan.insurer.email,
             'policy_related_tollno': '%d and 18001239419' % self.insurance_plan.insurer.intermediary_contact_number,

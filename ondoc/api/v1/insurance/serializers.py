@@ -68,6 +68,7 @@ class MemberListSerializer(serializers.Serializer):
     town = serializers.CharField(max_length=100)
     district = serializers.CharField(max_length=100)
     state = serializers.CharField(max_length=100)
+    user_form_id = serializers.IntegerField()
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -86,6 +87,18 @@ class MemberListSerializer(serializers.Serializer):
 class InsuredMemberSerializer(serializers.Serializer):
 
     members = serializers.ListSerializer(child=MemberListSerializer())
+
+    def validate(self, attrs):
+
+        # check if there is name duplicacy or not.
+        member_list = attrs.get('members', [])
+        name_set = set(map(lambda member: "%s-%s-%s" % (member['first_name'], member['middle_name'], member['last_name']), member_list))
+
+        if len(name_set) != len(member_list):
+            raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
+
+        return attrs
+
     # insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
     # insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
 
