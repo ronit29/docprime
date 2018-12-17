@@ -16,7 +16,7 @@ import json
 import logging
 import requests
 from decimal import Decimal
-from ondoc.account.tasks import set_order_dummy_transaction
+from ondoc.notification.tasks import set_order_dummy_transaction
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
