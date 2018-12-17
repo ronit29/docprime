@@ -892,7 +892,7 @@ class LabEntitySerializer(serializers.ModelSerializer):
 
 
 class CustomPackageLabSerializer(LabModelSerializer):
-    avg_rating = serializers.SerializerMethodField()
+    avg_rating = serializers.ReadOnlyField()
 
     class Meta:
         model = Lab
@@ -900,22 +900,22 @@ class CustomPackageLabSerializer(LabModelSerializer):
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
                   'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating')
 
-    def get_avg_rating(self, obj):
-        return obj.avg_rating
+    # def get_avg_rating(self, obj):
+    #     return obj.avg_rating
 
 
 class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     lab = serializers.SerializerMethodField()
     distance = serializers.SerializerMethodField()
     mrp = serializers.SerializerMethodField()
-    deal_price = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
     lab_timings = serializers.SerializerMethodField()
     lab_timings_data = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'deal_price', 'lab_timings', 'lab_timings_data',
-                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info')
+        fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timings', 'lab_timings_data',
+                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package')
         # fields = ('__all__')
 
     def get_lab(self, obj):
@@ -931,8 +931,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     def get_mrp(self, obj):
         return str(obj.mrp)
 
-    def get_deal_price(self, obj):
-        return str(obj.deal_price)
+    def get_price(self, obj):
+        return str(obj.price)
 
     def get_lab_timings(self, obj):
         lab_data = self.context.get('lab_data', [])

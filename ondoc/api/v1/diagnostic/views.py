@@ -173,7 +173,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                   D(m=max_distance))).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
-            deal_price=Case(
+            price=Case(
                 When(availablelabs__custom_deal_price__isnull=True,
                      then=F('availablelabs__computed_deal_price')),
                 When(availablelabs__custom_deal_price__isnull=False,
@@ -189,7 +189,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                       D(m=max_distance))).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
-            deal_price=Case(
+            price=Case(
                 When(availablelabs__custom_deal_price__isnull=True,
                      then=F('availablelabs__computed_deal_price')),
                 When(availablelabs__custom_deal_price__isnull=False,
@@ -203,7 +203,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         all_packages.extend([package for package in all_packages_in_non_network_labs])
         lab_ids = [package.lab for package in all_packages]
         lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network').annotate(
-            avg_rating=Avg('rating')).filter(id__in=lab_ids)
+            avg_rating=Avg('rating__ratings')).filter(id__in=lab_ids)
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'lab_data': lab_data, 'request': request})
         return Response(serializer.data)
