@@ -4,7 +4,7 @@ import json
 
 
 def map_entity_address():
-    geocoding_data = GeocodingResults.objects.all()[:10]
+    geocoding_data = GeocodingResults.objects.all()
     for data in geocoding_data:
         value = None
         value = json.loads(data.value)

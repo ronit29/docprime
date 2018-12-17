@@ -164,8 +164,14 @@ class EntityAddress(TimeStampedModel):
         return pattern.sub('', text)
     
     @classmethod
-    def use_address_in_url(cls, type, parent_entity=None):
+    def use_address_in_url(cls, type, name, parent_entity=None):
+
         if not type:
+            return False
+        if not cls.is_english(name):
+            return False
+
+        if parent_entity and not cls.is_english(parent_entity.alternative_value):
             return False
 
         use_in_url = True
@@ -194,6 +200,17 @@ class EntityAddress(TimeStampedModel):
             return slugify(text)
 
         return None
+
+    @classmethod
+    def is_english(cls, text):
+        if not text:
+            return False
+        try:
+            text.encode(encoding='utf-8').decode('ascii')
+        except UnicodeDecodeError:
+            return False
+        else:
+            return True
 
 
     @classmethod
@@ -277,7 +294,7 @@ class EntityAddress(TimeStampedModel):
                 #print(components)
                 components = cls.unique_components(components)
                 address = ", ".join(components)
-                use_in_url = cls.use_address_in_url(selected_type, parent_entity)
+                use_in_url = cls.use_address_in_url(selected_type, alternative_name, parent_entity)
                 search_slug = None
                 if use_in_url:
                     search_slug = cls.get_search_url_slug(selected_type, alternative_name, parent_entity)
@@ -391,28 +408,29 @@ class EntityLocationRelationship(TimeStampedModel):
 
     @transaction.atomic
     def lab_entity_loc_rel(**kwargs):
-        try:
-            content_type = kwargs.get('content_type')
-            if content_type:
-                content_type_id = content_type.id
-            object_ids = kwargs.get('object_ids')
-            entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type, object_id__in=object_ids)
-            if entity_location_qs:
-                entity_location_qs.delete()
-            query = '''insert into entity_location_relations(object_id, location_id, content_type_id, type, entity_geo_location, created_at, updated_at) 
-                        select l.id as object_id, ea.id as location_id, %s as content_type_id, type, l.location as entity_geo_location,
-                        now(), now()
-                        from lab l
-                        inner join geocoding_results gs on 
-                        st_x(l.location::geometry)=gs.longitude and st_y(l.location::geometry)=gs.latitude
-                         and l.is_live = True
-                        inner join entity_address ea on ea.geocoding_id = gs.id and use_in_url=true'''
-            results = RawSql(query, [content_type_id]).fetch_all()
-            results = [EntityLocationRelationship(**result) for result in results]
-            EntityLocationRelationship.objects.bulk_create(results)
-            return True
-        except Exception as e:
-            return False
+        #try:
+        content_type = kwargs.get('content_type')
+        if content_type:
+            content_type_id = content_type.id
+        #object_ids = kwargs.get('object_ids')
+        entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type).delete()
+        # if entity_location_qs:
+        #     entity_location_qs.delete()
+        print(str(content_type_id))
+        query = '''insert into entity_location_relations(object_id, location_id, content_type_id, type, entity_geo_location, created_at, updated_at) 
+                    select l.id as object_id, ea.id as location_id, %s as content_type_id, type, l.location as entity_geo_location,
+                    now(), now()
+                    from lab l
+                    inner join geocoding_results gs on 
+                    st_x(l.location::geometry)::text=gs.longitude and st_y(l.location::geometry)::text=gs.latitude
+                     and l.is_live = True
+                    inner join entity_address ea on ea.geocoding_id = gs.id and use_in_url=true'''
+        results = RawSql(query, [content_type_id]).execute()
+        #results = [EntityLocationRelationship(**result) for result in results]
+        #EntityLocationRelationship.objects.bulk_create(results)
+        return True
+        #except Exception as e:
+        #return False
 
     @transaction.atomic
     def hosp_entity_loc_rel(**kwargs):
