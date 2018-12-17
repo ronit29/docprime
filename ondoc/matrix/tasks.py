@@ -329,5 +329,3 @@ def push_order_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
-
-
