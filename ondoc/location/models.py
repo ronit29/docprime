@@ -21,6 +21,8 @@ from rest_framework import status
 from django.conf import settings
 from django.db import transaction
 from collections import OrderedDict
+import re
+from django.contrib.postgres.fields import ArrayField
 
 
 def split_and_append(initial_str, spliter, appender):
@@ -33,8 +35,10 @@ class GeocodingResults(TimeStampedModel):
     geocodine_cache = None
 
     value = models.TextField()
-    latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
-    longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    #latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    #longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    latitude = models.CharField(max_length=200, blank=True, null=True)
+    longitude = models.CharField(max_length=200, blank=True, null=True)
 
     class Meta:
         db_table = 'geocoding_results'
@@ -46,11 +50,19 @@ class GeocodingResults(TimeStampedModel):
             gr = GeocodingResults.objects.values('latitude', 'longitude')
             results = {}
             for x in gr:
-                results[str(x.get('latitude'))+'-'+str(x.get('longitude'))] = True
+                key = cls.get_key(x.get('latitude'), x.get('longitude'))
+                results[key] = True
             cls.geocodine_cache = results
 
 
         return cls.geocodine_cache
+
+    @classmethod
+    def get_key(cls, latitude, longitude):
+
+        latitude = str(latitude)
+        longitude = str(longitude)
+        return latitude+'-'+longitude
 
     @classmethod
     def get_or_create(cls, *args, **kwargs):
@@ -59,7 +71,9 @@ class GeocodingResults(TimeStampedModel):
 
         latitude = kwargs.get('latitude')
         longitude = kwargs.get('longitude')
-        exists = cls.get_location_dict().get(str(latitude)+'-'+str(longitude))
+        key = cls.get_key(latitude, longitude)
+
+        exists = cls.get_location_dict().get(key)
 
         #saved_json = GeocodingResults.objects.filter(latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'))
 
@@ -67,6 +81,7 @@ class GeocodingResults(TimeStampedModel):
             response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?sensor=false',
                                     params={'latlng': '%s,%s' % (kwargs.get('latitude'), kwargs.get('longitude')),
                                             'key': settings.REVERSE_GEOCODING_API_KEY, 'language': 'en'})
+
             if response.status_code != status.HTTP_200_OK or not response.ok:
                 #logger.info("[ERROR] Google API for fetching the location via latitude and longitude failed.")
                 #logger.info("[ERROR] %s", response.reason)
@@ -74,8 +89,8 @@ class GeocodingResults(TimeStampedModel):
 
                 return ('failure: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
                         + str(kwargs.get('content_object').id)
-                        + ', status_code: ' + response.status_code
-                        + ', reason: ' + response.reason)
+                        + ', status_code: ' + str(response.status_code)
+                        + ', reason: ' + str(response.reason))
 
             resp_data = response.json()
 
@@ -88,8 +103,8 @@ class GeocodingResults(TimeStampedModel):
                 # logger.info("[ERROR] %s", response.reason)
                 return ('failure: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
                         + str(kwargs.get('content_object').id)
-                        + ', status_code: ' + response.status_code
-                        + ', reason: ' + response.reason)
+                        + ', status_code: ' + str(response.status_code)
+                        + ', reason: ' + str(response.reason))
 
         return ('success: ' + str(kwargs.get('content_object').__class__.__name__) + '-'
                         + str(kwargs.get('content_object').id))
@@ -113,9 +128,12 @@ class EntityAddress(TimeStampedModel):
         ADMINISTRATIVE_AREA_LEVEL_2 = 'ADMINISTRATIVE_AREA_LEVEL_2'
         COUNTRY = 'COUNTRY'
 
-    type = models.CharField(max_length=128, blank=False, null=False, choices=AllowedKeys.as_choices())
+    type = models.CharField(max_length=128, blank=True, null=True, choices=AllowedKeys.as_choices())
     value = models.TextField()
     alternative_value = models.TextField(default='', null=True)
+    address = models.TextField(max_length=2000, blank=True, null=True)
+    components = ArrayField(models.TextField(), null=True)
+
     type_blueprint = models.CharField(max_length=128, blank=False, null=True)
     postal_code = models.PositiveIntegerField(null=True)
     parent = models.IntegerField(null=True)
@@ -126,7 +144,41 @@ class EntityAddress(TimeStampedModel):
     use_in_url = models.BooleanField(verbose_name='Use in URL', default=False)
     order = models.PositiveIntegerField(default=None, null=True)
 
-    def create(geocoding_obj, value):
+    @classmethod
+    def unique_components(cls, components):
+        if not components:
+            return []
+
+        seen, result = set(), []
+        for item in components:
+            processed = cls.to_aplhanumeric(item.lower())
+            if processed not in seen:
+                seen.add(processed)
+                result.append(item)
+        return result
+
+    @classmethod
+    def to_aplhanumeric(cls , text):
+        pattern = re.compile('[\W_]+')
+        return pattern.sub('', text)
+    
+    @classmethod
+    def use_address_in_url(cls, type, parent_entity=None):
+        if not type:
+            return False
+
+        use_in_url = True
+        if not type.startswith('LOCALITY') and not type.startswith('SUBLOCALITY'):
+            use_in_url = False
+
+        if use_in_url and parent_entity and parent_entity.use_in_url \
+            and parent_entity.type and parent_entity.type.startswith('SUBLOCALITY'):
+            use_in_url = False
+
+        return use_in_url
+
+    @classmethod
+    def create(cls, geocoding_obj, value):
         mapping_dictionary = {
             'bengaluru': 'Bangalore',
             'bengalooru': 'Bangalore',
@@ -155,11 +207,15 @@ class EntityAddress(TimeStampedModel):
         system_types = ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2', 'LOCALITY', 'SUBLOCALITY',
                      'SUBLOCALITY_LEVEL_1', 'SUBLOCALITY_LEVEL_2', 'SUBLOCALITY_LEVEL_3']
 
-        postal_code = None
+        pin_code = None
         parent_id = None
+        parent_entity = None
 
         order = 1
-        for component in address_component.reverse():
+        address_component.reverse()
+        save_location = False
+
+        for component in address_component:
 
             long_name = component.get('long_name')
             types = [key.upper() for key in component.get('types', [])]
@@ -167,7 +223,7 @@ class EntityAddress(TimeStampedModel):
             use_in_url = False
 
             if 'POSTAL_CODE' in types:
-                postal_code = component.get('POSTAL_CODE')
+                pin_code = long_name
                 continue
 
             selected_type = None
@@ -175,22 +231,45 @@ class EntityAddress(TimeStampedModel):
                 for tp in types:
                     if st==tp:
                         selected_type = st
-                        use_in_url = True
-            if not selected_type and len(types)>0:
-                selected_type = types[0]
+            if selected_type and selected_type.startswith('SUBLOCALITY'):
+                selected_type = 'SUBLOCALITY'
+                save_location = True
+
+            postal_code = None
+            if save_location:
+                postal_code = pin_code
 
             saved_data = EntityAddress.objects.filter(type=selected_type, value=long_name, parent=parent_id)
             if len(saved_data) > 0:
                 entity_address = saved_data[0]
             else:
-                point = Point(float(longitude), float(latitude))
+                point = None
+                if save_location:                    
+                    point = Point(float(longitude), float(latitude))
+
                 alternative_name = mapping_dictionary.get(long_name.lower(), long_name)
+                #address = alternative_name
+                components = [alternative_name]
+
+                if parent_entity:
+                    #components.append(parent_entity.components)
+                    components = components + parent_entity.components
+
+                print(components)
+                components = cls.unique_components(components)
+                address = ", ".join(components)
+                use_in_url = cls.use_address_in_url(selected_type, parent_entity)
+                print(use_in_url)
+
                 entity_address = EntityAddress(type=selected_type, abs_centroid=point, postal_code=postal_code,
                                                    type_blueprint=type_blueprint, value=long_name, parent=parent_id,
-                                                   alternative_value=alternative_name, geocoding=geocoding_obj, use_in_url=use_in_url, order=order)
+                                                   alternative_value=alternative_name, geocoding=geocoding_obj,
+                                                   order=order, use_in_url=use_in_url,
+                                                   address=address, components = components)
                 entity_address.save()
 
             parent_id = entity_address.id
+            parent_entity = entity_address
             order += 1
 
 
