@@ -50,7 +50,7 @@ from collections import defaultdict
 import copy
 import logging
 import jwt
-from ondoc.insurance.models import InsuranceTransaction
+from ondoc.insurance.models import InsuranceTransaction, UserInsurance
 from decimal import Decimal
 from ondoc.web.models import ContactUs
 
@@ -578,6 +578,25 @@ class UserAppointmentsViewSet(OndocViewSet):
                                                                         start__lte=time_slot_start.hour,
                                                                         end__gte=time_slot_start.hour).first()
                     if doctor_hospital:
+                        if opd_appointment.payment_type == 3 and opd_appointment.insurance_id is not None:
+                            user_insurance = UserInsurance.objects.get(id=opd_appointment.insurance_id)
+                            if user_insurance:
+                                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                                if doctor_hospital.mrp > insurance_threshold.opd_amount_limit:
+                                    resp = {
+                                        "status": 0,
+                                        "message": "Appointment amount is not covered under insurance"
+                                    }
+                                    return resp
+                                if time_slot_start > user_insurance.expiry_date:
+                                    resp = {
+                                        "status": 0,
+                                        "message": "Appointment time is not covered under insurance"
+                                    }
+                                    return resp
+
+
+
                         old_deal_price = opd_appointment.deal_price
                         old_effective_price = opd_appointment.effective_price
                         coupon_discount = opd_appointment.discount

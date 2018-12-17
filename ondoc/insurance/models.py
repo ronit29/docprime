@@ -293,6 +293,12 @@ class UserInsurance(auth_model.TimeStampedModel):
         else:
             return False
 
+    def is_appointment_valid(self, appointment_time):
+        if self.expiry_date >= appointment_time:
+            return True
+        else:
+            return False
+
     @classmethod
     def profile_create_or_update(cls, member, user):
         profile = {}
@@ -355,7 +361,8 @@ class UserInsurance(auth_model.TimeStampedModel):
         lab_mrp_check_list = []
         user_insurance = UserInsurance.objects.filter(user=user).last()
 
-        if not user_insurance or not user_insurance.is_valid():
+        if not user_insurance or not user_insurance.is_valid() or \
+                not user_insurance.is_appointment_valid(appointment_data['time_slot_start']):
             return False, "", 'Not covered under insurance'
 
         insured_members = user_insurance.members.all().filter(profile=profile)

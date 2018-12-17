@@ -1068,7 +1068,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         request = self.context.get("request")
         insurance_threshold = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
         resp = {
-            'is_insurance_covered': False,
+            'is_appointment_insured': False,
             'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000,
             'is_user_insured': False
         }
@@ -1082,62 +1082,15 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
                         resp['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
                             insurance_threshold.opd_amount_limit
                         resp['is_user_insured'] = True
+                        resp['insurance_expiry_date'] = user_insurance.expiry_date
+                    if obj.payment_type == 3 and obj.insurance_id == user_insurance.id:
+                        resp['is_appointment_insured'] = True
+                    else:
+                        resp['is_appointment_insured'] = False
 
-            if not user_insurance or not user_insurance.is_valid():
-                resp['is_insurance_covered'] = False
-                return resp
 
-            insured_members = user_insurance.members.all().filter(profile=obj.profile)
-            if not insured_members.exists():
-                resp['is_insurance_covered'] = False
-                return resp
 
-            if obj.procedures.count() > 0:
-                resp['is_insurance_covered'] = False
-                return resp
-            doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=obj.doctor).values(
-                'specialization_id')
-            specilization_ids = doctor
-            specilization_ids_set = set(
-                map(lambda specialization: specialization['specialization_id'], specilization_ids))
-            gynecologist_list = json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS)
-            gynecologist_set = set(gynecologist_list)
-            oncologist_list = json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS)
-            oncologist_set = set(oncologist_list)
-            if not (specilization_ids_set & oncologist_set) and not (specilization_ids_set & gynecologist_set):
-                resp['is_insurance_covered'] = True
-                return resp
-            members = user_insurance.members.all().get(profile=obj.profile)
-            if specilization_ids_set & gynecologist_set:
-                doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
-                    specialization_id__in=gynecologist_list).values_list(
-                    'doctor_id', flat=True)
-                opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
-                                                                      doctor_id__in=doctor_with_same_specialization,
-                                                                      payment_type=3,
-                                                                      insurance_id=user_insurance.id,
-                                                                      profile_id=members.profile.id).count()
-                if opd_appointment_count >= 5:
-                    resp['is_insurance_covered'] = False
-                    return resp
-                else:
-                    resp['is_insurance_covered'] = True
-                    return resp
-            elif specilization_ids_set & oncologist_set:
-                doctor_with_same_specialization = DoctorPracticeSpecialization.objects.filter(
-                    specialization_id__in=oncologist_list).values_list(
-                    'doctor_id', flat=True)
-                opd_appointment_count = OpdAppointment.objects.filter(~Q(status=6),
-                                                                      doctor_id__in=doctor_with_same_specialization,
-                                                                      payment_type=3,
-                                                                      insurance_id=user_insurance.id,
-                                                                      profile_id=members.profile.id).count()
-                if opd_appointment_count >= 5:
-                    resp['is_insurance_covered'] = False
-                    return resp
-                else:
-                    resp['is_insurance_covered'] = True
-                    return resp
+
         return resp
 
     def get_procedures(self, obj):
