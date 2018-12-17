@@ -271,7 +271,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         parameters = serializer.validated_data
         queryset_result = self.get_lab_search_list(parameters)
         count = len(queryset_result)
-        paginated_queryset = paginate_queryset(queryset, request)
+        paginated_queryset = paginate_queryset(queryset_result, request)
         response_queryset = self.form_lab_whole_data(paginated_queryset, parameters.get("ids"))
 
         serializer = diagnostic_serializer.LabCustomSerializer(response_queryset, many=True,
@@ -397,18 +397,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     test_str + ')'
                 )
 
-            # counter = 1
-            # if len(ids) > 0:
-            #     labtest_str = 'id IN('
-            #     for id in ids:
-            #         if not counter == 1:
-            #             labtest_str += ','
-            #         labtest_str = labtest_str + '%(' + 'test' + str(counter) + ')s'
-            #         params['test' + str(counter)] = id
-            #         counter += 1
-            #     test_params.append(
-            #         labtest_str + ')'
-            #     )
             params['length'] = len(ids)
         else:
             params['length']=0
