@@ -1493,11 +1493,12 @@ class DoctorPageURL(object):
                     sublocality_latitude = doc_sublocality.location.centroid.y
                     doc_sublocality = hospital.entity.filter(type="LOCALITY", valid=True).first()
 
-                    #doc_locality = EntityAddress.objects.filter(id=doc_sublocality.location.parent).first()
+                    doc_locality = EntityAddress.objects.filter(id=doc_sublocality.location.parent).first()
                     locality_value = doc_locality.alternative_value
                     locality_id = doc_locality.id
-                    locality_longitude = doc_locality.centroid.x
-                    locality_latitude = doc_locality.centroid.y
+                    if doc_locality.centroid:
+                        locality_longitude = doc_locality.centroid.x
+                        locality_latitude = doc_locality.centroid.y
                 else:
                     # doc_locality = hospital.entity.filter(type="LOCALITY", valid=True).first()
                     doc_locality = hospital.entity.filter(type="LOCALITY", valid=True, location__centroid__isnull=False).first()

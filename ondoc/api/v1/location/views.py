@@ -2,7 +2,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
 from django_extensions.db.fields import json
-
 from ondoc.doctor.models import DoctorPracticeSpecialization, PracticeSpecialization
 from ondoc.location import models as location_models
 from ondoc.doctor import models as doctor_models
@@ -26,6 +25,7 @@ class Footer(object):
         sql_urls = RawSql(query, parameters).fetch_all()
         return sql_urls
 
+
 class LabProfileFooter(Footer):
     def __init__(self, entity):
         self.sublocality_id = None
@@ -35,7 +35,9 @@ class LabProfileFooter(Footer):
         self.sublocality_location = entity.sublocality_location
 
         location_id = int(entity.extras.get('location_id'))
-        address = EntityAddress.objects.filter(pk=location_id)[0]
+        address = EntityAddress.objects.filter(pk=location_id)
+        if address:
+            address = address[0]
 
         if address:
             self.centroid = address.centroid
@@ -400,7 +402,9 @@ class DoctorProfileFooter(Footer):
         self.specialization_id = entity.specialization_id
         self.specialization = entity.specialization
         location_id = int(entity.extras.get('location_id'))
-        address = EntityAddress.objects.filter(pk=location_id).first()
+        address = EntityAddress.objects.filter(pk=location_id)
+        if address:
+            address = address[0]
 
         if address:
             self.centroid = address.centroid
