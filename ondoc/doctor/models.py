@@ -193,7 +193,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def get_short_address(self):
         address_items = [value for value in
-                         [self.sublocality, self.locality] if value]
+                         [self.locality, self.city] if value]
         return ", ".join(address_items)
 
     def update_live_status(self):
