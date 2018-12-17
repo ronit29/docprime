@@ -329,3 +329,21 @@ def push_order_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
+
+
+def get_masked_number(data):
+    try:
+        url = "http://qamatrixapi.docprime.com/communication/Communication.svc/GetVirtualNumber"
+        response = requests.post(url, data=json.dumps(data))
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.info("[ERROR] Could not mask the number from matrix system")
+            logger.error("[ERROR] %s", response.reason)
+            return None
+        else:
+            resp_data = response.text
+            return {}
+
+    except Exception as e:
+        logger.error("[ERROR] Could not mask the number from matrix system")
+        return None
