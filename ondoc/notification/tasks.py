@@ -7,6 +7,8 @@ from ondoc.notification import models as notification_models
 from celery import task
 import logging
 from django.conf import settings
+import requests
+from rest_framework import status
 
 logger = logging.getLogger(__name__)
 
