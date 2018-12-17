@@ -1,6 +1,6 @@
 from django.contrib.gis.db import models
 from django.db import migrations, transaction
-from django.db.models import Count, Sum, When, Case, Q, F
+from django.db.models import Count, Sum, When, Case, Q, F, Avg
 from django.contrib.postgres.operations import CreateExtension
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.postgres.fields import JSONField, ArrayField
@@ -193,7 +193,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def get_short_address(self):
         address_items = [value for value in
-                         [self.sublocality, self.locality] if value]
+                         [self.locality, self.city] if value]
         return ", ".join(address_items)
 
     def update_live_status(self):
@@ -396,6 +396,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def get_ratings(self):
          return self.rating.all()
+
+    def get_avg_rating(self):
+        return self.rating.all().aggregate(avg_rating=Avg('ratings'))
 
     def get_rating_count(self):
         count = 0
@@ -1281,7 +1284,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         try:
             # while completing appointment, add a merchant_payout entry
-            if database_instance.status != self.status and self.status == self.COMPLETED:
+            if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
         except Exception as e:

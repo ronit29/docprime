@@ -2,13 +2,17 @@
 from collections import OrderedDict, defaultdict
 import json 
 import datetime
+
+from django.db.models import Avg
 from rest_framework import serializers
+
+from ondoc.api.v1.doctor.serializers import DoctorPracticeSpecializationSerializer
 from .services import RestructureDataService
 from datetime import datetime
 
 from ondoc.doctor.models import (
         Doctor, Specialization, MedicalService, DoctorImage, Symptoms,
-        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, UserProfile, Hospital, DoctorEmail, DoctorMobile, DoctorMedicalService, DoctorAssociation, DoctorAward, DoctorLeave
+        DoctorQualification, DoctorImage, DoctorHospital, DoctorExperience, DoctorLanguage, OpdAppointment, Hospital, DoctorEmail, DoctorMobile, DoctorMedicalService, DoctorAssociation, DoctorAward, DoctorLeave
     )
 
 
@@ -104,6 +108,33 @@ class DoctorSerializer(serializers.ModelSerializer):
         model = Doctor
         fields = ('id', 'name', 'practice_duration', 'profile_img', 'qualificationSpecialization',
                  'email', 'availability', 'pastExperience' )
+
+
+class ArticleAuthorSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+    experience = serializers.SerializerMethodField()
+    profile_img = serializers.SerializerMethodField()
+    speciality = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Doctor
+        fields = ('id', 'name', 'experience', 'profile_img', 'speciality', 'rating')
+
+    def get_name(self, obj):
+        return obj.get_display_name()
+
+    def get_experience(self, obj):
+        return obj.experience_years()
+
+    def get_profile_img(self, obj):
+        return obj.get_thumbnail()
+
+    def get_speciality(self, obj):
+        return DoctorPracticeSpecializationSerializer(obj.doctorpracticespecializations.all(), many=True).data
+
+    def get_rating(self, obj):
+        return obj.get_avg_rating()
 
 
 class DoctorApiReformData(DoctorSerializer):

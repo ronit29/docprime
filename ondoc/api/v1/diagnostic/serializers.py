@@ -36,7 +36,7 @@ User = get_user_model()
 class LabTestListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'is_package')
+        fields = ('id', 'name', 'is_package', 'show_details')
 
 
 class LabListSerializer(serializers.ModelSerializer):
@@ -48,7 +48,7 @@ class LabListSerializer(serializers.ModelSerializer):
 class LabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'pre_test_info', 'why')
+        fields = ('id', 'name', 'pre_test_info', 'why', 'show_details')
         # fields = ('id', 'account_name', 'users', 'created')
 
 
@@ -319,6 +319,7 @@ class LabCustomSerializer(serializers.Serializer):
 class CommonTestSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='test.id')
     name = serializers.ReadOnlyField(source='test.name')
+    show_details = serializers.ReadOnlyField(source='test.show_details')
     icon = serializers.SerializerMethodField
 
     def get_icon(self, obj):
@@ -327,12 +328,13 @@ class CommonTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonTest
-        fields = ('id', 'name', 'icon')
+        fields = ('id', 'name', 'icon', 'show_details')
 
 
 class CommonPackageSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='package.id')
     name = serializers.ReadOnlyField(source='package.name')
+    show_details = serializers.ReadOnlyField(source='test.show_details')
     icon = serializers.SerializerMethodField()
 
     def get_icon(self, obj):
@@ -341,7 +343,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon')
+        fields = ('id', 'name', 'icon', 'show_details')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):

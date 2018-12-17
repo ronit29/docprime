@@ -699,6 +699,7 @@ class LabTest(TimeStampedModel, SearchKey):
     enable_for_ppc = models.BooleanField(default=False)
     enable_for_retail = models.BooleanField(default=False)
     about_test = models.TextField(blank=True, verbose_name='About the test')
+    show_details = models.BooleanField(default=False)
     preparations = models.TextField(blank=True, verbose_name='Preparations for the test')
     priority = models.PositiveIntegerField(default=0, null=True)
     hide_price = models.BooleanField(default=False)
@@ -987,7 +988,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
 
     def save(self, *args, **kwargs):
         database_instance = LabAppointment.objects.filter(pk=self.id).first()
-        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED):
+        if database_instance and (database_instance.status == self.COMPLETED or database_instance.status == self.CANCELLED) \
+                and (self.status != database_instance.status):
             raise Exception('Cancelled or Completed appointment cannot be saved')
 
         try:
@@ -995,16 +997,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                     (not database_instance or database_instance.status != self.status) and not self.outstanding):
                 out_obj = self.outstanding_create()
                 self.outstanding = out_obj
-        except:
-            pass
+        except Exception as e:
+            logger.error("Error while creating outstanding for lab- " + str(e))
 
         try:
             # while completing appointment, add a merchant_payout entry
-            if database_instance.status != self.status and self.status == self.COMPLETED:
+            if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
         except Exception as e:
-            pass
+            logger.error("Error while saving payout mercahnt for lab- " + str(e))
 
         push_to_matrix = kwargs.get('push_again_to_matrix', True)
         if 'push_again_to_matrix' in kwargs.keys():

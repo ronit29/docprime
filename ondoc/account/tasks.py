@@ -107,6 +107,9 @@ def set_order_dummy_transaction(self, order_id, user_id):
     from .models import Order, DummyTransactions
     from ondoc.account.models import User
     try:
+        if not settings.PAYOUTS_ENABLED:
+            return
+
         order_row = Order.objects.filter(id=order_id).first()
         user = User.objects.filter(id=user_id).first()
 
@@ -183,6 +186,9 @@ def process_payout(payout_id):
     from ondoc.api.v1.utils import create_payout_checksum
 
     try:
+        if not settings.PAYOUTS_ENABLED:
+            return
+
         if not payout_id:
             raise Exception("No payout specified")
 
