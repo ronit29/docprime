@@ -958,6 +958,8 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
             search_key = "".join(search_key.split("."))
             queryset = queryset.filter(
                 Q(test__search_key__istartswith=search_key) | Q(test__search_key__icontains=" "+search_key))
+        else:
+            queryset = queryset.order_by('-test__priority')
 
         # queryset = queryset[:20]
         paginated_queryset = paginate_queryset(queryset, request)
