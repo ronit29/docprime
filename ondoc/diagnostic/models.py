@@ -855,7 +855,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                                  (AUTO_CANCELLED, 'Auto Cancelled')]
 
     lab = models.ForeignKey(Lab, on_delete=models.SET_NULL, related_name='labappointment', null=True)
-    lab_test = models.ManyToManyField(AvailableLabTest)
+    lab_test = models.ManyToManyField(AvailableLabTest)  # Not to be used
     profile = models.ForeignKey(UserProfile, related_name="labappointments", on_delete=models.SET_NULL, null=True)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='lab_appointments')
     profile_detail = JSONField(blank=True, null=True)
@@ -885,6 +885,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
+    tests = models.ManyToManyField(LabTest, through='LabAppointmentTestMapping', through_fields=('appointment', 'test'))
 
     def get_reports(self):
         return self.reports.all()
@@ -1537,3 +1538,16 @@ class LabTestGroup(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'lab_test_group'
 
+
+class LabAppointmentTestMapping(models.Model):
+    appointment = models.ForeignKey(LabAppointment, on_delete=models.CASCADE, related_name='test_mappings')
+    test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='lab_appointment_mappings')
+    mrp = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    deal_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def __str__(self):
+        return '{}>{}'.format(self.appointment, self.test)
+
+    class Meta:
+        db_table = 'lab_appointment_test_mapping'
