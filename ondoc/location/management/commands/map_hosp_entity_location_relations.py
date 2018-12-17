@@ -7,9 +7,9 @@ def map_hosp_entity_location_relations():
     content_type = ContentType.objects.get(model='hospital')
     # if content_type:
     #     id = content_type.id
-    object_ids = Hospital.objects.filter(is_live=True).values_list('id', flat=True)
+    #object_ids = Hospital.objects.filter(is_live=True).values_list('id', flat=True)
 
-    is_bulk_created = EntityLocationRelationship.hosp_entity_loc_rel(content_type=content_type, object_ids=object_ids)
+    is_bulk_created = EntityLocationRelationship.hosp_entity_loc_rel(content_type=content_type)
 
     if is_bulk_created:
         print('success')

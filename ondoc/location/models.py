@@ -143,6 +143,7 @@ class EntityAddress(TimeStampedModel):
     no_of_childs = models.PositiveIntegerField(default=None, null=True)
     use_in_url = models.BooleanField(verbose_name='Use in URL', default=False)
     order = models.PositiveIntegerField(default=None, null=True)
+    search_slug = models.CharField(max_length=256, blank=True, null=True)
 
     @classmethod
     def unique_components(cls, components):
@@ -176,6 +177,24 @@ class EntityAddress(TimeStampedModel):
             use_in_url = False
 
         return use_in_url
+
+    @classmethod
+    def get_search_url_slug(cls, type, name, parent_entity=None):
+        if not type:
+            return False
+
+        text = None    
+
+        if type.startswith('LOCALITY'):
+            text = name
+        elif type.startswith('SUBLOCALITY') and parent_entity and parent_entity.type.startswith('LOCALITY'):
+            text = name+' '+parent_entity.alternative_value
+
+        if text:
+            return slugify(text)
+
+        return None
+
 
     @classmethod
     def create(cls, geocoding_obj, value):
@@ -255,17 +274,21 @@ class EntityAddress(TimeStampedModel):
                     #components.append(parent_entity.components)
                     components = components + parent_entity.components
 
-                print(components)
+                #print(components)
                 components = cls.unique_components(components)
                 address = ", ".join(components)
                 use_in_url = cls.use_address_in_url(selected_type, parent_entity)
-                print(use_in_url)
+                search_slug = None
+                if use_in_url:
+                    search_slug = cls.get_search_url_slug(selected_type, alternative_name, parent_entity)
+                #print(use_in_url)
 
                 entity_address = EntityAddress(type=selected_type, abs_centroid=point, postal_code=postal_code,
                                                    type_blueprint=type_blueprint, value=long_name, parent=parent_id,
                                                    alternative_value=alternative_name, geocoding=geocoding_obj,
                                                    order=order, use_in_url=use_in_url,
-                                                   address=address, components = components)
+                                                   address=address, components = components,
+                                                   search_slug = search_slug)
                 entity_address.save()
 
             parent_id = entity_address.id
@@ -338,9 +361,9 @@ class EntityLocationRelationship(TimeStampedModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
-    valid = models.BooleanField(default=True)
+    #valid = models.BooleanField(default=True)
     location = models.ForeignKey(EntityAddress, related_name='associated_relations', on_delete=models.CASCADE)
-    type = models.CharField(max_length=128, blank=False, null=False, choices=EntityAddress.AllowedKeys.as_choices())
+    type = models.CharField(max_length=128, blank=True, null=True, choices=EntityAddress.AllowedKeys.as_choices())
     entity_geo_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
 
     @classmethod
@@ -376,8 +399,9 @@ class EntityLocationRelationship(TimeStampedModel):
             entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type, object_id__in=object_ids)
             if entity_location_qs:
                 entity_location_qs.delete()
-            query = '''insert into entity_location_relations(object_id, location_id, content_type_id, type, entity_geo_location) 
-                        select l.id as object_id, ea.id as location_id, %s as content_type_id, type, l.location as entity_geo_location
+            query = '''insert into entity_location_relations(object_id, location_id, content_type_id, type, entity_geo_location, created_at, updated_at) 
+                        select l.id as object_id, ea.id as location_id, %s as content_type_id, type, l.location as entity_geo_location,
+                        now(), now()
                         from lab l
                         inner join geocoding_results gs on 
                         st_x(l.location::geometry)=gs.longitude and st_y(l.location::geometry)=gs.latitude
@@ -392,29 +416,30 @@ class EntityLocationRelationship(TimeStampedModel):
 
     @transaction.atomic
     def hosp_entity_loc_rel(**kwargs):
-        try:
-            content_type = kwargs.get('content_type')
-            if content_type:
-                content_type_id = content_type.id
-            else:
-                return False
-
-            object_ids = kwargs.get('object_ids')
-            entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type, object_id__in=object_ids)
-            if entity_location_qs:
-                entity_location_qs.delete()
-            query = '''insert into entity_location_relations(object_id, location_id, content_type_id, type, entity_geo_location) 
-                        select h.id as object_id, ea.id as location_id,
-                         %s as content_type_id, type, h.location as entity_geo_location
-                        from hospital h inner join geocoding_results gs on 
-                        st_x(h.location::geometry)=gs.longitude and st_y(h.location::geometry)=gs.latitude
-                         and h.is_live = True inner join entity_address ea on ea.geocoding_id = gs.id and use_in_url=true'''
-            results = RawSql(query, [content_type_id]).fetch_all()
-            #results = [EntityLocationRelationship(**result) for result in results]
-            #EntityLocationRelationship.objects.bulk_create(results)
-            return True
-        except Exception as e:
+        #try:
+        content_type = kwargs.get('content_type')
+        if content_type:
+            content_type_id = content_type.id
+        else:
             return False
+
+        #object_ids = kwargs.get('object_ids')
+        entity_location_qs = EntityLocationRelationship.objects.filter(content_type=content_type).delete()
+        # if entity_location_qs:
+        #     entity_location_qs.delete()
+        query = '''insert into entity_location_relations(object_id, location_id, content_type_id, type, entity_geo_location, created_at, updated_at) 
+                    select h.id as object_id, ea.id as location_id,
+                     %s as content_type_id, type, h.location as entity_geo_location, now(), now()
+                    from hospital h inner join geocoding_results gs on 
+                    st_x(h.location::geometry)::text=gs.longitude and st_y(h.location::geometry)::text=gs.latitude
+                     and h.is_live = True inner join entity_address ea on ea.geocoding_id = gs.id'''
+        results = RawSql(query, [content_type_id]).execute()
+        #results = [EntityLocationRelationship(**result) for result in results]
+        #EntityLocationRelationship.objects.bulk_create(results)
+        return True
+        # except Exception as e:
+        #     print(str(e))
+        #     return False
 
     class Meta:
         db_table = 'entity_location_relations'
