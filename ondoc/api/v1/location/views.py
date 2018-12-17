@@ -28,32 +28,36 @@ class Footer(object):
 
 class LabProfileFooter(Footer):
     def __init__(self, entity):
-        self.sublocality_id = None
-        self.locality_id = None
+        self.sublocality_id = int(entity.sublocatity_id)if entity.sublocatity_id else None
+        self.locality_id = int(entity.locality_id)
         self.sublocality = entity.sublocality_value
         self.locality = entity.locality_value
         self.sublocality_location = entity.sublocality_location
+        self.centroid = entity.location
 
-        location_id = int(entity.extras.get('location_id'))
-        address = EntityAddress.objects.filter(pk=location_id)
-        if address:
-            address = address[0]
 
-        if address:
-            self.centroid = address.centroid
 
-            if address.type_blueprint=='SUBLOCALITY':
-                self.sublocality_id = address.id
-                self.sublocality = address.alternative_value
-                address = EntityAddress.objects.filter(pk=address.parent)
-                if len(address)>0:
-                    address = address[0]
-                    self.locality_id = address.id
-                    self.locality= address.alternative_value
-
-            else:
-                self.locality_id = address.id
-                self.locality = address.alternative_value
+        # location_id = int(entity.extras.get('location_id'))
+        # address = EntityAddress.objects.filter(pk=location_id)
+        # if address:
+        #     address = address[0]
+        #
+        # if address:
+        #     self.centroid = address.centroid
+        #
+        #     if address.type_blueprint=='SUBLOCALITY':
+        #         self.sublocality_id = address.id
+        #         self.sublocality = address.alternative_value
+                # address = EntityAddress.objects.filter(pk=address.parent)
+                # if len(address)>0:
+                #     address = address[0]
+                #     self.locality_id = address.id
+                #     self.locality= address.alternative_value
+            #
+            #
+            # else:
+            #     self.locality_id = address.id
+            #     self.locality = address.alternative_value
 
     def get_footer(self):
         response = {}
@@ -395,31 +399,33 @@ class DoctorProfileFooter(Footer):
         #self.locality = entity.locality_value
         #self.centroid = entity.sublocality_location
         #self.sublocality_location = entity.sublocality_location
-        self.sublocality_id = None
-        self.locality_id = None
-        self.sublocality = None
-        self.locality = None
+        self.sublocality_id = int(entity.sublocatity_id )if entity.sublocatity_id else None
+        self.locality_id = int(entity.locality_id)
+        self.sublocality = entity.sublocatity_value
+        self.locality = entity.locality_value
         self.specialization_id = entity.specialization_id
         self.specialization = entity.specialization
-        location_id = int(entity.extras.get('location_id'))
-        address = EntityAddress.objects.filter(pk=location_id)
-        if address:
-            address = address[0]
+        self.centroid = entity.location
 
-        if address:
-            self.centroid = address.centroid
-
-            if address.type_blueprint=='SUBLOCALITY':
-                self.sublocality_id = address.id
-                self.sublocality = address.alternative_value
-                address = EntityAddress.objects.filter(pk=address.parent).first()
-                if address:
-                    self.locality_id = address.id
-                    self.locality= address.alternative_value
-
-            else:
-                self.locality_id = address.id
-                self.locality = address.alternative_value
+        # location_id = int(entity.extras.get('location_id'))
+        # address = EntityAddress.objects.filter(pk=location_id)
+        # if address:
+        #     address = address[0]
+        #
+        # if address:
+        #     self.centroid = address.centroid
+        #
+        #     if address.type_blueprint=='SUBLOCALITY':
+        #         self.sublocality_id = address.id
+        #         self.sublocality = address.alternative_value
+        #         address = EntityAddress.objects.filter(pk=address.parent).first()
+        #         if address:
+        #             self.locality_id = address.id
+        #             self.locality= address.alternative_value
+        #
+        #     else:
+        #         self.locality_id = address.id
+        #         self.locality = address.alternative_value
 
     def get_footer(self):
         response = {}

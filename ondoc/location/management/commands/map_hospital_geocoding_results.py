@@ -9,6 +9,7 @@ def map_hospital_geocoding_results():
 
     for hospital in all_hospitals:
         if hospital.location:
+
             print(GeocodingResults.get_or_create(latitude=hospital.location.y, longitude=hospital.location.x, content_object=hospital), 'hospital_id: ', hospital.id)
 
 

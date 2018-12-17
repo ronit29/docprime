@@ -187,8 +187,9 @@ class EntityAddress(TimeStampedModel):
 
         if type.startswith('LOCALITY'):
             text = name
-        elif type.startswith('SUBLOCALITY') and parent_entity and parent_entity.type.startswith('LOCALITY'):
-            text = name+' '+parent_entity.alternative_value
+        elif type and parent_entity and parent_entity.type:
+            if type.startswith('SUBLOCALITY') and parent_entity and parent_entity.type.startswith('LOCALITY'):
+                text = name+' '+parent_entity.alternative_value
 
         if text:
             return slugify(text)
@@ -270,7 +271,7 @@ class EntityAddress(TimeStampedModel):
                 #address = alternative_name
                 components = [alternative_name]
 
-                if parent_entity:
+                if parent_entity and parent_entity.components:
                     #components.append(parent_entity.components)
                     components = components + parent_entity.components
 
