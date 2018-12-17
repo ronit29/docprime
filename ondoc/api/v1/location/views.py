@@ -28,7 +28,7 @@ class Footer(object):
 
 class LabProfileFooter(Footer):
     def __init__(self, entity):
-        self.sublocality_id = int(entity.sublocatity_id)if entity.sublocatity_id else None
+        self.sublocality_id = int(entity.sublocality_id)if entity.sublocality_id else None
         self.locality_id = int(entity.locality_id)
         self.sublocality = entity.sublocality_value
         self.locality = entity.locality_value
@@ -399,9 +399,9 @@ class DoctorProfileFooter(Footer):
         #self.locality = entity.locality_value
         #self.centroid = entity.sublocality_location
         #self.sublocality_location = entity.sublocality_location
-        self.sublocality_id = int(entity.sublocatity_id )if entity.sublocatity_id else None
+        self.sublocality_id = int(entity.sublocality_id )if entity.sublocality_id else None
         self.locality_id = int(entity.locality_id)
-        self.sublocality = entity.sublocatity_value
+        self.sublocality = entity.sublocality_value
         self.locality = entity.locality_value
         self.specialization_id = entity.specialization_id
         self.specialization = entity.specialization
