@@ -80,7 +80,7 @@ class MemberListSerializer(serializers.Serializer):
                                                                     insurance_plan).first()
             dob_flag, message = insurance_threshold.age_validate(attrs)
             if not dob_flag:
-                raise serializers.ValidationError({'dob': message.get('message'), 'user_form_id': attrs.get('user_form_id')})
+                raise serializers.ValidationError({'dob': message.get('message')})
         return attrs
 
 
