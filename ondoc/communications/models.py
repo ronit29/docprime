@@ -1,5 +1,6 @@
 import copy
 import json
+import random
 from collections import defaultdict
 from itertools import groupby
 
@@ -316,7 +317,8 @@ class EMAILNotification:
                                                              product_id=Order.DOCTOR_PRODUCT_ID)
             context.update({"invoice": invoice})
             html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}.pdf".format(str(timezone.now().timestamp()))
+            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+                                                  random.randint(1111111111, 9999999999))
             try:
                 pdf_file = HTML(string=html_body).write_pdf()
                 invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
@@ -359,7 +361,8 @@ class EMAILNotification:
                                                              product_id=Order.LAB_PRODUCT_ID)
             context.update({"invoice": invoice})
             html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}.pdf".format(str(timezone.now().timestamp()))
+            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+                                                  random.randint(1111111111, 9999999999))
             try:
                 pdf_file = HTML(string=html_body).write_pdf()
                 invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
