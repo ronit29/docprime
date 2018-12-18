@@ -23,6 +23,13 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
 
         hospital = data.get('hospital')
         spoc_details = hospital.spoc_details.all()
+
+        request_data = {
+            "ExpirationDate": int((timezone.now() + timezone.timedelta(days=2)).timestamp()),
+            "FromNumber": data.get('mobile') if str(data.get('mobile')).startswith('0') else "0%d" % data.get('mobile')
+        }
+
+
         if hospital and hospital.is_live and len(spoc_details)>0:
             for type in [auth_models.SPOCDetails.SPOC, auth_models.SPOCDetails.MANAGER, auth_models.SPOCDetails.OTHER, auth_models.SPOCDetails.OWNER]:
                 for spoc in spoc_details:
@@ -33,7 +40,13 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
                         else:
                             final = '0' + str(spoc.number).lstrip('0')
                         if final:
-                            return Response({'status': 1, 'number': final}, status.HTTP_200_OK)
+                            request_data["ToNumber"] = final if final.startswith('0') else "0%s" % final
+
+                            request_response_data = self.get_masked_number(request_data)
+                            if not request_response_data:
+                                return Response({'status': 0, 'message': 'No Contact Number found'},
+                                                status.HTTP_404_NOT_FOUND)
+                            return Response({'status': 1, 'number': request_response_data}, status.HTTP_200_OK)
 
         doctor_details = doctor_model.DoctorMobile.objects.filter(doctor=doctor_obj).values('is_primary','number','std_code').order_by('-is_primary').first()
 
@@ -44,11 +57,7 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
         if doctor_details.get('std_code'):
             final = '0'+str(doctor_details.get('std_code')).lstrip('0')+str(doctor_details.get('number')).lstrip('0')
 
-        request_data = {
-            "ExpirationDate": int((timezone.now() + timezone.timedelta(days=2)).timestamp()),
-            "FromNumber": data.get('mobile') if str(data.get('mobile')).startswith('0') else "0%d" % data.get('mobile'),
-            "ToNumber": final if final.startswith('0') else "0%s" % final
-        }
+        request_data["ToNumber"] = final if final.startswith('0') else "0%s" % final
 
         request_response_data = self.get_masked_number(request_data)
         if not request_response_data:
