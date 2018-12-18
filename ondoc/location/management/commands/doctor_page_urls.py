@@ -27,11 +27,11 @@ def doctor_page_urls():
 
     doc_obj =Doctor.objects.prefetch_related('doctorpracticespecializations', 'doctorpracticespecializations__specialization',
                                         (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))
-                                         ).filter(is_live=True, is_test_doctor=False)
+                                         ).filter(is_live=True, is_test_doctor=False).order_by('id')[:100]
 
     for doctor in doc_obj:
         try:
-            print(DoctorPageURL.create_doctor_page_urls(doctor,sequence))
+            status = DoctorPageURL.create_doctor_page_urls(doctor,sequence)
         except Exception as e:
             print("failure: " + str(doctor.id) + ", error: " + str(e))
 

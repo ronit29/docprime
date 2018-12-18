@@ -711,9 +711,9 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                 hosp_entity_relation = hospital.hospital.entity.all().prefetch_related('location')
                 for entity_relation in hosp_entity_relation:
                     entity_address = entity_relation.location
-                    if entity_address.type == 'LOCALITY':
+                    if entity_address.type == 'LOCALITY' and entity_address.use_in_url:
                         locality = entity_address.alternative_value
-                    if entity_address.type == 'SUBLOCALITY':
+                    if entity_address.type == 'SUBLOCALITY' and entity_address.use_in_url:
                         sublocality = entity_address.alternative_value
 
         if len(obj.doctorpracticespecializations.all())>0:
