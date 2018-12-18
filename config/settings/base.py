@@ -106,7 +106,8 @@ THIRD_PARTY_APPS = (
     'anymail',
     'nested_admin',
     'ipware',
-    'django_user_agents'
+    'django_user_agents',
+    'ddtrace.contrib.django',
 )
 
 LOCAL_APPS = (
@@ -315,6 +316,7 @@ PG_DUMMY_TRANSACTION_URL = env('PG_DUMMY_TRANSACTION_URL')
 PG_DUMMY_TRANSACTION_TOKEN = env('PG_DUMMY_TRANSACTION_TOKEN')
 PG_REFUND_STATUS_API_URL = env('PG_REFUND_STATUS_API_URL')
 PG_SETTLEMENT_URL = env('PG_SETTLEMENT_URL')
+PAYOUTS_ENABLED = env('PAYOUTS_ENABLED')
 PG_REFUND_STATUS_POLL_TIME = 60  # In min
 REFUND_INACTIVE_TIME = 24  # In hours
 AUTO_CANCEL_OPD_DELAY = 3000  # In min

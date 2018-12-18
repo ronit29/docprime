@@ -154,8 +154,8 @@ class Order(TimeStampedModel):
                 }
 
         # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
-        if not self.txn.first():
-            set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5)
+        # if not self.txn.first():
+        #     set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5)
 
         if order_dict:
             self.update_order(order_dict)

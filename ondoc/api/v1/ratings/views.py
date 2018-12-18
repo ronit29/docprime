@@ -1,5 +1,6 @@
 from ondoc.diagnostic import models as lab_models
 from ondoc.ratings_review import models
+from django.db import transaction
 from ondoc.ratings_review.models import (RatingsReview, ReviewCompliments)
 from django.shortcuts import get_object_or_404
 from ondoc.doctor import models as doc_models
@@ -44,6 +45,7 @@ class RatingsViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
 
         resp={}
+        rating_review = None
         content_obj= None
         content_data = None
 
@@ -57,22 +59,24 @@ class RatingsViewSet(viewsets.GenericViewSet):
                 content_obj = content_data.lab
         if content_obj:
             try:
-                rating_review = RatingsReview(user=request.user, ratings=valid_data.get('rating'),
-                                              appointment_type=valid_data.get('appointment_type'),
-                                              appointment_id=valid_data.get('appointment_id'),
-                                              review=valid_data.get('review'),
-                                              content_object=content_obj)
-                rating_review.save()
-                content_data.is_rated = True
-                content_data.save()
+                with transaction.atomic():
+                    rating_review = RatingsReview(user=request.user, ratings=valid_data.get('rating'),
+                                                  appointment_type=valid_data.get('appointment_type'),
+                                                  appointment_id=valid_data.get('appointment_id'),
+                                                  # review=valid_data.get('review'),
+                                                  content_object=content_obj)
+                    rating_review.save()
+                    content_data.is_rated = True
+                    content_data.save()
 
-                if valid_data.get('compliment'):
-                    rating_review.compliment.add(*valid_data.get('compliment'))
+                # if valid_data.get('compliment'):
+                #     rating_review.compliment.add(*valid_data.get('compliment'))
             except Exception as e:
-                resp['error'] = e
+                return Response({'error': 'Something Went Wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'status': 'success', 'id': rating_review.id if rating_review else None})
         else:
             return Response({'error': 'Object Not Found'}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'status': 'success', 'id': rating_review.id if rating_review else None})
+
 
     def list(self, request):
         serializer = serializers.RatingListBodySerializerdata(data=request.query_params)

@@ -1,6 +1,6 @@
 from django.contrib.gis.db import models
 from django.db import migrations, transaction
-from django.db.models import Count, Sum, When, Case, Q, F
+from django.db.models import Count, Sum, When, Case, Q, F, Avg
 from django.contrib.postgres.operations import CreateExtension
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.postgres.fields import JSONField, ArrayField
@@ -195,7 +195,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def get_short_address(self):
         address_items = [value for value in
-                         [self.sublocality, self.locality] if value]
+                         [self.locality, self.city] if value]
         return ", ".join(address_items)
 
     def update_live_status(self):
@@ -211,10 +211,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def save(self, *args, **kwargs):
         self.update_live_status()
-        build_url = True
-        if self.is_live and self.id and self.location:
-            if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
-                build_url = False
+        # build_url = True
+        # if self.is_live and self.id and self.location:
+        #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
+        #         build_url = False
 
         super(Hospital, self).save(*args, **kwargs)
 
@@ -225,8 +225,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
 
-        if build_url and self.location and self.is_live:
-            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+        # if build_url and self.location and self.is_live:
+        #     ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
 
 class HospitalAward(auth_model.TimeStampedModel):
@@ -398,6 +398,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey):
 
     def get_ratings(self):
          return self.rating.all()
+
+    def get_avg_rating(self):
+        return self.rating.all().aggregate(avg_rating=Avg('ratings'))
 
     def get_rating_count(self):
         count = 0
@@ -1287,7 +1290,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         try:
             # while completing appointment, add a merchant_payout entry
-            if database_instance.status != self.status and self.status == self.COMPLETED:
+            if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
         except Exception as e:

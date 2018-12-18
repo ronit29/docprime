@@ -31,3 +31,5 @@ openpyxl==2.5.6
 django-user-agents==0.3.2
 pymongo==3.7.2
 django-hardcopy
+ddtrace
+setproctitle

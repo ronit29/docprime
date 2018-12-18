@@ -10,7 +10,7 @@ from ondoc.api.v1.utils import RawSql
 def map_hospital_locations():
     content_type = ContentType.objects.get(model='hospital')
     if content_type:
-        query = '''select distinct(h.id) from hospital h inner join entity_location_relations elr on h.id = elr.object_id 
+        query = '''select distinct(h.id) from hospital h left join entity_location_relations elr on h.id = elr.object_id 
         and elr.content_type_id=%s and h.is_live=True and (ST_Distance(h.location, elr.entity_geo_location)>0 
         or elr.entity_geo_location is null) order by h.id'''
         result = RawSql(query, [content_type.id]).fetch_all()
