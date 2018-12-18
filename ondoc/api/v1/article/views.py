@@ -47,7 +47,7 @@ class TopArticleCategoryViewSet(viewsets.GenericViewSet):
 class ArticleViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
-        return article_models.Article.objects.prefetch_related('category').filter(is_published=True)
+        return article_models.Article.objects.prefetch_related('category', 'author').filter(is_published=True)
 
     @transaction.non_atomic_requests
     def list(self, request):
@@ -105,15 +105,3 @@ class ArticleViewSet(viewsets.GenericViewSet):
             return Response(response)
         else:
             return Response({"error": "Not Found"}, status=status.HTTP_404_NOT_FOUND)
-        # query = '''select ac.name as content_box_name, la.title as linked_article_title,
-        #             lu.url as linked_url_url, lu.title as linked_url_title
-        #             from article_content_box ac
-        #             inner join linked_articles la on ac.id = la.content_box_id
-        #             left join article_linked_urls lu on ac.id = lu.content_box_id and lu.article_id = la.article_id
-        #             order by rank'''
-        # all_results = RawSql(query).fetch_all()
-        # final_response = defaultdict(list)
-        # for result in all_results:
-        #     key = result.pop('content_box_name')
-        #     final_response[key].append(result)
-        # return Response(final_response)

@@ -28,6 +28,8 @@ class TrackingVisit(auth_models.TimeStampedModel):
     ip_address = models.CharField(max_length=64, blank=True, null=True)
     visitor = models.ForeignKey(TrackingVisitor, on_delete=models.CASCADE)
     data = JSONField(blank=True, null=True)
+    location = JSONField(blank=True, null=True)
+    user_agent = models.CharField(max_length=500, blank=True, null=True)
 
     def __str__(self):
         return '{}'.format(self.visitor)

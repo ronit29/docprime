@@ -3,6 +3,8 @@ from django.utils.safestring import mark_safe
 from ondoc.authentication.models import TimeStampedModel, CreatedByModel, Image
 import datetime
 
+from ondoc.doctor.models import Doctor
+
 
 class ArticleCategory(TimeStampedModel):
 
@@ -36,6 +38,7 @@ class Article(TimeStampedModel, CreatedByModel):
     description = models.CharField(max_length=500, blank=True, null=True)
     keywords = models.CharField(max_length=256, blank=True, null=True)
     author_name = models.CharField(max_length=256, null=True, blank=True)
+    author = models.ForeignKey(Doctor, null=True, blank=True, related_name='published_articles', on_delete=models.SET_NULL)
     published_date = models.DateField(default=datetime.date.today)
     linked_articles = models.ManyToManyField('self', symmetrical=False, through='LinkedArticle',
                                              through_fields=('article', 'linked_article'))
