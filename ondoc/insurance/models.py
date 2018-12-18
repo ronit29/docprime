@@ -299,6 +299,32 @@ class UserInsurance(auth_model.TimeStampedModel):
         else:
             return False
 
+    def is_lab_appointment_count_valid(self, appointment_data):
+        from ondoc.diagnostic.models import LabAppointment
+        start_time = appointment_data['time_slot_start'] - timedelta(days=30)
+        end_time = appointment_data['time_slot_start']
+        threshold = self.insurance_plan.threshold.filter().first()
+        lab_appointment_count = LabAppointment.objects.filter(lab=appointment_data['lab'],
+                                                              time_slot_start__range=(start_time, end_time),
+                                                              user_id=self.user_id).count()
+        if lab_appointment_count >= threshold.lab_count_limit:
+            return False
+        else:
+            return True
+
+    def is_opd_appointment_count_valid(self, appointment_data):
+        from ondoc.doctor.models import OpdAppointment
+        start_time = appointment_data['time_slot_start'] - timedelta(days=30)
+        end_time = appointment_data['time_slot_start']
+        threshold = self.insurance_plan.threshold.filter().first()
+        opd_appointment_count = OpdAppointment.objects.filter(doctor=appointment_data['doctor'],
+                                                              time_slot_start__range=(start_time, end_time),
+                                                              user_id=self.user_id).count()
+        if opd_appointment_count >= threshold.opd_count_limit:
+            return False
+        else:
+            return True
+
     @classmethod
     def profile_create_or_update(cls, member, user):
         profile = {}
@@ -355,6 +381,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     @classmethod
     def validate_insurance(self, appointment_data):
         from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
         profile = appointment_data['profile']
         user = appointment_data['user']
         is_lab_insured = False
@@ -377,6 +404,8 @@ class UserInsurance(auth_model.TimeStampedModel):
             return False, user_insurance.id, 'Threshold Amount Not define for plan'
 
         if not 'doctor' in appointment_data:
+            if not user_insurance.is_lab_appointment_count_valid(appointment_data):
+                return False, user_insurance.id, 'Not Covered under Insurance'
             if appointment_data['extra_details']:
                 for detail in appointment_data['extra_details']:
                     if int(float(detail['mrp'])) <= threshold_lab:
@@ -390,12 +419,15 @@ class UserInsurance(auth_model.TimeStampedModel):
                     return False, user_insurance.id, 'Not Covered under Insurance'
             else:
                 return False, user_insurance.id, 'Not Covered under Insurance'
+
         else:
             if appointment_data['extra_details']:
                 for detail in appointment_data:
                     if detail['procedure_id']:
                         return False, user_insurance.id, 'Procedure Not covered under insurance'
             if not int(appointment_data['mrp']) <= threshold_opd:
+                return False, user_insurance.id, "Not Covered Under Insurance"
+            if not user_insurance.is_opd_appointment_count_valid(appointment_data):
                 return False, user_insurance.id, "Not Covered Under Insurance"
 
         doctor = DoctorPracticeSpecialization.objects.filter(doctor_id=appointment_data['doctor']).values('specialization_id')
