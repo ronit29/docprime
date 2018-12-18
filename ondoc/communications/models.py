@@ -401,8 +401,8 @@ class EMAILNotification:
             # except Exception as e:
             #     logger.error("Got error while creating pdf for lab invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
-            body_template = "email/lab/lab_invoice/body.html"
-            subject_template = "email/lab/lab_invoice/subject.txt"
+            body_template = "email/lab_invoice/body.html"
+            subject_template = "email/lab_invoice/subject.txt"
 
         return subject_template, body_template
 
