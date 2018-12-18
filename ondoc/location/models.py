@@ -625,8 +625,7 @@ class EntityUrls(TimeStampedModel):
 
     def create_doctor_search_entity_urls():
 
-        update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
-                        in ('DOCTORS_LOCALITY_CITY', 'DOCTORS_CITY')'''
+
 
         query = '''insert into entity_urls(sequence,extras, sitemap_identifier, url, count, entity_type, 
                          url_type,  created_at, 
@@ -640,21 +639,30 @@ class EntityUrls(TimeStampedModel):
                           locality_id, sublocality_id, locality_value,sublocality_value, True as is_valid
                          from seo_doctor_search_urls
                          '''
+
         update_locality_loc_query = '''update entity_urls set locality_location = st_setsrid(st_point(locality_longitude, locality_latitude),4326)::geography where 
                          locality_latitude is not null and locality_longitude is not null
                          and sitemap_identifier 
                         in ('DOCTORS_LOCALITY_CITY', 'DOCTORS_CITY') and is_valid = true'''
+
         update_sublocality_loc_query = '''update entity_urls set sublocality_location = st_setsrid(st_point(sublocality_longitude, sublocality_latitude),4326)::geography where 
                          sublocality_latitude is not null and sublocality_longitude is not null and 
                          sitemap_identifier in ('DOCTORS_LOCALITY_CITY', 'DOCTORS_CITY') and is_valid = true'''
 
+        sequence_query = '''select sequence from seo_doctor_search_urls limit 1 '''
+
+        sequence = RawSql(sequence_query, []).fetch_all()
+
+        update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
+                           in ('DOCTORS_LOCALITY_CITY', 'DOCTORS_CITY') and sequence<= %d''' %sequence[0].get('sequence')
+
         from django.db import connection
         with connection.cursor() as cursor:
             try:
-                cursor.execute(update_query)
                 cursor.execute(query)
                 cursor.execute(update_locality_loc_query)
                 cursor.execute(update_sublocality_loc_query)
+                cursor.execute(update_query)
             except Exception as e:
                 print(str(e))
                 return False
@@ -1590,14 +1598,13 @@ class LabPageUrl(object):
                             locality_longitude = locality.centroid.x
                             locality_latitude = locality.centroid.y
                 if lab:
-                    if not locality and not sublocality:
-                        return  ("failure: " + str(lab.id))
+
                     if locality and sublocality:
                         url = lab.name + "-in-%s-%s" % (sublocality_value, locality_value)
                     # elif locality:
                     #     url = lab.name + "-in-%s" % locality_value
-                    # else:
-                    #     url = url + "-lpp"
+                    else:
+                       url = lab.name
 
                     url = slugify(url)
 
