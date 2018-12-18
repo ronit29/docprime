@@ -45,7 +45,7 @@ def unique_phone_numbers(list_):
 
     for item in list_:
         if item.get('phone_number', None) and item.get('user', None):
-            temp.add((item.get('user'), item.get('phone_number').strip().lower()))
+            temp.add((item.get('user'), str(item.get('phone_number')).strip().lower()))
 
     return [{'user': item[0], 'phone_number': item[1]} for item in temp]
 
