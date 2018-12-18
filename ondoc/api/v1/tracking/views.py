@@ -36,7 +36,7 @@ class EventCreateViewSet(GenericViewSet):
                 except Exception as e:
                     resp['error'] = "Error Processing Event Data!"
 
-                if event_name=='utm-events':
+                if event_name == 'utm-events':
                     visit = track_models.TrackingVisit.objects.get(pk=visit_id)
                     if not visit.data:
                         ud = {}
@@ -48,7 +48,7 @@ class EventCreateViewSet(GenericViewSet):
                         ud['referrer'] = data.get('referrer')
                         visit.data = ud
                         visit.save()
-                elif event_name=='visitor-info':
+                elif event_name == 'visitor-info':
                     visitor = track_models.TrackingVisitor.objects.get(pk=visitor_id)
                     if not visitor.device_info:
                         ud = {}
@@ -57,6 +57,12 @@ class EventCreateViewSet(GenericViewSet):
                         ud['platform'] = data.get('platform')
                         visitor.device_info = ud
                         visitor.save()
+                elif event_name == "change-location":
+                    visit = track_models.TrackingVisit.objects.get(pk=visit_id)
+                    if not visit.location:
+                        visit.location = data.get('location', {})
+                        visit.user_agent = data.get('userAgent', "")
+                        visit.save()
 
             else:
                 resp['error'] = "Event name not Found!"
@@ -119,7 +125,6 @@ class EventCreateViewSet(GenericViewSet):
             visit_id = visit.id
 
         return (visitor_id, visit_id)
-
 
     def get_cookie(self, visitor_id, visit_id):
 

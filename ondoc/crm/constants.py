@@ -20,5 +20,6 @@ constants = {
     'ELASTIC_TEAM': 'elastic_team',
     'PROCEDURE_TEAM': 'procedure_team',
     'COUPON_MANAGEMENT_GROUP': 'coupon_group',
-    'LAB_TEST_TEAM' : 'lab_test_team'
+    'LAB_TEST_TEAM' : 'lab_test_team',
+    'MERCHANT_TEAM': 'merchant_team'
 }

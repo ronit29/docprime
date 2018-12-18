@@ -43,6 +43,11 @@ class DoctorSearchHelper:
         procedure_ids = self.query_params.get("procedure_ids", [])  # NEW_LOGIC
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
 
+        if self.query_params.get('hospital_id') is not None:
+            filtering_params.append(
+                "hospital_id=(%(hospital_id)s)")
+            params['hospital_id'] = str(self.query_params.get("hospital_id"))
+
         if len(condition_ids)>0:
             cs = list(models.MedicalConditionSpecialization.objects.filter(medical_condition_id__in=condition_ids).values_list('specialization_id', flat=True));
             cs = [str(i) for i in cs]
@@ -358,7 +363,7 @@ class DoctorSearchHelper:
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         for doctor in doctor_data:
 
-            is_gold = doctor.enabled_for_online_booking and doctor.is_gold
+            is_gold = False #doctor.enabled_for_online_booking and doctor.is_gold
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]

@@ -320,8 +320,10 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             except:
                 return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            return Response({'age': {'code': 'required', 'message': 'This field is required.'}},
-                            status=status.HTTP_400_BAD_REQUEST)
+            # return Response({'age': {'code': 'required', 'message': 'This field is required.'}},
+            #                 status=status.HTTP_400_BAD_REQUEST)
+            data['dob'] = None
+
 
         if not data.get('phone_number'):
             data['phone_number'] = request.user.phone_number

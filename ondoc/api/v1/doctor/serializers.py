@@ -688,6 +688,7 @@ class DoctorListSerializer(serializers.Serializer):
     max_distance = serializers.IntegerField(required=False, allow_null=True)
     min_distance = serializers.IntegerField(required=False, allow_null=True)
     is_insurance = serializers.BooleanField(required=False)
+    hospital_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate_procedure_ids(self, attrs):
         try:
@@ -816,7 +817,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         return False
 
     def get_is_gold(self, obj):
-        return obj.is_gold and obj.enabled_for_online_booking
+        return False #obj.is_gold and obj.enabled_for_online_booking
 
     def get_rating(self, obj):
         app = OpdAppointment.objects.select_related('profile').all()
@@ -1313,6 +1314,12 @@ class AdminDeleteBodySerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000, max_value=9999999999)
     entity_type = serializers.ChoiceField(choices=GenericAdminEntity.EntityChoices)
     id = serializers.IntegerField()
+
+
+class HospitalCardSerializer(serializers.Serializer):
+
+    latitude = serializers.FloatField()
+    longitude = serializers.FloatField()
 
 
 class DoctorDetailsRequestSerializer(serializers.Serializer):

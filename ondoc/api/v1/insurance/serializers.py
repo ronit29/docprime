@@ -27,7 +27,7 @@ class InsurancePlansSerializer(serializers.ModelSerializer):
 
     def get_content(self, obj):
         resp = defaultdict(list)
-        qs = obj.content.all().values('title', 'content')
+        qs = obj.content.all().order_by('id').values('title', 'content')
         for e in qs:
             resp[e['title'].lower()].append(e['content'])
         return resp
@@ -70,7 +70,6 @@ class MemberListSerializer(serializers.Serializer):
     town = serializers.CharField(max_length=100)
     district = serializers.CharField(max_length=100)
     state = serializers.CharField(max_length=100)
-    user_form_id = serializers.IntegerField()
 
     def validate(self, attrs):
         request = self.context.get("request")

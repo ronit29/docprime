@@ -3,9 +3,11 @@ from django import forms
 from rest_framework import serializers
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance
-from import_export.admin import ImportExportMixin, ImportExportModelAdmin
+from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
+from datetime import datetime
+from ondoc.insurance.models import InsuranceDisease
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -56,14 +58,28 @@ class InsuredMemberResource(resources.ModelResource):
     policy_number = fields.Field()
     insurance_plan = fields.Field()
     premium_amount = fields.Field()
+    nominee_name = fields.Field()
+    nominee_address = fields.Field()
+    sum_insured = fields.Field()
+    age = fields.Field()
+    account_holder_name = fields.Field()
+    account_number = fields.Field()
+    ifsc = fields.Field()
+    aadhar_number = fields.Field()
+    diabetes = fields.Field()
+    heart_diseases = fields.Field()
+    cancer = fields.Field()
+    pregnancy = fields.Field()
+    customer_consent_recieved = fields.Field()
 
-    def export(self, queryset=None):
-        queryset = self.get_queryset()
+    def export(self, queryset=None, *args, **kwargs):
+        queryset = self.get_queryset(**kwargs)
         fetched_queryset = list(queryset)
         return super().export(fetched_queryset)
 
-    def get_queryset(self):
-        return InsuredMembers.objects.all().prefetch_related('user_insurance')
+    def get_queryset(self, **kwargs):
+        date_range = [datetime.strptime(kwargs.get('from_date'), '%d-%m-%Y').date(), datetime.strptime(kwargs.get('to_date'), '%d-%m-%Y').date()]
+        return InsuredMembers.objects.filter(created_at__date__range=date_range).prefetch_related('user_insurance')
 
     class Meta:
         model = InsuredMembers
@@ -87,11 +103,79 @@ class InsuredMemberResource(resources.ModelResource):
     def dehydrate_premium_amount(self, insured_members):
         return insured_members.user_insurance.insurance_plan.amount
 
+    def dehydrate_nominee_name(self, insured_members):
+        return "legal heir"
+
+    def dehydrate_nominee_address(self, insured_members):
+        return ""
+
+    def dehydrate_sum_insured(self, insured_members):
+        return ""
+
+    def dehydrate_age(self, insured_members):
+        return int((datetime.now().date() - insured_members.dob).days/365)
+
+    def dehydrate_account_holder_name(self, insured_members):
+        return ""
+
+    def dehydrate_account_number(self, insured_members):
+        return ""
+
+    def dehydrate_ifsc(self, insured_members):
+        return ""
+
+    def dehydrate_aadhar_number(self, insured_members):
+        return ""
+
+    def dehydrate_diabetes(self, insured_members):
+        diseases = InsuranceDisease.objects.filter(disease__iexact='diabetes').first()
+        if diseases:
+            return str(diseases.affected_members.filter(member=insured_members).exists())
+        return "False"
+
+    def dehydrate_heart_diseases(self, insured_members):
+        diseases = InsuranceDisease.objects.filter(disease__iexact='Heart Disease').first()
+        if diseases:
+            return str(diseases.affected_members.filter(member=insured_members).exists())
+        return "False"
+
+    def dehydrate_cancer(self, insured_members):
+        diseases = InsuranceDisease.objects.filter(disease__iexact='Cancer').first()
+        if diseases:
+            return str(diseases.affected_members.filter(member=insured_members).exists())
+        return "False"
+
+    def dehydrate_pregnancy(self, insured_members):
+        diseases = InsuranceDisease.objects.filter(disease__iexact='Pregnancy').first()
+        if diseases:
+            return str(diseases.affected_members.filter(member=insured_members).exists())
+        return "False"
+
+    def dehydrate_customer_consent_recieved(self, insured_members):
+        return ""
+
 
 class InsuredMembersAdmin(ImportExportMixin, nested_admin.NestedModelAdmin):
     resource_class = InsuredMemberResource
+    export_template_name = "export_template_name.html"
+    formats = (base_formats.XLS,)
     list_display = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number']
     readonly_fields = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number', 'relation', 'profile']
+
+    def get_export_queryset(self, request):
+        super().get_export_queryset(request)
+
+    def get_export_data(self, file_format, queryset, *args, **kwargs):
+        """
+        Returns file_format representation for given queryset.
+        """
+        kwargs['from_date'] = kwargs.get('request').POST.get('from_date')
+        kwargs['to_date'] = kwargs.get('request').POST.get('to_date')
+        request = kwargs.pop("request")
+        resource_class = self.get_export_resource_class()
+        data = resource_class(**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
+        export_data = file_format.export_data(data)
+        return export_data
 
     def has_add_permission(self, request, obj=None):
         return False
