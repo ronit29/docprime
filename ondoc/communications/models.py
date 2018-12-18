@@ -29,30 +29,24 @@ logger = logging.getLogger(__name__)
 
 def unique_emails(list_):
     """Function accepts list of dictionaries and returns list of unique dictionaries"""
-    temp = defaultdict(list)
+    temp = set()
+
     for item in list_:
         if item.get('email', None) and item.get('user', None):
-            temp[item.get('email').strip().lower()].append(item.get('user'))
+            temp.add((item.get('user'), item.get('email').strip().lower()))
 
-    final_result = []
-    for key, value in temp.items():
-        final_result.append({'user': value[0], 'email': key})
-
-    return final_result
+    return [{'user': item[0], 'email': item[1]} for item in temp]
 
 
 def unique_phone_numbers(list_):
     """Function accepts list of dictionaries and returns list of unique dictionaries"""
-    temp = defaultdict(list)
+    temp = set()
+
     for item in list_:
         if item.get('phone_number', None) and item.get('user', None):
-            temp[item.get('phone_number')].append(item.get('user'))
+            temp.add((item.get('user'), item.get('phone_number').strip().lower()))
 
-    final_result = []
-    for key, value in temp.items():
-        final_result.append({'user': value[0], 'phone_number': key})
-
-    return final_result
+    return [{'user': item[0], 'phone_number': item[1]} for item in temp]
 
 
 def get_title_body(notification_type, context, user):
@@ -503,7 +497,7 @@ class OpdNotification(Notification):
         if notification_type:
             self.notification_type = notification_type
         else:
-            self.notification_type = Notification.OPD_NOTIFICATION_TYPE_MAPPING[appointment.status]
+            self.notification_type = self.OPD_NOTIFICATION_TYPE_MAPPING[appointment.status]
 
     def get_context(self):
         patient_name = self.appointment.profile.name if self.appointment.profile.name else ""
@@ -605,14 +599,14 @@ class OpdNotification(Notification):
         return all_receivers
 
 
-class LabNotification:
+class LabNotification(Notification):
 
     def __init__(self, appointment, notification_type=None):
         self.appointment = appointment
         if notification_type:
             self.notification_type = notification_type
         else:
-            self.notification_type = Notification.LAB_NOTIFICATION_TYPE_MAPPING[appointment.status]
+            self.notification_type = self.LAB_NOTIFICATION_TYPE_MAPPING[appointment.status]
 
     def get_context(self):
         instance = self.appointment
