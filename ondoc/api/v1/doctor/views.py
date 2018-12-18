@@ -1825,7 +1825,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                               Q(hospital__isnull=False,
                                                                 hospital=valid_data.get('hospital_id'))
                                                             )
-        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital').distinct()
+        if valid_data.get('updated_at'):
+            queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
+        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'updated_at').distinct()
         return Response(queryset)
 
     @transaction.atomic
@@ -1834,34 +1836,49 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         patient = None
-        sms_list = None
-        appntment_list = []
+        sms_list = []
         resp = []
+        clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in models.DoctorClinic.objects.all()]
+        pem_queryset = [(ga.doctor.id if ga.doctor else None, ga.hospital.id if ga.hospital else None) for ga in auth_models.GenericAdmin.objects.filter(is_disabled=False, user=request.user).all()]
+        doc_pem_list, hosp_pem_list = map(list, zip(*pem_queryset))
+
         for data in valid_data.get('data'):
+            if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
+                data['error'] = True
+                data['error_message'] = 'User forbidden to create Appointment with selected doctor or hospital!'
+            if (data.get('doctor').id, data.get('hospital').id) not in clinic_queryset:
+                data['error'] = True
+                data['error_message'] = 'Doctor is not associated with given hospital!'
             if not data.get('patient_id') and data.get('patient'):
                 patient_data = self.create_patient(request, data, data['patient'])
                 patient = patient_data['patient']
+                if patient_data['sms_list'] is not None:
+                    sms_list.append(patient_data['sms_list'])
             else:
                 patient = data.get('patient_id')
+                if patient.sms_notification:
+                    def_number = patient.patient_mobiles.filter(is_default=True).first()
+                    if def_number:
+                        sms_list.append(def_number.phone_number)
             time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
-            appnt = models.OfflineOPDAppointments(doctor=data.get('doctor'),
-                                                  id=data.get('id'),
-                                                  hospital=data.get('hospital'),
-                                                  time_slot_start=time_slot_start,
-                                                  booked_by=request.user,
-                                                  user=patient,
-                                                  status=models.OfflineOPDAppointments.ACCEPTED
-                                                 )
-            appntment_list.append(appnt)
+            appnt = models.OfflineOPDAppointments.objects.create(doctor=data.get('doctor'),
+                                                                 id=data.get('id'),
+                                                                 hospital=data.get('hospital'),
+                                                                 time_slot_start=time_slot_start,
+                                                                 booked_by=request.user,
+                                                                 user=patient,
+                                                                 status=models.OfflineOPDAppointments.ACCEPTED,
+                                                                 error=data.get('error') if data.get('error') else False,
+                                                                 error_message=data.get('error_message') if data.get('error_message') else False
+                                                                 )
+            ret_obj = {}
+            ret_obj['doctor'] = appnt.doctor.id
+            ret_obj['hospital'] = appnt.hospital.id
+            ret_obj['id'] = appnt.id
+            ret_obj['patient_id'] = appnt.user.id
+            ret_obj['error'] = appnt.error
+            ret_obj['error_message'] = appnt.error_message
 
-        created_objects = models.OfflineOPDAppointments.objects.bulk_create(appntment_list)
-
-        for obj in created_objects:
-            ret_obj= {}
-            ret_obj['doctor'] = obj.doctor.id
-            ret_obj['hospital'] = obj.hospital.id
-            ret_obj['id'] = obj.id
-            ret_obj['patient_id'] = obj.user.id
             resp.append(ret_obj)
 
         transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
@@ -1869,7 +1886,6 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
     def create_patient(self, request, valid_data, data):
-        sms_list = []
         hospital = valid_data.get('hospital') if data.get('share_with_hospital') else None
         patient = models.OfflinePatients.objects.create(name=data.get('name'),
                                                         id=data.get('id'),
@@ -1883,9 +1899,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                                          False),
                                                         doctor=valid_data.get('doctor'),
                                                         hospital=hospital,
-                                                        created_by=request.user
+                                                        created_by=request.user,
+                                                        error=data.get('error') if data.get('error') else False,
+                                                        error_message=data.get('error_message') if data.get(
+                                                            'error_message') else False
                                                         )
         default_num = None
+        sms_number = None
         for num in data.get('phone_number'):
             models.PatientMobile.objects.create(patient=patient,
                                                 phone_number=num.get('phone_number'),
@@ -1893,9 +1913,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
             if 'is_default' in num and num['is_default']:
                 default_num = num['phone_number']
-        if default_num and ('sms_notification' in valid_data and valid_data['sms_notification']):
-            sms_list.append(default_num)
-        return {"sms_list": sms_list, "patient": patient}
+        if default_num and ('sms_notification' in data and data['sms_notification']):
+            sms_number = default_num
+        return {"sms_list": sms_number, "patient": patient}
 
     def offline_timings(self, request):
         user = request.user

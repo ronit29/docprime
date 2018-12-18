@@ -1843,6 +1843,8 @@ class OfflinePatients(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, related_name="patients_hos", on_delete=models.SET_NULL, null=True, blank=True)
     share_with_hospital = models.BooleanField(default=False)
     created_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    error = models.BooleanField(default=False)
+    error_message = models.CharField(max_length=256, blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -1893,6 +1895,8 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
                                   null=True)
     status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
     time_slot_start = models.DateTimeField(blank=True, null=True)
+    error = models.BooleanField(default=False)
+    error_message = models.CharField(max_length=256, blank=True, null=True)
 
     def __str__(self):
         return '{}-{}'.format(self.doctor, self.hospital)

@@ -1235,39 +1235,41 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             .filter(doctor__is_live=True, hospital__is_live=True).annotate(
-            doctor_gender=F('doctor__gender'),
-            hospital_building=F('hospital__building'),
-
-            hospital_name=F('hospital__name'), doctor_name=F('doctor__name')).filter(
-            Q(
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital=F('hospital'),
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  doctor__manageable_doctors__write_permission=True) |
-                Q(doctor__manageable_doctors__user=user,
-                  doctor__manageable_doctors__hospital__isnull=True,
-                  doctor__manageable_doctors__is_disabled=False,
-                  doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  doctor__manageable_doctors__write_permission=True) |
-                Q(hospital__manageable_hospitals__doctor__isnull=True,
-                  hospital__manageable_hospitals__user=user,
-                  hospital__manageable_hospitals__is_disabled=False,
-                  hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                  hospital__manageable_hospitals__write_permission=True)
-            )|
-                Q(
-                    Q(doctor__manageable_doctors__user=user,
-                     doctor__manageable_doctors__super_user_permission=True,
-                     doctor__manageable_doctors__is_disabled=False,
-                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
-                    Q(hospital__manageable_hospitals__user=user,
-                      hospital__manageable_hospitals__super_user_permission=True,
-                      hospital__manageable_hospitals__is_disabled=False,
-                      hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-            )
-            ).values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender').distinct('hospital', 'doctor')
+                             .filter(doctor__is_live=True, hospital__is_live=True)
+                             .annotate(doctor_gender=F('doctor__gender'),
+                                       hospital_building=F('hospital__building'),
+                                       hospital_name=F('hospital__name'),
+                                       doctor_name=F('doctor__name')
+                                       )
+                             .filter(
+                                    Q(
+                                        Q(doctor__manageable_doctors__user=user,
+                                          doctor__manageable_doctors__hospital=F('hospital'),
+                                          doctor__manageable_doctors__is_disabled=False,
+                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          doctor__manageable_doctors__write_permission=True) |
+                                        Q(doctor__manageable_doctors__user=user,
+                                          doctor__manageable_doctors__hospital__isnull=True,
+                                          doctor__manageable_doctors__is_disabled=False,
+                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          doctor__manageable_doctors__write_permission=True) |
+                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
+                                          hospital__manageable_hospitals__user=user,
+                                          hospital__manageable_hospitals__is_disabled=False,
+                                          hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
+                                          hospital__manageable_hospitals__write_permission=True)
+                                    )|
+                                        Q(
+                                            Q(doctor__manageable_doctors__user=user,
+                                             doctor__manageable_doctors__super_user_permission=True,
+                                             doctor__manageable_doctors__is_disabled=False,
+                                             doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
+                                            Q(hospital__manageable_hospitals__user=user,
+                                              hospital__manageable_hospitals__super_user_permission=True,
+                                              hospital__manageable_hospitals__is_disabled=False,
+                                              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
+                                    ))
+                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender').distinct('hospital', 'doctor')
                              )
 
         # all_docs = [doc_hosp_queryset
