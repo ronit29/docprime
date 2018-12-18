@@ -25,7 +25,7 @@ class InsurancePlansSerializer(serializers.ModelSerializer):
 
     def get_content(self, obj):
         resp = defaultdict(list)
-        qs = obj.content.all().values('title', 'content')
+        qs = obj.content.all().order_by('id').values('title', 'content')
         for e in qs:
             resp[e['title'].lower()].append(e['content'])
         return resp
