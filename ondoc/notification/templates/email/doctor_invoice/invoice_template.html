@@ -71,7 +71,7 @@
 				</tr>
 				<tr>
 					<td style="width: 60%;padding-top: 10px;">
-						{{instance.hospital.name|capfirst}}
+						Dr. {{doctor_name|capfirst}}, {{instance.hospital.name|capfirst}}
 					</td>
 					<td style="width: 40%;padding-top: 10px;padding-left: 12px;">
 						{{patient_name|capfirst}}
@@ -82,7 +82,7 @@
 						{% if instance.hospital.building %}{{instance.hospital.building}}, {% endif %}{% if instance.hospital.sublocality %}{{instance.hospital.sublocality}}, {% endif %}{% if instance.hospital.locality %}{{instance.hospital.locality}}, {% endif %}{% if instance.hospital.city %}{{instance.hospital.city}}, {% endif %}{% if instance.hospital.state %}{{instance.hospital.state}}, {% endif %}{% if instance.hospital.pin_code %}{{instance.hospital.pin_code}} {% endif %}
 					</td>
 					<td style="width: 60%;padding-top: 10px;">
-						{% if instance.profile.phone_number %}+91{{instance.profile.phone_number}}{% endif %}
+						{% if instance.profile.phone_number %}+91-{{instance.profile.phone_number}}{% endif %}
 					</td>
 				</tr>
 				</tbody>
