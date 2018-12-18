@@ -68,7 +68,6 @@ class MemberListSerializer(serializers.Serializer):
     town = serializers.CharField(max_length=100)
     district = serializers.CharField(max_length=100)
     state = serializers.CharField(max_length=100)
-    user_form_id = serializers.IntegerField()
 
     def validate(self, attrs):
         request = self.context.get("request")
