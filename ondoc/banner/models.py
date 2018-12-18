@@ -12,30 +12,41 @@ class Banner(auth_model.TimeStampedModel):
     SPECIALIZATION = 3
     PROCEDURE_CATEGORY = 4
     CONDITION = 5
-    slider_choice = [(TEST, 'test'), (PROCEDURES, 'procedure'), (PROCEDURE_CATEGORY, 'procedure_category'), (SPECIALIZATION, 'specialization'), (CONDITION, 'condition')]
+    slider_choice = [(TEST, 'Test'), (PROCEDURES, 'Procedure'), (PROCEDURE_CATEGORY, 'Procedure Category'),
+                     (SPECIALIZATION, 'Specialization'), (CONDITION, 'Condition')]
     HOME_PAGE = 1
     DOCTOR_RESULT = 2
     LAB_RESULT = 3
+    PACKAGE = 4
+    PROCEDURE = 5
 
-    slider_location = [(HOME_PAGE, 'home_page'), (DOCTOR_RESULT, 'doctor_search_page'), (LAB_RESULT, 'lab_search_page')]
+    slider_location = [(HOME_PAGE, 'home_page'), (DOCTOR_RESULT, 'doctor_search_page'), (LAB_RESULT, 'lab_search_page'), (PROCEDURE, 'procedure_search_page'), (PACKAGE, 'package_search_page')]
     title = models.CharField(max_length=500)
     image = models.ImageField('Banner image', upload_to='banner/images')
-    url = models.URLField(blank=True)
-    # slider_id = models.PositiveSmallIntegerField(blank=True, null=True, unique=True)
+    url = models.URLField(max_length=1000)
+    priority = models.PositiveIntegerField(blank=True, null=True, default=0)
     slider_locate = models.SmallIntegerField(choices=slider_location)
     slider_action = models.SmallIntegerField(choices=slider_choice)
     object_id = models.PositiveIntegerField()
-    start_date = models.DateTimeField()
-    end_date = models.DateTimeField()
+    start_date = models.DateTimeField(null=True, blank=True)
+    end_date = models.DateTimeField(null=True, blank=True)
     enable = models.BooleanField(verbose_name='is enabled', default=True)
     event_name = models.CharField(max_length=1000)
-    latitude = models.FloatField()
-    longitude = models.FloatField()
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return self.title
 
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        slider_locate_choices = dict(self.slider_location)
+        # self.event_name = self.title+'_'+ str(slider_locate[self.slider_locate])
+        self.event_name = '_'.join(self.title.lower().split())\
+                          + '_' \
+                          + '_'.join(
+            str(slider_locate_choices[self.slider_locate]).lower().split())
+        super().save(force_insert, force_update, using, update_fields)
+
+
     class Meta:
         db_table = 'banner'
-
-
