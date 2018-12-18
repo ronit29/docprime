@@ -7,6 +7,7 @@ from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_
 import nested_admin
 from import_export import fields, resources
 from datetime import datetime
+from ondoc.insurance.models import InsuranceDisease
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -65,13 +66,10 @@ class InsuredMemberResource(resources.ModelResource):
     account_number = fields.Field()
     ifsc = fields.Field()
     aadhar_number = fields.Field()
-    hypertension_diabetes = fields.Field()
+    diabetes = fields.Field()
     heart_diseases = fields.Field()
-    liver_kidney_diseases = fields.Field()
     cancer = fields.Field()
-    gynaecological_condition = fields.Field()
-    other = fields.Field()
-    illness_or_injury_in_last_6_month = fields.Field()
+    pregnancy = fields.Field()
     customer_consent_recieved = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
@@ -129,26 +127,29 @@ class InsuredMemberResource(resources.ModelResource):
     def dehydrate_aadhar_number(self, insured_members):
         return ""
 
-    def dehydrate_hypertension_diabetes(self, insured_members):
-        return ""
+    def dehydrate_diabetes(self, insured_members):
+        diseases = InsuranceDisease.objects.filter(disease__iexact='diabetes').first()
+        if diseases:
+            return str(diseases.affected_members.filter(member=insured_members).exists())
+        return "False"
 
     def dehydrate_heart_diseases(self, insured_members):
-        return ""
-
-    def dehydrate_liver_kidney_diseases(self, insured_members):
-        return ""
+        diseases = InsuranceDisease.objects.filter(disease__iexact='Heart Disease').first()
+        if diseases:
+            return str(diseases.affected_members.filter(member=insured_members).exists())
+        return "False"
 
     def dehydrate_cancer(self, insured_members):
-        return ""
+        diseases = InsuranceDisease.objects.filter(disease__iexact='Cancer').first()
+        if diseases:
+            return str(diseases.affected_members.filter(member=insured_members).exists())
+        return "False"
 
-    def dehydrate_gynaecological_condition(self, insured_members):
-        return ""
-
-    def dehydrate_other(self, insured_members):
-        return ""
-
-    def dehydrate_illness_or_injury_in_last_6_month(self, insured_members):
-        return ""
+    def dehydrate_pregnancy(self, insured_members):
+        diseases = InsuranceDisease.objects.filter(disease__iexact='Pregnancy').first()
+        if diseases:
+            return str(diseases.affected_members.filter(member=insured_members).exists())
+        return "False"
 
     def dehydrate_customer_consent_recieved(self, insured_members):
         return ""
