@@ -353,7 +353,7 @@ class DoctorSearchHelper:
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
         for doctor in doctor_data:
 
-            is_gold = doctor.enabled_for_online_booking and doctor.is_gold
+            is_gold = False #doctor.enabled_for_online_booking and doctor.is_gold
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]

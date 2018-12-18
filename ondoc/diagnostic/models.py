@@ -998,15 +998,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
                 out_obj = self.outstanding_create()
                 self.outstanding = out_obj
         except Exception as e:
-            logger.error("Error while creating outstanding for lab- " + str(self.id))
+            logger.error("Error while creating outstanding for lab- " + str(e))
 
         try:
             # while completing appointment, add a merchant_payout entry
-            if database_instance.status != self.status and self.status == self.COMPLETED:
+            if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
         except Exception as e:
-            logger.error("Error while saving payout mercahnt for lab- " + str(self.id))
+            logger.error("Error while saving payout mercahnt for lab- " + str(e))
 
         push_to_matrix = kwargs.get('push_again_to_matrix', True)
         if 'push_again_to_matrix' in kwargs.keys():

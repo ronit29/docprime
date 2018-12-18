@@ -35,7 +35,7 @@ User = get_user_model()
 class LabTestListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabTest
-        fields = ('id', 'name', 'is_package')
+        fields = ('id', 'name', 'is_package', 'show_details')
 
 
 class LabListSerializer(serializers.ModelSerializer):

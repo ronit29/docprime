@@ -190,7 +190,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def get_short_address(self):
         address_items = [value for value in
-                         [self.sublocality, self.locality] if value]
+                         [self.locality, self.city] if value]
         return ", ".join(address_items)
 
     def update_live_status(self):
@@ -1281,7 +1281,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         try:
             # while completing appointment, add a merchant_payout entry
-            if database_instance.status != self.status and self.status == self.COMPLETED:
+            if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
         except Exception as e:
