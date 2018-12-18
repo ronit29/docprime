@@ -74,14 +74,14 @@ class InsuredMemberResource(resources.ModelResource):
     illness_or_injury_in_last_6_month = fields.Field()
     customer_consent_recieved = fields.Field()
 
-
-    def export(self, queryset=None):
-        queryset = self.get_queryset()
+    def export(self, queryset=None, *args, **kwargs):
+        queryset = self.get_queryset(**kwargs)
         fetched_queryset = list(queryset)
         return super().export(fetched_queryset)
 
-    def get_queryset(self):
-        return InsuredMembers.objects.all().prefetch_related('user_insurance')
+    def get_queryset(self, **kwargs):
+        date_range = [datetime.strptime(kwargs.get('from_date'), '%d-%m-%Y').date(), datetime.strptime(kwargs.get('to_date'), '%d-%m-%Y').date()]
+        return InsuredMembers.objects.filter(created_at__date__range=date_range).prefetch_related('user_insurance')
 
     class Meta:
         model = InsuredMembers
@@ -156,9 +156,25 @@ class InsuredMemberResource(resources.ModelResource):
 
 class InsuredMembersAdmin(ImportExportMixin, nested_admin.NestedModelAdmin):
     resource_class = InsuredMemberResource
+    export_template_name = "export_template_name.html"
     formats = (base_formats.XLS,)
     list_display = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number']
     readonly_fields = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number', 'relation', 'profile']
+
+    def get_export_queryset(self, request):
+        super().get_export_queryset(request)
+
+    def get_export_data(self, file_format, queryset, *args, **kwargs):
+        """
+        Returns file_format representation for given queryset.
+        """
+        kwargs['from_date'] = kwargs.get('request').POST.get('from_date')
+        kwargs['to_date'] = kwargs.get('request').POST.get('to_date')
+        request = kwargs.pop("request")
+        resource_class = self.get_export_resource_class()
+        data = resource_class(**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
+        export_data = file_format.export_data(data)
+        return export_data
 
     def has_add_permission(self, request, obj=None):
         return False
