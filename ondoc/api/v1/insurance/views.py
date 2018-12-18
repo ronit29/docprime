@@ -222,3 +222,45 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
 
         return Response(resp)
 
+class InsuranceValidationViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def validation(self, request):
+        resp = {}
+        resp['is_user_insured'] = False
+        resp['is_insurance_cover'] = False
+        resp['insurance_threshold'] = 0
+        resp['insurance_message'] = ""
+        user = request.user
+        serializer = serializers.InsuranceValidationSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        resp = {}
+        user_insurance = user.purchased_insurance.filter().order_by('id').last()
+        if user_insurance and user_insurance.is_valid():
+            threshold = user_insurance.insurance_plan.threshold.filter().first()
+            if not user_insurance.is_appointment_valid(valid_data.get('time_slot_start')):
+                resp['is_user_insured'] = True
+                resp['is_insurance_cover'] = False
+                resp['insurance_threshold'] = threshold.opd_amount_limit
+                resp['insurance_message'] = "Appointment date not covered under insurance tenure."
+                return Response(resp)
+            # if type == "doctor":
+                # if not user_insurance.is_opd_appointment_count_valid(valid_data):
+                #     resp['is_user_insured'] = True
+                #     resp['is_insurance_cover'] = False
+                #     resp['insurance_threshold'] = threshold.opd_amount_limit
+                #     resp['insurance_failure_message'] = "Monthly visit for the doctor exceeded"
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.doctor_specialization_validation(valid_data)
+            resp['is_user_insured'] = True
+            resp['is_insurance_cover'] = is_appointment_insured
+            resp['insurance_threshold'] = threshold.opd_amount_limit
+            resp['insurance_message'] = insurance_message
+        else:
+            resp['is_user_insured'] = False
+            resp['is_insurance_cover'] = False
+            resp['insurance_threshold'] = 0
+            resp['insurance_message'] = ""
+        return Response(resp)
+

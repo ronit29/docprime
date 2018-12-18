@@ -2,6 +2,8 @@ from rest_framework import serializers
 from collections import defaultdict
 from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
+
+from ondoc.doctor.models import Doctor
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
                                     InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent)
 from ondoc.authentication.models import (User, UserProfile)
@@ -145,3 +147,10 @@ class UserInsuranceSerializer(serializers.Serializer):
     purchase_date = serializers.DateTimeField()
     expiry_date = serializers.DateTimeField()
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
+
+
+class InsuranceValidationSerializer(serializers.Serializer):
+
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    time_slot_start = serializers.DateTimeField()
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
