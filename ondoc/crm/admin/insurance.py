@@ -3,9 +3,10 @@ from django import forms
 from rest_framework import serializers
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance
-from import_export.admin import ImportExportMixin, ImportExportModelAdmin
+from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
+from datetime import datetime
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -56,6 +57,23 @@ class InsuredMemberResource(resources.ModelResource):
     policy_number = fields.Field()
     insurance_plan = fields.Field()
     premium_amount = fields.Field()
+    nominee_name = fields.Field()
+    nominee_address = fields.Field()
+    sum_insured = fields.Field()
+    age = fields.Field()
+    account_holder_name = fields.Field()
+    account_number = fields.Field()
+    ifsc = fields.Field()
+    aadhar_number = fields.Field()
+    hypertension_diabetes = fields.Field()
+    heart_diseases = fields.Field()
+    liver_kidney_diseases = fields.Field()
+    cancer = fields.Field()
+    gynaecological_condition = fields.Field()
+    other = fields.Field()
+    illness_or_injury_in_last_6_month = fields.Field()
+    customer_consent_recieved = fields.Field()
+
 
     def export(self, queryset=None):
         queryset = self.get_queryset()
@@ -87,9 +105,58 @@ class InsuredMemberResource(resources.ModelResource):
     def dehydrate_premium_amount(self, insured_members):
         return insured_members.user_insurance.insurance_plan.amount
 
+    def dehydrate_nominee_name(self, insured_members):
+        return "legal heir"
+
+    def dehydrate_nominee_address(self, insured_members):
+        return ""
+
+    def dehydrate_sum_insured(self, insured_members):
+        return ""
+
+    def dehydrate_age(self, insured_members):
+        return int((datetime.now().date() - insured_members.dob).days/365)
+
+    def dehydrate_account_holder_name(self, insured_members):
+        return ""
+
+    def dehydrate_account_number(self, insured_members):
+        return ""
+
+    def dehydrate_ifsc(self, insured_members):
+        return ""
+
+    def dehydrate_aadhar_number(self, insured_members):
+        return ""
+
+    def dehydrate_hypertension_diabetes(self, insured_members):
+        return ""
+
+    def dehydrate_heart_diseases(self, insured_members):
+        return ""
+
+    def dehydrate_liver_kidney_diseases(self, insured_members):
+        return ""
+
+    def dehydrate_cancer(self, insured_members):
+        return ""
+
+    def dehydrate_gynaecological_condition(self, insured_members):
+        return ""
+
+    def dehydrate_other(self, insured_members):
+        return ""
+
+    def dehydrate_illness_or_injury_in_last_6_month(self, insured_members):
+        return ""
+
+    def dehydrate_customer_consent_recieved(self, insured_members):
+        return ""
+
 
 class InsuredMembersAdmin(ImportExportMixin, nested_admin.NestedModelAdmin):
     resource_class = InsuredMemberResource
+    formats = (base_formats.XLS,)
     list_display = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number']
     readonly_fields = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number', 'relation', 'profile']
 
