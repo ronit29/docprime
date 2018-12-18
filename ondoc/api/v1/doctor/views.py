@@ -43,9 +43,7 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F, Count
 from django.db.models.functions import StrIndex
-import datetime
-import copy
-import re
+import datetime, logging, copy, re
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as rating_models
@@ -59,6 +57,8 @@ from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
+
+logger = logging.getLogger(__name__)
 
 
 class CreateAppointmentPermission(permissions.BasePermission):
@@ -1402,7 +1402,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
             user = user_queryset
 
         if valid_data.get('entity_type') == GenericAdminEntity.DOCTOR:
-            doct = Doctor.objects.get(id=valid_data['id'])
+            doct = models.Doctor.objects.get(id=valid_data['id'])
             if valid_data.get('assoc_hosp'):
                 create_admins = []
                 for hos in valid_data['assoc_hosp']:
@@ -1514,7 +1514,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
     def assoc_hosp(self, request, pk=None):
-        doctor = get_object_or_404(Doctor.objects.prefetch_related('hospitals'), pk=pk)
+        doctor = get_object_or_404(models.Doctor.objects.prefetch_related('hospitals'), pk=pk)
         queryset = doctor.hospitals.filter(is_appointment_manager=False)
         return Response(queryset.values('name', 'id'))
 
@@ -1702,7 +1702,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 delete_queryset = delete_queryset.filter(hospital_id=None)
             if len(delete_queryset) > 0:
                 delete_queryset.delete()
-            doct = Doctor.objects.get(id=valid_data['id'])
+            doct = models.Doctor.objects.get(id=valid_data['id'])
             if valid_data.get('assoc_hosp'):
                 create_admins = []
                 for hos in valid_data['assoc_hosp']:
@@ -1831,6 +1831,43 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         return Response(queryset)
 
     @transaction.atomic
+    def create_offline_patients(self, request):
+        serializer = serializers.OfflinePatientCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        sms_list = []
+        resp = []
+        patient_ids = models.OfflinePatients.objects.values_list('id', flat=True)
+
+        for data in valid_data['data']:
+            if data.get('id') in patient_ids:
+                obj = {'doctor': data.get('doctor').id,
+                       'hospital': data.get('hospital').id if data.get('hospital') else None,
+                       'id': data.get('id'),
+                       'error': True,
+                       'error_message': "Patient With Same UUid exists!"}
+                resp.append(obj)
+                logger.error("Patient With Same UUid exists! " + str(data))
+                continue
+            patient_data = self.create_patient(request, data, data.get('hospital'), data.get('doctor'))
+            patient = patient_data['patient']
+            if patient_data['sms_list'] is not None:
+                sms_list.append(patient_data['sms_list'])
+
+            ret_obj = {}
+            ret_obj['doctor'] = patient.doctor.id
+            ret_obj['hospital'] = patient.hospital.id if patient.hospital else None
+            ret_obj['id'] = patient.id
+            ret_obj['error'] = patient.error
+            ret_obj['error_message'] = patient.error_message
+            resp.append(ret_obj)
+
+            if sms_list:
+                transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
+
+        return Response(resp)
+
+    @transaction.atomic
     def create_offline_appointments(self, request):
         serializer = serializers.OfflineAppointmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1838,19 +1875,41 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         patient = None
         sms_list = []
         resp = []
+        appntment_ids = models.OfflineOPDAppointments.objects.values_list('id', flat=True)
+        patient_ids = models.OfflinePatients.objects.values_list('id', flat=True)
         clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in models.DoctorClinic.objects.all()]
         pem_queryset = [(ga.doctor.id if ga.doctor else None, ga.hospital.id if ga.hospital else None) for ga in auth_models.GenericAdmin.objects.filter(is_disabled=False, user=request.user).all()]
         doc_pem_list, hosp_pem_list = map(list, zip(*pem_queryset))
 
         for data in valid_data.get('data'):
+            if data['id'] in appntment_ids or (data.get('patient') and data.get('patient')['id'] in patient_ids):
+                obj = {'doctor': data.get('doctor').id,
+                       'hospital': data.get('hospital').id,
+                       'id': data.get('id'),
+                       'error': True,
+                       'error_message': "Appointment With Same UUid exists!"}
+                resp.append(obj)
+                logger.error("Appointment With Same UUid exists! " + str(data))
+                continue
+            if not data.get('patient') and not data.get('patient_id'):
+                obj = {'doctor': data.get('doctor').id,
+                       'hospital': data.get('hospital').id,
+                       'id': data.get('id'),
+                       'error': True,
+                       'error_message': "Patient not Recieved for Offline Appointment!"}
+                resp.append(obj)
+                logger.error("Patient not Recieved for Offline Appointment! " + str(data))
+                continue
+
             if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
                 data['error'] = True
                 data['error_message'] = 'User forbidden to create Appointment with selected doctor or hospital!'
             if (data.get('doctor').id, data.get('hospital').id) not in clinic_queryset:
                 data['error'] = True
                 data['error_message'] = 'Doctor is not associated with given hospital!'
+
             if not data.get('patient_id') and data.get('patient'):
-                patient_data = self.create_patient(request, data, data['patient'])
+                patient_data = self.create_patient(request, data['patient'], data['hospital'], data['doctor'])
                 patient = patient_data['patient']
                 if patient_data['sms_list'] is not None:
                     sms_list.append(patient_data['sms_list'])
@@ -1881,12 +1940,15 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
             resp.append(ret_obj)
 
-        transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
+        if sms_list:
+            transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
 
         return Response(resp)
 
-    def create_patient(self, request, valid_data, data):
-        hospital = valid_data.get('hospital') if data.get('share_with_hospital') else None
+    def create_patient(self, request, data, hospital, doctor):
+        if data.get('share_with_hospital') and not hospital:
+            logger.error('Hospital Not Given when Shared with Hospital Set'+ str(data))
+        hosp = hospital if data.get('share_with_hospital') and hospital else None
         patient = models.OfflinePatients.objects.create(name=data.get('name'),
                                                         id=data.get('id'),
                                                         sms_notification=data.get('sms_notification', False),
@@ -1897,8 +1959,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                         welcome_message=data.get('welcome_message'),
                                                         display_welcome_message=data.get('display_welcome_message',
                                                                                          False),
-                                                        doctor=valid_data.get('doctor'),
-                                                        hospital=hospital,
+                                                        doctor=doctor,
+                                                        hospital=hosp,
                                                         created_by=request.user,
                                                         error=data.get('error') if data.get('error') else False,
                                                         error_message=data.get('error_message') if data.get(
@@ -1922,6 +1984,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer = serializers.DoctorAvailabilityTimingSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+
         dc_queryset = models.DoctorClinic.objects.filter(Q(
                                                    Q(doctor__manageable_doctors__user=user,
                                                      doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,

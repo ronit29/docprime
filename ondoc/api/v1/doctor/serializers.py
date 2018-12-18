@@ -1305,31 +1305,28 @@ class OfflinePatientBodySerializer(serializers.Serializer):
     phone_number = serializers.ListField()
     id = serializers.UUIDField()
 
-    def validate(self, attrs):
-        if OfflinePatients.objects.filter(id=attrs['id']).exists():
-            raise serializers.ValidationError("Patient with same UUID already exists!")
-        return attrs
+
+class OfflinePatientExplicitSerializer(OfflinePatientBodySerializer):
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all(), required=False)
 
 
 class OfflineAppointmentBodySerializer(serializers.Serializer):
     patient = OfflinePatientBodySerializer(many=False, allow_null=True, required=False)
     patient_id = serializers.PrimaryKeyRelatedField(queryset=OfflinePatients.objects.all(), required=False, allow_empty=True)
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
     start_date = serializers.DateTimeField()
     start_time = serializers.FloatField()
     id = serializers.UUIDField()
 
-    def validate(self, attrs):
-        if not attrs.get('patient') and not attrs.get('patient_id'):
-            raise serializers.ValidationError("Niether patient or Patient_id Provided")
-        if OfflineOPDAppointments.objects.filter(id=attrs['id']).exists():
-            raise serializers.ValidationError("Appointment with same UUID already exists!")
-        return attrs
-
 
 class OfflineAppointmentCreateSerializer(serializers.Serializer):
     data = OfflineAppointmentBodySerializer(many=True)
+
+
+class OfflinePatientCreateSerializer(serializers.Serializer):
+    data = OfflinePatientExplicitSerializer(many=True)
 
 
 class GetOfflinePatientsSerializer(serializers.Serializer):
