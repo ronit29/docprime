@@ -320,6 +320,7 @@ class EMAILNotification:
             filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
                                                   random.randint(1111111111, 9999999999))
             try:
+                logger.error(html_body)  # SHASHANK_SINGH Remove it.
                 pdf_file = HTML(string=html_body).write_pdf()
                 invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
                 invoice.save()
