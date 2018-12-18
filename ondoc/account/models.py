@@ -1,7 +1,8 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
-from ondoc.account.tasks import refund_curl_task, process_payout
+from ondoc.account.tasks import refund_curl_task
+from ondoc.notification.tasks import process_payout
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
 from django.db.models import Sum, Q, F, Max
