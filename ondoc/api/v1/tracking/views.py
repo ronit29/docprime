@@ -36,8 +36,9 @@ class EventCreateViewSet(GenericViewSet):
                 except Exception as e:
                     resp['error'] = "Error Processing Event Data!"
 
+                visit = track_models.TrackingVisit.objects.get(pk=visit_id)
+                modify_visit = False
                 if event_name == 'utm-events':
-                    visit = track_models.TrackingVisit.objects.get(pk=visit_id)
                     if not visit.data:
                         ud = {}
                         ud['utm_campaign'] = data.get('utm_campaign')
@@ -47,7 +48,7 @@ class EventCreateViewSet(GenericViewSet):
                         ud['source'] = data.get('source')
                         ud['referrer'] = data.get('referrer')
                         visit.data = ud
-                        visit.save()
+                        modify_visit = True
                 elif event_name == 'visitor-info':
                     visitor = track_models.TrackingVisitor.objects.get(pk=visitor_id)
                     if not visitor.device_info:
@@ -58,11 +59,16 @@ class EventCreateViewSet(GenericViewSet):
                         visitor.device_info = ud
                         visitor.save()
                 elif event_name == "change-location":
-                    visit = track_models.TrackingVisit.objects.get(pk=visit_id)
                     if not visit.location:
                         visit.location = data.get('location', {})
-                        visit.user_agent = data.get('userAgent', "")
-                        visit.save()
+                        modify_visit = True
+
+                if not visit.user_agent:
+                    visit.user_agent = data.get('userAgent', "")
+                    modify_visit = True
+
+                if modify_visit:
+                    visit.save()
 
             else:
                 resp['error'] = "Event name not Found!"
