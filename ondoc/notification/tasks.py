@@ -1,6 +1,8 @@
 from __future__ import absolute_import, unicode_literals
 
+import datetime
 import json
+from collections import OrderedDict
 
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
@@ -273,3 +275,94 @@ def set_order_dummy_transaction(self, order_id, user_id):
     except Exception as e:
         logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([order_id, user_id], countdown=300)
+
+@task()
+def process_payout(payout_id):
+    from ondoc.account.models import MerchantPayout, Order
+    from ondoc.api.v1.utils import create_payout_checksum
+
+    try:
+        if not payout_id:
+            raise Exception("No payout specified")
+
+        payout_data = MerchantPayout.objects.filter(id=payout_id).first()
+        if not payout_data or payout_data.status == payout_data.PAID:
+            raise Exception("Payment already done for this payout")
+
+        appointment = payout_data.get_appointment()
+        billed_to = payout_data.get_billed_to()
+        merchant = payout_data.get_merchant()
+        order_data = None
+
+        if not appointment or not billed_to or not merchant:
+            raise Exception("Insufficient Data " + str(payout_data))
+
+        if not merchant.verified_by_finance or not merchant.enabled:
+            raise Exception("Merchant is not verified or is not enabled. " + str(payout_data))
+
+        associated_merchant = billed_to.merchant.first()
+        if not associated_merchant.verified:
+            raise Exception("Associated Merchant not verified. " + str(payout_data))
+
+        # assuming 1 to 1 relation between Order and Appointment
+        order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
+
+        if not order_data:
+             raise Exception("Order not found for given payout " + str(payout_data))
+
+
+        all_txn = order_data.getTransactions()
+
+        if not all_txn or all_txn.count() == 0:
+            raise Exception("No transactions found for given payout " + str(payout_data))
+
+        req_data = { "payload" : [], "checkSum" : "" }
+
+        idx = 0
+        for txn in all_txn:
+            curr_txn = OrderedDict()
+            curr_txn["idx"] = idx
+            curr_txn["orderNo"] = txn.order_no
+            curr_txn["orderId"] = order_data.id
+            curr_txn["txnAmount"] = str(order_data.amount)
+            curr_txn["settledAmount"] = str(payout_data.payable_amount)
+            curr_txn["merchantCode"] = merchant.id
+            curr_txn["pgtxId"] = txn.transaction_id
+            curr_txn["refNo"] = txn.id
+            curr_txn["bookingId"] = appointment.id
+            req_data["payload"].append(curr_txn)
+            idx += 1
+
+        req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
+        headers = {
+            "auth": settings.PG_REFUND_AUTH_TOKEN,
+            "Content-Type": "application/json"
+        }
+        url = settings.PG_SETTLEMENT_URL
+
+        response = requests.post(url, data=json.dumps(req_data), headers=headers)
+        if response.status_code == status.HTTP_200_OK:
+            resp_data = response.json()
+            if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+                success_payout = False
+                result = resp_data.get('result')
+                if result:
+                    for res_txn in result:
+                        success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+
+                if success_payout:
+                    payout_data.payout_time = datetime.datetime.now()
+                    payout_data.status = payout_data.PAID
+                    payout_data.api_response = json.dumps(resp_data)
+                    payout_data.save()
+                    print("Payout processed")
+                    return
+
+        payout_data.retry_count += 1
+        payout_data.api_response = json.dumps(resp_data)
+        payout_data.save()
+        raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+    except Exception as e:
+        logger.error("Error in processing payout - with exception - " + str(e))
+
