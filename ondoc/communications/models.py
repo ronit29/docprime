@@ -5,10 +5,11 @@ from collections import defaultdict
 from itertools import groupby
 
 import pytz
+from hardcopy import bytestring_to_pdf
 
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
-from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
 from django.forms import model_to_dict
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
@@ -313,6 +314,7 @@ class EMAILNotification:
             body_template = "email/prescription_uploaded/body.html"
             subject_template = "email/prescription_uploaded/subject.txt"
         elif notification_type == NotificationAction.DOCTOR_INVOICE:
+
             invoice, created = Invoice.objects.get_or_create(reference_id=context.get("instance").id,
                                                              product_id=Order.DOCTOR_PRODUCT_ID)
             context.update({"invoice": invoice})
@@ -320,12 +322,26 @@ class EMAILNotification:
             filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
                                                   random.randint(1111111111, 9999999999))
             try:
-                logger.error(html_body)  # SHASHANK_SINGH Remove it.
-                pdf_file = HTML(string=html_body).write_pdf()
-                invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
+                extra_args = {
+                    'virtual-time-budget': 6000
+                }
+                temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+                file = open(temp_pdf_file.temporary_file_path())
+                bytestring_to_pdf(html_body.encode(), file, **extra_args)
+                file.seek(0)
+                file.flush()
+                file.content_type = 'application/pdf'
+                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf', temp_pdf_file.tell(), None)
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
+            # try:
+            #     logger.error(html_body)  # SHASHANK_SINGH Remove it.
+            #     file = HTML(string=html_body).write_pdf()
+            #     invoice.file = SimpleUploadedFile(filename, file, content_type='application/pdf')
+            #     invoice.save()
+            # except Exception as e:
+            #     logger.error("Got error while creating pdf for opd invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
@@ -365,11 +381,25 @@ class EMAILNotification:
             filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
                                                   random.randint(1111111111, 9999999999))
             try:
-                pdf_file = HTML(string=html_body).write_pdf()
-                invoice.file = SimpleUploadedFile(filename, pdf_file, content_type='application/pdf')
+                extra_args = {
+                    'virtual-time-budget': 6000
+                }
+                temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+                file = open(temp_pdf_file.temporary_file_path())
+                bytestring_to_pdf(html_body.encode(), file, **extra_args)
+                file.seek(0)
+                file.flush()
+                file.content_type = 'application/pdf'
+                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf', temp_pdf_file.tell(), None)
                 invoice.save()
             except Exception as e:
-                logger.error("Got error while creating pdf for lab invoice {}".format(e))
+                logger.error("Got error while creating pdf for opd invoice {}".format(e))
+            # try:
+            #     file = HTML(string=html_body).write_pdf()
+            #     invoice.file = SimpleUploadedFile(filename, file, content_type='application/pdf')
+            #     invoice.save()
+            # except Exception as e:
+            #     logger.error("Got error while creating pdf for lab invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
             body_template = "email/lab/lab_invoice/body.html"
             subject_template = "email/lab/lab_invoice/subject.txt"
