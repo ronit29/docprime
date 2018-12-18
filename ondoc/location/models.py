@@ -283,6 +283,9 @@ class EntityAddress(TimeStampedModel):
                         selected_type = st
             if selected_type and selected_type.startswith('SUBLOCALITY'):
                 selected_type = 'SUBLOCALITY'
+                
+            if (selected_type and selected_type.startswith('SUBLOCALITY')) or (parent_entity and parent_entity.type and
+                parent_entity.type.startswith('LOCALITY')):
                 save_location = True
 
             postal_code = None

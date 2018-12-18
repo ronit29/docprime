@@ -29,11 +29,15 @@ def doctor_page_urls():
                                         (Prefetch('hospitals', queryset=Hospital.objects.filter(is_live=True).order_by('hospital_type', 'id')))
                                          ).filter(is_live=True, is_test_doctor=False).order_by('id')[:100]
 
+
+    #     try:
     for doctor in doc_obj:
-        try:
-            status = DoctorPageURL.create_doctor_page_urls(doctor,sequence)
-        except Exception as e:
-            print("failure: " + str(doctor.id) + ", error: " + str(e))
+        status = DoctorPageURL.create_doctor_page_urls(doctor,sequence)
+        
+    EntityUrls.objects.filter(sitemap_identifier='DOCTOR_PAGE', sequence__lt=sequence).update(is_valid=False)
+
+        # except Exception as e:
+        #     print("failure: " + str(doctor.id) + ", error: " + str(e))
 
 
 class Command(BaseCommand):
