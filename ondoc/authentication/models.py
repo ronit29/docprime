@@ -1314,6 +1314,9 @@ class Merchant(TimeStampedModel):
     class Meta:
         db_table = 'merchant'
 
+    def __str__(self):
+        return self.beneficiary_name+"("+self.account_number+")"
+
 
 class AssociatedMerchant(TimeStampedModel):
 
