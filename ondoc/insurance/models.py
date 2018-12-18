@@ -267,7 +267,9 @@ class UserInsurance(auth_model.TimeStampedModel):
             'insurer_name': self.insurance_plan.insurer.name
         }
         html_body = render_to_string("pdfbody.html", context=context)
-        filename = "COI_{}.pdf".format(str(timezone.now().timestamp()))
+        policy_number = self.policy_number
+        certificate_number = policy_number.split('/')[-1]
+        filename = "{}.pdf".format(str(certificate_number))
         try:
             extra_args = {
                 'virtual-time-budget': 6000
