@@ -209,10 +209,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def save(self, *args, **kwargs):
         self.update_live_status()
-        build_url = True
-        if self.is_live and self.id and self.location:
-            if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
-                build_url = False
+        # build_url = True
+        # if self.is_live and self.id and self.location:
+        #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
+        #         build_url = False
 
         super(Hospital, self).save(*args, **kwargs)
 
@@ -223,8 +223,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
                 .update(is_disabled=False)
 
-        if build_url and self.location and self.is_live:
-            ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
+        # if build_url and self.location and self.is_live:
+        #     ea = location_models.EntityLocationRelationship.create(latitude=self.location.y, longitude=self.location.x, content_object=self)
 
 
 class HospitalAward(auth_model.TimeStampedModel):
