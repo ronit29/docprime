@@ -7,7 +7,7 @@ from ondoc.api.v1.utils import RawSql
 def map_lab_geocoding_results():
 
     lab_object = Lab.objects.first()
-    query = "select id, st_x(location::geometry)::text lng , st_y(location::geometry)::text lat from lab where location is not null and is_live=true limit 10";
+    query = "select id, st_x(location::geometry)::text lng , st_y(location::geometry)::text lat from lab where location is not null and is_live=true";
 
     all_labs = RawSql(query, []).fetch_all()
 

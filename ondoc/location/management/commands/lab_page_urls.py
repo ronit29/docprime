@@ -14,7 +14,7 @@ def map_lab_location_urls():
     all_labs = Lab.objects.filter(is_live=True).all().annotate(distance=Distance('location', Point(float(77.0694707),float(28.4502948), srid=4326))).order_by('distance')
     for lab in all_labs:
         print(LabPageUrl.create_lab_page_urls(lab, sequence))
-
+    EntityUrls.objects.filter(sitemap_identifier='LAB_PAGE', sequence__lt=sequence).update(is_valid=False)
 
 
 
