@@ -10,6 +10,7 @@ from ondoc.doctor import models as doctor_model
 from django.utils import timezone
 import requests
 import json
+from django.conf import settings
 
 
 class MaskNumberViewSet(viewsets.GenericViewSet):
@@ -67,7 +68,7 @@ class MaskNumberViewSet(viewsets.GenericViewSet):
 
     def get_masked_number(self, data):
         try:
-            url = "http://qamatrixapi.docprime.com/communication/Communication.svc/GetVirtualNumber"
+            url = settings.MATRIX_NUMBER_MASKING
             response = requests.post(url, data=json.dumps(data), headers={'Content-Type': 'application/json'})
 
             if response.status_code != status.HTTP_200_OK or not response.ok:
