@@ -579,6 +579,228 @@ class EntityUrls(TimeStampedModel):
 
         return True
 
+    def create_doctor_specialization_entity_urls():
+        query = '''insert into entity_urls(specialization_id, specialization, sequence,extras, sitemap_identifier, url, count, entity_type, 
+                        url_type,  created_at, 
+                        updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
+                        locality_longitude, locality_id, sublocality_id,
+                        locality_value, sublocality_value, is_valid, locality_location, sublocality_location)
+
+                        select specialization_id, specialization, sequence,extras, sitemap_identifier,getslug(url) as url, count, entity_type,
+                         url_type, now() as created_at, now() as updated_at,
+                         sublocality_latitude,sublocality_longitude,locality_latitude,locality_longitude,
+                         locality_id, sublocality_id, locality_value,sublocality_value, is_valid, 
+                         locality_location::geography, sublocality_location::geography
+                        from seo_doctor_search_urls '''
+
+        sequence_query = '''select sequence from seo_doctor_search_urls limit 1 '''
+
+        sequence = RawSql(sequence_query, []).fetch_all()
+
+        update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
+                                  in ('SPECIALIZATION_LOCALITY_CITY', 'SPECIALIZATION_CITY') and sequence< %d''' % \
+                       sequence[0].get(
+                           'sequence')
+
+        from django.db import connection
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute(query)
+                cursor.execute(update_query)
+            except Exception as e:
+                print(str(e))
+                return False
+
+        return True
+
+    def create_doctor_search_entity_urls():
+
+        query = '''insert into entity_urls(sequence,extras, sitemap_identifier, url, count, entity_type, 
+                 url_type,  created_at, 
+                 updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
+                 locality_longitude, locality_id, sublocality_id,
+                 locality_value, sublocality_value, is_valid, locality_location, sublocality_location)
+
+                 select sequence,extras, sitemap_identifier,getslug(url) as url, count, entity_type,
+                  url_type, now() as created_at, now() as updated_at,
+                  sublocality_latitude,sublocality_longitude,locality_latitude,locality_longitude,
+                  locality_id, sublocality_id, locality_value,sublocality_value, is_valid, 
+                  locality_location::geography, sublocality_location::geography
+                 from seo_doctor_search_urls '''
+
+        sequence_query = '''select sequence from seo_doctor_search_urls limit 1 '''
+
+        sequence = RawSql(sequence_query, []).fetch_all()
+
+        update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
+                           in ('DOCTORS_LOCALITY_CITY', 'DOCTORS_CITY') and sequence< %d''' % sequence[0].get(
+            'sequence')
+
+        from django.db import connection
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute(query)
+                cursor.execute(update_query)
+            except Exception as e:
+                print(str(e))
+                return False
+
+        return True
+
+    def create_doctor_search_urls_temp_table():
+        from ondoc.api.v1.utils import RawSql
+        query = '''select nextval('entity_url_version_seq') as inc;'''
+
+        seq = RawSql(query, []).fetch_all()
+        if seq:
+            sequence = seq[0]['inc'] if seq[0]['inc'] else 0
+        else:
+            sequence = 0
+
+        create_temp_table_query = '''create table seo_doctor_search_urls as
+                    select  ea.alternative_value, ea.search_slug, null::json as extras , null as sublocality_location,  
+                     null as locality_location,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    concat('doctors-in-', ea.search_slug, '-sptlitcit')
+                    else concat('doctors-in-', ea.search_slug, '-sptcit')
+                    end as url, ea.type, count(*) as count,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    ea.id 
+                    end as sublocality_id,
+                    case when ea.type = 'LOCALITY' then ea.id 
+                    when ea.type = 'SUBLOCALITY' then eaparent.id
+                    end as locality_id,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    st_x(ea.centroid::geometry) end as sublocality_longitude,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    st_y(ea.centroid::geometry) end as sublocality_latitude,
+                    case when ea.type = 'LOCALITY' then st_x(ea.centroid::geometry)
+                    when ea.type = 'SUBLOCALITY' then st_x(eaparent.centroid::geometry)
+                    end as locality_longitude,
+                    case when ea.type = 'LOCALITY' then st_y(ea.centroid::geometry)
+                    when ea.type = 'SUBLOCALITY' then st_y(eaparent.centroid::geometry) 
+                    end as locality_latitude,
+                    case when ea.type = 'SUBLOCALITY' then ea.alternative_value end as sublocality_value,
+                    case when ea.type = 'LOCALITY' then ea.alternative_value 
+                    when  ea.type = 'SUBLOCALITY' then eaparent.alternative_value end as locality_value,
+                    case when ea.type = 'LOCALITY' then 'DOCTORS_CITY'
+                    else 'DOCTORS_LOCALITY_CITY' end as sitemap_identifier,
+                    %d as sequence,
+                     'Doctor' as entity_type,
+                     'SEARCHURL' url_type,
+                     True as is_valid
+                    from hospital h inner join entity_address ea on ST_DWithin(ea.centroid,h.location,500) and h.is_live=true
+                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true inner join doctor_clinic dc on dc.hospital_id = h.id
+                    inner join doctor d on dc.doctor_id= d.id
+                    and d.is_live=true left join entity_address eaparent on ea.parent=eaparent.id and eaparent.use_in_url=true
+                    group by ea.id, eaparent.id having count(*) >= 3''' % sequence
+        create_temp_table = RawSql(create_temp_table_query, []).execute()
+
+        update_extras_query = '''update  seo_doctor_search_urls 
+                        set extras = case when type='LOCALITY' then
+                        json_build_object('location_json',json_build_object('locality_id',locality_id,'locality_value',locality_value, 
+                        'locality_latitude',locality_latitude,'locality_longitude',locality_longitude))
+
+                        else json_build_object('location_json',
+                        json_build_object('sublocality_id', sublocality_id,'sublocality_value', sublocality_value,
+                        'locality_id', locality_id, 'locality_value', locality_value,'breadcrum_url',getslug('doctors-in-' || locality_value ||'-sptcit'),
+                        'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 'locality_latitude',locality_latitude,
+                        'locality_longitude',locality_longitude))  end'''
+        update_extras = RawSql(update_extras_query, []).execute()
+
+        update_locality_loc_query = '''update seo_doctor_search_urls set locality_location = st_setsrid(st_point(locality_longitude, locality_latitude),4326)::geography where 
+        		            locality_latitude is not null and locality_longitude is not null'''
+
+        update_locality_loc = RawSql(update_locality_loc_query, []).execute()
+
+        update_sublocality_loc_query = '''update seo_doctor_search_urls set sublocality_location = st_setsrid(st_point(sublocality_longitude, sublocality_latitude),4326)::geography where 
+                                 sublocality_latitude is not null and sublocality_longitude is not null'''
+
+        update_sublocality_loc = RawSql(update_sublocality_loc_query, []).execute()
+
+        return 'success'
+
+    def create_doctor_spec_urls_temp_table():
+        from ondoc.api.v1.utils import RawSql
+        query = '''select nextval('entity_url_version_seq') as inc;'''
+
+        seq = RawSql(query, []).fetch_all()
+        if seq:
+            sequence = seq[0]['inc'] if seq[0]['inc'] else 0
+        else:
+            sequence = 0
+
+        create_temp_table_query = '''create table seo_doctor_specialization_search as
+                    select ps.id as specialization_id, ps.name as specialization, ea.alternative_value,
+                      ea.search_slug, null as url, null::json as extras, null as locality_location, null as sublocality_location,
+                     ea.type, count(*) as count,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    ea.id 
+                    end as sublocality_id,
+                    case when ea.type = 'LOCALITY' then ea.id 
+                    when ea.type = 'SUBLOCALITY' then eaparent.id
+                    end as locality_id,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    st_x(ea.centroid::geometry) end as sublocality_longitude,
+                    case when ea.type = 'SUBLOCALITY' then 
+                    st_y(ea.centroid::geometry) end as sublocality_latitude,
+                    case when ea.type = 'LOCALITY' then st_x(ea.centroid::geometry)
+                    when ea.type = 'SUBLOCALITY' then st_x(eaparent.centroid::geometry)
+                    end as locality_longitude,
+                    case when ea.type = 'LOCALITY' then st_y(ea.centroid::geometry)
+                    when ea.type = 'SUBLOCALITY' then st_y(eaparent.centroid::geometry) 
+                    end as locality_latitude,
+                    case when ea.type = 'SUBLOCALITY' then ea.alternative_value end as sublocality_value,
+                    case when ea.type = 'LOCALITY' then ea.alternative_value 
+                         when  ea.type = 'SUBLOCALITY' then eaparent.alternative_value end as locality_value,
+                    case when ea.type = 'LOCALITY' then 'SPECIALIZATION_CITY'
+                    else 'SPECIALIZATION_LOCALITY_CITY' end as sitemap_identifier,
+                    %d as sequence,
+                    'Doctor' as entity_type,
+                    'SEARCHURL' url_type,
+                    True as is_valid
+
+                    from hospital h inner join entity_address ea on ST_DWithin(ea.centroid,h.location,500) and h.is_live=true
+                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true inner join doctor_clinic dc on dc.hospital_id = h.id
+                    inner join doctor d on dc.doctor_id= d.id
+                    inner join doctor_practice_specialization dps on dps.doctor_id = d.id and d.is_live=true
+                    inner join practice_specialization ps on ps.id = dps.specialization_id 
+                    left join entity_address eaparent on ea.parent=eaparent.id and eaparent.use_in_url=true
+                    group by ps.id, ea.id, eaparent.id having count(*) >= 3 
+                ''' % sequence
+
+        create_temp_table = RawSql(create_temp_table_query, []).execute()
+
+        update_urls_query = '''update seo_doctor_specialization_search set url = case when type = 'SUBLOCALITY' then 
+                    concat(specialization,'-in-', search_slug, '-sptlitcit')
+                    else concat(specialization,'-in-', search_slug, '-sptcit')
+                    end'''
+        update_urls = RawSql(update_urls_query, []).execute()
+
+        update_extras_query = '''update  seo_doctor_specialization_search 
+                    set extras = case when type='LOCALITY' then
+                    json_build_object('location_json',json_build_object('locality_id',locality_id,'locality_value',locality_value, 
+                    'locality_latitude',locality_latitude,'locality_longitude',locality_longitude))
+
+                    else  json_build_object('location_json',
+                    json_build_object('sublocality_id',sublocality_id,'sublocality_value',sublocality_value,
+                    'locality_id', locality_id, 'locality_value', locality_value,'breadcrum_url',getslug(specialization||'-in-' || locality_value ||'-sptcit'),
+                    'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 'locality_latitude',locality_latitude,
+                    'locality_longitude',locality_longitude)) end'''
+        update_extras = RawSql(update_extras_query, []).execute()
+
+        update_locality_loc_query = '''update seo_doctor_specialization_search set locality_location = st_setsrid(st_point(locality_longitude, locality_latitude),4326)::geography where 
+                locality_latitude is not null and locality_longitude is not null'''
+
+        update_locality_loc = RawSql(update_locality_loc_query, []).execute()
+
+        update_sublocality_loc_query = '''update seo_doctor_specialization_search set sublocality_location = st_setsrid(st_point(sublocality_longitude, sublocality_latitude),4326)::geography where 
+                 sublocality_latitude is not null and sublocality_longitude is not null'''
+
+        update_sublocality_loc = RawSql(update_sublocality_loc_query, []).execute()
+
+        return 'success'
+
     @classmethod
     def create_doctor_search_urls(cls):
 
