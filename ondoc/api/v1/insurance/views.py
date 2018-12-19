@@ -20,6 +20,8 @@ from django.db import transaction
 from ondoc.authentication.models import User
 from datetime import timedelta
 from django.utils import timezone
+import logging
+logger = logging.getLogger(__name__)
 
 
 class ListInsuranceViewSet(viewsets.GenericViewSet):
@@ -49,6 +51,8 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         result = {}
         data['id'] = request.query_params.get('id')
         serializer = serializers.UserInsuranceIdsSerializer(data=data)
+        if not serializer.is_valid() and serializer.errors:
+            logger.error(str(serializer.errors))
         serializer.is_valid(raise_exception=True)
         parameter = serializer.validated_data
         user_insurance = UserInsurance.objects.get(id=parameter.get('id').id)
@@ -65,11 +69,16 @@ class InsuredMemberViewSet(viewsets.GenericViewSet):
         resp ={}
         members = request.data.get('members')
         member_serializer = InsuredMemberIdSerializer(data=members, many=True)
+        if not member_serializer.is_valid() and member_serializer.errors:
+            logger.error(str(member_serializer.errors))
         member_serializer.is_valid(raise_exception=True)
         for member in members:
             member_id = member.get('id')
             disease_list = member.get('disease')
             disease_serializer = InsuranceDiseaseIdSerializer(data=disease_list, many=True)
+            if not disease_serializer.is_valid() and disease_serializer.errors:
+                logger.error(str(disease_serializer.errors))
+
             disease_serializer.is_valid(raise_exception=True)
             for disease in disease_list:
                 InsuranceDiseaseResponse.objects.create(disease_id=disease.get('id'), member_id=member_id,
@@ -90,6 +99,9 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
         serializer = serializers.InsuredMemberSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid() and serializer.errors:
+            logger.error(str(serializer.errors))
+
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         amount = None
@@ -234,6 +246,10 @@ class InsuranceValidationViewSet(viewsets.GenericViewSet):
         resp['insurance_message'] = ""
         user = request.user
         serializer = serializers.InsuranceValidationSerializer(data=request.data, context={'request': request})
+
+        if not serializer.is_valid() and serializer.errors:
+            logger.error(str(serializer.errors))
+
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         resp = {}
