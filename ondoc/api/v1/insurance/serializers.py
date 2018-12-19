@@ -3,6 +3,7 @@ from collections import defaultdict
 from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
 
+from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import Doctor
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
                                     InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent)
@@ -149,7 +150,7 @@ class UserInsuranceSerializer(serializers.Serializer):
 
 
 class InsuranceValidationSerializer(serializers.Serializer):
-
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), allow_null=True)
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), allow_null=True)
     time_slot_start = serializers.DateTimeField()
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
