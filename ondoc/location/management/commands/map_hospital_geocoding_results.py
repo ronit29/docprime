@@ -8,7 +8,7 @@ def map_hospital_geocoding_results():
 
     hospital_object = Hospital.objects.first()
 
-    query = "select id, st_x(location::geometry)::text lng , st_y(location::geometry)::text lat from hospital where location is not null and is_live=true and id in (select hospital_id from doctor_clinic where doctor_id in (select id from doctor where is_live=true order by id limit 100) ) order by id limit 100";
+    query = "select id, st_x(location::geometry)::text lng , st_y(location::geometry)::text lat from hospital where location is not null and is_live=true order by id";
 
     all_hospitals = RawSql(query, []).fetch_all()
 

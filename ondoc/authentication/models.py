@@ -1310,9 +1310,24 @@ class Merchant(TimeStampedModel):
     type = models.PositiveIntegerField(choices=TYPE_CHOICES, null=True)
     enabled = models.BooleanField(default=False)
     verified_by_finance = models.BooleanField(default=False)
+    verified_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, editable=False, on_delete=models.SET_NULL)
+    merchant_add_1 = models.CharField(max_length=200, null=False, blank= True)
+    merchant_add_2 = models.CharField(max_length=200, null=False, blank= True)
+    merchant_add_3 = models.CharField(max_length=200, null=False, blank= True)
+    merchant_add_4 = models.CharField(max_length=200, null=False, blank= True)
+    city = models.CharField(max_length=200, null=False, blank= True)
+    pin = models.CharField(max_length=200, null=False, blank= True)
+    state = models.CharField(max_length=200, null=False, blank= True)
+    country = models.CharField(max_length=200, null=False, blank= True)
+    email = models.CharField(max_length=200, null=False, blank= True)
+    mobile = models.CharField(max_length=200, null=False, blank= True)
+
 
     class Meta:
         db_table = 'merchant'
+
+    def __str__(self):
+        return self.beneficiary_name+"("+self.account_number+")"
 
 
 class AssociatedMerchant(TimeStampedModel):

@@ -283,6 +283,9 @@ class EntityAddress(TimeStampedModel):
                         selected_type = st
             if selected_type and selected_type.startswith('SUBLOCALITY'):
                 selected_type = 'SUBLOCALITY'
+
+            if (selected_type and selected_type.startswith('SUBLOCALITY')) or (parent_entity and parent_entity.type and
+                parent_entity.type.startswith('LOCALITY')):
                 save_location = True
 
             postal_code = None
@@ -444,13 +447,14 @@ class EntityLocationRelationship(TimeStampedModel):
         #     entity_location_qs.delete()
         print(str(content_type_id))
         query = '''insert into entity_location_relations(object_id, location_id, content_type_id, type, entity_geo_location, created_at, updated_at) 
-                    select l.id as object_id, ea.id as location_id, %s as content_type_id, type, l.location as entity_geo_location,
-                    now(), now()
-                    from lab l
-                    inner join geocoding_results gs on 
+                    select l.id as object_id, ea.id as location_id,
+                     %s as content_type_id, type,  l.location as entity_geo_location, now(), now()
+                    from lab l inner join geocoding_results gs on 
                     st_x(l.location::geometry)::text=gs.longitude and st_y(l.location::geometry)::text=gs.latitude
-                     and l.is_live = True
-                    inner join entity_address ea on ea.geocoding_id = gs.id and use_in_url=true'''
+                     and l.is_live = True 
+                     inner join address_geo_mapping agm on agm.geocoding_result_id = gs.id
+                     inner join entity_address ea on agm.entity_address_id = ea.id 
+                     order by l.id, ea.order '''
         results = RawSql(query, [content_type_id]).execute()
         #results = [EntityLocationRelationship(**result) for result in results]
         #EntityLocationRelationship.objects.bulk_create(results)
@@ -584,16 +588,16 @@ class EntityUrls(TimeStampedModel):
                         url_type,  created_at, 
                         updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
                         locality_longitude, locality_id, sublocality_id,
-                        locality_value, sublocality_value, is_valid, locality_location, sublocality_location)
+                        locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location)
 
                         select specialization_id, specialization, sequence,extras, sitemap_identifier,getslug(url) as url, count, entity_type,
                          url_type, now() as created_at, now() as updated_at,
                          sublocality_latitude,sublocality_longitude,locality_latitude,locality_longitude,
                          locality_id, sublocality_id, locality_value,sublocality_value, is_valid, 
-                         locality_location::geography, sublocality_location::geography
-                        from seo_doctor_search_urls '''
+                         locality_location, sublocality_location, location
+                        from seo_doctor_specialization_search '''
 
-        sequence_query = '''select sequence from seo_doctor_search_urls limit 1 '''
+        sequence_query = '''select sequence from seo_doctor_specialization_search limit 1 '''
 
         sequence = RawSql(sequence_query, []).fetch_all()
 
@@ -619,13 +623,13 @@ class EntityUrls(TimeStampedModel):
                  url_type,  created_at, 
                  updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
                  locality_longitude, locality_id, sublocality_id,
-                 locality_value, sublocality_value, is_valid, locality_location, sublocality_location)
+                 locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location)
 
                  select sequence,extras, sitemap_identifier,getslug(url) as url, count, entity_type,
                   url_type, now() as created_at, now() as updated_at,
                   sublocality_latitude,sublocality_longitude,locality_latitude,locality_longitude,
                   locality_id, sublocality_id, locality_value,sublocality_value, is_valid, 
-                  locality_location::geography, sublocality_location::geography
+                  locality_location, sublocality_location, location
                  from seo_doctor_search_urls '''
 
         sequence_query = '''select sequence from seo_doctor_search_urls limit 1 '''
@@ -658,8 +662,8 @@ class EntityUrls(TimeStampedModel):
             sequence = 0
 
         create_temp_table_query = '''create table seo_doctor_search_urls as
-                    select  ea.alternative_value, ea.search_slug, null::json as extras , null as sublocality_location,  
-                     null as locality_location,
+                    select  ea.alternative_value, ea.search_slug, null::json as extras , null::geography as sublocality_location,  
+                     null::geography as locality_location, null::geography as location,
                     case when ea.type = 'SUBLOCALITY' then 
                     concat('doctors-in-', ea.search_slug, '-sptlitcit')
                     else concat('doctors-in-', ea.search_slug, '-sptcit')
@@ -718,6 +722,10 @@ class EntityUrls(TimeStampedModel):
 
         update_sublocality_loc = RawSql(update_sublocality_loc_query, []).execute()
 
+        update_location_query = '''update seo_doctor_search_urls set location = case when 
+                    sublocality_location is not null then sublocality_location  else locality_location end'''
+        update_location = RawSql(update_location_query, []).execute()
+
         return 'success'
 
     def create_doctor_spec_urls_temp_table():
@@ -732,7 +740,8 @@ class EntityUrls(TimeStampedModel):
 
         create_temp_table_query = '''create table seo_doctor_specialization_search as
                     select ps.id as specialization_id, ps.name as specialization, ea.alternative_value,
-                      ea.search_slug, null as url, null::json as extras, null as locality_location, null as sublocality_location,
+                      ea.search_slug, null as url, null::json as extras, null::geography as locality_location, 
+                      null::geography as sublocality_location, null::geography as location,
                      ea.type, count(*) as count,
                     case when ea.type = 'SUBLOCALITY' then 
                     ea.id 
@@ -798,6 +807,10 @@ class EntityUrls(TimeStampedModel):
                  sublocality_latitude is not null and sublocality_longitude is not null'''
 
         update_sublocality_loc = RawSql(update_sublocality_loc_query, []).execute()
+
+        update_location_query = '''update seo_doctor_specialization_search set location = case when 
+                           sublocality_location is not null then sublocality_location  else locality_location end'''
+        update_location = RawSql(update_location_query, []).execute()
 
         return 'success'
 
@@ -1583,38 +1596,38 @@ class LabPageUrl(object):
         sublocality_id = None
         sublocality_longitude = None
         sublocality_latitude = None
+        sublocality = None
+        locality = None
 
         if lab:
             if lab.is_live:
-                sublocality = lab.entity.filter(type="SUBLOCALITY", valid=True).first()
+                entity_location_relation = lab.entity.all()
+                for obj in entity_location_relation:
+                    if obj.location.use_in_url:
+                        if obj.location.type == 'SUBLOCALITY':
+                            sublocality = obj.location
+                            break
                 if sublocality:
-                    sublocality_value = sublocality.location.alternative_value
-                    sublocality_id = sublocality.location.id
-                    sublocality_longitude = sublocality.location.centroid.x
-                    sublocality_latitude = sublocality.location.centroid.y
-                    locality = EntityAddress.objects.filter(id=sublocality.location.parent).first()
-                    locality_value = locality.alternative_value
-                    locality_id = locality.id
-                    locality_longitude = locality.centroid.x
-                    locality_latitude = locality.centroid.y
-
-                else:
-                    # locality = lab.entity.filter(type="LOCALITY", valid=True).first()
-                    locality = lab.entity.filter(type="LOCALITY", valid=True, location__centroid__isnull=False).first()
+                    sublocality_value = sublocality.alternative_value
+                    sublocality_id = sublocality.id
+                    if sublocality.centroid:
+                        sublocality_longitude = sublocality.centroid.x
+                        sublocality_latitude = sublocality.centroid.y
+                    locality = EntityAddress.objects.filter(id=sublocality.parent).first()
                     if locality:
-                        locality_value = locality.location.alternative_value
-                        locality_id = locality.location.id
-                        locality_longitude = locality.location.centroid.x
-                        locality_latitude = locality.location.centroid.y
-
+                        locality_value = locality.alternative_value
+                        locality_id = locality.id
+                        if locality.centroid:
+                            locality_longitude = locality.centroid.x
+                            locality_latitude = locality.centroid.y
                 if lab:
-                    url = "%s" % lab.name
+
                     if locality and sublocality:
-                        url = url + "-in-%s-%s-lpp" % (sublocality_value, locality_value)
-                    elif locality:
-                        url = url + "-in-%s-lpp" % locality_value
+                        url = lab.name + "-in-%s-%s" % (sublocality_value, locality_value)
+                    # elif locality:
+                    #     url = lab.name + "-in-%s" % locality_value
                     else:
-                        url = url + "-lpp"
+                       url = lab.name
 
                     url = slugify(url)
 
@@ -1652,27 +1665,12 @@ class LabPageUrl(object):
 
                     new_url = url
 
-                    # counter = 0
-                    # while True:
-                    #     if counter>0:
-                    #         # new_url = url+'-'+'-'+''.join([random.choice(string.digits) for n in range(10)])
-                    #         new_url = url+'-'+str(counter)
-                    #     dup_url = EntityUrls.objects.filter(url=new_url, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).filter(~Q(entity_id=lab.id)).first()
-                    #     if not dup_url:
-                    #         break
-                    #     counter = counter + 1
-                    # dup_url = EntityUrls.objects.filter(url=new_url,
-                    #                                     sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).filter(
-                    #     ~Q(entity_id=lab.id)).first()
-                    #
-                    # if dup_url:
-                    #     new_url = new_url + '-' + str(lab.id)
-                    #
-                    dup_url = EntityUrls.objects.filter(url=new_url,
+                    dup_url = EntityUrls.objects.filter(url=new_url+'-lpp',
                                                         sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE
                                                         ).filter(~Q(entity_id=lab.id)).first()
                     if dup_url:
                         new_url = new_url + '-' + str(lab.id)
+                    new_url = new_url + '-lpp'
 
                     EntityUrls.objects.filter(entity_id=lab.id,
                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
@@ -1682,7 +1680,6 @@ class LabPageUrl(object):
                     EntityUrls.objects.filter(entity_id=lab.id,
                                               sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
                                               url=new_url).delete()
-
                     data['url'] = new_url
                     EntityUrls.objects.create(**data)
                     return ("success: " + str(lab.id))
