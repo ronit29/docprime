@@ -23,7 +23,7 @@ from django.template.loader import render_to_string
 from num2words import num2words
 from hardcopy import bytestring_to_pdf
 import math
-
+from decimal import  *
 logger = logging.getLogger(__name__)
 
 
@@ -70,6 +70,9 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     enabled = models.BooleanField(default=True)
     insurer_document = models.FileField(null=True,blank=False, upload_to='insurer/documents',
                                         validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
+    igst = models.PositiveSmallIntegerField(blank=False, null=True)
+    sgst = models.PositiveSmallIntegerField(blank=False, null=True)
+    cgst = models.PositiveSmallIntegerField(blank=False, null=True)
 
     @property
     def get_active_plans(self):
@@ -228,7 +231,35 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         threshold = self.insurance_plan.threshold.filter().first()
 
+        # Gst calculation.
+
+        premium_amount = Decimal(self.premium_amount)
+        amount_without_tax = (premium_amount * Decimal(100)) / Decimal(118)
+
+        cgst_tax = 'NA'
+        sgst_tax = 'NA'
+        igst_tax = 'NA'
+
+        if self.insurance_plan.insurer.cgst and self.insurance_plan.insurer.sgst:
+            cgst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.cgst)
+            cgst_tax = '%.2f' % (float(str(cgst_tax)))
+
+            sgst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.sgst)
+            sgst_tax = '%.2f' % (float(str(sgst_tax)))
+
+        elif self.insurance_plan.insurer.igst:
+            igst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.igst)
+            igst_tax = '%.2f' % (float(str(igst_tax)))
+
         context = {
+            'sgst_rate': '(%s%%)' % str(self.insurance_plan.insurer.sgst) if self.insurance_plan.insurer.sgst else '',
+            'cgst_rate': '(%s%%)' % str(self.insurance_plan.insurer.cgst) if self.insurance_plan.insurer.cgst else '',
+            'igst_rate': '(%s%%)' % str(self.insurance_plan.insurer.igst) if self.insurance_plan.insurer.igst else '',
+            'net_premium': '%.2f' % float(str(amount_without_tax)),
+            'cgst_rate_tax': cgst_tax,
+            'sgst_rate_tax': sgst_tax,
+            'igst_rate_tax': igst_tax,
+            'gross_amount': self.premium_amount,
             'purchase_data': str(self.purchase_date.date().strftime('%d-%m-%Y')),
             'start_time': str(self.purchase_date.strftime('%H:%M')),
             'expiry_date': str(self.expiry_date.date().strftime('%d-%m-%Y')),
@@ -264,7 +295,9 @@ class UserInsurance(auth_model.TimeStampedModel):
             'insurer_logo': self.insurance_plan.insurer.logo.url,
             'insurer_signature': self.insurance_plan.insurer.signature.url,
             'company_name': self.insurance_plan.insurer.company_name,
-            'insurer_name': self.insurance_plan.insurer.name
+            'insurer_name': self.insurance_plan.insurer.name,
+            'gst_state_code': '',
+            'reciept_number': ''
         }
         html_body = render_to_string("pdfbody.html", context=context)
         policy_number = self.policy_number
