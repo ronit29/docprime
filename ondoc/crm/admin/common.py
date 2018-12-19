@@ -17,6 +17,7 @@ import nested_admin
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.contrib.contenttypes.models import ContentType
+from import_export.admin import ImportExportMixin
 
 
 def practicing_since_choices():
@@ -254,13 +255,26 @@ class GenericAdminForm(forms.ModelForm):
                    'phone_number': forms.NumberInput(attrs={'size': 8})}
 
 
-class MerchantAdmin(VersionAdmin):
+class MerchantAdmin(ImportExportMixin, VersionAdmin):
     model = Merchant
+
+    list_display = ('beneficiary_name', 'account_number', 'ifsc_code', 'enabled', 'verified_by_finance')
+
+    change_list_template = 'superuser_import_export.html'
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
             return [f.name for f in self.model._meta.fields if f.name not in ['enabled','verified_by_finance']]
         return []
+
+
+    def save_model(self, request, obj, form, change):
+
+        if form.cleaned_data.get('verified_by_finance') and not obj.verified_by:
+            obj.verified_by = request.user
+
+        super().save_model(request, obj, form, change)
+
 
 class MerchantPayoutForm(forms.ModelForm):
     process_payout = forms.BooleanField(required=False)
@@ -298,6 +312,7 @@ class MerchantPayoutAdmin(VersionAdmin):
     model = MerchantPayout
     fields = ['id','charged_amount','updated_at','created_at','payable_amount','status','payout_time','paid_to',
     'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout']
+    list_display = ('object_id', 'status', 'payable_amount')
 
     def get_readonly_fields(self, request, obj=None):
         base = ['appointment_id', 'get_billed_to', 'get_merchant']
