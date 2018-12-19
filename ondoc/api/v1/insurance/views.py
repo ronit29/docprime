@@ -276,13 +276,18 @@ class InsuranceValidationViewSet(viewsets.GenericViewSet):
                 resp['insurance_threshold'] = threshold.opd_amount_limit
                 resp['insurance_message'] = insurance_message
                 return Response(resp)
-            else:
+            elif valid_data.get('lab'):
                 resp['is_user_insured'] = True
                 resp['is_insurance_cover'] = True
                 resp['insurance_threshold'] = threshold.lab_amount_limit
                 resp['insurance_message'] = "Cover Under Insurance"
                 return Response(resp)
-
+            else:
+                resp['is_user_insured'] = True
+                resp['is_insurance_cover'] = False
+                resp['insurance_threshold'] = threshold.lab_amount_limit
+                resp['insurance_message'] = "There is no doctor or lab selected for insurance"
+                return Response(resp)
         else:
             resp['is_user_insured'] = False
             resp['is_insurance_cover'] = False
