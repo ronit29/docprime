@@ -78,6 +78,8 @@ class GeocodingResults(TimeStampedModel):
         #saved_json = GeocodingResults.objects.filter(latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'))
 
         if not exists:
+            cls.geocodine_cache[key]=True
+
             response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?sensor=false',
                                     params={'latlng': '%s,%s' % (kwargs.get('latitude'), kwargs.get('longitude')),
                                             'key': settings.REVERSE_GEOCODING_API_KEY, 'language': 'en'})
