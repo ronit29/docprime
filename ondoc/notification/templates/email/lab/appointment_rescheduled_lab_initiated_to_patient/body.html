@@ -84,13 +84,11 @@
 									Home Visit Address
 									</td>
 								</tr>
-								{% if instance.address.address %}
 									<tr>
 										<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 4px;">
-										{{instance.address.address}}
+										{{instance.get_pickup_address}}
 										</td>
 									</tr>
-								{% endif %}
 								<tr>
 									<td style="font-size: 14px; color: #070707; font-weight: 500; padding-top: 2px;">
 									</td>

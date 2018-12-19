@@ -1251,11 +1251,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         from ondoc.notification.tasks import send_opd_notifications_refactored
         if push_to_matrix:
         # Push the appointment data to the matrix .
-            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+            try:
+                push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
-            send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+            try:
+                send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+            except Exception as e:
+                logger.error(str(e))
             # notification_tasks.send_opd_notifications_refactored(self.id)
             # notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id},
             #                                                                  countdown=1)
@@ -1264,7 +1270,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
                                                                          product=Order.DOCTOR_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
         if self.status == self.COMPLETED and not self.is_rated:
-            notification_tasks.send_opd_rating_message.apply_async(kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+            try:
+                notification_tasks.send_opd_rating_message.apply_async(
+                    kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+            except Exception as e:
+                logger.error(str(e))
+
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)

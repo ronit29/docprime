@@ -154,8 +154,11 @@ class Order(TimeStampedModel):
                 }
 
         # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
-        # if not self.txn.first():
-        #     set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5)
+        if not self.txn.first():
+            try:
+                transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5))
+            except Exception as e:
+                logger.error(str(e))
 
         if order_dict:
             self.update_order(order_dict)
@@ -757,7 +760,10 @@ class MerchantPayout(TimeStampedModel):
             if self.status == self.PENDING:
                 self.status = self.ATTEMPTED
 
-            transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
+            try:
+                transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
+            except Exception as e:
+                logger.error(str(e))
 
         super().save(*args, **kwargs)
 
