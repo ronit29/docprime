@@ -150,7 +150,7 @@ class UserInsuranceSerializer(serializers.Serializer):
 
 
 class InsuranceValidationSerializer(serializers.Serializer):
-    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), allow_null=True, allow_blank=True)
-    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), allow_null=True, allow_blank=True)
+    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), allow_null=True)
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all(), allow_null=True)
     time_slot_start = serializers.DateTimeField()
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
