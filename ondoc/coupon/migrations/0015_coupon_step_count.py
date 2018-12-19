@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             model_name='coupon',
             name='step_count',
             field=models.PositiveIntegerField(default=1, validators=[django.core.validators.MinValueValidator(1)],
-                                              verbose_name='Valid only at multiples of appointment number'),
+                                              verbose_name='Valid only at multiples of this appointment number'),
         ),
         migrations.AddField(
             model_name='coupon',
