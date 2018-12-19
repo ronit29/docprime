@@ -38,14 +38,11 @@ class Config():
 
     broker_backend = "SQS"
     broker_transport_options = {'region': 'ap-south-1'}
-    #BROKER_URL = “sqs://aws_access_key_id:aws_secret_access_key@”
+
     broker_url = "sqs://{}:{}@".format(settings.AWS_ACCESS_KEY_ID, quote(settings.AWS_SECRET_ACCESS_KEY, safe=''))
-    #broker_url = 'sqs://AKIAJVR2SXLCMUPJGSTA:bSptjN3adc%2By0SnwIWcl6dHs5P90ed0aDf83Oyh%2F@'
 
     task_create_missing_queues = False
-    #task_default_queue = settings.CELERY_QUEUE
-    #task_default_queue = 'qa4_notifications'
-    task_default_queue = 'QA4-CELERY'
+    task_default_queue = settings.CELERY_TASK_DEFAULT_QUEUE
     default_queue = settings.CELERY_TASK_DEFAULT_QUEUE
     default_exchange = default_queue
     default_exchange_type = default_queue
