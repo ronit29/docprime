@@ -1,4 +1,4 @@
-from ondoc.coupon.models import Coupon
+from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from ondoc.account.models import Order
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment, AvailableLabTest
@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from django.db import transaction
-from django.db.models import Q, Sum, Count, F
+from django.db.models import Q, Sum, Count, F, ExpressionWrapper, DateTimeField
 from . import serializers
 from django.conf import settings
 import requests, re, json
@@ -40,6 +40,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         test_ids = input_data.get("test_ids", [])
         deal_price = input_data.get("deal_price")
         coupon_code = input_data.get("coupon_code")
+        gender = input_data.get("gender")
+        age_range = input_data.get("age_range")
         types = []
         if deal_price==0:
             deal_price=None
@@ -73,8 +75,26 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
         if user and user.is_authenticated:
             coupons = coupons.filter(Q(is_user_specific=False) \
                 | (Q(is_user_specific=True) & Q(user_specific_coupon__user=user)))
+
+            expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
+
+            annotate_expression = ExpressionWrapper(expression, DateTimeField())
+            coupons = coupons.prefetch_related(Prefetch('random_generated_coupon',
+                                      queryset=RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression)
+                                      .filter(user=user,
+                                              sent_at__isnull=False,
+                                              consumed_at__isnull=True,
+                                              last_date__gte=datetime.datetime.now())))
         else:
             coupons = coupons.filter(is_user_specific=False)
+
+        if gender:
+            coupons = coupons.filter(Q(gender=gender) | Q(gender__isnull=True))
+
+        # TODO
+        if age_range:
+            age_start, age_end = age_range[0], age_range[1]
+            coupons = coupons.filter(age_start_lte=age_start, age_end_gte=age_end)
 
         if product_id:
             coupons = coupons.filter(is_corporate=False)
@@ -99,6 +119,10 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                                   queryset=LabAppointment.objects.filter(user=user).exclude(status__in=[LabAppointment.CANCELLED]), \
                                   to_attr='user_lab_booked')
 
+        # TODO
+        user_opd_completed = OpdAppointment.objects.filter(user=user, status__in=[OpdAppointment.COMPLETED]).count()
+
+        user_lab_completed = LabAppointment.objects.filter(user=user, status__in=[LabAppointment.COMPLETED]).count()
 
         coupons = coupons.prefetch_related('test', total_opd_booked, user_opd_booked, total_lab_booked, user_lab_booked)
         coupons = coupons.distinct()
@@ -113,6 +137,10 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
             if coupon.count and (len(coupon.user_opd_booked)+len(coupon.user_lab_booked)) \
                 >=coupon.count:
+                allowed = False
+
+            # TODO
+            if ((user_opd_completed + user_lab_completed + 1) % coupon.step_count != 0 ):
                 allowed = False
 
             if coupon.start_date and coupon.start_date>timezone.now() \
@@ -131,7 +159,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 allowed = False
 
             if allowed:
-                applicable_coupons.append({"coupon_type": coupon.type,
+                applicable_coupons.append({"is_random_generated": False,
+                            "coupon_type": coupon.type,
                             "coupon_id": coupon.id,
                             "code": coupon.code,
                             "desc": coupon.description,
@@ -141,6 +170,22 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                             "heading": coupon.heading,
                             "is_corporate" : coupon.is_corporate,
                             "tests": [ test.id for test in coupon.test.all() ],
+                            "network_id": coupon.lab_network.id if coupon.lab_network else None,
+                            "tnc": coupon.tnc})
+                for random_coupon in coupon.random_generated_coupon.all():
+                    applicable_coupons.append({"is_random_generated": True,
+                            "coupon_type": coupon.type,
+                            "random_coupon_id": random_coupon.id,
+                            "coupon_id": coupon.id,
+                            "random_code": random_coupon.random_coupon,
+                            "code": coupon.code,
+                            "desc": coupon.description,
+                            "coupon_count": 1,
+                            "used_count": 0,
+                            "coupon": coupon,
+                            "heading": coupon.heading,
+                            "is_corporate": coupon.is_corporate,
+                            "tests": [test.id for test in coupon.test.all()],
                             "network_id": coupon.lab_network.id if coupon.lab_network else None,
                             "tnc": coupon.tnc})
 
@@ -312,6 +357,7 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         lab = input_data.get("lab")
         tests = input_data.get("tests", [])
         doctor = input_data.get("doctor")
+        profile = input_data.get("profile")
 
         if str(product_id) == str(Order.DOCTOR_PRODUCT_ID):
             obj = OpdAppointment()
@@ -321,7 +367,8 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         discount = 0
 
         for coupon in coupons_data:
-            if obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
+            if obj.validate_user_coupon(user=request.user, coupon_obj=coupon,
+                                        profile=profile).get("is_valid"):
                 if lab and tests:
                     total_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon,
                                                                             test_ids=tests, lab=lab).get("total_price")

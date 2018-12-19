@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.fields import CharField
-from django.db.models import Q, Avg, Count, Max
+from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeField
 from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
@@ -15,7 +15,7 @@ from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin,
 from django.db.models import Avg
 from django.db.models import Q
 
-from ondoc.coupon.models import Coupon
+from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from ondoc.account.models import Order
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -247,9 +247,30 @@ class CreateAppointmentSerializer(serializers.Serializer):
                     request.data))
             raise serializers.ValidationError('Max'+str(MAX_APPOINTMENTS_ALLOWED)+' active appointments are allowed')
 
-        coupon_code = data.get("coupon_code", [])
-        coupon_obj = Coupon.objects.filter(code__in=coupon_code)
-        if len(coupon_code) == len(coupon_obj):
+        coupon_codes = data.get("coupon_code", [])
+        coupon_obj = None
+
+        if RandomGeneratedCoupon.objects.filter(random_coupon__in=coupon_codes).first():
+            expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
+            annotate_expression = ExpressionWrapper(expression, DateTimeField())
+            random_coupon = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
+                                                                   ).filter(random_coupon__in=coupon_codes,
+                                                                            sent_at__isnull=False,
+                                                                            consumed_at__isnull=True,
+                                                                            last_date__gte=datetime.datetime.now()
+                                                                            ).first()
+            if random_coupon:
+                # coupon_codes = list()
+                # for coupon in random_coupons:
+                #     coupon_codes.append(coupon.coupon)
+                # coupon_obj = Coupon.objects.filter(code__in=coupon_codes)
+                coupon_obj = Coupon.objects.filter(code=random_coupon.coupon)
+            else:
+                raise serializers.ValidationError('Invalid coupon code - ' + str(random_coupon))
+
+        coupon_obj = Coupon.objects.filter(code__in=coupon_codes) | coupon_obj
+        if coupon_obj:
+        # if len(coupon_code) == len(coupon_obj):
             ##### DO NOT DELETE ######
             # for coupon in coupon_obj:
             #     obj = OpdAppointment()
@@ -263,9 +284,11 @@ class CreateAppointmentSerializer(serializers.Serializer):
             #         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
             ##########################
             for coupon in coupon_obj:
+                profile = data.get("profile")
                 obj = OpdAppointment()
-                if not obj.validate_user_coupon(user=request.user, coupon_obj=coupon).get("is_valid"):
+                if not obj.validate_user_coupon(user=request.user, coupon_obj=coupon, profile=profile).get("is_valid"):
                     raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+            data["coupon_obj"] = list(coupon_obj)
 
         return data
 

@@ -351,8 +351,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def getCouponDiscout(self, data, deal_price):
         coupon_list = []
         coupon_discount = 0
-        if data.get("coupon_code"):
-            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
+        coupon_obj = data.get("coupon_obj")
+        if coupon_obj:
+            # coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
             obj = models.OpdAppointment()
             for coupon in coupon_obj:
                 coupon_discount += obj.get_discount(coupon, deal_price)

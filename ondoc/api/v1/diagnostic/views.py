@@ -694,8 +694,9 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         coupon_list = []
         coupon_discount = 0
-        if data.get("coupon_code"):
-            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
+        coupon_obj = data.get("coupon_obj")
+        if coupon_obj:
+            # coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
             obj = models.LabAppointment()
             for coupon in coupon_obj:
                 if coupon.is_user_specific and coupon.test.exists():

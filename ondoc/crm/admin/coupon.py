@@ -2,10 +2,11 @@ from dal import autocomplete
 from django.contrib import admin
 from django import forms
 from ondoc.diagnostic.models import Lab, LabTest
-from ondoc.coupon.models import Coupon, UserSpecificCoupon
+from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from import_export.admin import ImportExportModelAdmin
 from import_export import resources
 from ondoc.authentication.models import User
+from django.utils.crypto import get_random_string
 
 class LabAutocomplete(autocomplete.Select2QuerySetView):
 
@@ -51,6 +52,16 @@ class CouponForm(forms.ModelForm):
             'lab': autocomplete.ModelSelect2(url='lab-autocomplete', forward=['lab_network']),
             'test': autocomplete.ModelSelect2Multiple(url='test-autocomplete', forward=['lab', 'lab_network'])
         }
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        age_start = cleaned_data.get('age_start', None)
+        age_end = cleaned_data.get('age_end', None)
+        if age_start > age_end:
+            raise forms.ValidationError('Age End is smaller than Age Start.')
 
 
 class CouponAdmin(admin.ModelAdmin):
@@ -109,3 +120,20 @@ class UserSpecificCouponAdmin(ImportExportModelAdmin):
     resource_class = UserSpecificCouponResource
 
 
+class RandomGeneratedCouponAdmin(admin.ModelAdmin):
+
+    readonly_fields = ('random_coupon', 'sent_at', 'consumed_at')
+
+    list_display = ('id', 'random_coupon', 'coupon', 'user', 'sent_at', 'consumed_at', 'created_at', 'updated_at')
+
+    def save_model(self, request, obj, form, change):
+
+        if not obj.random_coupon:
+            obj.random_coupon = get_random_string(length=10).upper()
+            while RandomGeneratedCoupon.objects.filter(random_coupon=obj.random_coupon).exists():
+                obj.random_coupon = get_random_string(length=10).upper()
+        super().save_model(request, obj, form, change)
+
+    class Meta:
+        model = RandomGeneratedCoupon
+        fields = ('__all__')

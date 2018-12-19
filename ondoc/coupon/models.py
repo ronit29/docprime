@@ -2,6 +2,7 @@ from django.db import models
 from ondoc.authentication import models as auth_model
 from django.core.validators import MaxValueValidator, MinValueValidator
 import datetime
+from django.utils.crypto import get_random_string
 
 class Coupon(auth_model.TimeStampedModel):
     DOCTOR = 1
@@ -16,8 +17,14 @@ class Coupon(auth_model.TimeStampedModel):
     validity = models.PositiveIntegerField(blank=False, null=False)
     start_date = models.DateTimeField(default=None, null=True, blank=True)
     type = models.IntegerField(choices=TYPE_CHOICES)
+    age_start = models.PositiveIntegerField(blank=True, null=True, default=None,
+                                            validators=[MaxValueValidator(100), MinValueValidator(0)])
+    age_end = models.PositiveIntegerField(blank=True, null=True, default=None,
+                                          validators=[MaxValueValidator(100), MinValueValidator(0)])
+    gender = models.CharField(max_length=1, choices=auth_model.UserProfile.GENDER_CHOICES, default=None, null=True, blank=True)
     count = models.PositiveIntegerField()
     total_count = models.PositiveIntegerField(null=True, blank=True)
+    step_count = models.PositiveIntegerField(verbose_name="Valid only at multiples of this appointment number", default=1, validators=[MinValueValidator(1)])
     description = models.CharField(max_length=500, default="")
     heading = models.CharField(max_length=500, default="")
     tnc = models.CharField(max_length=2000, default="")
@@ -101,3 +108,20 @@ class UserSpecificCoupon(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "user_specific_coupon"
+
+
+class RandomGeneratedCoupon(auth_model.TimeStampedModel):
+
+    random_coupon = models.CharField(max_length=50)
+    coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, related_name="random_generated_coupon")
+    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE)
+    sent_at = models.DateTimeField(default=None, null=True, blank=True)
+    consumed_at = models.DateTimeField(default=None, null=True, blank=True)
+    validity = models.PositiveIntegerField(default=None)
+
+    def __str__(self):
+        return self.random_coupon
+
+    class Meta:
+        db_table = "random_generated_coupon"
+

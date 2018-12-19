@@ -17,6 +17,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
+from datetime import date, timedelta
 
 
 class Image(models.Model):
@@ -362,6 +363,10 @@ class UserProfile(TimeStampedModel):
             return True
         old_value = self.__class__._default_manager.filter(pk=self.pk).values('profile_image').get()['profile_image']
         return not getattr(self, 'profile_image').name == old_value
+
+    def get_age(self):
+        user_age = (date.today() - self.dob) // timedelta(days=365.2425)
+        return user_age
 
     def save(self, *args, **kwargs):
         if not self.has_image_changed():

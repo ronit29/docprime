@@ -11,7 +11,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType,LabService,
                                       AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition, LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory)
-from ondoc.coupon.models import Coupon, UserSpecificCoupon
+from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, MerchantPayout
 from ondoc.notification import models as notifcation_model
@@ -33,7 +33,7 @@ from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
 from .report import ReportAdmin
-from .coupon import CouponAdmin, UserSpecificCouponAdmin
+from .coupon import CouponAdmin, UserSpecificCouponAdmin, RandomGeneratedCouponAdmin
 from ondoc.reports import models as report_models
 from ondoc.authentication.models import GenericLabAdmin
 
@@ -131,6 +131,7 @@ admin.site.register(SitemapManger, SitemapManagerAdmin)
 admin.site.register(GoogleDetailing, GoogleDetailingAdmin)
 admin.site.register(Coupon, CouponAdmin)
 admin.site.register(UserSpecificCoupon, UserSpecificCouponAdmin)
+admin.site.register(RandomGeneratedCoupon, RandomGeneratedCouponAdmin)
 admin.site.register(VisitReason, VisitReasonAdmin)
 admin.site.register(CancellationReason)
 admin.site.register(SeoSpecialization, SeoSpecializationAdmin)
