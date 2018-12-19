@@ -3,8 +3,8 @@ from ondoc.doctor.models import Doctor
 from ondoc.location.models import EntityUrls
 
 
-def doctor_search_entity_urls():
-    success = EntityUrls.create_doctor_search_entity_urls()
+def doctor_spec_urls_temp_table():
+    success = EntityUrls.create_doctor_spec_urls_temp_table()
     if success:
         print("Successfull")
     else:
@@ -13,4 +13,4 @@ def doctor_search_entity_urls():
 
 class Command(BaseCommand):
     def handle(self, **options):
-        doctor_search_entity_urls()
+        doctor_spec_urls_temp_table()
