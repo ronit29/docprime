@@ -240,6 +240,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(verbose_name= 'Staff Status', default=False, help_text= 'Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField(auto_now_add=True)
 
+    def __hash__(self):
+        return self.id
+
+    def __eq__(self, other):
+        if self and other and self.id and other.id:
+            return self.id == other.id
+        return False
+
     def __str__(self):
         name = self.phone_number
         try:

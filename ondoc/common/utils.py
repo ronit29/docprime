@@ -1,6 +1,7 @@
 import json
 import re
-from ondoc.notification.rabbitmq_client import publish_message
+# from ondoc.notification.rabbitmq_client import publish_message
+from ondoc.notification.sqs_client import publish_message
 
 
 def all_emails(items):

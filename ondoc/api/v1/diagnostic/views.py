@@ -1,10 +1,12 @@
+from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
-                                     FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer, LabPricingGroup, LabTestCategory)
+                                     FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
+                                     LabPricingGroup, LabTestCategory, LabTestCategoryMapping)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.notification.models import EmailNotification
@@ -47,6 +49,11 @@ import re
 import datetime
 from django.contrib.auth import get_user_model
 from ondoc.matrix.tasks import push_order_to_matrix
+from django.contrib.gis.geos import Point
+from django.contrib.gis.measure import D
+from django.db.models.expressions import Window
+from django.db.models.functions import RowNumber
+from django.db.models import Avg
 User = get_user_model()
 
 
@@ -84,6 +91,29 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
     search_fields = ('name',)
 
     @transaction.non_atomic_requests
+    def autocomplete_packages(self, request, *args, **kwargs):
+        name = request.query_params.get('name')
+        temp_data = dict()
+        if name:
+            search_key = re.findall(r'[a-z0-9A-Z.]+', name)
+            search_key = " ".join(search_key).lower()
+            search_key = "".join(search_key.split("."))
+            test_queryset = LabTest.objects.filter(
+                Q(search_key__icontains=search_key) |
+                Q(search_key__icontains=' ' + search_key) |
+                Q(search_key__istartswith=search_key),
+                is_package=True).filter(searchable=True).annotate(
+                search_index=StrIndex('search_key', Value(search_key))).order_by(
+                'search_index')
+            test_queryset = paginate_queryset(test_queryset, request)
+        else:
+            test_queryset = self.queryset.filter(is_package=True)[:20]
+
+        test_serializer = diagnostic_serializer.LabTestListSerializer(test_queryset, many=True)
+        temp_data['packages'] = test_serializer.data
+        return Response(temp_data)
+
+    @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
         name = request.query_params.get('name')
         temp_data = dict()
@@ -118,6 +148,71 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     queryset = AvailableLabTest.objects.all()
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
+
+    @transaction.non_atomic_requests
+    def list_packages(self, request, **kwrgs):
+        parameters = dict(request.query_params)
+        if parameters.get('categories'):
+            parameters['categories'] = [category_id for category_id in str.split(parameters['categories'][0], ',')]
+        serializer = diagnostic_serializer.LabPackageListSerializer(data=parameters)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        default_long = 77.071848
+        default_lat = 28.450367
+        long = validated_data.get('long', default_long)
+        lat = validated_data.get('lat', default_lat)
+        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        max_distance = 50000
+        category_ids = validated_data.get('categories', None)
+        lab_tests =None
+        if category_ids:
+            lab_tests = LabTestCategoryMapping.objects.filter(parent_category__in=category_ids).values_list(
+                'lab_test',
+                flat=True)
+        all_packages_in_network_labs = LabTest.objects.filter(is_package=True,
+                                                              availablelabs__lab_pricing_group__labs__network__isnull=False,
+                                                              availablelabs__lab_pricing_group__labs__location__dwithin=(
+                                                                  Point(float(long), float(lat)),
+                                                                  D(m=max_distance))).annotate(
+            distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
+            lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
+            deal_price=Case(
+                When(availablelabs__custom_deal_price__isnull=True,
+                     then=F('availablelabs__computed_deal_price')),
+                When(availablelabs__custom_deal_price__isnull=False,
+                     then=F('availablelabs__custom_deal_price'))),
+            rank=Window(expression=RowNumber(), order_by=F('distance').desc(),
+                        partition_by=[F(
+                            'availablelabs__lab_pricing_group__labs__network'), F('id')]))
+
+        all_packages_in_non_network_labs = LabTest.objects.filter(is_package=True,
+                                                                  availablelabs__lab_pricing_group__labs__network__isnull=True,
+                                                                  availablelabs__lab_pricing_group__labs__location__dwithin=(
+                                                                      Point(float(long), float(lat)),
+                                                                      D(m=max_distance))).annotate(
+            distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
+            lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
+            deal_price=Case(
+                When(availablelabs__custom_deal_price__isnull=True,
+                     then=F('availablelabs__computed_deal_price')),
+                When(availablelabs__custom_deal_price__isnull=False,
+                     then=F('availablelabs__custom_deal_price'))),
+        )
+        if lab_tests:
+            all_packages_in_non_network_labs = all_packages_in_non_network_labs.filter(id__in=lab_tests)
+            all_packages_in_network_labs = all_packages_in_network_labs.filter(id__in=lab_tests)
+
+        all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
+        all_packages.extend([package for package in all_packages_in_non_network_labs])
+        lab_ids = [package.lab for package in all_packages]
+        lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network').annotate(
+            avg_rating=Avg('rating')).filter(id__in=lab_ids)
+        serializer = CustomLabTestPackageSerializer(all_packages, many=True,
+                                                    context={'lab_data': lab_data, 'request': request})
+        return Response(serializer.data)
+
+
 
     @transaction.non_atomic_requests
     def list_by_url(self, request, *args, **kwargs):
@@ -1219,3 +1314,14 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 resp['tests'] = temp_tests
                 empty.append(resp)
         return Response(empty)
+
+    def list_category(self, request):
+        queryset = LabTestCategory.objects.filter(is_package_category=True, is_live = True)
+        result = []
+        for category in queryset:
+            name = category.name
+            id = category.id
+            result.append({'name': name, 'id': id})
+
+        return Response(result)
+

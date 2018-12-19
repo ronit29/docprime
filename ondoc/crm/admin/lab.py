@@ -1090,7 +1090,6 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
-    form = LabTestAdminForm
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)

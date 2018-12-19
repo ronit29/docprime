@@ -14,9 +14,11 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
+
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout
+from ondoc.notification.models import NotificationAction
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.tasks import doc_app_auto_cancel
@@ -1246,19 +1248,34 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         return False
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
+        from ondoc.notification.tasks import send_opd_notifications_refactored
         if push_to_matrix:
         # Push the appointment data to the matrix .
-            push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-                                                     'product_id': 5, 'sub_product_id': 2}, ), countdown=5)
+            try:
+                push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
-            notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+            try:
+                send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+            except Exception as e:
+                logger.error(str(e))
+            # notification_tasks.send_opd_notifications_refactored(self.id)
+            # notification_tasks.send_opd_notifications.apply_async(kwargs={'appointment_id': self.id},
+            #                                                                  countdown=1)
         if not old_instance or old_instance.status != self.status:
             notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                          product=Order.DOCTOR_PRODUCT_ID,
                                                                          alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
         if self.status == self.COMPLETED and not self.is_rated:
-            notification_tasks.send_opd_rating_message.apply_async(kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+            try:
+                notification_tasks.send_opd_rating_message.apply_async(
+                    kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+            except Exception as e:
+                logger.error(str(e))
+
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
@@ -1528,10 +1545,20 @@ class PrescriptionFile(auth_model.TimeStampedModel, auth_model.Document):
                 notification_type=notification_models.NotificationAction.PRESCRIPTION_UPLOADED,
             )
 
+    def send_notification_refactored(self, database_instance):
+        from ondoc.communications.models import OpdNotification
+        appointment = self.prescription.appointment
+        if not appointment.user:
+            return
+        if not database_instance:
+            opd_notification = OpdNotification(appointment, NotificationAction.PRESCRIPTION_UPLOADED)
+            opd_notification.send()
+
     def save(self, *args, **kwargs):
         database_instance = PrescriptionFile.objects.filter(pk=self.id).first()
         super().save(*args, **kwargs)
-        self.send_notification(database_instance)
+        transaction.on_commit(lambda: self.send_notification_refactored(database_instance))
+        # self.send_notification(database_instance)
 
     class Meta:
         db_table = "prescription_file"

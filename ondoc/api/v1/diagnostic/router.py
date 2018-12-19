@@ -14,6 +14,8 @@ urlpatterns = [
     #path('block-calender', LabBlockCalendarViewSet.as_view({'get': 'list'}), name='get-lab-block-calender'),
     path('labsearch', SearchPageViewSet.as_view({'get': 'list'}), name='search-lab'),
     path('test', LabTestList.as_view({'get': 'list'}), name='test-list'),
+    path('package', LabTestList.as_view({'get': 'autocomplete_packages'}), name='package-autocomplete'),
+    path('packagelist', LabList.as_view({'get': 'list_packages'}), name='package-list'),
     # path('test/<int:id>/', LabTestList.as_view({'get': 'retrieve'}), name='test-detail'),
     path('lablist', LabList.as_view({'get': 'list'}), name='lab-list'),
     path('lablist_by_url', LabList.as_view({'get': 'list_by_url'}), name='search_by_city'),
@@ -44,4 +46,5 @@ urlpatterns = [
          name='appointment-complete'),
     path('test/details', TestDetailsViewset.as_view({'get':'retrieve'}), name='test-details'),
     path('test/category',LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
+    path('package/category', LabTestCategoryListViewSet.as_view({'get': 'list_category'}), name='package_category'),
 ]
