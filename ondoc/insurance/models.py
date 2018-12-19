@@ -236,22 +236,25 @@ class UserInsurance(auth_model.TimeStampedModel):
         premium_amount = Decimal(self.premium_amount)
         amount_without_tax = (premium_amount * Decimal(100)) / Decimal(118)
 
-        cgst_tax = '0% and 0.0'
-        sgst_tax = '0% and 0.0'
-        igst_tax = '0% and 0.0'
+        cgst_tax = 'NA'
+        sgst_tax = 'NA'
+        igst_tax = 'NA'
 
         if self.insurance_plan.insurer.cgst and self.insurance_plan.insurer.sgst:
             cgst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.cgst)
-            cgst_tax = '%s%% and %.2f' % (str(self.insurance_plan.insurer.cgst), float(str(cgst_tax)))
+            cgst_tax = '%.2f' % (float(str(cgst_tax)))
 
             sgst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.sgst)
-            sgst_tax = '%s%% and %.2f' % (str(self.insurance_plan.insurer.sgst), float(str(sgst_tax)))
+            sgst_tax = '%.2f' % (float(str(sgst_tax)))
 
         elif self.insurance_plan.insurer.igst:
             igst_tax = (amount_without_tax/Decimal(100)) * Decimal(self.insurance_plan.insurer.igst)
-            igst_tax = '%s%% and %.2f' % (str(self.insurance_plan.insurer.igst), float(str(igst_tax)))
+            igst_tax = '%.2f' % (float(str(igst_tax)))
 
         context = {
+            'sgst_rate': '(%s%%)' % str(self.insurance_plan.insurer.sgst) if self.insurance_plan.insurer.sgst else '',
+            'cgst_rate': '(%s%%)' % str(self.insurance_plan.insurer.cgst) if self.insurance_plan.insurer.cgst else '',
+            'igst_rate': '(%s%%)' % str(self.insurance_plan.insurer.igst) if self.insurance_plan.insurer.igst else '',
             'net_premium': '%.2f' % float(str(amount_without_tax)),
             'cgst_rate_tax': cgst_tax,
             'sgst_rate_tax': sgst_tax,
@@ -292,7 +295,9 @@ class UserInsurance(auth_model.TimeStampedModel):
             'insurer_logo': self.insurance_plan.insurer.logo.url,
             'insurer_signature': self.insurance_plan.insurer.signature.url,
             'company_name': self.insurance_plan.insurer.company_name,
-            'insurer_name': self.insurance_plan.insurer.name
+            'insurer_name': self.insurance_plan.insurer.name,
+            'gst_state_code': '',
+            'reciept_number': ''
         }
         html_body = render_to_string("pdfbody.html", context=context)
         policy_number = self.policy_number
