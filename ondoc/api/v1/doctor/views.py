@@ -1721,6 +1721,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error(str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 create_admins = []
@@ -1735,6 +1736,7 @@ class CreateAdminViewSet(viewsets.GenericViewSet):
                 try:
                     auth_models.GenericAdmin.objects.bulk_create(create_admins)
                 except Exception as e:
+                    logger.error(str(e))
                     return Response({'error': 'something went wrong!'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         elif valid_data.get('entity_type') == GenericAdminEntity.HOSPITAL:
             hosp = models.Hospital.objects.get(id=valid_data['id'])
