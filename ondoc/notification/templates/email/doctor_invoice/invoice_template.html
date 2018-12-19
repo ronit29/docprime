@@ -87,7 +87,7 @@
                         {% if instance.hospital.state %}{{instance.hospital.state}}, {% endif %}
                         {% if instance.hospital.pin_code %}{{instance.hospital.pin_code}}{% endif %}
                     </td>
-                    <td style="width: 60%;padding-top: 10px;">
+                    <td style="width: 60%;padding-top: 10px;padding-left: 12px;">
                         {% if instance.profile.phone_number %}+91-{{instance.profile.phone_number}}{% endif %}
                     </td>
                 </tr>
@@ -143,6 +143,16 @@
                     </td>
                 </tr>
                 {% endfor %}
+                {% if coupon_discount %}
+                <tr>
+                    <td colspan="4" style="border: 1px solid black;text-align: center;">
+                        Coupon Discount
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{coupon_discount}}
+                    </td>
+                </tr>
+                {% endif %}
                 <tr>
                     <td colspan="4" style="border: 1px solid black;text-align: center;">
                         Amount Paid
