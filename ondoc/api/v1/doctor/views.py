@@ -1812,7 +1812,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         queryset = models.OfflinePatients.objects.filter(Q(doctor__manageable_doctors__user=user,
                                                            doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
                                                            doctor__manageable_doctors__is_disabled=False,
-                                                           hospital__isnull=True)
+                                                           )
                                                          |
                                                          Q(hospital__isnull=False,
                                                            hospital__manageable_hospitals__user=user,
@@ -1827,7 +1827,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                             )
         if valid_data.get('updated_at'):
             queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
-        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'updated_at').distinct()
+        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'updated_at').distinct()
         return Response(queryset)
 
     @transaction.atomic
@@ -1889,7 +1889,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                        'error': True,
                        'error_message': "Appointment With Same UUid exists!"}
                 resp.append(obj)
-                logger.error("Appointment With Same UUid exists! " + str(data))
+                logger.error("PROVIDER_REQUEST - Offline Appointment With Same UUid exists! " + str(data))
                 continue
             if not data.get('patient') and not data.get('patient_id'):
                 obj = {'doctor': data.get('doctor').id,
@@ -1898,7 +1898,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                        'error': True,
                        'error_message': "Patient not Recieved for Offline Appointment!"}
                 resp.append(obj)
-                logger.error("Patient not Recieved for Offline Appointment! " + str(data))
+                logger.error("PROVIDER_REQUEST - Patient not Recieved for Offline Appointment! " + str(data))
                 continue
 
             if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
@@ -1947,13 +1947,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
     def create_patient(self, request, data, hospital, doctor):
         if data.get('share_with_hospital') and not hospital:
-            logger.error('Hospital Not Given when Shared with Hospital Set'+ str(data))
+            logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
         hosp = hospital if data.get('share_with_hospital') and hospital else None
         patient = models.OfflinePatients.objects.create(name=data.get('name'),
                                                         id=data.get('id'),
                                                         sms_notification=data.get('sms_notification', False),
                                                         gender=data.get('gender'),
                                                         dob=data.get("dob"),
+                                                        age=data.get('age'),
                                                         referred_by=data.get('referred_by'),
                                                         medical_history=data.get('medical_history'),
                                                         welcome_message=data.get('welcome_message'),
@@ -2122,7 +2123,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 phone_number = app.user.phone_number
                 patient_profile = app.profile_detail
                 patient_profile['user_id']= app.user.id if app.user else None
-                patient_profile['profile_id'] = app.profile.id if app.profile else None
+                patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
                 # patient_name = app.profile.name if hasattr(app, 'profile') else None
 
             ret_obj = {}

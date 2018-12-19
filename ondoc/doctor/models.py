@@ -1845,6 +1845,7 @@ class OfflinePatients(auth_model.TimeStampedModel):
     created_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
     error = models.BooleanField(default=False)
     error_message = models.CharField(max_length=256, blank=True, null=True)
+    age = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.name
