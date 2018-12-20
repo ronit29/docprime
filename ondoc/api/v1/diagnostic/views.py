@@ -273,8 +273,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         count = len(queryset_result)
         paginated_queryset = paginate_queryset(queryset_result, request)
         response_queryset = self.form_lab_search_whole_data(paginated_queryset, parameters.get("ids"))
-        result = {}
-        result['timing'] = response_queryset
+        result = list()
+        for data in response_queryset.items():
+            result.append(data[1])
 
         # serializer = diagnostic_serializer.LabNetworkSerializer(response_queryset, many=True,
         #                                                        context={"request": request})
@@ -328,7 +329,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             description += " and book test online, check fees, packages prices and more at DocPrime."
             seo = {'title': title, "description": description, "location": location}
 
-        return Response({"result": response_queryset,
+        return Response({"result": result,
                          "count": count, 'tests': tests,
                          "seo": seo})
 
@@ -439,7 +440,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             price_result['string'] = 'where price>=0'
 
         order_by = self.apply_search_sort(parameters)
-
+        # lab test enable conditions to be added in query
         if ids:
             query = '''select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority from
                         (
@@ -554,8 +555,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             next_lab_timing_data_dict = {}
             data_array = [list() for i in range(7)]
             lab_obj = temp_var[row["id"]]
-            row['city'] = lab_obj.city
-            row['sublocality'] = lab_obj.sublocality
+            row['address'] = lab_obj.sublocality + ' ' + lab_obj.city
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
 
@@ -602,20 +602,20 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row["next_lab_timing_data"] = next_lab_timing_data_dict
             row["tests"] = tests.get(row["id"])
 
-
-
             if row.get('network_id'):
                 if lab_network.get('network_id' + str(row.get('network_id'))):
-                    if not lab_network.get('network_id' + str(row.get('network_id'))).get('other_labs'):
-                        lab_network.get('network_id' + str(row.get('network_id')))['other_labs'] = None
 
-                    lab_network['network_id' + str(row.get('network_id'))]['other_labs']['lab_id' + str(row.get('id'))]= row
+                    lab_network['network_id' + str(row.get('network_id'))]['other_labs'].append(row)
 
                 else:
                     lab_network['network_id' + str(row.get('network_id'))] = row
+                    if not lab_network.get('network_id' + str(row.get('network_id'))).get('other_labs'):
+                        lab_network.get('network_id' + str(row.get('network_id')))['other_labs'] = list()
 
             else:
                 lab_network['lab_id: '+str(row.get('id'))] = row
+                if not lab_network.get('lab_id: '+str(row.get('id'))).get('other_labs'):
+                    lab_network.get('lab_id: '+str(row.get('id')))['other_labs'] = list()
             # resp_queryset.append(row)
 
         return lab_network
