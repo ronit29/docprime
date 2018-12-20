@@ -651,6 +651,10 @@ class LabNotification(Notification):
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         tests = self.appointment.get_tests_and_prices()
+        for test in tests:
+            test['mrp'] = str(test['mrp'])
+            test['deal_price'] = str(test['deal_price'])
+            test['discount'] = str(test['discount'])
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
@@ -663,7 +667,7 @@ class LabNotification(Notification):
             "pickup_address": self.appointment.get_pickup_address(),
             "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
             "time_slot_start": time_slot_start,
-            "tests": self.appointment.get_tests_and_prices()
+            "tests": tests
         }
         return context
 
