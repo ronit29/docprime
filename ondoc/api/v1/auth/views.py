@@ -350,14 +350,8 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         #         return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj = self.get_object()
-
-        if obj and hasattr(obj, 'id') and obj.id and InsuredMembers.objects.filter(profile__id=obj.id).exists():
-            if data.get('name') != obj.name or data.get('dob') != obj.dob or data.get('gender') != obj.gender:
-                return Response({
-                    "request_errors": {"code": "invalid",
-                                       "message": "Name, Gender, DOB cannot be changed for Profile which are covered under insurance."
-                                       }
-                }, status=status.HTTP_400_BAD_REQUEST)
+        serializer = serializers.UserProfileSerializer(obj, data=data, partial=True, context={"request": request})
+        serializer.is_valid(raise_exception=True)
 
         if data.get("name") and UserProfile.objects.exclude(id=obj.id).filter(name=data['name'],
                                                                               user=request.user).exists():
@@ -366,8 +360,15 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                                    "message": "Profile with the given name already exists."
                                    }
             }, status=status.HTTP_400_BAD_REQUEST)
-        serializer = serializers.UserProfileSerializer(obj, data=data, partial=True, context={"request": request})
-        serializer.is_valid(raise_exception=True)
+
+        if obj and hasattr(obj, 'id') and obj.id and InsuredMembers.objects.filter(profile__id=obj.id).exists():
+            if serializer.validated_data.get('name') != obj.name or serializer.validated_data.get('dob') != obj.dob or serializer.validated_data.get('gender') != obj.gender:
+                return Response({
+                    "request_errors": {"code": "invalid",
+                                       "message": "Name, Gender, DOB cannot be changed for Profile which are covered under insurance."
+                                       }
+                }, status=status.HTTP_400_BAD_REQUEST)
+
         serializer.save()
         return Response(serializer.data)
 
