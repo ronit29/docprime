@@ -889,7 +889,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     def get_tests_and_prices(self):
         test_price = []
         for test in self.lab_test.all():
-            test_price.append({'name': test.name, 'mrp': test.mrp, 'deal_price': (
+            test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
                 test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
                                'discount': test.mrp - (
                                    test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
