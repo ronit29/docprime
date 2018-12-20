@@ -336,13 +336,6 @@ class EMAILNotification:
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            # try:
-            #     logger.error(html_body)  # SHASHANK_SINGH Remove it.
-            #     file = HTML(string=html_body).write_pdf()
-            #     invoice.file = SimpleUploadedFile(filename, file, content_type='application/pdf')
-            #     invoice.save()
-            # except Exception as e:
-            #     logger.error("Got error while creating pdf for opd invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"

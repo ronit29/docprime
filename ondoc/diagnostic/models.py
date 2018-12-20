@@ -897,7 +897,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         if self.is_home_pickup:
             test_price.append(
                 {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
-                 'discount': 0})  # TODO: SHASHANK_SINGH Confirm from Arun Sir.
+                 'discount': '0.00'})
 
         return test_price
 
