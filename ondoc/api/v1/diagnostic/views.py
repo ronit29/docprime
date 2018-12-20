@@ -272,12 +272,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         queryset_result = self.get_lab_search_list(parameters)
         count = len(queryset_result)
         paginated_queryset = paginate_queryset(queryset_result, request)
-        response_queryset = self.form_lab_whole_data(paginated_queryset, parameters.get("ids"))
+        response_queryset = self.form_lab_search_whole_data(paginated_queryset, parameters.get("ids"))
+        result = {}
+        result['timing'] = response_queryset
 
-        serializer = diagnostic_serializer.LabCustomSerializer(response_queryset, many=True,
-                                                               context={"request": request})
+        # serializer = diagnostic_serializer.LabNetworkSerializer(response_queryset, many=True,
+        #                                                        context={"request": request})
 
-        entity_ids = [lab_data['id'] for lab_data in response_queryset]
+
+        entity_ids = [lab_data[1].get('id')for lab_data in response_queryset.items()]
 
         id_url_dict = dict()
         entity = EntityUrls.objects.filter(entity_id__in=entity_ids, url_type='PAGEURL', is_valid='t',
@@ -285,11 +288,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         for data in entity:
             id_url_dict[data['entity_id']] = data['url']
 
-        for resp in serializer.data:
-            if id_url_dict.get(resp['lab']['id']):
-                resp['lab']['url'] = id_url_dict[resp['lab']['id']]
+        for resp in response_queryset.items():
+            if id_url_dict.get(resp[1].get('id')):
+                resp[1]['url'] = id_url_dict[resp[1].get('id')]
             else:
-                resp['lab']['url'] = None
+                resp[1]['url'] = None
 
         test_ids = parameters.get('ids', [])
 
@@ -324,19 +327,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 location = sublocality
             description += " and book test online, check fees, packages prices and more at DocPrime."
             seo = {'title': title, "description": description, "location": location}
-            if sublocality:
-                breadcrumb = [{
-                    'name': locality,
-                    'url': breadcrumb_locality_url
-                },
-                    {
-                        'name': sublocality,
-                        'url': parameters.get('url')
-                    }]
 
-        return Response({"result": serializer.data,
+        return Response({"result": response_queryset,
                          "count": count, 'tests': tests,
-                         "seo": seo, "breadcrumb": breadcrumb})
+                         "seo": seo})
 
     def get_lab_search_list(self, parameters):
         # distance in meters
@@ -358,6 +352,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         network_id = parameters.get("network_id")
 
         filtering_params = []
+        filtering_params_query1 = []
         params = {}
         if not min_distance:
             min_distance=0
@@ -369,6 +364,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filtering_params.append("lb.network_id=(%(network_id)s)")
             params['network_id'] = str(network_id)
 
+            filtering_params_query1.append("network_id=(%(network_id)s)")
+
+
         if lat is not None and long is not None:
             params['latitude'] = lat
             params['longitude'] = long
@@ -378,8 +376,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             search_key = " ".join(search_key).lower()
             search_key = "".join(search_key.split("."))
             filtering_params.append(
-                "lb.name ilike (%(name)s)")
-            params['name'] = '%' + search_key + '%'
+                "lb.name ilike %(name)s")
+            params['name'] = search_key + '%'
+            filtering_params_query1.append(
+                "name ilike %(name)s")
 
         test_params = []
 
@@ -415,6 +415,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         filtering_result = {}
         if filtering_params:
             filtering_result['string'] = " and ".join(filtering_params)
+        if filtering_result.get('string'):
+            filtering_result = 'and ' + filtering_result.get('string')
+        else:
+            filtering_result = ' '
+        filtering_params_query1_result = {}
+        if filtering_params_query1:
+            filtering_params_query1_result['string'] = " and ".join(filtering_params_query1)
+        if filtering_params_query1_result.get('string'):
+            filtering_params_query1_result = 'and ' + filtering_params_query1_result.get('string')
+        else:
+            filtering_params_query1_result = ' '
 
         test_result={}
 
@@ -427,38 +438,187 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         else:
             price_result['string'] = 'where price>=0'
 
-        # order_by = self.apply_search_sort(parameters)
+        order_by = self.apply_search_sort(parameters)
 
-        query = '''select *, a.home_pickup_calculation as pickup_charges from (
-                   select lb.*, sum(mrp) total_mrp, count(*) as test_count, 
-                   sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
-                   case when bool_and(home_collection_possible)=True then home_pickup_charges else 0 end as home_pickup_calculation from lab lb inner join available_lab_test avlt on
-                    lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
-                    and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
-                     and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
-                    and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location, (%(min_distance)s)) = false and
-                     avlt.enabled = True and 
-                     {filtering_params} inner join lab_test lt on lt.id = avlt.test_id group by lb.id having count(*)=(%(length)s))a
-                    {price}'''.format(filtering_params=filtering_result.get('string'),price=price_result.get('string'))
+        if ids:
+            query = '''select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority from
+                        (
+                        select id,network_id,rank() over(partition by coalesce(network_id,id) order by id) as rank,
+                         name ,price, count, mrp, pickup_charges, distance, order_priority from
+                        (select id,network_id,  
+                        name ,price, test_count as count, total_mrp as mrp,pickup_charges, distance, 
+                        ROW_NUMBER () OVER (ORDER BY {order} ),
+                        max_order_priority as order_priority
+                        from (
+                        select lb.*, sum(mrp) total_mrp, count(*) as test_count,
+                        case when bool_and(home_collection_possible)=True and is_home_collection_enabled=True 
+                        then max(home_pickup_charges) else 0
+                        end as pickup_charges,
+                        sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
+                        max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
+                        max(order_priority) as max_order_priority from lab lb inner join available_lab_test avlt on
+                        lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
+                        and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
+                        and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
+                        and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
+                        and avlt.enabled = True 
+                        {filtering_params}
+                        inner join lab_test lt on lt.id = avlt.test_id
+                        group by lb.id having count(*)=(%(length)s))a
+                        {price})y )x where rank<=5
+                         '''.format(filtering_params=filtering_result, price=price_result.get('string'), order=order_by)
 
-        doctor_search_result = RawSql(query, params).fetch_all()
+            doctor_search_result = RawSql(query, params).fetch_all()
+        else:
+            query1 = '''select id,network_id, name , distance, order_priority from
+                    (
+                    select id,network_id,rank() over(partition by coalesce(network_id,id) order by id) as rank,
+                     name , distance, order_priority from
+                    (select id,network_id,  
+                    name , distance, 
+                    ROW_NUMBER () OVER (ORDER BY {order}),
+                    max_order_priority as order_priority
+                    from (
+                    select *,
+                    max(ST_Distance(location,St_setsrid(St_point(77.0333, 28.4667), 4326))) as distance,
+                    max(order_priority) as max_order_priority
+                    from lab where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
+                    and St_dwithin( St_setsrid(St_point(77.0333, 28.4667), 4326),location, 200000) 
+                    and St_dwithin(St_setsrid(St_point(77.0333, 28.4667), 4326), location, 0) = false
+                    {filtering_params}
+                     group by id)a)y )x where rank<=20'''.format(filtering_params=filtering_params_query1_result, order=order_by)
+            doctor_search_result = RawSql(query1, params).fetch_all()
+
         return doctor_search_result
 
-    # @staticmethod
-    # def apply_search_sort(parameters):
-    #     order_by = parameters.get("sort_on")
-    #     if order_by is not None:
-    #         if order_by == "fees" and parameters.get('ids'):
-    #             queryset_order_by = order by order_priority, F("price") + F("pickup_charges"), "distance")
-    #         elif order_by == 'distance':
-    #             queryset_order_by = order_by("-order_priority", "distance")
-    #         elif order_by == 'name':
-    #             queryset_order_by = order_by("-order_priority", "name")
-    #         else:
-    #             queryset_order_by =  order_by("-order_priority", "distance")
-    #     else:
-    #         queryset_order_by = order_by("-order_priority", "distance")
-    #     return queryset_order_by
+    def apply_search_sort(self, parameters):
+        order_by = parameters.get("sort_on")
+        if order_by is not None:
+            if order_by == "fees" and parameters.get('ids'):
+                queryset_order_by = ' order_priority desc, price asc , pickup_charges asc, distance asc'
+            elif order_by == 'distance':
+                queryset_order_by = ' order_priority desc, distance asc'
+            elif order_by == 'name':
+                queryset_order_by = ' order_priority desc, name asc'
+            else:
+                queryset_order_by = ' order_priority desc, distance asc'
+        else:
+            queryset_order_by =' order_priority desc, distance asc'
+        return queryset_order_by
+
+    def form_lab_search_whole_data(self, queryset, test_ids=None):
+        ids = [value.get('id') for value in queryset]
+        # ids, id_details = self.extract_lab_ids(queryset)
+        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
+
+        if test_ids:
+            group_queryset = LabPricingGroup.objects.prefetch_related(Prefetch(
+                    "available_lab_tests",
+                    queryset=AvailableLabTest.objects.filter(test_id__in=test_ids).prefetch_related('test'),
+                    to_attr="selected_tests"
+                )).all()
+
+            labs = labs.prefetch_related(
+                Prefetch(
+                    "lab_pricing_group",
+                    queryset=group_queryset,
+                    to_attr="selected_group"
+                )
+            )
+        labs = labs.filter(id__in=ids)
+        # resp_queryset = list()
+        temp_var = dict()
+        tests = dict()
+        lab = dict()
+
+        for obj in labs:
+            temp_var[obj.id] = obj
+            tests[obj.id] = list()
+            if test_ids and obj.selected_group and obj.selected_group.selected_tests:
+                for test in obj.selected_group.selected_tests:
+                    if test.custom_deal_price:
+                        deal_price=test.custom_deal_price
+                    else:
+                        deal_price=test.computed_deal_price
+                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
+
+        day_now = timezone.now().weekday()
+        days_array = [i for i in range(7)]
+        rotated_days_array = days_array[day_now:] + days_array[:day_now]
+        lab_network = dict()
+        for row in queryset:
+
+            lab_timing = list()
+            lab_timing_data = list()
+            next_lab_timing_dict = {}
+            next_lab_timing_data_dict = {}
+            data_array = [list() for i in range(7)]
+            lab_obj = temp_var[row["id"]]
+            row['city'] = lab_obj.city
+            row['sublocality'] = lab_obj.sublocality
+            row['home_pickup_charges'] = lab_obj.home_pickup_charges
+            row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
+
+            if lab_obj.always_open:
+                lab_timing = "12:00 AM - 11:45 PM"
+                next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
+                lab_timing_data = [{
+                    "start": 0.0,
+                    "end": 23.75
+                }]
+                next_lab_timing_data_dict = {rotated_days_array[1]: {
+                    "start": 0.0,
+                    "end": 23.75
+                }}
+            else:
+                timing_queryset =lab_obj.lab_timings.all()
+
+                for data in timing_queryset:
+                    data_array[data.day].append(data)
+
+                rotated_data_array = data_array[day_now:] + data_array[:day_now]
+
+                for count, timing_data in enumerate(rotated_data_array):
+                    day = rotated_days_array[count]
+                    if count == 0:
+                        if timing_data:
+                            lab_timing, lab_timing_data = self.get_lab_timing(timing_data)
+                            lab_timing_data = sorted(lab_timing_data, key=lambda k: k["start"])
+                    elif timing_data:
+                        next_lab_timing, next_lab_timing_data = self.get_lab_timing(timing_data)
+                        next_lab_timing_data = sorted(next_lab_timing_data, key=lambda k: k["start"])
+                        next_lab_timing_dict[day] = next_lab_timing
+                        next_lab_timing_data_dict[day] = next_lab_timing_data
+                        break
+
+            if lab_obj.home_collection_charges.exists():
+                row["distance_related_charges"] = 1
+            else:
+                row["distance_related_charges"] = 0
+
+            row["lab_timing"] = lab_timing
+            row["lab_timing_data"] = lab_timing_data
+            row["next_lab_timing"] = next_lab_timing_dict
+            row["next_lab_timing_data"] = next_lab_timing_data_dict
+            row["tests"] = tests.get(row["id"])
+
+
+
+            if row.get('network_id'):
+                if lab_network.get('network_id' + str(row.get('network_id'))):
+                    if not lab_network.get('network_id' + str(row.get('network_id'))).get('other_labs'):
+                        lab_network.get('network_id' + str(row.get('network_id')))['other_labs'] = None
+
+                    lab_network['network_id' + str(row.get('network_id'))]['other_labs']['lab_id' + str(row.get('id'))]= row
+
+                else:
+                    lab_network['network_id' + str(row.get('network_id'))] = row
+
+            else:
+                lab_network['lab_id: '+str(row.get('id'))] = row
+            # resp_queryset.append(row)
+
+        return lab_network
 
 
     @transaction.non_atomic_requests
@@ -711,6 +871,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         resp_queryset = list()
         temp_var = dict()
         tests = dict()
+        lab = dict()
 
         for obj in labs:
             temp_var[obj.id] = obj
@@ -722,6 +883,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     else:
                         deal_price=test.computed_deal_price
                     tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp})
+
         day_now = timezone.now().weekday()
         days_array = [i for i in range(7)]
         rotated_days_array = days_array[day_now:] + days_array[:day_now]
