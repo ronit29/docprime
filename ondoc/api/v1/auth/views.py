@@ -352,7 +352,7 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         obj = self.get_object()
 
         if obj and hasattr(obj, 'id') and obj.id and InsuredMembers.objects.filter(profile__id=obj.id).exists():
-            if set(data.keys()) & {'name', 'gender', 'dob'}:
+            if data.get('name') != obj.name or data.get('dob') != obj.dob or data.get('gender') != obj.gender:
                 return Response({
                     "request_errors": {"code": "invalid",
                                        "message": "Name, Gender, DOB cannot be changed for Profile which are covered under insurance."
