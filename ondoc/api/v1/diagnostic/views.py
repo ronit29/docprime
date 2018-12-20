@@ -1007,7 +1007,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
         paginated_queryset = paginate_queryset(queryset, request)
 
         serializer = diagnostic_serializer.AvailableLabTestSerializer(paginated_queryset, many=True,
-                                                                      context={"lab": lab_obj})
+                                                                      context={"lab": lab_obj, 'request': request})
         return Response(serializer.data)
 
 
