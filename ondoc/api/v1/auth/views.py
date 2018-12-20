@@ -50,7 +50,7 @@ from collections import defaultdict
 import copy
 import logging
 import jwt
-from ondoc.insurance.models import InsuranceTransaction, UserInsurance
+from ondoc.insurance.models import InsuranceTransaction, UserInsurance, InsuredMembers
 from decimal import Decimal
 from ondoc.web.models import ContactUs
 
@@ -350,6 +350,15 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         #         return Response({"error": "Invalid Age"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj = self.get_object()
+
+        if obj and hasattr(obj, 'id') and obj.id and InsuredMembers.objects.filter(profile__id=obj.id).exists():
+            if set(data.keys()) & {'name', 'gender', 'dob'}:
+                return Response({
+                    "request_errors": {"code": "invalid",
+                                       "message": "Name, Gender, DOB cannot be changed for Profile which are covered under insurance."
+                                       }
+                }, status=status.HTTP_400_BAD_REQUEST)
+
         if data.get("name") and UserProfile.objects.exclude(id=obj.id).filter(name=data['name'],
                                                                               user=request.user).exists():
             return Response({
