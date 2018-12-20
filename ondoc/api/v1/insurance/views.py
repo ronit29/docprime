@@ -92,112 +92,115 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic
     def create_order(self, request):
-        user = request.user
-
-        user_insurance = UserInsurance.objects.filter(user=user).last()
-        if user_insurance and user_insurance.is_valid():
-            return Response(data={'certificate': True}, status=status.HTTP_200_OK)
-
-        serializer = serializers.InsuredMemberSerializer(data=request.data, context={'request': request})
-        if not serializer.is_valid() and serializer.errors:
-            logger.error(str(serializer.errors))
-
-        serializer.is_valid(raise_exception=True)
-        valid_data = serializer.validated_data
-        amount = None
-        members = valid_data.get("members")
-        resp = {}
-        insurance_data = {}
-        insurance_plan = request.data.get('insurance_plan')
-        if not insurance_plan:
-            return Response({"message": "Insurance Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
-        if valid_data:
+        try:
             user = request.user
-            pre_insured_members = {}
-            insured_members_list = []
 
-            for member in members:
-                pre_insured_members['dob'] = member['dob']
-                pre_insured_members['title'] = member['title']
-                pre_insured_members['first_name'] = member['first_name']
-                pre_insured_members['middle_name'] = member['middle_name']
-                pre_insured_members['last_name'] = member['last_name']
-                pre_insured_members['address'] = member['address']
-                pre_insured_members['pincode'] = member['pincode']
-                pre_insured_members['email'] = member['email']
-                pre_insured_members['relation'] = member['relation']
-                pre_insured_members['profile'] = member.get('profile').id if member.get('profile') is not None else None
-                pre_insured_members['gender'] = member['gender']
-                pre_insured_members['member_type'] = member['member_type']
-                pre_insured_members['town'] = member['town']
-                pre_insured_members['district'] = member['district']
-                pre_insured_members['state'] = member['state']
+            user_insurance = UserInsurance.objects.filter(user=user).last()
+            if user_insurance and user_insurance.is_valid():
+                return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
-                insured_members_list.append(pre_insured_members.copy())
+            serializer = serializers.InsuredMemberSerializer(data=request.data, context={'request': request})
+            if not serializer.is_valid() and serializer.errors:
+                logger.error(str(serializer.errors))
 
-                if member['relation'] == 'self':
-                    if member['profile']:
-                        user_profile = UserProfile.objects.filter(id=member['profile'].id,
-                                                                  user_id=request.user.pk).values('id', 'name', 'email',
-                                                                                                'gender', 'user_id',
-                                                                                                'dob', 'phone_number').first()
+            serializer.is_valid(raise_exception=True)
+            valid_data = serializer.validated_data
+            amount = None
+            members = valid_data.get("members")
+            resp = {}
+            insurance_data = {}
+            insurance_plan = request.data.get('insurance_plan')
+            if not insurance_plan:
+                return Response({"message": "Insurance Plan is not Valid"}, status=status.HTTP_404_NOT_FOUND)
+            if valid_data:
+                user = request.user
+                pre_insured_members = {}
+                insured_members_list = []
 
-                    else:
-                        user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
-                            member['email'], "gender": member['gender'], "dob": member['dob']}
+                for member in members:
+                    pre_insured_members['dob'] = member['dob']
+                    pre_insured_members['title'] = member['title']
+                    pre_insured_members['first_name'] = member['first_name']
+                    pre_insured_members['middle_name'] = member['middle_name']
+                    pre_insured_members['last_name'] = member['last_name']
+                    pre_insured_members['address'] = member['address']
+                    pre_insured_members['pincode'] = member['pincode']
+                    pre_insured_members['email'] = member['email']
+                    pre_insured_members['relation'] = member['relation']
+                    pre_insured_members['profile'] = member.get('profile').id if member.get('profile') is not None else None
+                    pre_insured_members['gender'] = member['gender']
+                    pre_insured_members['member_type'] = member['member_type']
+                    pre_insured_members['town'] = member['town']
+                    pre_insured_members['district'] = member['district']
+                    pre_insured_members['state'] = member['state']
 
-        insurance_plan = InsurancePlans.objects.get(id=request.data.get('insurance_plan'))
-        transaction_date = datetime.datetime.now()
-        amount = insurance_plan.amount
+                    insured_members_list.append(pre_insured_members.copy())
 
-        expiry_date = transaction_date + timedelta(days=insurance_plan.policy_tenure*364)
-        expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
-        user_insurance = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
-                            transaction_date, 'expiry_date': expiry_date, 'premium_amount': amount,
-                            'user': request.user.pk, "insured_members": insured_members_list}
-        insurance_data = {"profile_detail": user_profile, "insurance_plan": insurance_plan.id,
-                          "user": request.user.pk, "user_insurance": user_insurance}
+                    if member['relation'] == 'self':
+                        if member['profile']:
+                            user_profile = UserProfile.objects.filter(id=member['profile'].id,
+                                                                      user_id=request.user.pk).values('id', 'name', 'email',
+                                                                                                    'gender', 'user_id',
+                                                                                                    'dob', 'phone_number').first()
 
-        consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
-        consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
-        balance = consumer_account.balance
+                        else:
+                            user_profile = {"name": member['first_name'] + " " + member['last_name'], "email":
+                                member['email'], "gender": member['gender'], "dob": member['dob']}
 
-        resp['is_agent'] = False
-        if hasattr(request, 'agent') and request.agent:
-            resp['is_agent'] = True
+            insurance_plan = InsurancePlans.objects.get(id=request.data.get('insurance_plan'))
+            transaction_date = datetime.datetime.now()
+            amount = insurance_plan.amount
 
-        insurance_data = insurance_transform(insurance_data)
+            expiry_date = transaction_date + timedelta(days=insurance_plan.policy_tenure*364)
+            expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
+            user_insurance = {'insurer': insurance_plan.insurer_id, 'insurance_plan': insurance_plan.id, 'purchase_date':
+                                transaction_date, 'expiry_date': expiry_date, 'premium_amount': amount,
+                                'user': request.user.pk, "insured_members": insured_members_list}
+            insurance_data = {"profile_detail": user_profile, "insurance_plan": insurance_plan.id,
+                              "user": request.user.pk, "user_insurance": user_insurance}
 
-        if balance < amount or resp['is_agent']:
+            consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+            consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+            balance = consumer_account.balance
 
-            payable_amount = amount - balance
+            resp['is_agent'] = False
+            if hasattr(request, 'agent') and request.agent:
+                resp['is_agent'] = True
 
-            order = account_models.Order.objects.create(
-                product_id=account_models.Order.INSURANCE_PRODUCT_ID,
-                action=account_models.Order.INSURANCE_CREATE,
-                action_data=insurance_data,
-                amount=payable_amount,
-                wallet_amount=balance,
-                payment_status=account_models.Order.PAYMENT_PENDING
-            )
-            resp["status"] = 1
-            resp['data'], resp["payment_required"] = payment_details(request, order)
-        else:
-            wallet_amount = amount
+            insurance_data = insurance_transform(insurance_data)
 
-            order = account_models.Order.objects.create(
-                product_id=account_models.Order.INSURANCE_PRODUCT_ID,
-                action=account_models.Order.INSURANCE_CREATE,
-                action_data=insurance_data,
-                amount=0,
-                wallet_amount=wallet_amount,
-                payment_status=account_models.Order.PAYMENT_PENDING
-            )
+            if balance < amount or resp['is_agent']:
 
-            insurance_object = order.process_order()
-            resp["status"] = 1
-            resp["payment_required"] = False
-            resp["data"] = {'id': insurance_object.id}
+                payable_amount = amount - balance
+
+                order = account_models.Order.objects.create(
+                    product_id=account_models.Order.INSURANCE_PRODUCT_ID,
+                    action=account_models.Order.INSURANCE_CREATE,
+                    action_data=insurance_data,
+                    amount=payable_amount,
+                    wallet_amount=balance,
+                    payment_status=account_models.Order.PAYMENT_PENDING
+                )
+                resp["status"] = 1
+                resp['data'], resp["payment_required"] = payment_details(request, order)
+            else:
+                wallet_amount = amount
+
+                order = account_models.Order.objects.create(
+                    product_id=account_models.Order.INSURANCE_PRODUCT_ID,
+                    action=account_models.Order.INSURANCE_CREATE,
+                    action_data=insurance_data,
+                    amount=0,
+                    wallet_amount=wallet_amount,
+                    payment_status=account_models.Order.PAYMENT_PENDING
+                )
+
+                insurance_object = order.process_order()
+                resp["status"] = 1
+                resp["payment_required"] = False
+                resp["data"] = {'id': insurance_object.id}
+        except Exception as e:
+            logger.error(str(e))
 
         return Response(resp)
 
