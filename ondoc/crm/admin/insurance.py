@@ -85,8 +85,12 @@ class InsuredMemberResource(resources.ModelResource):
         model = InsuredMembers
         fields = ('id', 'title', 'first_name', 'middle_name', 'last_name', 'dob', 'gender', 'relation', 'email',
                   'phone_number', 'address', 'town', 'district', 'state', 'pincode')
-        export_order = ('id', 'purchase_date', 'title', 'first_name', 'middle_name', 'last_name', 'dob', 'gender', 'relation', 'email',
-                        'phone_number', 'address', 'town', 'district', 'state', 'pincode')
+        export_order = ('id', 'title', 'first_name', 'middle_name', 'last_name', 'dob', 'gender',
+                        'relation', 'email', 'phone_number', 'address', 'town', 'district', 'state', 'pincode',
+                        'purchase_date', 'expiry_date', 'policy_number', 'insurance_plan', 'premium_amount',
+                        'nominee_name', 'nominee_address', 'sum_insured', 'age', 'account_holder_name', 'account_number'
+                        ,'ifsc', 'aadhar_number', 'diabetes', 'heart_diseases', 'cancer', 'pregnancy',
+                        'customer_consent_recieved')
 
     def dehydrate_purchase_date(self, insured_members):
         return str(insured_members.user_insurance.purchase_date.date())
