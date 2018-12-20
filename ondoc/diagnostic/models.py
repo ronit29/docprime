@@ -886,6 +886,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
 
+    def get_tests_and_prices(self):
+        test_price = []
+        for test in self.lab_test.all():
+            test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
+                test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
+                               'discount': test.mrp - (
+                                   test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+
+        if self.is_home_pickup:
+            test_price.append(
+                {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
+                 'discount': '0.00'})
+
+        return test_price
+
+
+
     def get_reports(self):
         return self.reports.all()
 
