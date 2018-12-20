@@ -176,7 +176,7 @@ def send_opd_notifications(appointment_id):
             notification_type=notification_models.NotificationAction.DOCTOR_INVOICE,
         )
 
-@task
+@task(max_retries=1)
 def send_opd_rating_message(appointment_id, type):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
