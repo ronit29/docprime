@@ -28,14 +28,12 @@ class Footer(object):
 
 class LabProfileFooter(Footer):
     def __init__(self, entity):
-        self.sublocality_id = int(entity.sublocality_id)if entity.sublocality_id else None
-        self.locality_id = int(entity.locality_id)
+        self.sublocality_id = int(entity.sublocality_id) if entity.sublocality_id else None
+        self.locality_id = int(entity.locality_id) if entity.locality_id else None
         self.sublocality = entity.sublocality_value
         self.locality = entity.locality_value
         self.sublocality_location = entity.sublocality_location
         self.centroid = entity.location
-
-
 
         # location_id = int(entity.extras.get('location_id'))
         # address = EntityAddress.objects.filter(pk=location_id)
@@ -64,7 +62,7 @@ class LabProfileFooter(Footer):
         response['menu'] = []
         labs_in_same_locality = []
 
-        if self.locality:
+        if self.locality and self.centroid:
             labs_in_same_locality = self.labs_in_same_locality()
             if labs_in_same_locality:
                 response['menu'].append(
@@ -399,8 +397,8 @@ class DoctorProfileFooter(Footer):
         #self.locality = entity.locality_value
         #self.centroid = entity.sublocality_location
         #self.sublocality_location = entity.sublocality_location
-        self.sublocality_id = int(entity.sublocality_id )if entity.sublocality_id else None
-        self.locality_id = int(entity.locality_id)
+        self.sublocality_id = int(entity.sublocality_id ) if entity.sublocality_id else None
+        self.locality_id = int(entity.locality_id) if entity.locality_id else None
         self.sublocality = entity.sublocality_value
         self.locality = entity.locality_value
         self.specialization_id = entity.specialization_id
