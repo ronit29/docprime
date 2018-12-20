@@ -1635,7 +1635,6 @@ class UserLeadViewSet(GenericViewSet):
             resp['name'] = validated_data.get('name')
             resp['message'] = validated_data.get('message')
             resp['phone_number'] = validated_data.get('phone_number')
-            resp['message'] = validated_data.get('message')
             resp['gender'] = validated_data.get('gender')
 
             ul_obj = UserLead.objects.create(**resp)
