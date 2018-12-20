@@ -23,7 +23,8 @@ from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationE
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification
-from ondoc.notification.sqs_client import publish_message
+# from ondoc.notification.sqs_client import publish_message
+from ondoc.notification.rabbitmq_client import publish_message
 
 User = get_user_model()
 logger = logging.getLogger(__name__)

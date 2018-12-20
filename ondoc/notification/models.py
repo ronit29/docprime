@@ -8,7 +8,7 @@ from ondoc.authentication.models import NotificationEndpoint
 from ondoc.authentication.models import UserProfile
 from ondoc.account import models as account_model
 from ondoc.api.v1.utils import readable_status_choices
-from ondoc.notification.sqs_client import publish_message
+from ondoc.notification.rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.utils import timezone

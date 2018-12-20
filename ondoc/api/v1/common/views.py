@@ -15,9 +15,9 @@ from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeS
 from ondoc.chat.models import ChatPrescription
 from ondoc.lead.models import SearchLead
 from ondoc.notification.models import EmailNotification
-# from ondoc.notification.rabbitmq_client import publish_message
+from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
-from ondoc.notification.sqs_client import publish_message
+# from ondoc.notification.sqs_client import publish_message
 from django.template.loader import render_to_string
 from . import serializers
 from ondoc.common.models import Cities
