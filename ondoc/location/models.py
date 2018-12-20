@@ -78,6 +78,14 @@ class GeocodingResults(TimeStampedModel):
         #saved_json = GeocodingResults.objects.filter(latitude=kwargs.get('latitude'), longitude=kwargs.get('longitude'))
 
         if not exists:
+            saved_json = GeocodingResults.objects.filter(latitude=latitude, longitude=longitude)
+            if saved_json:
+                cls.geocodine_cache[key]=True
+                exists = True
+
+        if not exists:
+            cls.geocodine_cache[key]=True
+
             response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?sensor=false',
                                     params={'latlng': '%s,%s' % (kwargs.get('latitude'), kwargs.get('longitude')),
                                             'key': settings.REVERSE_GEOCODING_API_KEY, 'language': 'en'})
@@ -504,7 +512,7 @@ class EntityUrls(TimeStampedModel):
         DOCTORS_LOCALITY_CITY = 'DOCTORS_LOCALITY_CITY'
         DOCTORS_CITY = 'DOCTORS_CITY'
         DOCTOR_PAGE = 'DOCTOR_PAGE'
-        LAB_TEST = 'LAB_TEST'
+        #LAB_TEST = 'LAB_TEST'
 
         LAB_LOCALITY_CITY = 'LAB_LOCALITY_CITY'
         LAB_CITY = 'LAB_CITY'
@@ -514,7 +522,7 @@ class EntityUrls(TimeStampedModel):
         PAGEURL = 'PAGEURL'
         SEARCHURL = 'SEARCHURL'
 
-    url = models.CharField(blank=False, null=True, max_length=500, db_index=True)
+    url = models.CharField(blank=False, null=True, max_length=2000, db_index=True)
     url_type = models.CharField(max_length=24, choices=UrlType.as_choices(), null=True)
     entity_type = models.CharField(max_length=24, null=True)
     extras = JSONField()
