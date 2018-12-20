@@ -2,7 +2,7 @@ from django.contrib.gis.db import models
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.core.validators import MaxValueValidator, MinValueValidator, FileExtensionValidator
 
-from ondoc.account.models import MerchantPayout
+from ondoc.account.models import MerchantPayout, ConsumerAccount, Order
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin, BillingAccount)
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason
@@ -881,6 +881,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="lab_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    cashback = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey(CancellationReason, on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
@@ -999,10 +1000,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
             pass
 
         try:
-            # while completing appointment, add a merchant_payout entry
+            # while completing appointment
             if database_instance.status != self.status and self.status == self.COMPLETED:
+                # add a merchant_payout entry
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
+                # credit cashback if any
+                if self.cashback is not None and self.cashback > 0:
+                    ConsumerAccount.credit_cashback(self.user, self.cashback, database_instance,
+                                                        Order.LAB_PRODUCT_ID)
         except Exception as e:
             pass
 

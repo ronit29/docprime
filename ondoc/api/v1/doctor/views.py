@@ -264,7 +264,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
             elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
-                coupon_discount, coupon_list = self.getCouponDiscout(data, doctor_clinic_timing.deal_price)
+                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, doctor_clinic_timing.deal_price)
                 if coupon_discount >= doctor_clinic_timing.deal_price:
                     effective_price = 0
                 else:
@@ -279,7 +279,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if data.get("payment_type") == models.OpdAppointment.INSURANCE:
                 effective_price = total_deal_price
             elif data.get("payment_type") in [models.OpdAppointment.COD, models.OpdAppointment.PREPAID]:
-                coupon_discount, coupon_list = self.getCouponDiscout(data, total_deal_price)
+                coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, total_deal_price)
                 if coupon_discount >= total_deal_price:
                     effective_price = 0
                 else:
@@ -313,7 +313,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             "time_slot_start": time_slot_start,
             "payment_type": data.get("payment_type"),
             "coupon": coupon_list,
-            "discount": coupon_discount
+            "discount": int(coupon_discount),
+            "cashback": int(coupon_cashback)
         }
         resp = self.create_order(request, opd_data, account_models.Order.DOCTOR_PRODUCT_ID)
 
@@ -348,17 +349,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         }
         return Response(response)
 
-    def getCouponDiscout(self, data, deal_price):
-        coupon_list = []
-        coupon_discount = 0
-        if data.get("coupon_code"):
-            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
-            obj = models.OpdAppointment()
-            for coupon in coupon_obj:
-                coupon_discount += obj.get_discount(coupon, deal_price)
-                coupon_list.append(coupon.id)
-        return coupon_discount, coupon_list
-
     @transaction.atomic
     def create_order(self, request, appointment_details, product_id):
 
@@ -367,6 +357,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
+        cashback_balance = consumer_account.cashback
+        total_balance = balance + cashback_balance
         resp = {}
 
         resp['is_agent'] = False
@@ -391,10 +383,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                     account_models.Order.OPD_APPOINTMENT_CREATE)
 
         if ((appointment_details['payment_type'] == models.OpdAppointment.PREPAID and
-             balance < appointment_details.get("effective_price")) or resp['is_agent']):
+             total_balance < appointment_details.get("effective_price")) or resp['is_agent']):
 
-            payable_amount = max(0, appointment_details.get("effective_price") - balance)
-            wallet_amount = min(balance, appointment_details.get("effective_price"))
+            payable_amount = max(0, appointment_details.get("effective_price") - total_balance)
+            required_amount = appointment_details.get("effective_price")
+            cashback_amount = min(required_amount, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < required_amount:
+                wallet_amount = min(balance, required_amount - cashback_amount)
+
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -402,6 +399,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 action_data=appointment_action_data,
                 amount=payable_amount,
                 wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
             appointment_details["payable_amount"] = payable_amount
@@ -421,8 +419,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 pass
         else:
             wallet_amount = 0
+            cashback_amount = 0
+
             if appointment_details['payment_type'] == models.OpdAppointment.PREPAID:
-                wallet_amount = appointment_details.get("effective_price")
+                cashback_amount = min(cashback_balance, appointment_details.get("effective_price"))
+                wallet_amount = max(0, appointment_details.get("effective_price") - cashback_amount)
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -430,6 +431,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 action_data=appointment_action_data,
                 amount=0,
                 wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 

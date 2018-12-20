@@ -1101,6 +1101,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
     rating_declined = models.BooleanField(default=False)
     coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="opd_appointment_coupon")
     discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    cashback = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     cancellation_reason = models.ForeignKey('CancellationReason', on_delete=models.SET_NULL, null=True, blank=True)
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
@@ -1283,10 +1284,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             kwargs.pop('push_again_to_matrix')
 
         try:
-            # while completing appointment, add a merchant_payout entry
+            # while completing appointment
             if database_instance.status != self.status and self.status == self.COMPLETED:
+                # add a merchant_payout entry
                 if self.merchant_payout is None:
                     self.save_merchant_payout()
+
+                # credit cashback if any
+                if self.cashback is not None and self.cashback > 0:
+                    ConsumerAccount.credit_cashback(self.user, self.cashback, database_instance, Order.DOCTOR_PRODUCT_ID)
+
         except Exception as e:
             pass
 

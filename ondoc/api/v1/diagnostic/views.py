@@ -692,18 +692,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 home_pickup_charges = data["lab"].home_pickup_charges
             # TODO PM - call coupon function to calculate effective price
 
-        coupon_list = []
-        coupon_discount = 0
-        if data.get("coupon_code"):
-            coupon_obj = Coupon.objects.filter(code__in=set(data.get("coupon_code")))
-            obj = models.LabAppointment()
-            for coupon in coupon_obj:
-                if coupon.is_user_specific and coupon.test.exists():
-                    total_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon, test_ids=data['test_ids'], lab=data["lab"]).get("total_price")
-                    coupon_discount += obj.get_discount(coupon, total_price)
-                else:
-                    coupon_discount += obj.get_discount(coupon, effective_price)
-                coupon_list.append(coupon.id)
+        coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
 
         if data.get("payment_type") in [doctor_model.OpdAppointment.COD, doctor_model.OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
@@ -751,7 +740,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
             # "lab_test": [x["id"] for x in lab_test_queryset.values("id")],
             "extra_details": extra_details,
             "coupon": coupon_list,
-            "discount": coupon_discount
+            "discount": int(coupon_discount),
+            "cashback": int(coupon_cashback)
         }
         if data.get("is_home_pickup") is True:
             address = Address.objects.filter(pk=data.get("address").id).first()
@@ -798,6 +788,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
         consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
         balance = consumer_account.balance
+        cashback_balance = consumer_account.cashback
+        total_balance = balance + cashback_balance
         resp = {}
 
         resp['is_agent'] = False
@@ -823,16 +815,22 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
 
         if ( (appointment_details['payment_type'] == doctor_model.OpdAppointment.PREPAID and
-                balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
+              total_balance < appointment_details.get("effective_price")) or resp['is_agent'] ):
 
-            payable_amount = appointment_details.get("effective_price") - balance
+            payable_amount = max(0, appointment_details.get("effective_price") - total_balance)
+            required_amount = appointment_details.get("effective_price")
+            cashback_amount = min(required_amount, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < required_amount:
+                wallet_amount = min(balance, required_amount - cashback_amount)
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
                 action=account_models.Order.LAB_APPOINTMENT_CREATE,
                 action_data=appointment_action_data,
                 amount=payable_amount,
-                wallet_amount=balance,
+                wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 
@@ -853,8 +851,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 pass
         else:
             wallet_amount = 0
+            cashback_amount = 0
+
             if appointment_details['payment_type'] == models.OpdAppointment.PREPAID:
-                wallet_amount = appointment_details.get("effective_price")
+                cashback_amount = min(cashback_balance, appointment_details.get("effective_price"))
+                wallet_amount = max(0, appointment_details.get("effective_price") - cashback_amount)
 
             order = account_models.Order.objects.create(
                 product_id=product_id,
@@ -862,6 +863,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 action_data=appointment_action_data,
                 amount=0,
                 wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
                 payment_status=account_models.Order.PAYMENT_PENDING
             )
 
