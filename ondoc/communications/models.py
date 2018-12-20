@@ -331,7 +331,8 @@ class EMAILNotification:
                 file.seek(0)
                 file.flush()
                 file.content_type = 'application/pdf'
-                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf', temp_pdf_file.tell(), None)
+                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+                                                    temp_pdf_file.tell(), None)
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
@@ -390,7 +391,8 @@ class EMAILNotification:
                 file.seek(0)
                 file.flush()
                 file.content_type = 'application/pdf'
-                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf', temp_pdf_file.tell(), None)
+                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+                                                    temp_pdf_file.tell(), None)
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
@@ -648,6 +650,7 @@ class LabNotification(Notification):
         lab_name = instance.lab.name.title() if instance.lab.name else ""
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
+        tests = self.appointment.get_tests_and_prices()
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
@@ -658,7 +661,9 @@ class LabNotification(Notification):
             "action_id": instance.id,
             "image_url": "",
             "pickup_address": self.appointment.get_pickup_address(),
-            "time_slot_start": time_slot_start
+            "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
+            "time_slot_start": time_slot_start,
+            "tests": self.appointment.get_tests_and_prices()
         }
         return context
 
