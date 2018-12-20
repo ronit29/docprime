@@ -142,6 +142,7 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
     min_age = models.PositiveIntegerField(default=0)
     max_age = models.PositiveIntegerField(default=0)
     child_min_age = models.PositiveIntegerField(default=0)
+    child_max_age = models.PositiveIntegerField(default=0)
     enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
 
@@ -161,6 +162,7 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         adult_max_age = self.max_age
         adult_min_age = self.min_age
         child_min_age = self.child_min_age
+        child_max_age = self.child_max_age
         # Age validation for parent in years
         if member['member_type'] == "adult":
             if (adult_max_age >= years_diff) and (adult_min_age <= years_diff):
@@ -172,7 +174,7 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         # Age validation for child in days
         #TODO INSURANCE check max age
         if member['member_type'] == "child":
-            if child_min_age <= days_diff and math.floor(days_diff/365) < 18:
+            if child_min_age <= days_diff and math.floor(days_diff/365) < child_max_age:
                 is_dob_valid = True
             else:
                 message = {"message": "Child Age should be more than " + str(child_min_age) + " days or less than 18 years"}
