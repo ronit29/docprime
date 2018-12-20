@@ -5,6 +5,8 @@ import datetime
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from django.http import HttpResponseRedirect
+from django.utils.safestring import mark_safe
+
 from ondoc.account import models as account_models
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -1636,8 +1638,13 @@ class UserLeadViewSet(GenericViewSet):
             resp['message'] = validated_data.get('message')
             resp['gender'] = validated_data.get('gender')
 
-            UserLead.objects.create(**resp)
-        #     MAIL TODO : SHreyas
+            ul_obj = UserLead.objects.create(**resp)
+            html_email = 'provider@docprime.com'
+            html_body = resp
+            email_subject = 'Lead from Ads' + str(ul_obj.created_at)
+            EmailNotification.publish_ops_email(html_email, mark_safe(html_body), email_subject)
+            resp['status'] = "success"
+
 
         return Response(resp)
 
