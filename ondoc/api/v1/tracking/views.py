@@ -26,6 +26,8 @@ class EventCreateViewSet(GenericViewSet):
         if data and isinstance(data, dict):
             event_name = data.get('event')
             if event_name:
+                userAgent = data.get('userAgent', None)
+                data.pop('userAgent', None)
                 try:
                     user = None
                     if request.user.is_authenticated:
@@ -63,8 +65,8 @@ class EventCreateViewSet(GenericViewSet):
                         visit.location = data.get('location', {})
                         modify_visit = True
 
-                if not visit.user_agent:
-                    visit.user_agent = data.get('userAgent', "")
+                if not visit.user_agent and userAgent:
+                    visit.user_agent = userAgent
                     modify_visit = True
 
                 if modify_visit:
@@ -76,9 +78,13 @@ class EventCreateViewSet(GenericViewSet):
             resp['error'] = "Invalid Data"
 
         #cookie = self.get_cookie(visitor_id, visit_id)
-        response = JsonResponse(resp)
+        # response = JsonResponse(resp)
         #response.set_signed_cookie('visit', value=cookie, max_age=365*24*60*60, path='/')
-        return response
+        # return response
+        if "error" in resp:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
+        else:
+            return Response(status=status.HTTP_200_OK, data=resp)
 
     def get_visit(self, request):
 
