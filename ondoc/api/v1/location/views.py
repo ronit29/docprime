@@ -605,7 +605,7 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         url = url.lower()
-        entity = location_models.EntityUrls.objects.filter(url__iexact=url, is_valid=True)
+        entity = location_models.EntityUrls.objects.filter(url=url, is_valid=True)
         if not len(entity)>0:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
