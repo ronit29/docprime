@@ -207,3 +207,18 @@ class SearchLead(TimeStampedModel):
 
     class Meta:
         db_table = "search_lead"
+
+
+class UserLead(TimeStampedModel):
+
+    gender_choice = [("", "Select"), ("m", "Male"), ("f", "Female"), ("o", "Other")]
+    name = models.CharField(max_length=50, blank=True, default="")
+    phone_number = models.CharField(max_length=15)
+    message = models.TextField(blank=True, default="")
+    gender = models.CharField(choices=gender_choice, blank=True, max_length=2, default=None)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = "user_lead"

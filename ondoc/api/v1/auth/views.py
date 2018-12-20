@@ -19,6 +19,7 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
 from ondoc.coupon.models import UserSpecificCoupon
+from ondoc.lead.models import UserLead
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, DoctorClinicTiming
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
@@ -1619,3 +1620,24 @@ class DoctorNumberAutocomplete(autocomplete.Select2QuerySetView):
         if self.q:
             qs = qs.filter(name__icontains=self.q).order_by('name')
         return qs
+
+class UserLeadViewSet(GenericViewSet):
+
+    def create(self,request):
+        resp = {}
+        serializer = serializers.UserLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        if validated_data:
+            resp['name'] = validated_data.get('name')
+            resp['message'] = validated_data.get('message')
+            resp['phone_number'] = validated_data.get('phone_number')
+            resp['message'] = validated_data.get('message')
+            resp['gender'] = validated_data.get('gender')
+
+            UserLead.objects.create(**resp)
+        #     MAIL TODO : SHreyas
+
+        return Response(resp)
+
