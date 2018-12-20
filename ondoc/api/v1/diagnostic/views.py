@@ -161,7 +161,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = 50000
         category_ids = validated_data.get('category_ids', None)
-        lab_tests =None
+        lab_tests = None
         if category_ids:
             lab_tests = LabTestCategoryMapping.objects.filter(parent_category_id__in=category_ids).values_list(
                 'lab_test',
@@ -206,7 +206,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             avg_rating=Avg('rating__ratings')).filter(id__in=lab_ids)
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'lab_data': lab_data, 'request': request})
-        return Response(serializer.data)
+        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True)
+        category_result = []
+        for category in category_queryset:
+            name = category.name
+            category_id = category.id
+            category_result.append({'name': name, 'id': category_id})
+
+        return Response({'result': serializer.data, 'categories': category_result})
 
 
 
@@ -1308,14 +1315,3 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
                 resp['tests'] = temp_tests
                 empty.append(resp)
         return Response(empty)
-
-    def list_category(self, request):
-        queryset = LabTestCategory.objects.filter(is_package_category=True, is_live = True)
-        result = []
-        for category in queryset:
-            name = category.name
-            id = category.id
-            result.append({'name': name, 'id': id})
-
-        return Response(result)
-

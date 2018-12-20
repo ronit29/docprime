@@ -893,12 +893,16 @@ class LabEntitySerializer(serializers.ModelSerializer):
 
 class CustomPackageLabSerializer(LabModelSerializer):
     avg_rating = serializers.ReadOnlyField()
+    distance_related_charges = serializers.ReadOnlyField(default=0)
+    pickup_charges = serializers.ReadOnlyField(default=0)
+    pickup_available = serializers.ReadOnlyField(default=0)
 
     class Meta:
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating')
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating',
+                  'distance_related_charges', 'pickup_charges', 'pickup_available')
 
     # def get_avg_rating(self, obj):
     #     return obj.avg_rating
