@@ -2,6 +2,7 @@ from __future__ import absolute_import, unicode_literals
 
 import datetime
 import json
+import math
 from collections import OrderedDict
 
 from django.forms import model_to_dict
@@ -383,11 +384,11 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
-                aware_time_zone(instance.time_slot_start) != aware_time_zone(previous_appointment_date_time) \
-                or aware_time_zone(timezone.now()) > aware_time_zone(instance.time_slot_start):
+                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
             logger.error(
-                'instance : {}, time : {}, now: {}'.format(str(model_to_dict(instance)), previous_appointment_date_time,
-                                                           timezone.now()))
+                'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
+                                                           previous_appointment_date_time,
+                                                           str(math.floor(instance.time_slot_start.timestamp()))))
             return
         opd_notification = OpdNotification(instance, NotificationAction.OPD_OTP_BEFORE_APPOINTMENT)
         opd_notification.send()
@@ -402,12 +403,11 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         instance = LabAppointment.objects.filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
-                aware_time_zone(instance.time_slot_start) != aware_time_zone(previous_appointment_date_time) \
-                or aware_time_zone(timezone.now()) > aware_time_zone(instance.time_slot_start):
+                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
             logger.error(
-                'instance : {}, time : {}, now: {}'.format(str(model_to_dict(instance)),
+                'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
                                                            previous_appointment_date_time,
-                                                           timezone.now()))
+                                                           str(math.floor(instance.time_slot_start.timestamp()))))
             return
         opd_notification = LabNotification(instance, NotificationAction.LAB_OTP_BEFORE_APPOINTMENT)
         opd_notification.send()

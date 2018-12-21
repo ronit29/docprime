@@ -986,9 +986,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
         if self.status == self.ACCEPTED or \
                 (self.status == self.RESCHEDULED_PATIENT and old_instance.time_slot_start != self.time_slot_start):
             try:
-                notification_tasks.lab_send_otp_before_appointment.apply_async((self.id, self.time_slot_start),
-                                                                               eta=self.time_slot_start - datetime.timedelta(
-                                                                                   minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                notification_tasks.lab_send_otp_before_appointment.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start - datetime.timedelta(
+                        minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                # notification_tasks.lab_send_otp_before_appointment(self.id, self.time_slot_start)
             except Exception as e:
                 logger.error(str(e))
 
