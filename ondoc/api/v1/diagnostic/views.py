@@ -166,11 +166,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             lab_tests = LabTestCategoryMapping.objects.filter(parent_category_id__in=category_ids).values_list(
                 'lab_test',
                 flat=True)
-        all_packages_in_network_labs = LabTest.objects.filter(is_package=True,
-                                                              availablelabs__lab_pricing_group__labs__network__isnull=False,
-                                                              availablelabs__lab_pricing_group__labs__location__dwithin=(
-                                                                  Point(float(long), float(lat)),
-                                                                  D(m=max_distance))).annotate(
+        all_packages_in_network_labs = LabTest.objects.prefetch_related('test').filter(is_package=True,
+                                                                                       availablelabs__lab_pricing_group__labs__network__isnull=False,
+                                                                                       availablelabs__lab_pricing_group__labs__location__dwithin=(
+                                                                                           Point(float(long),
+                                                                                                 float(lat)),
+                                                                                           D(m=max_distance))).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -182,11 +183,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         partition_by=[F(
                             'availablelabs__lab_pricing_group__labs__network'), F('id')]))
 
-        all_packages_in_non_network_labs = LabTest.objects.filter(is_package=True,
-                                                                  availablelabs__lab_pricing_group__labs__network__isnull=True,
-                                                                  availablelabs__lab_pricing_group__labs__location__dwithin=(
-                                                                      Point(float(long), float(lat)),
-                                                                      D(m=max_distance))).annotate(
+        all_packages_in_non_network_labs = LabTest.objects.prefetch_related('test').filter(is_package=True,
+                                                                                           availablelabs__lab_pricing_group__labs__network__isnull=True,
+                                                                                           availablelabs__lab_pricing_group__labs__location__dwithin=(
+                                                                                               Point(float(long),
+                                                                                                     float(lat)),
+                                                                                               D(
+                                                                                                   m=max_distance))).annotate(
             distance=Distance('availablelabs__lab_pricing_group__labs__location', pnt)).annotate(
             lab=F('availablelabs__lab_pricing_group__labs'), mrp=F('availablelabs__mrp'),
             price=Case(
@@ -202,7 +205,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         all_packages = [package for package in all_packages_in_network_labs if package.rank == 1]
         all_packages.extend([package for package in all_packages_in_non_network_labs])
         lab_ids = [package.lab for package in all_packages]
-        lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network').annotate(
+        lab_data = Lab.objects.prefetch_related('rating', 'lab_documents', 'lab_timings', 'network',
+                                                'home_collection_charges').annotate(
             avg_rating=Avg('rating__ratings')).filter(id__in=lab_ids)
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'lab_data': lab_data, 'request': request})

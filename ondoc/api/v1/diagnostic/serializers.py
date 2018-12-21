@@ -893,16 +893,12 @@ class LabEntitySerializer(serializers.ModelSerializer):
 
 class CustomPackageLabSerializer(LabModelSerializer):
     avg_rating = serializers.ReadOnlyField()
-    distance_related_charges = serializers.ReadOnlyField(default=0)
-    pickup_charges = serializers.ReadOnlyField(default=0)
-    pickup_available = serializers.ReadOnlyField(default=0)
 
     class Meta:
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating',
-                  'distance_related_charges', 'pickup_charges', 'pickup_available')
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating')
 
     # def get_avg_rating(self, obj):
     #     return obj.avg_rating
@@ -915,12 +911,15 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
     lab_timings = serializers.SerializerMethodField()
     lab_timings_data = serializers.SerializerMethodField()
+    pickup_charges = serializers.SerializerMethodField()
+    pickup_available = serializers.SerializerMethodField()
+    distance_related_charges = serializers.SerializerMethodField()
 
     class Meta:
         model = LabTest
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timings', 'lab_timings_data',
-                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package')
-        # fields = ('__all__')
+                  'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'is_package',
+                  'pickup_charges', 'pickup_available', 'distance_related_charges')
 
     def get_lab(self, obj):
         lab_data = self.context.get('lab_data')
@@ -954,7 +953,31 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         lab_data = self.context.get('lab_data', [])
         for data in lab_data:
             if data.id == obj.lab:
-                return data
+                return data.avg_rating
+
+    def get_pickup_charges(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab and data.is_home_collection_enabled:
+                return data.home_pickup_charges
+            else:
+                return 0
+
+    def get_pickup_available(self, obj):
+        for temp_test in obj.test.all():
+            if not temp_test.home_collection_possible:
+                return 0
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return 1 if data.is_home_collection_enabled else 0
+        return 0
+
+    def get_distance_related_charges(self, obj):
+        lab_data = self.context.get('lab_data', [])
+        for data in lab_data:
+            if data.id == obj.lab:
+                return 1 if bool(data.home_collection_charges.all()) else 0
 
 
 class LabPackageListSerializer(serializers.Serializer):
