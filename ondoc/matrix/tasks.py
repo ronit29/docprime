@@ -153,6 +153,20 @@ def push_appointment_to_matrix(self, data):
             mobile_list = list()
             # User mobile number
             mobile_list.append({'MobileNo': appointment.user.phone_number, 'Name': appointment.profile.name, 'Type': 1})
+            # SPOC details
+            for spoc_obj in appointment.hospital.spoc_details.all():
+                number = ''
+                if spoc_obj.number:
+                    number = str(spoc_obj.number)
+                if spoc_obj.std_code:
+                    number = str(spoc_obj.std_code) + number
+                if number:
+                    number = int(number)
+
+                mobile_list.append({'MobileNo': number,
+                                    'Name': '%s (Hospital)' % spoc_obj.name,
+                                    'Type': spoc_obj.contact_type})
+
             # Doctor mobile numbers
             doctor_mobiles = [doctor_mobile.number for doctor_mobile in appointment.doctor.mobiles.all()]
             doctor_mobiles = [{'MobileNo': number, 'Name': appointment.doctor.name, 'Type': 2} for number in doctor_mobiles]
