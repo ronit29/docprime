@@ -3,6 +3,7 @@ from django.contrib.postgres.fields import JSONField
 from django.contrib.gis.geos import Point
 from django.utils.safestring import mark_safe
 
+from ondoc.api.v1.utils import aware_time_zone
 from ondoc.doctor.models import (Hospital, Doctor, DoctorClinic,
                                  DoctorAward, DoctorQualification, DoctorExperience, DoctorMedicalService,
                                  MedicalService, Qualification, College)
@@ -240,7 +241,7 @@ class UserLead(TimeStampedModel):
             final_html_body = ''
             for k, v in html_body.items():
                 final_html_body += '{} : {}<br>'.format(k, v)
-            email_subject = 'Lead from Ads' + str(self.created_at)
+            email_subject = 'Lead from Ads ' + str(aware_time_zone(self.created_at).strftime("%I:%M %d/%m/%Y"))
             EmailNotification.publish_ops_email(email, mark_safe(final_html_body), email_subject)
         except Exception as e:
             logger.error(str(e))
