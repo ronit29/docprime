@@ -234,7 +234,7 @@ class UserLead(TimeStampedModel):
         from django.forms.models import model_to_dict
         try:
             email = 'provider@docprime.com'
-            html_body = model_to_dict(self)
+            html_body = str(model_to_dict(self))
             email_subject = 'Lead from Ads' + str(self.created_at)
             EmailNotification.publish_ops_email(email, mark_safe(html_body), email_subject)
         except Exception as e:
