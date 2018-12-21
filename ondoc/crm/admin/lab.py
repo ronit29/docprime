@@ -1027,12 +1027,12 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         if any(self.errors):
             return
         all_parent_categories = []
-        # count_is_primary = 0
+        count_is_primary = 0
         for value in self.cleaned_data:
             if value and not value.get("DELETE"):
                 all_parent_categories.append(value.get('parent_category'))
-                # if value.get('is_primary', False):
-                #     count_is_primary += 1
+                if value.get('is_primary', False):
+                    count_is_primary += 1
         # If lab test is a package its parent can only be package category.
         if self.instance.is_package:
             if any([not parent_category.is_package_category for parent_category in all_parent_categories]):
@@ -1040,8 +1040,8 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         else:
             if any([parent_category.is_package_category for parent_category in all_parent_categories]):
                 raise forms.ValidationError("Parent Categories must be a lab test category.")
-            # if not count_is_primary == 1:
-            #     raise forms.ValidationError("Must have one and only one primary parent category.")
+        if not count_is_primary == 1:
+            raise forms.ValidationError("Must have one and only one primary parent category.")
 
 
 class LabTestCategoryInline(AutoComplete, TabularInline):
@@ -1151,6 +1151,7 @@ class LabTestCategoryAdmin(VersionAdmin):
     search_fields = ['name']
     form = LabTestCategoryForm
     autocomplete_fields = ['preferred_lab_test']
+    list_filter = ['is_package_category']
 
 
 class AvailableLabTestAdmin(VersionAdmin):
