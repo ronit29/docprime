@@ -5,7 +5,7 @@ from collections import defaultdict
 from itertools import groupby
 
 import pytz
-# from hardcopy import bytestring_to_pdf
+from hardcopy import bytestring_to_pdf
 
 from ondoc.doctor.models import OpdAppointment
 from ondoc.diagnostic.models import LabAppointment
@@ -324,21 +324,21 @@ class EMAILNotification:
             html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
             filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
                                                   random.randint(1111111111, 9999999999))
-            # try:
-            #     extra_args = {
-            #         'virtual-time-budget': 6000
-            #     }
-            #     temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-            #     file = open(temp_pdf_file.temporary_file_path())
-            #     bytestring_to_pdf(html_body.encode(), file, **extra_args)
-            #     file.seek(0)
-            #     file.flush()
-            #     file.content_type = 'application/pdf'
-            #     invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-            #                                         temp_pdf_file.tell(), None)
-            #     invoice.save()
-            # except Exception as e:
-            #     logger.error("Got error while creating pdf for opd invoice {}".format(e))
+            try:
+                extra_args = {
+                    'virtual-time-budget': 6000
+                }
+                temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+                file = open(temp_pdf_file.temporary_file_path())
+                bytestring_to_pdf(html_body.encode(), file, **extra_args)
+                file.seek(0)
+                file.flush()
+                file.content_type = 'application/pdf'
+                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+                                                    temp_pdf_file.tell(), None)
+                invoice.save()
+            except Exception as e:
+                logger.error("Got error while creating pdf for opd invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
@@ -377,21 +377,21 @@ class EMAILNotification:
             html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
             filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
                                                   random.randint(1111111111, 9999999999))
-            # try:
-            #     extra_args = {
-            #         'virtual-time-budget': 6000
-            #     }
-            #     temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-            #     file = open(temp_pdf_file.temporary_file_path())
-            #     bytestring_to_pdf(html_body.encode(), file, **extra_args)
-            #     file.seek(0)
-            #     file.flush()
-            #     file.content_type = 'application/pdf'
-            #     invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-            #                                         temp_pdf_file.tell(), None)
-            #     invoice.save()
-            # except Exception as e:
-            #     logger.error("Got error while creating pdf for opd invoice {}".format(e))
+            try:
+                extra_args = {
+                    'virtual-time-budget': 6000
+                }
+                temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+                file = open(temp_pdf_file.temporary_file_path())
+                bytestring_to_pdf(html_body.encode(), file, **extra_args)
+                file.seek(0)
+                file.flush()
+                file.content_type = 'application/pdf'
+                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+                                                    temp_pdf_file.tell(), None)
+                invoice.save()
+            except Exception as e:
+                logger.error("Got error while creating pdf for opd invoice {}".format(e))
             # try:
             #     file = HTML(string=html_body).write_pdf()
             #     invoice.file = SimpleUploadedFile(filename, file, content_type='application/pdf')
