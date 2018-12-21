@@ -28,7 +28,7 @@ from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
-from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone
 from functools import reduce
 from operator import or_
 import logging
@@ -1278,8 +1278,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         if self.status == self.ACCEPTED or \
                 (self.status == self.RESCHEDULED_PATIENT and old_instance.time_slot_start != self.time_slot_start):
             try:
-                notification_tasks.opd_send_otp_before_appointment.apply_async((self.id, self.time_slot_start),
-                                                                               eta=self.time_slot_start - datetime.timedelta(
+                notification_tasks.opd_send_otp_before_appointment.apply_async((self.id, aware_time_zone(self.time_slot_start)),
+                                                                               eta=aware_time_zone(self.time_slot_start) - datetime.timedelta(
                                                                                    minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
                 # notification_tasks.opd_send_otp_before_appointment(self.id, self.time_slot_start)
             except Exception as e:

@@ -7,6 +7,7 @@ from collections import OrderedDict
 from django.forms import model_to_dict
 from django.utils import timezone
 
+from ondoc.api.v1.utils import aware_time_zone
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
 from celery import task
@@ -382,8 +383,8 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
-                instance.time_slot_start != previous_appointment_date_time \
-                or timezone.now() > instance.time_slot_start:
+                aware_time_zone(instance.time_slot_start) != aware_time_zone(previous_appointment_date_time) \
+                or aware_time_zone(timezone.now()) > aware_time_zone(instance.time_slot_start):
             logger.error(
                 'instance : {}, time : {}, now: {}'.format(str(model_to_dict(instance)), previous_appointment_date_time,
                                                            timezone.now()))
@@ -401,8 +402,8 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         instance = LabAppointment.objects.filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
-                instance.time_slot_start != previous_appointment_date_time \
-                or timezone.now() > instance.time_slot_start:
+                aware_time_zone(instance.time_slot_start) != aware_time_zone(previous_appointment_date_time) \
+                or aware_time_zone(timezone.now()) > aware_time_zone(instance.time_slot_start):
             logger.error(
                 'instance : {}, time : {}, now: {}'.format(str(model_to_dict(instance)),
                                                            previous_appointment_date_time,
