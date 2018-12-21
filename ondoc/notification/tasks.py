@@ -4,6 +4,7 @@ import datetime
 import json
 from collections import OrderedDict
 
+from django.forms import model_to_dict
 from django.utils import timezone
 
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -381,8 +382,11 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
-                instance.time_slot_start != previous_appointment_date_time:
-                # or timezone.now() > instance.time_slot_start:
+                instance.time_slot_start != previous_appointment_date_time \
+                or timezone.now() > instance.time_slot_start:
+            logger.error(
+                'instance : {}, time : {}, now: {}'.format(str(model_to_dict(instance)), previous_appointment_date_time,
+                                                           timezone.now()))
             return
         opd_notification = OpdNotification(instance, NotificationAction.OPD_OTP_BEFORE_APPOINTMENT)
         opd_notification.send()
@@ -397,8 +401,12 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         instance = LabAppointment.objects.filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
-                instance.time_slot_start != previous_appointment_date_time:
-                # or timezone.now() > instance.time_slot_start:
+                instance.time_slot_start != previous_appointment_date_time \
+                or timezone.now() > instance.time_slot_start:
+            logger.error(
+                'instance : {}, time : {}, now: {}'.format(str(model_to_dict(instance)),
+                                                           previous_appointment_date_time,
+                                                           timezone.now()))
             return
         opd_notification = LabNotification(instance, NotificationAction.LAB_OTP_BEFORE_APPOINTMENT)
         opd_notification.send()
