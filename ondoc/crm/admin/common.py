@@ -262,7 +262,7 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
     list_display = ('beneficiary_name', 'account_number', 'ifsc_code', 'enabled', 'verified_by_finance')
 
     change_list_template = 'superuser_import_export.html'
-    search_fields = ['name']
+    search_fields = ['beneficiary_name']
 
 
     def get_readonly_fields(self, request, obj=None):
