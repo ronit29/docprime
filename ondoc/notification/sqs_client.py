@@ -17,10 +17,10 @@ class SQSConnection():
     #     self.connection.close()
 
 
-def publish_message(body):
+# def publish_message(body):
 
-    sqs = boto3.resource('sqs')
+#     sqs = boto3.resource('sqs')
 
-    queue = sqs.get_queue_by_name(QueueName=settings.NOTIFICATION_QUEUE)
+#     queue = sqs.get_queue_by_name(QueueName=settings.NOTIFICATION_QUEUE)
 
-    queue.send_message(MessageBody=body)
+#     queue.send_message(MessageBody=body)

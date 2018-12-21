@@ -1319,6 +1319,7 @@ class Merchant(TimeStampedModel):
     enabled = models.BooleanField(default=False)
     verified_by_finance = models.BooleanField(default=False)
     verified_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, editable=False, on_delete=models.SET_NULL)
+    verified_at = models.DateTimeField(null=True, blank=True, editable=False)
     merchant_add_1 = models.CharField(max_length=200, null=False, blank= True)
     merchant_add_2 = models.CharField(max_length=200, null=False, blank= True)
     merchant_add_3 = models.CharField(max_length=200, null=False, blank= True)
@@ -1335,7 +1336,7 @@ class Merchant(TimeStampedModel):
         db_table = 'merchant'
 
     def __str__(self):
-        return self.beneficiary_name+"("+self.account_number+")"
+        return self.beneficiary_name+"("+self.account_number+")-("+str(self.id)+")"
 
 
 class AssociatedMerchant(TimeStampedModel):

@@ -1274,6 +1274,7 @@ class LabTestCategoryListViewSet(viewsets.GenericViewSet):
             return Response([], status= status.HTTP_400_BAD_REQUEST)
         if lab_tests:
             categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(lab_tests__id__in=lab_tests,
+                                                                                      lab_test_mappings__is_primary=True,
                                                                                       is_live=True).distinct()
         else:
             categories = LabTestCategory.objects.prefetch_related('lab_tests').filter(is_live=True).distinct()

@@ -23,7 +23,8 @@ from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationE
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification
-from ondoc.notification.sqs_client import publish_message
+# from ondoc.notification.sqs_client import publish_message
+from ondoc.notification.rabbitmq_client import publish_message
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -331,17 +332,11 @@ class EMAILNotification:
                 file.seek(0)
                 file.flush()
                 file.content_type = 'application/pdf'
-                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf', temp_pdf_file.tell(), None)
+                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+                                                    temp_pdf_file.tell(), None)
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
-            # try:
-            #     logger.error(html_body)  # SHASHANK_SINGH Remove it.
-            #     file = HTML(string=html_body).write_pdf()
-            #     invoice.file = SimpleUploadedFile(filename, file, content_type='application/pdf')
-            #     invoice.save()
-            # except Exception as e:
-            #     logger.error("Got error while creating pdf for opd invoice {}".format(e))
             context.update({"invoice_url": invoice.file.url})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
@@ -390,7 +385,8 @@ class EMAILNotification:
                 file.seek(0)
                 file.flush()
                 file.content_type = 'application/pdf'
-                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf', temp_pdf_file.tell(), None)
+                invoice.file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+                                                    temp_pdf_file.tell(), None)
                 invoice.save()
             except Exception as e:
                 logger.error("Got error while creating pdf for opd invoice {}".format(e))
@@ -648,6 +644,11 @@ class LabNotification(Notification):
         lab_name = instance.lab.name.title() if instance.lab.name else ""
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
+        tests = self.appointment.get_tests_and_prices()
+        for test in tests:
+            test['mrp'] = str(test['mrp'])
+            test['deal_price'] = str(test['deal_price'])
+            test['discount'] = str(test['discount'])
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
@@ -658,7 +659,9 @@ class LabNotification(Notification):
             "action_id": instance.id,
             "image_url": "",
             "pickup_address": self.appointment.get_pickup_address(),
-            "time_slot_start": time_slot_start
+            "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
+            "time_slot_start": time_slot_start,
+            "tests": tests
         }
         return context
 
