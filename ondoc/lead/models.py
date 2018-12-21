@@ -235,9 +235,13 @@ class UserLead(TimeStampedModel):
         from django.conf import settings
         try:
             email = settings.PROVIDER_EMAIL
-            html_body = str(model_to_dict(self))
+            html_body = model_to_dict(self)
+            html_body.pop('id', None)
+            final_html_body = ''
+            for k, v in html_body.items():
+                final_html_body += '{} : {}<br>'.format(k, v)
             email_subject = 'Lead from Ads' + str(self.created_at)
-            EmailNotification.publish_ops_email(email, mark_safe(html_body), email_subject)
+            EmailNotification.publish_ops_email(email, mark_safe(final_html_body), email_subject)
         except Exception as e:
             logger.error(str(e))
 
