@@ -1002,6 +1002,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
+        if (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) \
+                and request.query_params.get('is_insurance'):
+            return Response()
+
         parameters = request.query_params
         if kwargs.get("parameters"):
             parameters = kwargs.get("parameters")
