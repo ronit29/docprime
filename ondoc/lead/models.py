@@ -232,8 +232,9 @@ class UserLead(TimeStampedModel):
 
     def after_commit(self):
         from django.forms.models import model_to_dict
+        from django.conf import settings
         try:
-            email = 'provider@docprime.com'
+            email = settings.PROVIDER_EMAIL
             html_body = str(model_to_dict(self))
             email_subject = 'Lead from Ads' + str(self.created_at)
             EmailNotification.publish_ops_email(email, mark_safe(html_body), email_subject)
