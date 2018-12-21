@@ -241,7 +241,7 @@ class UserLead(TimeStampedModel):
             final_html_body = ''
             for k, v in html_body.items():
                 final_html_body += '{} : {}<br>'.format(k, v)
-            email_subject = 'Lead from Ads ' + str(aware_time_zone(self.created_at).strftime("%I:%M %d/%m/%Y"))
+            email_subject = 'Lead from Ads ' + str(aware_time_zone(self.created_at).strftime("%I:%M %p || %d/%m/%Y"))
             EmailNotification.publish_ops_email(email, mark_safe(final_html_body), email_subject)
         except Exception as e:
             logger.error(str(e))
