@@ -1248,7 +1248,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         return False
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
-        from ondoc.notification.tasks import send_opd_notifications_refactored
         if push_to_matrix:
         # Push the appointment data to the matrix .
             try:
@@ -1259,7 +1258,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         if self.is_to_send_notification(old_instance):
             try:
-                send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+                notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
             except Exception as e:
                 logger.error(str(e))
             # notification_tasks.send_opd_notifications_refactored(self.id)
@@ -1273,6 +1272,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             try:
                 notification_tasks.send_opd_rating_message.apply_async(
                     kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+            except Exception as e:
+                logger.error(str(e))
+
+        if self.status == self.ACCEPTED or \
+                (self.status == self.RESCHEDULED_PATIENT and old_instance.time_slot_start != self.time_slot_start):
+            try:
+                notification_tasks.opd_send_otp_before_appointment.apply_async((self.id, self.time_slot_start),
+                                                                               eta=self.time_slot_start - datetime.timedelta(
+                                                                                   minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
             except Exception as e:
                 logger.error(str(e))
 
