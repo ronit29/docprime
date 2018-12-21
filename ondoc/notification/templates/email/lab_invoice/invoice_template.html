@@ -3,145 +3,369 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>INVOICE</title>
+    <title>INVOICE</title>
 
-	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 
-	<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
+
+    <style>
+        @page{
+           margin:20px;
+        }
+
+        @media print{
+           footer {
+           left:0;
+           position:fixed;
+           }
+
+           header {
+           left:0;
+           position:fixed;
+           }
+        }
+
+    </style>
+
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Quicksand', sans-serif;">
-<table cellpadding="0" cellspacing="0" width="100%" style="width: 100%; max-width: 700px; margin: auto;">
-   <tbody>
-      <tr>
-         <td>
-            <table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px; background-color: #ffffff;">
-               <tbody>
-                  <tr>
-                     <td>
-                        <h3 style="font-weight: 500;">{{instance.lab.name|capfirst}}</h3>
-                     </td>
-                     <td style="text-align: right;">
-                        <h3 style="font-weight: 500;">Invoice</h3>
-                     </td>
-                  </tr>
-               </tbody>
+<table align="center" cellpadding="0" cellspacing="0" width="600px" style="max-width: 600px; margin: auto;">
+    <tbody>
+    <tr>
+        <td>
+            <img src="{{'notification/images/doctor_invoice_header.png'|get_absolute_url}}"/>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding-top: 10px;">
+            <table align="center" cellpadding="0" cellspacing="0" style="width: 100%;">
+                <tbody>
+                <tr>
+                    <td style="font-weight: 500;width: 60%;">
+                        Docprime Booking ID: <span style="font-weight: 400;">{{instance.id}}</span>
+                    </td>
+                    <td style="width: 40%;font-weight: 500;padding-left: 12px;">
+                        Receipt No: <span style="font-weight: 400;">{{invoice.id}}</span>
+                    </td>
+                </tr>
+                </tbody>
             </table>
-         </td>
-      </tr>
-      <tr>
-         <td>
-            <table cellpadding="0" cellspacing="0" style="padding-top: 20px; width: 100%;">
-               <tbody>
-                  <tr>
-                     <td>
-                        <p style="margin: 0; font-size: 12px; color: #757575; font-weight: 500;">{{instance.lab.get_lab_address}}</p>
-
-                     </td>
-                     <td style="text-align: right;">
-                        {% if instance.lab.license %}<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 500;">Registration No: <span style="font-weight: 600;">{{instance.lab.license}}</span></p>{% endif %}
-                        <p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 500;">Date: <span style="font-weight: 600;">{{invoice.created_at|date:'M d, Y'}}</span></p>
-                        <p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 500;">Invoice N0: <span style="font-weight: 600;">{{invoice.id}}</span></p>
-                     </td>
-                  </tr>
-               </tbody>
+        </td>
+    </tr>
+    <tr>
+        <td style="font-weight: 500;padding-top: 25px;">
+            Booking Date: <span style="font-weight: 400;">{{instance.created_at|date:"D jS F Y"}}</span>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding-top: 25px;">
+            <table align="center" cellpadding="0" cellspacing="0" style="width: 100%;">
+                <tbody>
+                <tr>
+                    <td style="font-weight: 500;width: 60%;">
+                        Serviced By:
+                    </td>
+                    <td style="font-weight: 500;width: 40%;padding-left: 12px;">
+                        Patient Name:
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width: 60%;padding-top: 10px;">
+                        {{lab_name|capfirst}}
+                    </td>
+                    <td style="width: 40%;padding-top: 10px;padding-left: 12px;">
+                        {{patient_name|capfirst}}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width: 60%;padding-top: 10px;">
+                        {{instance.lab.get_lab_address}}
+                    </td>
+                    <td style="width: 60%;padding-top: 10px;padding-left: 12px;">
+                        {% if instance.profile.phone_number %}+91-{{instance.profile.phone_number}}{% endif %}
+                    </td>
+                </tr>
+                </tbody>
             </table>
-         </td>
-      </tr>
-      <tr>
-         <td>
-            <hr style="margin: 20px 0;">
-            <table cellpadding="0" cellspacing="0" style="width: 100%;">
-               <tbody>
-                  <tr>
-                     <td>
-                        <p style="margin: 0; font-size: 12px; color: #000000; font-weight: 500;">{{instance.profile.name|capfirst}} | {{instance.profile.gender|get_gender}}</p>
-                        <p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">Booking ID: {{instance.id}}</p>
-                        {% if instance.profile.phone_number %}<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; ofont-weight: 500;">+91{{instance.profile.phone_number}}</p>{% endif %}
-                        {% if instance.profile.email %}<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{{instance.profile.email}}</p>{% endif %}
-                     </td>
-					 {% if instance.is_home_pickup %}
-						 <td style="text-align: right;">
-							<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 600;">Pickup Address</p>
-							<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{{instance.get_pickup_address}}</p>
-						 </td>
-					  {% endif %}
-                  </tr>
-               </tbody>
+        </td>
+    </tr>
+    <tr>
+        <td style="width: 60%;padding-top: 25px;font-weight: 500;">
+            Appointment Date &amp; Time : <span style="font-weight: 400;">{{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}</span>
+        </td>
+    </tr>
+    {% if instance.is_home_pickup and pickup_address %}
+    <tr>
+        <td style="width: 60%;padding-top: 25px;font-weight: 500;">
+            Home Pick up Address : <span style="font-weight: 400;">{{pickup_address}}</span>
+        </td>
+    </tr>
+    {% endif %}
+    <tr>
+        <td style="padding-top: 25px;">
+            <table align="center" cellpadding="0" cellspacing="0"
+                   style="width: 100%;border-collapse: collapse;border: 1px solid black;">
+                <thead>
+                <tr>
+                    <th style="border: 1px solid black;">
+                        S.No.
+                    </th>
+                    <th style="border: 1px solid black;">
+                        Particulars
+                    </th>
+                    <th style="border: 1px solid black;">
+                        MRP
+                    </th>
+                    <th style="border: 1px solid black;">
+                        Discount
+                    </th>
+                    <th style="border: 1px solid black;">
+                        Grand Total
+                    </th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for test in tests %}
+                <tr>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{forloop.counter}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{test.name|capfirst}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{test.mrp}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{test.discount}}
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{test.deal_price}}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if coupon_discount %}
+                <tr>
+                    <td colspan="4" style="border: 1px solid black;text-align: center;">
+                        Coupon Discount
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{coupon_discount}}
+                    </td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td colspan="4" style="border: 1px solid black;text-align: center;">
+                        Amount Paid
+                    </td>
+                    <td style="border: 1px solid black;text-align: center;">
+                        {{instance.effective_price}}
+                    </td>
+                </tr>
+                </tbody>
             </table>
-         </td>
-      </tr>
-      <tr>
-         <td>
-            <table cellpadding="0" cellspacing="0" style="padding-top: 30px; width: 100%;">
-               <thead>
-                  <tr style="background-color: #f3f3f3; ">
-                     <td width="8.333%" style="width: 8.333%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">S. No.</td>
-                     <td width="50%" style="width: 50%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Treatments</td>
-                     <td width="16.666%" style="width: 16.666%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Unit Cost</td>
-                     <td width="8.333%" style="width: 8.333%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Qty</td>
-                     <td width="16.666%" style="width: 16.666%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Total Cost</td>
-                  </tr>
-               </thead>
-               <tbody>
-                  {% for test in instance.lab_test.all %}
-                  <tr>
-                     <td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">1</td>
-                     <td width="50%" style="width: 50%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">{%if test.test.name %}{{test.test.name}} {% endif %}</td>
-                     <td width="16.666%" style="width: 16.666; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">{{test.mrp}}</td>
-                     <td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">1</td>
-                     <td width="16.666%" style="width: 16.666; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">{{test.mrp}}</td>
-                  </tr>
-                  {% endfor %}
-                  <!--<tr>-->
-                     <!--<td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">2</td>-->
-                     <!--<td width="50%" style="width: 50%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3; word-wrap: break-word;">Single sheet root canal treatment with microsocpe</td>-->
-                     <!--<td width="16.666%" style="width: 16.666%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">80,000.00</td>-->
-                     <!--<td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">2</td>-->
-                     <!--<td width="16.666%" style="width: 16.666%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">1,60,000.00</td>-->
-                  <!--</tr>-->
-               </tbody>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding-top: 25px;font-weight: 500;">
+            Mode of Payment : <span style="font-weight: 400;">{{instance.payment_type|mode_of_payment}}</span>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding-top: 25px;">
+            Thanks for choosing docprime.com
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 40px 50px 0;color: #757575;text-align: center;">
+            This is a system generated e-mail. Please do not reply to this e-mail. For any support, please write to us
+            at customercare@docprime.com
+        </td>
+    </tr>
+    <tr>
+        <td style="padding-top: 40px;">
+            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; background-color: #f78631;">
+                <tbody>
+                <tr>
+                    <td style="font-size: 14px; color: #fafafa; width: 55%">
+                        All Rights Reserved
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img
+                                src="{{'notification/images/youtube-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img
+                                src="{{'notification/images/instagram-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img
+                                src="{{'notification/images/facebook-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://twitter.com/DocPrimeindia" target="_blank"><img
+                                src="{{'notification/images/twitter-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.linkedin.com/company/docprime/" target="_blank"><img
+                                src="{{'notification/images/linkedin-email.png'|get_absolute_url}}"></a>
+                    </td>
+                </tr>
+                </tbody>
             </table>
-         </td>
-      </tr>
-      <tr>
-         <td>
-            <table cellpadding="0" cellspacing="0" width="100%" style="width: 100%; padding-top: 10px;">
-               <tbody>
-                  <tr>
-                     <td width="83.333%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Total Cost :</td>
-                     <td width="16.667%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{instance.price}}</td>
-                  </tr>
-                  <tr>
-                     <td width="83.334%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Discount :</td>
-                     <td width="16.666%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{ instance.price|subtract:instance.effective_price}}</td>
-                  </tr>
-				  {% if instance.is_home_pickup %}
-                  <tr>
-                     <td width="83.334%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Pickup Charges :</td>
-                     <td width="16.666%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{instance.home_pickup_charges}}</td>
-                  </tr>
-				  {% endif %}
-                  <tr>
-                     <td width="83.334%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Grand Total :</td>
-                     <td width="16.666%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{instance.effective_price}}</td>
-                  </tr>
-               </tbody>
-            </table>
-         </td>
-      </tr>
-      <tr>
-         <td>
-            <table cellpadding="0" cellspacing="0" width="100%" style="width: 100%; padding-top: 20px;">
-               <tbody>
-                  <tr>
-                     <td width="20%" style="width:20%; font-size: 14px; color: #757575; font-weight: 500;">Mode of Payment :</td>
-                     <td width="80%" style="width:80%; font-size: 14px; color: #000000; font-weight: 500;">{{instance.payment_type|mode_of_payment}}</td>
-                  </tr>
-               </tbody>
-            </table>
-         </td>
-      </tr>
-   </tbody>
+        </td>
+    </tr>
+    </tbody>
 </table>
 </body>
 </html>
+
+
+<!--{% load static %}-->
+<!--{% load invoice_tags %}-->
+<!--<!DOCTYPE html>-->
+<!--<html>-->
+<!--<head>-->
+	<!--<title>INVOICE</title>-->
+
+	<!--<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />-->
+
+	<!--<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">-->
+<!--</head>-->
+<!--<body style="margin: 0; padding: 0; font-family: 'Quicksand', sans-serif;">-->
+<!--<table cellpadding="0" cellspacing="0" width="100%" style="width: 100%; max-width: 700px; margin: auto;">-->
+   <!--<tbody>-->
+      <!--<tr>-->
+         <!--<td>-->
+            <!--<table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px; background-color: #ffffff;">-->
+               <!--<tbody>-->
+                  <!--<tr>-->
+                     <!--<td>-->
+                        <!--<h3 style="font-weight: 500;">{{instance.lab.name|capfirst}}</h3>-->
+                     <!--</td>-->
+                     <!--<td style="text-align: right;">-->
+                        <!--<h3 style="font-weight: 500;">Invoice</h3>-->
+                     <!--</td>-->
+                  <!--</tr>-->
+               <!--</tbody>-->
+            <!--</table>-->
+         <!--</td>-->
+      <!--</tr>-->
+      <!--<tr>-->
+         <!--<td>-->
+            <!--<table cellpadding="0" cellspacing="0" style="padding-top: 20px; width: 100%;">-->
+               <!--<tbody>-->
+                  <!--<tr>-->
+                     <!--<td>-->
+                        <!--<p style="margin: 0; font-size: 12px; color: #757575; font-weight: 500;">{{instance.lab.get_lab_address}}</p>-->
+
+                     <!--</td>-->
+                     <!--<td style="text-align: right;">-->
+                        <!--{% if instance.lab.license %}<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 500;">Registration No: <span style="font-weight: 600;">{{instance.lab.license}}</span></p>{% endif %}-->
+                        <!--<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 500;">Date: <span style="font-weight: 600;">{{invoice.created_at|date:'M d, Y'}}</span></p>-->
+                        <!--<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 500;">Invoice N0: <span style="font-weight: 600;">{{invoice.id}}</span></p>-->
+                     <!--</td>-->
+                  <!--</tr>-->
+               <!--</tbody>-->
+            <!--</table>-->
+         <!--</td>-->
+      <!--</tr>-->
+      <!--<tr>-->
+         <!--<td>-->
+            <!--<hr style="margin: 20px 0;">-->
+            <!--<table cellpadding="0" cellspacing="0" style="width: 100%;">-->
+               <!--<tbody>-->
+                  <!--<tr>-->
+                     <!--<td>-->
+                        <!--<p style="margin: 0; font-size: 12px; color: #000000; font-weight: 500;">{{instance.profile.name|capfirst}} | {{instance.profile.gender|get_gender}}</p>-->
+                        <!--<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">Booking ID: {{instance.id}}</p>-->
+                        <!--{% if instance.profile.phone_number %}<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">+91{{instance.profile.phone_number}}</p>{% endif %}-->
+                        <!--{% if instance.profile.email %}<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{{instance.profile.email}}</p>{% endif %}-->
+                     <!--</td>-->
+					 <!--{% if instance.is_home_pickup %}-->
+						 <!--<td style="text-align: right;">-->
+							<!--<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #000000; font-weight: 600;">Pickup Address</p>-->
+							<!--<p style="margin: 0; margin-top: 2px; font-size: 12px; color: #757575; font-weight: 500;">{{instance.get_pickup_address}}</p>-->
+						 <!--</td>-->
+					  <!--{% endif %}-->
+                  <!--</tr>-->
+               <!--</tbody>-->
+            <!--</table>-->
+         <!--</td>-->
+      <!--</tr>-->
+      <!--<tr>-->
+         <!--<td>-->
+            <!--<table cellpadding="0" cellspacing="0" style="padding-top: 30px; width: 100%;">-->
+               <!--<thead>-->
+                  <!--<tr style="background-color: #f3f3f3; ">-->
+                     <!--<td width="8.333%" style="width: 8.333%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">S. No.</td>-->
+                     <!--<td width="50%" style="width: 50%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Treatments</td>-->
+                     <!--<td width="16.666%" style="width: 16.666%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Unit Cost</td>-->
+                     <!--<td width="8.333%" style="width: 8.333%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Qty</td>-->
+                     <!--<td width="16.666%" style="width: 16.666%; font-size: 16px; color: #000000; font-weight: 500; text-align: center; padding: 16px 0;">Total Cost</td>-->
+                  <!--</tr>-->
+               <!--</thead>-->
+               <!--<tbody>-->
+                  <!--{% for test in instance.lab_test.all %}-->
+                  <!--<tr>-->
+                     <!--<td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">1</td>-->
+                     <!--<td width="50%" style="width: 50%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">{%if test.test.name %}{{test.test.name}} {% endif %}</td>-->
+                     <!--<td width="16.666%" style="width: 16.666; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">{{test.mrp}}</td>-->
+                     <!--<td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">1</td>-->
+                     <!--<td width="16.666%" style="width: 16.666; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">{{test.mrp}}</td>-->
+                  <!--</tr>-->
+                  <!--{% endfor %}-->
+                  <!--&lt;!&ndash;<tr>&ndash;&gt;-->
+                     <!--&lt;!&ndash;<td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">2</td>&ndash;&gt;-->
+                     <!--&lt;!&ndash;<td width="50%" style="width: 50%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3; word-wrap: break-word;">Single sheet root canal treatment with microsocpe</td>&ndash;&gt;-->
+                     <!--&lt;!&ndash;<td width="16.666%" style="width: 16.666%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">80,000.00</td>&ndash;&gt;-->
+                     <!--&lt;!&ndash;<td width="8.333%" style="width: 8.333%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">2</td>&ndash;&gt;-->
+                     <!--&lt;!&ndash;<td width="16.666%" style="width: 16.666%; font-size: 14px; color: #757575; font-weight: 500; text-align: center; padding: 16px 4px; border-bottom: 1px solid #d3d3d3;">1,60,000.00</td>&ndash;&gt;-->
+                  <!--&lt;!&ndash;</tr>&ndash;&gt;-->
+               <!--</tbody>-->
+            <!--</table>-->
+         <!--</td>-->
+      <!--</tr>-->
+      <!--<tr>-->
+         <!--<td>-->
+            <!--<table cellpadding="0" cellspacing="0" width="100%" style="width: 100%; padding-top: 10px;">-->
+               <!--<tbody>-->
+                  <!--<tr>-->
+                     <!--<td width="83.333%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Total Cost :</td>-->
+                     <!--<td width="16.667%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{instance.price}}</td>-->
+                  <!--</tr>-->
+                  <!--<tr>-->
+                     <!--<td width="83.334%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Discount :</td>-->
+                     <!--<td width="16.666%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{ instance.price|subtract:instance.effective_price}}</td>-->
+                  <!--</tr>-->
+				  <!--{% if instance.is_home_pickup %}-->
+                  <!--<tr>-->
+                     <!--<td width="83.334%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Pickup Charges :</td>-->
+                     <!--<td width="16.666%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{instance.home_pickup_charges}}</td>-->
+                  <!--</tr>-->
+				  <!--{% endif %}-->
+                  <!--<tr>-->
+                     <!--<td width="83.334%" style="width: 83.333%; font-size: 14px; color: #757575; padding: 8px 0; text-align: left; font-weight: 500;">Grand Total :</td>-->
+                     <!--<td width="16.666%" style="width: 16.667%; font-size: 14px; color: #000000; padding: 8px 0; text-align: center; font-weight: 500;">{{instance.effective_price}}</td>-->
+                  <!--</tr>-->
+               <!--</tbody>-->
+            <!--</table>-->
+         <!--</td>-->
+      <!--</tr>-->
+      <!--<tr>-->
+         <!--<td>-->
+            <!--<table cellpadding="0" cellspacing="0" width="100%" style="width: 100%; padding-top: 20px;">-->
+               <!--<tbody>-->
+                  <!--<tr>-->
+                     <!--<td width="20%" style="width:20%; font-size: 14px; color: #757575; font-weight: 500;">Mode of Payment :</td>-->
+                     <!--<td width="80%" style="width:80%; font-size: 14px; color: #000000; font-weight: 500;">{{instance.payment_type|mode_of_payment}}</td>-->
+                  <!--</tr>-->
+               <!--</tbody>-->
+            <!--</table>-->
+         <!--</td>-->
+      <!--</tr>-->
+   <!--</tbody>-->
+<!--</table>-->
+<!--</body>-->
+<!--</html>-->

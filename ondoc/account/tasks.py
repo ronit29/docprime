@@ -63,7 +63,7 @@ def refund_status_update(self):
 
 @task(bind=True, max_retries=6)
 def refund_curl_task(self, req_data):
-    from .models import ConsumerRefund, PgTransaction
+    from ondoc.account.models import ConsumerRefund, PgTransaction
     if settings.AUTO_REFUND:
         print(req_data)
         try:
@@ -104,7 +104,7 @@ def refund_curl_task(self, req_data):
 
 @task(bind=True, max_retries=5)
 def set_order_dummy_transaction(self, order_id, user_id):
-    from .models import Order, DummyTransactions
+    from ondoc.account.models import Order, DummyTransactions
     from ondoc.account.models import User
     try:
         if not settings.PAYOUTS_ENABLED:
@@ -182,7 +182,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
 @task()
 def process_payout(payout_id):
-    from .models import MerchantPayout, Order
+    from ondoc.account.models import MerchantPayout, Order
     from ondoc.api.v1.utils import create_payout_checksum
 
     try:

@@ -80,7 +80,7 @@
                 </tr>
                 <tr>
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
-                        Refund if applicable will be credited within 5-7 working days.
+                        Refund will be credited within 5-7 working days.
                     </td>
                 </tr>
                 <tr>
@@ -97,7 +97,7 @@
                             </tr>
                             <tr>
                                 <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
-                                    Patient
+                                    Patient Name
                                 </td>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     {{patient_name|capfirst}}
@@ -128,14 +128,16 @@
                                     {{instance.time_slot_start|date:"h:i A"}}
                                 </td>
                             </tr>
+                            {% if instance.effective_price > 0 %}
                             <tr>
                                 <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px">
-                                    Amount Paid
+                                    Refund Amount
                                 </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;padding-left:8px">
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;">
                                     {{instance.effective_price}}
                                 </td>
                             </tr>
+                            {% endif %}
                             </tbody>
                         </table>
                     </td>
@@ -144,11 +146,6 @@
                 <tr>
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:10px">
                         In case of any queries please contact us at our toll free number 1800-123-9419.
-                    </td>
-                </tr>
-                <tr>
-                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
-                        Apologies for the inconvenience caused.
                     </td>
                 </tr>
                 <tr>
@@ -168,8 +165,8 @@
                 <tbody>
                 <tr>
                     <td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;border-top: 1px solid #d3d3d3;">
-                        This is a system-generated e-mail. Please do not reply to this e-mail. For any support please
-                        write to customerhelp@docprime.com
+                        This is a system-generated e-mail. Please do not reply to this e-mail. For any support
+                        please write to customercare@docprime.com.
                     </td>
                 </tr>
                 </tbody>

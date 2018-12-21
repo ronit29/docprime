@@ -1,10 +1,35 @@
 from __future__ import absolute_import, unicode_literals
-from .labnotificationaction import LabNotificationAction
-from . import models as notification_models
+
+import datetime
+import json
+from collections import OrderedDict
+
+from ondoc.notification.labnotificationaction import LabNotificationAction
+from ondoc.notification import models as notification_models
 from celery import task
 import logging
+from django.conf import settings
+import requests
+from rest_framework import status
 
 logger = logging.getLogger(__name__)
+
+
+@task
+def send_lab_notifications_refactored(appointment_id):
+    from ondoc.diagnostic import models as lab_models
+    from ondoc.communications.models import LabNotification
+    instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
+    if not instance or not instance.user:
+        return
+    try:
+        instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
+        if not instance or not instance.user:
+            return
+        opd_notification = LabNotification(instance)
+        opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
 
 
 @task
@@ -68,6 +93,22 @@ def send_lab_notifications(appointment_id):
             notification_type=notification_models.NotificationAction.LAB_APPOINTMENT_BOOKED,
         )
         return
+
+
+@task()
+def send_opd_notifications_refactored(appointment_id):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance or not instance.user:
+            return
+
+        opd_notification = OpdNotification(instance)
+        opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
 
 @task
 def send_opd_notifications(appointment_id):
@@ -135,7 +176,7 @@ def send_opd_notifications(appointment_id):
             notification_type=notification_models.NotificationAction.DOCTOR_INVOICE,
         )
 
-@task
+@task(max_retries=1)
 def send_opd_rating_message(appointment_id, type):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
@@ -144,21 +185,188 @@ def send_opd_rating_message(appointment_id, type):
 
     data = {}
     name = ''
-    if type == 'opd':
-        appointment = OpdAppointment.objects.filter(id=appointment_id, is_rated=False, status=OpdAppointment.COMPLETED).first()
-        name = appointment.doctor.name if appointment else None
-    else:
-        appointment = LabAppointment.objects.filter(id=appointment_id, is_rated=False, status=LabAppointment.COMPLETED).first()
-        name = appointment.lab.name if appointment else None
-    if appointment:
-        number = appointment.user.phone_number
-        data['phone_number'] = number
-        app_url = settings.CONSUMER_APP_DOMAIN
-        text_url = str(app_url)+ "/" + str(type) + "/appointment/" + str(appointment_id)
-        text = '''You have successfully completed your appointment with %s . Rate your experience %s''' % (name, text_url)
-        data['text'] = mark_safe(text)
-        notification_models.SmsNotification.send_rating_link(data)
+    try:
+        if type == 'opd':
+            appointment = OpdAppointment.objects.filter(id=appointment_id, is_rated=False, status=OpdAppointment.COMPLETED).first()
+            name = appointment.doctor.name if appointment else None
+        else:
+            appointment = LabAppointment.objects.filter(id=appointment_id, is_rated=False, status=LabAppointment.COMPLETED).first()
+            name = appointment.lab.name if appointment else None
+        if appointment:
+            number = appointment.user.phone_number
+            data['phone_number'] = number
+            app_url = settings.CONSUMER_APP_DOMAIN
+            text_url = str(app_url)+ "/" + str(type) + "/appointment/" + str(appointment_id)
+            text = '''You have successfully completed your appointment with %s . Rate your experience %s''' % (name, text_url)
+            data['text'] = mark_safe(text)
+            notification_models.SmsNotification.send_rating_link(data)
+    except Exception as e:
+        logger.error(str(e))
+        pass
 
+@task(bind=True, max_retries=5)
+def set_order_dummy_transaction(self, order_id, user_id):
+    from ondoc.account.models import Order, DummyTransactions
+    from ondoc.account.models import User
+    try:
+        order_row = Order.objects.filter(id=order_id).first()
+        user = User.objects.filter(id=user_id).first()
+
+        if order_row and user and order_row.reference_id:
+            if order_row.getTransactions():
+                print("dummy Transaction already set")
+                return
+
+            appointment = order_row.getAppointment()
+            if not appointment:
+                raise Exception("No Appointment found.")
+
+            token = settings.PG_DUMMY_TRANSACTION_TOKEN
+            headers = {
+                "auth": token,
+                "Content-Type": "application/json"
+            }
+            url = settings.PG_DUMMY_TRANSACTION_URL
+
+            req_data = {
+                "customerId": user_id,
+                "mobile": user.phone_number,
+                "email": user.email or "dummyemail@docprime.com",
+                "productId": order_row.product_id,
+                "orderId": order_id,
+                "name": appointment.profile.name,
+                "txAmount": str(appointment.effective_price),
+                "couponCode": "",
+                "couponAmt": 0,
+                "paymentMode": "DC",
+                "AppointmentId": order_row.reference_id,
+                "buCallbackSuccessUrl": "",
+                "buCallbackFailureUrl": ""
+            }
+
+            response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
+                if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                    tx_data = {}
+                    tx_data['user'] = user
+                    tx_data['product_id'] = order_row.product_id
+                    tx_data['order_no'] = resp_data.get('orderNo')
+                    tx_data['order_id'] = order_row.id
+                    tx_data['reference_id'] = order_row.reference_id
+                    tx_data['type'] = DummyTransactions.CREDIT
+                    tx_data['amount'] = 0
+                    tx_data['payment_mode'] = "DC"
+
+                    # tx_data['transaction_id'] = resp_data.get('orderNo')
+                    # tx_data['response_code'] = response.get('responseCode')
+                    # tx_data['bank_id'] = response.get('bankTxId')
+                    # transaction_time = parse(response.get("txDate"))
+                    # tx_data['transaction_date'] = transaction_time
+                    # tx_data['bank_name'] = response.get('bankName')
+                    # tx_data['currency'] = response.get('currency')
+                    # tx_data['status_code'] = response.get('statusCode')
+                    # tx_data['pg_name'] = response.get('pgGatewayName')
+                    # tx_data['status_type'] = response.get('txStatus')
+                    # tx_data['pb_gateway_name'] = response.get('pbGatewayName')
+
+                    DummyTransactions.objects.create(**tx_data)
+                    print("SAVED DUMMY TRANSACTION")
+            else:
+                raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+    except Exception as e:
+        logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
+        self.retry([order_id, user_id], countdown=300)
+
+@task()
+def process_payout(payout_id):
+    from ondoc.account.models import MerchantPayout, Order
+    from ondoc.api.v1.utils import create_payout_checksum
+
+    try:
+        if not payout_id:
+            raise Exception("No payout specified")
+
+        payout_data = MerchantPayout.objects.filter(id=payout_id).first()
+        if not payout_data or payout_data.status == payout_data.PAID:
+            raise Exception("Payment already done for this payout")
+
+        appointment = payout_data.get_appointment()
+        billed_to = payout_data.get_billed_to()
+        merchant = payout_data.get_merchant()
+        order_data = None
+
+        if not appointment or not billed_to or not merchant:
+            raise Exception("Insufficient Data " + str(payout_data))
+
+        if not merchant.verified_by_finance or not merchant.enabled:
+            raise Exception("Merchant is not verified or is not enabled. " + str(payout_data))
+
+        associated_merchant = billed_to.merchant.first()
+        if not associated_merchant.verified:
+            raise Exception("Associated Merchant not verified. " + str(payout_data))
+
+        # assuming 1 to 1 relation between Order and Appointment
+        order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
+
+        if not order_data:
+             raise Exception("Order not found for given payout " + str(payout_data))
+
+
+        all_txn = order_data.getTransactions()
+
+        if not all_txn or all_txn.count() == 0:
+            raise Exception("No transactions found for given payout " + str(payout_data))
+
+        req_data = { "payload" : [], "checkSum" : "" }
+
+        idx = 0
+        for txn in all_txn:
+            curr_txn = OrderedDict()
+            curr_txn["idx"] = idx
+            curr_txn["orderNo"] = txn.order_no
+            curr_txn["orderId"] = order_data.id
+            curr_txn["txnAmount"] = str(order_data.amount)
+            curr_txn["settledAmount"] = str(payout_data.payable_amount)
+            curr_txn["merchantCode"] = merchant.id
+            curr_txn["pgtxId"] = txn.transaction_id
+            curr_txn["refNo"] = txn.id
+            curr_txn["bookingId"] = appointment.id
+            req_data["payload"].append(curr_txn)
+            idx += 1
+
+        req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
+        headers = {
+            "auth": settings.PG_REFUND_AUTH_TOKEN,
+            "Content-Type": "application/json"
+        }
+        url = settings.PG_SETTLEMENT_URL
+
+        response = requests.post(url, data=json.dumps(req_data), headers=headers)
+        if response.status_code == status.HTTP_200_OK:
+            resp_data = response.json()
+            if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+                success_payout = False
+                result = resp_data.get('result')
+                if result:
+                    for res_txn in result:
+                        success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+
+                if success_payout:
+                    payout_data.payout_time = datetime.datetime.now()
+                    payout_data.status = payout_data.PAID
+                    payout_data.api_response = json.dumps(resp_data)
+                    payout_data.save()
+                    print("Payout processed")
+                    return
+
+        payout_data.retry_count += 1
+        payout_data.api_response = json.dumps(resp_data)
+        payout_data.save()
+        raise Exception("Retry on invalid Http response status - " + str(response.content))
+    except Exception as e:
+        logger.error("Error in processing payout - with exception - " + str(e))
 
 # @task
 def send_insurance_notifications(user_id):

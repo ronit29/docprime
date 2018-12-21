@@ -185,7 +185,6 @@ def push_appointment_to_matrix(self, data):
 
 @task(bind=True, max_retries=2)
 def push_signup_lead_to_matrix(self, data):
-    # TODO: SHASHANK_SINGH Not sure what to do.
     try:
         from ondoc.web.models import OnlineLead
         lead_id = data.get('lead_id', None)
@@ -277,7 +276,6 @@ def push_order_to_matrix(self, data):
             raise Exception("Order could not found against id - " + str(order_id))
 
         appointment_details = order_obj.appointment_details()
-        # TODO: SHASHANK_SINGH not sure if any changes?
         request_data = {
             'LeadSource': 'DocPrime',
             'HospitalName': appointment_details.get('hospital_name'),

@@ -1,7 +1,8 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
-from ondoc.account.tasks import refund_curl_task, process_payout
+from ondoc.account.tasks import refund_curl_task
+from ondoc.notification.tasks import process_payout
 # from ondoc.diagnostic.models import LabAppointment
 from django.db import transaction
 from django.db.models import Sum, Q, F, Max
@@ -18,7 +19,7 @@ import logging
 import requests
 import datetime
 from decimal import Decimal
-from ondoc.account.tasks import set_order_dummy_transaction
+from ondoc.notification.tasks import set_order_dummy_transaction
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
@@ -166,8 +167,11 @@ class Order(TimeStampedModel):
             }
 
         # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
-        # if not self.txn.first():
-        #     set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5)
+        if not self.txn.first():
+            try:
+                transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((self.id, appointment_data['user'].id,), countdown=5))
+            except Exception as e:
+                logger.error(str(e))
 
         if order_dict:
             self.update_order(order_dict)
@@ -246,7 +250,6 @@ class Order(TimeStampedModel):
                 "order_id": self.id
             }
         elif self.product_id == self.DOCTOR_PRODUCT_ID:
-            # TODO: SHASHANK_SINGH some logic here also.
             doctor_name = None
             hospital_name = None
             profile_name = None
@@ -802,7 +805,10 @@ class MerchantPayout(TimeStampedModel):
             if self.status == self.PENDING:
                 self.status = self.ATTEMPTED
 
-            transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
+            try:
+                transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
+            except Exception as e:
+                logger.error(str(e))
 
         super().save(*args, **kwargs)
 

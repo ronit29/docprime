@@ -3,122 +3,183 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-	<title>Appointment Cancelled</title>
-	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
+    <title>Appointment Cancelled</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
 </head>
 <body style="margin: 0; padding: 0; width: 100%; font-family: 'Quicksand', sans-serif;">
-	<table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; margin: auto;">
-		<tbody>
-			<tr>
-				<td>
-					<table style="padding: 0 15px 40px; background-color: #ececec; width: 100%;">
-						<tbody>
-							<tr>
-								<td>
-									<table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px;">
-										<tbody>
-											<tr>
-												<td>
-													<img src="{{'notification/images/cancel-orange.png'|get_absolute_url}}">
-												</td>
-												<td style="text-align: right;">
-													<img src="{{'notification/images/logo.png'|get_absolute_url}}">
-												</td>
-											</tr>
-										</tbody>
-									</table>
-								</td>
-							</tr>
-							<tr>
-								<td>
-									<table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 16px;">
-										<tbody>
-											<tr>
-												<td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
-													Appointment Cancelled
-												</td>
-											</tr>
-											<tr>
-												<td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
-													{{instance.updated_at|date:'M d, Y'}}
-												</td>
-											</tr>
-										</tbody>
-									</table>
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 70px; border-bottom: 1px solid #d3d3d3;">
-						<tbody>
-							<tr>
-								<td style="color: #757575; font-size: 16px; font-weight: 500;">
-									<span style="color: #000000; font-weight: 600;"> Hi {{patient_name|capfirst}}, </span>
-								</td>
-							</tr>
-							<tr>
-								{% if instance.cancellation_type == 3 %}
-									<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
-										Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - {{lab_name|capfirst}} has been cancelled due to unavailability of the lab manager.
-									</td>
-								{% else %}
-									<td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
-										Your appointment for  {{patient_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}} with Lab - {{lab_name|capfirst}} has been cancelled as requested by you.
-									</td>
-								{% endif %}
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">
-						<tbody>
-							<tr>
-								<td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;">
-									This is a system-generated e-mail. Please do not reply to this e-mail. For any support please write to customerhelp@docprime.com
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; background-color: #f78631;">
-						<tbody>
-							<tr>
-								<td style="font-size: 14px; color: #fafafa; width: 55%">
-									All Rights Reserved
-								</td>
-								<td style="width: 9%; text-align: right;">
-									<a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img src="{{'notification/images/youtube-email.png'|get_absolute_url}}"></a>
-								</td>
-								<td style="width: 9%; text-align: right;">
-									<a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img src="{{'notification/images/instagram-email.png'|get_absolute_url}}"></a>
-								</td>
-								<td style="width: 9%; text-align: right;">
-									<a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img src="{{'notification/images/facebook-email.png'|get_absolute_url}}"></a>
-								</td>
-								<td style="width: 9%; text-align: right;">
-									<a href="https://twitter.com/DocPrimeindia" target="_blank"><img src="{{'notification/images/twitter-email.png'|get_absolute_url}}"></a>
-								</td>
-								<td style="width: 9%; text-align: right;">
-									<a href="https://www.linkedin.com/company/docprime/" target="_blank"><img src="{{'notification/images/linkedin-email.png'|get_absolute_url}}"></a>
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</td>
-			</tr>
-		</tbody>
-	</table>
+<table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; margin: auto;">
+    <tbody>
+    <tr>
+        <td>
+            <table style="padding: 0 15px 40px; background-color: #ececec; width: 100%;">
+                <tbody>
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px;">
+                            <tbody>
+                            <tr>
+                                <td>
+                                    <img src="{{'notification/images/cancel-orange.png'|get_absolute_url}}">
+                                </td>
+                                <td style="text-align: right;">
+                                    <img src="{{'notification/images/logo.png'|get_absolute_url}}">
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 16px;">
+                            <tbody>
+                            <tr>
+                                <td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
+                                    Appointment Cancelled
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
+                                    {{instance.updated_at|date:'M d, Y'}}
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <table cellpadding="0" cellspacing="0"
+                   style="width: 100%; padding: 20px 15px 70px; border-bottom: 1px solid #d3d3d3;">
+                <tbody>
+                <tr>
+                    <td style="color: #757575; font-size: 16px; font-weight: 500;">
+                        <span style="color: #000000; font-weight: 600;"> Hi {{patient_name|capfirst}}, </span>
+                    </td>
+                </tr>
+                <tr>
+                    {% if instance.cancellation_type == 3 %}
+                    <td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
+                        Your appointment for {{patient_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at
+                        {{instance.time_slot_start|date:"h:i a"}} with {{lab_name|capfirst}} has been cancelled due to
+                        unavailability of the lab manager.
+                    </td>
+                    {% else %}
+                    <td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
+                        Your appointment for {{patient_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at
+                        {{instance.time_slot_start|date:"h:i a"}} with {{lab_name|capfirst}} has been cancelled as
+                        requested by you.
+                    </td>
+                    {% endif %}
+                </tr>
+                <tr>
+                    <td>
+                        <table>
+                            <tbody>
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Booking ID
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.id}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Patient Name
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{patient_name|capfirst}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Date and Time
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.time_slot_start|date:"D jS F Y"}} ||
+                                    {{instance.time_slot_start|date:"h:i A"}}
+                                </td>
+                            </tr>
+                            {% if instance.effective_price > 0 %}
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px">
+                                    Refund Amount
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:8px;">
+                                    {{instance.effective_price}}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% if instance.effective_price > 0 %}
+                <tr>
+                    <td style="color: #000000; font-size: 14px; font-weight: 500; padding-top: 16px;">
+                        Refund if applicable will be credited within 5-7 working days.
+                    </td>
+                </tr>
+                {% endif %}
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">
+                <tbody>
+                <tr>
+                    <td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;">
+                        This is a system-generated e-mail. Please do not reply to this e-mail. For any
+                        support please write to customercare@docprime.com.
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; background-color: #f78631;">
+                <tbody>
+                <tr>
+                    <td style="font-size: 14px; color: #fafafa; width: 55%">
+                        All Rights Reserved
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img
+                                src="{{'notification/images/youtube-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img
+                                src="{{'notification/images/instagram-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img
+                                src="{{'notification/images/facebook-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://twitter.com/DocPrimeindia" target="_blank"><img
+                                src="{{'notification/images/twitter-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.linkedin.com/company/docprime/" target="_blank"><img
+                                src="{{'notification/images/linkedin-email.png'|get_absolute_url}}"></a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    </tbody>
+</table>
 </body>
 </html>

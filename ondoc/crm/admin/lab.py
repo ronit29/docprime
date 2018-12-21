@@ -29,12 +29,11 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabAppointment, HomePickupCharges,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer, LabReport, LabReportFile, LabTestCategoryMapping)
 from .common import *
-from ondoc.authentication.models import GenericAdmin, User, QCModel, BillingAccount, GenericLabAdmin, AssociatedMerchant
+from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete
 from ondoc.crm.admin.autocomplete import PackageAutoCompleteView
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication import forms as auth_forms
-from ondoc.authentication.admin import BillingAccountInline
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet
 import logging
 import nested_admin
@@ -500,7 +499,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
                LabAccreditationInline,
                LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
-               BillingAccountInline, GenericLabAdminInline, AssociatedMerchantInline]
+               GenericLabAdminInline, AssociatedMerchantInline]
     autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
@@ -1028,12 +1027,12 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         if any(self.errors):
             return
         all_parent_categories = []
-        # count_is_primary = 0
+        count_is_primary = 0
         for value in self.cleaned_data:
             if value and not value.get("DELETE"):
                 all_parent_categories.append(value.get('parent_category'))
-                # if value.get('is_primary', False):
-                #     count_is_primary += 1
+                if value.get('is_primary', False):
+                    count_is_primary += 1
         # If lab test is a package its parent can only be package category.
         if self.instance.is_package:
             if any([not parent_category.is_package_category for parent_category in all_parent_categories]):
@@ -1041,8 +1040,8 @@ class LabTestToParentCategoryInlineFormset(forms.BaseInlineFormSet):
         else:
             if any([parent_category.is_package_category for parent_category in all_parent_categories]):
                 raise forms.ValidationError("Parent Categories must be a lab test category.")
-            # if not count_is_primary == 1:
-            #     raise forms.ValidationError("Must have one and only one primary parent category.")
+        if not count_is_primary == 1:
+            raise forms.ValidationError("Must have one and only one primary parent category.")
 
 
 class LabTestCategoryInline(AutoComplete, TabularInline):
@@ -1090,7 +1089,6 @@ class LabTestAdmin(PackageAutoCompleteView, ImportExportMixin, VersionAdmin):
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
-    form = LabTestAdminForm
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)
@@ -1153,6 +1151,7 @@ class LabTestCategoryAdmin(VersionAdmin):
     search_fields = ['name']
     form = LabTestCategoryForm
     autocomplete_fields = ['preferred_lab_test']
+    list_filter = ['is_package_category']
 
 
 class AvailableLabTestAdmin(VersionAdmin):
