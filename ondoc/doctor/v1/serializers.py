@@ -122,7 +122,7 @@ class ArticleAuthorSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'experience', 'profile_img', 'speciality', 'rating')
 
     def get_name(self, obj):
-        return obj.get_display_name()
+        return obj.name
 
     def get_experience(self, obj):
         return obj.experience_years()

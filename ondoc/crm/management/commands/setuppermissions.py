@@ -57,7 +57,7 @@ class Command(BaseCommand):
         group.permissions.clear()
 
 
-        content_types = ContentType.objects.get_for_models(BillingAccount, Doctor, Hospital, HospitalNetwork)
+        content_types = ContentType.objects.get_for_models(Merchant, Doctor, Hospital, HospitalNetwork)
         for cl, ct in content_types.items():
 
             permissions = Permission.objects.filter(
@@ -81,7 +81,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
-            SPOCDetails, DoctorClinicProcedure)
+            SPOCDetails, DoctorClinicProcedure, AssociatedMerchant)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -134,7 +134,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(BillingAccount,
+        content_types = ContentType.objects.get_for_models(Merchant,
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
@@ -178,7 +178,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, SPOCDetails, DoctorClinicProcedure)
+            CompetitorMonthlyVisit, SPOCDetails, DoctorClinicProcedure, AssociatedMerchant)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -220,7 +220,7 @@ class Command(BaseCommand):
             LabTestType, LabService, TestParameter, PracticeSpecialization,
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
-            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory
+            ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant
         )
 
         for cl, ct in content_types.items():
@@ -253,7 +253,7 @@ class Command(BaseCommand):
             HospitalCertification, HospitalNetworkManager, HospitalNetworkHelpline,
             HospitalNetworkEmail, HospitalNetworkAccreditation, HospitalNetworkAward,
             HospitalNetworkCertification, DoctorPracticeSpecialization, HospitalNetworkDocument, CompetitorInfo,
-            CompetitorMonthlyVisit, SPOCDetails, GenericAdmin, GenericLabAdmin, DoctorClinicProcedure)
+            CompetitorMonthlyVisit, SPOCDetails, GenericAdmin, GenericLabAdmin, DoctorClinicProcedure, AssociatedMerchant)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

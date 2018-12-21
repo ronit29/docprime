@@ -1,6 +1,7 @@
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
 import datetime
+from django.utils import timezone
 from django.contrib.gis import forms
 from django.core.exceptions import ObjectDoesNotExist
 from ondoc.crm.constants import constants
@@ -261,17 +262,28 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
     list_display = ('beneficiary_name', 'account_number', 'ifsc_code', 'enabled', 'verified_by_finance')
 
     change_list_template = 'superuser_import_export.html'
+    search_fields = ['name']
+
 
     def get_readonly_fields(self, request, obj=None):
-        if obj:
-            return [f.name for f in self.model._meta.fields if f.name not in ['enabled','verified_by_finance']]
-        return []
+
+        if request.user.is_member_of(constants['MERCHANT_TEAM']):
+            if obj and obj.verified_by:
+                return [f.name for f in self.model._meta.fields if f.name not in ['enabled','verified_by_finance']]
+            return []
+
+        if obj and obj.verified_by:
+            return [f.name for f in self.model._meta.fields]
+
+        return ['enabled','verified_by_finance']        
+
 
 
     def save_model(self, request, obj, form, change):
 
         if form.cleaned_data.get('verified_by_finance') and not obj.verified_by:
             obj.verified_by = request.user
+            obj.verified_at = timezone.now()
 
         super().save_model(request, obj, form, change)
 
@@ -360,6 +372,8 @@ class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularI
     extra = 0
     model = AssociatedMerchant
     show_change_link = False
+    autocomplete_fields = ['merchant', ]
+
     #fields = "__all__"
     #readonly_fields = ['merchant_id']
     #fields = ['merchant_id', 'type', 'account_number', 'ifsc_code', 'pan_number', 'pan_copy', 'account_copy', 'enabled']
