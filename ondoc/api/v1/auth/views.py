@@ -1638,10 +1638,6 @@ class UserLeadViewSet(GenericViewSet):
             resp['gender'] = validated_data.get('gender')
 
             ul_obj = UserLead.objects.create(**resp)
-            html_email = 'provider@docprime.com'
-            html_body = resp
-            email_subject = 'Lead from Ads' + str(ul_obj.created_at)
-            EmailNotification.publish_ops_email(html_email, mark_safe(html_body), email_subject)
             resp['status'] = "success"
 
 

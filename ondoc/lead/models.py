@@ -1,10 +1,16 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.postgres.fields import JSONField
 from django.contrib.gis.geos import Point
+from django.utils.safestring import mark_safe
+
 from ondoc.doctor.models import (Hospital, Doctor, DoctorClinic,
                                  DoctorAward, DoctorQualification, DoctorExperience, DoctorMedicalService,
                                  MedicalService, Qualification, College)
 from ondoc.authentication.models import TimeStampedModel
+from ondoc.notification.models import EmailNotification
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class HospitalLead(models.Model):
@@ -215,10 +221,24 @@ class UserLead(TimeStampedModel):
     name = models.CharField(max_length=50, blank=True, default="")
     phone_number = models.CharField(max_length=15)
     message = models.TextField(blank=True, default="")
-    gender = models.CharField(choices=gender_choice, blank=True, max_length=2, default=None)
+    gender = models.CharField(choices=gender_choice, blank=True, max_length=2, default='')
 
     def __str__(self):
         return self.name
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        super().save(force_insert, force_update, using, update_fields)
+        transaction.on_commit(lambda: self.after_commit())
+
+    def after_commit(self):
+        from django.forms.models import model_to_dict
+        try:
+            email = 'provider@docprime.com'
+            html_body = model_to_dict(self)
+            email_subject = 'Lead from Ads' + str(self.created_at)
+            EmailNotification.publish_ops_email(email, mark_safe(html_body), email_subject)
+        except Exception as e:
+            logger.error(str(e))
 
     class Meta:
         db_table = "user_lead"
