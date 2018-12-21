@@ -384,7 +384,8 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
-                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
+                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time \
+                or instance.status != OpdAppointment.ACCEPTED:
             logger.error(
                 'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
                                                            previous_appointment_date_time,
@@ -403,7 +404,8 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         instance = LabAppointment.objects.filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
-                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
+                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time \
+                or instance.status != LabAppointment.ACCEPTED:
             logger.error(
                 'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
                                                            previous_appointment_date_time,
