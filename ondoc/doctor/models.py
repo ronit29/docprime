@@ -28,7 +28,7 @@ from ondoc.payout import models as payout_model
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
-from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin
+from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone
 from functools import reduce
 from operator import or_
 import logging
@@ -1248,7 +1248,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
         return False
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
-        from ondoc.notification.tasks import send_opd_notifications_refactored
         if push_to_matrix:
         # Push the appointment data to the matrix .
             try:
@@ -1259,7 +1258,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
 
         if self.is_to_send_notification(old_instance):
             try:
-                send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+                notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
             except Exception as e:
                 logger.error(str(e))
             # notification_tasks.send_opd_notifications_refactored(self.id)
@@ -1273,6 +1272,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             try:
                 notification_tasks.send_opd_rating_message.apply_async(
                     kwargs={'appointment_id': self.id, 'type': 'opd'}, countdown=int(settings.RATING_SMS_NOTIF))
+            except Exception as e:
+                logger.error(str(e))
+
+        if old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
+            try:
+                notification_tasks.opd_send_otp_before_appointment.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start - datetime.timedelta(
+                        minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                # notification_tasks.opd_send_otp_before_appointment(self.id, self.time_slot_start)
             except Exception as e:
                 logger.error(str(e))
 

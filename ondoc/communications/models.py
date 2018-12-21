@@ -188,7 +188,8 @@ class SMSNotification:
     def get_template(self, user):
         notification_type = self.notification_type
         body_template = ''
-        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
+                notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
             body_template = "sms/appointment_accepted.txt"
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
             body_template = "sms/appointment_booked_patient.txt"
@@ -207,7 +208,8 @@ class SMSNotification:
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
             body_template = "sms/prescription_uploaded.txt"
 
-        if notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
+                notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
             body_template = "sms/lab/appointment_accepted.txt"
         elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user.user_type == User.CONSUMER:
             body_template = "sms/lab/appointment_booked_patient.txt"
@@ -559,6 +561,9 @@ class OpdNotification(Notification):
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
+        elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
         else:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
@@ -580,7 +585,8 @@ class OpdNotification(Notification):
         if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
                                  NotificationAction.PRESCRIPTION_UPLOADED,
-                                 NotificationAction.DOCTOR_INVOICE]:
+                                 NotificationAction.DOCTOR_INVOICE,
+                                 NotificationAction.OPD_OTP_BEFORE_APPOINTMENT]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.APPOINTMENT_BOOKED,
@@ -673,6 +679,9 @@ class LabNotification(Notification):
         if notification_type == NotificationAction.LAB_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
+        elif notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
         else:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
@@ -694,7 +703,8 @@ class LabNotification(Notification):
         if notification_type in [NotificationAction.LAB_APPOINTMENT_ACCEPTED,
                                  NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
                                  NotificationAction.LAB_REPORT_UPLOADED,
-                                 NotificationAction.LAB_INVOICE]:
+                                 NotificationAction.LAB_INVOICE,
+                                 NotificationAction.LAB_OTP_BEFORE_APPOINTMENT]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.LAB_APPOINTMENT_BOOKED,
