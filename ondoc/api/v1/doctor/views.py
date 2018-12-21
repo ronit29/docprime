@@ -1004,7 +1004,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
     def list(self, request, *args, **kwargs):
         if (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) \
                 and request.query_params.get('is_insurance'):
-            return Response()
+            return Response({"result": [], "count": 0,
+                         'specializations': [], 'conditions': [], "seo": {},
+                         "breadcrumb": [], 'search_content': "",
+                         'procedures': [], 'procedure_categories': []})
 
         parameters = request.query_params
         if kwargs.get("parameters"):
