@@ -1275,7 +1275,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin):
             except Exception as e:
                 logger.error(str(e))
 
-        if old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
+        if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
                 notification_tasks.opd_send_otp_before_appointment.apply_async(
                     (self.id, str(math.floor(self.time_slot_start.timestamp()))),
