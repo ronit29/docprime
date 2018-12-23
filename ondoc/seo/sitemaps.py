@@ -25,14 +25,14 @@ class SpecializationLocalityCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.SPECIALIZATION_LOCALITY_CITY)\
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.SPECIALIZATION_LOCALITY_CITY)\
             .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
 
     def lastmod(self, obj):
-        return datetime.datetime(2018, 11, 12, hour=2, minute=10, second=0, microsecond=0)
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
 
 
 
@@ -42,11 +42,14 @@ class SpecializationCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.SPECIALIZATION_CITY)\
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.SPECIALIZATION_CITY)\
             .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
 
 
 class DoctorLocalityCitySitemap(Sitemap):
@@ -54,11 +57,14 @@ class DoctorLocalityCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)\
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)\
             .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
 
 
 class DoctorCitySitemap(Sitemap):
@@ -66,11 +72,14 @@ class DoctorCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTORS_CITY)\
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTORS_CITY)\
             .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
 
 
 class DoctorPageSitemap(Sitemap):
@@ -78,11 +87,14 @@ class DoctorPageSitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE)\
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE)\
             .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
 
 
 class LabLocalityCitySitemap(Sitemap):
@@ -90,11 +102,14 @@ class LabLocalityCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_LOCALITY_CITY)\
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_LOCALITY_CITY)\
             .order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
 
 
 class LabCitySitemap(Sitemap):
@@ -102,10 +117,13 @@ class LabCitySitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_CITY).order_by('created_at')
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_CITY).order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
 
 
 class LabPageSitemap(Sitemap):
@@ -113,10 +131,13 @@ class LabPageSitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by('created_at')
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return datetime.datetime.today() - datetime.timedelta(days=datetime.datetime.today().isoweekday() % 7)
 
 
 class ArticleSitemap(Sitemap):
@@ -132,6 +153,10 @@ class ArticleSitemap(Sitemap):
 
     def location(self, obj):
         return "/%s" % obj.url
+
+    def lastmod(self, obj):
+        return obj.updated_at
+    
 
 
 sitemap_identifier_mapping = {

@@ -28,8 +28,7 @@ logger = logging.getLogger(__name__)
 
 from ondoc.account.models import Order
 from django.contrib.contenttypes.admin import GenericTabularInline
-from ondoc.authentication.models import GenericAdmin, BillingAccount, SPOCDetails, AssociatedMerchant, Merchant
-from ondoc.authentication.admin import BillingAccountInline
+from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant
 from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorLanguage, DoctorAward, DoctorAssociation, DoctorExperience,
                                  MedicalConditionSpecialization, DoctorMedicalService, DoctorImage,
@@ -899,7 +898,6 @@ class DoctorAdmin(ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nest
         DoctorImageInline,
         DoctorDocumentInline,
         GenericAdminInline,
-        BillingAccountInline,
         AssociatedMerchantInline
     ]
 
