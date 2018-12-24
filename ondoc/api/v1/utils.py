@@ -541,23 +541,18 @@ class CouponsMixin(object):
         if coupon_obj:
 
             if kwargs.get("product_id") == Order.LAB_PRODUCT_ID:
-                if kwargs.get("lab"):
-                    lab = Lab.objects.filter(pk=kwargs.get("lab").id)
-                    if lab:
-                        # if kwargs.get("test"):
-                        test = kwargs.get("test", [])
-                        lab = lab.filter(lab_pricing_group__available_lab_tests__test__in=test)
-                        if lab.count() == len(test):
-                            lab = lab.first()
-                            # if (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and not coupon_obj.test.exists()) or \
-                            #     (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or \
-                            #     (coupon_obj.lab is not None and not coupon_obj.test.exists() and coupon_obj.lab==lab) or \
-                            #     (coupon_obj.lab is not None and coupon_obj.test.exists() and coupon_obj.lab==lab and set(test) & set(coupon_obj.test.all())):
-                            #     # (coupon_obj.lab is not None and coupon_obj.test.all() and coupon_obj.lab == lab and set(test)<=set(coupon_obj.test.all())):
-                            if (coupon_obj.lab_network and coupon_obj.lab_network == lab.network) or (not coupon_obj.lab_network):
-                                if (coupon_obj.lab and coupon_obj.lab==lab) or (not coupon_obj.lab):
-                                    if (coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or not coupon_obj.test.exists():
-                                        is_valid = True
+                lab = kwargs.get("lab")
+                if lab:
+                    tests = kwargs.get("test", [])
+                    available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
+                    lab_tests = list()
+                    for lab_test in available_lab_tests:
+                        lab_tests.append(lab_test.test)
+                    if set(tests) <= set(lab_tests):
+                        if (coupon_obj.lab_network and coupon_obj.lab_network == lab.network) or (not coupon_obj.lab_network):
+                            if (coupon_obj.lab and coupon_obj.lab==lab) or (not coupon_obj.lab):
+                                if (coupon_obj.test.exists() and set(tests) & set(coupon_obj.test.all())) or not coupon_obj.test.exists():
+                                    is_valid = True
 
             elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
                 if kwargs.get("doctor"):
