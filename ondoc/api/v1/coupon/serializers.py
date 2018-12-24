@@ -45,7 +45,10 @@ class CouponListSerializer(serializers.Serializer):
             for coupon in random_coupons:
                 coupon_codes.append(coupon.coupon)
             coupons_data = Coupon.objects.filter(code__in=coupon_codes)
-        coupons_data = Coupon.objects.filter(code__in=codes) | coupons_data
+        if coupons_data:
+            coupons_data = Coupon.objects.filter(code__in=codes) | coupons_data
+        else:
+            coupons_data = Coupon.objects.filter(code__in=codes)
         if not random_coupons and not (coupons_data.exists() and len(coupons_data) == len(set(attrs.get("coupon_code")))):
             raise serializers.ValidationError("Invalid Coupon Codes")
         return attrs
@@ -74,7 +77,10 @@ class UserSpecificCouponSerializer(CouponListSerializer):
             for coupon in random_coupons:
                 coupon_codes.append(coupon.coupon)
             coupons_data = Coupon.objects.filter(code__in=coupon_codes)
-        coupons_data = Coupon.objects.filter(code__in=codes) | coupons_data
+        if coupons_data:
+            coupons_data = Coupon.objects.filter(code__in=codes) | coupons_data
+        else:
+            coupons_data = Coupon.objects.filter(code__in=codes)
         attrs["coupons_data"] = coupons_data
 
         # if not coupons_data.exists() or len(coupons_data) != len(set(attrs.get("coupon_code"))):

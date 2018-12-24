@@ -496,14 +496,6 @@ class CouponsMixin(object):
         coupon_obj = kwargs.get("coupon_obj")
         profile = kwargs.get("profile")
 
-        if profile:
-            user_profile = user.profiles.filter(id=profile.id).first()
-        else:
-            user_profile = user.profiles.filter(is_default_user=True).first()
-
-        if user_profile:
-            user_age = user_profile.get_age()
-
         if coupon_obj:
             if coupon_obj.is_user_specific and not user.is_authenticated:
                 return {"is_valid": False, "used_count": 0}
@@ -525,26 +517,35 @@ class CouponsMixin(object):
                     return {"is_valid": False, "used_count": None}
 
             # check if a user is new i.e user has done any appointments
-            if user and coupon_obj.new_user_constraint:
-                if not self.is_user_first_time(user):
+            if user.is_authenticated:
+                if profile:
+                    user_profile = user.profiles.filter(id=profile.id).first()
+                else:
+                    user_profile = user.profiles.filter(is_default_user=True).first()
+                user_age = user_profile.get_age()
+            # else:
+            #     user_profile = None
+            #     user_age = None
+
+                if coupon_obj.new_user_constraint and not self.is_user_first_time(user):
                     return {"is_valid": False, "used_count": 0}
 
-            # TODO
-            if user and coupon_obj.step_count != 1:
-                user_opd_completed = OpdAppointment.objects.filter(user=user,
-                                                                   status__in=[OpdAppointment.COMPLETED]).count()
-                user_lab_completed = LabAppointment.objects.filter(user=user,
-                                                                   status__in=[LabAppointment.COMPLETED]).count()
-                if ((user_opd_completed + user_lab_completed + 1) % coupon_obj.step_count != 0):
+                # TODO
+                if coupon_obj.step_count != 1:
+                    user_opd_completed = OpdAppointment.objects.filter(user=user,
+                                                                       status__in=[OpdAppointment.COMPLETED]).count()
+                    user_lab_completed = LabAppointment.objects.filter(user=user,
+                                                                       status__in=[LabAppointment.COMPLETED]).count()
+                    if ((user_opd_completed + user_lab_completed + 1) % coupon_obj.step_count != 0):
+                        return {"is_valid": False, "used_count": None}
+
+                if coupon_obj.gender and coupon_obj.gender != user_profile.gender:
                     return {"is_valid": False, "used_count": None}
 
-            if user and coupon_obj.gender and coupon_obj.gender != user_profile.gender:
-                return {"is_valid": False, "used_count": None}
-
-            # TODO
-            if user and ((coupon_obj.age_start and coupon_obj.age_start >= user_age)
-                         or (coupon_obj.age_end and coupon_obj.age_end <= user_age)):
-                return {"is_valid": False, "used_count": None}
+                # TODO
+                if ((coupon_obj.age_start and coupon_obj.age_start >= user_age)
+                        or (coupon_obj.age_end and coupon_obj.age_end <= user_age)):
+                    return {"is_valid": False, "used_count": None}
 
             count = coupon_obj.used_coupon_count(user)
             total_used_count = coupon_obj.total_used_coupon_count()
@@ -575,12 +576,16 @@ class CouponsMixin(object):
                         lab = lab.filter(lab_pricing_group__available_lab_tests__test__in=test)
                         if lab.count() == len(test):
                             lab = lab.first()
-                            if (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and not coupon_obj.test.exists()) or \
-                                (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or \
-                                (coupon_obj.lab is not None and not coupon_obj.test.exists() and coupon_obj.lab==lab) or \
-                                (coupon_obj.lab is not None and coupon_obj.test.exists() and coupon_obj.lab==lab and set(test) & set(coupon_obj.test.all())):
-                                # (coupon_obj.lab is not None and coupon_obj.test.all() and coupon_obj.lab == lab and set(test)<=set(coupon_obj.test.all())):
-                                is_valid = True
+                            # if (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and not coupon_obj.test.exists()) or \
+                            #     (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or \
+                            #     (coupon_obj.lab is not None and not coupon_obj.test.exists() and coupon_obj.lab==lab) or \
+                            #     (coupon_obj.lab is not None and coupon_obj.test.exists() and coupon_obj.lab==lab and set(test) & set(coupon_obj.test.all())) or \
+                            #     (coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())):
+                            #     # (coupon_obj.lab is not None and coupon_obj.test.all() and coupon_obj.lab == lab and set(test)<=set(coupon_obj.test.all())):
+                            if (coupon_obj.lab_network and coupon_obj.lab_network == lab.network) or (not coupon_obj.lab_network):
+                                if (coupon_obj.lab and coupon_obj.lab==lab) or (not coupon_obj.lab):
+                                    if (coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or not coupon_obj.test.exists():
+                                        is_valid = True
 
             elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
                 if kwargs.get("doctor"):
