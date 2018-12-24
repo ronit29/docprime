@@ -27,6 +27,9 @@ from collections import OrderedDict
 import datetime
 from django.utils.dateparse import parse_datetime
 import hashlib
+import logging
+logger = logging.getLogger(__name__)
+
 User = get_user_model()
 
 
@@ -805,6 +808,8 @@ def create_payout_checksum(all_txn, product_id):
         checksum += curr
 
     checksum = secret_key + "|[" + checksum + "]|" + client_key
-    checksum = hashlib.sha256(str(checksum).encode())
-    checksum = checksum.hexdigest()
-    return checksum
+    checksum_hash = hashlib.sha256(str(checksum).encode())
+    checksum_hash = checksum_hash.hexdigest()
+    print("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    logger.error("checksum string - " + str(checksum) + "checksum hash - " + str(checksum_hash))
+    return checksum_hash
