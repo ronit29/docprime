@@ -9,6 +9,8 @@ import datetime, calendar
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+
+from ondoc.lead.models import UserLead
 from ondoc.web.models import OnlineLead, Career, ContactUs
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -477,3 +479,20 @@ class ContactUsSerializer(serializers.Serializer):
     class Meta:
         model = ContactUs
         fields = ('name', 'mobile', 'email', 'message')
+
+
+class UserLeadSerializer(serializers.ModelSerializer):
+
+    gender = serializers.ChoiceField(choices=UserLead.gender_choice, allow_null=True, allow_blank=True)
+    name = serializers.CharField(max_length=255, allow_blank=True, allow_null=True)
+    phone_number = serializers.CharField(max_length=15, required=True)
+    message = serializers.CharField(allow_null=True, allow_blank=True)
+
+    class Meta:
+        model = UserLead
+        fields = ('name', 'phone_number', 'gender', 'message')
+
+
+
+
+

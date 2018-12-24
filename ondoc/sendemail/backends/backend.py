@@ -4,6 +4,7 @@ from django.core.mail.backends.smtp import EmailBackend as SMTP
 from django.core.mail import send_mail, get_connection
 from django.conf import settings
 from ondoc.notification.rabbitmq_client import publish_message
+# from ondoc.notification.sqs_client import publish_message
 
 
 class NodeJsEmailBackend(object):

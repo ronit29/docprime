@@ -11,7 +11,7 @@ from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
 from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant
-from ondoc.authentication.admin import BillingAccountInline, SPOCDetailsInline
+from ondoc.authentication.admin import SPOCDetailsInline
 from django import forms
 from ondoc.api.v1.utils import GenericAdminEntity
 import nested_admin
@@ -309,7 +309,6 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalDocumentInline,
         HospitalCertificationInline,
         GenericAdminInline,
-        BillingAccountInline,
         SPOCDetailsInline,
         AssociatedMerchantInline
     ]
