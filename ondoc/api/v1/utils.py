@@ -158,6 +158,9 @@ class RawSql:
             ]
         return result
 
+    def execute(self):
+        with connection.cursor() as cursor:
+            cursor.execute(self.query, self.parameters)
 
 class AgreedPriceCalculate(Func):
     function = 'labtest_agreed_price_calculate'

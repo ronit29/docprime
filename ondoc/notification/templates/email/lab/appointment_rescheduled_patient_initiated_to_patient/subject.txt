@@ -1,1 +1,1 @@
-Appointment Reschedule (ID- {{instance.id}})
+docprime.com || Appointment Reschedule Request || ID - {{instance.id}}

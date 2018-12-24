@@ -26,6 +26,8 @@ class EventCreateViewSet(GenericViewSet):
         if data and isinstance(data, dict):
             event_name = data.get('event')
             if event_name:
+                userAgent = data.get('userAgent', None)
+                data.pop('userAgent', None)
                 try:
                     user = None
                     if request.user.is_authenticated:
@@ -36,8 +38,9 @@ class EventCreateViewSet(GenericViewSet):
                 except Exception as e:
                     resp['error'] = "Error Processing Event Data!"
 
-                if event_name=='utm-events':
-                    visit = track_models.TrackingVisit.objects.get(pk=visit_id)
+                visit = track_models.TrackingVisit.objects.get(pk=visit_id)
+                modify_visit = False
+                if event_name == 'utm-events':
                     if not visit.data:
                         ud = {}
                         ud['utm_campaign'] = data.get('utm_campaign')
@@ -47,8 +50,8 @@ class EventCreateViewSet(GenericViewSet):
                         ud['source'] = data.get('source')
                         ud['referrer'] = data.get('referrer')
                         visit.data = ud
-                        visit.save()
-                elif event_name=='visitor-info':
+                        modify_visit = True
+                elif event_name == 'visitor-info':
                     visitor = track_models.TrackingVisitor.objects.get(pk=visitor_id)
                     if not visitor.device_info:
                         ud = {}
@@ -57,6 +60,17 @@ class EventCreateViewSet(GenericViewSet):
                         ud['platform'] = data.get('platform')
                         visitor.device_info = ud
                         visitor.save()
+                elif event_name == "change-location":
+                    if not visit.location:
+                        visit.location = data.get('location', {})
+                        modify_visit = True
+
+                if not visit.user_agent and userAgent:
+                    visit.user_agent = userAgent
+                    modify_visit = True
+
+                if modify_visit:
+                    visit.save()
 
             else:
                 resp['error'] = "Event name not Found!"
@@ -64,9 +78,13 @@ class EventCreateViewSet(GenericViewSet):
             resp['error'] = "Invalid Data"
 
         #cookie = self.get_cookie(visitor_id, visit_id)
-        response = JsonResponse(resp)
+        # response = JsonResponse(resp)
         #response.set_signed_cookie('visit', value=cookie, max_age=365*24*60*60, path='/')
-        return response
+        # return response
+        if "error" in resp:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
+        else:
+            return Response(status=status.HTTP_200_OK, data=resp)
 
     def get_visit(self, request):
 
@@ -119,7 +137,6 @@ class EventCreateViewSet(GenericViewSet):
             visit_id = visit.id
 
         return (visitor_id, visit_id)
-
 
     def get_cookie(self, visitor_id, visit_id):
 

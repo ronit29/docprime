@@ -1,1 +1,11 @@
-Appointment Confirmed for {{patient_name|capfirst}} requested with Lab - {{lab_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.
+The appointment for {{patient_name|capfirst}} with {{lab_name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} has been confirmed.
+Unique Confirmation Code : {{instance.otp}}
+Share this code with the lab at the time of your appointment.
+Booking ID : {{instance.id}}
+Patient Name : {{patient_name|capfirst}}
+Lab Name : {{lab_name|capfirst}}
+Lab Address : {{instance.lab.get_lab_address}}
+Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+Helpline Toll Free Number : 1800-123-9419
+
+Thanks for choosing docprime.com

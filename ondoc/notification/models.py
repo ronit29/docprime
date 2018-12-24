@@ -8,7 +8,7 @@ from ondoc.authentication.models import NotificationEndpoint
 from ondoc.authentication.models import UserProfile
 from ondoc.account import models as account_model
 from ondoc.api.v1.utils import readable_status_choices
-from .rabbitmq_client import publish_message
+from ondoc.notification.rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -44,6 +44,9 @@ class NotificationAction:
     DOCTOR_INVOICE = 10
     LAB_INVOICE = 11
 
+    OPD_OTP_BEFORE_APPOINTMENT = 30
+    LAB_OTP_BEFORE_APPOINTMENT = 31
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -75,7 +78,7 @@ class NotificationAction:
     )
 
     @classmethod
-    def trigger(cls, instance, user, notification_type):  # SHASHANK_SINGH all context making
+    def trigger(cls, instance, user, notification_type):
         from ondoc.doctor.models import OpdAppointment
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = instance.time_slot_start.astimezone(est)
@@ -438,6 +441,8 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     class Meta:
         db_table = "email_notification"
 
+    def __str__(self):
+        return '{} -> {} ({})'.format(self.email_subject, self.email, self.user)
 
     @classmethod
     def send_notification(cls, user, email, notification_type, context):
@@ -492,7 +497,6 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
 
     @classmethod
     def ops_notification_alert(cls, data_obj, email_list, product, alert_type):
-        # TODO: SHASHANK_SINGH not sure about this code if i have to change something.
         status_choices = readable_status_choices(product)
 
         html_body = None
@@ -666,6 +670,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     class Meta:
         db_table = "sms_notification"
 
+    def __str__(self):
+        return '{} -> {} ({})'.format(self.content, self.phone_number, self.user)
+
     @classmethod
     def send_notification(cls, user, phone_number, notification_type, context):
         html_body = super().get_message_body(user, phone_number, notification_type, context)
@@ -767,6 +774,9 @@ class AppNotification(TimeStampedModel):
     class Meta:
         db_table = "app_notification"
 
+    def __str__(self):
+        return '{} -> ({})'.format(self.content, self.user)
+
     @classmethod
     def send_notification(cls, user, notification_type, context):
         context.pop("instance", None)
@@ -794,6 +804,9 @@ class PushNotification(TimeStampedModel):
 
     class Meta:
         db_table = "push_notification"
+
+    def __str__(self):
+        return '{} -> ({})'.format(self.content, self.user)
 
     @classmethod
     def send_notification(cls, user, notification_type, context):
