@@ -549,12 +549,15 @@ class CouponsMixin(object):
                         lab = lab.filter(lab_pricing_group__available_lab_tests__test__in=test)
                         if lab.count() == len(test):
                             lab = lab.first()
-                            if (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and not coupon_obj.test.exists()) or \
-                                (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or \
-                                (coupon_obj.lab is not None and not coupon_obj.test.exists() and coupon_obj.lab==lab) or \
-                                (coupon_obj.lab is not None and coupon_obj.test.exists() and coupon_obj.lab==lab and set(test) & set(coupon_obj.test.all())):
-                                # (coupon_obj.lab is not None and coupon_obj.test.all() and coupon_obj.lab == lab and set(test)<=set(coupon_obj.test.all())):
-                                is_valid = True
+                            # if (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and not coupon_obj.test.exists()) or \
+                            #     (coupon_obj.lab_network is not None and coupon_obj.lab_network==lab.network and coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or \
+                            #     (coupon_obj.lab is not None and not coupon_obj.test.exists() and coupon_obj.lab==lab) or \
+                            #     (coupon_obj.lab is not None and coupon_obj.test.exists() and coupon_obj.lab==lab and set(test) & set(coupon_obj.test.all())):
+                            #     # (coupon_obj.lab is not None and coupon_obj.test.all() and coupon_obj.lab == lab and set(test)<=set(coupon_obj.test.all())):
+                            if (coupon_obj.lab_network and coupon_obj.lab_network == lab.network) or (not coupon_obj.lab_network):
+                                if (coupon_obj.lab and coupon_obj.lab==lab) or (not coupon_obj.lab):
+                                    if (coupon_obj.test.exists() and set(test) & set(coupon_obj.test.all())) or not coupon_obj.test.exists():
+                                        is_valid = True
 
             elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
                 if kwargs.get("doctor"):
