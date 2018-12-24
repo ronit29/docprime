@@ -58,8 +58,12 @@ class CouponForm(forms.ModelForm):
         if any(self.errors):
             return
         cleaned_data = self.cleaned_data
-        age_start = cleaned_data.get('age_start', None)
-        age_end = cleaned_data.get('age_end', None)
+        age_start = cleaned_data.get('age_start')
+        if not age_start:
+            age_start = 0
+        age_end = cleaned_data.get('age_end')
+        if not age_end:
+            age_end = 100
         if age_start > age_end:
             raise forms.ValidationError('Age End is smaller than Age Start.')
 
