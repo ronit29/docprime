@@ -1298,6 +1298,7 @@ class OfflinePatientBodySerializer(serializers.Serializer):
     share_with_hospital = serializers.BooleanField(required=False)
     gender = serializers.ChoiceField(choices=OfflinePatients.GENDER_CHOICES, required=False)
     dob = serializers.DateField(required=False, format="%Y-%m-%d")
+    calculated_dob = serializers.DateField(required=False, format="%Y-%m-%d")
     referred_by = serializers.ChoiceField(choices=OfflinePatients.REFERENCE_CHOICES, required=False)
     medical_history = serializers.CharField(required=False, max_length=256)
     welcome_message = serializers.CharField(required=False, max_length=256)
@@ -1322,8 +1323,16 @@ class OfflineAppointmentBodySerializer(serializers.Serializer):
     id = serializers.UUIDField()
 
 
+class OfflineAppointmentUpdateBodySerializer(OfflineAppointmentBodySerializer):
+    status = serializers.IntegerField()
+
+
 class OfflineAppointmentCreateSerializer(serializers.Serializer):
     data = OfflineAppointmentBodySerializer(many=True)
+
+
+class OfflineAppointmentUpdateSerializer(serializers.Serializer):
+    data = OfflineAppointmentUpdateBodySerializer(many=True)
 
 
 class OfflinePatientCreateSerializer(serializers.Serializer):
@@ -1345,4 +1354,4 @@ class OfflineAppointmentFilterSerializer(serializers.Serializer):
 class OfflinePatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = OfflinePatients
-        fields = ('id','name','dob','gender')
+        fields = ('id', 'name', 'dob', 'calculated_dob', 'gender')

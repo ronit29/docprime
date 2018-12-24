@@ -57,6 +57,7 @@ from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.db.models import Avg
 from django.db.models import Count
+from ondoc.api.v1.auth import serializers as auth_serializers
 
 logger = logging.getLogger(__name__)
 
@@ -1838,7 +1839,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                             )
         if valid_data.get('updated_at'):
             queryset = queryset.filter(updated_at__gte=valid_data.get('updated_at'))
-        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'updated_at').distinct()
+        queryset = queryset.values('name', 'id', 'gender', 'doctor', 'hospital', 'age', 'dob', 'calculated_dob', 'updated_at').distinct()
         return Response(queryset)
 
     @transaction.atomic
@@ -1888,7 +1889,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         resp = []
         appntment_ids = models.OfflineOPDAppointments.objects.values_list('id', flat=True)
         patient_ids = models.OfflinePatients.objects.values_list('id', flat=True)
-        clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in models.DoctorClinic.objects.all()]
+        req_hosp_ids = [data.get('hospital').id if data.get('hospital') else None for data in valid_data.get('data')]
+        clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in
+                           models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
         pem_queryset = [(ga.doctor.id if ga.doctor else None, ga.hospital.id if ga.hospital else None) for ga in auth_models.GenericAdmin.objects.filter(is_disabled=False, user=request.user).all()]
         doc_pem_list, hosp_pem_list = map(list, zip(*pem_queryset))
 
@@ -1965,6 +1968,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                         sms_notification=data.get('sms_notification', False),
                                                         gender=data.get('gender'),
                                                         dob=data.get("dob"),
+                                                        calculated_dob=data.get("dob"),
                                                         age=data.get('age'),
                                                         referred_by=data.get('referred_by'),
                                                         medical_history=data.get('medical_history'),
@@ -1990,6 +1994,98 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if default_num and ('sms_notification' in data and data['sms_notification']):
             sms_number = default_num
         return {"sms_list": sms_number, "patient": patient}
+
+
+    def get_error_obj(self, data):
+        return {'doctor': data.get('doctor').id,
+                'hospital': data.get('hospital').id,
+                'id': data.get('id'),
+                'error': True}
+
+    @transaction.atomic
+    def update_offline_appointments(self, request):
+        serializer = serializers.OfflineAppointmentUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        patient = None
+        sms_list = []
+        resp = []
+        appntment_ids = models.OfflineOPDAppointments.objects.all()
+        # patient_ids = models.OfflinePatients.objects.values_list('id', flat=True)
+        req_hosp_ids = [data.get('hospital').id if data.get('hospital') else None for data in valid_data.get('data')]
+        clinic_queryset = [(dc.doctor.id, dc.hospital.id) for dc in models.DoctorClinic.objects.filter(hospital__id__in=req_hosp_ids)]
+        pem_queryset = [(ga.doctor.id if ga.doctor else None, ga.hospital.id if ga.hospital else None) for ga in
+                        auth_models.GenericAdmin.objects.filter(is_disabled=False, user=request.user).all()]
+        doc_pem_list, hosp_pem_list = map(list, zip(*pem_queryset))
+
+        for data in valid_data.get('data'):
+            found = False
+            for appnt in appntment_ids:
+                if data.get('id') == appnt.id:
+                    found = True
+                    if appnt.error:
+                        obj = self.get_error_obj(data)
+                        obj['error_message'] = 'Cannot Update an invalid/error appointment!'
+                        resp.append(obj)
+                        logger.error("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
+                        break
+                    if appnt.status == models.OfflineOPDAppointments.CANCELLED:
+                        obj = self.get_error_obj(data)
+                        obj['error_message'] = 'Cannot Update a cancelled appointment!'
+                        resp.append(obj)
+                        logger.error("PROVIDER_REQUEST - Updating a Cancelled Appointment! " + str(data))
+                        break
+                    if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
+                        obj = self.get_error_obj(data)
+                        obj['error_message'] = 'User forbidden to update Appointment with selected doctor or hospital!'
+                        resp.append(obj)
+                    if (data.get('doctor').id, data.get('hospital').id) not in clinic_queryset:
+                        obj = self.get_error_obj(data)
+                        obj['error_message'] = 'Doctor is not associated with given hospital!'
+                        resp.append(obj)
+                    if data.get('status') and data.get('status') not in [models.OfflineOPDAppointments.NO_SHOW,
+                                                                         models.OfflineOPDAppointments.RESCHEDULED_DOCTOR,
+                                                                         models.OfflineOPDAppointments.CANCELLED,
+                                                                         models.OfflineOPDAppointments.ACCEPTED]:
+                        obj = self.get_error_obj(data)
+                        obj['error_message'] = 'Invalid Appointment Status Recieved!'
+                        resp.append(obj)
+                        logger.error("PROVIDER_REQUEST - Invalid Appointment Status Recieved! " + str(data))
+                        break
+
+                    patient = appnt.user
+                    if patient.sms_notification:
+                        def_number = patient.patient_mobiles.filter(is_default=True).first()
+                        if def_number:
+                            sms_list.append(def_number.phone_number)
+                    appnt.doctor = data.get('doctor')
+                    appnt.hospital = data.get('hospital')
+                    if data.get("start_date") and data.get("start_time"):
+                        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+                        appnt.time_slot_start = time_slot_start
+                    if data.get('status'):
+                        appnt.status = data.get('status')
+                    appnt.save()
+                    ret_obj = {}
+                    ret_obj['doctor'] = appnt.doctor.id
+                    ret_obj['hospital'] = appnt.hospital.id
+                    ret_obj['id'] = appnt.id
+                    ret_obj['patient_id'] = appnt.user.id
+                    ret_obj['error'] = appnt.error
+                    ret_obj['error_message'] = appnt.error_message
+
+                    resp.append(ret_obj)
+            if not found:
+                obj = self.get_error_obj(data)
+                obj['error_message'] = "Appointment not Found!"
+                resp.append(obj)
+                logger.error("PROVIDER_REQUEST - Offline Update Appointment is not Found! " + str(data))
+
+
+        if sms_list:
+            transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
+
+        return Response(resp)
 
     def offline_timings(self, request):
         user = request.user
@@ -2102,16 +2198,21 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
-            .select_related('profile').distinct()
+            .select_related('user', 'profile', 'doctor') \
+            .prefetch_related('doctor__qualifications', 'doctor__doctorpracticespecializations')\
+            .distinct()
         offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
+            .select_related('user')\
             .prefetch_related('user__patient_mobiles').distinct()
         start_date = valid_data.get('start_date')
         end_date = valid_data.get('end_date')
         updated_at = valid_data.get('updated_at')
         final_data = []
         if start_date and end_date:
-            online_queryset = online_queryset.filter(time_slot_start__date__range=(start_date, end_date)).order_by('time_slot_start')
-            offline_queryset = offline_queryset.filter(time_slot_start__date__range=(start_date, end_date)).order_by('time_slot_start')
+            online_queryset = online_queryset.filter(time_slot_start__date__range=(start_date, end_date))\
+                .order_by('time_slot_start')
+            offline_queryset = offline_queryset.filter(time_slot_start__date__range=(start_date, end_date))\
+                .order_by('time_slot_start')
         if updated_at:
             online_queryset = online_queryset.filter(updated_at__gte=updated_at)
             offline_queryset = offline_queryset.filter(updated_at__gte=updated_at)
@@ -2122,24 +2223,29 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
             patient_name = phone_number = is_docprime = None
+            allowed_actions = []
             if instance == OFFLINE:
                 patient_profile = OfflinePatientSerializer(app.user).data
                 is_docprime = False
-                # patient_name = app.user.name if hasattr(app.user, 'name') else None
-                phone_number_query = app.user.patient_mobiles.filter(is_default=True) if hasattr(app.user, 'patient_mobiles') else None
-                if phone_number_query.exists():
-                    phone_number = phone_number_query.first().phone_number
+                patient_name = app.user.name if hasattr(app.user, 'name') else None
+                if hasattr(app.user, 'patient_mobiles'):
+                    for mob in app.user.patient_mobiles.all():
+                        if mob.is_default:
+                            phone_number = mob.phone_number
+                error_flag = app.error if app.error else None
             else:
                 is_docprime = True
+                allowed_actions = app.allowed_action(User.DOCTOR, request)
                 phone_number = app.user.phone_number
-                patient_profile = app.profile_detail
+                patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
                 patient_profile['user_id']= app.user.id if app.user else None
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
-                # patient_name = app.profile.name if hasattr(app, 'profile') else None
-
+                patient_name = app.profile.name if hasattr(app, 'profile') else None
+                error_flag = None
             ret_obj = {}
             ret_obj['id'] = app.id
             ret_obj['patient_number'] = phone_number
+            ret_obj['allowed_actions'] = allowed_actions
             ret_obj['patient_name'] = patient_name
             ret_obj['updated_at']=app.updated_at
             ret_obj['doctor_name'] = app.doctor.name
@@ -2152,6 +2258,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['hospital'] = HospitalModelSerializer(app.hospital).data
             ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(app.doctor).data
             ret_obj['is_docprime'] = is_docprime
+            ret_obj['error'] = error_flag
             final_result.append(ret_obj)
             # if group.get(app.time_slot_start.strftime("%B %d, %Y")):
             #     group[app.time_slot_start.strftime("%B %d, %Y")].append(ret_obj)

@@ -1871,6 +1871,7 @@ class OfflinePatients(auth_model.TimeStampedModel):
     sms_notification = models.BooleanField(default=False)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=GENDER_CHOICES)
     dob = models.DateField(blank=True, null=True)
+    calculated_dob = models.DateField(blank=True, null=True)
     referred_by = models.PositiveSmallIntegerField(choices=REFERENCE_CHOICES, null=True, blank=True)
     medical_history = models.CharField(max_length=256, null=True, blank=True)
     welcome_message = models.CharField(max_length=128, null=True, blank=True)
@@ -1913,7 +1914,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     CREATED = 1
     BOOKED = 2
     RESCHEDULED_DOCTOR = 3
-    RESCHEDULED_PATIENT = 4
+    NO_SHOW = 4
     ACCEPTED = 5
     CANCELLED = 6
     COMPLETED = 7
@@ -1921,7 +1922,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
                       (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
-                      (RESCHEDULED_PATIENT, 'Rescheduled by patient'),
+                      (NO_SHOW, 'No Show'),
                       (ACCEPTED, 'Accepted'), (CANCELLED, 'Cancelled'),
                       (COMPLETED, 'Completed')]
     doctor = models.ForeignKey(Doctor, related_name="offline_doctor_appointments", on_delete=models.SET_NULL, null=True)
