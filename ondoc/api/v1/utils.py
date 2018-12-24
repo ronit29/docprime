@@ -539,29 +539,64 @@ class CouponsMixin(object):
 
         coupon_obj = kwargs.get("coupon_obj")
 
-        is_valid = False
+        is_valid = True
 
-        if coupon_obj:
+        if not coupon_obj:
+            return False
 
-            if kwargs.get("product_id") == Order.LAB_PRODUCT_ID:
-                lab = kwargs.get("lab")
-                if lab:
-                    tests = kwargs.get("test", [])
-                    available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
-                    lab_tests = list()
-                    for lab_test in available_lab_tests:
-                        lab_tests.append(lab_test.test)
-                    if set(tests) <= set(lab_tests):
-                        if (coupon_obj.lab_network and coupon_obj.lab_network == lab.network) or (not coupon_obj.lab_network):
-                            if (coupon_obj.lab and coupon_obj.lab==lab) or (not coupon_obj.lab):
-                                if (coupon_obj.test.exists() and set(tests) & set(coupon_obj.test.all())) or not coupon_obj.test.exists():
-                                    is_valid = True
+        # product_id = kwargs.get("product_id")
 
-            elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
-                if kwargs.get("doctor"):
-                    pass
+        # if product_id == Order.LAB_PRODUCT_ID:
+        lab = kwargs.get("lab")
+        tests = kwargs.get("test", [])
 
-        return is_valid
+        if coupon_obj.lab and coupon_obj.lab != lab:
+            return False
+
+        if coupon_obj.lab_network and (not lab or lab.network!=coupon_obj.lab_network):
+            return False
+
+        if tests and coupon_obj.test.exists():
+            count = coupon_obj.test.filter(id__in=[t.id for t in tests]).count()
+            #count = lab.lab_pricing_group.available_lab_tests.filter(enabled=True, test__id__in=tests).count()
+            if count == 0:
+                return False
+
+        return is_valid    
+                    
+        # elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
+        #     return True
+            # if kwargs.get("doctor"):
+            #     pass
+
+        # return is_valid    
+
+
+        #     coupon_obj.lab_network and coupon_obj.lab_network == lab.network
+
+        # if coupon_obj:
+
+        #     if kwargs.get("product_id") == Order.LAB_PRODUCT_ID:
+        #         lab = kwargs.get("lab")
+        #         if lab:
+        #             tests = kwargs.get("test", [])
+
+        #             available_lab_tests = lab.lab_pricing_group.available_lab_tests.filter(enabled=True, test__id__in=tests).prefetch_related('test')
+        #             available_lab_tests = lab.lab_pricing_group.available_lab_tests.all().prefetch_related('test')
+        #             lab_tests = list()
+        #             for lab_test in available_lab_tests:
+        #                 lab_tests.append(lab_test.test)
+        #             if set(tests) <= set(lab_tests):
+        #                 if (coupon_obj.lab_network and coupon_obj.lab_network == lab.network) or (not coupon_obj.lab_network):
+        #                     if (coupon_obj.lab and coupon_obj.lab==lab) or (not coupon_obj.lab):
+        #                         if (coupon_obj.test.exists() and set(tests) & set(coupon_obj.test.all())) or not coupon_obj.test.exists():
+        #                             is_valid = True
+
+        #     elif kwargs.get("product_id") == Order.DOCTOR_PRODUCT_ID:
+        #         if kwargs.get("doctor"):
+        #             pass
+
+        # return is_valid
 
     def get_discount(self, coupon_obj, price):
 
