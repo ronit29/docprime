@@ -22,6 +22,7 @@ class Coupon(auth_model.TimeStampedModel):
     age_end = models.PositiveIntegerField(blank=True, null=True, default=None,
                                           validators=[MaxValueValidator(100), MinValueValidator(0)])
     gender = models.CharField(max_length=1, choices=auth_model.UserProfile.GENDER_CHOICES, default=None, null=True, blank=True)
+    city = models.CharField(max_length=50, default=None, null=True, blank=True)
     count = models.PositiveIntegerField()
     total_count = models.PositiveIntegerField(null=True, blank=True)
     step_count = models.PositiveIntegerField(verbose_name="Valid only at multiples of this appointment number", default=1, validators=[MinValueValidator(1)])
