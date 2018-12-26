@@ -1,4 +1,5 @@
-from collections import defaultdict, OrderedDict
+
+from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer
 from ondoc.doctor import models
@@ -1214,6 +1215,77 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
                          "breadcrumb": breadcrumb, 'search_content': specialization_dynamic_content,
+                         'procedures': procedures, 'procedure_categories': procedure_categories})
+
+    @transaction.non_atomic_requests
+    def search_by_hospital(self, request):
+        parameters = request.query_params
+        serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        specialization_dynamic_content = ''
+        doctor_search_helper = DoctorSearchByHospitalHelper(validated_data)
+        if not validated_data.get("search_id"):
+            filtering_params = doctor_search_helper.get_filtering_params()
+            order_by_field, rank_by = doctor_search_helper.get_ordering_params()
+            query_string = doctor_search_helper.prepare_raw_query(filtering_params,
+                                                                  order_by_field, rank_by)
+            doctor_search_result = RawSql(query_string.get('query'),
+                                          query_string.get('params')).fetch_all()
+
+            result_count = len(doctor_search_result)
+            # sa
+            # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
+            #                                                                result_count=result_count)
+        else:
+            saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
+        doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
+        preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
+        doctor_data = models.Doctor.objects.filter(
+            id__in=doctor_ids).prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__availability",
+                                                "doctor_clinics__hospital",
+                                                "doctorpracticespecializations",
+                                                "doctorpracticespecializations__specialization",
+                                                "images",
+                                                "doctor_clinics__doctorclinicprocedure_set__procedure__parent_categories_mapping").order_by(
+            preserved)
+
+        response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, doctor_ids, request)
+
+        # from collections import Counter
+        # for hosp in response.items():
+        #     hosp_specialization = list()
+        #     doctors_in_hosp = hosp[1][0].get('doctors')
+        #     for doctor in doctors_in_hosp:
+        #         specialization = doctor.get('general_specialization')
+        #         for spec in specialization:
+        #             hosp_specialization.append(spec.get('name'))
+        #     spec_dict = Counter(hosp_specialization)
+        #     max_value = max(spec_dict.values())
+        #     for spec_key in spec_dict.items():
+        #         if spec_key[1] == max_value:
+        #             hosp[1][0]['specialization'] = spec_key[0]
+        #         if hosp[1][0].get('specialization'):
+        #             break
+
+        result = list()
+        for data in response.values():
+            result.append(data[0])
+
+        validated_data.get('procedure_categories', [])
+        procedures = list(Procedure.objects.filter(pk__in=validated_data.get('procedure_ids', [])).values('id', 'name'))
+        procedure_categories = list(
+            ProcedureCategory.objects.filter(pk__in=validated_data.get('procedure_category_ids', [])).values('id',
+                                                                                                             'name'))
+        conditions = list(
+            models.MedicalCondition.objects.filter(id__in=validated_data.get('condition_ids', [])).values('id',
+                                                                                                          'name'))
+        specializations = list(
+            models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids', [])).values(
+                'id', 'name'))
+
+        return Response(data={"result": result, "count": result_count,
+                         'specializations': specializations, 'conditions': conditions,
                          'procedures': procedures, 'procedure_categories': procedure_categories})
 
 

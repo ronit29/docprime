@@ -280,7 +280,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # serializer = diagnostic_serializer.LabNetworkSerializer(response_queryset, many=True,
         #                                                        context={"request": request})
 
-
         entity_ids = [lab_data[1].get('id')for lab_data in response_queryset.items()]
 
         id_url_dict = dict()
@@ -440,15 +439,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             price_result['string'] = 'where price>=0'
 
         order_by = self.apply_search_sort(parameters)
-        # lab test enable conditions to be added in query
+
         if ids:
-            query = '''select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority from
+            query = ''' select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority
+            from ( 
+            select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
+                        dense_rank() over(order by network_rank) as new_network_rank from
                         (
-                        select id,network_id,rank() over(partition by coalesce(network_id,id) order by id) as rank,
+                        select id,network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                         min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
                          name ,price, count, mrp, pickup_charges, distance, order_priority from
                         (select id,network_id,  
                         name ,price, test_count as count, total_mrp as mrp,pickup_charges, distance, 
-                        ROW_NUMBER () OVER (ORDER BY {order} ),
+                        ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
                         from (
                         select lb.*, sum(mrp) total_mrp, count(*) as test_count,
@@ -466,18 +469,20 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         {filtering_params}
                         inner join lab_test lt on lt.id = avlt.test_id
                         group by lb.id having count(*)=(%(length)s))a
-                        {price})y )x where rank<=5
+                        {price})y )x where rank<=5 )z where new_network_rank<=20
                          '''.format(filtering_params=filtering_result, price=price_result.get('string'), order=order_by)
 
             doctor_search_result = RawSql(query, params).fetch_all()
         else:
-            query1 = '''select id,network_id, name , distance, order_priority from
+            query1 = '''select id,network_id, name , distance, order_priority from (select id,network_id, name , distance, order_priority, 
+                    dense_rank() over(order by network_rank) as new_network_rank from
                     (
-                    select id,network_id,rank() over(partition by coalesce(network_id,id) order by id) as rank,
+                    select id,network_id,rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                     min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
                      name , distance, order_priority from
                     (select id,network_id,  
                     name , distance, 
-                    ROW_NUMBER () OVER (ORDER BY {order}),
+                    ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                     max_order_priority as order_priority
                     from (
                     select *,
@@ -487,8 +492,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     and St_dwithin( St_setsrid(St_point(77.0333, 28.4667), 4326),location, 200000) 
                     and St_dwithin(St_setsrid(St_point(77.0333, 28.4667), 4326), location, 0) = false
                     {filtering_params}
-                     group by id)a)y )x where rank<=20'''.format(filtering_params=filtering_params_query1_result, order=order_by)
+                     group by id)a)y )x where rank<=5)z where new_network_rank<=20'''.format(filtering_params=filtering_params_query1_result, order=order_by)
             doctor_search_result = RawSql(query1, params).fetch_all()
+
 
         return doctor_search_result
 
@@ -555,7 +561,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             next_lab_timing_data_dict = {}
             data_array = [list() for i in range(7)]
             lab_obj = temp_var[row["id"]]
-            row['address'] = lab_obj.sublocality + ' ' + lab_obj.city
+            if lab_obj.sublocality and lab_obj.city:
+                row['address'] = lab_obj.sublocality + ' ' + lab_obj.city
+            elif lab_obj.city:
+                row['address'] =  lab_obj.city
+
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
 
