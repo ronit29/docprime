@@ -2,7 +2,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
 from django_extensions.db.fields import json
-
 from ondoc.doctor.models import DoctorPracticeSpecialization, PracticeSpecialization
 from ondoc.location import models as location_models
 from ondoc.doctor import models as doctor_models
@@ -26,39 +25,44 @@ class Footer(object):
         sql_urls = RawSql(query, parameters).fetch_all()
         return sql_urls
 
+
 class LabProfileFooter(Footer):
     def __init__(self, entity):
-        self.sublocality_id = None
-        self.locality_id = None
+        self.sublocality_id = int(entity.sublocality_id) if entity.sublocality_id else None
+        self.locality_id = int(entity.locality_id) if entity.locality_id else None
         self.sublocality = entity.sublocality_value
         self.locality = entity.locality_value
         self.sublocality_location = entity.sublocality_location
+        self.centroid = entity.location
 
-        location_id = int(entity.extras.get('location_id'))
-        address = EntityAddress.objects.filter(pk=location_id)[0]
-
-        if address:
-            self.centroid = address.centroid
-
-            if address.type_blueprint=='SUBLOCALITY':
-                self.sublocality_id = address.id
-                self.sublocality = address.alternative_value
-                address = EntityAddress.objects.filter(pk=address.parent)
-                if len(address)>0:
-                    address = address[0]
-                    self.locality_id = address.id
-                    self.locality= address.alternative_value
-
-            else:
-                self.locality_id = address.id
-                self.locality = address.alternative_value
+        # location_id = int(entity.extras.get('location_id'))
+        # address = EntityAddress.objects.filter(pk=location_id)
+        # if address:
+        #     address = address[0]
+        #
+        # if address:
+        #     self.centroid = address.centroid
+        #
+        #     if address.type_blueprint=='SUBLOCALITY':
+        #         self.sublocality_id = address.id
+        #         self.sublocality = address.alternative_value
+                # address = EntityAddress.objects.filter(pk=address.parent)
+                # if len(address)>0:
+                #     address = address[0]
+                #     self.locality_id = address.id
+                #     self.locality= address.alternative_value
+            #
+            #
+            # else:
+            #     self.locality_id = address.id
+            #     self.locality = address.alternative_value
 
     def get_footer(self):
         response = {}
         response['menu'] = []
         labs_in_same_locality = []
 
-        if self.locality:
+        if self.locality and self.centroid:
             labs_in_same_locality = self.labs_in_same_locality()
             if labs_in_same_locality:
                 response['menu'].append(
@@ -393,29 +397,33 @@ class DoctorProfileFooter(Footer):
         #self.locality = entity.locality_value
         #self.centroid = entity.sublocality_location
         #self.sublocality_location = entity.sublocality_location
-        self.sublocality_id = None
-        self.locality_id = None
-        self.sublocality = None
-        self.locality = None
+        self.sublocality_id = int(entity.sublocality_id ) if entity.sublocality_id else None
+        self.locality_id = int(entity.locality_id) if entity.locality_id else None
+        self.sublocality = entity.sublocality_value
+        self.locality = entity.locality_value
         self.specialization_id = entity.specialization_id
         self.specialization = entity.specialization
-        location_id = int(entity.extras.get('location_id'))
-        address = EntityAddress.objects.filter(pk=location_id).first()
+        self.centroid = entity.location
 
-        if address:
-            self.centroid = address.centroid
-
-            if address.type_blueprint=='SUBLOCALITY':
-                self.sublocality_id = address.id
-                self.sublocality = address.alternative_value
-                address = EntityAddress.objects.filter(pk=address.parent).first()
-                if address:
-                    self.locality_id = address.id
-                    self.locality= address.alternative_value
-
-            else:
-                self.locality_id = address.id
-                self.locality = address.alternative_value
+        # location_id = int(entity.extras.get('location_id'))
+        # address = EntityAddress.objects.filter(pk=location_id)
+        # if address:
+        #     address = address[0]
+        #
+        # if address:
+        #     self.centroid = address.centroid
+        #
+        #     if address.type_blueprint=='SUBLOCALITY':
+        #         self.sublocality_id = address.id
+        #         self.sublocality = address.alternative_value
+        #         address = EntityAddress.objects.filter(pk=address.parent).first()
+        #         if address:
+        #             self.locality_id = address.id
+        #             self.locality= address.alternative_value
+        #
+        #     else:
+        #         self.locality_id = address.id
+        #         self.locality = address.alternative_value
 
     def get_footer(self):
         response = {}
@@ -648,9 +656,14 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         else:
             related_entity_url_obj = related_entity_url_objs.first()
             if related_entity_url_obj.url_type == 'SEARCHURL':
-                extra_info_dict = related_entity_url_obj.additional_info
-                location_id = extra_info_dict.get('location_id', None)
-                if not location_id:
+                # extra_info_dict = related_entity_url_obj.additional_info
+                # location_id = extra_info_dict.get('location_id', None)
+                # if not location_id:
+                if related_entity_url_obj.sublocality_id:
+                    location_id = related_entity_url_obj.sublocality_id
+                elif related_entity_url_obj.locality_id:
+                    location_id = related_entity_url_obj.locality_id
+                else:
                     return Response(response)
 
                 location_dict = dict()
@@ -673,7 +686,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                         if related_entity_url_obj.entity_type.upper() == 'DOCTOR':
                             associated_doctors = obj.assoc_doctors.all()
                             for doctor in associated_doctors:
-                                if doctor.doctorpracticespecializations.all().filter(specialization__id=extra_info_dict['specialization_id']).exists():
+                                if doctor.doctorpracticespecializations.all().filter(specialization__id=related_entity_url_obj.specialization_id).exists():
                                     entities.append(doctor)
 
                 entities_list = list()

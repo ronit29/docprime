@@ -4,5 +4,4 @@ Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Lab Name : {{lab_name|capfirst}}
 
-Apologies for the inconvenience caused.
 Team docprime

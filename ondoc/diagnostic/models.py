@@ -886,6 +886,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     cancellation_comments = models.CharField(max_length=5000, null=True, blank=True)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="lab_appointment", on_delete=models.SET_NULL, null=True)
 
+    def get_tests_and_prices(self):
+        test_price = []
+        for test in self.lab_test.all():
+            test_price.append({'name': test.test.name, 'mrp': test.mrp, 'deal_price': (
+                test.custom_deal_price if test.custom_deal_price else test.computed_deal_price),
+                               'discount': test.mrp - (
+                                   test.custom_deal_price if test.custom_deal_price else test.computed_deal_price)})
+
+        if self.is_home_pickup:
+            test_price.append(
+                {'name': 'Home Pick Up Charges', 'mrp': self.home_pickup_charges, 'deal_price': self.home_pickup_charges,
+                 'discount': '0.00'})
+
+        return test_price
+
+
+
     def get_reports(self):
         return self.reports.all()
 
@@ -934,18 +951,48 @@ class LabAppointment(TimeStampedModel, CouponsMixin):
     def app_commit_tasks(self, old_instance, push_to_matrix):
         if push_to_matrix:
             # Push the appointment data to the matrix
-            push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id':5,
-                                                     'sub_product_id': 2}, ), countdown=5)
+            try:
+                push_appointment_to_matrix.apply_async(
+                    ({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
+                      'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
-            notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+            try:
+                notification_tasks.send_lab_notifications_refactored.apply_async(kwargs={'appointment_id': self.id},
+                                                                                 countdown=1)
+                # notification_tasks.send_lab_notifications_refactored(self.id)
+                # notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
+            except Exception as e:
+                logger.error(str(e))
 
         if not old_instance or old_instance.status != self.status:
-            notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
-                                                                         product=account_model.Order.LAB_PRODUCT_ID,
-                                                                         alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+            try:
+                notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
+                                                                             product=account_model.Order.LAB_PRODUCT_ID,
+                                                                             alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+            except Exception as e:
+                logger.error(str(e))
+
         if self.status == self.COMPLETED and not self.is_rated:
-            notification_tasks.send_opd_rating_message.apply_async(kwargs={'appointment_id': self.id, 'type': 'lab'}, countdown=int(settings.RATING_SMS_NOTIF))
+            try:
+                notification_tasks.send_opd_rating_message.apply_async(
+                    kwargs={'appointment_id': self.id, 'type': 'lab'}, countdown=int(settings.RATING_SMS_NOTIF))
+            except Exception as e:
+                logger.error(str(e))
+
+        if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
+            try:
+                notification_tasks.lab_send_otp_before_appointment.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start - datetime.timedelta(
+                        minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                # notification_tasks.lab_send_otp_before_appointment(self.id, self.time_slot_start)
+            except Exception as e:
+                logger.error(str(e))
+
+
         # Do not delete below commented code
         # try:
         #     prev_app_dict = {'id': self.id,

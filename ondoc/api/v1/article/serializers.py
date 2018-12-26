@@ -84,7 +84,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Article
-        fields = ('title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
+        fields = ('title','heading_title', 'url', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
                   'linked', 'author_name', 'published_date', 'author', 'last_updated_at')
 
 

@@ -310,6 +310,22 @@ class LabCustomSerializer(serializers.Serializer):
     distance_related_charges = serializers.IntegerField()
     tests = serializers.ListField(child=serializers.DictField())
 
+# class LabNetworkSerializer(serializers.Serializer):
+#     # lab = serializers.SerializerMethodField()
+#     lab = LabModelSerializer()
+#     network_id = serializers.IntegerField(default=None)
+#     price = serializers.IntegerField(default=None)
+#     mrp = serializers.IntegerField(default=None)
+#     distance = serializers.IntegerField()
+#     pickup_available = serializers.IntegerField(default=0)
+#     lab_timing = serializers.CharField(max_length=1000)
+#     lab_timing_data = serializers.ListField()
+#     next_lab_timing = serializers.DictField()
+#     next_lab_timing_data = serializers.DictField()
+#     pickup_charges = serializers.IntegerField(default=None)
+#     distance_related_charges = serializers.IntegerField()
+#     tests = serializers.ListField(child=serializers.DictField())
+
     # def get_lab(self, obj):
     #     queryset = Lab.objects.get(pk=obj['lab'])
     #     serializer = LabModelSerializer(queryset)
