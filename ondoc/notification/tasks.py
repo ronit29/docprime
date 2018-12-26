@@ -16,7 +16,7 @@ import logging
 from django.conf import settings
 import requests
 from rest_framework import status
-
+from django.utils.safestring import mark_safe
 from ondoc.notification.models import NotificationAction
 
 logger = logging.getLogger(__name__)
@@ -188,8 +188,6 @@ def send_opd_rating_message(appointment_id, type):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
     from django.conf import settings
-    from django.utils.safestring import mark_safe
-
     data = {}
     name = ''
     try:
@@ -288,7 +286,6 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
 @task
 def send_offline_welcome_message(number):
-    from django.utils.safestring import mark_safe
     data = {}
     data['phone_number'] = number
     text = '''Welcome to Docprime'''
@@ -298,6 +295,29 @@ def send_offline_welcome_message(number):
     except Exception as e:
         logger.error("Error sending welcome message - "+ str(e))
 
+@task
+def send_offline_appointment_reminder_message(number, doctor, date):
+    data = {}
+    data['phone_number'] = number
+    text = '''You have an upcomming Appointment with Dr. %s scheduled on %s''' % (doctor, date)
+    data['text'] = mark_safe(text)
+    try:
+        notification_models.SmsNotification.send_rating_link(data)
+    except Exception as e:
+        logger.error("Error sending welcome message - " + str(e))
+
+@task
+def send_appointment_location_message(number, hospital_lat, hospital_long):
+    data = {}
+    data['phone_number'] = number
+
+    link = '''http://maps.google.com/maps?q=loc:%s,-%s''' % (hospital_lat, hospital_long)
+    text = '''Location for your Upcoming Appointment %s ''' % (link)
+    data['text'] = mark_safe(text)
+    try:
+        notification_models.SmsNotification.send_rating_link(data)
+    except Exception as e:
+        logger.error("Error sending welcome message - " + str(e))
 
 @task()
 def process_payout(payout_id):

@@ -1918,6 +1918,8 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     ACCEPTED = 5
     CANCELLED = 6
     COMPLETED = 7
+    REMINDER = 8
+    SEND_MAP_LINK = 9
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),

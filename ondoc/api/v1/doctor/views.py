@@ -8,6 +8,7 @@ from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
+from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
@@ -1816,6 +1817,43 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return None
 
+    def get_error_obj(self, data):
+        return {'doctor': data.get('doctor').id,
+                'hospital': data.get('hospital').id,
+                'id': data.get('id'),
+                'error': True}
+
+
+    def get_offline_response_obj(self, appnt, request):
+        phone_number = []
+        patient_profile = OfflinePatientSerializer(appnt.user).data
+        patient_name = appnt.user.name if hasattr(appnt.user, 'name') else None
+        if hasattr(appnt.user, 'patient_mobiles'):
+            for mob in appnt.user.patient_mobiles.all():
+                phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+
+        ret_obj = {}
+        ret_obj['patient_name'] = patient_name
+        ret_obj['patient_number'] = phone_number
+        ret_obj['profile'] = patient_profile
+        ret_obj['patient_thumbnail'] = None
+        ret_obj['deal_price'] = None
+        ret_obj['effective_price'] = None
+        ret_obj['allowed_action'] = []
+        ret_obj['updated_at'] = appnt.updated_at
+        ret_obj['doctor_name'] = appnt.doctor.name
+        ret_obj['doctor_id'] = appnt.doctor.id
+        ret_obj['doctor_thumbnail'] = request.build_absolute_uri(appnt.doctor.get_thumbnail())
+        ret_obj['hospital_id'] = appnt.hospital.id
+        ret_obj['hospital_name'] = appnt.hospital.name
+        ret_obj['time_slot_start'] = appnt.time_slot_start
+        ret_obj['status'] = appnt.status
+        ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
+        ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
+        ret_obj['is_docprime'] = False
+        ret_obj['type'] = 'doctor'
+        return ret_obj
+
     def list_patients(self, request):
         user = request.user
         serializer = serializers.GetOfflinePatientsSerializer(data=request.query_params)
@@ -1897,20 +1935,19 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
         for data in valid_data.get('data'):
             if data['id'] in appntment_ids or (data.get('patient') and data.get('patient')['id'] in patient_ids):
-                obj = {'doctor': data.get('doctor').id,
-                       'hospital': data.get('hospital').id,
-                       'id': data.get('id'),
+                obj = {'id': data.get('id'),
                        'error': True,
                        'error_message': "Appointment With Same UUid exists!"}
+                obj.update(self.get_offline_response_obj(appnt, request))
+
                 resp.append(obj)
                 logger.error("PROVIDER_REQUEST - Offline Appointment With Same UUid exists! " + str(data))
                 continue
             if not data.get('patient') and not data.get('patient_id'):
-                obj = {'doctor': data.get('doctor').id,
-                       'hospital': data.get('hospital').id,
-                       'id': data.get('id'),
+                obj = {'id': data.get('id'),
                        'error': True,
                        'error_message': "Patient not Recieved for Offline Appointment!"}
+                obj.update(self.get_offline_response_obj(appnt, request))
                 resp.append(obj)
                 logger.error("PROVIDER_REQUEST - Patient not Recieved for Offline Appointment! " + str(data))
                 continue
@@ -1945,12 +1982,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                  error_message=data.get('error_message') if data.get('error_message') else None
                                                                  )
             ret_obj = {}
-            ret_obj['doctor'] = appnt.doctor.id
-            ret_obj['hospital'] = appnt.hospital.id
             ret_obj['id'] = appnt.id
             ret_obj['patient_id'] = appnt.user.id
             ret_obj['error'] = appnt.error
             ret_obj['error_message'] = appnt.error_message
+
+            ret_obj.update(self.get_offline_response_obj(appnt, request))
 
             resp.append(ret_obj)
 
@@ -1995,18 +2032,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             sms_number = default_num
         return {"sms_list": sms_number, "patient": patient}
 
-    def get_error_obj(self, data):
-        return {'doctor': data.get('doctor').id,
-                'hospital': data.get('hospital').id,
-                'id': data.get('id'),
-                'error': True}
-
-    @transaction.atomic
     def update_offline_appointments(self, request):
         serializer = serializers.OfflineAppointmentUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        patient = None
         sms_list = []
         resp = []
         appntment_ids = models.OfflineOPDAppointments.objects.all()
@@ -2018,80 +2047,135 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         doc_pem_list, hosp_pem_list = map(list, zip(*pem_queryset))
 
         for data in valid_data.get('data'):
-            try:
-                id = UUID(data.get('id'), version=4)
-            except ValueError:
-                obj = self.get_error_obj(data)
-                obj['error_message'] = 'Invalid UUid - Offline Appointment Update!'
-                resp.append(obj)
-                logger.error("PROVIDER_REQUEST - Invalid UUid - Offline Appointment Update! " + str(data))
-                continue
-            found = False
-            for appnt in appntment_ids:
-                if id == appnt.id:
-                    found = True
-                    if appnt.error:
-                        obj = self.get_error_obj(data)
-                        obj['error_message'] = 'Cannot Update an invalid/error appointment!'
-                        resp.append(obj)
-                        logger.error("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
-                        break
-                    if appnt.status == models.OfflineOPDAppointments.CANCELLED or appnt.status == models.OfflineOPDAppointments.NO_SHOW:
-                        obj = self.get_error_obj(data)
-                        obj['error_message'] = 'Cannot Update a Cancelled/NoShow appointment!'
-                        resp.append(obj)
-                        logger.error("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
-                        break
-                    if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
-                        obj = self.get_error_obj(data)
-                        obj['error_message'] = 'User forbidden to update Appointment with selected doctor or hospital!'
-                        resp.append(obj)
-                    if (data.get('doctor').id, data.get('hospital').id) not in clinic_queryset:
-                        obj = self.get_error_obj(data)
-                        obj['error_message'] = 'Doctor is not associated with given hospital!'
-                        resp.append(obj)
-                    if data.get('status') and data.get('status') not in [models.OfflineOPDAppointments.NO_SHOW,
-                                                                         models.OfflineOPDAppointments.RESCHEDULED_DOCTOR,
-                                                                         models.OfflineOPDAppointments.CANCELLED,
-                                                                         models.OfflineOPDAppointments.ACCEPTED]:
-                        obj = self.get_error_obj(data)
-                        obj['error_message'] = 'Invalid Appointment Status Recieved!'
-                        resp.append(obj)
-                        logger.error("PROVIDER_REQUEST - Invalid Appointment Status Recieved! " + str(data))
-                        break
+            if not data.get('is_docprime'):
+                try:
+                    id = UUID(data.get('id'), version=4)
+                except ValueError:
+                    obj = self.get_error_obj(data)
+                    obj['error_message'] = 'Invalid UUid - Offline Appointment Update!'
+                    resp.append(obj)
+                    logger.error("PROVIDER_REQUEST - Invalid UUid - Offline Appointment Update! " + str(data))
+                    continue
+                found = False
+                for appnt in appntment_ids:
+                    if id == appnt.id:
+                        patient = def_number = None
+                        found = True
+                        if appnt.error:
+                            obj = self.get_error_obj(data)
+                            obj['error_message'] = 'Cannot Update an invalid/error appointment!'
+                            obj.update(self.get_offline_response_obj(appnt, request))
+                            resp.append(obj)
+                            logger.error("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
+                            break
+                        if appnt.status == models.OfflineOPDAppointments.CANCELLED or appnt.status == models.OfflineOPDAppointments.NO_SHOW:
+                            obj = self.get_error_obj(data)
+                            obj['error_message'] = 'Cannot Update a Cancelled/NoShow appointment!'
+                            obj.update(self.get_offline_response_obj(appnt, request))
+                            resp.append(obj)
+                            logger.error("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
+                            break
+                        if not data.get('doctor').id in doc_pem_list and not data.get('hospital').id in hosp_pem_list:
+                            data['error'] = True
+                            data['error_message'] = 'User forbidden to update Appointment with selected doctor or hospital!'
+                        if (data.get('doctor').id, data.get('hospital').id) not in clinic_queryset:
+                            data['error'] = True
+                            data['error_message'] = 'Doctor is not associated with given hospital!'
+                        if data.get('status') and data.get('status') not in [models.OfflineOPDAppointments.NO_SHOW,
+                                                                             models.OfflineOPDAppointments.RESCHEDULED_DOCTOR,
+                                                                             models.OfflineOPDAppointments.CANCELLED,
+                                                                             models.OfflineOPDAppointments.ACCEPTED,
+                                                                             models.OfflineOPDAppointments.REMINDER,
+                                                                             models.OfflineOPDAppointments.SEND_MAP_LINK]:
+                            obj = self.get_error_obj(data)
+                            obj['error_message'] = 'Invalid Appointment Status Recieved!'
+                            obj.update(self.get_offline_response_obj(appnt, request))
+                            resp.append(obj)
+                            logger.error("PROVIDER_REQUEST - Invalid Appointment Status Recieved! " + str(data))
+                            break
 
-                    patient = appnt.user
-                    if patient.sms_notification:
-                        def_number = patient.patient_mobiles.filter(is_default=True).first()
-                        if def_number:
-                            sms_list.append(def_number.phone_number)
-                    appnt.doctor = data.get('doctor')
-                    appnt.hospital = data.get('hospital')
-                    if data.get("start_date") and data.get("start_time"):
-                        time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
-                        appnt.time_slot_start = time_slot_start
-                    if data.get('status'):
-                        appnt.status = data.get('status')
-                    appnt.save()
-                    ret_obj = {}
-                    ret_obj['doctor'] = appnt.doctor.id
-                    ret_obj['hospital'] = appnt.hospital.id
-                    ret_obj['id'] = appnt.id
-                    ret_obj['patient_id'] = appnt.user.id
-                    ret_obj['error'] = appnt.error
-                    ret_obj['status'] = appnt.status
-                    ret_obj['error_message'] = appnt.error_message if appnt.error_message else None
+                        patient = appnt.user
+                        if patient.sms_notification:
+                            def_number = patient.patient_mobiles.filter(is_default=True).first()
+                            if def_number:
+                                sms_list.append(def_number.phone_number)
+                        if data.get('status') == models.OfflineOPDAppointments.REMINDER:
+                            if def_number:
+                                try:
+                                    notification_tasks.send_offline_appointment_reminder_message.apply_async(kwargs={'number': def_number.phone_number,
+                                                                                                                     'doctor': appnt.doctor.name,
+                                                                                                                     'date': appnt.time_slot_start.strftime("%B %d, %Y")},
+                                                                                                             countdown=1)
 
-                    resp.append(ret_obj)
-                    break
-            if not found:
-                obj = self.get_error_obj(data)
-                obj['error_message'] = "Appointment not Found!"
-                resp.append(obj)
-                logger.error("PROVIDER_REQUEST - Offline Update Appointment is not Found! " + str(data))
+                                except Exception as e:
+                                    obj = self.get_error_obj(data)
+                                    obj['error_message'] = 'Error Sending Appointment Reminder Message!'
+                                    resp.append(obj)
+                                    logger.error("Error Sending Appointment Reminder Message " + str(e))
+                            resp.append({'doctor': appnt.doctor.id,
+                                         'hospital': appnt.hospital.id,
+                                         'id': appnt.id, 'patient_id': appnt.user.id,
+                                         'error': appnt.error,
+                                         'status': appnt.status})
+                            break
+                        if data.get('status') == models.OfflineOPDAppointments.SEND_MAP_LINK:
+                            if def_number:
+                                try:
+                                    notification_tasks.send_appointment_location_message.apply_async(
+                                        kwargs={'number': def_number.phone_number,
+                                                'hospital_lat': appnt.hospital.location.y,
+                                                'hospital_long': appnt.hospital.location.x,
+                                                },
+                                        countdown=1)
 
-        if sms_list:
-            transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
+                                except Exception as e:
+                                    obj = self.get_error_obj(data)
+                                    obj['error_message'] = 'Error Sending Appointment Reminder Message!'
+                                    resp.append(obj)
+                                    logger.error("Error Sending Appointment Reminder Message " + str(e))
+                            resp.append({'doctor': appnt.doctor.id,
+                                         'hospital': appnt.hospital.id,
+                                         'id': appnt.id, 'patient_id': appnt.user.id,
+                                         'error': appnt.error,
+                                         'status': appnt.status})
+                            break
+
+                        appnt.doctor = data.get('doctor')
+                        appnt.hospital = data.get('hospital')
+                        appnt.error = data.get('error')
+                        appnt.error_message = data.get('error_message')
+
+                        if data.get("start_date") and data.get("start_time") and \
+                                data.get('status') == models.OfflineOPDAppointments.RESCHEDULED_DOCTOR:
+                            time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
+                            appnt.time_slot_start = time_slot_start
+                        if data.get('status'):
+                            appnt.status = data.get('status')
+                        try:
+                            appnt.save()
+                        except Exception as e:
+                            obj = self.get_error_obj(data)
+                            obj['error_message'] = 'Error Saving Appointment ' + str(e)
+                            obj.update(self.get_offline_response_obj(appnt, request))
+                            resp.append(obj)
+                            break
+                        ret_obj = {}
+                        ret_obj['id'] = appnt.id
+                        ret_obj['patient_id'] = appnt.user.id
+                        ret_obj['error'] = appnt.error
+                        ret_obj['status'] = appnt.status
+                        ret_obj['error_message'] = appnt.error_message if appnt.error_message else None
+                        ret_obj.update(self.get_offline_response_obj(appnt, request))
+                        resp.append(ret_obj)
+                        break
+                if not found:
+                    obj = self.get_error_obj(data)
+                    obj['error_message'] = "Appointment not Found!"
+                    resp.append(obj)
+                    logger.error("PROVIDER_REQUEST - Offline Update Appointment is not Found! " + str(data))
+
+        # if sms_list:
+        #     transaction.on_commit(lambda: models.OfflinePatients.after_commit_sms(sms_list))
 
         return Response(resp)
 
@@ -2209,7 +2293,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             .select_related('user', 'profile', 'doctor') \
             .prefetch_related('doctor__qualifications', 'doctor__doctorpracticespecializations')\
             .distinct()
-        offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
+        offline_queryset = get_opd_pemnotification_tasks_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
             .prefetch_related('user__patient_mobiles').distinct()
         start_date = valid_data.get('start_date')
@@ -2230,7 +2314,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         final_result = []
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
-            patient_name  = is_docprime = None
+            patient_name  = is_docprime = effective_price = deal_price = patient_thumbnail = doctor_thumbnail = None
             phone_number = []
             allowed_actions = []
             if instance == OFFLINE:
@@ -2243,9 +2327,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 error_flag = app.error if app.error else None
             else:
                 is_docprime = True
+                effective_price = app.effective_price
+                deal_price = app.deal_price
                 allowed_actions = app.allowed_action(User.DOCTOR, request)
                 phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
                 patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
+                patient_thumbnail = patient_profile['profile_image']
                 patient_profile['user_id']= app.user.id if app.user else None
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
@@ -2253,20 +2340,25 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj = {}
             ret_obj['id'] = app.id
             ret_obj['patient_number'] = phone_number
-            ret_obj['allowed_actions'] = allowed_actions
+            ret_obj['deal_price'] = deal_price
+            ret_obj['effective_price'] = effective_price
+            ret_obj['allowed_action'] = allowed_actions
             ret_obj['patient_name'] = patient_name
-            ret_obj['updated_at']=app.updated_at
+            ret_obj['updated_at'] = app.updated_at
             ret_obj['doctor_name'] = app.doctor.name
             ret_obj['doctor_id'] = app.doctor.id
+            ret_obj['doctor_thumbnail'] = app.doctor.get_thumbnail()
             ret_obj['hospital_id'] = app.hospital.id
             ret_obj['hospital_name'] = app.hospital.name
             ret_obj['time_slot_start'] = app.time_slot_start
             ret_obj['status'] = app.status
-            ret_obj['patient'] = patient_profile
+            ret_obj['profile'] = patient_profile
             ret_obj['hospital'] = HospitalModelSerializer(app.hospital).data
             ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(app.doctor).data
             ret_obj['is_docprime'] = is_docprime
+            ret_obj['patient_thumbnail'] = patient_thumbnail
             ret_obj['error'] = error_flag
+            ret_obj['type'] = 'doctor'
             final_result.append(ret_obj)
             # if group.get(app.time_slot_start.strftime("%B %d, %Y")):
             #     group[app.time_slot_start.strftime("%B %d, %Y")].append(ret_obj)
