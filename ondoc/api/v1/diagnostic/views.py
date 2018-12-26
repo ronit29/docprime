@@ -215,9 +215,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         for category in category_queryset:
             name = category.name
             category_id = category.id
-            category_result.append({'name': name, 'id': category_id})
+            if category_id in category_ids:
+                is_selected = True
+            else:
+                is_selected = False
+            category_result.append({'name': name, 'id': category_id, 'is_selected': is_selected})
 
-        return Response({'result': serializer.data, 'categories': category_result})
+        return Response({'result': serializer.data, 'categories': category_result, 'count': len(all_packages)})
 
 
 
