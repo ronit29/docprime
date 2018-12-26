@@ -164,7 +164,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user",
-                  "profile_image", "age", "user", "dob")
+                  "profile_image", "age", "user", "dob", "updated_at")
 
     def get_age(self, obj):
         from datetime import date

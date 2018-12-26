@@ -1355,4 +1355,5 @@ class OfflineAppointmentFilterSerializer(serializers.Serializer):
 class OfflinePatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = OfflinePatients
-        fields = ('id', 'name', 'dob', 'calculated_dob', 'gender')
+        fields = ('id', 'name', 'dob', 'calculated_dob', 'gender', 'referred_by', 'display_welcome_message',
+                  'share_with_hospital', 'sms_notification', 'medical_history', 'updated_at')

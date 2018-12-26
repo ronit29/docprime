@@ -1818,11 +1818,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         return None
 
     def get_error_obj(self, data):
-        return {'doctor': data.get('doctor').id,
-                'hospital': data.get('hospital').id,
-                'id': data.get('id'),
+        return {'id': data.get('id'),
                 'error': True}
-
 
     def get_offline_response_obj(self, appnt, request):
         phone_number = []
@@ -1831,10 +1828,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if hasattr(appnt.user, 'patient_mobiles'):
             for mob in appnt.user.patient_mobiles.all():
                 phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+        patient_profile['patient_numbers'] = phone_number
 
         ret_obj = {}
         ret_obj['patient_name'] = patient_name
-        ret_obj['patient_number'] = phone_number
+        # ret_obj['patient_number'] = phone_number
         ret_obj['profile'] = patient_profile
         ret_obj['patient_thumbnail'] = None
         ret_obj['deal_price'] = None
@@ -2052,6 +2050,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                     id = UUID(data.get('id'), version=4)
                 except ValueError:
                     obj = self.get_error_obj(data)
+                    obj['doctor_id'] = data.get('doctor').id
+                    obj['hospital_id'] = data.get('hospital').id
                     obj['error_message'] = 'Invalid UUid - Offline Appointment Update!'
                     resp.append(obj)
                     logger.error("PROVIDER_REQUEST - Invalid UUid - Offline Appointment Update! " + str(data))
@@ -2100,6 +2100,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             if def_number:
                                 sms_list.append(def_number.phone_number)
                         if data.get('status') == models.OfflineOPDAppointments.REMINDER:
+                            obj = {'id': appnt.id,
+                                   'patient_id': appnt.user.id, 'error_message': '',
+                                   'error': False}
                             if def_number:
                                 try:
                                     notification_tasks.send_offline_appointment_reminder_message.apply_async(kwargs={'number': def_number.phone_number,
@@ -2108,17 +2111,19 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                                                              countdown=1)
 
                                 except Exception as e:
-                                    obj = self.get_error_obj(data)
+                                    obj['error'] = True
                                     obj['error_message'] = 'Error Sending Appointment Reminder Message!'
-                                    resp.append(obj)
                                     logger.error("Error Sending Appointment Reminder Message " + str(e))
-                            resp.append({'doctor': appnt.doctor.id,
-                                         'hospital': appnt.hospital.id,
-                                         'id': appnt.id, 'patient_id': appnt.user.id,
-                                         'error': appnt.error,
-                                         'status': appnt.status})
+                            else:
+                                obj['error'] = True
+                                obj['error_message'] = 'No Default Number'
+                            obj.update(self.get_offline_response_obj(appnt, request))
+                            resp.append(obj)
                             break
                         if data.get('status') == models.OfflineOPDAppointments.SEND_MAP_LINK:
+                            obj = {'id': appnt.id,
+                                   'patient_id': appnt.user.id, 'error_message': '',
+                                   'error': False}
                             if def_number:
                                 try:
                                     notification_tasks.send_appointment_location_message.apply_async(
@@ -2129,15 +2134,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                         countdown=1)
 
                                 except Exception as e:
-                                    obj = self.get_error_obj(data)
+                                    obj['error'] = True
                                     obj['error_message'] = 'Error Sending Appointment Reminder Message!'
-                                    resp.append(obj)
                                     logger.error("Error Sending Appointment Reminder Message " + str(e))
-                            resp.append({'doctor': appnt.doctor.id,
-                                         'hospital': appnt.hospital.id,
-                                         'id': appnt.id, 'patient_id': appnt.user.id,
-                                         'error': appnt.error,
-                                         'status': appnt.status})
+                            else:
+                                obj['error'] = True
+                                obj['error_message'] = 'No Default Number'
+                            obj.update(self.get_offline_response_obj(appnt, request))
+                            resp.append(obj)
                             break
 
                         appnt.doctor = data.get('doctor')
@@ -2314,7 +2318,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         final_result = []
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
-            patient_name  = is_docprime = effective_price = deal_price = patient_thumbnail = doctor_thumbnail = None
+            patient_name = is_docprime = effective_price = deal_price = patient_thumbnail = doctor_thumbnail = None
+            error_flag = False
+            error_message = ''
             phone_number = []
             allowed_actions = []
             if instance == OFFLINE:
@@ -2324,7 +2330,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 if hasattr(app.user, 'patient_mobiles'):
                     for mob in app.user.patient_mobiles.all():
                         phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
-                error_flag = app.error if app.error else None
+                patient_profile['phone_numbers'] = phone_number
+                error_flag = app.error if app.error else False
+                error_message = app.error_message if app.error_message else ''
             else:
                 is_docprime = True
                 effective_price = app.effective_price
@@ -2333,13 +2341,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
                 patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
                 patient_thumbnail = patient_profile['profile_image']
-                patient_profile['user_id']= app.user.id if app.user else None
+                patient_profile['user_id'] = app.user.id if app.user else None
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
+                patient_profile['phone_numbers'] = phone_number
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
-                error_flag = None
             ret_obj = {}
             ret_obj['id'] = app.id
-            ret_obj['patient_number'] = phone_number
+            # ret_obj['patient_number'] = phone_number
             ret_obj['deal_price'] = deal_price
             ret_obj['effective_price'] = effective_price
             ret_obj['allowed_action'] = allowed_actions
@@ -2347,7 +2355,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['updated_at'] = app.updated_at
             ret_obj['doctor_name'] = app.doctor.name
             ret_obj['doctor_id'] = app.doctor.id
-            ret_obj['doctor_thumbnail'] = app.doctor.get_thumbnail()
+            ret_obj['doctor_thumbnail'] = request.build_absolute_uri(app.doctor.get_thumbnail())
             ret_obj['hospital_id'] = app.hospital.id
             ret_obj['hospital_name'] = app.hospital.name
             ret_obj['time_slot_start'] = app.time_slot_start
@@ -2358,6 +2366,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['is_docprime'] = is_docprime
             ret_obj['patient_thumbnail'] = patient_thumbnail
             ret_obj['error'] = error_flag
+            ret_obj['error_message'] = error_message
             ret_obj['type'] = 'doctor'
             final_result.append(ret_obj)
             # if group.get(app.time_slot_start.strftime("%B %d, %Y")):
